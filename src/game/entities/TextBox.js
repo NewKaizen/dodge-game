@@ -86,7 +86,9 @@ export default class TextBox {
         this.texto(cx + 18, ly, item.texto, w - 90, cor, 15)
         if (item.direita) this.texto(cx + w - 34, ly, item.direita, 60, cor, 15).setOrigin(1, 0)
       })
-      if (inicio + visiveis < col.itens.length) this.texto(cx + w - 34, cy + (visiveis - 1) * LINHA + 6, '▼', 20, TEXTO.desabilitado, 10).setOrigin(1, 0)
+      // setas de rolagem, à direita do custo/quantidade
+      if (inicio > 0) this.texto(cx + w - 23, cy + 2, '▲', 20, TEXTO.desabilitado, 10).setOrigin(1, 0)
+      if (inicio + visiveis < col.itens.length) this.texto(cx + w - 23, cy + (visiveis - 1) * LINHA + 6, '▼', 20, TEXTO.desabilitado, 10).setOrigin(1, 0)
       if (col.rodape) this.texto(cx, this.area.y + this.area.altura - 26, col.rodape, w - 30, TEXTO.desabilitado, 13)
     })
   }

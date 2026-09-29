@@ -1,6 +1,7 @@
 import king from './king.js'
 import queen from './queen.js'
 import jevil from './jevil.js'
+import coronel from './coronel.js'
 
 // Chefes selecionáveis, na ordem da tela de seleção.
 //
@@ -9,6 +10,7 @@ import jevil from './jevil.js'
 //   dificuldade        chave de DIFICULDADES (constants.js): velocidade máxima das balas
 //   sprite, fundo, musica   chaves de textura (assets.js), fundo (backgrounds/) e música
 //   hp, defesa, danoBala    balanceamento (danoBala = dano de cada bala antes da defesa)
+//   desafio            opcional { velocidade, densidade }: aperto só deste chefe (multiplica, em cima de DESAFIO)
 //   rotuloMercy        nome da barra de MERCY (ex.: 'CANSAÇO')
 //   descricao          texto do Check
 //   textoInicial       primeira mensagem da batalha
@@ -20,5 +22,5 @@ import jevil from './jevil.js'
 //   aoFimDoTurno(chefe, ctx)   opcional, roda depois de cada ataque
 //   fases              [{ hp, entrada, falas, flavor, ataques, velocidadeFundo }]
 //                      a fase vale quando HP/HP máx <= hp; ataques rodam em ordem, um por turno
-export const CHEFES = { king, queen, jevil }
-export const ORDEM_CHEFES = ['king', 'queen', 'jevil']
+export const CHEFES = { king, queen, jevil, coronel }
+export const ORDEM_CHEFES = ['king', 'queen', 'jevil', 'coronel']

@@ -12,7 +12,8 @@ export default {
 
   hp: 200,
   defesa: 0,
-  danoBala: 5,
+  danoBala: 7,
+  desafio: { velocidade: 1.15, densidade: 1.2 }, // mais bravo que o padrão (em cima de DESAFIO)
 
   rotuloMercy: 'MERCY',
   descricao: 'Um rei de xadrez que exige respeito. Adora elogios à coroa.',
@@ -38,6 +39,8 @@ export default {
       nome: 'Reverência',
       executar(ctx) {
         ctx.texto(`* ${ctx.ator.nome} fez uma reverência exagerada.`)
+        ctx.texto('* O rei se distrai com a plateia... O próximo ataque vai ser mais fraco!')
+        ctx.proximoAtaque({ velocidade: 0.8, densidade: 0.85 })
         ctx.mercy(ctx.alvo, 30)
       },
     },

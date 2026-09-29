@@ -12,7 +12,8 @@ export default class Boot extends Phaser.Scene {
   preload() {
     for (const [chave, arquivo] of Object.entries(ASSETS.texturas)) if (arquivo) this.load.image(chave, arquivo)
     for (const [nome, arquivo] of Object.entries(ASSETS.sons)) if (arquivo) this.load.audio(`som-${nome}`, arquivo)
-    for (const [nome, arquivo] of Object.entries(ASSETS.musicas)) if (arquivo) this.load.audio(`musica-${nome}`, arquivo)
+    // .mid não passa pelo Phaser: quem toca é game/midi.js
+    for (const [nome, arquivo] of Object.entries(ASSETS.musicas)) if (arquivo && !/\.midi?$/i.test(arquivo)) this.load.audio(`musica-${nome}`, arquivo)
   }
 
   async create() {

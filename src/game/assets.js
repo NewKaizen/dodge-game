@@ -1,7 +1,8 @@
 // Manifesto único de assets. Por padrão tudo é gerado por código:
 //   texturas: null -> desenhada em game/arte/ (pixel art e formas procedurais)
 //   sons:     null -> sintetizado em game/audio.js
-//   musicas:  null -> silêncio
+//   musicas:  null -> procura public/assets/musicas/<nome>.mid (tocado com soundfont, ver midi.js);
+//             não achou -> silêncio. Pode apontar para outro arquivo: 'assets/musicas/tema.mid' ou .ogg
 //
 // Para trocar por arquivos seus, coloque o caminho relativo a public/, ex.:
 //   texturas: { kris: 'assets/sprites/kris.png' }
@@ -25,6 +26,7 @@ export const ASSETS = {
     king: null,
     queen: null,
     jevil: null,
+    coronel: null,
     'icone-kris': null,
     'icone-susie': null,
 
@@ -45,6 +47,8 @@ export const ASSETS = {
 
     // balas
     'bala-bola': null,
+    'bala-chama': null,
+    'bala-caminhonete': null,
     'bala-losango': null,
     'bala-coroa': null,
     'bala-hex': null,
@@ -73,6 +77,7 @@ export const ASSETS = {
     cura: null,
     golpe: null,
     critico: null,
+    combo: null,
     explosao: null,
     aviso: null,
     laser: null,
@@ -81,6 +86,8 @@ export const ASSETS = {
     gameover: null,
     quebrar: null,
     voo: null,
+    buzina: null,
+    motor: null,
   },
 
   musicas: {
@@ -88,6 +95,7 @@ export const ASSETS = {
     king: null,
     queen: null,
     jevil: null,
+    coronel: null,
     vitoria: null,
   },
 }

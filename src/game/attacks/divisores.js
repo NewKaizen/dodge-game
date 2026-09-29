@@ -15,7 +15,10 @@ export default definirAtaque({
       const alvo = a.alvo()
       const dir = Math.atan2(alvo.y - y, alvo.x - x)
       const forma = cfg.forma ?? a.forma(i)
-      const mae = a.bala({
+      // o tempo da divisão vem do relógio da própria bala (idade), não do
+      // relógio do ataque, que para durante os respiros da onda
+      let dividida = false
+      a.bala({
         x,
         y,
         vx: Math.cos(dir) * cfg.velocidade,
@@ -23,25 +26,26 @@ export default definirAtaque({
         raio: cfg.raio,
         forma,
         girar: 3,
-      })
-
-      a.depois(mae.aviso + cfg.divideEm - avisoDivisao, () => (mae.piscar = true))
-      a.depois(mae.aviso + cfg.divideEm, () => {
-        if (mae.morta || mae.inofensiva) return
-        mae.morta = true
-        for (let k = 0; k < cfg.filhos; k++) {
-          const ang = dir + (k - (cfg.filhos - 1) / 2) * cfg.abertura
-          a.bala({
-            x: mae.x,
-            y: mae.y,
-            vx: Math.cos(ang) * cfg.velocidadeFilhos,
-            vy: Math.sin(ang) * cfg.velocidadeFilhos,
-            raio: cfg.raio * 0.7,
-            forma,
-            girar: 5,
-            jaAvisada: true,
-          })
-        }
+        atualizar: (mae) => {
+          const t = mae.idade - mae.aviso
+          if (t >= cfg.divideEm - avisoDivisao) mae.piscar = true
+          if (t < cfg.divideEm || dividida || mae.morta || mae.inofensiva) return
+          dividida = true
+          mae.morta = true
+          for (let k = 0; k < cfg.filhos; k++) {
+            const ang = dir + (k - (cfg.filhos - 1) / 2) * cfg.abertura
+            a.bala({
+              x: mae.x,
+              y: mae.y,
+              vx: Math.cos(ang) * cfg.velocidadeFilhos,
+              vy: Math.sin(ang) * cfg.velocidadeFilhos,
+              raio: cfg.raio * 0.7,
+              forma,
+              girar: 5,
+              jaAvisada: true,
+            })
+          }
+        },
       })
     })
   },

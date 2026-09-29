@@ -18,8 +18,8 @@ export default class Inimigo {
 
     const bx = x - LARGURA_BARRA / 2
     const by = y - 94
-    const pequeno = { fontFamily: FONTE, fontSize: '11px', color: '#ffffff' }
-    this.nome = scene.add.text(x, by - 18, def.nome.toUpperCase(), { ...pequeno, fontSize: '13px' }).setOrigin(0.5, 0)
+    const pequeno = { fontFamily: FONTE, fontSize: '12px', color: '#ffffff' }
+    this.nome = scene.add.text(x, by - 18, def.nome.toUpperCase(), { ...pequeno, fontSize: '15px' }).setOrigin(0.5, 0)
     this.hp = [
       scene.add.rectangle(bx, by, LARGURA_BARRA, 6, 0x303030).setOrigin(0),
       scene.add.rectangle(bx, by, LARGURA_BARRA, 6, CORES.hpChefe).setOrigin(0),
@@ -43,17 +43,18 @@ export default class Inimigo {
     this.mercy.forEach((o) => o.setVisible(chefe.mercy > 0 && chefe.ativo))
   }
 
-  dano() {
+  // intensidade 0..1 (escala com o dano do golpe): amplitude e duração do tremor
+  dano(intensidade = 0.4) {
     this.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL)
     this.scene.time.delayedCall(110, () => this.sprite.setTintMode(Phaser.TintModes.MULTIPLY).setTint(0xffffff))
     this.tweenTremer?.stop()
     this.sprite.x = this.x
     this.tweenTremer = this.scene.tweens.add({
       targets: this.sprite,
-      x: this.x + 8,
+      x: this.x + 5 + 9 * intensidade,
       duration: 35,
       yoyo: true,
-      repeat: 4,
+      repeat: 4 + Math.round(intensidade * 4),
       onComplete: () => (this.sprite.x = this.x),
     })
   }

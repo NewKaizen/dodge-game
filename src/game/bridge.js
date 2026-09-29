@@ -1,5 +1,5 @@
 import { jogo } from '../lib/estado.js'
-import { setSomLigado } from './audio.js'
+import { setSomLigado, setVolumes } from './audio.js'
 
 // Repassa mudanças do store para o Phaser:
 // - estado vai para o registry: this.registry.get('jogadores')
@@ -14,6 +14,7 @@ export function ligarBridge(game) {
     game.registry.set('jogadores', s.jogadores)
     game.registry.set('velocidade', s.velocidade)
     setSomLigado(s.som)
+    setVolumes(s.volume.musica / 100, s.volume.efeitos / 100)
 
     if (s.botao && s.botao !== ultimoBotao) {
       ultimoBotao = s.botao

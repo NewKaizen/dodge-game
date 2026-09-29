@@ -31,6 +31,7 @@ export default definirAtaque({
       a.lacuna(cfg.vaos * passo * anel.raio - 2 * rb, `vão do anel ${k + 1}`)
       for (let j = cfg.vaos; j < anel.quantidade; j++) {
         const ang0 = j * passo + k * 0.5
+        let t = 0 // segundos de ataque desta bala (só conta depois do aviso)
         a.bala({
           x: cx + Math.cos(ang0) * anel.raio,
           y: cy + Math.sin(ang0) * anel.raio,
@@ -39,8 +40,9 @@ export default definirAtaque({
           aviso: cfg.aviso,
           atravessa: true,
           girar: 3,
-          atualizar: (b) => {
-            const t = (b.idade - b.aviso) / 1000
+          atualizar: (b, dt) => {
+            // o tempo do anel anda no ritmo do chefe (ACTs que deixam o ataque mais lento valem aqui também)
+            t += (dt / 1000) * a.balas.fatorVelocidade
             const r = anel.raio + Math.sin((t * Math.PI * 2 * 1000) / cfg.periodo) * cfg.respira
             const ang = ang0 + anel.giro * t
             b.x = cx + Math.cos(ang) * r

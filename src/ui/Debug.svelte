@@ -2,7 +2,8 @@
   import { jogo } from '../lib/estado.js'
 </script>
 
-<div class="debug">
+<details class="debug" open>
+  <summary>painel (volume, velocidade, debug)</summary>
   <div>último evento: {$jogo.ultimoEvento ?? '-'}</div>
   {#each $jogo.jogadores as j, i}
     <div>P{i + 1} joy: {j.joy.x}, {j.joy.y}</div>
@@ -18,12 +19,22 @@
     som
   </label>
 
+  <label>
+    volume da música: {$jogo.volume.musica}%
+    <input type="range" min="0" max="100" step="1" bind:value={$jogo.volume.musica} disabled={!$jogo.som} />
+  </label>
+
+  <label>
+    volume dos efeitos: {$jogo.volume.efeitos}%
+    <input type="range" min="0" max="100" step="1" bind:value={$jogo.volume.efeitos} disabled={!$jogo.som} />
+  </label>
+
   <div class="dica">
     Teclado — P1: WASD, A = Espaço/Z/E, B = Q/X · P2: setas, A = Enter, B = Shift direito<br />
     Console (dev, na batalha): <code>testarAtaque(ataques.foice({'{'} varridas: 2 {'}'}))</code>,
     <code>listarAtaques()</code>, <code>debugJogo.estado()</code>
   </div>
-</div>
+</details>
 
 <style>
   .debug {
@@ -46,6 +57,11 @@
   .linha {
     flex-direction: row;
     align-items: center;
+  }
+
+  summary {
+    cursor: pointer;
+    color: #aaa;
   }
 
   .dica {

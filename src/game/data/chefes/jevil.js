@@ -18,7 +18,8 @@ export default {
 
   hp: 480,
   defesa: 3,
-  danoBala: 10,
+  danoBala: 13,
+  desafio: { velocidade: 1.08, densidade: 1.12 },
 
   rotuloMercy: 'CANSAÇO',
   descricao: 'Um bobo da corte que só quer brincar. Hipnotizá-lo deixa tudo mais lento.',

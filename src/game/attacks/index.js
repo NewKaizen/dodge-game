@@ -1,4 +1,4 @@
-import { juntos, sequencia } from './definir.js'
+import { juntos, sequencia, comCaixa } from './definir.js'
 import rain from './rain.js'
 import sides from './sides.js'
 import spiral from './spiral.js'
@@ -12,6 +12,9 @@ import divisores from './divisores.js'
 import carrossel from './carrossel.js'
 import foice from './foice.js'
 import bombas from './bombas.js'
+import caminhonete from './caminhonete.js'
+import brasas from './brasas.js'
+import forcado from './forcado.js'
 
 // Todos os ataques disponíveis. Para criar um novo, copie um arquivo desta
 // pasta, mude nome/padrao/iniciar e adicione aqui.
@@ -20,6 +23,8 @@ import bombas from './bombas.js'
 //   ataques.rain({ velocidade: 300, intervalo: 60 })  configurado
 //   ataques.juntos(ataques.rain(), ataques.aimed())   ao mesmo tempo
 //   ataques.sequencia(ataques.sides(), ataques.spiral())  um depois do outro
+//   ataques.rain({ caixa: null })                     sem mudar a caixa (rain, sides, aimed, spiral e caminhonete mudam por padrão)
+//   ataques.comCaixa({ largura: 180, altura: 180 }, ataques.juntos(...))  outra caixa para um grupo
 //
 // Regras (ver constants.js ATAQUE e attacks/validacao.js): toda bala pisca
 // por ATAQUE.telegrafoMs antes de valer (ou vem depois de um a.aviso), toda
@@ -43,8 +48,12 @@ export const ataques = {
   carrossel,
   foice,
   bombas,
+  caminhonete,
+  brasas,
+  forcado,
   juntos,
   sequencia,
+  comCaixa,
 }
 
-export const PADROES = Object.keys(ataques).filter((nome) => nome !== 'juntos' && nome !== 'sequencia')
+export const PADROES = Object.keys(ataques).filter((nome) => !['juntos', 'sequencia', 'comCaixa'].includes(nome))

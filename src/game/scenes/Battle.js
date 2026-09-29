@@ -13,19 +13,23 @@ import Fight from '../battle/Fight.js'
 import Inventario from '../battle/Inventario.js'
 import ContextoAtaque from '../attacks/contexto.js'
 import { ataques, PADROES } from '../attacks/index.js'
+import { encurtar, preparoCaixa } from '../attacks/definir.js'
 import { novaRodada, validarEspacoLivre, estatisticas } from '../attacks/validacao.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { shake } from '../effects/shake.js'
+import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
+import { etiqueta, descreverModificador } from '../effects/etiqueta.js'
 import { particulas } from '../effects/particulas.js'
 import { tocar, musica } from '../audio.js'
 import { debug } from '../debug.js'
+import { nivelDe, sortearCaos, comCaos, abrirTurno, criarEtiquetaNivel } from '../battle/nivel.js'
 import { ESCALA } from '../arte/texturas.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { ITENS } from '../data/itens.js'
 import { CHEFES } from '../data/chefes/index.js'
 import { BATALHA } from '../data/batalha.js'
-import { ATAQUE, CORES, TEXTO, LAYOUT, TP, DEFEND, TEMPOS, COMANDOS, MERCY_MAX, DIFICULDADES, RITMO } from '../constants.js'
+import { FIGHT, DESAFIO, ATAQUE, CORES, TEXTO, LAYOUT, TP, DEFEND, TEMPOS, COMANDOS, MERCY_MAX, DIFICULDADES, RITMO, IMPACTO } from '../constants.js'
 
 // Batalha no estilo Deltarune. Fases de cada turno:
 //   'intro'     entrada (só no começo)
@@ -42,6 +46,7 @@ export default class Battle extends Phaser.Scene {
 
   init(dados) {
     this.idChefe = dados?.chefe ?? this.registry.get('chefe') ?? BATALHA.chefePadrao
+    this.nivel = nivelDe(this.registry, dados?.nivel) // FÁCIL / MÉDIO / DIFÍCIL (battle/nivel.js)
   }
 
   create() {
@@ -53,7 +58,7 @@ export default class Battle extends Phaser.Scene {
     this.controles = new Controles(this)
     this.controles.onBotao((jogador, botao) => this.aoBotao(jogador, botao))
 
-    this.fundo = criarFundo(this, this.defChefe.fundo)
+    this.fundo = criarFundo(this, this.defChefe.fundo, this.nivel.fundo)
     this.party = BATALHA.party.map((id, i) => this.criarMembro(id, i))
     this.chefe = this.criarChefe(this.defChefe)
     this.inimigos = [this.chefe]
@@ -73,11 +78,13 @@ export default class Battle extends Phaser.Scene {
 
     this.caixa = new BattleBox(this)
     this.balas = new Balas(this, this.caixa)
-    this.balas.velocidadeMax = this.dificuldade.velocidadeMaxBala
+    this.balas.velocidadeMax = this.dificuldade.velocidadeMaxBala * DESAFIO.velocidadeMax * this.nivel.velocidadeMax
     this.coracoes = Array.from({ length: this.numJogadores }, (_, j) => new Heart(this, this.caixa, CORES.almas[j], j))
+    this.caixa.aoMudar = () => this.coracoes.forEach((c) => c.ativo && c.ajustar()) // a caixa empurra os corações
     this.hud = new Hud(this, this.party, this.numJogadores)
     this.textbox = new TextBox(this)
     this.balao = new Balao(this)
+    criarEtiquetaNivel(this, this.nivel)
 
     if (import.meta.env.DEV) {
       window.ataques = ataques
@@ -174,8 +181,8 @@ export default class Battle extends Phaser.Scene {
       id: def.id,
       def,
       nome: def.nome,
-      hp: def.hp,
-      max: def.hp,
+      hp: Math.round(def.hp * this.nivel.hp),
+      max: Math.round(def.hp * this.nivel.hp),
       defesa: def.defesa ?? 0,
       mercy: 0,
       poupado: false,
@@ -319,6 +326,8 @@ export default class Battle extends Phaser.Scene {
       if (m.acao?.tipo === 'DEFEND') {
         m.defendendo = true
         this.tp = Math.min(TP.max, this.tp + DEFEND.ganhoTP)
+        this.modificarProximoAtaque(DEFEND.proximoAtaque)
+        numero(this, m.ator.x + 34, m.ator.y - 30, 'GUARDA', TEXTO.guarda)
       }
     }
 
@@ -328,7 +337,7 @@ export default class Battle extends Phaser.Scene {
       this.fight = new Fight(
         this,
         lutadores,
-        (membro, alvo, dano, critico) => this.golpe(membro, alvo, dano, critico),
+        (membro, alvo, dano, critico, combo) => this.golpe(membro, alvo, this.aplicarForca(membro, dano), critico, combo),
         () => this.resolverAcoes(),
       )
     } else {
@@ -339,6 +348,11 @@ export default class Battle extends Phaser.Scene {
 
   resolverAcoes() {
     this.fight = null
+    for (const m of this.party) {
+      if (!m.forcaUsada) continue
+      m.forca = null
+      m.forcaUsada = false
+    }
     const passos = []
     for (const m of this.party) {
       const acao = m.acao
@@ -418,7 +432,7 @@ export default class Battle extends Phaser.Scene {
     const chefe = this.chefe
     lista = (lista ?? [this.escolherAtaque()]).filter(Boolean)
     if (!lista.length) return this.fimTurnoInimigo()
-    const ataque = lista.length === 1 ? lista[0] : ataques.juntos(...lista)
+    let ataque = lista.length === 1 ? lista[0] : ataques.juntos(...lista)
 
     this.fase = 'inimigo'
     this.inimigoPronto = false
@@ -428,9 +442,17 @@ export default class Battle extends Phaser.Scene {
 
     // agressividade (ACTs) e modificador do próximo ataque
     const ritmo = {
-      velocidade: chefe.ritmo.velocidade * (chefe.proximo?.velocidade ?? 1),
-      densidade: chefe.ritmo.densidade * (chefe.proximo?.densidade ?? 1),
+      velocidade: chefe.ritmo.velocidade * (chefe.proximo?.velocidade ?? 1) * DESAFIO.velocidade * (this.defChefe.desafio?.velocidade ?? 1) * this.nivel.velocidade,
+      densidade: chefe.ritmo.densidade * (chefe.proximo?.densidade ?? 1) * DESAFIO.densidade * (this.defChefe.desafio?.densidade ?? 1) * this.nivel.densidade,
     }
+    // "reduz uma onda": o ataque perde a última onda (sequência) ou parte do tempo
+    ataque = encurtar(ataque, chefe.proximo?.duracao ?? 1)
+    // nível MÉDIO/DIFÍCIL: às vezes (ou sempre) vem uma camada extra de caos junto
+    const caos = sortearCaos(this, this.nivel)
+    if (caos) ataque = comCaos(ataque, this.nivel.caos)
+    abrirTurno(this, this.nivel, caos)
+    const aviso = descreverModificador(chefe.proximo)
+    if (aviso) etiqueta(this, aviso.texto, aviso.cor)
     chefe.proximo = null
     this.balas.fatorVelocidade = ritmo.velocidade
 
@@ -441,12 +463,16 @@ export default class Battle extends Phaser.Scene {
       caixa: this.caixa,
       coracoes: this.coracoes,
       tema: this.defChefe.tema,
-      dano: this.defChefe.danoBala,
+      dano: Math.round(this.defChefe.danoBala * DESAFIO.dano * this.nivel.dano),
       ritmo,
       semente: `${ATAQUE.semente}:${ataque.nome}:${vez}`,
       nome: ataque.nome,
     })
-    this.ataque = { ctx, nome: ataque.nome, restante: ATAQUE.respiroMs * 2 + ataque.duracao, proximaValidacao: 0, desarmado: false }
+    // se o ataque pede outra caixa, o aviso e a mudança acontecem logo que o coração pousa
+    // (durante o respiro do turno) e o ataque só começa depois
+    const preparo = preparoCaixa(null, ataque.caixa)
+    const inicio = Math.max(ATAQUE.respiroMs, preparo)
+    this.ataque = { ctx, nome: ataque.nome, restante: inicio + ataque.duracao + ATAQUE.respiroMs, duracao: ataque.duracao, ritmo, proximaValidacao: 0, desarmado: false }
 
     // caixa abre -> corações voam dos personagens até a caixa -> respiro -> ataque -> respiro
     const l = this.caixa.limites
@@ -456,8 +482,9 @@ export default class Battle extends Phaser.Scene {
       ativos.forEach((c, k) => this.voarCoracao(this.membrosVivos(c.jogador)[0].ator, destinos[k], c.cor))
       this.esperar(TEMPOS.vooMs, () => {
         ativos.forEach((c, k) => c.mostrar(destinos[k].x, destinos[k].y))
-        ctx.depois(ATAQUE.respiroMs, () => ataque.iniciar(ctx.limitar(ataque.duracao)))
-        ctx.depois(ATAQUE.respiroMs + ataque.duracao, () => {
+        if (preparo) ctx.caixaPara(ataque.caixa)
+        ctx.depois(inicio, () => ataque.iniciar(ctx.limitar(ataque.duracao)))
+        ctx.depois(inicio + ataque.duracao, () => {
           this.balas.desarmar(ATAQUE.respiroMs)
           this.ataque.desarmado = true
         })
@@ -480,6 +507,7 @@ export default class Battle extends Phaser.Scene {
     for (const c of this.coracoes) if (c.ativo) c.update(this.controles.joy(c.jogador), velocidade, delta)
 
     const at = this.ataque
+    this.caixa.atualizar(delta) // aviso/transição da caixa no mesmo relógio do ataque
     at.ctx.atualizar(delta)
     this.balas.atualizar(
       delta,
@@ -505,9 +533,10 @@ export default class Battle extends Phaser.Scene {
     const alvos = this.membrosVivos(coracao.jogador)
     if (!alvos.length) return false
 
-    const membro = this.rng.pick(alvos)
+    const membro = this.escolherAlvo(alvos)
     let dano = Math.max(1, bala.dano - membro.defesa)
     if (membro.defendendo) dano = Math.ceil(dano * DEFEND.multiplicadorDano)
+    if (membro.protecao) dano = Math.max(1, Math.ceil(dano * membro.protecao))
     membro.hp -= dano
     membro.ator.tremer()
     numero(this, membro.ator.x + 34, membro.ator.y - 30, String(dano), TEXTO.dano)
@@ -522,10 +551,25 @@ export default class Battle extends Phaser.Scene {
     }
 
     coracao.tomarDano(TEMPOS.invencivelMs)
-    shake(this, 120, 0.008)
+    // tremor + flash vermelho, proporcionais ao dano (balas fortes pesam mais)
+    const forca = Phaser.Math.Clamp(dano / IMPACTO.danoReferencia, 0.7, 1.6)
+    shake(this, IMPACTO.tremorMs, IMPACTO.tremorForca * forca)
+    flashTela(this, IMPACTO.flashCor, Math.min(0.5, IMPACTO.flashAlpha * forca), IMPACTO.flashMs)
     if (!this.membrosVivos(coracao.jogador).length) coracao.esconder()
     this.atualizarUI()
     return true
+  }
+
+  // Quem leva o dano. Com 1 jogador o coração representa a party toda, então
+  // o dano se espalha: sorteio com peso, que evita repetir quem acabou de
+  // apanhar e puxa para quem está com mais HP (ninguém é focado até cair).
+  escolherAlvo(alvos) {
+    if (alvos.length === 1) return alvos[0]
+    const pesos = alvos.map((m) => (0.4 + Math.max(0, m.hp) / m.max) * (m === this.ultimoAlvo ? 0.45 : 1))
+    let r = Math.random() * pesos.reduce((a, b) => a + b, 0)
+    const escolhido = alvos.find((_, i) => (r -= pesos[i]) <= 0) ?? alvos[alvos.length - 1]
+    this.ultimoAlvo = escolhido
+    return escolhido
   }
 
   grazeou(coracao) {
@@ -549,6 +593,7 @@ export default class Battle extends Phaser.Scene {
     this.turno++
     this.chefe.turnosNaFase++
     this.fila = []
+    this.encerrarProtecao()
 
     if (this.verificarFim()) return
     this.defChefe.aoFimDoTurno?.(this.chefe, this.contextoAcao(null, this.chefe))
@@ -603,9 +648,13 @@ export default class Battle extends Phaser.Scene {
   //   ctx.texto(msg)                     mostra uma mensagem
   //   ctx.dano(inimigo, n)   ctx.curar(membro, n)   ctx.mercy(inimigo, n)   ctx.tp(n)
   //   ctx.revelar()                      mostra a barra de HP do chefe
-  //   ctx.proximoAtaque({ velocidade, densidade })   só o próximo ataque (ex.: 0.7 = 30% mais lento)
+  //   ctx.proximoAtaque({ velocidade, densidade, duracao })   só o próximo ataque (ex.: 0.7 = 30% mais lento;
+  //                                      duracao < 1 encurta a onda). Vários se acumulam, até RITMO.proximoMinimo
   //   ctx.agressividade({ velocidade, densidade })   permanente, multiplica (limites em RITMO)
   //   ctx.maisFerido()                   membro da party com menor % de HP
+  //   ctx.fortalecer(membro, fator)      o próximo FIGHT desse membro causa dano * fator (ex.: 1.5)
+  //   ctx.proteger(membro, fator)        no próximo turno do chefe, o dano que ele leva é * fator (ex.: 0.5)
+  //   ctx.sortear(min, max)              inteiro aleatório entre min e max (inclusive)
   contextoAcao(ator, alvo, aliado = null) {
     const chefe = this.chefe
     return {
@@ -624,31 +673,90 @@ export default class Battle extends Phaser.Scene {
         chefe.revelado = true
         this.atualizarUI()
       },
-      proximoAtaque: (mod) => {
-        chefe.proximo = { ...(chefe.proximo ?? {}), ...mod }
-      },
+      proximoAtaque: (mod) => this.modificarProximoAtaque(mod),
       agressividade: ({ velocidade = 1, densidade = 1 }) => {
         chefe.ritmo.velocidade = Phaser.Math.Clamp(chefe.ritmo.velocidade * velocidade, RITMO.minimo, RITMO.maximo)
         chefe.ritmo.densidade = Phaser.Math.Clamp(chefe.ritmo.densidade * densidade, RITMO.minimo, RITMO.maximo)
       },
       maisFerido: () => [...this.party].sort((a, b) => a.hp / a.max - b.hp / b.max)[0],
+      fortalecer: (membro, fator) => this.fortalecer(membro, fator),
+      proteger: (membro, fator) => this.proteger(membro, fator),
+      sortear: (min, max) => Phaser.Math.Between(min, max),
     }
   }
 
-  golpe(membro, alvo, dano, critico) {
+  // Buff do próximo FIGHT (ctx.fortalecer): não acumula, fica o maior fator.
+  // É gasto no primeiro golpe que acerta (MISS não gasta).
+  fortalecer(membro, fator) {
+    membro.forca = Math.max(membro.forca ?? 1, fator)
+    numero(this, membro.ator.x + 34, membro.ator.y - 30, `FORÇA +${Math.round((membro.forca - 1) * 100)}%`, TEXTO.selecionado, { tamanho: 14 })
+  }
+
+  // Vale para TODOS os golpes do combo do FIGHT; é gasto no fim do FIGHT
+  // (resolverAcoes), só se algum golpe acertou
+  aplicarForca(membro, dano) {
+    if (!membro.forca || dano <= 0) return dano
+    if (!membro.forcaUsada) {
+      membro.forcaUsada = true
+      numero(this, membro.ator.x + 34, membro.ator.y - 50, `FORÇA x${membro.forca}`, TEXTO.selecionado, { tamanho: 14 })
+    }
+    return Math.round(dano * membro.forca)
+  }
+
+  // Redução de dano no próximo turno do chefe (ctx.proteger): fica o menor fator.
+  // Acaba no fim do turno do chefe (encerrarProtecao).
+  proteger(membro, fator) {
+    membro.protecao = Math.min(membro.protecao ?? 1, fator)
+    numero(this, membro.ator.x + 34, membro.ator.y - 30, `ESCUDO -${Math.round((1 - membro.protecao) * 100)}%`, TEXTO.guarda, { tamanho: 14 })
+  }
+
+  encerrarProtecao() {
+    const protegidos = this.party.filter((m) => m.protecao)
+    if (!protegidos.length) return
+    protegidos.forEach((m) => (m.protecao = null))
+    etiqueta(this, 'O ESCUDO SE DESFEZ', TEXTO.desabilitado)
+  }
+
+  // Modificador só do próximo ataque do chefe: { velocidade, densidade, duracao }
+  // (fatores; < 1 enfraquece). DEFEND e ACTs chegam aqui e se acumulam
+  // (multiplicam) dentro de [RITMO.proximoMinimo, RITMO.maximo].
+  modificarProximoAtaque(mod) {
+    const atual = this.chefe.proximo ?? {}
+    const novo = { ...atual }
+    for (const [chave, fator] of Object.entries(mod)) {
+      novo[chave] = Phaser.Math.Clamp((atual[chave] ?? 1) * fator, RITMO.proximoMinimo, RITMO.maximo)
+    }
+    this.chefe.proximo = novo
+  }
+
+  // Um acerto do combo do FIGHT (combo = último golpe com todas as barras acertadas)
+  golpe(membro, alvo, dano, critico, combo = false) {
     alvo = this.alvoValido(alvo)
     if (!alvo) return
     membro.ator.pular()
     if (dano <= 0) return numero(this, alvo.visual.x, alvo.visual.y - 50, 'MISS', TEXTO.desabilitado)
-    this.danoInimigo(alvo, Math.max(1, dano - alvo.defesa), critico)
+    // cada acerto é só uma fração do golpe cheio, então a defesa também conta nessa fração
+    const cfg = { ...FIGHT, ...membro.def.fight }
+    this.danoInimigo(alvo, Math.max(1, dano - Math.round(alvo.defesa * cfg.fatorGolpe)), critico)
+    // atacar também carrega o TP: golpe bom enche mais, combo completo ganha extra
+    const base = cfg.dano * cfg.fatorGolpe
+    let ganho = critico ? TP.porGolpe + TP.critico : dano >= base * 0.75 ? TP.porGolpe : Math.ceil(TP.porGolpe / 2)
+    if (combo) ganho += TP.combo
+    this.ganharTP(ganho)
+    numero(this, membro.ator.x + 34, membro.ator.y - 30, `+${ganho} TP`, TEXTO.guarda, { tamanho: 14, desvio: 6 })
   }
 
   danoInimigo(inimigo, n, critico = false) {
     if (!inimigo?.ativo) return
     inimigo.hp = Math.max(0, inimigo.hp - n)
     inimigo.revelado = true
-    inimigo.visual.dano()
-    numero(this, inimigo.visual.x, inimigo.visual.y - 50, String(n), critico ? TEXTO.selecionado : TEXTO.dano)
+    const forca = Phaser.Math.Clamp(n / 40, 0.15, 1) // golpe fraco = 0.15, golpe pesado (>= 40) = 1
+    inimigo.visual.dano(forca)
+    numero(this, inimigo.visual.x, inimigo.visual.y - 50, String(n), critico ? TEXTO.selecionado : TEXTO.dano, {
+      tamanho: Math.round(20 + 12 * forca + (critico ? 6 : 0)),
+      pop: critico ? 1.5 : 1.25,
+      desvio: 14,
+    })
     particulas(this, inimigo.visual.x, inimigo.visual.y, { cor: 0xffffff, quantidade: critico ? 18 : 10, velocidade: 170 })
     shake(this, critico ? 160 : 90, critico ? 0.012 : 0.006)
     if (!inimigo.ativo) {
@@ -747,6 +855,7 @@ export default class Battle extends Phaser.Scene {
         fase: this.chefe.fase,
         ativo: this.chefe.ativo,
         ritmo: { ...this.chefe.ritmo },
+        proximo: this.chefe.proximo ? { ...this.chefe.proximo } : null,
         poupavel: this.defChefe.podePoupar ? this.defChefe.podePoupar(this.chefe) : this.chefe.mercy >= MERCY_MAX,
       },
       party: this.party.map((m) => ({ nome: m.nome, hp: m.hp, max: m.max, caido: m.caido, jogador: m.jogador })),
@@ -760,7 +869,10 @@ export default class Battle extends Phaser.Scene {
       })),
       fight: this.fight?.estado() ?? null,
       digitando: this.textbox.digitandoAinda,
-      ataque: this.ataque ? { nome: this.ataque.nome, tempo: this.ataque.ctx.tempo, balas: this.balas.lista.length } : null,
+      caixa: { ...this.caixa.limites, emTransicao: this.caixa.emTransicao },
+      ataque: this.ataque
+        ? { nome: this.ataque.nome, tempo: this.ataque.ctx.tempo, balas: this.balas.lista.length, duracao: this.ataque.duracao, ritmo: { ...this.ataque.ritmo } }
+        : null,
       validacao: { ...estatisticas },
     }
   }

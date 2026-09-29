@@ -1,0 +1,3 @@
+soundfont.sf3 = FluidR3 Mono GM (versão SF3 comprimida distribuída pelo MuseScore)
+FluidR3_GM por Frank Wen e colaboradores, licença MIT.
+Pode ser trocado por qualquer soundfont General MIDI .sf2/.sf3 com o mesmo nome.

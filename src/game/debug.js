@@ -5,6 +5,9 @@
 //   debugJogo.estado()          fase, HP, TP, inventário, menus, barras do FIGHT...
 //   testarAtaque(ataques.foice({ varridas: 2 }))    (durante a batalha, no menu)
 //   listarAtaques()
+//   debugJogo.musica()          MIDI tocando agora e o segundo atual
+import { estadoMidi } from './midi.js'
+
 export const debug = { invencivel: false, acelerar: 1 }
 
 export function registrarDebug(game) {
@@ -12,7 +15,14 @@ export function registrarDebug(game) {
   window.debugJogo = {
     set: (opcoes) => Object.assign(debug, opcoes),
     config: debug,
+    jogo: game, // o Phaser.Game (inspeção no console)
+    musica: () => estadoMidi(), // { tocando, tempo, contexto }
     cena: () => game.scene.getScenes(true).map((s) => s.scene.key),
+    // a cena Battle viva, para inspecionar balas, caixa e corações no console
+    batalha: () => {
+      const batalha = game.scene.getScene('Battle')
+      return batalha?.sys.isActive() ? batalha : null
+    },
     estado: () => {
       const batalha = game.scene.getScene('Battle')
       return batalha?.sys.isActive() ? batalha.estadoDebug() : null

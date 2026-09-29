@@ -14,6 +14,7 @@
     "vite": "^8.3.0"
   },
   "dependencies": {
-    "phaser": "^4.2.1"
+    "phaser": "^4.2.1",
+    "spessasynth_lib": "4.3.14"
   }
 }

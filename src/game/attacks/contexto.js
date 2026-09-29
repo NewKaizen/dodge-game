@@ -12,18 +12,22 @@ import { LACUNA_MINIMA, avisar, validarParede, validarLacuna } from './validacao
 //                                    + ms (padrão ATAQUE.telegrafoMs)
 //   a.parede({ eixo, lacunas | ocupados })   valida a rota de fuga de uma parede
 //   a.lacuna(px, descricao)   valida uma abertura isolada
-//   a.aCada(ms, fn)           repete fn(i) a cada ms (i = 0, 1, 2...)
+//   a.aCada(ms, fn, vezes?, atraso?)   repete fn(i) a cada ms (i = 0, 1, 2...); atraso = ms até o 1º
 //   a.depois(ms, fn)          roda fn uma vez depois de ms
 //   a.aoAtualizar(fn)         roda fn(dt, tempo) todo frame
 //   a.decoracao(objeto)       objeto visual que só aparece na caixa e some no fim
-//   a.caixa                   retângulo da caixa (left, right, top, bottom, centerX, centerY, width, height)
+//   a.caixa                   retângulo da caixa (left, right, top, bottom, centerX, centerY, width, height);
+//                             é o mesmo objeto o turno todo, então leia a.caixa na hora de usar (ela pode ter mudado)
+//   a.caixaPara(forma)        muda a caixa ({ largura, altura, x?, y? }; null = padrão), com aviso antes.
+//                             Normalmente não chame direto: use a opção `caixa` do ataque (attacks/definir.js)
 //   a.alvo()                  posição {x, y} de um coração (alterna entre os jogadores)
 //   a.pontoLonge(distancia)   ponto da caixa longe de todos os corações
 //   a.aleatorio(min, max)     número com semente fixa (padrões repetíveis)
 //   a.inteiro(min, max), a.escolher(lista)
 //   a.forma(i), a.cor(forma)  formas/cores de bala do tema do chefe
 //   a.lacunaMinima            tamanho mínimo de uma rota de fuga (px)
-//   a.tempo                   ms desde o início do turno
+//   a.tempo                   ms desde o início do turno (relógio: inclui os respiros)
+//   a.respiro                 pausas da onda atual (ver attacks/definir.js); nelas os timers ficam parados
 //
 // Tudo que foi agendado para automaticamente quando o ataque acaba.
 export default class ContextoAtaque {
@@ -101,19 +105,26 @@ export default class ContextoAtaque {
     return objeto
   }
 
+  // Muda a forma da caixa com pré-visualização (CAIXA_DINAMICA.avisoMs) e
+  // transição. O ataque só começa depois: veja preparoCaixa() em definir.js
+  caixaPara(forma) {
+    return this.caixaDeBatalha.mudarPara(forma)
+  }
+
   // ---------- tempo ----------
 
-  aCada(ms, fn, vezes = Infinity) {
+  // atraso: ms até o primeiro disparo (padrão: o próprio intervalo)
+  aCada(ms, fn, vezes = Infinity, atraso = null) {
     const intervalo = Math.max(1, ms / this.ritmo.densidade)
-    this.timers.push({ intervalo, restante: intervalo, fn, vezes, contador: 0, fim: this.fim })
+    this.timers.push({ intervalo, restante: atraso ?? intervalo, fn, vezes, contador: 0, fim: this.fim, respiro: this.respiro })
   }
 
   depois(ms, fn) {
-    this.timers.push({ intervalo: 1, restante: ms, fn, vezes: 1, contador: 0, fim: this.fim })
+    this.timers.push({ intervalo: 1, restante: ms, fn, vezes: 1, contador: 0, fim: this.fim, respiro: this.respiro })
   }
 
   aoAtualizar(fn) {
-    this.timers.push({ cadaFrame: true, fn, fim: this.fim })
+    this.timers.push({ cadaFrame: true, fn, fim: this.fim, respiro: this.respiro })
   }
 
   // Contexto filho cujos timers param depois de `ms` (usado por juntos/sequencia).
@@ -128,6 +139,7 @@ export default class ContextoAtaque {
     this.tempo += dt
     for (const t of [...this.timers]) {
       if (this.tempo > t.fim) continue
+      if (t.respiro && this.emRespiro(t.respiro)) continue // calmaria: o relógio do ataque para
       if (t.cadaFrame) {
         t.fn(dt, this.tempo)
         continue
@@ -140,6 +152,12 @@ export default class ContextoAtaque {
       }
     }
     this.timers = this.timers.filter((t) => this.tempo <= t.fim && (t.cadaFrame || t.vezes > 0))
+  }
+
+  // A onda que criou o timer está numa pausa (respiro de início ou do meio)?
+  emRespiro(respiro) {
+    const rel = this.tempo - respiro.origem
+    return respiro.pausas.some(([ini, fim]) => rel >= ini && rel < fim)
   }
 
   limpar() {

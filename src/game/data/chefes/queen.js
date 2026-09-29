@@ -13,7 +13,8 @@ export default {
 
   hp: 360,
   defesa: 2,
-  danoBala: 8,
+  danoBala: 11,
+  desafio: { velocidade: 1.12, densidade: 1.15 },
 
   rotuloMercy: 'MERCY',
   descricao: 'Uma rainha digital obcecada por desempenho. Odeia ser ignorada.',

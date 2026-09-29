@@ -31,9 +31,9 @@ export default class Hud {
       scene.add.image(px + 24, y + 14, `icone-${m.id}`).setScale(ESCALA.icone)
       const nome = texto(px + 46, y + 4, m.nome.toUpperCase(), 16, corTexto(m.cor))
       if (numJogadores > 1) {
-        texto(nome.x + nome.width + 8, y + 7, `P${m.jogador + 1}`, 12, corTexto(CORES.almas[m.jogador]))
+        texto(nome.x + nome.width + 8, y + 7, `P${m.jogador + 1}`, 13, corTexto(CORES.almas[m.jogador]))
       }
-      const hp = texto(px + w - 14, y + 5, '', 13).setOrigin(1, 0)
+      const hp = texto(px + w - 14, y + 5, '', 14).setOrigin(1, 0)
       const larguraBarra = w - 62
       scene.add.rectangle(px + 46, y + 24, larguraBarra, 6, CORES.hpFundo).setOrigin(0)
       const barra = scene.add.rectangle(px + 46, y + 24, larguraBarra, 6, m.cor).setOrigin(0)

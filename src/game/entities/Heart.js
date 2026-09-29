@@ -63,6 +63,15 @@ export default class Heart {
     this.posicionar()
   }
 
+  // Depois que a caixa muda de tamanho: traz o coração para dentro dela
+  ajustar() {
+    const r = this.caixa.limites
+    const meio = CORACAO.tamanho / 2
+    this.x = Phaser.Math.Clamp(this.x, r.left + meio, r.right - meio)
+    this.y = Phaser.Math.Clamp(this.y, r.top + meio, r.bottom - meio)
+    this.posicionar()
+  }
+
   posicionar() {
     this.sprite.setPosition(this.x, this.y)
     this.anel.setPosition(this.x, this.y)
@@ -77,5 +86,8 @@ export default class Heart {
   tomarDano(duracaoMs) {
     this.invencivelMs = duracaoMs
     flash(this.scene, this.sprite, duracaoMs)
+    // "pop": o coração incha e volta, junto do flash e do tremor
+    this.sprite.setScale(ESCALA.coracao * 1.9)
+    this.scene.tweens.add({ targets: this.sprite, scale: ESCALA.coracao, duration: 180, ease: 'Back.easeOut' })
   }
 }

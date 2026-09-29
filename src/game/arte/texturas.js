@@ -79,6 +79,13 @@ function poligono(g, pontos) {
 // ---------- formas de bala ----------
 
 const FORMAS = {
+  // chama: gota de fogo com a ponta para cima (não gire)
+  chama: (g, r) => {
+    g.moveTo(0, -r)
+    g.bezierCurveTo(r * 0.5, -r * 0.4, r * 0.95, r * 0.1, r * 0.7, r * 0.6)
+    g.bezierCurveTo(r * 0.45, r * 1.0, -r * 0.45, r * 1.0, -r * 0.7, r * 0.6)
+    g.bezierCurveTo(-r * 0.95, r * 0.1, -r * 0.5, -r * 0.4, 0, -r)
+  },
   bola: (g, r) => g.arc(0, 0, r, 0, Math.PI * 2),
   losango: (g, r) => poligono(g, [[0, -r], [r * 0.72, 0], [0, r], [-r * 0.72, 0]]),
   coroa: (g, r) =>
@@ -287,6 +294,9 @@ const GERADORES = {
   king: sprite('king'),
   queen: sprite('queen'),
   jevil: sprite('jevil'),
+  coronel: sprite('coronel'),
+  // colorida: a caminhonete usa cor 0xffffff na bala para não ser pintada pelo tema
+  'bala-caminhonete': sprite('caminhonete'),
   'icone-kris': iconePersonagem('kris'),
   'icone-susie': iconePersonagem('susie'),
 
@@ -305,6 +315,7 @@ const GERADORES = {
   aviso,
 
   'bala-bola': bala('bola'),
+  'bala-chama': bala('chama'),
   'bala-losango': bala('losango'),
   'bala-coroa': bala('coroa'),
   'bala-hex': bala('hex'),

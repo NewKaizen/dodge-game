@@ -1,0 +1,13 @@
+Coloque aqui as músicas em MIDI (.mid), com o nome da tela ou do chefe:
+
+  selecao.mid    tela de escolha do chefe
+  king.mid       batalha do Chaos King
+  queen.mid      batalha da Queen
+  jevil.mid      batalha do Jevil
+  coronel.mid    batalha do Coronel Caçamba
+  vitoria.mid    tela de vitória
+
+Não precisa mexer em código: o jogo procura <nome>.mid aqui sozinho e toca em
+loop com o soundfont (public/assets/audio/soundfont.sf3). Sem o arquivo, fica
+em silêncio. Para usar outro nome ou um .ogg, aponte em src/game/assets.js
+(ASSETS.musicas). Volume da música: AUDIO.musica em src/game/constants.js.

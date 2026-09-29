@@ -32,6 +32,7 @@ export default class Balas {
     this.lista = []
     this.velocidadeMax = Infinity
     this.fatorVelocidade = 1
+    this.criadas = 0 // total de balas criadas (diagnóstico: debugJogo.estado())
   }
 
   criar(o) {
@@ -91,6 +92,7 @@ export default class Balas {
     }
     this.caixa.recortar(sprite)
     this.lista.push(b)
+    this.criadas++
     return b
   }
 

@@ -1,12 +1,26 @@
 import { ASSETS } from './assets.js'
 import { AUDIO } from './constants.js'
+import { tocarMidi, pararMidi, setVolumeMidi } from './midi.js'
 
 // Sons: se assets.js tiver um arquivo, toca o arquivo; senão sintetiza com WebAudio.
-// Músicas: só tocam se houver arquivo em assets.js (senão, silêncio).
+// Músicas: arquivo .mid toca com soundfont (midi.js); .ogg/.mp3 tocam direto.
+// Sem nada em assets.js, procura public/assets/musicas/<nome>.mid; não
+// achou, silêncio.
 
 let contexto = null
 let ligado = true
 let musicaAtual = null
+// multiplicadores dos sliders do painel (0 a 1), em cima de AUDIO.volume
+const volumes = { musica: 1, efeitos: 1 }
+
+export function setVolumes(musica, efeitos) {
+  // o store muda a todo instante (joystick): só age quando o volume mudou de verdade
+  if (musica === volumes.musica && efeitos === volumes.efeitos) return
+  volumes.musica = musica
+  volumes.efeitos = efeitos
+  setVolumeMidi(musica)
+  musicaAtual?.setVolume(AUDIO.volume * musica)
+}
 
 export function setSomLigado(valor) {
   ligado = valor
@@ -17,7 +31,7 @@ export function tocar(scene, nome) {
   if (!ligado) return
   const chave = `som-${nome}`
   if (ASSETS.sons[nome] && scene.cache.audio.exists(chave)) {
-    scene.sound.play(chave, { volume: AUDIO.volume })
+    scene.sound.play(chave, { volume: AUDIO.volume * volumes.efeitos })
     return
   }
   const c = obterContexto()
@@ -25,15 +39,26 @@ export function tocar(scene, nome) {
 }
 
 export function musica(scene, nome) {
+  const arquivo = ASSETS.musicas[nome] ?? `assets/musicas/${nome}.mid`
+  if (/\.midi?$/i.test(arquivo)) {
+    musicaAtual?.stop()
+    musicaAtual?.destroy()
+    musicaAtual = null
+    const c = obterContexto()
+    if (!ligado || !c) return pararMidi()
+    tocarMidi(c, arquivo)
+    return
+  }
   const chave = `musica-${nome}`
   if (musicaAtual?.key === chave && musicaAtual.isPlaying) return
   pararMusica()
   if (!ligado || !ASSETS.musicas[nome] || !scene.cache.audio.exists(chave)) return
-  musicaAtual = scene.sound.add(chave, { loop: true, volume: AUDIO.volume })
+  musicaAtual = scene.sound.add(chave, { loop: true, volume: AUDIO.volume * volumes.musica })
   musicaAtual.play()
 }
 
 export function pararMusica() {
+  pararMidi()
   musicaAtual?.stop()
   musicaAtual?.destroy()
   musicaAtual = null
@@ -51,7 +76,7 @@ function obterContexto() {
 
 function sintetizador(c) {
   const saida = c.createGain()
-  saida.gain.value = AUDIO.volume
+  saida.gain.value = AUDIO.volume * volumes.efeitos
   saida.connect(c.destination)
   const agora = c.currentTime
 
@@ -97,6 +122,7 @@ const SINTESE = {
   dano: (s) => {
     s.ruido(0.15, 0.3, 0, 1200)
     s.tom(180, 0.15, 'sawtooth', 0.15, 80)
+    s.tom(120, 0.09, 'square', 0.18, 45) // baque grave: dá peso ao acerto
   },
   graze: (s) => s.tom(1800, 0.04, 'triangle', 0.08, 2400),
   cura: (s) => {
@@ -111,6 +137,12 @@ const SINTESE = {
   critico: (s) => {
     s.ruido(0.1, 0.3, 0, 4000)
     s.tom(880, 0.12, 'square', 0.14, 1760, 0.04)
+  },
+  // combo completo do FIGHT: arpejo rápido subindo + estalo
+  combo: (s) => {
+    s.ruido(0.06, 0.2, 0, 5000)
+    const notas = [587, 740, 988, 1318]
+    notas.forEach((f, i) => s.tom(f, 0.07, 'square', 0.1, f * 1.02, i * 0.045))
   },
   explosao: (s) => s.ruido(0.4, 0.35, 0, 800),
   aviso: (s) => {
@@ -129,4 +161,16 @@ const SINTESE = {
     s.tom(300, 0.2, 'square', 0.15, 60)
   },
   voo: (s) => s.tom(400, 0.18, 'sine', 0.1, 1200),
+  // fom-fom: dois tons juntos (acorde "desafinado" de buzina), duas vezes
+  buzina: (s) => {
+    for (const atraso of [0, 0.22]) {
+      s.tom(392, 0.16, 'square', 0.09, 380, atraso)
+      s.tom(470, 0.16, 'square', 0.07, 455, atraso)
+    }
+  },
+  // ronco do motor passando
+  motor: (s) => {
+    s.tom(70, 0.45, 'sawtooth', 0.14, 140)
+    s.ruido(0.35, 0.12, 0, 500)
+  },
 }
