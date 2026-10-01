@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { definirAtaque, juntos, sequencia, comCaixa } from '../../attacks/definir.js'
-import { CARTAS, PERSONAGENS_PVP, NAIPES, CUSTOS, custoDoValor, ataqueDaCarta, danoDaCarta, ritmoDaCarta, inverterDaCarta, efeitosDaCarta, TEMAS } from '../cartas.js'
+import { CARTAS, PERSONAGENS_PVP, NAIPES, CUSTOS, custoDoValor, ataqueDaCarta, danoDaCarta, ritmoDaCarta, inverterDaCarta, efeitosDaCarta, TEMAS, DIFICULDADE_PVP, forca } from '../cartas.js'
 
 // Biblioteca falsa com a mesma forma de attacks/index.js: usa o definir.js de
 // verdade (que roda em Node) e padrões vazios que só guardam a config
@@ -100,7 +100,7 @@ test('valor maior = mais forte (mais rápido, mais denso, mais longo, mais dano)
 
 test('copas manda só ataque fraco; espadas dá mais dano que ouros', () => {
   for (const c of todas.filter((x) => x.naipe === 'copas' && x.valor > 1)) {
-    assert.equal(danoDaCarta(c), 2)
+    assert.equal(danoDaCarta(c), Math.round(2 * DIFICULDADE_PVP.dano))
     assert.ok(efeitosDaCarta(c), c.id)
   }
   const ks = todas.filter((c) => c.valor === 13 && c.naipe === 'espadas')
@@ -110,11 +110,23 @@ test('copas manda só ataque fraco; espadas dá mais dano que ouros', () => {
 
 test('ouros acelera as balas e as figuras de ouros invertem controles', () => {
   const ouro = CARTAS.berdly.find((c) => c.valor === 13 && c.naipe === 'ouros')
-  assert.ok(ritmoDaCarta(ouro).velocidade > 1)
   assert.ok(inverterDaCarta(ouro) > 0)
   const espada = CARTAS.berdly.find((c) => c.naipe === 'espadas' && c.valor === 10)
-  assert.equal(ritmoDaCarta(espada).velocidade, 1)
+  assert.ok(ritmoDaCarta(ouro).velocidade > ritmoDaCarta(espada).velocidade)
+  assert.equal(ritmoDaCarta(espada).velocidade, DIFICULDADE_PVP.velocidade)
   assert.equal(inverterDaCarta(espada), 0)
+})
+
+test('dificuldade do PvP: piso de força, mais dano e o aperto em todas as cartas', () => {
+  assert.equal(forca(2), DIFICULDADE_PVP.forcaMinima)
+  assert.equal(forca(13), 1) // o teto não passa do K já validado
+  const espada2 = CARTAS.kris.find((c) => c.naipe === 'espadas' && c.valor === 3)
+  assert.ok(danoDaCarta(espada2) > Math.round(2 + 3 * 0.6)) // mais que o dano antigo
+  for (const c of todas) {
+    const r = ritmoDaCarta(c)
+    assert.ok(r.velocidade >= DIFICULDADE_PVP.velocidade, c.id)
+    assert.equal(r.densidade, DIFICULDADE_PVP.densidade, c.id)
+  }
 })
 
 test('caixaFixa tira a mudança de caixa', () => {

@@ -46,8 +46,21 @@ export const especialDaCarta = (carta) => (carta?.valor === 1 ? ESPECIAIS[carta.
 // Força usada pelo ataque que o Ás manda (eco do espelho, anular, roubo)
 const VALOR_DO_ESPECIAL = { espelho: 7, anular: 5, roubo: 5 }
 
-// 0 (valor 2) .. 1 (K): fração da força usada para escalar os ataques
-export const forca = (valor) => Math.min(1, Math.max(0, (valor - 2) / 11))
+// Dificuldade geral do PvP (vale para TODAS as cartas, em cima do valor).
+//   forcaMinima   piso da força: a carta 2 já ataca como se fosse mais alta
+//                 (o teto continua 1, a força do K, que passou sem avisos de justiça)
+//   dano          multiplica o dano por bala de todo ataque
+//   velocidade    multiplicam o ritmo de todo ataque; 1,15 e 1,2 são o mesmo
+//   densidade     aperto (DESAFIO) do co-op, com o qual as 134 cartas já foram validadas
+// Tudo neutro (0, 1, 1, 1) = as cartas como eram antes.
+export const DIFICULDADE_PVP = { forcaMinima: 0.3, dano: 1.3, velocidade: 1.15, densidade: 1.2 }
+
+// 0 (valor 2) .. 1 (K): fração da força usada para escalar os ataques (com o piso de DIFICULDADE_PVP)
+export const forca = (valor) => {
+  const base = Math.min(1, Math.max(0, (valor - 2) / 11))
+  const piso = DIFICULDADE_PVP.forcaMinima
+  return piso + (1 - piso) * base
+}
 
 const lerp = (a, b, t) => Math.round(a + (b - a) * t)
 const duracaoDe = (t) => lerp(4000, 7000, t) // tempo ativo do ataque (os respiros somam ~0,8 s)
@@ -490,22 +503,24 @@ export function efeitosDaCarta(carta) {
 // ---------- carta -> ataque ----------
 
 // Dano de cada bala do ataque da carta (antes do escudo de quem recebe)
-//   espadas 3..10, paus 3..9, ouros 3..8, copas 2
+//   com DIFICULDADE_PVP.dano 1,3: espadas 4..13, paus 4..12, ouros 4..10, copas 3
 export function danoDaCarta(carta) {
   const especial = especialDaCarta(carta)
   const valor = especial ? VALOR_DO_ESPECIAL[especial] ?? 0 : carta.valor
   const naipe = especial === 'espelho' ? 'espadas' : carta.naipe
   if (!valor) return 0
-  if (naipe === 'copas') return 2
+  if (naipe === 'copas') return Math.round(2 * DIFICULDADE_PVP.dano)
   const porValor = { espadas: 0.6, paus: 0.55, ouros: 0.45 }[naipe]
-  return Math.round(2 + valor * porValor)
+  return Math.round((2 + valor * porValor) * DIFICULDADE_PVP.dano)
 }
 
 // Multiplicadores de ritmo do ataque (ouros deixa as balas mais rápidas)
+// (todas levam o aperto de DIFICULDADE_PVP; ouros ainda acelera até 20% em cima)
 export function ritmoDaCarta(carta) {
-  if (carta.naipe !== 'ouros') return { velocidade: 1, densidade: 1 }
+  const { velocidade, densidade } = DIFICULDADE_PVP
+  if (carta.naipe !== 'ouros') return { velocidade, densidade }
   const valor = carta.valor === 1 ? VALOR_DO_ESPECIAL.anular : carta.valor
-  return { velocidade: Math.round((1 + 0.2 * forca(valor)) * 100) / 100, densidade: 1 }
+  return { velocidade: Math.round(velocidade * (1 + 0.2 * forca(valor)) * 100) / 100, densidade }
 }
 
 // ms de controles invertidos que o ataque causa na caixa de quem recebe
