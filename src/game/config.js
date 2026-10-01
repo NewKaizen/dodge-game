@@ -2,6 +2,9 @@ import Phaser from 'phaser'
 import { LARGURA, ALTURA, CORES } from './constants.js'
 import Boot from './scenes/Boot.js'
 import Menu from './scenes/Menu.js'
+import Modo from './scenes/Modo.js'
+import EscolhaParty from './scenes/EscolhaParty.js'
+import PvpEmBreve from './scenes/PvpEmBreve.js'
 import Selecao from './scenes/Selecao.js'
 import Dificuldade from './scenes/Dificuldade.js'
 import Battle from './scenes/Battle.js'
@@ -9,6 +12,8 @@ import Vitoria from './scenes/Vitoria.js'
 import Pausa from './scenes/Pausa.js'
 import GameOver from './scenes/GameOver.js'
 import Entrada from './scenes/Entrada.js'
+import TesteCartas from './scenes/TesteCartas.js'
+import PvpArenaTeste from './scenes/PvpArenaTeste.js'
 
 // tamanho: { largura, altura, zoomCss } de prepararResolucao() (resolucao.js)
 export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCss = 1 } = {}) {
@@ -21,6 +26,7 @@ export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCs
     pixelArt: true,
     roundPixels: true,
     scale: { mode: Phaser.Scale.NONE, zoom: zoomCss },
-    scene: [Boot, Menu, Selecao, Dificuldade, Battle, Vitoria, GameOver, Entrada, Pausa],
+    // TesteCartas e PvpArenaTeste: telas de teste do PvP (no dev: debugJogo.jogo.scene.start('...'))
+    scene: [Boot, Menu, Modo, EscolhaParty, PvpEmBreve, Selecao, Dificuldade, Battle, Vitoria, GameOver, Entrada, Pausa, TesteCartas, PvpArenaTeste],
   }
 }

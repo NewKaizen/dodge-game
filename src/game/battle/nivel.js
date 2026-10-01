@@ -3,6 +3,7 @@ import { NIVEIS, ATAQUE, FONTE, LARGURA } from '../constants.js'
 import { ataques } from '../attacks/index.js'
 import { juntos, sequencia, comCaixa } from '../attacks/definir.js'
 import { shake } from '../effects/shake.js'
+import { ignorarNasCaixas } from '../recorte.js'
 
 // Nível da luta (FÁCIL / MÉDIO / DIFÍCIL, escolhido na tela Dificuldade).
 // Os números ficam em NIVEIS (constants.js); aqui só o que o nível FAZ na
@@ -65,7 +66,7 @@ export function criarEtiquetaNivel(cena, nivel) {
     .setOrigin(1, 0)
     .setDepth(30)
     .setAlpha(0.85)
-  cena.cameraCaixa?.ignore(t)
+  ignorarNasCaixas(cena, t)
   cena.etiquetaNivel = t
   return t
 }

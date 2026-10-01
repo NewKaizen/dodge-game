@@ -29,6 +29,21 @@ export const ASSETS = {
     coronel: null,
     'icone-kris': null,
     'icone-susie': null,
+    // Personagens sem arte própria: por padrão viram um boneco genérico (manequim
+    // na cor do personagem com a inicial no peito, ver boneco() em arte/sprites.js).
+    // Para usar o seu desenho, aponte para um PNG, ex.:
+    //   ralsei: 'assets/sprites/ralsei.png', 'icone-ralsei': 'assets/sprites/icone-ralsei.png'
+    // Tamanhos e escala: public/assets/sprites/LEIA-ME.txt
+    ralsei: null,
+    noelle: null,
+    berdly: null,
+    dess: null,
+    asriel: null,
+    'icone-ralsei': null,
+    'icone-noelle': null,
+    'icone-berdly': null,
+    'icone-dess': null,
+    'icone-asriel': null,
 
     // interface
     coracao: null,
@@ -48,6 +63,7 @@ export const ASSETS = {
     confete: null,
     estrela: null,
     raio: null,
+    'carta-brilho': null, // halo das cartas (entities/Carta.js)
 
     // balas
     'bala-bola': null,
@@ -115,6 +131,14 @@ export const ASSETS = {
     letraPesada: null,
     lamento: null,
     sino: null,
+    // cartas (entities/Carta.js e Mao.js)
+    cartaComprar: null,
+    cartaSelecionar: null,
+    cartaVirar: null,
+    cartaRevelar: null,
+    cartaArremessar: null,
+    cartaImpacto: null,
+    cartaDescartar: null,
   },
 
   musicas: {

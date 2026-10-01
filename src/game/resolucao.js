@@ -46,7 +46,7 @@ export function ajustarCamera(camera, x = 0, y = 0, largura = LARGURA, altura = 
 function ajustarCena(cena) {
   if (!cena.sys.isActive() && !cena.sys.isVisible()) return
   ajustarCamera(cena.cameras.main)
-  cena.caixa?.reaplicar?.() // câmera de recorte da caixa de batalha
+  for (const caixa of cena.caixasDeRecorte ?? []) caixa.reaplicar() // câmeras de recorte das caixas (recorte.js)
   const textos = (lista) =>
     lista.forEach((o) => {
       if (o instanceof Phaser.GameObjects.Text) o.setResolution(RES.escala)

@@ -9,7 +9,8 @@ export default class Ator {
     this.x = x
     this.y = y
     this.caido = false
-    this.sprite = scene.add.image(x, y, textura).setScale(ESCALA.personagem).setDepth(2)
+    // personagem sem sprite ainda: coração no lugar
+    this.sprite = scene.add.image(x, y, scene.textures.exists(textura) ? textura : 'coracao').setScale(ESCALA.personagem).setDepth(2)
     scene.tweens.add({
       targets: this.sprite,
       scaleY: ESCALA.personagem * 1.03,

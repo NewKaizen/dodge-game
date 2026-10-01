@@ -4,6 +4,7 @@ import { ajustarCamera } from '../resolucao.js'
 import { ESCALA } from '../arte/texturas.js'
 import { LARGURA, ALTURA, LAYOUT } from '../constants.js'
 import { flashTela } from './flash.js'
+import { ignorarNasCaixas } from '../recorte.js'
 
 // O momento da derrota, dentro da Battle (quando o último membro cai):
 //   o mundo congela e perde a cor, a música afunda e morre, o(s) coração(ões)
@@ -50,7 +51,7 @@ export function derrota(cena, aoTerminar) {
 
   // véu escuro por cima do campo de batalha
   const veu = cena.add.rectangle(0, 0, LARGURA, ALTURA, 0x000000).setOrigin(0).setDepth(95).setAlpha(0)
-  cena.cameraCaixa?.ignore(veu)
+  ignorarNasCaixas(cena, veu)
   animar(1700, (p) => veu.setAlpha(0.62 * p), 'Quad.easeOut')
 
   // ---------- o mundo congela e perde a cor ----------
@@ -82,7 +83,7 @@ export function derrota(cena, aoTerminar) {
   palco.ignore(cena.children.list)
   const noPalco = (obj) => {
     principal.ignore(obj)
-    cena.cameraCaixa?.ignore(obj)
+    ignorarNasCaixas(cena, obj)
     return obj
   }
 

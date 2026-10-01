@@ -1,5 +1,6 @@
 import { ASSETS } from '../assets.js'
-import { SPRITES, CORACAO_MAPA, RACHADURA, ICONES } from './sprites.js'
+import { SPRITES, CORACAO_MAPA, RACHADURA, ICONES, boneco, iconeBoneco } from './sprites.js'
+import { PERSONAGENS } from '../data/personagens.js'
 
 // Escala em que cada sprite de pixel art aparece no jogo
 export const ESCALA = { personagem: 3, chefe: 4, icone: 2, coracao: 1.4 }
@@ -211,6 +212,24 @@ function confete() {
   return c
 }
 
+// ---------- cartas (entities/Carta.js) ----------
+
+// Halo de carta: retângulo arredondado bem desfocado (pintado com tint, ADD).
+// A carta de 70x100 ocupa o miolo; a borda é o brilho que vaza.
+function cartaBrilho() {
+  const [c, g] = tela(128, 160)
+  g.imageSmoothingEnabled = true
+  g.fillStyle = '#ffffff'
+  g.shadowColor = 'rgba(255,255,255,1)'
+  g.shadowBlur = 16
+  g.beginPath()
+  g.roundRect(29, 30, 70, 100, 10)
+  g.fill()
+  g.shadowBlur = 24
+  g.fill()
+  return c
+}
+
 // Estrela de 5 pontas branca com brilho
 function estrela() {
   const [c, g] = tela(24, 24)
@@ -335,7 +354,24 @@ const iconePersonagem = (id) => () => pixelArt(SPRITES[id].mapa.slice(0, 10), SP
 const icone = (id) => () => pixelArt(ICONES[id], { '#': '#ffffff' }, `icone-${id}`)
 const bala = (forma) => () => formaBrilhante(FORMAS[forma])
 
+// Personagem sem pixel art própria em SPRITES: boneco genérico na cor dele com
+// a inicial do nome (placeholder; troque por PNG em assets.js)
+const desenhoBoneco = (id, fazer) => () => {
+  const def = PERSONAGENS[id]
+  const { mapa, paleta } = fazer(def.cor, def.nome[0])
+  return pixelArt(mapa, paleta, id)
+}
+const bonecos = Object.fromEntries(
+  Object.keys(PERSONAGENS)
+    .filter((id) => !SPRITES[id])
+    .flatMap((id) => [
+      [id, desenhoBoneco(id, boneco)],
+      [`icone-${id}`, desenhoBoneco(id, iconeBoneco)],
+    ]),
+)
+
 const GERADORES = {
+  ...bonecos, // ralsei, noelle, berdly, dess, asriel e os ícones deles
   kris: sprite('kris'),
   susie: sprite('susie'),
   king: sprite('king'),
@@ -364,6 +400,7 @@ const GERADORES = {
   aviso,
   confete,
   estrela,
+  'carta-brilho': cartaBrilho,
   raio,
 
   'bala-bola': bala('bola'),

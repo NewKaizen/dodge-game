@@ -31,7 +31,7 @@ import { ESCALA } from '../arte/texturas.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { ITENS } from '../data/itens.js'
 import { CHEFES } from '../data/chefes/index.js'
-import { BATALHA } from '../data/batalha.js'
+import { BATALHA, partyDe } from '../data/batalha.js'
 import { FIGHT, DESAFIO, ATAQUE, CORES, TEXTO, LAYOUT, TP, DEFEND, TEMPOS, COMANDOS, MERCY_MAX, DIFICULDADES, RITMO, IMPACTO } from '../constants.js'
 
 // Batalha no estilo Deltarune. Fases de cada turno:
@@ -64,7 +64,7 @@ export default class Battle extends Phaser.Scene {
     this.pausado = false
 
     this.fundo = criarFundo(this, this.defChefe.fundo, this.nivel.fundo)
-    this.party = BATALHA.party.map((id, i) => this.criarMembro(id, i))
+    this.party = partyDe(this.registry).map((id, i) => this.criarMembro(id, i))
     this.chefe = this.criarChefe(this.defChefe)
     this.inimigos = [this.chefe]
     this.inventario = new Inventario(this.defChefe.inventario)
@@ -286,7 +286,7 @@ export default class Battle extends Phaser.Scene {
 
   voarCoracao(de, para, cor, aoChegar) {
     const c = this.add.image(de.x, de.y, 'coracao').setTint(cor).setScale(ESCALA.coracao).setDepth(40)
-    this.cameraCaixa.ignore(c)
+    this.caixa.camera.ignore(c)
     tocar(this, 'voo')
     this.tweens.add({
       targets: c,

@@ -1,4 +1,5 @@
 import { FONTE, LARGURA, TEXTO } from '../constants.js'
+import { ignorarNasCaixas } from '../recorte.js'
 
 // Etiqueta curta no alto da tela (ex.: "ATAQUE ENFRAQUECIDO"): aparece, fica
 // um pouco e some. Diferente de numero(), que é um número que pula e sobe.
@@ -8,7 +9,7 @@ export function etiqueta(scene, texto, cor = TEXTO.cura, { x = LARGURA / 2, y = 
     .setOrigin(0.5)
     .setDepth(30)
     .setAlpha(0)
-  scene.cameraCaixa?.ignore(t)
+  ignorarNasCaixas(scene, t)
   scene.tweens.add({ targets: t, alpha: 1, duration: 150 })
   scene.tweens.add({ targets: t, alpha: 0, delay: Math.max(150, ms - 350), duration: 350, onComplete: () => t.destroy() })
   return t

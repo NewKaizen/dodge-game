@@ -19,7 +19,7 @@ export default class Menu extends Phaser.Scene {
       })
       .setOrigin(0.5, 0)
 
-    const iniciar = () => this.scene.start('Selecao')
+    const iniciar = () => this.scene.start('Modo')
     if (this.registry.get('conectado')) return iniciar()
 
     const aoMudar = (_, conectado) => conectado && iniciar()

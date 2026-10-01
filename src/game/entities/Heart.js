@@ -83,6 +83,12 @@ export default class Heart {
     this.scene.tweens.add({ targets: this.anel, alpha: 0, duration: 250 })
   }
 
+  destruir() {
+    this.scene.tweens.killTweensOf([this.sprite, this.anel])
+    this.sprite.destroy()
+    this.anel.destroy()
+  }
+
   tomarDano(duracaoMs) {
     this.invencivelMs = duracaoMs
     flash(this.scene, this.sprite, duracaoMs)

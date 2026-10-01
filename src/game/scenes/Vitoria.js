@@ -5,6 +5,7 @@ import { criarFundo } from '../backgrounds/index.js'
 import { ESCALA } from '../arte/texturas.js'
 import { tocar, musica } from '../audio.js'
 import { calcularRank, formatarTempo } from '../battle/estatisticas.js'
+import { partyDe } from '../data/batalha.js'
 import { fogoArtificio, canhoesConfete, chuvaConfete, raiosDeLuz, CORES_FESTA } from '../effects/festa.js'
 import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
@@ -284,10 +285,13 @@ export default class Vitoria extends Phaser.Scene {
     }
 
     const chao = 358
-    const membros = [
-      { textura: 'kris', x: 74, atraso: 0 },
-      { textura: 'susie', x: 142, atraso: 210 },
-    ]
+    // a party que lutou (registry 'party'), lado a lado embaixo do chefe
+    const party = partyDe(this.registry)
+    const membros = party.map((id, i) => ({
+      textura: this.textures.exists(id) ? id : 'coracao',
+      x: 108 + (i - (party.length - 1) / 2) * Math.min(68, 150 / Math.max(1, party.length - 1)),
+      atraso: i * 210,
+    }))
     membros.forEach(({ textura, x, atraso }, i) => {
       const sombra = this.add.ellipse(x, chao + 2, 40, 10, 0x000000, 0.45).setDepth(4)
       const s = this.add.image(x, chao, textura).setOrigin(0.5, 1).setScale(ESCALA.personagem).setDepth(5)

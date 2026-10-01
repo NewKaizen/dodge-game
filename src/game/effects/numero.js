@@ -1,4 +1,5 @@
 import { FONTE, TEXTO } from '../constants.js'
+import { ignorarNasCaixas } from '../recorte.js'
 
 // Número flutuante (dano, cura, MISS...) que pula, sobe e some.
 //   tamanho  fonte em px (padrão 20)
@@ -11,7 +12,7 @@ export function numero(scene, x, y, texto, cor = TEXTO.dano, { tamanho = 20, pop
     .setOrigin(0.5)
     .setDepth(30)
     .setScale(0.4)
-  scene.cameraCaixa?.ignore(t)
+  ignorarNasCaixas(scene, t)
   scene.tweens.add({ targets: t, scale: pop, duration: 120, ease: 'Back.easeOut' })
   if (pop > 1) scene.tweens.add({ targets: t, scale: 1, delay: 120, duration: 140, ease: 'Sine.easeInOut' })
   scene.tweens.add({

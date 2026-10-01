@@ -2,29 +2,51 @@ import Phaser from 'phaser'
 import { LAYOUT, CAIXA, CAIXA_DINAMICA, CORES } from '../constants.js'
 import { tocar } from '../audio.js'
 import { ajustarCamera } from '../resolucao.js'
+import { caixasDe, registrarCaixa, removerCaixa, ignorarNasCaixas } from '../recorte.js'
 
 // A caixa branca onde os corações desviam (expande no turno inimigo e
 // encolhe no fim). Pode mudar de forma no meio do turno (mudarPara), sempre
 // com uma pré-visualização antes, e volta ao padrão quando fecha.
+//
+// Pode haver várias caixas na mesma cena (arena PvP: pvp/Pista.js). Opções
+// (todas opcionais; sem elas é a caixa do co-op, igual a antes):
+//   x, y              centro padrão (LAYOUT.caixa)
+//   largura, altura   tamanho padrão (CAIXA)
+//   dinamica          limites da caixa dinâmica, mesclados em CAIXA_DINAMICA
+//                     (larguraMin/Max, alturaMin/Max, deslocMax, campo)
+//   cor               cor da borda (CORES.caixa)
+// As formas pedidas pelos ataques ({ largura, altura, x, y }) são pensadas
+// para a caixa padrão CAIXA; numa caixa de outro tamanho elas são escaladas
+// na mesma proporção (ver destinoDe).
 export default class BattleBox {
-  constructor(scene) {
+  constructor(scene, { x = LAYOUT.caixa.x, y = LAYOUT.caixa.y, largura = CAIXA.largura, altura = CAIXA.altura, dinamica = {}, cor = CORES.caixa } = {}) {
     this.scene = scene
-    const { x, y } = LAYOUT.caixa
-    this.base = { x, y, largura: CAIXA.largura, altura: CAIXA.altura } // centro e tamanho padrão
+    this.base = { x, y, largura, altura } // centro e tamanho padrão
+    this.dinamica = { ...CAIXA_DINAMICA, ...dinamica }
+    this.escala = { x: largura / CAIXA.largura, y: altura / CAIXA.altura } // formas dos ataques -> esta caixa
     // `limites` é um objeto só, alterado no lugar: quem guardou a referência (ataques, corações, balas) sempre vê a caixa atual
-    this.limites = new Phaser.Geom.Rectangle(x - CAIXA.largura / 2, y - CAIXA.altura / 2, CAIXA.largura, CAIXA.altura)
+    this.limites = new Phaser.Geom.Rectangle(x - largura / 2, y - altura / 2, largura, altura)
     this.retangulo = scene.add
-      .rectangle(x, y, CAIXA.largura, CAIXA.altura, CORES.fundo)
-      .setStrokeStyle(CAIXA.borda, CORES.caixa)
+      .rectangle(x, y, largura, altura, CORES.fundo)
+      .setStrokeStyle(CAIXA.borda, cor)
       .setDepth(1)
       .setVisible(false)
 
     // Câmera com viewport do tamanho da caixa: o que for passado para
     // recortar() só é desenhado por ela, então some fora da caixa. Ela só
-    // fica visível com a caixa aberta.
+    // fica visível com a caixa aberta. Cada caixa tem a sua: quem precisa
+    // dela usa caixa.camera (ou recorte.js para "todas as caixas").
     const l = this.limites
     this.camera = ajustarCamera(scene.cameras.add(), l.x, l.y, l.width, l.height).setScroll(l.x, l.y).setVisible(false)
-    scene.cameraCaixa = this.camera
+    // objetos recortados por esta caixa: as câmeras das outras caixas não os desenham
+    this.recortados = new Set()
+    for (const outra of caixasDe(scene)) this.camera.ignore([...outra.recortados])
+    // o retângulo das outras caixas também não aparece aqui (nem o desta nas outras)
+    for (const outra of caixasDe(scene)) {
+      this.camera.ignore(outra.retangulo)
+      outra.camera.ignore(this.retangulo)
+    }
+    registrarCaixa(scene, this)
 
     this.mudanca = null // mudança em andamento (ver mudarPara)
     this.aoMudar = null // chamado a cada passo da transição (a cena usa para empurrar os corações)
@@ -34,8 +56,26 @@ export default class BattleBox {
     return this.mudanca !== null
   }
 
+  // Os objetos passam a ser desenhados só pela câmera desta caixa
   recortar(...objetos) {
-    this.scene.cameras.main.ignore(objetos)
+    const lista = objetos.flat()
+    this.scene.cameras.main.ignore(lista)
+    for (const outra of caixasDe(this.scene)) if (outra !== this) outra.camera.ignore(lista)
+    for (const o of lista) {
+      if (this.recortados.has(o)) continue
+      this.recortados.add(o)
+      o.once?.('destroy', () => this.recortados.delete(o))
+    }
+  }
+
+  // Remove a caixa da cena (a do co-op vive a cena toda e não precisa disso)
+  destruir() {
+    this.cancelarMudanca()
+    this.scene.tweens.killTweensOf(this.retangulo)
+    removerCaixa(this.scene, this)
+    this.scene.cameras.remove(this.camera)
+    this.retangulo.destroy()
+    this.recortados.clear()
   }
 
   mostrar(aoAbrir) {
@@ -79,13 +119,15 @@ export default class BattleBox {
 
   // Retângulo de destino de uma forma { largura, altura, x?, y? } (null = padrão),
   // respeitando os limites de tamanho e o campo da tela
+  // (as medidas da forma são da caixa padrão CAIXA e escalam com esta caixa)
   destinoDe(forma) {
-    const d = CAIXA_DINAMICA
+    const d = this.dinamica
     const f = forma ?? {}
-    const largura = Phaser.Math.Clamp(f.largura ?? this.base.largura, d.larguraMin, d.larguraMax)
-    const altura = Phaser.Math.Clamp(f.altura ?? this.base.altura, d.alturaMin, d.alturaMax)
-    const cx = Phaser.Math.Clamp(this.base.x + Phaser.Math.Clamp(f.x ?? 0, -d.deslocMax, d.deslocMax), d.campo.esquerda + largura / 2, d.campo.direita - largura / 2)
-    const cy = Phaser.Math.Clamp(this.base.y + Phaser.Math.Clamp(f.y ?? 0, -d.deslocMax, d.deslocMax), d.campo.topo + altura / 2, d.campo.base - altura / 2)
+    const e = this.escala
+    const largura = Phaser.Math.Clamp((f.largura ?? CAIXA.largura) * e.x, d.larguraMin, d.larguraMax)
+    const altura = Phaser.Math.Clamp((f.altura ?? CAIXA.altura) * e.y, d.alturaMin, d.alturaMax)
+    const cx = Phaser.Math.Clamp(this.base.x + Phaser.Math.Clamp((f.x ?? 0) * e.x, -d.deslocMax, d.deslocMax), d.campo.esquerda + largura / 2, d.campo.direita - largura / 2)
+    const cy = Phaser.Math.Clamp(this.base.y + Phaser.Math.Clamp((f.y ?? 0) * e.y, -d.deslocMax, d.deslocMax), d.campo.topo + altura / 2, d.campo.base - altura / 2)
     return new Phaser.Geom.Rectangle(Math.round(cx - largura / 2), Math.round(cy - altura / 2), Math.round(largura), Math.round(altura))
   }
 
@@ -171,7 +213,7 @@ export default class BattleBox {
     }
     const principal = this.scene.add.graphics().setDepth(8)
     desenhar(principal)
-    this.camera.ignore(principal)
+    ignorarNasCaixas(this.scene, principal) // fora da caixa: só a câmera principal
     const dentro = this.scene.add.graphics().setDepth(8)
     desenhar(dentro)
     this.recortar(dentro)

@@ -381,4 +381,48 @@ const SINTESE = {
   },
   // brilho extra quando a nota é S
   brilhoRank: (s) => [1318, 1568, 2093, 2637].forEach((f, i) => s.tom(f, 0.16, 'triangle', 0.07, f, 0.08 + i * 0.06)),
+  // ---------- cartas ----------
+  // carta saindo do monte: "fsst" curto subindo
+  cartaComprar: (s) => {
+    s.ruido(0.07, 0.16, 0, 5000)
+    s.tom(700, 0.07, 'sine', 0.06, 1500)
+  },
+  // cursor passando de uma carta para outra: tique leve de papel
+  cartaSelecionar: (s) => {
+    s.ruido(0.025, 0.1, 0, 7000)
+    s.tom(900, 0.035, 'triangle', 0.06, 1150)
+  },
+  // carta virando na mesa: estalo de papel + batidinha grave
+  cartaVirar: (s) => {
+    s.ruido(0.03, 0.22, 0, 8000)
+    s.tom(320, 0.06, 'square', 0.05, 160)
+    s.ruido(0.05, 0.1, 0.03, 1500)
+  },
+  // as duas cartas aparecendo: estalo + brilho subindo
+  cartaRevelar: (s) => {
+    s.ruido(0.035, 0.24, 0, 8000)
+    ;[784, 1046, 1318].forEach((f, i) => s.tom(f, 0.16, 'triangle', 0.06, f * 1.01, 0.03 + i * 0.04))
+  },
+  // carta girando no ar: zumbido que sobe e corta o ar
+  cartaArremessar: (s) => {
+    s.ruido(0.28, 0.14, 0, 3000)
+    s.tom(220, 0.26, 'sawtooth', 0.05, 900)
+    s.tom(440, 0.2, 'triangle', 0.05, 1600, 0.04)
+  },
+  // carta se estilhaçando no alvo: pancada, vidro e cacos
+  cartaImpacto: (s) => {
+    s.ruido(0.06, 0.4, 0, 9000)
+    s.ruido(0.3, 0.28, 0, 1200)
+    s.tom(150, 0.3, 'square', 0.16, 40)
+    s.tom(70, 0.4, 'sine', 0.35, 30)
+    for (let i = 0; i < 6; i++) {
+      const f = 2200 + Math.random() * 2000
+      s.tom(f, 0.05 + Math.random() * 0.06, 'triangle', 0.04, f * 0.95, 0.04 + i * 0.035)
+    }
+  },
+  // carta sumindo da mão: sopro curto descendo
+  cartaDescartar: (s) => {
+    s.ruido(0.12, 0.12, 0, 2500)
+    s.tom(500, 0.12, 'sine', 0.05, 200)
+  },
 }

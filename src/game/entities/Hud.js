@@ -28,7 +28,8 @@ export default class Hud {
     this.paineis = party.map((m, i) => {
       const px = x + i * w
       scene.add.rectangle(px + 3, y, w - 6, altura, CORES.painel).setOrigin(0).setStrokeStyle(2, m.cor)
-      scene.add.image(px + 24, y + 14, `icone-${m.id}`).setScale(ESCALA.icone)
+      const icone = scene.textures.exists(`icone-${m.id}`) ? `icone-${m.id}` : 'coracao' // personagem sem ícone ainda
+      scene.add.image(px + 24, y + 14, icone).setScale(ESCALA.icone)
       const nome = texto(px + 46, y + 4, m.nome.toUpperCase(), 16, corTexto(m.cor))
       if (numJogadores > 1) {
         texto(nome.x + nome.width + 8, y + 7, `P${m.jogador + 1}`, 13, corTexto(CORES.almas[m.jogador]))

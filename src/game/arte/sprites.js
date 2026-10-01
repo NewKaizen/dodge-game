@@ -418,3 +418,99 @@ export const ICONES = {
     '.....##.....',
   ],
 }
+
+// ---------- boneco genérico (placeholder) ----------
+//
+// Manequim neutro, igual para todos os personagens sem arte própria: só muda a
+// cor e a inicial no peito. Não representa ninguém de propósito; troque pelo
+// seu PNG em assets.js (ver public/assets/sprites/LEIA-ME.txt).
+//   boneco(cor, letra)       -> { mapa, paleta } de 17x24 (mesma altura de kris/susie)
+//   iconeBoneco(cor, letra)  -> { mapa, paleta } de 11x11 (cabeça com a inicial)
+// cor é um número 0xRRGGBB (o mesmo `cor` de personagens.js).
+
+// Letras 3x5 para a inicial
+const LETRAS = {
+  A: ['.#.', '#.#', '###', '#.#', '#.#'],
+  B: ['##.', '#.#', '##.', '#.#', '##.'],
+  C: ['.##', '#..', '#..', '#..', '.##'],
+  D: ['##.', '#.#', '#.#', '#.#', '##.'],
+  E: ['###', '#..', '##.', '#..', '###'],
+  F: ['###', '#..', '##.', '#..', '#..'],
+  G: ['.##', '#..', '#.#', '#.#', '.##'],
+  H: ['#.#', '#.#', '###', '#.#', '#.#'],
+  I: ['###', '.#.', '.#.', '.#.', '###'],
+  J: ['..#', '..#', '..#', '#.#', '.#.'],
+  K: ['#.#', '#.#', '##.', '#.#', '#.#'],
+  L: ['#..', '#..', '#..', '#..', '###'],
+  M: ['#.#', '###', '###', '#.#', '#.#'],
+  N: ['##.', '#.#', '#.#', '#.#', '#.#'],
+  O: ['.#.', '#.#', '#.#', '#.#', '.#.'],
+  P: ['##.', '#.#', '##.', '#..', '#..'],
+  Q: ['.#.', '#.#', '#.#', '##.', '.##'],
+  R: ['##.', '#.#', '##.', '#.#', '#.#'],
+  S: ['.##', '#..', '.#.', '..#', '##.'],
+  T: ['###', '.#.', '.#.', '.#.', '.#.'],
+  U: ['#.#', '#.#', '#.#', '#.#', '###'],
+  V: ['#.#', '#.#', '#.#', '#.#', '.#.'],
+  W: ['#.#', '#.#', '###', '###', '#.#'],
+  X: ['#.#', '#.#', '.#.', '#.#', '#.#'],
+  Y: ['#.#', '#.#', '.#.', '.#.', '.#.'],
+  Z: ['###', '..#', '.#.', '#..', '###'],
+  '?': ['##.', '..#', '.#.', '...', '.#.'],
+}
+
+// 0xRRGGBB -> '#rrggbb' com o brilho multiplicado por f
+function tom(cor, f) {
+  const canal = (d) => Math.min(255, Math.round(((cor >> d) & 0xff) * f))
+  return '#' + [16, 8, 0].map((d) => canal(d).toString(16).padStart(2, '0')).join('')
+}
+
+// Letra escura em cor clara, branca em cor escura
+function corDaLetra(cor) {
+  const luz = 0.299 * ((cor >> 16) & 0xff) + 0.587 * ((cor >> 8) & 0xff) + 0.114 * (cor & 0xff)
+  return luz > 150 ? '#1a1a2e' : '#ffffff'
+}
+
+// Monta o mapa a partir de uma função (x, y) -> 'c' | 'C' | null e põe o
+// contorno 'o' em volta de tudo que foi preenchido
+function contornar(largura, altura, preencher) {
+  const grade = Array.from({ length: altura }, (_, y) => Array.from({ length: largura }, (_, x) => preencher(x, y) ?? '.'))
+  const cheio = (x, y) => grade[y]?.[x] !== undefined && grade[y][x] !== '.' && grade[y][x] !== 'o'
+  for (let y = 0; y < altura; y++) {
+    for (let x = 0; x < largura; x++) {
+      if (grade[y][x] !== '.') continue
+      if (cheio(x - 1, y) || cheio(x + 1, y) || cheio(x, y - 1) || cheio(x, y + 1)) grade[y][x] = 'o'
+    }
+  }
+  return grade
+}
+
+function carimbarLetra(grade, letra, x0, y0) {
+  const desenho = LETRAS[String(letra).toUpperCase()] ?? LETRAS['?']
+  desenho.forEach((linha, dy) => [...linha].forEach((ch, dx) => ch === '#' && (grade[y0 + dy][x0 + dx] = 'l')))
+}
+
+function paletaBoneco(cor) {
+  return { c: tom(cor, 1), C: tom(cor, 0.72), o: tom(cor, 0.38), l: corDaLetra(cor) }
+}
+
+export function boneco(cor, letra) {
+  const dentro = (x, y, x0, y0, x1, y1) => x >= x0 && x <= x1 && y >= y0 && y <= y1
+  const grade = contornar(17, 24, (x, y) => {
+    if ((x - 8) ** 2 + (y - 4) ** 2 <= 3.5 ** 2) return 'c' // cabeça
+    if (dentro(x, y, 7, 8, 9, 8)) return 'C' // pescoço
+    if (dentro(x, y, 4, 9, 12, 16) && !((x === 4 || x === 12) && y === 9)) return 'c' // tronco (ombros arredondados)
+    if (dentro(x, y, 2, 10, 3, 16) || dentro(x, y, 13, 10, 14, 16)) return 'C' // braços
+    if (dentro(x, y, 5, 17, 7, 21) || dentro(x, y, 9, 17, 11, 21)) return 'C' // pernas
+    if (dentro(x, y, 4, 22, 7, 22) || dentro(x, y, 9, 22, 12, 22)) return 'c' // pés
+    return null
+  })
+  carimbarLetra(grade, letra, 7, 11)
+  return { mapa: grade.map((l) => l.join('')), paleta: paletaBoneco(cor) }
+}
+
+export function iconeBoneco(cor, letra) {
+  const grade = contornar(11, 11, (x, y) => ((x - 5) ** 2 + (y - 5) ** 2 <= 4.6 ** 2 ? 'c' : null))
+  carimbarLetra(grade, letra, 4, 3)
+  return { mapa: grade.map((l) => l.join('')), paleta: paletaBoneco(cor) }
+}

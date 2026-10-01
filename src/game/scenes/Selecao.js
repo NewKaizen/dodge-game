@@ -9,6 +9,7 @@ import { CORES, DIFICULDADES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants
 const CARTA = { largura: 142, altura: 270, y: 245, passo: 152 }
 
 // Tela de seleção de chefe (com a dificuldade base); depois vem a tela do nível (Dificuldade)
+// B: volta para a escolha da party (EscolhaParty)
 export default class Selecao extends Phaser.Scene {
   constructor() {
     super('Selecao')
@@ -16,7 +17,7 @@ export default class Selecao extends Phaser.Scene {
 
   create() {
     this.controles = new Controles(this)
-    this.controles.onBotao((_, botao) => botao === 'A' && this.confirmar())
+    this.controles.onBotao((_, botao) => (botao === 'A' ? this.confirmar() : this.voltar()))
     this.fundo = null
     this.escolhido = false
     const texto = (x, y, conteudo, tamanho, cor = TEXTO.normal, extra = {}) =>
@@ -42,7 +43,7 @@ export default class Selecao extends Phaser.Scene {
 
     this.cursor = this.add.image(0, 0, 'coracao').setTint(CORES.almas[0]).setScale(1.8)
     this.info = texto(LARGURA / 2, ALTURA - 56, '', 15)
-    texto(LARGURA / 2, ALTURA - 30, '← → escolher     A: confirmar', 14, TEXTO.desabilitado)
+    texto(LARGURA / 2, ALTURA - 30, '← → escolher     A: confirmar     B: party', 14, TEXTO.desabilitado)
 
     const atual = ORDEM_CHEFES.indexOf(this.registry.get('chefe'))
     this.selecionar(Math.max(0, atual), false)
@@ -74,6 +75,14 @@ export default class Selecao extends Phaser.Scene {
     this.cameras.main.flash(200, 255, 255, 255)
     this.cameras.main.fadeOut(300, 0, 0, 0)
     this.time.delayedCall(320, () => this.scene.start('Dificuldade', { chefe: ORDEM_CHEFES[this.indice] }))
+  }
+
+  voltar() {
+    if (this.escolhido) return
+    this.escolhido = true
+    tocar(this, 'cancelar')
+    this.cameras.main.fadeOut(200, 0, 0, 0)
+    this.time.delayedCall(220, () => this.scene.start('EscolhaParty'))
   }
 
   update(time, delta) {

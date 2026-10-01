@@ -5,6 +5,7 @@ import { particulas } from '../effects/particulas.js'
 import { flashTela } from '../effects/flash.js'
 import { shake } from '../effects/shake.js'
 import { tocar } from '../audio.js'
+import { ignorarNasCaixas } from '../recorte.js'
 
 const LARGURA_BARRA = 100
 const TREMOR_MS = 750 // tempo tremendo antes de estourar (no relógio da cena: a câmera lenta estica)
@@ -125,7 +126,7 @@ export default class Inimigo {
           .setDepth(3)
           .setTintMode(Phaser.TintModes.FILL)
           .setTint(0xffffff)
-        scene.cameraCaixa?.ignore(pedaco)
+        ignorarNasCaixas(scene, pedaco)
         // voa para longe do centro, com um pouco de gravidade
         const angulo = Math.atan2(py - this.y, px - this.x) + Phaser.Math.FloatBetween(-0.4, 0.4)
         const distancia = Phaser.Math.Between(60, 190)

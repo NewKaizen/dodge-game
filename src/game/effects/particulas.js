@@ -1,3 +1,5 @@
+import { ignorarNasCaixas } from '../recorte.js'
+
 // Explosão de faíscas (acertos, graze, cura...)
 export function particulas(scene, x, y, { cor = 0xffffff, quantidade = 10, velocidade = 120, vida = 450, escala = 1 } = {}) {
   const emissor = scene.add.particles(x, y, 'faisca', {
@@ -11,7 +13,7 @@ export function particulas(scene, x, y, { cor = 0xffffff, quantidade = 10, veloc
     emitting: false,
   })
   emissor.setDepth(25)
-  scene.cameraCaixa?.ignore(emissor)
+  ignorarNasCaixas(scene, emissor)
   emissor.explode(quantidade)
   scene.time.delayedCall(vida + 200, () => emissor.destroy())
 }
