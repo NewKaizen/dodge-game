@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import Controles from '../controles.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { PERSONAGENS_PVP } from '../pvp/cartas.js'
+import { NIVEIS_BOT, NIVEL_BOT_PADRAO } from '../pvp/bot.js'
 import { perfilPvp, rotuloCarta, COR_NAIPE, TIPO_NAIPE, TEXTO_JOGADOR } from '../pvp/perfil.js'
 import { desenharNaipe } from '../entities/Carta.js'
 import { criarFundo } from '../backgrounds/index.js'
@@ -13,6 +14,8 @@ import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 const GRADE = { topo: 62, base: 190, esquerda: 20, direita: 620, espaco: 8, larguraMax: 96, alturaMax: 128 }
 const PAINEL = { y: 198, altura: 250, espaco: 8 }
 const CHAVE_SALVA = 'dodge-pvp' // última escolha (também fica no registry 'pvp')
+const CHAVE_NIVEL = 'dodge-pvp-cpu' // nível da CPU (também fica no registry 'pvpNivelBot')
+const NOMES_NIVEL = { facil: 'FÁCIL', normal: 'NORMAL', dificil: 'DIFÍCIL' }
 
 // Transição "P1 VS P2" (ms desde a confirmação do segundo jogador)
 const VS = { entrada: 120, batida: 560, espelho: 760, saida: 1500, fim: 1760 }
@@ -21,8 +24,9 @@ const VS = { entrada: 120, batida: 560, espelho: 760, saida: 1500, fim: 1760 }
 //   2 jogadores: cada um tem seu cursor (cor da alma) e confirma o seu ao
 //                mesmo tempo; os dois PODEM pegar o mesmo personagem (espelho).
 //                B desfaz a própria escolha; sem nada para desfazer, volta ao Modo.
-//   1 jogador:   modo treino: o mesmo controle escolhe o P1 e depois o P2;
-//                B desfaz o último; sem nada escolhido, volta ao Modo.
+//   1 jogador:   contra a CPU: o controle escolhe o próprio lutador (P1) e
+//                depois o da CPU (P2); ↑/↓ trocam o nível da CPU (fácil,
+//                normal, difícil). B desfaz o último; sem nada escolhido, volta ao Modo.
 // O painel de cada jogador mostra o personagem em foco: HP no PvP, a
 // composição do baralho por naipe, as 3 cartas mais fortes e o estilo.
 // Quando os dois confirmam: "P1 VS P2", grava registry 'pvp' = { p1, p2 }
@@ -38,7 +42,8 @@ export default class PvpEscolha extends Phaser.Scene {
     this.controles = new Controles(this)
     this.controles.onBotao((jogador, botao) => (botao === 'A' ? this.confirmar(jogador) : this.desfazer(jogador)))
     this.solo = this.controles.numJogadores === 1
-    this.etapa = 0 // modo treino: qual jogador o controle está escolhendo
+    this.etapa = 0 // contra a CPU: qual jogador o controle está escolhendo
+    this.nivelBot = this.lerNivelBot()
     this.confirmados = [null, null]
     this.saindo = false
     this.vs = null
@@ -72,8 +77,41 @@ export default class PvpEscolha extends Phaser.Scene {
     this.registry.events.on('changedata-numJogadores', aoMudar)
     this.events.once('shutdown', () => this.registry.events.off('changedata-numJogadores', aoMudar))
 
-    musica(this, 'selecao')
+    musica(this, 'pvpEscolha', 'selecao')
     this.cameras.main.fadeIn(250)
+  }
+
+  // nome curto de cada lado (contra a CPU, o P2 é "CPU")
+  rotulo(j) {
+    return this.solo && j === 1 ? 'CPU' : `P${j + 1}`
+  }
+
+  lerNivelBot() {
+    let nivel = this.registry.get('pvpNivelBot')
+    if (!nivel) {
+      try {
+        nivel = localStorage.getItem(CHAVE_NIVEL)
+      } catch {
+        nivel = null
+      }
+    }
+    return NIVEIS_BOT[nivel] ? nivel : NIVEL_BOT_PADRAO
+  }
+
+  // ↑/↓ contra a CPU: troca o nível (fica salvo para as próximas partidas)
+  mudarNivelBot(passo) {
+    const niveis = Object.keys(NIVEIS_BOT)
+    const i = niveis.indexOf(this.nivelBot)
+    this.nivelBot = niveis[(i + passo + niveis.length) % niveis.length]
+    this.registry.set('pvpNivelBot', this.nivelBot)
+    try {
+      localStorage.setItem(CHAVE_NIVEL, this.nivelBot)
+    } catch {
+      // sem armazenamento: fica só no registry
+    }
+    tocar(this, 'mover')
+    this.atualizarTela()
+    this.tweens.add({ targets: this.status, scale: { from: 1.15, to: 1 }, duration: 140 })
   }
 
   ultimaEscolha() {
@@ -120,7 +158,7 @@ export default class PvpEscolha extends Phaser.Scene {
       const selos = [0, 1].map((j) => {
         const sx = x + (j === 0 ? -1 : 1) * (largura / 2 - 17)
         const fundo = this.add.rectangle(sx, y - altura / 2 + 12, 28, 16, CORES.almas[j]).setStrokeStyle(2, 0x000000).setDepth(6).setVisible(false)
-        const rotulo = this.add.text(sx, fundo.y, `P${j + 1}`, { fontFamily: FONTE, fontSize: '12px', color: '#000000' }).setOrigin(0.5).setDepth(6).setVisible(false)
+        const rotulo = this.add.text(sx, fundo.y, this.rotulo(j), { fontFamily: FONTE, fontSize: '12px', color: '#000000' }).setOrigin(0.5).setDepth(6).setVisible(false)
         return { fundo, rotulo }
       })
       return { id, def, x, y, moldura, sprite, selos }
@@ -137,7 +175,7 @@ export default class PvpEscolha extends Phaser.Scene {
       const y = p.y
       const moldura = this.add.rectangle(x, y, largura, p.altura, CORES.painel, 0.92).setOrigin(0).setStrokeStyle(2, CORES.almas[j], 0.85)
       this.add.rectangle(x + 8, y + 8, 30, 20, CORES.almas[j]).setOrigin(0)
-      this.add.text(x + 23, y + 18, `P${j + 1}`, estilo(14, '#000000')).setOrigin(0.5)
+      this.add.text(x + 23, y + 18, this.rotulo(j), estilo(14, '#000000')).setOrigin(0.5)
       const nome = this.add.text(x + 46, y + 7, '', estilo(19))
       const hp = this.add.text(x + largura - 10, y + 9, '', estilo(16)).setOrigin(1, 0)
       const coracaoHp = this.add.image(0, y + 18, 'coracao').setTint(0xff4050).setScale(0.8)
@@ -231,6 +269,7 @@ export default class PvpEscolha extends Phaser.Scene {
     this.saindo = true
     const [p1, p2] = this.confirmados
     this.registry.set('pvp', { p1, p2 })
+    this.registry.set('pvpNivelBot', this.nivelBot)
     try {
       localStorage.setItem(CHAVE_SALVA, JSON.stringify({ p1, p2 }))
     } catch {
@@ -304,7 +343,7 @@ export default class PvpEscolha extends Phaser.Scene {
     })
 
     if (this.solo) {
-      this.status.setText('PvP é para 2 jogadores — modo treino: um controle escolhe os dois').setColor(TEXTO.selecionado)
+      this.status.setText(`VOCÊ x CPU  ·  nível da CPU: ${NOMES_NIVEL[this.nivelBot]}  (↑/↓ muda)`).setColor(TEXTO.selecionado)
     } else {
       const faltam = this.confirmados.filter((c) => !c).length
       this.status.setText(faltam ? 'cada jogador escolhe 1 lutador  ·  pode repetir!' : '').setColor(TEXTO.normal)
@@ -325,10 +364,10 @@ export default class PvpEscolha extends Phaser.Scene {
       rodape = this.solo ? 'PRONTO!' : 'PRONTO!  (B desfaz)'
       cor = TEXTO.cura
     } else if (this.solo && j > this.etapa) {
-      rodape = 'escolha depois do P1'
+      rodape = 'depois: o lutador da CPU'
       cor = TEXTO.desabilitado
     } else {
-      rodape = this.solo ? `A: escolher o P${j + 1}` : 'A: escolher'
+      rodape = !this.solo ? 'A: escolher' : j === 1 ? 'A: escolher a CPU' : 'A: escolher o seu'
       if (this.confirmados[1 - j] === id) {
         rodape += '  ·  ESPELHO!'
         cor = TEXTO.selecionado
@@ -425,7 +464,7 @@ export default class PvpEscolha extends Phaser.Scene {
       const sprite = this.add.image(x, chao, textura).setOrigin(0.5, 1).setScale(5).setDepth(topo + 5).setFlipX(j === 1)
       if (textura === 'coracao') sprite.setTint(def.cor)
       const etiqueta = this.add
-        .text(x, chao + 26, `P${j + 1}`, { fontFamily: FONTE, fontSize: '18px', color: TEXTO_JOGADOR[j], stroke: '#000000', strokeThickness: 4 })
+        .text(x, chao + 26, this.rotulo(j), { fontFamily: FONTE, fontSize: '18px', color: TEXTO_JOGADOR[j], stroke: '#000000', strokeThickness: 4 })
         .setOrigin(0.5)
         .setDepth(topo + 5)
       const nome = this.add
@@ -508,8 +547,9 @@ export default class PvpEscolha extends Phaser.Scene {
         const direcao = this.controles.toque(j)
         if (direcao === 'esquerda') this.mover(j, -1)
         if (direcao === 'direita') this.mover(j, 1)
-        if (direcao === 'cima') this.moverLinha(j, -1)
-        if (direcao === 'baixo') this.moverLinha(j, 1)
+        // contra a CPU, ↑/↓ trocam o nível dela (com uma linha só de lutadores, ↑/↓ não fariam nada)
+        if (direcao === 'cima') this.solo ? this.mudarNivelBot(1) : this.moverLinha(j, -1)
+        if (direcao === 'baixo') this.solo ? this.mudarNivelBot(-1) : this.moverLinha(j, 1)
       }
     }
     this.fundo.atualizar(delta)
