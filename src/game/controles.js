@@ -9,10 +9,13 @@ export default class Controles {
     this.scene = scene
     this.numJogadores = scene.registry.get('numJogadores') ?? 1
     this.ouvintes = []
+    this.ouvintesPausa = []
     this.anterior = []
     this.toques = []
 
     const aoBotao = ({ jogador, botao }) => {
+      // o botão de pause vale para qualquer jogador
+      if (botao === 'C') return this.ouvintesPausa.forEach((fn) => fn(jogador))
       const j = this.numJogadores === 1 ? 0 : jogador
       if (j >= this.numJogadores) return
       this.ouvintes.forEach((fn) => fn(j, botao))
@@ -24,6 +27,11 @@ export default class Controles {
   // fn(jogador, 'A' | 'B')
   onBotao(fn) {
     this.ouvintes.push(fn)
+  }
+
+  // fn(jogador): botão de pause (C no teclado / BTN C no joystick)
+  onPausa(fn) {
+    this.ouvintesPausa.push(fn)
   }
 
   // Direção analógica do jogador, -100..100 em cada eixo

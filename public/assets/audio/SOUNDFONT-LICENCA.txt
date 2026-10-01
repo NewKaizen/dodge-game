@@ -1,3 +1,7 @@
-soundfont.sf3 = FluidR3 Mono GM (versão SF3 comprimida distribuída pelo MuseScore)
-FluidR3_GM por Frank Wen e colaboradores, licença MIT.
+soundfont.sf3 = GeneralUser GS v1.471, de S. Christian Collins (http://www.schristiancollins.com)
+Convertido de SF2 para SF3 (amostras em Ogg Vorbis, qualidade 6) para ficar leve na web: 31 MB -> 8,8 MB.
+
+Licença (resumo do LICENSE da GeneralUser GS v2.0): pode ser usado sem restrição para criar
+música, privada ou comercial, e em projetos de software; pode ser modificado e reempacotado.
+
 Pode ser trocado por qualquer soundfont General MIDI .sf2/.sf3 com o mesmo nome.

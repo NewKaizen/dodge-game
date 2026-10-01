@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js'
 import { AUDIO } from './constants.js'
-import { tocarMidi, pararMidi, setVolumeMidi } from './midi.js'
+import { tocarMidi, pararMidi, pausarMidi, retomarMidi, setVolumeMidi, distorcerMidi } from './midi.js'
 
 // Sons: se assets.js tiver um arquivo, toca o arquivo; senão sintetiza com WebAudio.
 // Músicas: arquivo .mid toca com soundfont (midi.js); .ogg/.mp3 tocam direto.
@@ -57,11 +57,66 @@ export function musica(scene, nome) {
   musicaAtual.play()
 }
 
+// Menu de pause: congela a música e continua do mesmo ponto depois
+export function pausarMusica() {
+  pausarMidi()
+  if (musicaAtual?.isPlaying) musicaAtual.pause()
+}
+
+export function retomarMusica() {
+  retomarMidi()
+  if (musicaAtual?.isPaused) musicaAtual.resume()
+}
+
 export function pararMusica() {
   pararMidi()
   musicaAtual?.stop()
   musicaAtual?.destroy()
   musicaAtual = null
+}
+
+// Fim de luta: distorce a música tocando (fita perdendo força, filtro
+// fechando) e para. Serve para .mid (midi.js) e .ogg/.mp3 (rate + detune do
+// Phaser). Sem música tocando, resolve na hora.
+//   opcoes.suave    chefe poupado: cai menos e termina em fade, sem estalo
+//   opcoes.sombrio  party derrotada: despenca muito, abafa e some, sem estalo
+// Devolve Promise<boolean> (true se havia música); aceita também um callback.
+export function distorcerEParar(ms = 1600, opcoes = {}, aoTerminar) {
+  const estalo = () => {
+    const c = ligado && obterContexto()
+    if (c) SINTESE.estalo(sintetizador(c))
+  }
+  const promessa = musicaAtual ? distorcerArquivo(ms, opcoes, estalo) : distorcerMidi(ms, { ...opcoes, aoCortar: estalo })
+  if (aoTerminar) promessa.then(aoTerminar)
+  return promessa
+}
+
+// Versão para música em arquivo (som do Phaser)
+function distorcerArquivo(ms, { suave = false, sombrio = false }, estalo) {
+  const som = musicaAtual
+  musicaAtual = null // a próxima musica() começa limpa (outro objeto de som)
+  if (!som.isPlaying) {
+    som.destroy()
+    return Promise.resolve(false)
+  }
+  const volume = som.volume
+  const cfg = sombrio ? { ritmo: 0.85, cents: -2400 } : suave ? { ritmo: 0.4, cents: -300 } : { ritmo: 0.75, cents: -900 }
+  return new Promise((resolver) => {
+    const inicio = performance.now()
+    const passo = setInterval(() => {
+      const p = Math.min(1, (performance.now() - inicio) / ms)
+      som.setRate(Math.max(0.1, 1 - cfg.ritmo * p ** 1.4))
+      som.setDetune(cfg.cents * p ** 2 + Math.sin(p * 38) * 35 * p)
+      if (suave) som.setVolume(volume * (1 - p))
+      if (sombrio) som.setVolume(volume * Math.min(1, (1 - p) / 0.55))
+      if (p < 1) return
+      clearInterval(passo)
+      som.stop()
+      som.destroy()
+      if (!suave && !sombrio) estalo()
+      resolver(true)
+    }, 30)
+  })
 }
 
 function obterContexto() {
@@ -89,6 +144,21 @@ function sintetizador(c) {
       o.frequency.setValueAtTime(freq, t)
       o.frequency.exponentialRampToValueAtTime(Math.max(1, freqFinal), t + dur)
       g.gain.setValueAtTime(vol, t)
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur)
+      o.connect(g).connect(saida)
+      o.start(t)
+      o.stop(t + dur + 0.02)
+    },
+    // como tom(), mas entra devagar (ataque em s): bom para notas longas e roncos
+    nota(freq, dur, tipo = 'sine', vol = 0.2, freqFinal = freq, atraso = 0, ataque = 0.25) {
+      const t = agora + atraso
+      const o = c.createOscillator()
+      const g = c.createGain()
+      o.type = tipo
+      o.frequency.setValueAtTime(freq, t)
+      o.frequency.exponentialRampToValueAtTime(Math.max(1, freqFinal), t + dur)
+      g.gain.setValueAtTime(0.0001, t)
+      g.gain.linearRampToValueAtTime(vol, t + Math.min(ataque, dur * 0.8))
       g.gain.exponentialRampToValueAtTime(0.001, t + dur)
       o.connect(g).connect(saida)
       o.start(t)
@@ -145,6 +215,17 @@ const SINTESE = {
     notas.forEach((f, i) => s.tom(f, 0.07, 'square', 0.1, f * 1.02, i * 0.045))
   },
   explosao: (s) => s.ruido(0.4, 0.35, 0, 800),
+  // corte seco da música no fim da luta: clique curto + baque abafado
+  estalo: (s) => {
+    s.ruido(0.035, 0.5, 0, 6000)
+    s.tom(90, 0.12, 'sine', 0.35, 40)
+  },
+  // chefe derrotado se desfazendo em pedaços
+  estouro: (s) => {
+    s.ruido(0.6, 0.35, 0, 1400)
+    s.tom(220, 0.5, 'square', 0.12, 50)
+    s.ruido(0.25, 0.2, 0.08, 5000)
+  },
   aviso: (s) => {
     s.tom(1320, 0.05, 'square', 0.06)
     s.tom(1320, 0.05, 'square', 0.06, 1320, 0.09)
@@ -173,4 +254,131 @@ const SINTESE = {
     s.tom(70, 0.45, 'sawtooth', 0.14, 140)
     s.ruido(0.35, 0.12, 0, 500)
   },
+  // entrada na batalha: batidas graves que aceleram, sobem de tom e de volume (~0,9 s)
+  tensao: (s) => {
+    let t = 0
+    for (let i = 0; i < 11; i++) {
+      const k = i / 10
+      s.tom(48 + k * 46, 0.16, 'sawtooth', 0.07 + k * 0.17, 30 + k * 20, t)
+      s.tom(96 + k * 92, 0.08, 'square', 0.03 + k * 0.05, 60, t)
+      s.ruido(0.07, 0.04 + k * 0.12, t, 300 + k * 900)
+      t += 0.13 - k * 0.085 // cada batida mais perto da outra
+    }
+  },
+  // vidro trincando
+  rachar: (s) => {
+    s.ruido(0.06, 0.28, 0, 7000)
+    s.tom(1700, 0.05, 'square', 0.05, 520)
+    s.ruido(0.05, 0.16, 0.035, 5000)
+  },
+  // o estouro da entrada: baque fundo, estilhaço agudo e um rastro que ecoa
+  impacto: (s) => {
+    s.ruido(0.08, 0.4, 0, 9000)
+    s.ruido(0.7, 0.42, 0, 700)
+    s.tom(110, 0.6, 'sawtooth', 0.3, 28)
+    s.tom(58, 0.9, 'sine', 0.5, 22)
+    s.tom(220, 0.25, 'square', 0.1, 55, 0.02)
+    s.ruido(0.5, 0.12, 0.18, 400)
+  },
+
+  // ---------- tela de vitória ----------
+  // sopro subindo antes do estouro de luz
+  subida: (s) => {
+    s.tom(180, 0.55, 'sawtooth', 0.05, 1400)
+    s.tom(360, 0.55, 'triangle', 0.05, 2200)
+    s.ruido(0.5, 0.05, 0.05, 6000)
+  },
+  // estouro de luz/confete: baque grave + chiado brilhante
+  estouroFesta: (s) => {
+    s.tom(110, 0.35, 'sine', 0.35, 40)
+    s.ruido(0.5, 0.28, 0, 7000)
+    s.ruido(0.25, 0.2, 0, 900)
+  },
+  // fanfarra curta: três toques rápidos e um acorde aberto sustentado
+  fanfarra: (s) => {
+    ;[392, 392, 523].forEach((f, i) => s.tom(f, 0.09, 'square', 0.09, f, i * 0.1))
+    for (const f of [523, 659, 784, 1046]) s.tom(f, 0.7, 'square', 0.06, f * 1.005, 0.32)
+    s.tom(262, 0.7, 'triangle', 0.14, 262, 0.32)
+  },
+  // fogo de artifício ao fundo: estalo leve (baixinho, toca várias vezes)
+  fogo: (s) => {
+    s.tom(700, 0.12, 'sine', 0.04, 180)
+    s.ruido(0.3, 0.07, 0.05, 5000)
+  },
+  // "tic" de contador rolando (curto e agudo, toca muitas vezes)
+  contador: (s) => s.tom(1500 + Math.random() * 200, 0.018, 'square', 0.04),
+  // fim de uma linha de estatística
+  contadorFim: (s) => {
+    s.tom(988, 0.05, 'square', 0.08)
+    s.tom(1318, 0.09, 'square', 0.08, 1318, 0.05)
+  },
+  // rufar curto antes do carimbo: batidas cada vez mais rápidas e fortes
+  rufar: (s) => {
+    let t = 0
+    for (let i = 0; i < 14; i++) {
+      s.ruido(0.04, 0.06 + i * 0.012, t, 1800)
+      t += Math.max(0.018, 0.06 - i * 0.004)
+    }
+  },
+  // carimbo da nota: pancada seca + estalo
+  carimbo: (s) => {
+    s.tom(90, 0.25, 'square', 0.3, 35)
+    s.ruido(0.18, 0.35, 0, 1500)
+    s.ruido(0.05, 0.25, 0, 8000)
+  },
+  // ---------- derrota e game over ----------
+  // batida fraca do coração (tum-tum grave)
+  batimento: (s) => {
+    s.tom(64, 0.2, 'sine', 0.5, 38)
+    s.tom(56, 0.24, 'sine', 0.36, 34, 0.21)
+    s.ruido(0.1, 0.06, 0, 220)
+  },
+  // o coração trincando: estalo agudo, lascas e um gemido grave por baixo
+  trincar: (s) => {
+    s.ruido(0.05, 0.36, 0, 8000)
+    s.tom(2300, 0.04, 'square', 0.06, 700)
+    s.ruido(0.04, 0.22, 0.055, 6000)
+    s.ruido(0.03, 0.16, 0.12, 7500)
+    s.tom(150, 0.32, 'sawtooth', 0.12, 55)
+  },
+  // o coração se partindo: estouro de vidro, baque fundo e cacos tilintando
+  estilhacar: (s) => {
+    s.ruido(0.09, 0.45, 0, 9000)
+    s.ruido(0.55, 0.26, 0, 1400)
+    s.tom(96, 0.55, 'sine', 0.45, 28)
+    s.tom(190, 0.18, 'square', 0.1, 50)
+    for (let i = 0; i < 11; i++) {
+      const f = 2100 + Math.random() * 2400
+      s.tom(f, 0.05 + Math.random() * 0.08, 'triangle', 0.05, f * 0.96, 0.05 + i * 0.045 + Math.random() * 0.03)
+    }
+  },
+  // entrada do game over: ronco fundo que cresce e se arrasta
+  abismo: (s) => {
+    s.nota(55, 3.4, 'triangle', 0.26, 41, 0, 0.7)
+    s.nota(27.5, 3.4, 'sine', 0.4, 22, 0, 0.9)
+    s.nota(58.3, 3, 'triangle', 0.1, 43, 0.1, 0.9) // levemente desafinado: dá o "batimento" sinistro
+    s.ruido(2.4, 0.07, 0, 260)
+  },
+  // letra do título caindo pesada no chão
+  letraPesada: (s) => {
+    s.tom(88, 0.32, 'square', 0.2, 30)
+    s.ruido(0.24, 0.3, 0, 650)
+    s.tom(176, 0.07, 'sawtooth', 0.07, 60)
+  },
+  // melodia curta e lenta em menor, descendo até repousar no grave
+  lamento: (s) => {
+    const notas = [330, 311, 294, 262, 247]
+    notas.forEach((f, i) => s.nota(f, 0.9, 'triangle', 0.09, f, i * 0.52, 0.08))
+    s.nota(220, 2.4, 'triangle', 0.1, 220, notas.length * 0.52, 0.1)
+    s.nota(110, 4.6, 'sine', 0.16, 108, 0, 0.6)
+    s.nota(165, 2.4, 'sine', 0.05, 164, notas.length * 0.52, 0.3)
+  },
+  // sino distante (toca de tempos em tempos enquanto a tela espera)
+  sino: (s) => {
+    s.tom(98, 2.8, 'sine', 0.16, 97)
+    s.tom(247, 1.7, 'sine', 0.05, 246)
+    s.tom(392, 0.9, 'sine', 0.025, 391)
+  },
+  // brilho extra quando a nota é S
+  brilhoRank: (s) => [1318, 1568, 2093, 2637].forEach((f, i) => s.tom(f, 0.16, 'triangle', 0.07, f, 0.08 + i * 0.06)),
 }

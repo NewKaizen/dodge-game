@@ -21,7 +21,7 @@ export function registrarDebug(game) {
     // a cena Battle viva, para inspecionar balas, caixa e corações no console
     batalha: () => {
       const batalha = game.scene.getScene('Battle')
-      return batalha?.sys.isActive() ? batalha : null
+      return batalha?.sys.isActive() || batalha?.sys.isPaused() ? batalha : null // pausada (menu de pause) também vale
     },
     estado: () => {
       const batalha = game.scene.getScene('Battle')

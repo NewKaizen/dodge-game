@@ -43,7 +43,11 @@ export const ASSETS = {
     'icone-defend': null,
     faisca: null,
     brilho: null,
+    vinheta: null,
     aviso: null,
+    confete: null,
+    estrela: null,
+    raio: null,
 
     // balas
     'bala-bola': null,
@@ -88,6 +92,29 @@ export const ASSETS = {
     voo: null,
     buzina: null,
     motor: null,
+    tensao: null,
+    rachar: null,
+    impacto: null,
+    estalo: null,
+    estouro: null,
+    // tela de vitória
+    subida: null,
+    estouroFesta: null,
+    fanfarra: null,
+    fogo: null,
+    contador: null,
+    contadorFim: null,
+    rufar: null,
+    carimbo: null,
+    brilhoRank: null,
+    // derrota e game over
+    batimento: null,
+    trincar: null,
+    estilhacar: null,
+    abismo: null,
+    letraPesada: null,
+    lamento: null,
+    sino: null,
   },
 
   musicas: {

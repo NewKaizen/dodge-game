@@ -21,9 +21,12 @@ import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { etiqueta, descreverModificador } from '../effects/etiqueta.js'
 import { particulas } from '../effects/particulas.js'
-import { tocar, musica } from '../audio.js'
+import { impactoDerrota, fimSuave, depoisDoSilencio } from '../effects/fimDeLuta.js'
+import { derrota } from '../effects/derrota.js'
+import { tocar, musica, pausarMusica, retomarMusica } from '../audio.js'
 import { debug } from '../debug.js'
 import { nivelDe, sortearCaos, comCaos, abrirTurno, criarEtiquetaNivel } from '../battle/nivel.js'
+import { iniciarEstatisticas, contar, anotarDano, resumoEstatisticas } from '../battle/estatisticas.js'
 import { ESCALA } from '../arte/texturas.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { ITENS } from '../data/itens.js'
@@ -57,6 +60,8 @@ export default class Battle extends Phaser.Scene {
     this.rng = new Phaser.Math.RandomDataGenerator([`${ATAQUE.semente}:${this.idChefe}`])
     this.controles = new Controles(this)
     this.controles.onBotao((jogador, botao) => this.aoBotao(jogador, botao))
+    this.controles.onPausa(() => this.pausar())
+    this.pausado = false
 
     this.fundo = criarFundo(this, this.defChefe.fundo, this.nivel.fundo)
     this.party = BATALHA.party.map((id, i) => this.criarMembro(id, i))
@@ -66,6 +71,7 @@ export default class Battle extends Phaser.Scene {
     this.tp = 0
     this.tpCheioAntes = false
     this.turno = 0
+    iniciarEstatisticas(this) // números da luta para a tela de vitória
     this.fila = []
     this.falas = []
     this.menus = []
@@ -126,6 +132,7 @@ export default class Battle extends Phaser.Scene {
   }
 
   aoBotao(jogador, botao) {
+    if (this.pausado) return
     if (this.fase === 'menu') {
       const menu = this.menus.find((m) => m.jogador === jogador)
       if (!menu) return
@@ -323,6 +330,7 @@ export default class Battle extends Phaser.Scene {
 
     for (const m of this.party) {
       if (m.acao?.tipo === 'ACT') this.tp -= m.acao.item.custoTP ?? 0
+      if (m.acao?.tipo === 'ACT') contar(this, 'tpGasto', m.acao.item.custoTP ?? 0)
       if (m.acao?.tipo === 'DEFEND') {
         m.defendendo = true
         this.tp = Math.min(TP.max, this.tp + DEFEND.ganhoTP)
@@ -538,6 +546,7 @@ export default class Battle extends Phaser.Scene {
     if (membro.defendendo) dano = Math.ceil(dano * DEFEND.multiplicadorDano)
     if (membro.protecao) dano = Math.max(1, Math.ceil(dano * membro.protecao))
     membro.hp -= dano
+    contar(this, 'danoRecebido', dano)
     membro.ator.tremer()
     numero(this, membro.ator.x + 34, membro.ator.y - 30, String(dano), TEXTO.dano)
     particulas(this, coracao.x, coracao.y, { cor: coracao.cor, quantidade: 10, velocidade: 110 })
@@ -575,6 +584,7 @@ export default class Battle extends Phaser.Scene {
   grazeou(coracao) {
     if (coracao.invencivel) return
     coracao.piscarGraze()
+    contar(this, 'grazes')
     particulas(this, coracao.x, coracao.y, { cor: 0xffffff, quantidade: 3, velocidade: 60, vida: 250, escala: 0.6 })
     if (this.time.now - this.ultimoGraze > 70) tocar(this, 'graze')
     this.ultimoGraze = this.time.now
@@ -621,12 +631,38 @@ export default class Battle extends Phaser.Scene {
       const modo = this.chefe.poupado ? 'spare' : 'hp'
       this.fase = 'mensagens'
       this.textbox.mensagem(modo === 'spare' ? `* Vocês pouparam ${this.chefe.nome}!` : `* Vocês derrotaram ${this.chefe.nome}!`)
-      this.avancar = () => this.sair('Vitoria', { modo })
+      this.avancar = () => depoisDoSilencio(this, () => this.sair('Vitoria', { modo, estatisticas: resumoEstatisticas(this) }))
     } else {
       this.fase = 'fim'
-      this.esperar(700, () => this.sair('GameOver', {}))
+      // números da luta perdida para a tela de game over (quanto faltava do chefe etc.)
+      const dados = { estatisticas: resumoEstatisticas(this), hpChefe: Math.max(0, this.chefe.hp), hpMaxChefe: this.chefe.max, mercy: this.chefe.mercy }
+      derrota(this, () => this.sair('GameOver', dados))
     }
     return true
+  }
+
+  // ---------- pause (botão C) ----------
+
+  // Só pausa com a luta rolando: não na abertura, não depois que o chefe caiu
+  // (a distorção da música e a ida para a vitória estão em andamento) e não saindo
+  podePausar() {
+    const fases = ['menu', 'fight', 'fala', 'inimigo', 'mensagens']
+    return fases.includes(this.fase) && !this.saindo && this.chefe.ativo && !this.scene.isActive('Entrada')
+  }
+
+  pausar() {
+    if (this.pausado || !this.podePausar()) return
+    this.pausado = true
+    pausarMusica()
+    this.scene.pause()
+    this.scene.launch('Pausa', { chefe: this.idChefe, nome: this.defChefe.nome })
+  }
+
+  retomarDaPausa() {
+    if (!this.pausado) return
+    this.pausado = false
+    this.scene.resume()
+    retomarMusica()
   }
 
   sair(cena, dados) {
@@ -742,12 +778,14 @@ export default class Battle extends Phaser.Scene {
     const base = cfg.dano * cfg.fatorGolpe
     let ganho = critico ? TP.porGolpe + TP.critico : dano >= base * 0.75 ? TP.porGolpe : Math.ceil(TP.porGolpe / 2)
     if (combo) ganho += TP.combo
+    if (combo) contar(this, 'combos')
     this.ganharTP(ganho)
     numero(this, membro.ator.x + 34, membro.ator.y - 30, `+${ganho} TP`, TEXTO.guarda, { tamanho: 14, desvio: 6 })
   }
 
   danoInimigo(inimigo, n, critico = false) {
     if (!inimigo?.ativo) return
+    anotarDano(this, inimigo, n, critico)
     inimigo.hp = Math.max(0, inimigo.hp - n)
     inimigo.revelado = true
     const forca = Phaser.Math.Clamp(n / 40, 0.15, 1) // golpe fraco = 0.15, golpe pesado (>= 40) = 1
@@ -761,6 +799,7 @@ export default class Battle extends Phaser.Scene {
     shake(this, critico ? 160 : 90, critico ? 0.012 : 0.006)
     if (!inimigo.ativo) {
       inimigo.visual.sumir(false)
+      if (!this.inimigosAtivos().length) impactoDerrota(this)
       this.fila.push(`* ${inimigo.nome} foi derrotado!`)
     }
     this.atualizarUI()
@@ -812,6 +851,7 @@ export default class Battle extends Phaser.Scene {
     if (pode) {
       inimigo.poupado = true
       inimigo.visual.sumir(true)
+      if (!this.inimigosAtivos().length) fimSuave(this)
       tocar(this, 'cura')
       this.fila.push(`* ${membro.nome} poupou ${inimigo.nome}!`)
       return

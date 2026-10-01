@@ -19,7 +19,7 @@ export const jogo = writable({
   fonte: null, // 'serial' | 'simulador'
   numJogadores: 1, // lido quando a batalha começa
   jogadores: Array.from({ length: MAX_JOGADORES }, () => ({ joy: { x: 0, y: 0 } })),
-  botao: null, // último botão apertado: { jogador, botao: 'A' | 'B', id }
+  botao: null, // último botão apertado: { jogador, botao: 'A' | 'B' | 'C', id } (C = pause)
   velocidade: CORACAO.velocidadePadrao, // px/s do coração
   som: true,
   volume: lerVolume(), // { musica, efeitos } em %

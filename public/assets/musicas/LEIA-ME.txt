@@ -6,6 +6,7 @@ Coloque aqui as músicas em MIDI (.mid), com o nome da tela ou do chefe:
   jevil.mid      batalha do Jevil
   coronel.mid    batalha do Coronel Caçamba
   vitoria.mid    tela de vitória
+  gameover.mid   tela de game over (opcional)
 
 Não precisa mexer em código: o jogo procura <nome>.mid aqui sozinho e toca em
 loop com o soundfont (public/assets/audio/soundfont.sf3). Sem o arquivo, fica

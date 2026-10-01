@@ -199,6 +199,53 @@ function degrade(tamanho, paradas) {
   return c
 }
 
+// ---------- tela de vitória ----------
+
+// Tirinha de confete branca (pintada com tint)
+function confete() {
+  const [c, g] = tela(4, 8)
+  g.fillStyle = '#ffffff'
+  g.fillRect(0, 0, 4, 8)
+  g.fillStyle = 'rgba(0,0,0,0.25)' // meia sombra: o giro fica visível
+  g.fillRect(0, 5, 4, 3)
+  return c
+}
+
+// Estrela de 5 pontas branca com brilho
+function estrela() {
+  const [c, g] = tela(24, 24)
+  g.imageSmoothingEnabled = true
+  g.translate(12, 12)
+  const pontos = []
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 ? 4 : 10
+    const a = -Math.PI / 2 + (i * Math.PI) / 5
+    pontos.push([Math.cos(a) * r, Math.sin(a) * r])
+  }
+  g.fillStyle = '#ffffff'
+  g.shadowColor = 'rgba(255,255,255,0.9)'
+  g.shadowBlur = 4
+  g.beginPath()
+  poligono(g, pontos)
+  g.fill()
+  return c
+}
+
+// Raio de luz: cunha que abre para cima e some na ponta (a origem fica embaixo)
+function raio() {
+  const [c, g] = tela(64, 320)
+  g.imageSmoothingEnabled = true
+  const grad = g.createLinearGradient(0, 320, 0, 0)
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)')
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.35)')
+  grad.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = grad
+  g.beginPath()
+  poligono(g, [[32, 320], [0, 0], [64, 0]])
+  g.fill()
+  return c
+}
+
 function aviso() {
   const [c, g] = tela(16, 16)
   g.fillStyle = '#ffffff'
@@ -312,7 +359,12 @@ const GERADORES = {
   'icone-defend': icone('defend'),
   faisca: () => degrade(8, [[0, 'rgba(255,255,255,1)'], [1, 'rgba(255,255,255,0)']]),
   brilho: () => degrade(64, [[0, 'rgba(255,255,255,0.9)'], [0.4, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']]),
+  // vinheta branca (pintada com tint): centro livre, bordas e cantos fechando
+  vinheta: () => degrade(128, [[0, 'rgba(255,255,255,0)'], [0.55, 'rgba(255,255,255,0)'], [0.85, 'rgba(255,255,255,0.55)'], [1, 'rgba(255,255,255,0.9)']]),
   aviso,
+  confete,
+  estrela,
+  raio,
 
   'bala-bola': bala('bola'),
   'bala-chama': bala('chama'),

@@ -11,6 +11,7 @@ const TECLADO = [
     direita: ['KeyD'],
     A: ['Space', 'KeyZ', 'KeyE'],
     B: ['KeyQ', 'KeyX', 'ShiftLeft'],
+    C: ['KeyC', 'Escape'], // pause
   },
   {
     cima: ['ArrowUp'],
@@ -19,6 +20,7 @@ const TECLADO = [
     direita: ['ArrowRight'],
     A: ['Enter', 'NumpadEnter'],
     B: ['ShiftRight', 'Backspace'],
+    C: ['KeyP'], // pause
   },
 ]
 
@@ -31,6 +33,7 @@ function mapear(code) {
     const teclas = TECLADO[jogador]
     if (teclas.A.includes(code)) return { jogador, botao: 'A' }
     if (teclas.B.includes(code)) return { jogador, botao: 'B' }
+    if (teclas.C.includes(code)) return { jogador, botao: 'C' }
     if (DIRECOES.some((d) => teclas[d].includes(code))) return { jogador }
   }
   return null

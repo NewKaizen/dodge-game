@@ -23,11 +23,12 @@ export function processarLinha(linha) {
         break
       }
       case 'BTN': {
-        // BTN <A|B>  ou  BTN <jogador> <A|B>
+        // BTN <A|B|C>  ou  BTN <jogador> <A|B|C>   (C = pause; START/PAUSE também valem)
         const [p, b] = args.length >= 2 ? args : ['1', args[0]]
         const i = indiceJogador(p)
-        const botao = b?.toUpperCase()
-        if (i === null || (botao !== 'A' && botao !== 'B')) break
+        let botao = b?.toUpperCase()
+        if (botao === 'START' || botao === 'PAUSE') botao = 'C'
+        if (i === null || !['A', 'B', 'C'].includes(botao)) break
         novo.botao = { jogador: i, botao, id: proximoIdBotao++ }
         break
       }
