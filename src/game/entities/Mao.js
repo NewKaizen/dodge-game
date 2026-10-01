@@ -118,15 +118,18 @@ export default class Mao {
   }
 
   // cria a Carta e compra do monte. Devolve Promise<Carta> (quando ela já virou para cima)
-  adicionar(dados, { atraso = 0, revelar = true } = {}) {
+  //   total: tamanho final da mão quando várias chegam em sequência (comprarVarias),
+  //   para cada carta já voar para o lugar definitivo
+  adicionar(dados, { atraso = 0, revelar = true, total = 0 } = {}) {
     const monte = this.posicaoMonte()
     const carta = new Carta(this.scene, monte.x, monte.y, dados, { largura: this.larguraCarta, corFoco: this.cor })
     carta.mao = this
     this.cartas.push(carta)
-    const p = this.posicao(this.cartas.length - 1)
+    const n = Math.max(total, this.cartas.length)
+    const p = this.posicao(this.cartas.length - 1, n)
     // as outras abrem espaço; a nova vem do monte
     this.cartas.slice(0, -1).forEach((c, i) => {
-      const q = this.posicao(i)
+      const q = this.posicao(i, n)
       this.scene.tweens.add({ targets: c, x: q.x, y: q.y, rotation: q.rotacao, duration: 240, ease: 'Cubic.easeOut' })
     })
     carta.setDepth(this.profundidade + this.cartas.length)
@@ -138,7 +141,8 @@ export default class Mao {
 
   // compra várias em sequência (intervalo em ms). Devolve Promise<Carta[]>
   comprarVarias(lista, { intervalo = 110, revelar = true } = {}) {
-    return Promise.all(lista.map((dados, i) => this.adicionar(dados, { atraso: i * intervalo, revelar })))
+    const total = this.cartas.length + lista.length
+    return Promise.all(lista.map((dados, i) => this.adicionar(dados, { atraso: i * intervalo, revelar, total })))
   }
 
   // tira a carta da mão (sem destruir) e fecha o leque

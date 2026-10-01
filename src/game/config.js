@@ -4,7 +4,9 @@ import Boot from './scenes/Boot.js'
 import Menu from './scenes/Menu.js'
 import Modo from './scenes/Modo.js'
 import EscolhaParty from './scenes/EscolhaParty.js'
-import PvpEmBreve from './scenes/PvpEmBreve.js'
+import PvpEscolha from './scenes/PvpEscolha.js'
+import PvpArena from './scenes/PvpArena.js'
+import PvpResultado from './scenes/PvpResultado.js'
 import Selecao from './scenes/Selecao.js'
 import Dificuldade from './scenes/Dificuldade.js'
 import Battle from './scenes/Battle.js'
@@ -27,6 +29,6 @@ export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCs
     roundPixels: true,
     scale: { mode: Phaser.Scale.NONE, zoom: zoomCss },
     // TesteCartas e PvpArenaTeste: telas de teste do PvP (no dev: debugJogo.jogo.scene.start('...'))
-    scene: [Boot, Menu, Modo, EscolhaParty, PvpEmBreve, Selecao, Dificuldade, Battle, Vitoria, GameOver, Entrada, Pausa, TesteCartas, PvpArenaTeste],
+    scene: [Boot, Menu, Modo, EscolhaParty, PvpEscolha, PvpArena, PvpResultado, Selecao, Dificuldade, Battle, Vitoria, GameOver, Entrada, Pausa, TesteCartas, PvpArenaTeste],
   }
 }

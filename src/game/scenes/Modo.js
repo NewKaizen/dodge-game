@@ -4,9 +4,8 @@ import { criarFundo } from '../backgrounds/index.js'
 import { tocar, musica } from '../audio.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 
-// Para onde vai o PVP. Enquanto o modo não existe, cai na tela "em construção".
-// Quando a cena do PvP existir, troque por 'PvpEscolha' (e registre em config.js).
-export const CENA_PVP = 'PvpEmBreve'
+// Para onde vai o PVP: a escolha de personagem (PvpEscolha -> PvpArena -> PvpResultado)
+export const CENA_PVP = 'PvpEscolha'
 
 const OPCAO = { largura: 268, altura: 250, y: 236, passo: 292 }
 
@@ -28,7 +27,7 @@ const MODOS = [
 ]
 
 // Tela do modo de jogo, logo depois do Menu: CO-OP (Menu -> Modo -> EscolhaParty
-// -> Selecao -> Dificuldade -> Battle) ou PVP (ainda em construção).
+// -> Selecao -> Dificuldade -> Battle) ou PVP (PvpEscolha -> PvpArena -> PvpResultado).
 // A: confirmar · ← →: escolher
 export default class Modo extends Phaser.Scene {
   constructor() {
@@ -63,8 +62,7 @@ export default class Modo extends Phaser.Scene {
           .setAngle(modo.id === 'pvp' ? lado * 90 : 0),
       )
       const detalhes = texto(x, topo + 176, modo.descricao.join('\n'), 15, TEXTO.normal, { align: 'center', lineSpacing: 4, strokeThickness: 0 })
-      const extra = modo.cena === 'PvpEmBreve' ? texto(x, topo + 228, 'EM CONSTRUÇÃO', 13, TEXTO.desabilitado, { strokeThickness: 0 }) : null
-      return { modo, moldura, rotulo, icones, detalhes, extra, x, y, cor }
+      return { modo, moldura, rotulo, icones, detalhes, x, y, cor }
     })
 
     this.cursor = this.add.image(0, 0, 'coracao').setTint(CORES.almas[0]).setScale(1.8)
