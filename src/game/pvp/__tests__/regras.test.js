@@ -125,7 +125,7 @@ test('copas aplica em quem jogou: cura, escudo, energia, compra extra', () => {
   assert.equal(r.caixas[0].escudo, ef.escudo)
   assert.equal(e.jogadores[0].escudo, null)
   // copas manda só um ataque fraquinho
-  assert.equal(r.caixas[1].dano, 2)
+  assert.equal(r.caixas[1].dano, danoDaCarta(cura))
   fimDaRodada(e)
 
   // energia e compra extra

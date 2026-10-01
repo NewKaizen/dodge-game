@@ -9,7 +9,7 @@ import { ENERGIA } from './regras.js'
 // copas (escudo, segunda chance). O P1 fica à esquerda e o P2 à direita
 // (espelhado). Só visual: a cena passa os números de regras.js.
 //
-//   const hud = new HudPvp(cena, { jogador: 0, personagem: 'kris', hpMax: 90 })
+//   const hud = new HudPvp(cena, { jogador: 0, personagem: 'kris', hpMax: 90, rotulo? })   rotulo: 'CPU' (padrão P1/P2)
 //   hud.setHp(70)            barra anda (com o rastro branco do dano)
 //   hud.setEnergia(5)        gemas acesas; as novas piscam
 //   hud.setEscudo(0.6)       "ESCUDO -40%" (fator do dano; null apaga)
@@ -21,7 +21,7 @@ const GEMA = { passo: 12, raio: 5 }
 const MARGEM = 14
 
 export default class HudPvp {
-  constructor(cena, { jogador, personagem, hpMax }) {
+  constructor(cena, { jogador, personagem, hpMax, rotulo }) {
     this.cena = cena
     this.jogador = jogador
     this.hpMax = hpMax
@@ -42,7 +42,7 @@ export default class HudPvp {
     const texto = (x, y, conteudo, tamanho, cor, extra = {}) =>
       cena.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra })
 
-    const tag = texto(x0, 6, `P${jogador + 1}`, 13, corTexto(CORES.almas[jogador])).setOrigin(origem, 0)
+    const tag = texto(x0, 6, rotulo ?? `P${jogador + 1}`, 13, corTexto(CORES.almas[jogador])).setOrigin(origem, 0)
     const coracao = cena.add.image(x0 + s * (tag.width + 10), 13, 'coracao').setTint(CORES.almas[jogador]).setScale(0.9)
     this.nome = texto(x0 + s * (tag.width + 20), 4, (def?.nome ?? personagem).toUpperCase(), 16, corTexto(corPersonagem)).setOrigin(origem, 0)
     this.estado = texto(this.nome.x + s * (this.nome.width + 10), 8, '', 10, TEXTO.guarda).setOrigin(origem, 0)

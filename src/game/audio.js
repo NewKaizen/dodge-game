@@ -38,7 +38,11 @@ export function tocar(scene, nome) {
   if (c) SINTESE[nome]?.(sintetizador(c))
 }
 
-export function musica(scene, nome) {
+// reserva: outra música para tocar se `nome` não existir (ex.: 'pvp' cai na
+// 'jevil' enquanto não houver pvp.mid em public/assets/musicas/)
+let pedidoMusica = 0
+export function musica(scene, nome, reserva) {
+  const pedido = ++pedidoMusica
   const arquivo = ASSETS.musicas[nome] ?? `assets/musicas/${nome}.mid`
   if (/\.midi?$/i.test(arquivo)) {
     musicaAtual?.stop()
@@ -46,13 +50,16 @@ export function musica(scene, nome) {
     musicaAtual = null
     const c = obterContexto()
     if (!ligado || !c) return pararMidi()
-    tocarMidi(c, arquivo)
+    tocarMidi(c, arquivo).then((ok) => {
+      // só cai na reserva se ninguém pediu outra música nesse meio tempo
+      if (!ok && reserva && reserva !== nome && pedido === pedidoMusica) musica(scene, reserva)
+    })
     return
   }
   const chave = `musica-${nome}`
   if (musicaAtual?.key === chave && musicaAtual.isPlaying) return
   pararMusica()
-  if (!ligado || !ASSETS.musicas[nome] || !scene.cache.audio.exists(chave)) return
+  if (!ligado || !ASSETS.musicas[nome] || !scene.cache.audio.exists(chave)) return reserva && reserva !== nome ? musica(scene, reserva) : undefined
   musicaAtual = scene.sound.add(chave, { loop: true, volume: AUDIO.volume * volumes.musica })
   musicaAtual.play()
 }
@@ -425,4 +432,72 @@ const SINTESE = {
     s.ruido(0.12, 0.12, 0, 2500)
     s.tom(500, 0.12, 'sine', 0.05, 200)
   },
+  // carta deslizando no feltro até a mesa / até a coluna entre as caixas
+  cartaDeslizar: (s) => {
+    s.ruido(0.18, 0.13, 0, 1800)
+    s.ruido(0.05, 0.08, 0.13, 6000)
+    s.tom(260, 0.16, 'triangle', 0.04, 380)
+  },
+  // ---------- PvP ----------
+  // começo da rodada: gongo curto
+  rodada: (s) => {
+    s.tom(196, 0.7, 'sine', 0.22, 194)
+    s.tom(392, 0.4, 'triangle', 0.07, 390)
+    s.tom(588, 0.25, 'sine', 0.04, 585)
+    s.ruido(0.05, 0.1, 0, 4000)
+  },
+  // energia recarregando (gemas acendendo)
+  energia: (s) => [880, 1175, 1568].forEach((f, i) => s.tom(f, 0.09, 'triangle', 0.06, f * 1.03, i * 0.05)),
+  // ficha do PASSAR caindo na mesa
+  passar: (s) => {
+    s.tom(1250, 0.05, 'square', 0.05, 1100)
+    s.tom(1250, 0.05, 'square', 0.035, 1100, 0.07)
+    s.ruido(0.04, 0.08, 0, 5000)
+  },
+  // caixa de esquiva abrindo / fechando
+  caixaAbrir: (s) => {
+    s.tom(160, 0.22, 'sawtooth', 0.07, 420)
+    s.ruido(0.18, 0.06, 0.04, 2500)
+  },
+  caixaFechar: (s) => {
+    s.tom(420, 0.2, 'sawtooth', 0.06, 140)
+    s.ruido(0.1, 0.06, 0.08, 1200)
+  },
+  // controles invertidos: tom que sobe e desce, bem enjoado
+  inverter: (s) => {
+    s.tom(300, 0.18, 'square', 0.07, 900)
+    s.tom(900, 0.22, 'square', 0.06, 250, 0.18)
+    s.tom(450, 0.4, 'sine', 0.06, 470)
+  },
+  // escudo de copas segurando o golpe: brilho metálico
+  escudo: (s) => {
+    s.tom(1760, 0.35, 'triangle', 0.06, 1720)
+    s.tom(2640, 0.25, 'sine', 0.04, 2600, 0.02)
+    s.tom(220, 0.12, 'square', 0.08, 180)
+    s.ruido(0.05, 0.12, 0, 9000)
+  },
+  // espelho rebatendo: vidro tinindo e um "uóóm" que volta
+  espelho: (s) => {
+    s.tom(2100, 0.3, 'sine', 0.06, 2080)
+    s.tom(3150, 0.2, 'sine', 0.04, 3120, 0.03)
+    s.tom(600, 0.25, 'triangle', 0.07, 1500, 0.04)
+  },
+  // carta roubada passando para a outra mão: assobio rápido
+  roubo: (s) => {
+    s.ruido(0.14, 0.12, 0, 4500)
+    s.tom(500, 0.12, 'sine', 0.07, 1400)
+    s.tom(1400, 0.08, 'sine', 0.05, 900, 0.12)
+  },
+  // ninguém atacou: dois tons murchos
+  vazio: (s) => {
+    s.tom(330, 0.12, 'triangle', 0.08, 300)
+    s.tom(262, 0.22, 'triangle', 0.08, 240, 0.13)
+  },
+  // HP baixo: bipe de alarme
+  hpBaixo: (s) => {
+    s.tom(988, 0.08, 'square', 0.06)
+    s.tom(784, 0.12, 'square', 0.06, 784, 0.1)
+  },
+  // CPU confirmando a carta (igual ao jogador, um pouco mais grave)
+  cpu: (s) => s.tom(520, 0.07, 'square', 0.1, 780),
 }

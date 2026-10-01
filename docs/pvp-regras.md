@@ -38,6 +38,35 @@ O estado é JSON puro (`structuredClone`/`JSON.stringify` funcionam) e a partida
 | Grazes | +1 a cada 5 |
 | Passar a vez | +1 |
 
+## Dificuldade das cartas
+
+`DIFICULDADE_PVP` em `cartas.js` vale para todas as cartas, em cima do valor de cada uma:
+
+| Ajuste | Valor | O que faz |
+|---|---|---|
+| `forcaMinima` | 0,3 | piso da força: o 2 já ataca como uma carta mais alta (o K continua com força 1, a validada) |
+| `dano` | ×1,3 | dano por bala de todo ataque |
+| `velocidade` | ×1,15 | balas mais rápidas (o mesmo aperto do co-op) |
+| `densidade` | ×1,2 | disparos mais frequentes (o mesmo aperto do co-op) |
+
+Tudo neutro (`0, 1, 1, 1`) = as cartas como eram antes. As tabelas de dano abaixo são os valores **antes** do ×1,3.
+
+## Contra a CPU (1 jogador)
+
+Com 1 jogador no painel, o P2 é a CPU:
+
+- `src/game/pvp/bot.js` escolhe a carta: dá uma nota a cada carta jogável (ataque = dano × força; copas valem mais com o HP baixo; Ases conforme a energia e a mão do adversário) e passa a vez quando segurar energia libera uma carta bem mais forte.
+- `src/game/pvp/botEsquiva.js` desvia: a cada decisão simula as balas um pouco à frente em 17 direções e foge da mais perigosa.
+- Nível na tela de escolha com ↑/↓ (fica salvo):
+
+| Nível | Reação | Enxerga à frente | Erra a direção | Distrai |
+|---|---|---|---|---|
+| fácil | 200 ms | 240 ms | 25% | 10% das decisões, 650 ms |
+| normal | 130 ms | 330 ms | 10% | 5%, 500 ms |
+| difícil | 70 ms | 520 ms | 2% | quase nunca |
+
+Controles invertidos também confundem a CPU (chance extra de errar).
+
 ## Custos
 
 | Valor | 2 a 4 | 5 a 8 | 9, 10, J | Q | K | Ás |

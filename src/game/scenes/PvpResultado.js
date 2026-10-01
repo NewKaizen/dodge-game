@@ -70,6 +70,7 @@ export default class PvpResultado extends Phaser.Scene {
     this.vencedor = [1, 2].includes(dados.vencedor) ? dados.vencedor : 0
     this.empate = this.vencedor === 0
     this.rodadas = dados.rodadas ?? 0
+    this.contraCpu = Boolean(dados.cpu) // partida contra a CPU: o P2 aparece como CPU
     this.stats = [1, 2].map((j) => ({ ...VAZIO, ...(dados.estatisticas?.[`p${j}`] ?? dados.estatisticas?.[j]) })) // a arena manda { p1, p2 }
     this.corTitulo = this.empate ? COR_EMPATE : TEXTO_JOGADOR[this.vencedor - 1]
     this.corNumero = this.empate ? 0xc8c8d8 : CORES.almas[this.vencedor - 1]
@@ -105,7 +106,7 @@ export default class PvpResultado extends Phaser.Scene {
     const em = (t, f) => e.push({ t, f })
     em(TEMPO.subida, (r) => this.subida(r))
     em(TEMPO.estouro, (r) => this.estouro(r))
-    em(TEMPO.musica, () => musica(this, 'vitoria'))
+    em(TEMPO.musica, () => musica(this, 'pvpResultado', 'vitoria'))
     em(TEMPO.lutadores, (r) => this.entrarLutadores(r))
     em(TEMPO.painel, (r) => this.abrirPainel(r))
     LINHAS.forEach((linha, i) => em(TEMPO.painel + 300 + i * TEMPO.linha, (r) => this.mostrarLinha(linha, i, r)))
@@ -200,8 +201,14 @@ export default class PvpResultado extends Phaser.Scene {
     this.criarTitulo(rapido)
   }
 
+  // nome curto do jogador 1 ou 2 (contra a CPU, o 2 é "CPU")
+  rotulo(j) {
+    return this.contraCpu && j === 2 ? 'CPU' : `P${j}`
+  }
+
   criarTitulo(rapido) {
-    const texto = this.empate ? 'EMPATE!' : `JOGADOR ${this.vencedor} VENCE!`
+    const vencedor = this.contraCpu ? (this.vencedor === 1 ? 'VOCÊ VENCEU!' : 'A CPU VENCEU!') : `JOGADOR ${this.vencedor} VENCE!`
+    const texto = this.empate ? 'EMPATE!' : vencedor
     this.titulo = this.add
       .text(LARGURA / 2, 52, texto, estilo(this.empate ? 54 : 44, this.corTitulo, { strokeThickness: 8 }))
       .setOrigin(0.5)
@@ -250,7 +257,7 @@ export default class PvpResultado extends Phaser.Scene {
       const sombra = this.add.ellipse(x, chao + 2, 58, 12, 0x000000, 0.5).setDepth(4)
       const s = this.add.image(x, chao, textura).setOrigin(0.5, 1).setScale(escala).setDepth(5).setFlipX(k === 1)
       if (textura === 'coracao') s.setTint(def.cor)
-      this.add.text(x, chao + 22, `P${j}`, estilo(15, TEXTO_JOGADOR[k])).setOrigin(0.5).setDepth(5)
+      this.add.text(x, chao + 22, this.rotulo(j), estilo(15, TEXTO_JOGADOR[k])).setOrigin(0.5).setDepth(5)
       this.add.text(x, chao + 44, def.nome.toUpperCase(), estilo(18, venceu || this.empate ? corTexto(def.cor) : '#8a8a8a')).setOrigin(0.5).setDepth(5)
 
       if (!rapido) {
@@ -318,7 +325,7 @@ export default class PvpResultado extends Phaser.Scene {
     g.setPosition(x, y)
     const cabecalho = [
       this.add.text(COLUNA[0], y + 23, 'P1', estilo(20, TEXTO_JOGADOR[0])).setOrigin(0.5),
-      this.add.text(COLUNA[1], y + 23, 'P2', estilo(20, TEXTO_JOGADOR[1])).setOrigin(0.5),
+      this.add.text(COLUNA[1], y + 23, this.rotulo(2), estilo(20, TEXTO_JOGADOR[1])).setOrigin(0.5),
       this.add.text(x + largura / 2, y + 16, 'RODADAS', estilo(11, '#9a9aae')).setOrigin(0.5),
       this.add.text(x + largura / 2, y + 32, String(this.rodadas), estilo(17, TEXTO.selecionado)).setOrigin(0.5),
     ]

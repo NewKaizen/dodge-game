@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { LARGURA, ALTURA, FONTE, CORES, TEXTO, ATAQUE, corTexto } from '../constants.js'
+import { LARGURA, ALTURA, FONTE, CORES, TEXTO, ATAQUE, CORACAO, corTexto } from '../constants.js'
 import Controles from '../controles.js'
 import { tocar, musica, pausarMusica, retomarMusica } from '../audio.js'
 import { debug } from '../debug.js'
@@ -11,6 +11,9 @@ import HudPvp from '../pvp/HudPvp.js'
 import { CARTAS, TEMAS } from '../pvp/cartas.js'
 import { ataqueDaCartaNoJogo } from '../pvp/ataquesDasCartas.js'
 import { criarPartida, iniciarRodada, podeJogar, resolverRodada, aplicarDano, registrarGrazes, fimDaRodada, ENERGIA } from '../pvp/regras.js'
+import { escolherJogada, NIVEIS_BOT, NIVEL_BOT_PADRAO } from '../pvp/bot.js'
+import { EsquivaBot } from '../pvp/botEsquiva.js'
+import { criarRng } from '../pvp/baralho.js'
 import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
@@ -37,13 +40,20 @@ import { particulas } from '../effects/particulas.js'
 //                da pista (aplicarDano), grazes viram energia (registrarGrazes)
 //   'fim'        fimDaRodada: vencedor? -> 'resultado' (PvpResultado); senão volta ao 'inicio'
 //
-// Com 1 jogador no painel (modo treino) o P1 escolhe a carta do P1, depois a
-// do P2, e na esquiva o joystick move os dois corações.
+// Com 1 jogador no painel, o P2 é a CPU (pvp/bot.js escolhe a carta,
+// pvp/botEsquiva.js desvia). Nível: registry 'pvpNivelBot' (tela PvpEscolha, ↑/↓).
+//
+// Música: musica('pvp'), ou seja public/assets/musicas/pvp.mid; sem o arquivo, toca a do Jevil.
 //
 // No dev: debugJogo.jogo.scene.start('PvpArena', { p1: 'susie', p2: 'noelle' })
 // e window.pvpArena (estadoDebug, forcarMao, setHp) para os testes.
 
-export const TEMPO = { escolha: 15000, fatorTreino: 2 }
+export const TEMPO = { escolha: 15000 }
+
+// CPU: quanto ela "pensa" antes de mexer o cursor e quanto leva cada passo dele (ms)
+const CPU = { pensarMin: 700, pensarMax: 1700, passoMin: 150, passoMax: 260 }
+// HP abaixo desta fração do máximo: alarme (uma vez, até curar acima de novo)
+const HP_BAIXO = 0.25
 
 const PISTA = { largura: 220, altura: 170, y: 198 }
 const CENTROS = [LARGURA / 4, (LARGURA * 3) / 4]
@@ -93,8 +103,14 @@ export default class PvpArena extends Phaser.Scene {
   create() {
     this.controles = new Controles(this)
     this.numJogadores = this.controles.numJogadores
-    this.treino = this.numJogadores < 2
-    this.tempoEscolha = this.tempoBase * (this.treino ? TEMPO.fatorTreino : 1)
+    // sozinho: o P2 é a CPU
+    this.cpu = this.numJogadores < 2 ? 1 : null
+    const nivel = this.registry.get('pvpNivelBot')
+    this.nivelBot = NIVEIS_BOT[nivel] ? nivel : NIVEL_BOT_PADRAO
+    this.rngBot = criarRng(`${this.semente}:cpu`)
+    this.esquivaBot = this.cpu === null ? null : new EsquivaBot({ nivel: this.nivelBot })
+    this.tempoEscolha = this.tempoBase
+    this.hpAvisado = [false, false]
     this.estado = criarPartida({ p1: this.ids[0], p2: this.ids[1], semente: this.semente })
     this.fase = 'abertura'
     this.saindo = false
@@ -111,7 +127,7 @@ export default class PvpArena extends Phaser.Scene {
 
     this.desenharFundo()
     this.criarPistas()
-    this.huds = [0, 1].map((j) => new HudPvp(this, { jogador: j, personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax }))
+    this.huds = [0, 1].map((j) => new HudPvp(this, { jogador: j, personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, rotulo: this.rotulo(j) }))
     this.criarTopo()
     this.montes = [0, 1].map((j) => this.criarMonte(j))
     this.maos = [0, 1].map(
@@ -138,7 +154,7 @@ export default class PvpArena extends Phaser.Scene {
       if (window.pvpArena === this) delete window.pvpArena
     })
 
-    musica(this, 'pvp')
+    musica(this, 'pvp', 'jevil')
     this.cameras.main.fadeIn(300)
     this.partida()
   }
@@ -193,7 +209,7 @@ export default class PvpArena extends Phaser.Scene {
     this.textoRodada = texto(5, 13, TEXTO.normal)
     this.textoRelogio = texto(22, 22, TEXTO.selecionado)
     this.textoTreino = texto(50, 9, '#9be7ff')
-    if (this.treino) this.textoTreino.setText('modo treino: 1 controle')
+    if (this.cpu !== null) this.textoTreino.setText(`VS CPU · ${{ facil: 'fácil', normal: 'normal', dificil: 'difícil' }[this.nivelBot]}`)
   }
 
   // monte de cada jogador (3 versos empilhados e quantas cartas restam)
@@ -331,13 +347,14 @@ export default class PvpArena extends Phaser.Scene {
     })
   }
 
-  ladoTreino() {
-    return this.escolhas[0] === undefined ? 0 : 1
+  // nome curto do lado j nos textos (a CPU aparece como CPU)
+  rotulo(j) {
+    return j === this.cpu ? 'CPU' : `P${j + 1}`
   }
 
-  // qual lado o controle j comanda agora
+  // qual lado o controle j comanda (sozinho, o controle é sempre o do P1)
   ladoDoControle(j) {
-    return this.treino ? this.ladoTreino() : j
+    return j
   }
 
   // ---------- partida ----------
@@ -404,7 +421,8 @@ export default class PvpArena extends Phaser.Scene {
     this.textoRodada.setText(`RODADA ${this.estado.rodada}`)
     this.tweens.add({ targets: this.textoRodada, scale: { from: 1.5, to: 1 }, duration: 260, ease: 'Back.easeOut' })
     this.mostrarBanner(`RODADA ${this.estado.rodada}`, TEXTO.normal, { y: 200, tamanho: 28, ms: 700 })
-    tocar(this, 'confirmar')
+    tocar(this, 'rodada')
+    this.time.delayedCall(260, () => tocar(this, 'energia'))
     this.atualizarHuds()
     this.maos.forEach((m) => m.setAtiva(false))
     await this.sincronizarMaos()
@@ -438,6 +456,7 @@ export default class PvpArena extends Phaser.Scene {
           const p = mao.adicionar({ ...dados }, { atraso: i * intervalo, total })
           mao.monte = monte
           particulas(this, roubada.x, roubada.y, { cor: 0xb8a8ff, quantidade: 12, velocidade: 120 })
+          tocar(this, 'roubo')
           roubada.destroy()
           return p
         }),
@@ -468,13 +487,14 @@ export default class PvpArena extends Phaser.Scene {
     })
     this.dica.setText('←/→ escolher   A: confirmar   B: desfazer / ir para PASSAR   C: pausa')
     this.atualizarEscolha()
+    if (this.cpu !== null) this.jogadaDaCpu(this.cpu, this.estado.rodada)
     return new Promise((resolver) => (this.fimDaEscolha = resolver))
   }
 
   atualizarEscolha() {
     const escolhendo = this.fase === 'escolha'
     for (const j of [0, 1]) {
-      const livre = escolhendo && this.escolhas[j] === undefined && (!this.treino || this.ladoTreino() === j)
+      const livre = escolhendo && this.escolhas[j] === undefined
       const naMao = livre && !this.noPassar[j]
       this.maos[j].setAtiva(naMao)
       this.maos[j].setTravada(typeof this.escolhas[j] === 'string')
@@ -482,8 +502,7 @@ export default class PvpArena extends Phaser.Scene {
       let texto = ''
       if (escolhendo) {
         if (this.escolhas[j] !== undefined) texto = 'PRONTO!'
-        else if (!this.treino || this.ladoTreino() === j) texto = this.treino ? `vez do P${j + 1}: escolha` : 'escolha uma carta'
-        else texto = 'espera...'
+        else texto = j === this.cpu ? 'CPU pensando...' : 'escolha uma carta'
       }
       this.status[j].setText(texto)
       this.atualizarPrevia(j)
@@ -493,7 +512,8 @@ export default class PvpArena extends Phaser.Scene {
   // prévia ampliada da carta sob o cursor (ou a explicação do PASSAR)
   atualizarPrevia(j) {
     const mao = this.maos[j]
-    const ativo = this.fase === 'escolha' && this.escolhas[j] === undefined && (!this.treino || this.ladoTreino() === j)
+    // a CPU não abre a prévia ampliada (só o cursor dela anda pela mão)
+    const ativo = this.fase === 'escolha' && this.escolhas[j] === undefined && j !== this.cpu
     const carta = ativo && !this.noPassar[j] ? mao.selecionada : null
     const chave = !ativo ? null : this.noPassar[j] ? 'passar' : carta?.dados.id ?? null
     if (this.previas[j]?.chave === chave && (!carta || this.previas[j].indisponivel === carta.indisponivel)) return
@@ -568,9 +588,9 @@ export default class PvpArena extends Phaser.Scene {
 
   apertarB(j) {
     if (this.fase !== 'escolha') return
-    // 2 jogadores: cada um desfaz a sua. Treino: B desfaz a do P1 quando já está na vez do P2
-    const m = this.treino ? (this.escolhas[0] !== undefined ? 0 : null) : j
-    if (m !== null && this.escolhas[m] !== undefined) return this.desfazer(m)
+    // cada um desfaz a sua
+    const m = this.ladoDoControle(j)
+    if (this.escolhas[m] !== undefined) return this.desfazer(m)
     // nada escolhido: atalho para o PASSAR
     const a = this.ladoDoControle(j)
     if (this.escolhas[a] !== undefined || this.noPassar[a]) return
@@ -584,13 +604,42 @@ export default class PvpArena extends Phaser.Scene {
     if (id) {
       this.maos[m].selecionada.confirmar()
     } else {
-      tocar(this, 'confirmar')
+      tocar(this, 'passar')
       this.noPassar[m] = true
       this.botoesPassar[m].setEscolhido(true)
       if (automatico) this.etiquetaEm(PASSAR[m].x, PASSAR[m].y - 50, 'TEMPO!', TEXTO.caido, { tamanho: 13, ms: 900 })
     }
     this.atualizarEscolha()
     if (this.escolhas.every((e) => e !== undefined)) this.encerrarEscolha()
+  }
+
+  // A CPU escolhe a carta (pvp/bot.js), "pensa" um pouco e leva o cursor até
+  // ela passo a passo (com som), como um jogador faria; depois confirma.
+  async jogadaDaCpu(j, rodada) {
+    const valida = () => !this.saindo && this.fase === 'escolha' && this.estado.rodada === rodada && this.escolhas[j] === undefined
+    const sorte = (min, max) => min + Math.random() * (max - min)
+    const id = escolherJogada(this.estado, j, { nivel: this.nivelBot, rng: this.rngBot })
+    await this.esperar(sorte(CPU.pensarMin, CPU.pensarMax))
+    const mao = this.maos[j]
+    const ladoPassar = PASSAR[j].lado
+    const contrario = ladoPassar === 'direita' ? 'esquerda' : 'direita'
+    for (let passos = 0; passos < 12 && valida(); passos++) {
+      const alvo = id ? mao.cartas.findIndex((c) => c.dados.id === id) : -1
+      let direcao = null
+      if (!id) direcao = this.noPassar[j] ? null : ladoPassar
+      else if (alvo < 0) break
+      else if (this.noPassar[j]) direcao = contrario
+      else if (alvo !== mao.indice) direcao = alvo > mao.indice ? 'direita' : 'esquerda'
+      if (!direcao) break
+      this.moverCursor(j, direcao)
+      await this.esperar(sorte(CPU.passoMin, CPU.passoMax))
+    }
+    if (!valida()) return
+    await this.esperar(sorte(150, 350))
+    if (!valida()) return
+    const ok = id && mao.selecionada?.dados.id === id && !this.noPassar[j] && podeJogar(this.estado, j, id).ok
+    tocar(this, 'cpu')
+    this.escolher(j, ok ? id : null)
   }
 
   desfazer(m) {
@@ -699,6 +748,7 @@ export default class PvpArena extends Phaser.Scene {
       return carta
     })
     this.maos.forEach((m) => m.setTravada(false))
+    tocar(this, 'cartaDeslizar')
     await Promise.all(
       this.reveladas.map((c, j) => this.tween({ targets: c, x: MESA[j].x, y: MESA[j].y, rotation: 0, scaleX: ESCALA_MESA, scaleY: ESCALA_MESA, duration: 320, ease: 'Cubic.easeOut' })),
     )
@@ -710,8 +760,13 @@ export default class PvpArena extends Phaser.Scene {
     const especiais = r.jogadas.map((jog) => (jog.anulada ? null : jog.especial))
     const anulou = r.jogadas.some((jog) => jog.anulada)
     if (anulou) this.mostrarBanner('ANULADA!', TEXTO.caido)
-    else if (especiais.includes('espelho')) this.mostrarBanner('ESPELHO!', '#d8ccff')
-    else if (especiais.includes('roubo')) this.mostrarBanner('ROUBO!', '#d0b8ff')
+    else if (especiais.includes('espelho')) {
+      this.mostrarBanner('ESPELHO!', '#d8ccff')
+      tocar(this, 'espelho')
+    } else if (especiais.includes('roubo')) {
+      this.mostrarBanner('ROUBO!', '#d0b8ff')
+      tocar(this, 'roubo')
+    }
     else if (especiais.includes('segundaChance')) this.mostrarBanner('SEGUNDA CHANCE!', '#ffe9a0', { tamanho: 22 })
     else if (r.jogadas.every((jog) => jog.passou)) this.mostrarBanner('OS DOIS PASSARAM', TEXTO.desabilitado, { tamanho: 18 })
     else this.esconderBanner()
@@ -734,6 +789,9 @@ export default class PvpArena extends Phaser.Scene {
         tocar(this, 'cura')
         numero(this, hud.pontoHp.x, hud.pontoHp.y + 6, `+${ef.cura}`, TEXTO.cura, { tamanho: 16 })
       }
+      // escudo e energia de copas (o PASSAR já tocou a ficha na escolha)
+      if (ef.escudo && !jog.anulada) this.time.delayedCall(180, () => tocar(this, 'escudo'))
+      if (ef.energia && !jog.passou) this.time.delayedCall(320, () => tocar(this, 'energia'))
       // escudo: mostra o que vale nesta rodada (gasto no impacto, se vier ataque)
       hud.setEscudo(r.caixas[j]?.escudo ?? this.estado.jogadores[j].escudo)
       hud.setProtegido(this.estado.jogadores[j].protegido)
@@ -791,6 +849,7 @@ export default class PvpArena extends Phaser.Scene {
       this.reveladas.forEach((c) => this.tirarDaMesa(c))
       this.reveladas = [null, null]
       this.mostrarBanner('NINGUÉM ATACOU', TEXTO.desabilitado, { y: 200, tamanho: 18, ms: 800 })
+      tocar(this, 'vazio')
       await this.esperar(1100)
       return
     }
@@ -812,6 +871,8 @@ export default class PvpArena extends Phaser.Scene {
     })
     for (const j of [0, 1]) if (!usadas.has(j)) this.tirarDaMesa(this.reveladas[j])
     // as que voam esperam na coluna do meio (entre as caixas) enquanto elas abrem
+    tocar(this, 'caixaAbrir')
+    if (usadas.size) tocar(this, 'cartaDeslizar')
     await Promise.all([
       ...this.pistas.map((p) => p.mostrar()),
       ...[...usadas].map((j) => this.tween({ targets: this.reveladas[j], x: LARGURA / 2, y: COLUNA[j], scaleX: 0.8, scaleY: 0.8, duration: 260, ease: 'Cubic.easeOut' })),
@@ -826,7 +887,7 @@ export default class PvpArena extends Phaser.Scene {
         const espelho = this.reveladas[outro(j)]
         await carta.arremessar({ x: espelho.x, y: espelho.y }, { destruir: false, duracao: 300, giros: 1, arco: 30, escalaFinal: carta.scaleX * 0.9 })
         this.etiquetaEm(espelho.x, espelho.y - 80, 'DEVOLVIDA!', '#d8ccff', { tamanho: 14, ms: 700 })
-        tocar(this, 'estalo')
+        tocar(this, 'espelho')
         this.tweens.add({ targets: espelho, scaleX: espelho.scaleX * 1.15, scaleY: espelho.scaleY * 1.15, duration: 90, yoyo: true })
         espelho.descartar?.()
         await this.esperar(80)
@@ -856,7 +917,7 @@ export default class PvpArena extends Phaser.Scene {
     this.infoPista[j].setText(`${nome} (${quem})${caixa.refletida ? ' · devolvida' : ''}\n${caixa.dano} de dano por acerto`).setColor(TEXTO.normal)
     if (caixa.escudo != null) {
       this.etiquetaEm(CENTROS[j], PISTA.y - PISTA.altura / 2 - 18, `ESCUDO! -${Math.round((1 - caixa.escudo) * 100)}%`, TEXTO.guarda, { tamanho: 13, ms: 1100 })
-      tocar(this, 'estalo')
+      tocar(this, 'escudo')
       this.huds[j].setEscudo(this.estado.jogadores[j].escudo)
     }
   }
@@ -867,6 +928,7 @@ export default class PvpArena extends Phaser.Scene {
     this.fase = 'esquiva'
     this.ko = [false, false]
     this.grazesRodada = [0, 0]
+    this.esquivaBot?.reiniciar()
     if (!r.caixas.some(Boolean)) return
     const promessas = [0, 1].map((j) => {
       const caixa = r.caixas[j]
@@ -883,6 +945,7 @@ export default class PvpArena extends Phaser.Scene {
     await this.esperar(250)
     if (this.saindo) return
     this.infoPista.forEach((t) => t.setText(''))
+    tocar(this, 'caixaFechar')
     await Promise.all(this.pistas.map((p) => p.esconder()))
   }
 
@@ -902,6 +965,10 @@ export default class PvpArena extends Phaser.Scene {
     this.time.delayedCall(140, () => borda.scene && borda.setStrokeStyle(4, CORES.almas[j]))
     if (jog.protegido && jog.hp === 1 && dano > 0) {
       this.etiquetaEm(CENTROS[j], PISTA.y - PISTA.altura / 2 - 18, 'SEGUNDA CHANCE: AGUENTA!', '#ffe9a0', { tamanho: 11, ms: 700 })
+    }
+    if (jog.hp > 0 && jog.hp <= jog.hpMax * HP_BAIXO && !this.hpAvisado[j]) {
+      this.hpAvisado[j] = true
+      this.time.delayedCall(120, () => tocar(this, 'hpBaixo'))
     }
     if (jog.hp <= 0) this.nocaute(j)
     return true
@@ -951,7 +1018,10 @@ export default class PvpArena extends Phaser.Scene {
     this.atualizarHuds()
     this.avisoPista.forEach((t) => t.setText('').setFontSize(12))
     if (vencedor) return vencedor
+    // curou acima do limite: o alarme de HP baixo pode tocar de novo
+    this.estado.jogadores.forEach((jog, j) => jog.hp > jog.hpMax * HP_BAIXO && (this.hpAvisado[j] = false))
     // as mãos voltam
+    tocar(this, 'cartaDeslizar')
     this.maos.forEach((m, j) => m.setPosicao({ y: MAOS[j].y }))
     this.botoesPassar.forEach((b) => b.descer(false))
     this.montes.forEach((m) => this.tweens.add({ targets: [...m.cartas, m.texto], alpha: 1, duration: 200 }))
@@ -964,7 +1034,7 @@ export default class PvpArena extends Phaser.Scene {
     const v = VENCEDOR[vencedor]
     if (v) {
       const cor = corTexto(PERSONAGENS[this.ids[v - 1]]?.cor ?? 0xffffff)
-      this.mostrarBanner(`P${v} VENCEU!`, cor, { y: 200, tamanho: 34 })
+      this.mostrarBanner(`${this.rotulo(v - 1)} VENCEU!`, cor, { y: 200, tamanho: 34 })
       this.huds[outro(v - 1)].container.setAlpha(0.5)
       tocar(this, 'vitoria')
     } else {
@@ -984,6 +1054,7 @@ export default class PvpArena extends Phaser.Scene {
       p1: this.ids[0],
       p2: this.ids[1],
       rodadas: this.estado.rodada,
+      cpu: this.cpu !== null,
       estatisticas: { p1: { ...this.estatisticas[0] }, p2: { ...this.estatisticas[1] } },
     })
   }
@@ -1033,11 +1104,16 @@ export default class PvpArena extends Phaser.Scene {
     }
 
     this.pistas.forEach((pista, j) => {
-      let joy = this.controles.joy(j)
       const inv = this.invertido[j]
+      const invertendo = Boolean(inv) && inv.espera <= 0 && inv.restante > 0
+      let joy = j === this.cpu ? this.joyDaCpu(pista, delta, invertendo) : this.controles.joy(j)
       if (inv) {
         if (inv.espera > 0) inv.espera -= delta
         else if (inv.restante > 0) {
+          if (!inv.avisado) {
+            inv.avisado = true
+            tocar(this, 'inverter')
+          }
           inv.restante -= delta
           joy = { x: -joy.x, y: -joy.y }
           this.avisoPista[j].setText(Math.floor(this.time.now / 180) % 2 ? 'CONTROLES INVERTIDOS!' : '').setColor('#ff9a3a')
@@ -1047,6 +1123,21 @@ export default class PvpArena extends Phaser.Scene {
         }
       }
       pista.atualizar(delta, joy)
+    })
+  }
+
+  // joystick da CPU na pista dela (pvp/botEsquiva.js)
+  joyDaCpu(pista, delta, invertido) {
+    const coracao = pista.coracoes[0]
+    if (this.fase !== 'esquiva' || !pista.rodando || !coracao?.ativo || this.ko[this.cpu]) return { x: 0, y: 0 }
+    return this.esquivaBot.joy(delta, {
+      coracao,
+      limites: pista.caixa.limites,
+      balas: pista.balas.lista,
+      velocidade: pista.velocidade ?? this.registry.get('velocidade') ?? CORACAO.velocidadePadrao,
+      fatorVelocidade: pista.balas.fatorVelocidade,
+      velocidadeMax: pista.balas.velocidadeMax,
+      invertido,
     })
   }
 
@@ -1091,7 +1182,8 @@ export default class PvpArena extends Phaser.Scene {
     return {
       fase: this.fase,
       rodada: this.estado.rodada,
-      treino: this.treino,
+      cpu: this.cpu,
+      nivelBot: this.cpu === null ? null : this.nivelBot,
       relogio: Math.round(this.relogio),
       escolhas: this.escolhas.map((e) => (e === undefined ? 'escolhendo' : e)),
       noPassar: [...this.noPassar],

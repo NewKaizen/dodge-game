@@ -139,6 +139,20 @@ export const ASSETS = {
     cartaArremessar: null,
     cartaImpacto: null,
     cartaDescartar: null,
+    cartaDeslizar: null,
+    // arena PvP (scenes/PvpArena.js)
+    rodada: null,
+    energia: null,
+    passar: null,
+    caixaAbrir: null,
+    caixaFechar: null,
+    inverter: null,
+    escudo: null,
+    espelho: null,
+    roubo: null,
+    vazio: null,
+    hpBaixo: null,
+    cpu: null,
   },
 
   musicas: {
@@ -148,5 +162,8 @@ export const ASSETS = {
     jevil: null,
     coronel: null,
     vitoria: null,
+    pvpEscolha: null, // escolha de lutador do PvP (sem o arquivo: selecao)
+    pvp: null, // partida PvP (sem o arquivo: jevil)
+    pvpResultado: null, // resultado do PvP (sem o arquivo: vitoria)
   },
 }
