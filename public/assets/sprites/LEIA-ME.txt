@@ -34,3 +34,11 @@ SPRITE DA BATALHA  (chave = id do personagem: ralsei, noelle, berdly...)
 
 A cor do painel, da barra de HP e do nome vem de `cor` em
 src/game/data/personagens.js, não do PNG.
+
+BONUS ROUNDS DO PVP  (pasta bonus/)
+  - Os PNGs de public/assets/sprites/bonus/ (explosão, alvo, bomba, bola de
+    discoteca, balão, tiro, espada, bumerangue, seta, holofote e o selo
+    "BONUS ROUND!") são gerados por scripts/gerar_sprites_bonus.py
+    (python3 + Pillow). Para mudar, edite o script e rode de novo na raiz:
+        python3 scripts/gerar_sprites_bonus.py
+    As chaves e o uso de cada um estão em src/game/pvp/bonus/LEIA-ME.md.
