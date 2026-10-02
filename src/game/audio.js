@@ -519,4 +519,108 @@ const SINTESE = {
   },
   // CPU confirmando a carta (igual ao jogador, um pouco mais grave)
   cpu: (s) => s.tom(520, 0.07, 'square', 0.1, 780),
+  // ---------- bonus rounds do PvP (pvp/bonus/) ----------
+  // "BONUS ROUND!": estalo, arpejo subindo rapidinho e acorde maior com brilho
+  bonusRound: (s) => {
+    s.ruido(0.06, 0.2, 0, 7000)
+    ;[523, 659, 784, 1046, 1318].forEach((f, i) => s.tom(f, 0.08, 'square', 0.07, f * 1.02, i * 0.055))
+    for (const f of [784, 988, 1175, 1568]) s.tom(f, 0.6, 'square', 0.045, f * 1.004, 0.3)
+    s.tom(196, 0.6, 'triangle', 0.14, 196, 0.3)
+    s.ruido(0.4, 0.06, 0.3, 9000)
+  },
+  // tique da roleta girando (curtinho, toca muitas vezes)
+  roleta: (s) => {
+    s.tom(1100 + Math.random() * 120, 0.022, 'square', 0.05, 900)
+    s.ruido(0.015, 0.06, 0, 6000)
+  },
+  // roleta parou no evento: "ding" com brilho
+  roletaFim: (s) => {
+    s.tom(1318, 0.5, 'triangle', 0.1, 1316)
+    s.tom(1976, 0.35, 'sine', 0.05, 1974, 0.01)
+    s.tom(659, 0.1, 'square', 0.06, 659)
+    s.ruido(0.04, 0.12, 0, 8000)
+  },
+  // explosão grande: estalo, baque fundo e rugido que se espalha
+  explosaoGrande: (s) => {
+    s.ruido(0.06, 0.35, 0, 9000)
+    s.ruido(0.8, 0.35, 0, 900)
+    s.tom(120, 0.6, 'sawtooth', 0.18, 30)
+    s.tom(60, 0.8, 'sine', 0.4, 24)
+    s.ruido(0.5, 0.1, 0.15, 350)
+  },
+  // língua de sogra + apito de festa
+  festa: (s) => {
+    s.tom(520, 0.28, 'sawtooth', 0.06, 760)
+    s.tom(528, 0.28, 'square', 0.04, 770)
+    s.tom(2200, 0.1, 'sine', 0.06, 2600, 0.3)
+    s.tom(2600, 0.16, 'sine', 0.06, 2300, 0.4)
+    s.ruido(0.25, 0.05, 0, 6000)
+  },
+  // mundo virando de ponta-cabeça: "fuuuum" varrendo
+  virarMundo: (s) => {
+    s.ruido(0.6, 0.12, 0, 2500)
+    s.tom(160, 0.6, 'sawtooth', 0.06, 900)
+    s.tom(900, 0.4, 'triangle', 0.05, 180, 0.25)
+    s.nota(220, 0.7, 'sine', 0.08, 110, 0, 0.3)
+  },
+  // apagão: força caindo (zumbido elétrico descendo + estalo do disjuntor)
+  apagao: (s) => {
+    s.ruido(0.04, 0.3, 0, 7000)
+    s.tom(440, 0.9, 'sawtooth', 0.08, 30)
+    s.tom(120, 0.7, 'square', 0.05, 25, 0.05)
+    s.tom(60, 0.4, 'sine', 0.2, 30, 0.02)
+  },
+  // gravidade mudou: tom bambo, sobe e desce, e assenta grave
+  gravidade: (s) => {
+    s.tom(300, 0.15, 'sine', 0.1, 520)
+    s.tom(520, 0.15, 'sine', 0.1, 260, 0.15)
+    s.tom(260, 0.15, 'sine', 0.1, 420, 0.3)
+    s.tom(420, 0.3, 'sine', 0.1, 140, 0.45)
+    s.tom(90, 0.3, 'triangle', 0.15, 50, 0.6)
+  },
+  // os dois trocaram de lugar: zíper rápido indo e voltando
+  trocar: (s) => {
+    s.tom(400, 0.12, 'square', 0.05, 1600)
+    s.tom(1600, 0.12, 'square', 0.05, 400, 0.12)
+    s.ruido(0.24, 0.08, 0, 4000)
+  },
+  // carta maluca: "boing" de desenho animado
+  maluca: (s) => {
+    s.tom(180, 0.4, 'triangle', 0.14, 520)
+    s.tom(360, 0.4, 'sine', 0.05, 1040)
+    for (let i = 0; i < 4; i++) s.tom(500 - i * 40, 0.07, 'sine', 0.06 - i * 0.01, 620 - i * 40, 0.1 + i * 0.07)
+  },
+  // tiro: "pew"
+  tiro: (s) => {
+    s.tom(1500, 0.11, 'square', 0.05, 300)
+    s.ruido(0.03, 0.08, 0, 6000)
+  },
+  // espadada: corte no ar
+  espadada: (s) => {
+    s.ruido(0.14, 0.18, 0, 5000)
+    s.tom(900, 0.12, 'sawtooth', 0.04, 2200)
+    s.tom(2600, 0.08, 'sine', 0.03, 2400, 0.06)
+  },
+  // bumerangue girando: zumbido que pulsa
+  bumerangue: (s) => {
+    for (let i = 0; i < 5; i++) {
+      s.tom(260 + i * 20, 0.07, 'triangle', 0.06, 420 + i * 20, i * 0.07)
+      s.ruido(0.05, 0.05, i * 0.07, 2500)
+    }
+  },
+  // pavio queimando: chiado com estalinhos
+  pavio: (s) => {
+    s.ruido(0.5, 0.06, 0, 7000)
+    for (let i = 0; i < 4; i++) s.ruido(0.02, 0.1, 0.05 + i * 0.1 + Math.random() * 0.04, 9000)
+  },
+  // duelo: choque de lâminas e gongo dramático
+  duelo: (s) => {
+    s.ruido(0.05, 0.3, 0, 9000)
+    s.tom(2400, 0.3, 'triangle', 0.06, 2350)
+    s.tom(3600, 0.2, 'sine', 0.04, 3550)
+    s.tom(110, 1.4, 'sine', 0.26, 108, 0.05)
+    s.tom(220, 1.0, 'triangle', 0.08, 218, 0.05)
+    s.tom(331, 0.6, 'sine', 0.04, 329, 0.05)
+    s.ruido(0.4, 0.08, 0.05, 1500)
+  },
 }

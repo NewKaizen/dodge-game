@@ -13,7 +13,11 @@ import { ataqueDaCartaNoJogo } from '../pvp/ataquesDasCartas.js'
 import { criarPartida, iniciarRodada, podeJogar, resolverRodada, aplicarDano, registrarGrazes, fimDaRodada, ENERGIA } from '../pvp/regras.js'
 import { escolherJogada, NIVEIS_BOT, NIVEL_BOT_PADRAO } from '../pvp/bot.js'
 import { EsquivaBot } from '../pvp/botEsquiva.js'
-import { criarRng } from '../pvp/baralho.js'
+import { criarRng, aleatorio, inteiro } from '../pvp/baralho.js'
+import { EVENTOS, EVENTO, ehRodadaBonus, sortearEvento, transformarMalucas, desfazerMalucas, podeJogarDuelo, resolverDuelo } from '../pvp/bonus.js'
+import { EFEITOS } from '../pvp/bonus/eventos/index.js'
+import { anunciarBonus } from '../pvp/bonus/anuncio.js'
+import Duelo from '../pvp/bonus/Duelo.js'
 import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
@@ -38,12 +42,24 @@ import { particulas } from '../effects/particulas.js'
 //                até a caixa de quem vai desviar dela (o espelho rebate)
 //   'esquiva'    as duas Pistas rodam ao mesmo tempo; acertos tiram HP do dono
 //                da pista (aplicarDano), grazes viram energia (registrarGrazes)
+//   'duelo'      só no bonus round de duelo, no lugar de 'arremesso' e 'esquiva'
 //   'fim'        fimDaRodada: vencedor? -> 'resultado' (PvpResultado); senão volta ao 'inicio'
 //
 // Morte súbita (ACELERACAO em constants.js): a cada 5 rodadas (começo da 5ª,
 // 10ª...) tudo acelera: balas (velocidade, densidade e teto), o coração (metade
 // do bônus), o relógio da escolha (mais curto), as animações de carta e a
 // música. Aviso grande ao subir e o selo "VELOCIDADE xN" no alto.
+//
+// Bonus round (pvp/bonus.js, a cada 3 rodadas: 3ª, 6ª...): no começo da
+// rodada uma roleta (pvp/bonus/anuncio.js) sorteia um evento caótico. Só
+// caos, sem prêmio. Conforme evento.cartas:
+//   'normal'   rodada de sempre; o efeito (pvp/bonus/eventos/) bagunça a
+//              esquiva, que acontece mesmo se ninguém atacar (caixa "vazia")
+//   'malucas'  na revelação cada carta vira outra sorteada (transformarMalucas)
+//   'duelo'    qualquer carta vale (sem energia) e vira a arma do duelo:
+//              arremesso + esquiva dão lugar a 'duelo' (pvp/bonus/Duelo.js)
+// Testes: scene.start('PvpArena', { bonus: 'festa' }) força esse evento em
+// toda rodada bônus; pvpArena.forcarBonus('duelo') faz a PRÓXIMA rodada ser bônus.
 //
 // ♦ Q/K (caixa.inverterMs > 0): os controles do dono da caixa ficam invertidos
 // do fim do respiro inicial até o ataque daquela caixa acabar (o ataque todo).
@@ -93,6 +109,8 @@ const ESCALA_MESA = 1.45
 const COLUNA = [150, 262] // y das cartas na coluna entre as caixas, antes do arremesso
 
 const outro = (j) => 1 - j
+// bonus round: o "ataque" da caixa que não recebeu carta (só o evento bagunça ela)
+const ATAQUE_VAZIO = { nome: 'bonus', duracao: 5000, caixa: null, iniciar() {} }
 const VENCEDOR = { p1: 1, p2: 2, empate: 0 }
 
 export default class PvpArena extends Phaser.Scene {
@@ -106,6 +124,7 @@ export default class PvpArena extends Phaser.Scene {
     this.ids = [valido(dados?.p1) ?? valido(salvo.p1) ?? 'kris', valido(dados?.p2) ?? valido(salvo.p2) ?? 'susie']
     this.semente = dados?.semente ?? `pvp:${Date.now()}`
     this.tempoBase = dados?.tempo ?? TEMPO.escolha
+    this.bonusForcado = EVENTO[dados?.bonus] ? dados.bonus : null
   }
 
   create() {
@@ -133,6 +152,12 @@ export default class PvpArena extends Phaser.Scene {
     this.ko = [false, false]
     this.aceleracao = 1 // fator da morte súbita (fatorAceleracao da rodada)
     this.nivelAceleracao = 0
+    this.rngBonus = criarRng(`${this.semente}:bonus`)
+    this.bonus = null // evento do bonus round atual (EVENTOS de pvp/bonus.js) ou null
+    this.bonusAnterior = null
+    this.bonusProximo = null // forcarBonus(): a próxima rodada é bônus com este evento
+    this.efeitoBonus = null // efeito do evento rodando na esquiva (pvp/bonus/eventos/)
+    this.duelo = null
     velocidadeMusica(1) // começa no andamento normal (revanche/recomeçar também)
     this.estatisticas = [0, 1].map(() => ({ danoCausado: 0, danoRecebido: 0, cartasJogadas: 0, maiorCarta: null, grazes: 0, ases: 0, passes: 0 }))
 
@@ -149,6 +174,7 @@ export default class PvpArena extends Phaser.Scene {
 
     this.controles.onBotao((j, botao) => {
       if (this.pausado || this.saindo) return
+      if (this.fase === 'duelo') return botao === 'A' && this.duelo?.atacar(this.ladoDoControle(j))
       if (botao === 'A') this.apertarA(j)
       else this.apertarB(j)
     })
@@ -161,6 +187,9 @@ export default class PvpArena extends Phaser.Scene {
     this.events.once('shutdown', () => {
       this.saindo = true
       this.events.off('postupdate', this.filtrarCaixas, this)
+      this.encerrarEfeitoBonus()
+      this.duelo?.parar()
+      this.duelo = null
       this.pistas.forEach((p) => p.destruir())
       velocidadeMusica(1) // a próxima tela não herda a música acelerada
       if (window.pvpArena === this) delete window.pvpArena
@@ -223,6 +252,8 @@ export default class PvpArena extends Phaser.Scene {
     this.textoTreino = texto(50, 9, '#9be7ff')
     if (this.cpu !== null) this.textoTreino.setText(`VS CPU · ${{ facil: 'fácil', normal: 'normal', dificil: 'difícil' }[this.nivelBot]}`)
     // morte súbita: logo abaixo do "VS CPU" (escondido enquanto for x1)
+    // bonus round: nome do evento enquanto a rodada dura
+    this.textoBonus = texto(70, 11, TEXTO.selecionado).setOrigin(0.5)
     this.indicadorVelocidade = new IndicadorVelocidade(this, LARGURA / 2, this.cpu !== null ? 61 : 50, { tamanho: 10 })
   }
 
@@ -378,17 +409,32 @@ export default class PvpArena extends Phaser.Scene {
     while (!this.saindo) {
       await this.inicioDaRodada()
       if (this.saindo) return
-      const jogadas = await this.escolha()
+      let jogadas = await this.escolha()
       if (this.saindo) return
-      const resultado = resolverRodada(this.estado, jogadas[0], jogadas[1])
-      this.contarJogadas(resultado)
-      await this.revelacao(resultado)
+      if (this.bonus?.cartas === 'duelo') {
+        const duelo = resolverDuelo(this.estado, jogadas[0], jogadas[1], this.rngBonus)
+        this.contarJogadas(duelo)
+        await this.revelacaoDuelo(duelo)
+        if (this.saindo) return
+        await this.rodarDuelo(duelo)
+      } else {
+        // cartas malucas: cada carta vira outra antes de resolver (o baralho volta ao normal logo depois)
+        let trocas = null
+        if (this.bonus?.cartas === 'malucas') ({ jogadas, trocas } = transformarMalucas(this.estado, jogadas, this.rngBonus))
+        const resultado = resolverRodada(this.estado, jogadas[0], jogadas[1])
+        if (trocas) {
+          desfazerMalucas(this.estado, trocas)
+          resultado.trocas = trocas
+        }
+        this.contarJogadas(resultado)
+        await this.revelacao(resultado)
+        if (this.saindo) return
+        await this.arremesso(resultado)
+        if (this.saindo) return
+        await this.esquiva(resultado)
+      }
       if (this.saindo) return
-      await this.arremesso(resultado)
-      if (this.saindo) return
-      await this.esquiva(resultado)
-      if (this.saindo) return
-      const vencedor = await this.terminarRodada(resultado)
+      const vencedor = await this.terminarRodada()
       if (this.saindo) return
       if (vencedor) return this.resultado(vencedor)
     }
@@ -443,6 +489,102 @@ export default class PvpArena extends Phaser.Scene {
     await this.sincronizarMaos()
     this.atualizarMontes()
     if (acelerou && !this.saindo) await this.avisarAceleracao()
+    if (!this.saindo) await this.sortearBonus()
+  }
+
+  // ---------- bonus round ----------
+
+  // Rodada bônus (a cada 3, ou a forçada por forcarBonus): roleta e o selo no alto
+  async sortearBonus() {
+    const forcado = this.bonusProximo
+    this.bonusProximo = null
+    if (!forcado && !ehRodadaBonus(this.estado.rodada)) return
+    const evento = EVENTO[forcado] ?? EVENTO[this.bonusForcado] ?? sortearEvento(this.rngBonus, { anterior: this.bonusAnterior })
+    this.bonus = evento
+    this.bonusAnterior = evento.id
+    this.esconderBanner() // o "RODADA N" não fica por cima da roleta
+    await anunciarBonus(this, evento, { eventos: EVENTOS, rng: () => aleatorio(this.rngBonus) })
+    if (this.saindo) return
+    this.textoBonus.setText(`★ BONUS: ${evento.nome} ★`).setColor(corTexto(evento.cor)).setAlpha(1)
+    this.tweens.add({ targets: this.textoBonus, scale: { from: 1.6, to: 1 }, duration: 260, ease: 'Back.easeOut' })
+  }
+
+  // Liga o efeito do evento (se ele tem um) quando a esquiva começa
+  iniciarEfeitoBonus() {
+    const criar = this.bonus && EFEITOS[this.bonus.id]
+    if (!criar) return
+    this.efeitoBonus = criar(this, { rng: () => aleatorio(this.rngBonus), rodada: this.estado.rodada, aceleracao: this.aceleracao })
+    this.efeitoBonus.comecar?.()
+  }
+
+  encerrarEfeitoBonus() {
+    const efeito = this.efeitoBonus
+    this.efeitoBonus = null
+    efeito?.terminar?.()
+  }
+
+  get temEfeitoBonus() {
+    return Boolean(this.bonus && EFEITOS[this.bonus.id])
+  }
+
+  // Duelo: as cartas vão ao centro, viram e mostram a arma de cada um
+  async revelacaoDuelo(r) {
+    this.fase = 'revelacao'
+    this.atualizarEscolha()
+    this.maos.forEach((m) => m.setAtiva(false))
+    const cartas = [0, 1].map((j) => {
+      const jog = r.jogadas[j]
+      if (jog.passou) {
+        const b = this.botoesPassar[j]
+        b.setEscolhido(false)
+        b.setFoco(false)
+        return this.criarFichaPassar(j, b.c.x, b.c.y)
+      }
+      const mao = this.maos[j]
+      const carta = mao.cartas.find((c) => c.dados.id === jog.carta.id)
+      carta.focar(false)
+      mao.retirar(carta)
+      return carta.setDepth(80 + j)
+    })
+    this.maos.forEach((m) => m.setTravada(false))
+    tocar(this, 'cartaDeslizar')
+    await Promise.all(cartas.map((c, j) => this.tween({ targets: c, x: MESA[j].x, y: MESA[j].y, rotation: 0, scaleX: ESCALA_MESA, scaleY: ESCALA_MESA, duration: 320, ease: 'Cubic.easeOut' })))
+    this.mostrarBanner('DUELO!', corTexto(this.bonus.cor))
+    await this.esperar(240)
+    await Promise.all(cartas.map((c) => (c instanceof Carta ? c.revelar() : this.tween({ targets: c, scale: ESCALA_MESA * 1.15, duration: 110, yoyo: true }))))
+    const NOMES = { tiro: 'TIRO', espada: 'ESPADA', bumerangue: 'BUMERANGUE', explosao: 'EXPLOSÃO' }
+    const etiquetas = r.armas.flatMap((arma, j) => [
+      this.etiquetaEm(MESA[j].x, MESA[j].y + 86, NOMES[arma.arma] ?? arma.arma, '#ffe9a0', { atraso: 120, tamanho: 14, ms: 1700 }),
+      this.etiquetaEm(MESA[j].x, MESA[j].y + 104, r.jogadas[j].passou ? 'sorteada (passou)' : `${arma.dano} por acerto`, TEXTO.normal, { atraso: 280, tamanho: 11, ms: 1540 }),
+    ])
+    tocar(this, 'brilhoRank')
+    await this.esperar(1700)
+    etiquetas.forEach((t) => t.scene && t.destroy())
+    cartas.forEach((c) => this.tirarDaMesa(c))
+    this.esconderBanner()
+  }
+
+  async rodarDuelo(r) {
+    // as mãos descem e o meio da mesa vira a arena do duelo
+    this.maos.forEach((m) => m.setPosicao({ y: MAO_ESCONDIDA }))
+    this.botoesPassar.forEach((b) => b.descer(true))
+    this.status.forEach((s) => s.setText(''))
+    this.montes.forEach((m) => this.tweens.add({ targets: [...m.cartas, m.texto], alpha: 0.25, duration: 200 }))
+    await this.esperar(300)
+    if (this.saindo) return
+    this.fase = 'duelo'
+    this.ko = [false, false]
+    this.dica.setText(this.cpu === null ? 'mexa para mirar   A: atacar' : 'mexa para mirar   A: atacar   (a CPU também luta!)')
+    this.duelo = new Duelo(this, { armas: r.armas, cpu: this.cpu, nivelBot: this.nivelBot, semente: `${this.semente}:duelo:${this.estado.rodada}`, aceleracao: this.aceleracao })
+    await this.duelo.rodar()
+    this.duelo = null
+    this.dica.setText('')
+  }
+
+  // dev: a próxima rodada é bônus com o evento `id` (ou sorteado, sem id)
+  forcarBonus(id = null) {
+    this.bonusProximo = EVENTO[id] ? id : true
+    return this.bonusProximo
   }
 
   // ---------- morte súbita ----------
@@ -513,7 +655,7 @@ export default class PvpArena extends Phaser.Scene {
     // sobrou alguma saída sem destino (não deveria): some
     saidas.flat().forEach((c) => c.scene && c.descartar())
     await Promise.all(compras)
-    this.maos.forEach((m, j) => m.setEnergia(this.estado.jogadores[j].energia))
+    this.maos.forEach((m, j) => m.setEnergia(this.energiaNaMao(j)))
   }
 
   // ---------- escolha ----------
@@ -525,7 +667,7 @@ export default class PvpArena extends Phaser.Scene {
     this.relogio = this.tempoEscolha
     this.ultimoSegundo = null
     this.maos.forEach((m, j) => {
-      m.setEnergia(this.estado.jogadores[j].energia)
+      m.setEnergia(this.energiaNaMao(j))
       m.setTravada(false)
       m.selecionar(Math.floor(m.cartas.length / 2))
     })
@@ -533,10 +675,24 @@ export default class PvpArena extends Phaser.Scene {
       b.setEscolhido(false)
       b.setFoco(false)
     })
-    this.dica.setText('←/→ escolher   A: confirmar   B: desfazer / ir para PASSAR   C: pausa')
+    this.dica.setText(
+      this.bonus?.cartas === 'duelo'
+        ? 'DUELO: qualquer carta vale!   ♥ tiro   ♠ espada   ♦ bumerangue   ♣ explosão'
+        : '←/→ escolher   A: confirmar   B: desfazer / ir para PASSAR   C: pausa',
+    )
     this.atualizarEscolha()
     if (this.cpu !== null) this.jogadaDaCpu(this.cpu, this.estado.rodada)
     return new Promise((resolver) => (this.fimDaEscolha = resolver))
+  }
+
+  // energia que a mão usa para marcar as cartas (no duelo nada custa)
+  energiaNaMao(j) {
+    return this.bonus?.cartas === 'duelo' ? Infinity : this.estado.jogadores[j].energia
+  }
+
+  // podeJogar da rodada atual (no duelo basta a carta estar na mão)
+  podeJogarAgora(j, id) {
+    return this.bonus?.cartas === 'duelo' ? podeJogarDuelo(this.estado, j, id) : podeJogar(this.estado, j, id)
   }
 
   atualizarEscolha() {
@@ -619,7 +775,7 @@ export default class PvpArena extends Phaser.Scene {
     if (this.noPassar[m] || !this.maos[m].cartas.length) return this.escolher(m, null)
     const carta = this.maos[m].selecionada
     if (!carta) return
-    const v = podeJogar(this.estado, m, carta.dados.id)
+    const v = this.podeJogarAgora(m, carta.dados.id)
     if (!v.ok) {
       carta.negar()
       this.previas[m]?.negar?.()
@@ -666,7 +822,12 @@ export default class PvpArena extends Phaser.Scene {
   async jogadaDaCpu(j, rodada) {
     const valida = () => !this.saindo && this.fase === 'escolha' && this.estado.rodada === rodada && this.escolhas[j] === undefined
     const sorte = (min, max) => min + Math.random() * (max - min)
-    const id = escolherJogada(this.estado, j, { nivel: this.nivelBot, rng: this.rngBot })
+    // no duelo a CPU pega qualquer carta da mão (todas viram arma)
+    const mao0 = this.estado.jogadores[j].baralho.mao
+    const id =
+      this.bonus?.cartas === 'duelo'
+        ? mao0[inteiro(this.rngBot, 0, mao0.length - 1)]?.id ?? null
+        : escolherJogada(this.estado, j, { nivel: this.nivelBot, rng: this.rngBot })
     await this.esperar(sorte(CPU.pensarMin, CPU.pensarMax))
     const mao = this.maos[j]
     const ladoPassar = PASSAR[j].lado
@@ -685,7 +846,7 @@ export default class PvpArena extends Phaser.Scene {
     if (!valida()) return
     await this.esperar(sorte(150, 350))
     if (!valida()) return
-    const ok = id && mao.selecionada?.dados.id === id && !this.noPassar[j] && podeJogar(this.estado, j, id).ok
+    const ok = id && mao.selecionada?.dados.id === id && !this.noPassar[j] && this.podeJogarAgora(j, id).ok
     tocar(this, 'cpu')
     this.escolher(j, ok ? id : null)
   }
@@ -789,7 +950,9 @@ export default class PvpArena extends Phaser.Scene {
         return ficha
       }
       const mao = this.maos[j]
-      const carta = mao.cartas.find((c) => c.dados.id === jog.carta.id)
+      // carta maluca: na mão ainda está a original
+      const id = r.trocas?.[j]?.de.id ?? jog.carta.id
+      const carta = mao.cartas.find((c) => c.dados.id === id)
       carta.focar(false)
       mao.retirar(carta)
       carta.setDepth(80 + j)
@@ -803,6 +966,7 @@ export default class PvpArena extends Phaser.Scene {
     this.mostrarBanner('REVELAR!')
     await this.esperar(240)
     await Promise.all(this.reveladas.map((c) => (c instanceof Carta ? c.revelar() : this.tween({ targets: c, scale: ESCALA_MESA * 1.15, duration: 110, yoyo: true }))))
+    if (r.trocas?.some(Boolean)) await this.enlouquecerCartas(r.trocas)
 
     // destaque do especial da rodada
     const especiais = r.jogadas.map((jog) => (jog.anulada ? null : jog.especial))
@@ -854,6 +1018,30 @@ export default class PvpArena extends Phaser.Scene {
     await this.esperar(1250)
   }
 
+  // Cartas malucas: cada carta revelada gira, vira outra e mostra no que virou
+  async enlouquecerCartas(trocas) {
+    this.mostrarBanner('CARTAS MALUCAS!', corTexto(EVENTO.malucas.cor), { tamanho: 22 })
+    tocar(this, 'maluca')
+    await Promise.all(
+      trocas.map(async (troca, j) => {
+        const velha = this.reveladas[j]
+        if (!troca || !(velha instanceof Carta)) return
+        // gira rápido (achata e volta algumas vezes) e troca no meio
+        for (let k = 0; k < 3; k++) await this.tween({ targets: velha, scaleX: 0.05, duration: 70 + k * 30, yoyo: true, ease: 'Sine.easeInOut' })
+        await this.tween({ targets: velha, scaleX: 0.05, duration: 110, ease: 'Sine.easeIn' })
+        const nova = new Carta(this, velha.x, velha.y, { ...troca.para }, { largura: velha.largura }).setDepth(velha.depth)
+        nova.setScale(0.05, velha.scaleY)
+        velha.destroy()
+        this.reveladas[j] = nova
+        particulas(this, nova.x, nova.y, { cor: EVENTO.malucas.cor, quantidade: 26, velocidade: 180 })
+        await this.tween({ targets: nova, scaleX: ESCALA_MESA, duration: 160, ease: 'Back.easeOut' })
+        const quem = PERSONAGENS[troca.para.personagem]?.nome ?? troca.para.personagem
+        this.etiquetasMesa.push(this.etiquetaEm(MESA[j].x, MESA[j].y - 86, `VIROU ${troca.para.nome}!\n(${quem})`, '#e0c0ff', { tamanho: 11, ms: 1600 }))
+      }),
+    )
+    await this.esperar(500)
+  }
+
   criarFichaPassar(j, x, y) {
     const c = this.add.container(x, y).setDepth(80 + j)
     const g = this.add.graphics()
@@ -890,7 +1078,7 @@ export default class PvpArena extends Phaser.Scene {
   async arremesso(r) {
     this.fase = 'arremesso'
     this.esconderBanner()
-    if (!r.caixas.some(Boolean)) {
+    if (!r.caixas.some(Boolean) && !this.temEfeitoBonus) {
       // ninguém mandou ataque (passou, anulou, segunda chance...): nem abre as caixas
       for (const t of this.etiquetasMesa ?? []) if (t.scene) this.tweens.add({ targets: t, alpha: 0, duration: 150, onComplete: () => t.destroy() })
       this.etiquetasMesa = []
@@ -942,7 +1130,7 @@ export default class PvpArena extends Phaser.Scene {
       }
       await carta.arremessar({ x: CENTROS[j], y: PISTA.y }, { aoImpacto: () => this.impactoNaCaixa(j, caixa) })
     })
-    for (const j of [0, 1]) if (!r.caixas[j]) this.infoPista[j].setText('caixa livre nesta rodada').setColor(TEXTO.desabilitado)
+    for (const j of [0, 1]) if (!r.caixas[j]) this.infoPista[j].setText(this.temEfeitoBonus ? 'sem carta: só o caos!' : 'caixa livre nesta rodada').setColor(TEXTO.desabilitado)
     await Promise.all(voos)
     this.reveladas = [null, null]
     await this.esperar(200)
@@ -977,18 +1165,22 @@ export default class PvpArena extends Phaser.Scene {
     this.ko = [false, false]
     this.grazesRodada = [0, 0]
     this.esquivaBot?.reiniciar()
-    if (!r.caixas.some(Boolean)) return
+    const bonus = this.temEfeitoBonus
+    if (!r.caixas.some(Boolean) && !bonus) return
     const promessas = [0, 1].map((j) => {
       const caixa = r.caixas[j]
       const ataque = caixa ? ataqueDaCartaNoJogo(caixa.carta) : null
-      if (!ataque) return null
       const pista = this.pistas[j]
+      // bonus round: a caixa sem ataque também abre, só com o caos do evento
+      if (!ataque) return bonus ? pista.rodar(ATAQUE_VAZIO, { dano: 0, semente: `${this.semente}:${this.estado.rodada}:${j}`, aceleracao: this.aceleracao }) : null
       pista.tema = TEMAS[caixa.carta.personagem] ?? pista.tema
       // ♦ Q/K: inverte do começo do ataque (depois do respiro) até ele acabar (ver update)
       if (caixa.inverterMs) this.invertido[j] = { avisado: false }
       return pista.rodar(ataque, { dano: caixa.dano, ritmo: caixa.ritmo, semente: `${this.semente}:${this.estado.rodada}:${j}`, aceleracao: this.aceleracao })
     })
+    if (bonus) this.iniciarEfeitoBonus()
     await Promise.all(promessas.filter(Boolean))
+    this.encerrarEfeitoBonus()
     this.invertido = [0, 0]
     this.avisoPista.forEach((t) => t.setText(''))
     await this.esperar(250)
@@ -999,7 +1191,7 @@ export default class PvpArena extends Phaser.Scene {
   }
 
   acertou(j, dano) {
-    if (this.fase !== 'esquiva' || this.ko[j] || debug.invencivel) return false
+    if ((this.fase !== 'esquiva' && this.fase !== 'duelo') || this.ko[j] || debug.invencivel) return false
     const efetivo = aplicarDano(this.estado, j, dano)
     const jog = this.estado.jogadores[j]
     this.estatisticas[j].danoRecebido += efetivo
@@ -1009,9 +1201,11 @@ export default class PvpArena extends Phaser.Scene {
     hud.tremer()
     numero(this, hud.pontoHp.x, hud.pontoHp.y + 4, efetivo ? `-${efetivo}` : '0', TEXTO.caido, { tamanho: 16, desvio: 12 })
     shake(this, 90, 0.004)
-    const borda = this.pistas[j].caixa.retangulo
-    borda.setStrokeStyle(4, 0xff3048)
-    this.time.delayedCall(140, () => borda.scene && borda.setStrokeStyle(4, CORES.almas[j]))
+    if (this.fase === 'esquiva') {
+      const borda = this.pistas[j].caixa.retangulo
+      borda.setStrokeStyle(4, 0xff3048)
+      this.time.delayedCall(140, () => borda.scene && borda.setStrokeStyle(4, CORES.almas[j]))
+    }
     if (jog.protegido && jog.hp === 1 && dano > 0) {
       this.etiquetaEm(CENTROS[j], PISTA.y - PISTA.altura / 2 - 18, 'SEGUNDA CHANCE: AGUENTA!', '#ffe9a0', { tamanho: 11, ms: 700 })
     }
@@ -1027,6 +1221,8 @@ export default class PvpArena extends Phaser.Scene {
   // depois (dá tempo do outro zerar também: empate)
   nocaute(j) {
     this.ko[j] = true
+    // o duelo quebra o coração (com efeitos próprios) e termina a luta
+    if (this.fase === 'duelo') return this.duelo?.nocaute(j)
     const coracao = this.pistas[j].coracoes[0]
     tocar(this, 'quebrar')
     flashTela(this, CORES.almas[j], 0.3, 220)
@@ -1043,7 +1239,7 @@ export default class PvpArena extends Phaser.Scene {
   }
 
   grazeou(j) {
-    if (this.fase !== 'esquiva' || this.ko[j]) return
+    if ((this.fase !== 'esquiva' && this.fase !== 'duelo') || this.ko[j]) return
     this.estatisticas[j].grazes++
     this.grazesRodada[j]++
     const ganho = registrarGrazes(this.estado, j, 1)
@@ -1060,6 +1256,10 @@ export default class PvpArena extends Phaser.Scene {
   async terminarRodada() {
     this.fase = 'fim'
     const vencedor = fimDaRodada(this.estado)
+    if (this.bonus) {
+      this.bonus = null
+      this.tweens.add({ targets: this.textoBonus, alpha: 0, duration: 300 })
+    }
     this.huds.forEach((hud, j) => {
       hud.setProtegido(false)
       hud.setEscudo(this.estado.jogadores[j].escudo)
@@ -1111,7 +1311,7 @@ export default class PvpArena extends Phaser.Scene {
   // ---------- pause (botão C) ----------
 
   podePausar() {
-    return ['inicio', 'escolha', 'revelacao', 'arremesso', 'esquiva'].includes(this.fase) && !this.saindo && !this.pausado
+    return ['inicio', 'escolha', 'revelacao', 'arremesso', 'esquiva', 'duelo'].includes(this.fase) && !this.saindo && !this.pausado
   }
 
   pausar() {
@@ -1172,8 +1372,12 @@ export default class PvpArena extends Phaser.Scene {
         this.invertido[j] = 0
         if (!this.ko[j]) this.avisoPista[j].setText('')
       }
+      // bonus round: o evento pode mexer no joystick (gravidade, coração trocado...)
+      if (this.efeitoBonus?.joy) joy = this.efeitoBonus.joy(j, joy) ?? joy
       pista.atualizar(delta, joy)
     })
+    this.efeitoBonus?.atualizar?.(delta)
+    if (this.fase === 'duelo') this.duelo?.atualizar(delta)
   }
 
   // joystick da CPU na pista dela (pvp/botEsquiva.js)
@@ -1240,6 +1444,9 @@ export default class PvpArena extends Phaser.Scene {
       vencedor: this.estado.vencedor,
       pausado: this.pausado,
       aceleracao: { nivel: this.nivelAceleracao, fator: this.aceleracao, tempoEscolha: this.tempoEscolha },
+      bonus: this.bonus?.id ?? null,
+      efeitoBonus: Boolean(this.efeitoBonus),
+      duelo: this.duelo?.estadoDebug?.() ?? null,
       jogadores: this.estado.jogadores.map((jog, j) => {
         const pista = this.pistas[j]
         const cor = pista.coracoes[0]

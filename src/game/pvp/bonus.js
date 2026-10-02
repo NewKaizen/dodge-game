@@ -1,0 +1,156 @@
+// Bonus rounds do PvP: a cada BONUS.aCadaRodadas rodadas (3ª, 6ª, 9ª...) a
+// rodada vira um evento caótico sorteado. Só caos, sem prêmio: ninguém ganha
+// nada a mais por causa do evento (o dano continua valendo normalmente).
+// Lógica pura (sem Phaser), testável em Node. O visual de cada evento fica em
+// pvp/bonus/ (ver pvp/bonus/LEIA-ME.md).
+//
+//   ehRodadaBonus(estado.rodada)                    true na 3ª, 6ª, 9ª...
+//   const ev = sortearEvento(rng, { anterior })    um de EVENTOS (não repete o anterior)
+//   ev.cartas                                      como a rodada trata as cartas:
+//     'normal'   escolha e resolução de sempre; o evento só bagunça a esquiva
+//     'malucas'  escolha de sempre; na revelação cada carta vira outra
+//                sorteada (transformarMalucas antes de resolverRodada e
+//                desfazerMalucas depois: o baralho não muda de verdade)
+//     'duelo'    qualquer carta da mão vale (sem custo de energia); ela vira a
+//                arma do duelo numa caixa só para os dois (resolverDuelo)
+
+import { CARTAS, PERSONAGENS_PVP, forca } from './cartas.js'
+import { cartaNaMao, descartar, inteiro } from './baralho.js'
+
+export const BONUS = { aCadaRodadas: 3 }
+
+// id, nome (aviso grande), descricao (uma linha embaixo), cor (texto/brilho)
+export const EVENTOS = [
+  { id: 'explosoes', nome: 'CHUVA DE EXPLOSÕES', descricao: 'bombas caem do céu nas duas caixas!', cartas: 'normal', cor: 0xff7a1a },
+  { id: 'festa', nome: 'MODO FESTA', descricao: 'luzes, confete e balões dançando!', cartas: 'normal', cor: 0xff4fd8 },
+  { id: 'pontaCabeca', nome: 'MUNDO DE PONTA-CABEÇA', descricao: 'a tela inteira vira de cabeça pra baixo!', cartas: 'normal', cor: 0x7fd8ff },
+  { id: 'malucas', nome: 'CARTAS MALUCAS', descricao: 'cada carta vira outra na hora de revelar!', cartas: 'malucas', cor: 0xc07dff },
+  { id: 'duelo', nome: 'DUELO!', descricao: 'uma caixa só: a carta vira sua arma (A ataca)', cartas: 'duelo', cor: 0xff3048 },
+  { id: 'apagao', nome: 'APAGÃO', descricao: 'as luzes caíram: só dá pra ver em volta do coração!', cartas: 'normal', cor: 0xffe040 },
+  { id: 'gravidade', nome: 'GRAVIDADE MALUCA', descricao: 'a gravidade muda de lado o tempo todo!', cartas: 'normal', cor: 0x3cff6a },
+  { id: 'trocado', nome: 'CORAÇÃO TROCADO', descricao: 'você controla o coração do OUTRO!', cartas: 'normal', cor: 0xff8aa8 },
+]
+
+export const EVENTO = Object.fromEntries(EVENTOS.map((ev) => [ev.id, ev]))
+
+export function ehRodadaBonus(rodada, cfg = BONUS) {
+  return rodada > 0 && rodada % cfg.aCadaRodadas === 0
+}
+
+// Sorteia o evento da rodada bônus. Não repete o anterior (se houver outro).
+//   disponiveis  ids permitidos (padrão: todos)
+export function sortearEvento(rng, { anterior = null, disponiveis = EVENTOS.map((ev) => ev.id) } = {}) {
+  const ids = disponiveis.filter((id) => EVENTO[id])
+  if (!ids.length) throw new Error('sortearEvento: nenhum evento disponível')
+  const opcoes = ids.length > 1 ? ids.filter((id) => id !== anterior) : ids
+  return EVENTO[opcoes[inteiro(rng, 0, opcoes.length - 1)]]
+}
+
+// ---------- cartas malucas ----------
+
+// Uma carta qualquer de qualquer personagem (Ases inclusos)
+function cartaAleatoria(rng) {
+  const personagem = PERSONAGENS_PVP[inteiro(rng, 0, PERSONAGENS_PVP.length - 1)]
+  const lista = CARTAS[personagem]
+  return lista[inteiro(rng, 0, lista.length - 1)]
+}
+
+// Troca, NA MÃO, cada carta jogada por outra sorteada (de qualquer personagem).
+// A nova custa o mesmo que a original (a energia já foi conferida na escolha)
+// e ganha o id '<original>~maluca'. Chame antes de resolverRodada com as
+// jogadas devolvidas. Devolve { jogadas, trocas }:
+//   jogadas[j]  id da carta nova (ou null: passou)
+//   trocas[j]   { de, para } (cartas inteiras) ou null
+export function transformarMalucas(estado, jogadas, rng) {
+  const trocas = [null, null]
+  const novas = jogadas.map((jogada, j) => {
+    const id = jogada == null ? null : typeof jogada === 'string' ? jogada : jogada.carta ?? null
+    if (id === null) return null
+    const baralho = estado.jogadores[j].baralho
+    const i = baralho.mao.findIndex((c) => c.id === id)
+    if (i < 0) return id // carta fora da mão: resolverRodada acusa o erro
+    const de = baralho.mao[i]
+    const sorteada = cartaAleatoria(rng)
+    const para = { ...sorteada, id: `${de.id}~maluca`, custo: de.custo, maluca: true, original: de.id }
+    baralho.mao[i] = para
+    trocas[j] = { de, para }
+    return para.id
+  })
+  return { jogadas: novas, trocas }
+}
+
+// Depois da rodada: a carta maluca volta a ser a original, onde quer que esteja
+// (descarte, mão, monte). O baralho de cada um fica igual ao de antes.
+export function desfazerMalucas(estado, trocas) {
+  for (const troca of trocas) {
+    if (!troca) continue
+    for (const jog of estado.jogadores) {
+      for (const pilha of [jog.baralho.descarte, jog.baralho.mao, jog.baralho.monte]) {
+        const i = pilha.findIndex((c) => c.id === troca.para.id)
+        if (i >= 0) pilha[i] = troca.de
+      }
+    }
+  }
+}
+
+// ---------- duelo ----------
+
+// Naipe -> arma do duelo
+//   ♥ copas    tiro        projéteis em linha reta, recarga curta
+//   ♠ espadas  espada      golpe corpo a corpo em arco na frente do coração
+//   ♦ ouros    bumerangue  vai na direção do movimento e volta para o dono
+//   ♣ paus     explosao    bomba com pavio que explode em área; recarga MAIOR
+export const ARMAS = { copas: 'tiro', espadas: 'espada', ouros: 'bumerangue', paus: 'explosao' }
+export const LISTA_ARMAS = ['tiro', 'espada', 'bumerangue', 'explosao']
+
+// Dano base por acerto de cada arma (força 0) e quanto a força da carta soma (força 1).
+// Num duelo de 15 s a espada acerta muito: com mais que isto um duelo decide a partida
+export const DANO_ARMA = {
+  tiro: { base: 2, extra: 2 },
+  espada: { base: 3, extra: 3 },
+  bumerangue: { base: 2, extra: 3 },
+  explosao: { base: 5, extra: 4 },
+}
+
+// A arma de quem jogou `carta` (null = passou: arma sorteada, força mínima)
+//   { arma, forca (0..1), dano, carta }
+export function armaDaCarta(carta, rng) {
+  const arma = carta ? ARMAS[carta.naipe] : LISTA_ARMAS[inteiro(rng, 0, LISTA_ARMAS.length - 1)]
+  // Ás conta como a carta mais forte no duelo
+  const t = carta ? forca(carta.valor === 1 ? 13 : carta.valor) : forca(2)
+  const d = DANO_ARMA[arma]
+  return { arma, forca: t, dano: Math.round(d.base + d.extra * t), carta: carta ?? null }
+}
+
+// Valida para o duelo: a carta só precisa estar na mão (não custa energia)
+export function podeJogarDuelo(estado, j, jogada) {
+  const id = jogada == null ? null : typeof jogada === 'string' ? jogada : jogada.carta ?? null
+  if (id === null) return { ok: true, motivo: null }
+  if (!cartaNaMao(estado.jogadores[j].baralho, id)) return { ok: false, motivo: 'carta não está na mão' }
+  return { ok: true, motivo: null }
+}
+
+// Resolve a rodada de duelo (no lugar de resolverRodada): descarta as cartas
+// (sem gastar energia, sem efeitos de copas/Ases) e devolve as armas.
+//   { rodada, duelo: true, jogadas: [{ carta, passou }], armas: [arma0, arma1], eventos }
+export function resolverDuelo(estado, jogadaP1, jogadaP2, rng) {
+  if (estado.vencedor) throw new Error('a partida já acabou')
+  const jogadas = [jogadaP1, jogadaP2]
+  jogadas.forEach((jogada, j) => {
+    const v = podeJogarDuelo(estado, j, jogada)
+    if (!v.ok) throw new Error(`jogada inválida do p${j + 1}: ${v.motivo}`)
+  })
+  const eventos = []
+  const cartas = jogadas.map((jogada, j) => {
+    const id = jogada == null ? null : typeof jogada === 'string' ? jogada : jogada.carta ?? null
+    if (id === null) return null
+    const carta = descartar(estado.jogadores[j].baralho, id)
+    eventos.push(`p${j + 1} pegou ${carta.nome} para o duelo`)
+    return carta
+  })
+  const armas = cartas.map((c) => armaDaCarta(c, rng))
+  estado.fase = 'esquiva'
+  estado.historico.push({ rodada: estado.rodada, duelo: true, cartas: cartas.map((c) => c?.id ?? null), armas: armas.map((a) => a.arma) })
+  return { rodada: estado.rodada, duelo: true, jogadas: cartas.map((c) => ({ carta: c, passou: !c })), armas, eventos }
+}
+

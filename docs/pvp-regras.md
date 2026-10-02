@@ -108,6 +108,21 @@ Ficar parado não é mais uma estratégia: quase todo padrão tem uma parte mira
 
 A cada 5 rodadas (rodadas 5, 10, 15, 20, 25) tudo fica 30% mais rápido, até ×2,5 na rodada 25 (`ACELERACAO` em `constants.js`): balas (velocidade e densidade), relógio da escolha (15 s → até 8 s), animações e música. O coração ganha metade do bônus para continuar dando para desviar. Aparece um aviso "VELOCIDADE ×1,3!" e o selo fica no HUD. No co-op a regra fica desligada (`ACELERACAO.coop = false`; com `true` ela vale por turno do chefe, por cima do `RITMO`).
 
+## Bonus rounds (a cada 3 rodadas)
+
+Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento caótico, que nunca repete o da rodada bônus anterior. Só caos, sem prêmio: ninguém ganha nada a mais, e o dano continua valendo. Nos eventos de esquiva, as duas caixas abrem mesmo que ninguém tenha atacado.
+
+| Evento | Cartas | O que acontece |
+|---|---|---|
+| Chuva de explosões | normais | bombas com mira caem nas duas caixas e explodem em área |
+| Modo festa | normais | bola de discoteca, holofotes, confete e balões que estouram |
+| Mundo de ponta-cabeça | normais | a tela gira 180° (os controles não, aí que mora o caos) |
+| Apagão | normais | escuridão: só se enxerga em volta do coração (com relâmpagos de vez em quando) |
+| Gravidade maluca | normais | uma gravidade puxa o coração e muda de lado a cada ~2 s, com aviso |
+| Coração trocado | normais | cada um controla o coração do OUTRO (a CPU tenta te jogar nas balas) |
+| Cartas malucas | viram outras | na revelação cada carta vira uma carta sorteada de qualquer personagem (mesmo custo). Depois da rodada o baralho volta ao normal |
+| Duelo | viram armas | qualquer carta da mão vale, sem gastar energia. Uma caixa só para os dois: ♥ tiro, ♠ espada, ♦ bumerangue, ♣ explosão (recarga maior, acerta até o dono). A ataca; o valor da carta aumenta o dano. Passar dá uma arma sorteada, fraca |
+
 ## Ases (cartas especiais, um por naipe em todo baralho, custo 3)
 
 | Ás | Efeito |
