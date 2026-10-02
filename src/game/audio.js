@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js'
 import { AUDIO } from './constants.js'
-import { tocarMidi, pararMidi, pausarMidi, retomarMidi, setVolumeMidi, distorcerMidi } from './midi.js'
+import { tocarMidi, pararMidi, pausarMidi, retomarMidi, setVolumeMidi, distorcerMidi, setVelocidadeMidi } from './midi.js'
 
 // Sons: se assets.js tiver um arquivo, toca o arquivo; senão sintetiza com WebAudio.
 // Músicas: arquivo .mid toca com soundfont (midi.js); .ogg/.mp3 tocam direto.
@@ -12,6 +12,7 @@ let ligado = true
 let musicaAtual = null
 // multiplicadores dos sliders do painel (0 a 1), em cima de AUDIO.volume
 const volumes = { musica: 1, efeitos: 1 }
+let andamento = 1 // velocidade da música (velocidadeMusica)
 
 export function setVolumes(musica, efeitos) {
   // o store muda a todo instante (joystick): só age quando o volume mudou de verdade
@@ -60,8 +61,18 @@ export function musica(scene, nome, reserva) {
   if (musicaAtual?.key === chave && musicaAtual.isPlaying) return
   pararMusica()
   if (!ligado || !ASSETS.musicas[nome] || !scene.cache.audio.exists(chave)) return reserva && reserva !== nome ? musica(scene, reserva) : undefined
-  musicaAtual = scene.sound.add(chave, { loop: true, volume: AUDIO.volume * volumes.musica })
+  musicaAtual = scene.sound.add(chave, { loop: true, volume: AUDIO.volume * volumes.musica, rate: andamento })
   musicaAtual.play()
+}
+
+// Andamento da música (1 = normal), para a morte súbita das partidas longas
+// (ACELERACAO em constants.js). Vale para a música atual e as próximas, até
+// pedirem 1 de novo: as cenas que aceleram voltam para 1 ao começar e ao sair.
+// .mid acelera sem mudar o tom; .ogg/.mp3 (rate do Phaser) sobe o tom junto.
+export function velocidadeMusica(fator = 1) {
+  andamento = fator
+  setVelocidadeMidi(fator)
+  if (musicaAtual?.isPlaying || musicaAtual?.isPaused) musicaAtual.setRate(fator)
 }
 
 // Menu de pause: congela a música e continua do mesmo ponto depois
@@ -497,6 +508,14 @@ const SINTESE = {
   hpBaixo: (s) => {
     s.tom(988, 0.08, 'square', 0.06)
     s.tom(784, 0.12, 'square', 0.06, 784, 0.1)
+  },
+  // morte súbita: tudo acelerou (sirene curta subindo + dois toques de alerta)
+  acelerar: (s) => {
+    s.tom(220, 0.5, 'sawtooth', 0.08, 880)
+    s.tom(330, 0.5, 'square', 0.05, 1320, 0.02)
+    s.tom(1320, 0.07, 'square', 0.07, 1320, 0.5)
+    s.tom(1760, 0.12, 'square', 0.07, 1760, 0.6)
+    s.ruido(0.3, 0.06, 0, 5000)
   },
   // CPU confirmando a carta (igual ao jogador, um pouco mais grave)
   cpu: (s) => s.tom(520, 0.07, 'square', 0.1, 780),

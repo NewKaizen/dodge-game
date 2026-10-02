@@ -4,7 +4,7 @@ import Inimigo from '../entities/Inimigo.js'
 import BattleBox from '../entities/BattleBox.js'
 import Balas from '../entities/Bullets.js'
 import Heart from '../entities/Heart.js'
-import Hud from '../entities/Hud.js'
+import Hud, { IndicadorVelocidade } from '../entities/Hud.js'
 import TextBox from '../entities/TextBox.js'
 import Balao from '../entities/Balao.js'
 import Controles from '../controles.js'
@@ -23,7 +23,7 @@ import { etiqueta, descreverModificador } from '../effects/etiqueta.js'
 import { particulas } from '../effects/particulas.js'
 import { impactoDerrota, fimSuave, depoisDoSilencio } from '../effects/fimDeLuta.js'
 import { derrota } from '../effects/derrota.js'
-import { tocar, musica, pausarMusica, retomarMusica } from '../audio.js'
+import { tocar, musica, pausarMusica, retomarMusica, velocidadeMusica } from '../audio.js'
 import { debug } from '../debug.js'
 import { nivelDe, sortearCaos, comCaos, abrirTurno, criarEtiquetaNivel } from '../battle/nivel.js'
 import { iniciarEstatisticas, contar, anotarDano, resumoEstatisticas } from '../battle/estatisticas.js'
@@ -32,7 +32,9 @@ import { PERSONAGENS } from '../data/personagens.js'
 import { ITENS } from '../data/itens.js'
 import { CHEFES } from '../data/chefes/index.js'
 import { BATALHA, partyDe } from '../data/batalha.js'
-import { FIGHT, DESAFIO, ATAQUE, CORES, TEXTO, LAYOUT, TP, DEFEND, TEMPOS, COMANDOS, MERCY_MAX, DIFICULDADES, RITMO, IMPACTO } from '../constants.js'
+import { FIGHT, DESAFIO, ATAQUE, CORES, TEXTO, LAYOUT, TP, DEFEND, TEMPOS, COMANDOS, MERCY_MAX, DIFICULDADES, RITMO, IMPACTO, FONTE, LARGURA, CORACAO } from '../constants.js'
+import { ACELERACAO, fatorAceleracao, nivelAceleracao, parteDoFator } from '../constants.js' // morte súbita
+import { ignorarNasCaixas } from '../recorte.js'
 
 // Batalha no estilo Deltarune. Fases de cada turno:
 //   'intro'     entrada (só no começo)
@@ -42,6 +44,10 @@ import { FIGHT, DESAFIO, ATAQUE, CORES, TEXTO, LAYOUT, TP, DEFEND, TEMPOS, COMAN
 //   'fala'      balão de fala do chefe
 //   'inimigo'   corações na caixa desviando do ataque
 //   'fim'       saindo para a vitória ou o game over
+//
+// Morte súbita (ACELERACAO em constants.js): cada turno do chefe é uma rodada;
+// a cada 5 (começo do 6º, 11º...) tudo acelera: balas (velocidade, densidade e
+// teto, POR CIMA dos limites de RITMO), o coração (metade do bônus) e a música.
 export default class Battle extends Phaser.Scene {
   constructor() {
     super('Battle')
@@ -84,13 +90,19 @@ export default class Battle extends Phaser.Scene {
 
     this.caixa = new BattleBox(this)
     this.balas = new Balas(this, this.caixa)
-    this.balas.velocidadeMax = this.dificuldade.velocidadeMaxBala * DESAFIO.velocidadeMax * this.nivel.velocidadeMax
+    this.velocidadeMaxBase = this.dificuldade.velocidadeMaxBala * DESAFIO.velocidadeMax * this.nivel.velocidadeMax
+    this.balas.velocidadeMax = this.velocidadeMaxBase
+    this.aceleracao = 1 // fator da morte súbita (ver aplicarAceleracao)
+    this.nivelAceleracao = 0
     this.coracoes = Array.from({ length: this.numJogadores }, (_, j) => new Heart(this, this.caixa, CORES.almas[j], j))
     this.caixa.aoMudar = () => this.coracoes.forEach((c) => c.ativo && c.ajustar()) // a caixa empurra os corações
     this.hud = new Hud(this, this.party, this.numJogadores)
     this.textbox = new TextBox(this)
     this.balao = new Balao(this)
     criarEtiquetaNivel(this, this.nivel)
+    // selo da morte súbita no canto de cima à esquerda (escondido enquanto for x1)
+    this.indicadorVelocidade = new IndicadorVelocidade(this, 8, 6, { origem: [0, 0], tamanho: 12, profundidade: 30 })
+    this.events.once('shutdown', () => velocidadeMusica(1)) // a próxima tela não herda a música acelerada
 
     if (import.meta.env.DEV) {
       window.ataques = ataques
@@ -101,6 +113,7 @@ export default class Battle extends Phaser.Scene {
       this.events.once('shutdown', () => delete window.testarAtaque)
     }
 
+    velocidadeMusica(1) // recomeçar a luta volta ao andamento normal
     musica(this, this.defChefe.musica)
     this.intro()
   }
@@ -448,10 +461,15 @@ export default class Battle extends Phaser.Scene {
     this.fundo.escurecer(true)
     novaRodada()
 
-    // agressividade (ACTs) e modificador do próximo ataque
+    // morte súbita: este turno é a rodada this.turno + 1
+    const acelerou = this.aplicarAceleracao(this.turno + 1)
+    // agressividade (ACTs) e modificador do próximo ataque; a aceleração entra
+    // depois dos limites de RITMO (que só valem para ACTs/DEFEND), então soma
     const ritmo = {
-      velocidade: chefe.ritmo.velocidade * (chefe.proximo?.velocidade ?? 1) * DESAFIO.velocidade * (this.defChefe.desafio?.velocidade ?? 1) * this.nivel.velocidade,
-      densidade: chefe.ritmo.densidade * (chefe.proximo?.densidade ?? 1) * DESAFIO.densidade * (this.defChefe.desafio?.densidade ?? 1) * this.nivel.densidade,
+      velocidade:
+        chefe.ritmo.velocidade * (chefe.proximo?.velocidade ?? 1) * DESAFIO.velocidade * (this.defChefe.desafio?.velocidade ?? 1) * this.nivel.velocidade * this.aceleracao,
+      densidade:
+        chefe.ritmo.densidade * (chefe.proximo?.densidade ?? 1) * DESAFIO.densidade * (this.defChefe.desafio?.densidade ?? 1) * this.nivel.densidade * this.aceleracao,
     }
     // "reduz uma onda": o ataque perde a última onda (sequência) ou parte do tempo
     ataque = encurtar(ataque, chefe.proximo?.duracao ?? 1)
@@ -460,7 +478,7 @@ export default class Battle extends Phaser.Scene {
     if (caos) ataque = comCaos(ataque, this.nivel.caos)
     abrirTurno(this, this.nivel, caos)
     const aviso = descreverModificador(chefe.proximo)
-    if (aviso) etiqueta(this, aviso.texto, aviso.cor)
+    if (aviso) etiqueta(this, aviso.texto, aviso.cor, acelerou ? { y: 76 } : undefined) // mais embaixo: o aviso da aceleração está no alto
     chefe.proximo = null
     this.balas.fatorVelocidade = ritmo.velocidade
 
@@ -502,6 +520,41 @@ export default class Battle extends Phaser.Scene {
     this.atualizarUI()
   }
 
+  // Fator da morte súbita na rodada (turno do chefe) `rodada`: teto das balas,
+  // coração, música e selo. Quando o nível sobe, aviso grande + som.
+  // Desligada no co-op (ACELERACAO.coop = false): o fator fica sempre 1.
+  aplicarAceleracao(rodada) {
+    const ligada = ACELERACAO.coop
+    const nivel = ligada ? nivelAceleracao(rodada) : 0
+    this.aceleracao = ligada ? fatorAceleracao(rodada) : 1
+    this.balas.velocidadeMax = this.velocidadeMaxBase * this.aceleracao
+    const subiu = nivel > this.nivelAceleracao
+    this.nivelAceleracao = nivel
+    this.indicadorVelocidade.set(this.aceleracao, subiu)
+    if (!subiu) return false
+    velocidadeMusica(parteDoFator(this.aceleracao, ACELERACAO.musica))
+    this.avisarAceleracao()
+    return true
+  }
+
+  avisarAceleracao() {
+    const maximo = this.aceleracao >= ACELERACAO.maximo
+    tocar(this, 'acelerar')
+    flashTela(this, 0xff8a1a, 0.18, 260)
+    const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 4, align: 'center' })
+    const titulo = this.add.text(LARGURA / 2, 24, `VELOCIDADE x${this.aceleracao.toFixed(2)}!`, estilo(24, '#ff9a3a')).setOrigin(0.5).setDepth(31)
+    const sub = this.add
+      .text(LARGURA / 2, 44, maximo ? 'VELOCIDADE MÁXIMA!' : 'a luta está demorando: tudo acelera!', estilo(11, maximo ? TEXTO.caido : TEXTO.normal))
+      .setOrigin(0.5)
+      .setDepth(31)
+      .setAlpha(0)
+    ignorarNasCaixas(this, titulo, sub)
+    titulo.setScale(1.8)
+    this.tweens.add({ targets: titulo, scale: 1, duration: 260, ease: 'Back.easeOut' })
+    this.tweens.add({ targets: sub, alpha: 1, delay: 150, duration: 180 })
+    this.tweens.add({ targets: [titulo, sub], alpha: 0, delay: 1700, duration: 300, onComplete: () => [titulo, sub].forEach((t) => t.destroy()) })
+  }
+
   escolherAtaque() {
     const chefe = this.chefe
     const fase = this.faseAtual()
@@ -511,7 +564,7 @@ export default class Battle extends Phaser.Scene {
 
   atualizarTurnoInimigo(delta) {
     if (!this.inimigoPronto) return
-    const velocidade = this.registry.get('velocidade')
+    const velocidade = (this.registry.get('velocidade') ?? CORACAO.velocidadePadrao) * parteDoFator(this.aceleracao, ACELERACAO.coracao)
     for (const c of this.coracoes) if (c.ativo) c.update(this.controles.joy(c.jogador), velocidade, delta)
 
     const at = this.ataque
@@ -887,6 +940,7 @@ export default class Battle extends Phaser.Scene {
       fase: this.fase,
       turno: this.turno,
       tp: this.tp,
+      aceleracao: { nivel: this.nivelAceleracao, fator: this.aceleracao, velocidadeMax: this.balas.velocidadeMax },
       chefe: {
         id: this.chefe.id,
         hp: this.chefe.hp,

@@ -1,13 +1,13 @@
 import Phaser from 'phaser'
-import { LARGURA, ALTURA, FONTE, CORES, TEXTO, ATAQUE, CORACAO, corTexto } from '../constants.js'
+import { LARGURA, ALTURA, FONTE, CORES, TEXTO, corTexto, ACELERACAO, fatorAceleracao, nivelAceleracao, parteDoFator } from '../constants.js'
 import Controles from '../controles.js'
-import { tocar, musica, pausarMusica, retomarMusica } from '../audio.js'
+import { tocar, musica, pausarMusica, retomarMusica, velocidadeMusica } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import Carta, { CORES_CARTA, TIPOS } from '../entities/Carta.js'
 import Mao from '../entities/Mao.js'
 import Pista from '../pvp/Pista.js'
-import HudPvp from '../pvp/HudPvp.js'
+import HudPvp, { IndicadorVelocidade } from '../pvp/HudPvp.js'
 import { CARTAS, TEMAS } from '../pvp/cartas.js'
 import { ataqueDaCartaNoJogo } from '../pvp/ataquesDasCartas.js'
 import { criarPartida, iniciarRodada, podeJogar, resolverRodada, aplicarDano, registrarGrazes, fimDaRodada, ENERGIA } from '../pvp/regras.js'
@@ -39,6 +39,14 @@ import { particulas } from '../effects/particulas.js'
 //   'esquiva'    as duas Pistas rodam ao mesmo tempo; acertos tiram HP do dono
 //                da pista (aplicarDano), grazes viram energia (registrarGrazes)
 //   'fim'        fimDaRodada: vencedor? -> 'resultado' (PvpResultado); senão volta ao 'inicio'
+//
+// Morte súbita (ACELERACAO em constants.js): a cada 5 rodadas (começo da 5ª,
+// 10ª...) tudo acelera: balas (velocidade, densidade e teto), o coração (metade
+// do bônus), o relógio da escolha (mais curto), as animações de carta e a
+// música. Aviso grande ao subir e o selo "VELOCIDADE xN" no alto.
+//
+// ♦ Q/K (caixa.inverterMs > 0): os controles do dono da caixa ficam invertidos
+// do fim do respiro inicial até o ataque daquela caixa acabar (o ataque todo).
 //
 // Com 1 jogador no painel, o P2 é a CPU (pvp/bot.js escolhe a carta,
 // pvp/botEsquiva.js desvia). Nível: registry 'pvpNivelBot' (tela PvpEscolha, ↑/↓).
@@ -123,6 +131,9 @@ export default class PvpArena extends Phaser.Scene {
     this.relogio = 0
     this.invertido = [0, 0]
     this.ko = [false, false]
+    this.aceleracao = 1 // fator da morte súbita (fatorAceleracao da rodada)
+    this.nivelAceleracao = 0
+    velocidadeMusica(1) // começa no andamento normal (revanche/recomeçar também)
     this.estatisticas = [0, 1].map(() => ({ danoCausado: 0, danoRecebido: 0, cartasJogadas: 0, maiorCarta: null, grazes: 0, ases: 0, passes: 0 }))
 
     this.desenharFundo()
@@ -151,6 +162,7 @@ export default class PvpArena extends Phaser.Scene {
       this.saindo = true
       this.events.off('postupdate', this.filtrarCaixas, this)
       this.pistas.forEach((p) => p.destruir())
+      velocidadeMusica(1) // a próxima tela não herda a música acelerada
       if (window.pvpArena === this) delete window.pvpArena
     })
 
@@ -210,6 +222,8 @@ export default class PvpArena extends Phaser.Scene {
     this.textoRelogio = texto(22, 22, TEXTO.selecionado)
     this.textoTreino = texto(50, 9, '#9be7ff')
     if (this.cpu !== null) this.textoTreino.setText(`VS CPU · ${{ facil: 'fácil', normal: 'normal', dificil: 'difícil' }[this.nivelBot]}`)
+    // morte súbita: logo abaixo do "VS CPU" (escondido enquanto for x1)
+    this.indicadorVelocidade = new IndicadorVelocidade(this, LARGURA / 2, this.cpu !== null ? 61 : 50, { tamanho: 10 })
   }
 
   // monte de cada jogador (3 versos empilhados e quantas cartas restam)
@@ -418,6 +432,7 @@ export default class PvpArena extends Phaser.Scene {
   async inicioDaRodada() {
     this.fase = 'inicio'
     iniciarRodada(this.estado)
+    const acelerou = this.atualizarAceleracao()
     this.textoRodada.setText(`RODADA ${this.estado.rodada}`)
     this.tweens.add({ targets: this.textoRodada, scale: { from: 1.5, to: 1 }, duration: 260, ease: 'Back.easeOut' })
     this.mostrarBanner(`RODADA ${this.estado.rodada}`, TEXTO.normal, { y: 200, tamanho: 28, ms: 700 })
@@ -427,6 +442,39 @@ export default class PvpArena extends Phaser.Scene {
     this.maos.forEach((m) => m.setAtiva(false))
     await this.sincronizarMaos()
     this.atualizarMontes()
+    if (acelerou && !this.saindo) await this.avisarAceleracao()
+  }
+
+  // ---------- morte súbita ----------
+
+  // Fator da rodada atual (ACELERACAO). Aplica nas pistas, no relógio, na
+  // música e no selo; devolve true se o nível subiu agora.
+  atualizarAceleracao() {
+    const nivel = nivelAceleracao(this.estado.rodada)
+    const fator = fatorAceleracao(this.estado.rodada)
+    const subiu = nivel > this.nivelAceleracao
+    this.nivelAceleracao = nivel
+    this.aceleracao = fator
+    this.pistas.forEach((p) => (p.fatorCoracao = parteDoFator(fator, ACELERACAO.coracao)))
+    // relógio da escolha mais curto (em meios segundos redondos), nunca abaixo do mínimo
+    if (this.tempoBase) this.tempoEscolha = Math.max(Math.min(this.tempoBase, ACELERACAO.escolhaMinMs), Math.round(this.tempoBase / fator / 500) * 500)
+    if (subiu) velocidadeMusica(parteDoFator(fator, ACELERACAO.musica))
+    this.indicadorVelocidade.set(fator, subiu)
+    return subiu
+  }
+
+  async avisarAceleracao() {
+    const maximo = this.aceleracao >= ACELERACAO.maximo
+    tocar(this, 'acelerar')
+    shake(this, 220, 0.008)
+    flashTela(this, 0xff8a1a, 0.18, 260)
+    this.mostrarBanner(`VELOCIDADE x${this.aceleracao.toFixed(2)}!`, '#ff9a3a', { y: 200, tamanho: 28, ms: 1300 })
+    this.etiquetaEm(LARGURA / 2, 232, maximo ? 'VELOCIDADE MÁXIMA!' : 'a partida está demorando: tudo acelera!', maximo ? TEXTO.caido : TEXTO.normal, {
+      atraso: 200,
+      tamanho: 12,
+      ms: 1100,
+    })
+    await this.esperar(1500)
   }
 
   // A mão visual (Mao) passa a ter as mesmas cartas da mão do estado: cartas
@@ -936,8 +984,9 @@ export default class PvpArena extends Phaser.Scene {
       if (!ataque) return null
       const pista = this.pistas[j]
       pista.tema = TEMAS[caixa.carta.personagem] ?? pista.tema
-      if (caixa.inverterMs) this.invertido[j] = { espera: ATAQUE.respiroMs, restante: caixa.inverterMs }
-      return pista.rodar(ataque, { dano: caixa.dano, ritmo: caixa.ritmo, semente: `${this.semente}:${this.estado.rodada}:${j}` })
+      // ♦ Q/K: inverte do começo do ataque (depois do respiro) até ele acabar (ver update)
+      if (caixa.inverterMs) this.invertido[j] = { avisado: false }
+      return pista.rodar(ataque, { dano: caixa.dano, ritmo: caixa.ritmo, semente: `${this.semente}:${this.estado.rodada}:${j}`, aceleracao: this.aceleracao })
     })
     await Promise.all(promessas.filter(Boolean))
     this.invertido = [0, 0]
@@ -1088,8 +1137,11 @@ export default class PvpArena extends Phaser.Scene {
 
   update(_, deltaReal) {
     const delta = deltaReal * debug.acelerar
-    this.tweens.timeScale = debug.acelerar
-    this.time.timeScale = debug.acelerar
+    // morte súbita: animações de carta, esperas e transições também aceleram
+    // (as pistas usam o delta: o bônus delas já vem no ritmo das balas)
+    const animacao = debug.acelerar * parteDoFator(this.aceleracao, ACELERACAO.animacao)
+    this.tweens.timeScale = animacao
+    this.time.timeScale = animacao
     this.controles.atualizar()
 
     if (this.fase === 'escolha') {
@@ -1104,23 +1156,21 @@ export default class PvpArena extends Phaser.Scene {
     }
 
     this.pistas.forEach((pista, j) => {
+      // controles invertidos: valem enquanto o ataque desta pista roda (do fim
+      // do respiro inicial até o fim); acabou o ataque (ou parou no K.O.), acabou
       const inv = this.invertido[j]
-      const invertendo = Boolean(inv) && inv.espera <= 0 && inv.restante > 0
+      const invertendo = Boolean(inv) && pista.atacando && !this.ko[j]
       let joy = j === this.cpu ? this.joyDaCpu(pista, delta, invertendo) : this.controles.joy(j)
-      if (inv) {
-        if (inv.espera > 0) inv.espera -= delta
-        else if (inv.restante > 0) {
-          if (!inv.avisado) {
-            inv.avisado = true
-            tocar(this, 'inverter')
-          }
-          inv.restante -= delta
-          joy = { x: -joy.x, y: -joy.y }
-          this.avisoPista[j].setText(Math.floor(this.time.now / 180) % 2 ? 'CONTROLES INVERTIDOS!' : '').setColor('#ff9a3a')
-        } else {
-          this.invertido[j] = 0
-          if (!this.ko[j]) this.avisoPista[j].setText('')
+      if (invertendo) {
+        if (!inv.avisado) {
+          inv.avisado = true
+          tocar(this, 'inverter')
         }
+        joy = { x: -joy.x, y: -joy.y }
+        this.avisoPista[j].setText(Math.floor(this.time.now / 180) % 2 ? 'CONTROLES INVERTIDOS!' : '').setColor('#ff9a3a')
+      } else if (inv?.avisado) {
+        this.invertido[j] = 0
+        if (!this.ko[j]) this.avisoPista[j].setText('')
       }
       pista.atualizar(delta, joy)
     })
@@ -1134,7 +1184,7 @@ export default class PvpArena extends Phaser.Scene {
       coracao,
       limites: pista.caixa.limites,
       balas: pista.balas.lista,
-      velocidade: pista.velocidade ?? this.registry.get('velocidade') ?? CORACAO.velocidadePadrao,
+      velocidade: pista.velocidadeCoracao,
       fatorVelocidade: pista.balas.fatorVelocidade,
       velocidadeMax: pista.balas.velocidadeMax,
       invertido,
@@ -1189,6 +1239,7 @@ export default class PvpArena extends Phaser.Scene {
       noPassar: [...this.noPassar],
       vencedor: this.estado.vencedor,
       pausado: this.pausado,
+      aceleracao: { nivel: this.nivelAceleracao, fator: this.aceleracao, tempoEscolha: this.tempoEscolha },
       jogadores: this.estado.jogadores.map((jog, j) => {
         const pista = this.pistas[j]
         const cor = pista.coracoes[0]

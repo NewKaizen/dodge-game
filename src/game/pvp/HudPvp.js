@@ -4,6 +4,10 @@ import { PERSONAGENS } from '../data/personagens.js'
 import { CORES_CARTA } from '../entities/Carta.js'
 import { ENERGIA } from './regras.js'
 
+// Selo "VELOCIDADE x1.24" da morte súbita (o mesmo do co-op): a arena põe um
+// no alto, no meio, entre os dois placares (é da partida, não de um jogador)
+export { IndicadorVelocidade } from '../entities/Hud.js'
+
 // Placar de um jogador na arena PvP (canto de cima): P1/P2, nome do
 // personagem na cor dele, barra de HP, gemas de energia e os estados de
 // copas (escudo, segunda chance). O P1 fica à esquerda e o P2 à direita

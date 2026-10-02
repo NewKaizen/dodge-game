@@ -4,17 +4,32 @@ import { lacunasLivres } from './validacao.js'
 // Colunas verticais que caem na caixa. A faixa inteira de cada coluna pisca
 // antes (aviso) e as colunas são escolhidas para sempre sobrar uma lacuna
 // de pelo menos 3x o coração.
+//
+//   mirar   fração das levas em que uma das colunas cai na faixa do coração
+//           (0 = todas sorteadas, 1 = toda leva tem uma coluna mirada). Assim
+//           ficar parado não é seguro; o aviso da faixa dá tempo de sair.
 export default definirAtaque({
   nome: 'colunas',
-  padrao: { duracao: 5500, intervalo: 1400, quantidade: 2, largura: 22, velocidade: 170, aviso: 550, forma: null },
+  padrao: { duracao: 5500, intervalo: 1400, quantidade: 2, largura: 22, velocidade: 170, aviso: 550, forma: null, mirar: 0.5 },
   iniciar(a, cfg) {
     const l = a.caixa
     const slots = Math.floor(l.width / cfg.largura)
     const passo = cfg.largura - 4
     const porColuna = Math.ceil(l.height / passo) + 1
+    // acumulador: a fração `mirar` vira um ritmo fixo (0.5 = uma leva sim, outra não;
+    // a 1ª leva nunca é mirada, para quem acabou de entrar na caixa)
+    let mira = 0
 
     a.aCada(cfg.intervalo, (i) => {
-      const xs = escolherColunas(a, slots, cfg)
+      mira += Number(cfg.mirar) || 0
+      let fixo = null
+      if (mira >= 1) {
+        mira -= 1
+        const alvo = a.alvo()
+        const folga = (l.width - slots * cfg.largura) / 2
+        fixo = Math.min(slots - 1, Math.max(0, Math.floor((alvo.x - l.left - folga) / cfg.largura)))
+      }
+      const xs = escolherColunas(a, slots, cfg, fixo)
       a.parede({ eixo: 'x', ocupados: xs.map((x) => [x - cfg.largura / 2, x + cfg.largura / 2]) })
 
       for (const x of xs) {
@@ -40,14 +55,18 @@ export default definirAtaque({
   },
 })
 
-// Sorteia as colunas (com semente) até sobrar uma lacuna grande o bastante
-function escolherColunas(a, slots, cfg) {
+// Sorteia as colunas (com semente) até sobrar uma lacuna grande o bastante.
+// `fixo`: índice de uma coluna que sempre entra (a mirada no coração)
+function escolherColunas(a, slots, cfg, fixo = null) {
   const l = a.caixa
   let xs = []
   for (let tentativa = 0; tentativa < 10; tentativa++) {
-    const indices = new Set()
+    const indices = new Set(fixo === null ? [] : [fixo])
     while (indices.size < Math.min(cfg.quantidade, slots)) indices.add(a.inteiro(0, slots - 1))
-    xs = [...indices].map((s) => l.left + cfg.largura / 2 + s * cfg.largura)
+    // as faixas ficam centradas na caixa: a sobra se divide entre os dois lados
+    // (antes ficava toda à direita, e o canto direito nunca levava coluna)
+    const folga = (l.width - slots * cfg.largura) / 2
+    xs = [...indices].map((s) => l.left + folga + cfg.largura / 2 + s * cfg.largura)
     const livres = lacunasLivres(l.left, l.right, xs.map((x) => [x - cfg.largura / 2, x + cfg.largura / 2]))
     if (Math.max(0, ...livres.map(([p, q]) => q - p)) >= a.lacunaMinima) break
   }

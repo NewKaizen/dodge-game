@@ -126,7 +126,7 @@ export default class Balas {
       if (b.marcador || b.sprite.alpha < 1) {
         b.marcador?.destroy()
         b.marcador = null
-        if (!b.inofensiva) b.sprite.setAlpha(1)
+        if (!b.inofensiva && !b.piscar) b.sprite.setAlpha(1) // piscando: animar() cuida do alpha
       }
 
       b.vx += b.ax * s

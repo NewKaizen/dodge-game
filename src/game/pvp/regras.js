@@ -10,6 +10,10 @@
 //   podeJogar(estado, 0, 'kris-espadas-9')        { ok, motivo }
 //   const r = resolverRodada(estado, 'kris-espadas-9', 'susie-copas-5')
 //   r.caixas[0]  o que a caixa do P1 roda: { carta, de, refletida, dano, ritmo, inverterMs }
+//                inverterMs > 0: controles invertidos durante o ATAQUE TODO daquela caixa
+//                (a arena usa só como "liga"; o valor em ms não limita mais a duração)
+//   a "morte súbita" (ACELERACAO em constants.js) usa estado.rodada: a arena
+//   acelera tudo a cada 5 rodadas (fatorAceleracao(estado.rodada))
 //   ... os dois desviam; a cena chama aplicarDano(estado, j, dano) a cada acerto
 //   ... e registrarGrazes(estado, j, n) para a energia dos grazes
 //   fimDaRodada(estado)                           -> vencedor ('p1' | 'p2' | 'empate' | null)

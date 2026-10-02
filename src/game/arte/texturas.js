@@ -350,7 +350,6 @@ function cidade(perto) {
 // ---------- tabela de geradores (uma entrada por chave de assets.js) ----------
 
 const sprite = (id) => () => pixelArt(SPRITES[id].mapa, SPRITES[id].paleta, id)
-const iconePersonagem = (id) => () => pixelArt(SPRITES[id].mapa.slice(0, 10), SPRITES[id].paleta)
 const icone = (id) => () => pixelArt(ICONES[id], { '#': '#ffffff' }, `icone-${id}`)
 const bala = (forma) => () => formaBrilhante(FORMAS[forma])
 
@@ -361,27 +360,48 @@ const desenhoBoneco = (id, fazer) => () => {
   const { mapa, paleta } = fazer(def.cor, def.nome[0])
   return pixelArt(mapa, paleta, id)
 }
+
+// Pixel art apoiada no chão: tira as linhas vazias de baixo e completa em cima
+// até a altura padrão (o sprite é centrado, então assim os pés de todos ficam
+// na mesma linha)
+const vaziaLinha = (l) => /^\.*$/.test(l)
+function apoiarNoChao(mapa, altura) {
+  let fim = mapa.length
+  while (fim > 0 && vaziaLinha(mapa[fim - 1])) fim--
+  const corpo = mapa.slice(0, fim)
+  const vazia = '.'.repeat(Math.max(...mapa.map((l) => l.length)))
+  return [...Array(Math.max(0, altura - corpo.length)).fill(vazia), ...corpo]
+}
+const spriteNoChao = (id, altura) => () => pixelArt(apoiarNoChao(SPRITES[id].mapa, altura), SPRITES[id].paleta, id)
+// ícone do HUD: a cabeça (as 10 primeiras linhas com desenho)
+const iconeDaCabeca = (id) => () => {
+  const mapa = SPRITES[id].mapa
+  const ini = Math.max(0, mapa.findIndex((l) => !vaziaLinha(l)))
+  return pixelArt(mapa.slice(ini, ini + 10), SPRITES[id].paleta)
+}
+// Personagem com pixel art em SPRITES usa ela; sem, vira o boneco genérico
 const bonecos = Object.fromEntries(
-  Object.keys(PERSONAGENS)
-    .filter((id) => !SPRITES[id])
-    .flatMap((id) => [
-      [id, desenhoBoneco(id, boneco)],
-      [`icone-${id}`, desenhoBoneco(id, iconeBoneco)],
-    ]),
+  Object.keys(PERSONAGENS).flatMap((id) =>
+    SPRITES[id]
+      ? [
+          [id, spriteNoChao(id, 24)],
+          [`icone-${id}`, iconeDaCabeca(id)],
+        ]
+      : [
+          [id, desenhoBoneco(id, boneco)],
+          [`icone-${id}`, desenhoBoneco(id, iconeBoneco)],
+        ],
+  ),
 )
 
 const GERADORES = {
-  ...bonecos, // ralsei, noelle, berdly, dess, asriel e os ícones deles
-  kris: sprite('kris'),
-  susie: sprite('susie'),
+  ...bonecos, // personagens jogáveis e os ícones deles
   king: sprite('king'),
   queen: sprite('queen'),
   jevil: sprite('jevil'),
   coronel: sprite('coronel'),
   // colorida: a caminhonete usa cor 0xffffff na bala para não ser pintada pelo tema
   'bala-caminhonete': sprite('caminhonete'),
-  'icone-kris': iconePersonagem('kris'),
-  'icone-susie': iconePersonagem('susie'),
 
   coracao: () => coracao('inteiro'),
   'coracao-rachado': () => coracao('rachado'),

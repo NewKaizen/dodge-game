@@ -6,7 +6,7 @@ import { CARTAS, PERSONAGENS_PVP, NAIPES, CUSTOS, custoDoValor, ataqueDaCarta, d
 
 // Biblioteca falsa com a mesma forma de attacks/index.js: usa o definir.js de
 // verdade (que roda em Node) e padrões vazios que só guardam a config
-const NOMES = ['rain', 'sides', 'spiral', 'aimed', 'colunas', 'ondas', 'lasers', 'quicantes', 'anel', 'divisores', 'carrossel', 'foice', 'bombas', 'caminhonete', 'brasas', 'forcado']
+const NOMES = ['rain', 'sides', 'spiral', 'aimed', 'colunas', 'ondas', 'lasers', 'quicantes', 'anel', 'divisores', 'carrossel', 'foice', 'bombas', 'caminhonete', 'brasas', 'forcado', 'rachaduras', 'caosFinal']
 const configs = []
 const A = { juntos, sequencia, comCaixa }
 for (const nome of NOMES) {

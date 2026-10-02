@@ -203,3 +203,31 @@ export const IMPACTO = { flashCor: 0xff2030, flashAlpha: 0.32, flashMs: 170, tre
 export const FUNDO = { escurecer: 0.45 }
 // musica: volume da música relativo ao geral (MIDI costuma ser alto)
 export const AUDIO = { volume: 0.25, musica: 1.6 }
+
+// Morte súbita: partida longa acelera TUDO. A cada `aCadaRodadas` rodadas
+// (começo da 5ª, 10ª, 15ª, 20ª, 25ª) o nível sobe e o fator ganha `passo`, até `maximo`.
+// Vale no PvP (rodadas de cartas). Na co-op (turnos do chefe) só se `coop` for true.
+//   passo, maximo   fator das balas: velocidade E densidade (ritmo) e o teto de velocidade
+//   coracao         fração do bônus que o coração ganha (0.5 = metade: continua dá para desviar)
+//   escolhaMinMs    o relógio da escolha de carta (PvP) encolhe com o fator, até aqui
+//   animacao        fração do bônus nas animações de carta/transições do PvP
+//   musica          fração do bônus no andamento da música
+//   coop            true liga também na batalha co-op (desligada a pedido)
+export const ACELERACAO = { aCadaRodadas: 5, passo: 0.3, maximo: 2.5, coracao: 0.5, escolhaMinMs: 8000, animacao: 1, musica: 1, coop: false }
+
+// Nível de aceleração na rodada `rodada` (1 = primeira): 0 nas 5 primeiras,
+// 1 da 5ª à 9ª, 2 da 10ª à 14ª... (x2,5 na 25ª) (para de subir quando o fator chega ao máximo)
+export function nivelAceleracao(rodada, cfg = ACELERACAO) {
+  const nivel = Math.max(0, Math.floor(Math.max(0, rodada) / cfg.aCadaRodadas))
+  const teto = Math.ceil((cfg.maximo - 1) / cfg.passo - 1e-9)
+  return Math.min(nivel, teto)
+}
+
+// Fator de velocidade (1 = normal) na rodada `rodada`, arredondado em 2 casas
+export function fatorAceleracao(rodada, cfg = ACELERACAO) {
+  const f = Math.min(cfg.maximo, 1 + nivelAceleracao(rodada, cfg) * cfg.passo)
+  return Math.round(f * 100) / 100
+}
+
+// Só uma fração do bônus (ex.: o coração ganha metade do que as balas ganham)
+export const parteDoFator = (fator, fracao) => Math.round((1 + (fator - 1) * fracao) * 1000) / 1000

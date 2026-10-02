@@ -9,20 +9,39 @@ import { definirAtaque } from './definir.js'
 //   frequencia  velocidade do balanço (voltas por segundo)
 //   estouro     a cada quantas brasas uma estoura (0 desliga)
 //   fagulhas    quantas fagulhas saem do estouro
+//   mirar       fração das brasas que nascem na coluna do coração (piscando no
+//               chão como as outras). Sem isso, os cantos de cima quase nunca
+//               eram alcançados e dava para esperar parado.
 export default definirAtaque({
   nome: 'brasas',
-  padrao: { duracao: 5500, intervalo: 240, velocidade: 120, raio: 7, ondulacao: 18, frequencia: 1.2, estouro: 5, fagulhas: 4, aviso: 450, forma: 'chama' },
+  padrao: { duracao: 5500, intervalo: 240, velocidade: 120, raio: 7, ondulacao: 18, frequencia: 1.2, estouro: 5, fagulhas: 4, aviso: 450, forma: 'chama', mirar: 0.25 },
   iniciar(a, cfg) {
+    let mira = 0 // acumulador: `mirar` vira um ritmo fixo de brasas miradas
+
     a.aCada(cfg.intervalo, (i) => {
       const l = a.caixa
-      const x0 = a.aleatorio(l.left + cfg.ondulacao + cfg.raio, l.right - cfg.ondulacao - cfg.raio)
-      const fase = a.aleatorio(0, Math.PI * 2)
+      const [min, max] = [l.left + cfg.ondulacao + cfg.raio, l.right - cfg.ondulacao - cfg.raio]
+      let x0 = a.aleatorio(min, max)
+      let fase = a.aleatorio(0, Math.PI * 2)
+      mira += Number(cfg.mirar) || 0
+      if (mira >= 1) {
+        mira -= 1
+        // nasce na coluna do coração: o centro do balanço fica o mais perto
+        // possível dele e a fase é acertada para a brasa passar pelo coração
+        // quando chegar na altura dele
+        const alvo = a.alvo()
+        x0 = Math.min(Math.max(alvo.x, min), max)
+        const s = Math.min(1, Math.max(-1, (alvo.x - x0) / cfg.ondulacao))
+        const subida = Math.max(0, l.bottom - cfg.raio - 2 - alvo.y) / cfg.velocidade
+        const base = a.aleatorio(0, 1) < 0.5 ? Math.asin(s) : Math.PI - Math.asin(s)
+        fase = base - subida * cfg.frequencia * Math.PI * 2
+      }
       const estoura = cfg.estouro > 0 && i % cfg.estouro === cfg.estouro - 1
       const alturaEstouro = l.top + l.height * 0.45
       let estourou = false
 
       a.bala({
-        x: x0,
+        x: x0 + Math.sin(fase) * cfg.ondulacao, // já nasce onde o balanço começa
         y: l.bottom - cfg.raio - 2,
         vy: -cfg.velocidade,
         raio: estoura ? cfg.raio * 1.3 : cfg.raio,

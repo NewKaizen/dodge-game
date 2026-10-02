@@ -21,13 +21,16 @@
 // margem      folga extra (px) além da hitbox que o bot tenta manter
 // erro        chance de, numa decisão, ir para uma direção sorteada
 // confusao    controles invertidos: chance extra de errar (o bot também se atrapalha)
+// adaptaMs    a inversão dura o ataque inteiro: em tanto tempo a confusão cai
+//             até CONFUSAO_RESIDUAL dela (o bot "se acostuma", como gente)
 // lapso       chance, a cada decisão, de "se distrair" e seguir na mesma direção
 // lapsoMs     por quanto tempo (é o que faz a CPU tomar dano como gente)
 export const NIVEIS_ESQUIVA = {
-  facil: { decidirMs: 200, horizonteMs: 240, margem: 2, erro: 0.25, confusao: 0.4, lapso: 0.1, lapsoMs: 650 },
-  normal: { decidirMs: 130, horizonteMs: 330, margem: 5, erro: 0.1, confusao: 0.25, lapso: 0.05, lapsoMs: 500 },
-  dificil: { decidirMs: 70, horizonteMs: 520, margem: 9, erro: 0.02, confusao: 0.08, lapso: 0.008, lapsoMs: 300 },
+  facil: { decidirMs: 200, horizonteMs: 240, margem: 2, erro: 0.25, confusao: 0.4, adaptaMs: 4000, lapso: 0.1, lapsoMs: 650 },
+  normal: { decidirMs: 130, horizonteMs: 330, margem: 5, erro: 0.1, confusao: 0.25, adaptaMs: 2500, lapso: 0.05, lapsoMs: 500 },
+  dificil: { decidirMs: 70, horizonteMs: 520, margem: 9, erro: 0.02, confusao: 0.08, adaptaMs: 1500, lapso: 0.008, lapsoMs: 300 },
 }
+const CONFUSAO_RESIDUAL = 0.35
 
 const PASSO_MS = 35 // passo da simulação
 const MEIO = 8 // metade do coração (CORACAO.tamanho / 2): o centro não passa daqui na parede
@@ -81,15 +84,25 @@ export class EsquivaBot {
     this.sorte = sorte
     this.espera = 0
     this.direcao = { x: 0, y: 0 }
+    this.tempoInvertido = 0 // ms seguidos com os controles invertidos
   }
 
   // reinicia entre rodadas (o bot não "lembra" a direção da rodada anterior)
   reiniciar() {
     this.espera = 0
     this.direcao = { x: 0, y: 0 }
+    this.tempoInvertido = 0
+  }
+
+  // chance extra de errar agora por causa da inversão (cai com o tempo invertido)
+  confusaoAgora() {
+    const adapta = this.cfg.adaptaMs ?? 0
+    const p = adapta > 0 ? Math.min(1, this.tempoInvertido / adapta) : 0
+    return this.cfg.confusao * (1 - p * (1 - CONFUSAO_RESIDUAL))
   }
 
   joy(dt, situacao) {
+    this.tempoInvertido = situacao.invertido ? this.tempoInvertido + dt : 0
     this.espera -= dt
     if (this.espera <= 0) {
       this.espera = this.cfg.decidirMs
@@ -107,7 +120,7 @@ export class EsquivaBot {
   }
 
   decidir({ coracao, limites, balas, velocidade = 180, fatorVelocidade = 1, velocidadeMax = Infinity, invertido = false }) {
-    const chanceErro = this.cfg.erro + (invertido ? this.cfg.confusao : 0)
+    const chanceErro = this.cfg.erro + (invertido ? this.confusaoAgora() : 0)
     if (this.sorte() < chanceErro) return DIRECOES[1 + Math.floor(this.sorte() * 16)]
     const ativas = balas.filter((b) => !b.morta && !b.inofensiva)
     const seguro = (coracao.hitbox ?? 5) + this.cfg.margem

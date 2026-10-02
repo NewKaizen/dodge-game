@@ -35,6 +35,7 @@ Regras, que a validação confere no console em modo dev:
 - **Paredes:** declare toda parede com `a.parede({ eixo, lacunas | ocupados })` e toda abertura com `a.lacuna(px)`. A lacuna mínima é 3x o coração (48 px).
 - **Sorteios:** use só `a.aleatorio`, `a.inteiro` e `a.escolher`, que têm semente fixa.
 - **Alvos:** use `a.alvo()`, que alterna entre os corações quando há 2 jogadores.
+- **Nada de ficar parado:** todo ataque deve ameaçar um coração parado (mire parte das balas com `a.alvo()`). Vários padrões têm a opção `mirar` (0 = comportamento antigo).
 
 Para testar no console do navegador, durante a batalha e na fase de menu:
 

@@ -24,6 +24,8 @@ let pedido = 0 // descarta pedidos antigos quando a música muda no meio do carr
 const arquivos = new Map() // url -> Promise<ArrayBuffer | null>
 let pausada = false // menu de pause aberto (pausarMidi)
 let volume = 1 // slider "volume da música" (0 a 1)
+let velocidade = 1 // andamento pedido pelo jogo (setVelocidadeMidi): sobrevive à troca de música e ao distorcerMidi
+let rampa = null // setInterval da rampa de andamento em andamento
 
 const alvo = () => AUDIO.volume * AUDIO.musica * volume
 
@@ -35,6 +37,37 @@ export function setVolumeMidi(v) {
   motor.ganho.gain.cancelScheduledValues(t)
   motor.ganho.gain.setTargetAtTime(alvo(), t, 0.05)
 }
+
+// Andamento da música (1 = normal; 1.24 = 24% mais rápida), para a "morte
+// súbita" das partidas longas. Muda numa rampa curta (sem tranco) e fica
+// valendo para as próximas músicas e depois do efeito de fim de luta, até
+// alguém pedir 1 de novo (as cenas voltam para 1 ao sair).
+export function setVelocidadeMidi(fator, ms = 600) {
+  velocidade = Math.max(0.25, Math.min(4, Number(fator) || 1))
+  clearInterval(rampa)
+  rampa = null
+  // sem música (ou no meio do distorcerMidi, que mexe no andamento sozinho): só guarda
+  if (!motor || !atual) return
+  const seq = motor.seq
+  const de = seq.playbackRate
+  const para = velocidade
+  if (!ms || Math.abs(para - de) < 0.001) {
+    seq.playbackRate = para
+    return
+  }
+  const inicio = performance.now()
+  rampa = setInterval(() => {
+    const p = Math.min(1, (performance.now() - inicio) / ms)
+    // a música parou (ou começou o distorcerMidi) no meio: não mexe mais no andamento
+    if (atual) seq.playbackRate = de + (para - de) * p
+    if (p >= 1) {
+      clearInterval(rampa)
+      rampa = null
+    }
+  }, 30)
+}
+
+export const velocidadeMidi = () => velocidade
 
 function preparar(ctx) {
   preparo ??= (async () => {
@@ -123,6 +156,7 @@ export async function tocarMidi(ctx, url) {
   restaurar(m) // desfaz o efeito de fim de luta, se a última música morreu com ele
   m.seq.loadNewSongList([{ binary: dados.slice(0), fileName: url.split('/').pop() }])
   m.seq.loopCount = Infinity // loop infinito (a doc da lib fala em -1, mas o motor só repete com Infinity)
+  m.seq.playbackRate = velocidade // andamento da morte súbita (setVelocidadeMidi)
   m.seq.play()
   const t = m.ctx.currentTime
   m.ganho.gain.cancelScheduledValues(t)
@@ -190,10 +224,10 @@ function curvaSaturacao() {
   return curva
 }
 
-// Volta andamento, afinação, filtro e saturação ao normal
+// Volta andamento (ao pedido por setVelocidadeMidi), afinação, filtro e saturação ao normal
 function restaurar(m) {
   const t = m.ctx.currentTime
-  m.seq.playbackRate = 1
+  m.seq.playbackRate = velocidade
   m.synth.setSystemParameter('fineTune', 0)
   for (const [param, valor] of [
     [m.filtro.frequency, FILTRO_ABERTO],
@@ -220,6 +254,9 @@ export function distorcerMidi(ms = 1600, { suave = false, sombrio = false, aoCor
   const { ctx, seq, synth, ganho, filtro, seco, molhado } = m
   atual = null // o slider de volume não mexe mais; musica(mesma) recomeça do zero
   const meu = ++pedido // outra música (ou pararMidi) no meio cancela o efeito
+  clearInterval(rampa) // a rampa da morte súbita não briga com o efeito
+  rampa = null
+  const base = seq.playbackRate // a fita cai a partir do andamento atual (pode estar acelerada)
   const s = ms / 1000
   const t = ctx.currentTime
   const cfg = sombrio
@@ -257,7 +294,7 @@ export function distorcerMidi(ms = 1600, { suave = false, sombrio = false, aoCor
         return resolver(false) // quem cancelou (tocarMidi) restaura ao começar a próxima
       }
       const p = Math.min(1, (performance.now() - inicio) / ms)
-      seq.playbackRate = Math.max(0.05, 1 - cfg.ritmo * p ** 1.4)
+      seq.playbackRate = Math.max(0.05, base * (1 - cfg.ritmo * p ** 1.4))
       const vibrato = Math.sin(p * 38) * 35 * p // a "fita" oscila enquanto morre
       synth.setSystemParameter('fineTune', cfg.cents * p ** 2 + vibrato)
       if (p < 1) return
@@ -279,5 +316,5 @@ export function distorcerMidi(ms = 1600, { suave = false, sombrio = false, aoCor
 
 // Diagnóstico (debugJogo.musica()): o que está tocando e em que segundo
 export function estadoMidi() {
-  return { tocando: atual, tempo: motor ? Math.round(motor.seq.currentTime * 10) / 10 : null, contexto: motor?.ctx.state ?? null }
+  return { tocando: atual, velocidade, tempo: motor ? Math.round(motor.seq.currentTime * 10) / 10 : null, contexto: motor?.ctx.state ?? null }
 }

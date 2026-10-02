@@ -15,6 +15,8 @@ import bombas from './bombas.js'
 import caminhonete from './caminhonete.js'
 import brasas from './brasas.js'
 import forcado from './forcado.js'
+import rachaduras from './rachaduras.js'
+import caosFinal from './caosFinal.js'
 
 // Todos os ataques disponíveis. Para criar um novo, copie um arquivo desta
 // pasta, mude nome/padrao/iniciar e adicione aqui.
@@ -51,6 +53,8 @@ export const ataques = {
   caminhonete,
   brasas,
   forcado,
+  rachaduras,
+  caosFinal,
   juntos,
   sequencia,
   comCaixa,

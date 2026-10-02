@@ -29,17 +29,24 @@ import { tocar } from '../audio.js'
 //
 //   pista.mostrar()                      abre a caixa e põe o coração nela (Promise)
 //   pista.esconder()                     fecha a caixa (Promise)
-//   pista.rodar(ataque, { dano, ritmo, semente })
+//   pista.rodar(ataque, { dano, ritmo, semente, aceleracao })
 //       Promise que resolve quando o ataque termina: preparo da caixa (se o
 //       ataque pede outra forma), respiros, o ataque e a volta da caixa ao
 //       padrão. Abre a caixa antes, se estiver fechada. Uma por vez: um
 //       rodar() novo interrompe o anterior (a Promise do anterior resolve).
+//       aceleracao (morte súbita, ACELERACAO em constants.js): multiplica a
+//       velocidade e a densidade do ritmo E o teto de velocidade das balas
+//       (senão o teto comeria o bônus das balas que já são rápidas)
 //   pista.parar()                        interrompe o ataque em andamento (a Promise resolve)
 //   pista.atualizar(dt, joy)             todo frame; joy = {x, y} (-100..100) do dono,
 //                                        ou função (jogador) => {x, y} se a pista tem vários corações
 //   pista.aoAcertar = (dano, bala, coracao) => {}   devolva false para o acerto não contar
 //   pista.aoGraze = (coracao, bala) => {}
 //   pista.destruir()
+//
+//   pista.fatorCoracao                   multiplica a velocidade do coração (morte súbita; padrão 1)
+//   pista.atacando                       o ataque em si já começou (passou o respiro/preparo inicial)
+//                                        e ainda não acabou
 //
 //   pista.caixa (BattleBox), pista.balas (Balas), pista.coracoes (Heart[]), pista.rodando
 export default class Pista {
@@ -66,7 +73,9 @@ export default class Pista {
       },
     })
     this.balas = new Balas(cena, this.caixa)
+    this.velocidadeMaxBase = velocidadeMax
     this.balas.velocidadeMax = velocidadeMax
+    this.fatorCoracao = 1
     this.coracoes = this.jogadores.map((j) => new Heart(cena, this.caixa, cor ?? CORES.almas[j] ?? CORES.almas[0], j))
     this.caixa.aoMudar = () => this.coracoes.forEach((c) => c.ativo && c.ajustar()) // a caixa empurra os corações
 
@@ -86,6 +95,15 @@ export default class Pista {
 
   get rodando() {
     return this.ataque !== null
+  }
+
+  get atacando() {
+    return Boolean(this.ataque?.iniciado)
+  }
+
+  // px/s do coração agora (o do painel, com o bônus da morte súbita)
+  get velocidadeCoracao() {
+    return (this.velocidade ?? this.cena.registry.get('velocidade') ?? CORACAO.velocidadePadrao) * this.fatorCoracao
   }
 
   // ---------- caixa ----------
@@ -131,7 +149,7 @@ export default class Pista {
 
   // ---------- ataque ----------
 
-  async rodar(ataque, { dano = 5, ritmo = {}, semente } = {}) {
+  async rodar(ataque, { dano = 5, ritmo = {}, semente, aceleracao = 1 } = {}) {
     if (this.ataque) this.parar()
     this.voltando?.() // a volta ao padrão do ataque anterior é cancelada pela mudança deste
     const geracao = ++this.geracao
@@ -139,7 +157,10 @@ export default class Pista {
     if (geracao !== this.geracao || this.destruida || !this.aberta) return // outro rodar() ou esconder() enquanto a caixa abria
     novaRodada() // avisos de justiça voltam a aparecer (são por ataque)
     const r = { velocidade: 1, densidade: 1, ...ritmo }
+    r.velocidade *= aceleracao
+    r.densidade *= aceleracao
     this.balas.fatorVelocidade = r.velocidade
+    this.balas.velocidadeMax = this.velocidadeMaxBase * aceleracao
     const ctx = new ContextoAtaque({
       cena: this.cena,
       balas: this.balas,
@@ -156,14 +177,19 @@ export default class Pista {
     // e a mudança acontecem no respiro inicial e o ataque só começa depois
     const preparo = preparoCaixa(null, ataque.caixa)
     const inicio = Math.max(ATAQUE.respiroMs, preparo)
+    let at
     const fim = new Promise((resolver) => {
-      this.ataque = { ctx, nome: ataque.nome, restante: inicio + ataque.duracao + ATAQUE.respiroMs, desarmado: false, proximaValidacao: 0, resolver }
+      at = { ctx, nome: ataque.nome, restante: inicio + ataque.duracao + ATAQUE.respiroMs, iniciado: false, desarmado: false, proximaValidacao: 0, resolver }
+      this.ataque = at
     })
     if (preparo) ctx.caixaPara(ataque.caixa)
-    ctx.depois(inicio, () => ataque.iniciar(ctx.limitar(ataque.duracao)))
+    ctx.depois(inicio, () => {
+      at.iniciado = true
+      ataque.iniciar(ctx.limitar(ataque.duracao))
+    })
     ctx.depois(inicio + ataque.duracao, () => {
       this.balas.desarmar(ATAQUE.respiroMs)
-      this.ataque.desarmado = true
+      at.desarmado = true
     })
     await fim
     // só volta ao padrão se nenhum outro rodar() começou nesse meio tempo
@@ -178,6 +204,7 @@ export default class Pista {
     at.ctx.limpar()
     this.balas.limpar()
     this.balas.fatorVelocidade = 1
+    this.balas.velocidadeMax = this.velocidadeMaxBase
     at.resolver()
   }
 
@@ -204,7 +231,7 @@ export default class Pista {
   }
 
   passo(dt, joy) {
-    const velocidade = this.velocidade ?? this.cena.registry.get('velocidade') ?? CORACAO.velocidadePadrao
+    const velocidade = this.velocidadeCoracao
     for (const c of this.coracoes) if (c.ativo) c.update(typeof joy === 'function' ? joy(c.jogador) : joy, velocidade, dt)
 
     this.caixa.atualizar(dt) // aviso/transição da caixa no mesmo relógio do ataque

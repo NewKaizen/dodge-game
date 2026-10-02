@@ -10,6 +10,10 @@ import { definirAtaque } from './definir.js'
 //   inverte    ms entre inversões do giro
 //   virada     ms sem disparar na inversão (a virada é o momento de respirar)
 //   caixa      a espiral ganha uma arena maior para abrir (aviso antes de mudar)
+//   deriva     px/s com que o núcleo desliza em direção ao coração depois de
+//              acender (0 = parado no centro). Sem isso, os cantos da caixa
+//              ficavam entre os braços e dava para esperar parado.
+//   distancia  o núcleo para de se aproximar a essa distância (px) do coração
 export default definirAtaque({
   nome: 'spiral',
   padrao: {
@@ -23,10 +27,13 @@ export default definirAtaque({
     partida: 0.55,
     inverte: 2200,
     virada: 350,
+    deriva: 24,
+    distancia: 64,
     caixa: { largura: 270, altura: 190 },
   },
   iniciar(a, cfg) {
-    const { centerX: x, centerY: y } = a.caixa
+    // posição do núcleo (muda com a deriva; as balas saem de onde ele estiver)
+    let { centerX: x, centerY: y } = a.caixa
     const brilho = a.decoracao(a.cena.add.image(x, y, 'brilho').setTint(a.cor(a.forma(0))).setScale(0.6).setDepth(4))
     a.cena.tweens.add({ targets: brilho, scale: 0.85, duration: 220, yoyo: true, repeat: -1 })
 
@@ -43,6 +50,25 @@ export default definirAtaque({
       let angulo = 0
       let sentido = 1
       let parados = 0
+
+      // deriva: o núcleo (visível, brilhando) persegue devagar o coração, sem
+      // chegar mais perto que `distancia`. O alvo é relido a cada 400 ms
+      if (cfg.deriva > 0) {
+        let alvo = a.alvo()
+        a.aCada(400, () => (alvo = a.alvo()))
+        a.aoAtualizar((dt) => {
+          const dx = alvo.x - x
+          const dy = alvo.y - y
+          const d = Math.hypot(dx, dy)
+          if (d <= cfg.distancia) return
+          const passo = Math.min(d - cfg.distancia, (cfg.deriva * dt) / 1000)
+          const l = a.caixa
+          const m = 24
+          x = Math.min(Math.max(x + (dx / d) * passo, l.left + m), l.right - m)
+          y = Math.min(Math.max(y + (dy / d) * passo, l.top + m), l.bottom - m)
+          brilho.setPosition(x, y)
+        })
+      }
 
       a.aCada(cfg.intervalo, (i) => {
         if (i > 0 && i % disparosPorGiro === 0) {

@@ -78,8 +78,8 @@ Controles invertidos também confundem a CPU (chance extra de errar).
 | Naipe | Tipo | Ataque na caixa do adversário | Dano por bala |
 |---|---|---|---|
 | ♠ espadas | ataque direto | padrões do personagem escalados pelo valor | 2 + 0,6 × valor (3 a 10) |
-| ♦ ouros | controle | balas até 20% mais rápidas, caixa menor (210×170 → 160×135), Q/K invertem os controles (1,2 a 2 s) | 2 + 0,45 × valor (3 a 8) |
-| ♣ paus | armadilha | bombas, lasers, colunas, ondas, forcado | 2 + 0,55 × valor (3 a 9) |
+| ♦ ouros | controle | balas até 20% mais rápidas, caixa menor (210×170 → 160×135), Q/K invertem os controles durante o ataque todo | 2 + 0,45 × valor (3 a 8) |
+| ♣ paus | armadilha | bombas, lasers, colunas, ondas, forcado, chão rachado | 2 + 0,55 × valor (3 a 9) |
 | ♥ copas | suporte em quem joga | só um ataque fraquinho (4 s, dano 2) | 2 |
 
 Valor = força: `t = (valor - 2) / 11` vai de 0 (2) a 1 (K). Com `t` maior o ataque fica mais rápido, mais denso, mais longo (4 a 7 s ativos, mais os respiros) e dá mais dano.
@@ -92,6 +92,21 @@ Efeitos de copas (cada carta junta um ou mais):
 | escudo | o próximo ataque recebido causa 60% do dano (2-6), 50% (7-10), 35% (J-K); não acumula, fica o melhor |
 | energia | +1 (2-6), +2 (7-10), +3 (J-K) |
 | compra extra | 1 carta (2-8), 2 cartas (9-K); a mão vai até 7 |
+
+## Ataques que obrigam a se mexer
+
+Ficar parado não é mais uma estratégia: quase todo padrão tem uma parte mirada no coração (`mirar` nos ataques, sobe com a força da carta).
+
+- `foice` (Giro do Machado, Machadada, Chaos Saber...): machado bumerangue que mira a faixa do coração, volta pelo outro lado, alterna varridas horizontais e verticais e solta faíscas.
+- `forcado`: o forcado segue a fileira do coração enquanto está parado lá dentro; a cada 3 estocadas vem a pinça (um de cada lado, vãos desencontrados).
+- `rachaduras` (Chão Rachado, Dinamite, Emboscada): o chão racha passando pelo coração e solta espinhos; nas cartas fortes, estilhaços.
+- `carrossel`: os anéis respiram forte, invertem o giro (piscam antes), o centro persegue o coração e atiram balas miradas.
+- `caosFinal` (Caos Final, K♦ do Asriel): estrelas miradas → cruz do caos giratória → anel que colapsa no coração e explode.
+- Outros: `rain`, `colunas`, `ondas`, `quicantes`, `bombas` e `anel` miram parte das balas; a `spiral` vem atrás do coração.
+
+## Morte súbita (aceleração)
+
+A cada 5 rodadas (rodadas 5, 10, 15, 20, 25) tudo fica 30% mais rápido, até ×2,5 na rodada 25 (`ACELERACAO` em `constants.js`): balas (velocidade e densidade), relógio da escolha (15 s → até 8 s), animações e música. O coração ganha metade do bônus para continuar dando para desviar. Aparece um aviso "VELOCIDADE ×1,3!" e o selo fica no HUD. No co-op a regra fica desligada (`ACELERACAO.coop = false`; com `true` ela vale por turno do chefe, por cima do `RITMO`).
 
 ## Ases (cartas especiais, um por naipe em todo baralho, custo 3)
 
@@ -132,4 +147,4 @@ A lista completa (nome, valor, custo, descrição) sai de `CARTAS` em `cartas.js
 
 ## Justiça dos ataques
 
-Todas as cartas dos 7 personagens (134) foram rodadas na batalha co-op com `testarAtaque`, com o ritmo e o tema de cada carta: 0 avisos `[rota de fuga]` ou `[telegrafo]`. As figuras (J/Q/K) também passaram com o aperto do co-op por cima (velocidade ×1,15, densidade ×1,2).
+Todas as cartas dos 7 personagens (134) foram rodadas na batalha co-op com `testarAtaque`: 0 avisos `[telegrafo]`; 1 aviso `[rota de fuga]` conhecido (Cabos Enrolados, Dess 10♣, lasers — já existia antes da revisão de 2026-10-02). As figuras (J/Q/K) também passaram com o aperto do co-op por cima (velocidade ×1,15, densidade ×1,2).

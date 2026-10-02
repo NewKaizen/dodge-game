@@ -100,7 +100,7 @@ const sem = (o) => {
 
 const P = {
   chuva: (A, t, o = {}) =>
-    A.rain({ duracao: duracaoDe(t), intervalo: lerp(320, 200, t) * esp(o), velocidade: lerp(115, 165, t), ...sem(o) }),
+    A.rain({ duracao: duracaoDe(t), intervalo: lerp(320, 200, t) * esp(o), velocidade: lerp(115, 165, t), mirar: 0.35 + 0.3 * t, ...sem(o) }),
   // neve: chuva lenta, gotas que já saem quase na velocidade final (flocos)
   neve: (A, t, o = {}) =>
     A.rain({ duracao: duracaoDe(t), intervalo: lerp(360, 240, t) * esp(o), velocidade: lerp(90, 130, t), partida: 0.7, cascata: 3, raio: 7, girar: 1, ...sem(o) }),
@@ -109,17 +109,17 @@ const P = {
   mira: (A, t, o = {}) =>
     A.aimed({ duracao: duracaoDe(t), intervalo: lerp(1050, 680, t) * esp(o), velocidade: lerp(115, 175, t), rajada: t >= 0.6 ? 4 : 3, ...sem(o) }),
   espiral: (A, t, o = {}) =>
-    A.spiral({ duracao: duracaoDe(t), velocidade: lerp(95, 130, t), bracos: t >= 0.7 ? 4 : 3, intervalo: lerp(170, 140, t) * esp(o), ...sem(o) }),
+    A.spiral({ duracao: duracaoDe(t), velocidade: lerp(95, 130, t), bracos: t >= 0.7 ? 4 : 3, intervalo: lerp(170, 140, t) * esp(o), deriva: lerp(16, 30, t), ...sem(o) }),
   colunas: (A, t, o = {}) =>
-    A.colunas({ duracao: duracaoDe(t), quantidade: t >= 0.5 ? 3 : 2, velocidade: lerp(140, 230, t), intervalo: lerp(1500, 1000, t) * esp(o), ...sem(o) }),
+    A.colunas({ duracao: duracaoDe(t), quantidade: t >= 0.5 ? 3 : 2, velocidade: lerp(140, 230, t), intervalo: lerp(1500, 1000, t) * esp(o), mirar: 0.4 + 0.3 * t, ...sem(o) }),
   ondas: (A, t, o = {}) =>
-    A.ondas({ duracao: duracaoDe(t), velocidade: lerp(120, 205, t), intervalo: lerp(900, 660, t) * esp(o), amplitude: lerp(35, 55, t), ...sem(o) }),
+    A.ondas({ duracao: duracaoDe(t), velocidade: lerp(120, 205, t), intervalo: lerp(900, 660, t) * esp(o), amplitude: lerp(35, 55, t), mirar: 0.4 + 0.3 * t, ...sem(o) }),
   lasers: (A, t, o = {}) =>
     A.lasers({ duracao: duracaoDe(t), quantidade: t >= 0.6 ? 2 : 1, intervalo: lerp(1450, 1100, t) * esp(o), ...sem(o) }),
   quicantes: (A, t, o = {}) =>
-    A.quicantes({ duracao: duracaoDe(t), intervalo: lerp(1150, 620, t) * esp(o), velocidade: lerp(140, 215, t), quiques: t >= 0.6 ? 5 : 4, ...sem(o) }),
+    A.quicantes({ duracao: duracaoDe(t), intervalo: lerp(1150, 620, t) * esp(o), velocidade: lerp(140, 215, t), quiques: t >= 0.6 ? 5 : 4, mirar: 0.4 + 0.3 * t, ...sem(o) }),
   anel: (A, t, o = {}) =>
-    A.anel({ duracao: duracaoDe(t), intervalo: lerp(2500, 1600, t) * esp(o), tempoFechar: lerp(1500, 1250, t), ...sem(o) }),
+    A.anel({ duracao: duracaoDe(t), intervalo: lerp(2500, 1600, t) * esp(o), tempoFechar: lerp(1500, 1250, t), mirar: 0.25 + 0.25 * t, ...sem(o) }),
   divisores: (A, t, o = {}) =>
     A.divisores({ duracao: duracaoDe(t), intervalo: lerp(1600, 1150, t) * esp(o), velocidade: lerp(100, 135, t), ...sem(o) }),
   carrossel: (A, t, o = {}) => {
@@ -130,15 +130,38 @@ const P = {
         { raio: 42, quantidade: 8, giro: (lerp(100, 160, t) / 100) * sentido },
         { raio: 112, quantidade: 18, giro: (-lerp(70, 115, t) / 100) * sentido },
       ],
+      respira: lerp(16, 24, t),
+      inverte: lerp(3200, 2200, t),
+      persegue: lerp(14, 30, t),
+      tiros: lerp(2300, 1300, t) * esp(o),
       ...resto,
     })
   },
   foice: (A, t, o = {}) =>
-    A.foice({ duracao: duracaoDe(t), varridas: Math.ceil(duracaoDe(t) / 2100), travessia: lerp(1900, 1450, t), ...sem(o) }),
+    A.foice({
+      duracao: duracaoDe(t),
+      varridas: Math.ceil(duracaoDe(t) / 2100),
+      travessia: lerp(1900, 1450, t),
+      aviso: lerp(750, 600, t),
+      faiscas: t >= 0.6 ? 3 : 2,
+      vertical: t >= 0.45, // fraca: só horizontal (ainda mira e volta)
+      ...sem(o),
+    }),
   bombas: (A, t, o = {}) =>
-    A.bombas({ duracao: duracaoDe(t), intervalo: lerp(1800, 1150, t) * esp(o), fragmentos: t >= 0.6 ? 10 : 8, velocidade: lerp(120, 160, t), ...sem(o) }),
+    A.bombas({ duracao: duracaoDe(t), intervalo: lerp(1800, 1150, t) * esp(o), fragmentos: t >= 0.6 ? 10 : 8, velocidade: lerp(120, 160, t), mirar: 0.4 + 0.3 * t, ...sem(o) }),
   forcado: (A, t, o = {}) =>
-    A.forcado({ duracao: duracaoDe(t), intervalo: lerp(1800, 1200, t) * esp(o), parada: lerp(300, 200, t), ...sem(o) }),
+    A.forcado({ duracao: duracaoDe(t), intervalo: lerp(1800, 1200, t) * esp(o), parada: lerp(300, 200, t), rastrear: lerp(40, 75, t), profundidade: t >= 0.4 ? 0.2 : 0.1, pinca: t >= 0.55 ? 3 : 0, ...sem(o) }),
+  rachaduras: (A, t, o = {}) =>
+    A.rachaduras({ duracao: duracaoDe(t), intervalo: lerp(1350, 850, t) * esp(o), ramos: t >= 0.75 ? 5 : t >= 0.45 ? 4 : 3, comprimento: lerp(85, 110, t), aviso: lerp(700, 560, t), fragmentos: t >= 0.6 ? 3 : 0, velocidade: lerp(100, 140, t), ...sem(o) }),
+  // finalização em 3 fases; pensado para t alto (com duracao < ~6000 o colapso não chega a explodir)
+  caosFinal: (A, t, o = {}) =>
+    A.caosFinal({
+      duracao: duracaoDe(t),
+      estrelas: { intervalo: lerp(400, 300, t) * esp(o), velocidade: lerp(130, 160, t) },
+      cruz: { giro: lerp(80, 110, t) / 100, inverte: lerp(1800, 1300, t), tiro: lerp(1300, 900, t) * esp(o) },
+      colapso: { tempoFechar: lerp(1350, 1200, t), fragmentos: t >= 0.6 ? 10 : 8, velocidade: lerp(105, 125, t) },
+      ...sem(o),
+    }),
 }
 
 // Ouros: a caixa encolhe (mais forte = menor). Mínimos acima de CAIXA_DINAMICA.
@@ -151,17 +174,19 @@ const TEXTOS = {
   neve: 'Flocos gelados caindo devagar em cascata',
   estocadas: 'Lanças pelas laterais, na fileira do coração',
   mira: 'Rajadas miradas no coração',
-  espiral: 'Espiral que inverte o giro',
+  espiral: 'Espiral que inverte o giro e vem atrás do coração',
   colunas: 'Colunas despencam do alto',
   ondas: 'Paredes com uma abertura que ondula',
   lasers: 'Lasers que piscam e queimam a faixa',
   quicantes: 'Bolas que quicam nas paredes',
   anel: 'Anel que se fecha com um vão',
   divisores: 'Projéteis que se dividem em leque',
-  carrossel: 'Anéis girando ao redor do centro',
-  foice: 'Lâmina giratória varre metade da caixa',
+  carrossel: 'Anéis que giram, invertem e perseguem o coração',
+  foice: 'Machado bumerangue mira a faixa do coração e volta',
   bombas: 'Bombas com contagem que explodem em estilhaços',
-  forcado: 'Três dentes entram pela lateral',
+  forcado: 'Forcado entra pela lateral e persegue sua fileira',
+  rachaduras: 'O chão racha sob o coração e solta espinhos',
+  caosFinal: 'Estrelas, cruz do caos e colapso final',
 }
 
 // ---------- baralhos ----------
@@ -173,7 +198,8 @@ const TEXTOS = {
 //   leve        ataque fraquinho das cartas de copas
 //   receitas    { chave: { texto, criar(A, t) } } -> ataques próprios
 //   cartas      [naipe, valor, nome, receita | efeitos de copas, extras?]
-//               extras: { inverter: ms }  (controles invertidos na caixa do adversário)
+//               extras: { inverter: ms }  (controles invertidos na caixa do adversário;
+//                         qualquer valor > 0 = durante o ataque todo, ver PvpArena)
 //
 // Receita simples: o nome de um padrão de P. Receita composta: um objeto em `receitas`.
 
@@ -193,7 +219,7 @@ const BARALHOS = {
       passo: r('Rajadas miradas numa caixa apertada', (A, t) => apertar(A, t, P.mira(A, t))),
       formacao: r('Lasers alternados numa caixa apertada', (A, t) => apertar(A, t, P.lasers(A, t, { orientacao: 'alternar', quantidade: 1 }))),
       alma: r('Rajadas miradas numa caixa apertada', (A, t) => apertar(A, t, P.mira(A, t))),
-      emboscada: r('Forcado e bombas', (A, t) => A.juntos(P.forcado(A, t, { esparso: 1.4 }), P.bombas(A, t, { esparso: 1.8 }))),
+      emboscada: r('Forcado e chão rachado', (A, t) => A.juntos(P.forcado(A, t, { esparso: 1.4 }), P.rachaduras(A, t, { esparso: 1.9, ramos: 3 }))),
     },
     cartas: [
       ['espadas', 1, 'Reflexo da Lâmina'],
@@ -223,14 +249,15 @@ const BARALHOS = {
     tema: { formas: ['hex', 'bola'], cores: { hex: 0xb05cff, bola: 0xd9a0ff, barra: 0xc890ff, foice: 0xe0c0ff }, cor: 0xb05cff },
     hp: 110,
     principal: { espadas: 'foice', ouros: 'mira', paus: 'bombas' },
-    leve: (A) => A.colunas({ duracao: 4000, quantidade: 1, velocidade: 130, intervalo: 1700 }),
+    leve: (A) => A.colunas({ duracao: 4000, quantidade: 1, velocidade: 130, intervalo: 1700, mirar: 0 }),
     receitas: {
       rugido: r('Rajadas miradas numa caixa apertada', (A, t) => apertar(A, t, P.mira(A, t))),
       pressao: r('Estocadas numa caixa apertada', (A, t) => apertar(A, t, P.estocadas(A, t))),
-      buster: r('Machadada com rajadas miradas', (A, t) => A.juntos(P.foice(A, t), P.mira(A, t, { esparso: 1.8, caixa: null }))),
-      maluco: r('Pisões e depois o machado girando', (A, t) =>
-        A.sequencia(P.colunas(A, t, { duracao: metade(t) }), P.foice(A, t, { duracao: metade(t), varridas: 2 }))),
-      dinamite: r('Bombas e colunas', (A, t) => A.juntos(P.bombas(A, t, { esparso: 1.3 }), P.colunas(A, t, { esparso: 1.7, quantidade: 2 }))),
+      buster: r('Machado bumerangue com rajadas miradas', (A, t) =>
+        A.juntos(P.foice(A, t, { faiscas: 1 }), P.mira(A, t, { esparso: 1.8, caixa: null }))),
+      maluco: r('Pisões e depois o machado bumerangue', (A, t) =>
+        A.sequencia(P.colunas(A, t, { duracao: metade(t) }), P.foice(A, t, { duracao: metade(t), varridas: 2, aviso: 600, avisoVolta: 450, faiscas: 3 }))),
+      dinamite: r('Bombas e chão rachado', (A, t) => A.juntos(P.bombas(A, t, { esparso: 1.4 }), P.rachaduras(A, t, { esparso: 1.6 }))),
     },
     cartas: [
       ['espadas', 1, 'Revide Selvagem'],
@@ -247,7 +274,7 @@ const BARALHOS = {
       ['ouros', 11, 'Pressão', 'pressao', { inverter: 1200 }],
       ['paus', 1, 'Roubar Lanche'],
       ['paus', 5, 'Bomba de Giz', 'bombas'],
-      ['paus', 9, 'Chão Rachado', 'forcado'],
+      ['paus', 9, 'Chão Rachado', 'rachaduras'],
       ['paus', 11, 'Dinamite', 'dinamite'],
       ['copas', 1, 'Teimosia'],
       ['copas', 5, 'Ultimate Heal', ['cura']],
@@ -263,7 +290,7 @@ const BARALHOS = {
     leve: (A) => A.anel({ duracao: 4000, intervalo: 2800, quantidade: 16, abertura: 1.4, tempoFechar: 1700 }),
     receitas: {
       ninar: r('Carrossel lento numa caixa apertada', (A, t) => apertar(A, t, P.carrossel(A, t * 0.5))),
-      sono: r('Anéis numa caixa apertada', (A, t) => apertar(A, t, P.anel(A, t))),
+      sono: r('Anéis numa caixa apertada', (A, t) => apertar(A, t, P.anel(A, t, { mirar: 0.2 }))),
       laco: r('Divisores e anel', (A, t) => A.juntos(P.divisores(A, t, { esparso: 1.3 }), P.anel(A, t, { esparso: 1.6 }))),
     },
     cartas: [
@@ -294,7 +321,7 @@ const BARALHOS = {
     tema: { formas: ['losango', 'hex'], cores: { losango: 0x9fe6ff, hex: 0xe0f8ff, barra: 0xc8f0ff, bola: 0x9fe6ff }, cor: 0x9fe6ff },
     hp: 85,
     principal: { espadas: 'neve', ouros: 'lasers', paus: 'colunas' },
-    leve: (A) => A.rain({ duracao: 4000, intervalo: 560, velocidade: 90, partida: 0.7, cascata: 3, raio: 7, girar: 1 }),
+    leve: (A) => A.rain({ duracao: 4000, intervalo: 560, velocidade: 90, partida: 0.7, cascata: 3, raio: 7, girar: 1, mirar: 0.3 }),
     receitas: {
       nevasca: r('Neve com um anel de gelo se fechando', (A, t) => A.juntos(P.neve(A, t, { esparso: 1.5, caixa: null }), P.anel(A, t, { esparso: 1.5 }))),
       ventoGelido: r('Neve numa caixa apertada', (A, t) => apertar(A, t, P.neve(A, t))),
@@ -406,14 +433,15 @@ const BARALHOS = {
     tema: { formas: ['losango', 'copas', 'bola'], cores: { losango: 0xfff07a, copas: 0xff8ad8, bola: 0x9ad8ff, barra: 0xffffff }, cor: 0xfff07a },
     hp: 95,
     principal: { espadas: 'chuva', ouros: 'carrossel', paus: 'bombas' },
-    leve: (A) => A.rain({ duracao: 4000, intervalo: 520, velocidade: 105 }),
+    leve: (A) => A.rain({ duracao: 4000, intervalo: 520, velocidade: 105, mirar: 0.3 }),
     receitas: {
-      buster: r('Lâmina do caos e depois chuva de estrelas', (A, t) =>
-        A.sequencia(P.foice(A, t, { duracao: metade(t), varridas: 2 }), P.chuva(A, t, { duracao: metade(t) }))),
+      buster: r('Lâmina do caos vai e volta, depois chuva de estrelas', (A, t) =>
+        A.sequencia(P.foice(A, t, { duracao: metade(t), varridas: 2, aviso: 600, avisoVolta: 450 }), P.chuva(A, t, { duracao: metade(t) }))),
       goner: r('Espiral de estrelas com chuva', (A, t) => A.juntos(P.espiral(A, t, { esparso: 1.3 }), P.chuva(A, t, { esparso: 2.2, caixa: null }))),
       shocker: r('Raios verticais numa caixa apertada', (A, t) => apertar(A, t, P.lasers(A, t, { orientacao: 'vertical', quantidade: 1 }))),
-      tempo: r('Espiral numa caixa apertada', (A, t) => apertar(A, t, P.espiral(A, t * 0.6))),
-      final: r('Carrossel numa caixa apertada', (A, t) => apertar(A, t * 0.3, P.carrossel(A, t, { sentido: -1 }))),
+      tempo: r('Espiral que inverte com rajadas miradas numa caixa apertada', (A, t) =>
+        apertar(A, t * 0.6, A.juntos(P.espiral(A, t * 0.6, { esparso: 1.3, caixa: null }), P.mira(A, t, { esparso: 2.2, caixa: null, rajada: 2 })))),
+      final: r('Estrelas miradas, cruz giratória e colapso que explode', (A, t) => apertar(A, t * 0.3, P.caosFinal(A, t))),
       meteoros: r('Bombas com chuva de estrelas', (A, t) => A.juntos(P.bombas(A, t, { esparso: 1.3 }), P.chuva(A, t, { esparso: 2, caixa: null }))),
       raio: r('Lasers em cruz', (A, t) => P.lasers(A, t, { orientacao: 'cruz', intervalo: lerp(1500, 1250, t) })),
       supernova: r('Bombas e projéteis que se dividem', (A, t) => A.juntos(P.bombas(A, t, { esparso: 1.3 }), P.divisores(A, t, { esparso: 1.5 }))),
@@ -473,7 +501,7 @@ function montar(personagem) {
       const texto = def.receitas[receita]?.texto ?? TEXTOS[receita]
       if (!texto) throw new Error(`carta ${id}: receita desconhecida "${receita}"`)
       descricao = `${texto}.`
-      if (extras.inverter) descricao += ` Inverte os controles por ${(extras.inverter / 1000).toLocaleString('pt-BR')} s.`
+      if (extras.inverter) descricao += ' Inverte os controles do adversário durante o ataque todo.'
     }
     DETALHES[id] = { receita: especial ? null : naipe === 'copas' ? null : receita, efeitos, especial, inverter: extras.inverter ?? 0 }
     return { id, personagem, naipe, valor, nome, descricao, custo: custoDoValor(valor) }
