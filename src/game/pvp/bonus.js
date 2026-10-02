@@ -103,12 +103,13 @@ export function desfazerMalucas(estado, trocas) {
 export const ARMAS = { copas: 'tiro', espadas: 'espada', ouros: 'bumerangue', paus: 'explosao' }
 export const LISTA_ARMAS = ['tiro', 'espada', 'bumerangue', 'explosao']
 
-// Dano base por acerto de cada arma (força 0) e quanto a força da carta soma (força 1)
+// Dano base por acerto de cada arma (força 0) e quanto a força da carta soma (força 1).
+// Num duelo de 15 s a espada acerta muito: com mais que isto um duelo decide a partida
 export const DANO_ARMA = {
-  tiro: { base: 3, extra: 3 },
-  espada: { base: 6, extra: 5 },
-  bumerangue: { base: 4, extra: 4 },
-  explosao: { base: 8, extra: 6 },
+  tiro: { base: 2, extra: 2 },
+  espada: { base: 3, extra: 3 },
+  bumerangue: { base: 2, extra: 3 },
+  explosao: { base: 5, extra: 4 },
 }
 
 // A arma de quem jogou `carta` (null = passou: arma sorteada, força mínima)
