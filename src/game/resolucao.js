@@ -18,8 +18,13 @@ const MARGEM_VERTICAL = 110 // barra de conexão acima do jogo
 const DPR_MAX = 2 // acima disso o canvas fica pesado sem ganho visível
 
 function medir() {
-  const zoomLivre = Math.min((window.innerWidth - 32) / LARGURA, (window.innerHeight - MARGEM_VERTICAL) / ALTURA)
-  const zoom = Math.max(1, Math.floor(zoomLivre * 20) / 20) // passos de 5%, para não recriar tudo a cada pixel de resize
+  // em tela cheia (lib/telaCheia.js) só o jogo aparece: sem margens, ocupa tudo
+  const cheia = Boolean(document.fullscreenElement)
+  const zoomLivre = cheia
+    ? Math.min(window.innerWidth / LARGURA, window.innerHeight / ALTURA)
+    : Math.min((window.innerWidth - 32) / LARGURA, (window.innerHeight - MARGEM_VERTICAL) / ALTURA)
+  // fora da tela cheia: passos de 5%, para não recriar tudo a cada pixel de resize
+  const zoom = cheia ? zoomLivre : Math.max(1, Math.floor(zoomLivre * 20) / 20)
   const dpr = Math.min(window.devicePixelRatio || 1, DPR_MAX)
   return { zoom, dpr, escala: zoom * dpr }
 }
@@ -87,5 +92,9 @@ export function instalarResolucao(game) {
     }, 150)
   }
   window.addEventListener('resize', aoRedimensionar)
-  return () => window.removeEventListener('resize', aoRedimensionar)
+  document.addEventListener('fullscreenchange', aoRedimensionar)
+  return () => {
+    window.removeEventListener('resize', aoRedimensionar)
+    document.removeEventListener('fullscreenchange', aoRedimensionar)
+  }
 }

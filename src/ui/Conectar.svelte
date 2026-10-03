@@ -2,6 +2,7 @@
   import { jogo, MAX_JOGADORES } from '../lib/estado.js'
   import { conectarSerial } from '../lib/serial.js'
   import { iniciarSimulador, pararSimulador } from '../lib/simulador.js'
+  import { alternarTelaCheia } from '../lib/telaCheia.js'
 
   let erro = $state('')
 
@@ -33,6 +34,7 @@
     <button onclick={conectar}>Conectar joystick</button>
     <button onclick={() => iniciarSimulador()}>Simulador (teclado)</button>
   {/if}
+  <button onclick={alternarTelaCheia}>⛶ Tela cheia (F)</button>
   {#if erro}<span class="erro">{erro}</span>{/if}
 </div>
 
