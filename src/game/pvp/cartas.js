@@ -320,8 +320,8 @@ const BARALHOS = {
       laco: r('Divisores e anel', (A, t) => A.juntos(P.divisores(A, t, { esparso: 1.3 }), P.anel(A, t, { esparso: 1.6 }))),
     },
     super: {
-      nome: 'Valsa Real',
-      texto: 'Carrossel de anéis, anel com projéteis que se dividem e uma espiral de copas',
+      nome: 'Último Capítulo',
+      texto: 'Sopros de fogo em leque pelos cantos, uma moldura de espinhos com a janela sempre deslizando e, no fim, a sombra de um dragão ondulando fogo pela caixa',
       criar: (A) => A.superRalsei()
     },
     cartas: [
@@ -362,8 +362,8 @@ const BARALHOS = {
       avalanche: r('Pingentes e neve', (A, t) => A.juntos(P.colunas(A, t, { esparso: 1.4, forma: 'losango' }), P.neve(A, t, { esparso: 1.8, caixa: null }))),
     },
     super: {
-      nome: 'Inverno Absoluto',
-      texto: 'Neve em cascata, raios de gelo verticais e pingentes com um anel de gelo',
+      nome: 'Zero Absoluto',
+      texto: 'Pingentes que racham o chão em placas que nunca mais voltam, a nevasca que isola as últimas seguras e a estrela de gelo final',
       criar: (A) => A.superNoelle()
     },
     cartas: [
@@ -405,8 +405,8 @@ const BARALHOS = {
       ciclone: r('Paredes de vento que descem', (A, t) => P.ondas(A, t, { direcao: 'baixo', abertura: 72 })),
     },
     super: {
-      nome: 'Furacão Genial',
-      texto: 'Vento da esquerda, estocadas numa caixa apertada e lasers em cruz com rajadas miradas',
+      nome: 'Prova Irrefutável',
+      texto: 'Um redemoinho de lâminas de vento que acelera e lança rajadas de páginas a cada volta, até o giro dourado e o corte final da resposta certa',
       criar: (A) => A.superBerdly()
     },
     cartas: [
@@ -447,8 +447,8 @@ const BARALHOS = {
       palco: r('Bombas e ondas sonoras', (A, t) => A.juntos(P.bombas(A, t, { esparso: 1.4 }), P.ondas(A, t, { esparso: 1.6 }))),
     },
     super: {
-      nome: 'Turnê Final',
-      texto: 'Ondas sonoras, bolas rebatidas e o palco explosivo',
+      nome: 'Último Bis',
+      texto: 'Um show de ritmo: acordes nos trastes, um solo correndo pelo braço e o mergulho do whammy em onda de choque',
       criar: (A) => A.superDess()
     },
     cartas: [
@@ -495,8 +495,8 @@ const BARALHOS = {
     },
     // a 3ª fase é o Caos Final encurtado (o colapso ainda explode: fica com 50% do tempo)
     super: {
-      nome: 'Supernova Arco-Íris',
-      texto: 'Chuva de estrelas, espiral com chuva e o Caos Final',
+      nome: 'Singularidade Radiante',
+      texto: 'Um vazio que cresce e puxa as estrelas para o centro, depois implode numa supernova que dispara raios arco-íris para fora',
       criar: (A) => A.superAsriel()
     },
     cartas: [
