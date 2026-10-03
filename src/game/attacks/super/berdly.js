@@ -271,7 +271,7 @@ function corteFinal(a, cfg, cx, cy) {
   a.aviso({ tipo: 'linha', x1: cx - dx, y1: cy - dy, x2: cx + dx, y2: cy + dy, espessura: 18, ms: aviso }, () => {
     tocar(a.cena, 'super-berdly-estalo')
     shake(a.cena, 200, 0.012)
-    a.bala({
+    const feixe = a.bala({
       x: cx,
       y: cy,
       comprimento: comp * 2,
@@ -289,6 +289,10 @@ function corteFinal(a, cfg, cx, cy) {
         }
       },
     })
+    // a textura (160x20) ampliada pelo comprimento ficaria grossa demais: fixa a espessura visual
+    feixe.sprite.setDisplaySize(comp * 2, 30)
+    feixe.escalaX = feixe.sprite.scaleX
+    feixe.escalaY = feixe.sprite.scaleY
     particulas(a.cena, cx, cy, { cor: 0xfff0b0, quantidade: 22, velocidade: 210, vida: 420 })
     particulas(a.cena, cx, cy, { cor: 0xd8f05a, quantidade: 14, velocidade: 150, vida: 360 })
   })
