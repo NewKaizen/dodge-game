@@ -551,8 +551,7 @@ export default class PvpArena extends Phaser.Scene {
     if (!forcado) return
     if (adiarBonus(this.estado, jogadas)) {
       this.bonusProximo = forcado
-      this.textoBonus.setText('★ BONUS ADIADO: SUPER! ★').setColor(TEXTO.normal).setAlpha(1)
-      this.tweens.add({ targets: this.textoBonus, alpha: 0, delay: 1800, duration: 300 })
+      this.tweens.add({ targets: this.textoBonus, alpha: 0, duration: 300 })
       return
     }
     this.fase = 'bonus'
