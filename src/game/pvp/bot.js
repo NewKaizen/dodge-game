@@ -13,10 +13,12 @@
 //   Ás ♦ anular      idem, um pouco menos
 //   Ás ♣ roubo       melhor com a mão do adversário cheia
 //   Ás ♥ 2ª chance   só quando o HP está baixo
+//   SUPER (★)        nota bem alta (imparável, ~9 s de ataque); com o SUPER na mão
+//                    e a energia perto dos 10, o bot topa passar para juntar energia
 //   passar           quando nada jogável vale a pena ou quando segurar a energia
 //                    libera uma carta forte na próxima rodada
 import { cartasJogaveis, ENERGIA } from './regras.js'
-import { danoDaCarta, efeitosDaCarta, especialDaCarta, forca, inverterDaCarta } from './cartas.js'
+import { danoDaCarta, efeitosDaCarta, especialDaCarta, forca, inverterDaCarta, ehSuper } from './cartas.js'
 import { aleatorio } from './baralho.js'
 
 // Níveis da CPU (a esquiva usa os mesmos nomes, ver botEsquiva.js)
@@ -31,6 +33,10 @@ export const NIVEL_BOT_PADRAO = 'normal'
 
 const outro = (j) => 1 - j
 
+// Nota do SUPER: quase o dobro de um K♠ (13 x 1,8 = 23,4), porque não pode ser
+// anulado nem refletido e dura umas três cartas
+const NOTA_SUPER = 45
+
 // Nota de uma carta jogável para o jogador j (maior = melhor)
 export function notaDaCarta(estado, j, carta) {
   const eu = estado.jogadores[j]
@@ -39,6 +45,7 @@ export function notaDaCarta(estado, j, carta) {
   const hpAdv = adv.hp / adv.hpMax
   const especial = especialDaCarta(carta)
 
+  if (ehSuper(carta)) return NOTA_SUPER * (hpAdv < 0.35 ? 1.4 : 1)
   if (especial === 'segundaChance') return meuHp < 0.3 ? 30 : meuHp < 0.5 ? 6 : 0.5
   if (especial === 'espelho') return 4 + Math.min(adv.energia, 6) * 1.6
   if (especial === 'anular') return 3 + Math.min(adv.energia, 6) * 1.3
@@ -67,10 +74,21 @@ function notaDePassar(estado, j, nivel, melhor) {
   const eu = estado.jogadores[j]
   const proxima = Math.min(ENERGIA.maxima, eu.energia + ENERGIA.passar + ENERGIA.porRodada)
   const caras = eu.baralho.mao.filter((c) => c.custo > eu.energia && c.custo <= proxima)
-  if (!caras.length) return 0
-  const sonho = Math.max(...caras.map((c) => notaDaCarta(estado, j, c)))
+  const sonho = caras.length ? Math.max(...caras.map((c) => notaDaCarta(estado, j, c))) : 0
   // só vale guardar se a carta cara for MUITO melhor que a melhor de agora
-  return sonho > melhor * 1.8 ? sonho * 0.5 * nivel.paciencia : 0
+  const guardar = sonho > melhor * 1.8 ? sonho * 0.5 * nivel.paciencia : 0
+  return Math.max(guardar, notaDeGuardarSuper(estado, j, nivel))
+}
+
+// SUPER na mão sem energia para ele: vale juntar energia se faltar no máximo
+// 2 rodadas (passando) e o bot não estiver quase caindo
+function notaDeGuardarSuper(estado, j, nivel) {
+  const eu = estado.jogadores[j]
+  const sup = eu.baralho.mao.find((c) => ehSuper(c) && c.custo > eu.energia)
+  if (!sup || eu.hp / eu.hpMax < 0.3) return 0
+  const rodadas = Math.ceil((sup.custo - eu.energia) / (ENERGIA.passar + ENERGIA.porRodada))
+  if (rodadas > 2) return 0
+  return (notaDaCarta(estado, j, sup) * 0.6 * nivel.paciencia) / rodadas
 }
 
 // id da carta que o bot joga (ou null para passar)

@@ -213,7 +213,7 @@ export const AUDIO = { volume: 0.25, musica: 1.6 }
 //   animacao        fração do bônus nas animações de carta/transições do PvP
 //   musica          fração do bônus no andamento da música
 //   coop            true liga também na batalha co-op (desligada a pedido)
-export const ACELERACAO = { aCadaRodadas: 5, passo: 0.3, maximo: 2.5, coracao: 0.5, escolhaMinMs: 8000, animacao: 1, musica: 1, coop: false }
+export const ACELERACAO = { aCadaRodadas: 5, passo: 0.3, maximo: 2.5, coracao: 0.5, escolhaMinMs: 8000, animacao: 1, musica: 0.35, coop: false }
 
 // Nível de aceleração na rodada `rodada` (1 = primeira): 0 nas 5 primeiras,
 // 1 da 5ª à 9ª, 2 da 10ª à 14ª... (x2,5 na 25ª) (para de subir quando o fator chega ao máximo)

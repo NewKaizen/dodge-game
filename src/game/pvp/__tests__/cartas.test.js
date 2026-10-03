@@ -2,11 +2,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { definirAtaque, juntos, sequencia, comCaixa } from '../../attacks/definir.js'
-import { CARTAS, PERSONAGENS_PVP, NAIPES, CUSTOS, custoDoValor, ataqueDaCarta, danoDaCarta, ritmoDaCarta, inverterDaCarta, efeitosDaCarta, TEMAS, DIFICULDADE_PVP, forca } from '../cartas.js'
+import { CARTAS, PERSONAGENS_PVP, NAIPES, CUSTOS, custoDoValor, ataqueDaCarta, danoDaCarta, ritmoDaCarta, inverterDaCarta, efeitosDaCarta, TEMAS, DIFICULDADE_PVP, forca, ehSuper } from '../cartas.js'
 
 // Biblioteca falsa com a mesma forma de attacks/index.js: usa o definir.js de
 // verdade (que roda em Node) e padrões vazios que só guardam a config
-const NOMES = ['rain', 'sides', 'spiral', 'aimed', 'colunas', 'ondas', 'lasers', 'quicantes', 'anel', 'divisores', 'carrossel', 'foice', 'bombas', 'caminhonete', 'brasas', 'forcado', 'rachaduras', 'caosFinal']
+const NOMES = ['rain', 'sides', 'spiral', 'aimed', 'colunas', 'ondas', 'lasers', 'quicantes', 'anel', 'divisores', 'carrossel', 'foice', 'bombas', 'caminhonete', 'brasas', 'forcado', 'rachaduras', 'caosFinal', 'superKris', 'superSusie', 'superRalsei', 'superNoelle', 'superBerdly', 'superDess', 'superAsriel']
 const configs = []
 const A = { juntos, sequencia, comCaixa }
 for (const nome of NOMES) {
@@ -18,24 +18,28 @@ for (const nome of NOMES) {
 }
 
 const todas = Object.values(CARTAS).flat()
+// as cartas "normais" (sem o SUPER, que tem regras próprias: ver super.test.js)
+const normaisDe = (p) => CARTAS[p].filter((c) => !ehSuper(c))
 
 test('formato da carta é exatamente o combinado', () => {
   const campos = ['id', 'personagem', 'naipe', 'valor', 'nome', 'descricao', 'custo'].sort()
   for (const c of todas) {
     assert.deepEqual(Object.keys(c).sort(), campos, c.id)
     assert.ok(NAIPES.includes(c.naipe), c.id)
-    assert.ok(Number.isInteger(c.valor) && c.valor >= 1 && c.valor <= 13, c.id)
+    assert.ok(Number.isInteger(c.valor) && c.valor >= 1 && c.valor <= 14, c.id)
     assert.equal(c.id, `${c.personagem}-${c.naipe}-${c.valor}`)
     assert.ok(c.nome && c.descricao)
     assert.equal(c.custo, custoDoValor(c.valor))
   }
 })
 
-test('7 personagens, 16 a 20 cartas, ids únicos e um Ás por naipe', () => {
+test('7 personagens, 16 a 20 cartas (mais o SUPER), ids únicos e um Ás por naipe', () => {
   assert.deepEqual(Object.keys(CARTAS).sort(), [...PERSONAGENS_PVP].sort())
   for (const p of PERSONAGENS_PVP) {
     const lista = CARTAS[p]
-    assert.ok(lista.length >= 16 && lista.length <= 20, `${p}: ${lista.length}`)
+    const normais = normaisDe(p).length
+    assert.ok(normais >= 16 && normais <= 20, `${p}: ${normais}`)
+    assert.equal(lista.length - normais, 1, `${p}: um SUPER`)
     assert.equal(new Set(lista.map((c) => c.id)).size, lista.length)
     for (const n of NAIPES) assert.equal(lista.filter((c) => c.naipe === n && c.valor === 1).length, 1, `${p} Ás de ${n}`)
     assert.ok(TEMAS[p]?.formas?.length)
@@ -43,7 +47,7 @@ test('7 personagens, 16 a 20 cartas, ids únicos e um Ás por naipe', () => {
 })
 
 test('proporções de naipe combinam com o papel', () => {
-  const conta = (p, n) => CARTAS[p].filter((c) => c.naipe === n).length
+  const conta = (p, n) => normaisDe(p).filter((c) => c.naipe === n).length
   const maior = (p, n) => NAIPES.every((o) => o === n || conta(p, n) > conta(p, o))
   assert.ok(maior('ralsei', 'copas'))
   assert.ok(maior('noelle', 'copas'))
@@ -52,7 +56,7 @@ test('proporções de naipe combinam com o papel', () => {
   assert.ok(maior('berdly', 'ouros'))
   assert.ok(maior('kris', 'ouros'))
   // asriel: equilibrado e com mais figuras que todos
-  const figuras = (p) => CARTAS[p].filter((c) => c.valor >= 11).length
+  const figuras = (p) => normaisDe(p).filter((c) => c.valor >= 11).length
   assert.ok(NAIPES.every((n) => conta('asriel', n) === 5))
   assert.ok(PERSONAGENS_PVP.every((p) => p === 'asriel' || figuras('asriel') > figuras(p)))
 })
@@ -67,7 +71,7 @@ test('tabela de custos', () => {
 })
 
 test('toda carta vira um ataque válido (menos o Ás de copas), com 4-7 s ativos', () => {
-  for (const c of todas) {
+  for (const c of todas.filter((x) => !ehSuper(x))) {
     const ataque = ataqueDaCarta(c, { ataques: A })
     if (c.naipe === 'copas' && c.valor === 1) {
       assert.equal(ataque, null)

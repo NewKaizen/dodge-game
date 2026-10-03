@@ -17,13 +17,13 @@ Testes: `npm test` (ou `node --test src/game/pvp/__tests__/*.test.js`).
 2. Os dois escolhem ao mesmo tempo (`podeJogar` / `cartasJogaveis`). Passar a vez (`null`) sempre pode e dá +1 de energia.
 3. `resolverRodada(estado, jogadaP1, jogadaP2)` valida tudo antes de mudar o estado e resolve nesta ordem:
    1. paga a energia e descarta as cartas jogadas;
-   2. ♦ Anular cancela a carta do outro (dois Anular: as duas se cancelam);
+   2. ♦ Anular cancela a carta do outro (dois Anular: as duas se cancelam), menos o SUPER;
    3. ♥ suporte em quem jogou (cura, escudo, energia, compra) e Ás de copas;
-   4. ataques: cada carta vai para a caixa do adversário; ♠ Espelho devolve o ataque do outro para a caixa dele;
+   4. ataques: cada carta vai para a caixa do adversário; ♠ Espelho devolve o ataque do outro para a caixa dele (o SUPER não volta);
    5. o escudo de quem recebe reduz o dano por bala daquele ataque (e é gasto);
    6. ♣ Roubo pega uma carta sorteada da mão do outro.
 4. A cena roda `caixas[j]` (o que o jogador j desvia): `{ carta, de, refletida, dano, ritmo, inverterMs, escudo }`. O ataque em si vem de `ataqueDaCartaNoJogo(caixa.carta)` (`null` = caixa calma).
-5. Durante a esquiva: `aplicarDano(estado, j, caixa.dano)` a cada acerto e `registrarGrazes(estado, j, n)` (+1 de energia a cada 5 grazes).
+5. Durante a esquiva: `aplicarDano(estado, j, caixa.dano)` a cada acerto, `registrarGrazes(estado, j, n)` (+1 de energia a cada 5 grazes) e, no fim, `registrarPerfeito(estado, j, caixa.carta)` se j passou pelo ataque sem levar dano.
 6. `fimDaRodada(estado)` → `'p1' | 'p2' | 'empate' | null`. HP corrido: perde quem zerar; os dois juntos = empate.
 
 O estado é JSON puro (`structuredClone`/`JSON.stringify` funcionam) e a partida é determinística pela semente (`criarPartida({ p1, p2, semente })`).
@@ -37,6 +37,7 @@ O estado é JSON puro (`structuredClone`/`JSON.stringify` funcionam) e a partida
 | Teto (o que sobra acumula) | 10 |
 | Grazes | +1 a cada 5 |
 | Passar a vez | +1 |
+| Desvio perfeito | +1 a +3 (pela carta do ataque, ver abaixo) |
 
 ## Dificuldade das cartas
 
@@ -69,9 +70,42 @@ Controles invertidos também confundem a CPU (chance extra de errar).
 
 ## Custos
 
-| Valor | 2 a 4 | 5 a 8 | 9, 10, J | Q | K | Ás |
-|---|---|---|---|---|---|---|
-| Custo | 1 | 2 | 3 | 4 | 5 | 3 |
+| Valor | 2 a 4 | 5 a 8 | 9, 10, J | Q | K | Ás | ★ SUPER |
+|---|---|---|---|---|---|---|---|
+| Custo | 1 | 2 | 3 | 4 | 5 | 3 | 10 |
+
+## Carta SUPER (★)
+
+Todo baralho tem **uma** carta SUPER (`valor: 14`, `naipe: 'espadas'`, id `'<personagem>-espadas-14'`), que sai na compra normal. Custa **10** de energia (o teto), então só dá para jogar juntando energia (passar a vez, grazes, desvio perfeito).
+
+- Ataque exclusivo de cada personagem: 3 fases de ~3 s com força 1 (~9 s ativos, mais os respiros), montadas com os padrões que já existem e dentro das faixas já validadas. Dano 13 por bala (já com o ×1,3, o mesmo de um K♠), ritmo padrão, não inverte controles.
+- **Imparável**: o ♦ Anular não cancela e o ♠ Espelho não reflete o SUPER. Com Espelho do outro lado, o Espelho manda o eco dele e o SUPER vai normal para a caixa do adversário.
+- A carta do adversário continua valendo: os dois atacam.
+- Na cena: animação especial (`pvp/super/anuncio.js`) e a música do personagem (`public/assets/musicas/super_<personagem>.mid`, se existir); depois a música de batalha volta de onde parou.
+- API em `cartas.js`: `SUPER = { valor: 14, custo: 10 }`, `ehSuper(carta)`, `superDoPersonagem(personagem)` → `{ nome, descricao, cor }`, `nomeDoValor(14) === '★'`. Em `resolverRodada`, cada jogada traz `super: true|false`.
+- CPU (`bot.js`): o SUPER tem a nota mais alta de todas; com ele na mão e faltando até 2 rodadas de energia, a CPU passa a vez para juntar energia (a não ser que esteja com menos de 30% de HP).
+
+| Personagem | SUPER | Fases |
+|---|---|---|
+| Kris | Alma Determinada | estocadas + colunas de espada → lasers alternados numa caixa apertada → forcado + rajadas miradas |
+| Susie | Machado Colossal | pisões → machado gigante com faíscas → dinamite (bombas + chão rachado) |
+| Ralsei | Valsa Real | carrossel de anéis → anel + divisores → espiral de copas |
+| Noelle | Inverno Absoluto | neve em cascata → raios de gelo verticais → pingentes + anel de gelo |
+| Berdly | Furacão Genial | vento da esquerda → estocadas numa caixa apertada → lasers em cruz + mira |
+| Dess | Turnê Final | ondas sonoras → bolas quicando → palco explosivo |
+| Asriel | Supernova Arco-Íris | chuva de estrelas → espiral + chuva → Caos Final (com tempo para o colapso explodir) |
+
+## Desvio perfeito
+
+Passar por um ataque inteiro sem levar dano dá aplausos e energia, pela carta daquele ataque (`energiaPerfeito(carta)` / `registrarPerfeito(estado, j, carta)` em `regras.js`, que respeita o teto de 10 e devolve a energia ganha de fato):
+
+| Carta do ataque | Energia |
+|---|---|
+| 2 a 8 | +1 |
+| 9, 10, J, Q | +2 |
+| K e SUPER | +3 |
+| Ás que manda ataque (Espelho/eco, Anular, Roubo) | +1 |
+| copas, Ás de copas, caixa vazia | 0 |
 
 ## Naipes
 
@@ -110,7 +144,7 @@ A cada 5 rodadas (rodadas 5, 10, 15, 20, 25) tudo fica 30% mais rápido, até ×
 
 ## Bonus rounds (a cada 3 rodadas)
 
-Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento caótico, que nunca repete o da rodada bônus anterior. Só caos, sem prêmio: ninguém ganha nada a mais, e o dano continua valendo. Nos eventos de esquiva, as duas caixas abrem mesmo que ninguém tenha atacado.
+Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento caótico **depois** que os dois escolhem as cartas (no Duelo, a carta escolhida vira a arma, sem gastar energia), que nunca repete o da rodada bônus anterior. Só caos, sem prêmio: ninguém ganha nada a mais, e o dano continua valendo. Nos eventos de esquiva, as duas caixas abrem mesmo que ninguém tenha atacado.
 
 | Evento | Cartas | O que acontece |
 |---|---|---|
@@ -119,9 +153,9 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Mundo de ponta-cabeça | normais | a tela gira 180° (os controles não, aí que mora o caos) |
 | Apagão | normais | escuridão: só se enxerga em volta do coração (com relâmpagos de vez em quando) |
 | Gravidade maluca | normais | uma gravidade puxa o coração e muda de lado a cada ~2 s, com aviso |
-| Coração trocado | normais | cada um controla o coração do OUTRO (a CPU tenta te jogar nas balas) |
-| Cartas malucas | viram outras | na revelação cada carta vira uma carta sorteada de qualquer personagem (mesmo custo). Depois da rodada o baralho volta ao normal |
-| Duelo | viram armas | qualquer carta da mão vale, sem gastar energia. Uma caixa só para os dois: ♥ tiro, ♠ espada, ♦ bumerangue, ♣ explosão (recarga maior, acerta até o dono). A ataca; o valor da carta aumenta o dano. Passar dá uma arma sorteada, fraca |
+| Coração trocado | normais | os corações trocam de caixa: cada um desvia do próprio ataque |
+| Cartas malucas | viram outras | na revelação cada carta vira uma carta sorteada de qualquer personagem (mesmo custo); o SUPER não vira (é imparável). Depois da rodada o baralho volta ao normal |
+| Duelo | viram armas | a carta escolhida vira a arma, sem gastar energia. Uma caixa só para os dois: ♥ tiro, ♠ espada, ♦ bumerangue, ♣ explosão (recarga maior, acerta até o dono). A ataca; o valor da carta aumenta o dano. Passar dá uma arma sorteada, fraca |
 
 ## Ases (cartas especiais, um por naipe em todo baralho, custo 3)
 
@@ -134,17 +168,33 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 
 ## Baralhos
 
-HP de `data/personagens.js` quando o personagem existe lá (Kris 90, Susie 110); senão, o HP de reserva do baralho.
+HP de `data/personagens.js` quando o personagem existe lá (Kris 90, Susie 110); senão, o HP de reserva do baralho. Por cima, `PVP.ajusteHp` em `regras.js` ajusta o HP só no PvP (hoje só o Asriel, ×0,9). Toda contagem abaixo é sem o SUPER; cada baralho tem +1 carta ★.
 
 | Personagem | Papel | HP | Cartas | ♠ | ♥ | ♦ | ♣ | Mais fortes (J/Q/K) |
 |---|---|---|---|---|---|---|---|---|
-| Kris | equilibrado, puxado para controle | 90 | 19 | 5 | 4 | 6 | 4 | K♠ Lâmina Determinada, J♦ Formação, Q♦ Controle da Alma |
-| Susie | força bruta | 110 | 19 | 8 | 3 | 4 | 4 | Q♠ Rude Buster, K♠ Machado Maluco, J♦ Pressão, J♣ Dinamite |
-| Ralsei | suporte | 80 | 19 | 3 | 8 | 4 | 4 | J♦ Feitiço de Sono, Q♥ Pacify, K♥ Oração Maior |
-| Noelle | suporte gélido | 85 | 19 | 4 | 7 | 4 | 4 | Q♠ Nevasca, K♦ Inverno Eterno, J♣ Avalanche, J♥ Anjo da Neve |
-| Berdly | controle | 90 | 19 | 4 | 4 | 7 | 4 | Q♦ QI Elevado, K♦ Vendaval Supremo, J♣ Ciclone |
-| Dess | ataque | 100 | 19 | 7 | 3 | 4 | 5 | J♠ Solo de Guitarra, K♠ Show de Rock, Q♦ Feedback, Q♣ Palco Explosivo |
-| Asriel | equilibrado, cheio de figuras | 95 | 20 | 5 | 5 | 5 | 5 | J/Q/K de todos os naipes (12 figuras) |
+| Kris | equilibrado, puxado para controle | 90 | 19 + ★ | 5 | 4 | 6 | 4 | K♠ Lâmina Determinada, J♦ Formação, Q♦ Controle da Alma · ★ Alma Determinada |
+| Susie | força bruta | 110 | 19 + ★ | 8 | 3 | 4 | 4 | Q♠ Rude Buster, K♠ Machado Maluco, J♦ Pressão, J♣ Dinamite · ★ Machado Colossal |
+| Ralsei | suporte | 80 | 19 + ★ | 3 | 8 | 4 | 4 | J♦ Feitiço de Sono, Q♥ Pacify, K♥ Oração Maior · ★ Valsa Real |
+| Noelle | suporte gélido | 85 | 19 + ★ | 4 | 7 | 4 | 4 | Q♠ Nevasca, K♦ Inverno Eterno, J♣ Avalanche, J♥ Anjo da Neve · ★ Inverno Absoluto |
+| Berdly | controle | 90 | 19 + ★ | 4 | 4 | 7 | 4 | Q♦ QI Elevado, K♦ Vendaval Supremo, J♣ Ciclone · ★ Furacão Genial |
+| Dess | ataque | 100 | 19 + ★ | 7 | 3 | 4 | 5 | J♠ Solo de Guitarra, K♠ Show de Rock, Q♦ Feedback, Q♣ Palco Explosivo · ★ Turnê Final |
+| Asriel | equilibrado, com mais figuras | 90 | 20 + ★ | 5 | 5 | 5 | 5 | J♠ Chaos Buster, K♠ Hyper Goner, Q♦ Tempo Parado, K♦ Caos Final, K♣ Supernova, Q♥ Sonho (6 figuras) · ★ Supernova Arco-Íris |
+
+### Balanceamento do Asriel (2026-10-02)
+
+O Asriel ganhava quase toda partida: 12 figuras (J/Q/K em todos os naipes) e 100 de HP. Agora:
+
+- **6 figuras** (ainda mais que qualquer outro), mantendo 5 cartas por naipe:
+
+| Naipe | Antes | Agora |
+|---|---|---|
+| ♠ | A, 6, J, Q, K | A, 4, 8, J, K |
+| ♦ | A, 5, J, Q, K | A, 3, 7, Q, K |
+| ♣ | A, 4, J, Q, K | A, 4, 8, 10, K |
+| ♥ | A, 7, J, Q, K | A, 5, 8, 10, Q |
+
+- O ♥ Sonho (Q) perdeu o efeito de energia (agora só cura + escudo).
+- HP no PvP ×0,9 (`PVP.ajusteHp.asriel` em `regras.js`): 100 → 90. O co-op não muda (`data/personagens.js` fica igual).
 
 Cara própria por personagem (padrões e tema das balas):
 
@@ -162,4 +212,4 @@ A lista completa (nome, valor, custo, descrição) sai de `CARTAS` em `cartas.js
 
 ## Justiça dos ataques
 
-Todas as cartas dos 7 personagens (134) foram rodadas na batalha co-op com `testarAtaque`: 0 avisos `[telegrafo]`; 1 aviso `[rota de fuga]` conhecido (Cabos Enrolados, Dess 10♣, lasers — já existia antes da revisão de 2026-10-02). As figuras (J/Q/K) também passaram com o aperto do co-op por cima (velocidade ×1,15, densidade ×1,2).
+Todas as cartas dos 7 personagens (134) foram rodadas na batalha co-op com `testarAtaque`: 0 avisos `[telegrafo]`; 1 aviso `[rota de fuga]` conhecido (Cabos Enrolados, Dess 10♣, lasers — já existia antes da revisão de 2026-10-02). As figuras (J/Q/K) também passaram com o aperto do co-op por cima (velocidade ×1,15, densidade ×1,2). Os SUPERs usam os mesmos padrões com força 1 (as faixas já validadas), só encadeados em 3 fases.

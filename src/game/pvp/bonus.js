@@ -11,10 +11,11 @@
 //     'malucas'  escolha de sempre; na revelação cada carta vira outra
 //                sorteada (transformarMalucas antes de resolverRodada e
 //                desfazerMalucas depois: o baralho não muda de verdade)
-//     'duelo'    qualquer carta da mão vale (sem custo de energia); ela vira a
-//                arma do duelo numa caixa só para os dois (resolverDuelo)
+//     'duelo'    a carta escolhida (o evento só é revelado DEPOIS da escolha)
+//                vira a arma do duelo numa caixa só para os dois, sem gastar
+//                energia (resolverDuelo)
 
-import { CARTAS, PERSONAGENS_PVP, forca } from './cartas.js'
+import { CARTAS, PERSONAGENS_PVP, forca, ehSuper } from './cartas.js'
 import { cartaNaMao, descartar, inteiro } from './baralho.js'
 
 export const BONUS = { aCadaRodadas: 3 }
@@ -28,7 +29,7 @@ export const EVENTOS = [
   { id: 'duelo', nome: 'DUELO!', descricao: 'uma caixa só: a carta vira sua arma (A ataca)', cartas: 'duelo', cor: 0xff3048 },
   { id: 'apagao', nome: 'APAGÃO', descricao: 'as luzes caíram: só dá pra ver em volta do coração!', cartas: 'normal', cor: 0xffe040 },
   { id: 'gravidade', nome: 'GRAVIDADE MALUCA', descricao: 'a gravidade muda de lado o tempo todo!', cartas: 'normal', cor: 0x3cff6a },
-  { id: 'trocado', nome: 'CORAÇÃO TROCADO', descricao: 'você controla o coração do OUTRO!', cartas: 'normal', cor: 0xff8aa8 },
+  { id: 'trocado', nome: 'CORAÇÃO TROCADO', descricao: 'os corações trocam de caixa: desvie do SEU ataque!', cartas: 'normal', cor: 0xff8aa8 },
 ]
 
 export const EVENTO = Object.fromEntries(EVENTOS.map((ev) => [ev.id, ev]))
@@ -70,6 +71,7 @@ export function transformarMalucas(estado, jogadas, rng) {
     const i = baralho.mao.findIndex((c) => c.id === id)
     if (i < 0) return id // carta fora da mão: resolverRodada acusa o erro
     const de = baralho.mao[i]
+    if (ehSuper(de)) return id // o SUPER é imparável: não vira outra carta
     const sorteada = cartaAleatoria(rng)
     const para = { ...sorteada, id: `${de.id}~maluca`, custo: de.custo, maluca: true, original: de.id }
     baralho.mao[i] = para

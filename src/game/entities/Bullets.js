@@ -24,6 +24,10 @@ const ESCALA_BARRA = 32 / 24 // textura bala-barra: miolo de 24px numa tela de 3
 //   quicar             quantas vezes rebate nas paredes da caixa
 //   atravessa          não some ao acertar um coração
 //   atualizar(bala, dt)  lógica extra por frame (pode mudar x, vx, angulo, morta, piscar...)
+//   textura            chave de uma textura qualquer (ex.: sprites dos SUPERs) no lugar de bala-<forma>;
+//                      com textura própria a bala só é pintada se vier `cor`
+//   quadro             quadro da spritesheet (com `textura`)
+//   tamanho            px do lado maior do sprite (com `textura`; padrão: o tamanho da colisão)
 export default class Balas {
   constructor(scene, caixa) {
     this.scene = scene
@@ -38,8 +42,11 @@ export default class Balas {
   criar(o) {
     const tipo = o.comprimento !== undefined ? 'segmento' : o.largura !== undefined ? 'retangulo' : 'circulo'
     const forma = o.forma ?? (tipo === 'circulo' ? 'bola' : 'barra')
-    const textura = this.scene.textures.exists(`bala-${forma}`) ? `bala-${forma}` : 'bala-bola'
-    const sprite = this.scene.add.image(o.x, o.y, textura).setDepth(5).setTint(o.cor ?? CORES.bala)
+    const propria = o.textura && this.scene.textures.exists(o.textura)
+    const textura = propria ? o.textura : this.scene.textures.exists(`bala-${forma}`) ? `bala-${forma}` : 'bala-bola'
+    const sprite = this.scene.add.image(o.x, o.y, textura, propria ? o.quadro : undefined).setDepth(5)
+    if (!propria) sprite.setTint(o.cor ?? CORES.bala)
+    else if (o.cor !== undefined) sprite.setTint(o.cor)
     const aviso = o.jaAvisada ? 0 : (o.aviso ?? ATAQUE.telegrafoMs)
 
     if (!o.jaAvisada && aviso < ATAQUE.telegrafoMs) {
@@ -80,7 +87,12 @@ export default class Balas {
       escalaY: 1,
     }
 
-    if (tipo === 'circulo') sprite.setScale(b.raio / RAIO_BALA)
+    if (propria) {
+      // textura própria: o lado maior do sprite vira `tamanho` (padrão: o tamanho da colisão)
+      const lado = o.tamanho ?? (tipo === 'circulo' ? b.raio * 2.4 : tipo === 'retangulo' ? Math.max(b.largura, b.altura) * 1.15 : b.comprimento * 1.05)
+      sprite.setScale(lado / Math.max(1, sprite.width, sprite.height))
+      if (tipo === 'segmento') sprite.setRotation(b.angulo)
+    } else if (tipo === 'circulo') sprite.setScale(b.raio / RAIO_BALA)
     else if (tipo === 'retangulo') sprite.setDisplaySize(b.largura * ESCALA_BARRA, b.altura * ESCALA_BARRA)
     else sprite.setDisplaySize(b.comprimento * (forma === 'foice' ? 1.05 : ESCALA_BARRA), b.espessura * 2.2).setRotation(b.angulo)
     b.escalaX = sprite.scaleX

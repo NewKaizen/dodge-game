@@ -1,5 +1,5 @@
 import { ALTURA, CORES, LARGURA } from '../../../constants.js'
-import { tocar } from '../../../audio.js'
+import { tocar, somContinuo } from '../../../audio.js'
 import { ignorarNasCaixas } from '../../../recorte.js'
 import { flashTela } from '../../../effects/flash.js'
 
@@ -7,6 +7,8 @@ import { flashTela } from '../../../effects/flash.js'
 // menos um círculo de luz suave em volta do coração dela; o resto da tela
 // também escurece. Balas telegrafando continuam "piscando" por cima do escuro
 // (contorno vermelho), e a cada ~2,5s um relâmpago acende tudo por ~150ms.
+// Som: chuva contínua (somContinuo) do começo ao fim e um trovão um pouquinho
+// depois de cada relâmpago (a luz chega antes do som, como na vida real).
 //
 // O escuro de cada caixa é uma imagem preta com um furo suave (textura feita
 // uma vez a partir de bonus-holofote, ou de um degradê) que segue o coração,
@@ -21,6 +23,8 @@ const PISCA_MS = 700 // pisca-pisca do começo
 const RAIO_MIN = 2300 // intervalo entre relâmpagos (sorteado)
 const RAIO_MAX = 2800
 const MARGEM = 200 // os retângulos passam da tela com folga
+const TROVAO_MIN = 150 // atraso (ms) do trovão depois do clarão (sorteado)
+const TROVAO_MAX = 400
 
 // Textura 128x128 preta com um furo transparente suave no meio
 function texturaLuz(arena) {
@@ -75,6 +79,8 @@ export default function criar(arena, { rng }) {
   let t = 0
   let proximoRaio = 0
   let raioEm = -Infinity
+  let trovaoEm = Infinity // quando tocar o trovão do último relâmpago
+  let chuva = null // somContinuo('chuva')
   let veu = null
   let escuros = [] // por pista: { pista, luz, bordas[4], avisos }
 
@@ -133,6 +139,8 @@ export default function criar(arena, { rng }) {
       t = 0
       proximoRaio = PISCA_MS + proximoIntervalo() - 600
       tocar(arena, 'apagao')
+      trovaoEm = Infinity
+      chuva = somContinuo(arena, 'chuva')
       const chave = texturaLuz(arena)
       // véu da tela (fora das caixas): por baixo dos textos de aviso e do HUD
       veu = arena.add.rectangle(0, 0, LARGURA, ALTURA, 0x000000).setOrigin(0).setDepth(15).setAlpha(0)
@@ -157,6 +165,11 @@ export default function criar(arena, { rng }) {
         raioEm = t
         proximoRaio = t + proximoIntervalo()
         flashTela(arena, 0xffffff, 0.22, 220)
+        trovaoEm = t + TROVAO_MIN + sorte() * (TROVAO_MAX - TROVAO_MIN)
+      }
+      if (t >= trovaoEm) {
+        trovaoEm = Infinity
+        tocar(arena, 'trovao')
       }
       let escuro = t < PISCA_MS ? piscaInicial(t) : 1
       escuro = Math.min(escuro, relampago(t - raioEm))
@@ -172,6 +185,9 @@ export default function criar(arena, { rng }) {
     terminar() {
       if (!ativo) return
       ativo = false
+      chuva?.parar(600)
+      chuva = null
+      trovaoEm = Infinity
       veu?.destroy()
       veu = null
       for (const e of escuros) {

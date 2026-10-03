@@ -16,9 +16,10 @@ const SOUNDFONT = 'assets/audio/soundfont.sf3'
 const PROCESSADOR = 'assets/audio/spessasynth_processor.min.js'
 const FADE_S = 0.35
 const FILTRO_ABERTO = 20000 // Hz: passa-baixas "aberto" = não filtra nada audível
+const GRAVE_HZ = 180 // realce de graves (setGraveMidi): lowshelf abaixo daqui
 
 let preparo = null // Promise do sintetizador pronto (uma vez só)
-let motor = null // { ctx, synth, seq, ganho, filtro, seco, molhado }
+let motor = null // { ctx, synth, seq, ganho, filtro, grave, seco, molhado }
 let atual = null // url da música tocando
 let pedido = 0 // descarta pedidos antigos quando a música muda no meio do carregamento
 const arquivos = new Map() // url -> Promise<ArrayBuffer | null>
@@ -26,6 +27,7 @@ let pausada = false // menu de pause aberto (pausarMidi)
 let volume = 1 // slider "volume da música" (0 a 1)
 let velocidade = 1 // andamento pedido pelo jogo (setVelocidadeMidi): sobrevive à troca de música e ao distorcerMidi
 let rampa = null // setInterval da rampa de andamento em andamento
+let graveDb = 0 // realce de graves pedido (setGraveMidi): sobrevive à troca de música
 
 const alvo = () => AUDIO.volume * AUDIO.musica * volume
 
@@ -69,6 +71,32 @@ export function setVelocidadeMidi(fator, ms = 600) {
 
 export const velocidadeMidi = () => velocidade
 
+// Realce de graves (dB no lowshelf de ~180 Hz; 0 = normal), ex.: o MODO FESTA
+// "batendo" mais forte. Rampa suave; fica valendo para as próximas músicas
+// até alguém pedir 0 (restaurar() não mexe nele).
+export function setGraveMidi(db = 0, ms = 400) {
+  graveDb = Math.max(-24, Math.min(24, Number(db) || 0))
+  if (!motor) return // preparar() já cria o filtro com graveDb
+  const g = motor.grave.gain
+  const t = motor.ctx.currentTime
+  g.cancelScheduledValues(t)
+  g.setValueAtTime(g.value, t)
+  g.linearRampToValueAtTime(graveDb, t + Math.max(0.01, ms / 1000))
+}
+
+// Segundo atual (posição na música) do sequenciador; 0 sem música
+export function tempoMidi() {
+  if (!motor || !atual) return 0
+  const tempo = motor.seq.currentTime || 0
+  const duracao = motor.seq.midiData?.duration ?? motor.seq.duration
+  return duracao > 0 ? tempo % duracao : tempo // depois de dar a volta no loop
+}
+
+// O .mid existe? (usa o mesmo cache de baixar(): não baixa duas vezes)
+export async function existeMidi(url) {
+  return !!(await baixar(url))
+}
+
 function preparar(ctx) {
   preparo ??= (async () => {
     await ctx.audioWorklet.addModule(PROCESSADOR)
@@ -77,7 +105,7 @@ function preparar(ctx) {
     ganho.gain.value = 0
     // cadeia do efeito de fim de luta (em repouso não altera o som):
     // synth -> seco ─────────────┐
-    //       -> saturação -> molhado ┴-> filtro passa-baixas -> ganho -> saída
+    //       -> saturação -> molhado ┴-> filtro passa-baixas -> grave (lowshelf) -> ganho -> saída
     const seco = ctx.createGain()
     const molhado = ctx.createGain()
     molhado.gain.value = 0
@@ -88,18 +116,23 @@ function preparar(ctx) {
     filtro.type = 'lowpass'
     filtro.frequency.value = FILTRO_ABERTO
     filtro.Q.value = 0.7
+    const grave = ctx.createBiquadFilter()
+    grave.type = 'lowshelf'
+    grave.frequency.value = GRAVE_HZ
+    grave.gain.value = graveDb
     synth.connect(seco)
     synth.connect(saturacao)
     saturacao.connect(molhado)
     seco.connect(filtro)
     molhado.connect(filtro)
-    filtro.connect(ganho)
+    filtro.connect(grave)
+    grave.connect(ganho)
     ganho.connect(ctx.destination)
     const banco = await (await fetch(SOUNDFONT)).arrayBuffer()
     await synth.soundBankManager.addSoundBank(banco, 'principal')
     await synth.isReady
     const seq = new Sequencer(synth)
-    motor = { ctx, synth, seq, ganho, filtro, seco, molhado }
+    motor = { ctx, synth, seq, ganho, filtro, grave, seco, molhado }
     return motor
   })().catch((erro) => {
     console.warn('[música] não deu para iniciar o MIDI:', erro)
@@ -137,8 +170,9 @@ function destravar(ctx) {
 }
 
 // Toca `url` em loop (se já estiver tocando, não reinicia).
+// opcoes.inicio: começa desse segundo (ex.: voltar a música de batalha de onde parou)
 // Devolve false se o arquivo não existe.
-export async function tocarMidi(ctx, url) {
+export async function tocarMidi(ctx, url, { inicio = 0 } = {}) {
   if (atual === url) return true
   pararMidi() // fade da anterior (incrementa `pedido`)
   const meu = ++pedido // este pedido; o incremento também cancela a pausa agendada pelo fade
@@ -158,6 +192,7 @@ export async function tocarMidi(ctx, url) {
   m.seq.loopCount = Infinity // loop infinito (a doc da lib fala em -1, mas o motor só repete com Infinity)
   m.seq.playbackRate = velocidade // andamento da morte súbita (setVelocidadeMidi)
   m.seq.play()
+  if (inicio > 0) m.seq.currentTime = inicio // a mensagem vai na fila depois do play: pula para o ponto
   const t = m.ctx.currentTime
   m.ganho.gain.cancelScheduledValues(t)
   m.ganho.gain.setValueAtTime(0, t)

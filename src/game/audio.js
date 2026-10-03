@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js'
 import { AUDIO } from './constants.js'
-import { tocarMidi, pararMidi, pausarMidi, retomarMidi, setVolumeMidi, distorcerMidi, setVelocidadeMidi } from './midi.js'
+import { tocarMidi, pararMidi, pausarMidi, retomarMidi, setVolumeMidi, distorcerMidi, setVelocidadeMidi, setGraveMidi, tempoMidi, existeMidi, estadoMidi } from './midi.js'
 
 // Sons: se assets.js tiver um arquivo, toca o arquivo; senão sintetiza com WebAudio.
 // Músicas: arquivo .mid toca com soundfont (midi.js); .ogg/.mp3 tocam direto.
@@ -13,30 +13,72 @@ let musicaAtual = null
 // multiplicadores dos sliders do painel (0 a 1), em cima de AUDIO.volume
 const volumes = { musica: 1, efeitos: 1 }
 let andamento = 1 // velocidade da música (velocidadeMusica)
+let abafo = 1 // abaixarMusica(): fração do volume da música enquanto algo importante toca
+let rampaAbafo = null
+let nomeMusica = null // nome (musica(scene, nome)) da música pedida por último
+let guardada = null // tocarMusicaEspecial(): a música que estava tocando, para voltar depois
+let especial = null // { nome, som? } música especial tocando agora (som = Phaser, se não for .mid)
+let pedidoEspecial = 0 // descarta tocarMusicaEspecial que ainda estava conferindo o arquivo
+const continuos = new Set() // somContinuo() tocando (setSomLigado(false) para todos)
 
 export function setVolumes(musica, efeitos) {
   // o store muda a todo instante (joystick): só age quando o volume mudou de verdade
   if (musica === volumes.musica && efeitos === volumes.efeitos) return
   volumes.musica = musica
   volumes.efeitos = efeitos
-  setVolumeMidi(musica)
-  musicaAtual?.setVolume(AUDIO.volume * musica)
+  setVolumeMidi(musica * abafo)
+  musicaAtual?.setVolume(AUDIO.volume * musica * abafo)
+}
+
+// Abaixa a música (fator 0..1 do volume normal) numa rampa curta, ex.: a
+// roleta do bonus round; restaurarMusica() volta ao normal. Vale para .mid e
+// .ogg/.mp3 e respeita o slider do painel.
+export function abaixarMusica(fator = 0.35, ms = 250) {
+  rampaVolume(Math.max(0, Math.min(1, fator)), ms)
+}
+
+export function restaurarMusica(ms = 400) {
+  rampaVolume(1, ms)
+}
+
+function rampaVolume(alvo, ms) {
+  clearInterval(rampaAbafo)
+  rampaAbafo = null
+  abafo = alvo
+  setVolumeMidi(volumes.musica * abafo) // o midi já faz a rampa (setTargetAtTime)
+  const som = musicaAtual
+  if (!som) return
+  const de = som.volume
+  const para = AUDIO.volume * volumes.musica * abafo
+  const inicio = performance.now()
+  rampaAbafo = setInterval(() => {
+    const p = Math.min(1, (performance.now() - inicio) / Math.max(1, ms))
+    if (som === musicaAtual) som.setVolume(de + (para - de) * p)
+    if (p >= 1 || som !== musicaAtual) {
+      clearInterval(rampaAbafo)
+      rampaAbafo = null
+    }
+  }, 30)
 }
 
 export function setSomLigado(valor) {
   ligado = valor
-  if (!valor) pararMusica()
+  if (!valor) {
+    pararMusica()
+    for (const c of [...continuos]) c.parar(0)
+  }
 }
 
-export function tocar(scene, nome) {
+// opcoes: repassadas ao som sintetizado (ex.: roletaGiro { duracao })
+export function tocar(scene, nome, opcoes) {
   if (!ligado) return
   const chave = `som-${nome}`
-  if (ASSETS.sons[nome] && scene.cache.audio.exists(chave)) {
+  if (scene.cache.audio.exists(chave)) { // ASSETS.sons ou os sons dos SUPERs (pvp/super/sprites/)
     scene.sound.play(chave, { volume: AUDIO.volume * volumes.efeitos })
     return
   }
   const c = obterContexto()
-  if (c) SINTESE[nome]?.(sintetizador(c))
+  if (c) SINTESE[nome]?.(sintetizador(c), opcoes ?? {})
 }
 
 // reserva: outra música para tocar se `nome` não existir (ex.: 'pvp' cai na
@@ -44,6 +86,8 @@ export function tocar(scene, nome) {
 let pedidoMusica = 0
 export function musica(scene, nome, reserva) {
   const pedido = ++pedidoMusica
+  esquecerEspecial() // outra música pedida: a especial (e o que ela guardou) perdeu a vez
+  nomeMusica = nome
   const arquivo = ASSETS.musicas[nome] ?? `assets/musicas/${nome}.mid`
   if (/\.midi?$/i.test(arquivo)) {
     musicaAtual?.stop()
@@ -61,7 +105,7 @@ export function musica(scene, nome, reserva) {
   if (musicaAtual?.key === chave && musicaAtual.isPlaying) return
   pararMusica()
   if (!ligado || !ASSETS.musicas[nome] || !scene.cache.audio.exists(chave)) return reserva && reserva !== nome ? musica(scene, reserva) : undefined
-  musicaAtual = scene.sound.add(chave, { loop: true, volume: AUDIO.volume * volumes.musica, rate: andamento })
+  musicaAtual = scene.sound.add(chave, { loop: true, volume: AUDIO.volume * volumes.musica * abafo, rate: andamento })
   musicaAtual.play()
 }
 
@@ -87,10 +131,279 @@ export function retomarMusica() {
 }
 
 export function pararMusica() {
+  esquecerEspecial()
   pararMidi()
   musicaAtual?.stop()
   musicaAtual?.destroy()
   musicaAtual = null
+}
+
+// ---------- música especial (carta SUPER) ----------
+// tocarMusicaEspecial(scene, nome): se assets/musicas/<nome>.mid existir (ou
+// ASSETS.musicas[nome]), guarda a música que estava tocando (nome e segundo
+// onde parou), para ela e toca a especial em loop. Sem o arquivo não faz
+// NADA (a música de batalha continua) e devolve false.
+// voltarMusicaNormal(scene): volta a guardada do ponto onde parou, com
+// fade-in. Sem nada guardado, não faz nada.
+// O andamento da morte súbita (velocidadeMusica) e o abafo (abaixarMusica)
+// continuam valendo para a especial e para a volta.
+export async function tocarMusicaEspecial(scene, nome) {
+  if (!ligado) return false
+  const meu = ++pedidoEspecial
+  const arquivo = ASSETS.musicas[nome] ?? `assets/musicas/${nome}.mid`
+  const ehMidi = /\.midi?$/i.test(arquivo)
+  const chave = `musica-${nome}`
+  if (ehMidi ? !(await existeMidi(arquivo)) : !scene.cache.audio.exists(chave)) return false
+  // voltarMusicaNormal/musica()/pararMusica() no meio da conferência: desiste
+  if (meu !== pedidoEspecial || !ligado) return false
+  const c = obterContexto()
+  if (ehMidi && !c) return false
+
+  // guarda o que estava tocando (só se ainda não há nada guardado: a 2ª
+  // especial seguida não pode guardar a 1ª como "música normal")
+  if (!guardada) {
+    if (musicaAtual) {
+      if (musicaAtual.isPlaying) musicaAtual.pause()
+      guardada = { tipo: 'arquivo', nome: nomeMusica, som: musicaAtual }
+      musicaAtual = null // musica()/pararMusica() não destroem o som guardado
+    } else {
+      const { tocando } = estadoMidi()
+      guardada = tocando ? { tipo: 'midi', nome: nomeMusica, arquivo: tocando, tempo: tempoMidi() } : { tipo: 'nada', nome: nomeMusica }
+    }
+  }
+  pararEspecialArquivo()
+  pedidoMusica++ // uma reserva atrasada de musica() não atropela a especial
+  if (ehMidi) {
+    especial = { nome }
+    tocarMidi(c, arquivo)
+  } else {
+    pararMidi()
+    const som = scene.sound.add(chave, { loop: true, volume: AUDIO.volume * volumes.musica * abafo, rate: andamento })
+    especial = { nome, som }
+    musicaAtual = som // slider, abafo, andamento e pause valem para ela
+    som.play()
+  }
+  return true
+}
+
+export function voltarMusicaNormal(scene) {
+  pedidoEspecial++ // cancela uma tocarMusicaEspecial ainda conferindo o arquivo
+  const g = guardada
+  if (!g) return
+  guardada = null
+  pararEspecialArquivo()
+  especial = null
+  nomeMusica = g.nome
+  pedidoMusica++
+  if (!ligado) {
+    if (g.tipo === 'arquivo') g.som.destroy()
+    return
+  }
+  if (g.tipo === 'midi') {
+    const c = obterContexto()
+    if (c) tocarMidi(c, g.arquivo, { inicio: g.tempo }) // tocarMidi já entra em fade-in
+    else pararMidi()
+    return
+  }
+  pararMidi()
+  if (g.tipo === 'arquivo') {
+    // o som do Phaser pode ter morrido junto com a cena
+    if (!g.som.manager || g.som.pendingRemove) return
+    musicaAtual = g.som
+    const para = AUDIO.volume * volumes.musica * abafo
+    g.som.setVolume(0)
+    g.som.setRate(andamento)
+    if (g.som.isPaused) g.som.resume()
+    else g.som.play()
+    const som = g.som
+    const inicio = performance.now()
+    const passo = setInterval(() => {
+      const p = Math.min(1, (performance.now() - inicio) / 400)
+      if (som === musicaAtual) som.setVolume(para * p)
+      if (p >= 1 || som !== musicaAtual) clearInterval(passo)
+    }, 30)
+  }
+  // 'nada': não havia música; a especial já parou
+}
+
+// para a especial tocada como arquivo do Phaser (a .mid é trocada direto pelo tocarMidi)
+function pararEspecialArquivo() {
+  const som = especial?.som
+  if (!som) return
+  if (musicaAtual === som) musicaAtual = null
+  som.stop()
+  som.destroy()
+  especial = { nome: especial.nome }
+}
+
+// musica()/pararMusica(): esquece a especial e solta o que ela guardou
+function esquecerEspecial() {
+  pedidoEspecial++
+  if (guardada?.tipo === 'arquivo') {
+    guardada.som.stop()
+    guardada.som.destroy()
+  }
+  guardada = null
+  especial = null
+}
+
+// Realce de graves na música .mid (dB num lowshelf de ~180 Hz; 0 = normal),
+// ex.: o MODO FESTA. Fica valendo até alguém pedir 0. (Música em .ogg/.mp3 não muda.)
+export function reforcarGrave(db = 0, ms = 400) {
+  setGraveMidi(db, ms)
+}
+
+// ---------- sons contínuos (loop até parar) ----------
+// somContinuo(scene, nome) -> { parar(ms = 400) }. Sintetizado, volume dos
+// efeitos, entra e sai em fade. Nomes: 'chuva'. Som desligado (ou nome
+// desconhecido): devolve um { parar() {} } que não faz nada.
+export function somContinuo(scene, nome) {
+  const nada = { parar() {} }
+  if (!ligado) return nada
+  // com arquivo próprio (ASSETS.sons[nome]): toca o arquivo em loop
+  if (ASSETS.sons[nome] && scene.cache.audio.exists(`som-${nome}`)) return somContinuoArquivo(scene, nome)
+  if (!CONTINUOS[nome]) return nada
+  const c = obterContexto()
+  if (!c) return nada
+  const saida = c.createGain()
+  saida.gain.setValueAtTime(0.0001, c.currentTime)
+  saida.gain.linearRampToValueAtTime(AUDIO.volume * volumes.efeitos, c.currentTime + 0.6)
+  saida.connect(c.destination)
+  const desfazer = CONTINUOS[nome](c, saida)
+  let parado = false
+  const controle = {
+    parar(ms = 400) {
+      if (parado) return
+      parado = true
+      continuos.delete(controle)
+      const t = c.currentTime
+      const s = Math.max(0.01, ms / 1000)
+      saida.gain.cancelScheduledValues(t)
+      saida.gain.setValueAtTime(saida.gain.value, t)
+      saida.gain.linearRampToValueAtTime(0, t + s)
+      setTimeout(() => {
+        desfazer()
+        saida.disconnect()
+      }, s * 1000 + 60)
+    },
+  }
+  continuos.add(controle)
+  return controle
+}
+
+// somContinuo com arquivo (som do Phaser em loop), fade de entrada e de saída
+function somContinuoArquivo(scene, nome) {
+  const som = scene.sound.add(`som-${nome}`, { loop: true, volume: 0 })
+  som.play()
+  const alvo = () => AUDIO.volume * volumes.efeitos
+  let rampa = null
+  const rampaPara = (de, para, ms, fim) => {
+    clearInterval(rampa)
+    const inicio = performance.now()
+    rampa = setInterval(() => {
+      const p = Math.min(1, (performance.now() - inicio) / Math.max(1, ms))
+      if (som.manager && !som.pendingRemove) som.setVolume(de + (para - de) * p)
+      if (p < 1) return
+      clearInterval(rampa)
+      fim?.()
+    }, 30)
+  }
+  rampaPara(0, alvo(), 600)
+  let parado = false
+  const controle = {
+    parar(ms = 400) {
+      if (parado) return
+      parado = true
+      continuos.delete(controle)
+      rampaPara(som.volume, 0, ms, () => {
+        som.stop()
+        som.destroy()
+      })
+    },
+  }
+  continuos.add(controle)
+  return controle
+}
+
+// buffer de ruído branco em loop (n segundos)
+function bufferRuido(c, s = 2) {
+  const buffer = c.createBuffer(1, Math.ceil(c.sampleRate * s), c.sampleRate)
+  const dados = buffer.getChannelData(0)
+  for (let i = 0; i < dados.length; i++) dados[i] = Math.random() * 2 - 1
+  return buffer
+}
+
+// Cada som contínuo: (contexto, saida) => função que desliga tudo
+const CONTINUOS = {
+  // chuva: chiado agudo filtrado + ronco grave (ruído em loop, com um
+  // "vento" lento no volume) e gotinhas aleatórias batendo
+  chuva: (c, saida) => {
+    const fontes = []
+    const camada = (tipo, freq, q, vol) => {
+      const f = c.createBufferSource()
+      f.buffer = bufferRuido(c, 2 + Math.random())
+      f.loop = true
+      const filtro = c.createBiquadFilter()
+      filtro.type = tipo
+      filtro.frequency.value = freq
+      filtro.Q.value = q
+      const g = c.createGain()
+      g.gain.value = vol
+      f.connect(filtro).connect(g).connect(saida)
+      f.start()
+      fontes.push(f)
+      return g
+    }
+    camada('bandpass', 5200, 0.6, 0.22) // chiado agudo
+    camada('highpass', 9000, 0.7, 0.08) // brilho fino das gotas no chão
+    const ronco = camada('lowpass', 380, 0.8, 0.5) // ronco grave
+    // "vento": o ronco sobe e desce devagar
+    const lfo = c.createOscillator()
+    lfo.frequency.value = 0.13
+    const fundo = c.createGain()
+    fundo.gain.value = 0.18
+    lfo.connect(fundo).connect(ronco.gain)
+    lfo.start()
+    fontes.push(lfo)
+    // gotinhas: estalinho curto (tom agudo caindo + clique de ruído)
+    const clique = bufferRuido(c, 0.03)
+    const gota = () => {
+      const t = c.currentTime + Math.random() * 0.05
+      const freq = 1800 + Math.random() * 2600
+      const o = c.createOscillator()
+      const g = c.createGain()
+      o.type = 'sine'
+      o.frequency.setValueAtTime(freq, t)
+      o.frequency.exponentialRampToValueAtTime(freq * 0.55, t + 0.04)
+      const vol = 0.012 + Math.random() * 0.03
+      g.gain.setValueAtTime(vol, t)
+      g.gain.exponentialRampToValueAtTime(0.0005, t + 0.05)
+      o.connect(g).connect(saida)
+      o.start(t)
+      o.stop(t + 0.06)
+      const r = c.createBufferSource()
+      r.buffer = clique
+      const rg = c.createGain()
+      rg.gain.setValueAtTime(vol * 1.5, t)
+      rg.gain.exponentialRampToValueAtTime(0.0005, t + 0.025)
+      r.connect(rg).connect(saida)
+      r.start(t)
+    }
+    const intervalo = setInterval(() => {
+      const n = Math.random() < 0.6 ? 1 : Math.random() < 0.7 ? 2 : 0
+      for (let i = 0; i < n; i++) gota()
+    }, 45)
+    return () => {
+      clearInterval(intervalo)
+      for (const f of fontes) {
+        try {
+          f.stop()
+        } catch {
+          // já parado
+        }
+      }
+    }
+  },
 }
 
 // Fim de luta: distorce a música tocando (fita perdendo força, filtro
@@ -197,6 +510,40 @@ function sintetizador(c) {
       g.gain.exponentialRampToValueAtTime(0.001, t + dur)
       fonte.connect(filtro).connect(g).connect(saida)
       fonte.start(t)
+    },
+    // bolinha rolando na roda da roleta: chiado num passa-faixa que desce de
+    // tom, com um "trrr" (tremolo) que desacelera junto com a roda
+    rolamento(dur, vol = 0.1, atraso = 0) {
+      const t = agora + atraso
+      const buffer = c.createBuffer(1, Math.ceil(c.sampleRate * dur), c.sampleRate)
+      const dados = buffer.getChannelData(0)
+      for (let i = 0; i < dados.length; i++) dados[i] = Math.random() * 2 - 1
+      const fonte = c.createBufferSource()
+      fonte.buffer = buffer
+      const filtro = c.createBiquadFilter()
+      filtro.type = 'bandpass'
+      filtro.Q.value = 3
+      filtro.frequency.setValueAtTime(3200, t)
+      filtro.frequency.exponentialRampToValueAtTime(900, t + dur)
+      // tremolo: ganho base + LFO (o LFO desacelera de 22 Hz para 6 Hz)
+      const trem = c.createGain()
+      trem.gain.value = 0.5
+      const lfo = c.createOscillator()
+      lfo.type = 'square'
+      lfo.frequency.setValueAtTime(22, t)
+      lfo.frequency.exponentialRampToValueAtTime(6, t + dur)
+      const profundidade = c.createGain()
+      profundidade.gain.value = 0.45
+      lfo.connect(profundidade).connect(trem.gain)
+      const g = c.createGain()
+      g.gain.setValueAtTime(0.0001, t)
+      g.gain.linearRampToValueAtTime(vol, t + Math.min(0.12, dur * 0.2))
+      g.gain.setValueAtTime(vol, t + dur * 0.7)
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur)
+      fonte.connect(filtro).connect(trem).connect(g).connect(saida)
+      fonte.start(t)
+      lfo.start(t)
+      lfo.stop(t + dur + 0.02)
     },
   }
 }
@@ -528,13 +875,22 @@ const SINTESE = {
     s.tom(196, 0.6, 'triangle', 0.14, 196, 0.3)
     s.ruido(0.4, 0.06, 0.3, 9000)
   },
-  // tique da roleta girando (curtinho, toca muitas vezes)
+  // tique da roleta girando: a bolinha batendo nas divisórias (toca muitas vezes)
   roleta: (s) => {
-    s.tom(1100 + Math.random() * 120, 0.022, 'square', 0.05, 900)
-    s.ruido(0.015, 0.06, 0, 6000)
+    s.tom(2300 + Math.random() * 400, 0.018, 'triangle', 0.08, 1500)
+    s.tom(700 + Math.random() * 80, 0.02, 'square', 0.025, 500)
+    s.ruido(0.012, 0.07, 0, 8000)
   },
-  // roleta parou no evento: "ding" com brilho
+  // roda de cassino girando (o giro todo): bolinha rolando + ronco da roda
+  roletaGiro: (s, { duracao = 1.8 } = {}) => {
+    s.rolamento(duracao, 0.1)
+    s.nota(110, duracao, 'triangle', 0.05, 70, 0, 0.15)
+  },
+  // roleta parou no evento: a bolinha cai na casa (clac-clac) e "ding" com brilho
   roletaFim: (s) => {
+    s.tom(2600, 0.02, 'triangle', 0.09, 1600)
+    s.tom(2200, 0.02, 'triangle', 0.07, 1400, 0.06)
+    s.ruido(0.015, 0.08, 0.06, 8000)
     s.tom(1318, 0.5, 'triangle', 0.1, 1316)
     s.tom(1976, 0.35, 'sine', 0.05, 1974, 0.01)
     s.tom(659, 0.1, 'square', 0.06, 659)
@@ -622,5 +978,43 @@ const SINTESE = {
     s.tom(220, 1.0, 'triangle', 0.08, 218, 0.05)
     s.tom(331, 0.6, 'sine', 0.04, 329, 0.05)
     s.ruido(0.4, 0.08, 0.05, 1500)
+  },
+  // trovão (APAGÃO): estalo seco e um ronco grave longo que rola e some (~2,5 s)
+  trovao: (s) => {
+    s.ruido(0.05, 0.45, 0, 9000)
+    s.ruido(0.18, 0.35, 0.02, 2500)
+    s.ruido(2.5, 0.42, 0.05, 260)
+    s.nota(42, 2.4, 'sine', 0.32, 28, 0.04, 0.12)
+    s.nota(63, 1.8, 'triangle', 0.08, 40, 0.1, 0.3)
+    // o ronco "rola" em ondas
+    for (let i = 0; i < 5; i++) s.ruido(0.5 + Math.random() * 0.4, 0.14 + Math.random() * 0.12, 0.25 + i * 0.35 + Math.random() * 0.15, 420)
+  },
+  // DESVIO PERFEITO: plateia batendo palmas (~1,6 s) e um "uhuu" subindo
+  aplausos: (s) => {
+    for (let i = 0; i < 46; i++) {
+      const t = Math.random() * 1.45 * Math.sqrt(Math.random()) // mais palmas no começo
+      s.ruido(0.022 + Math.random() * 0.02, 0.25 + Math.random() * 0.2, t, 3500 + Math.random() * 5000) // mais alto: o sintetizado sumia embaixo da música
+    }
+    s.nota(300, 0.55, 'sawtooth', 0.035, 620, 0.12, 0.08)
+    s.nota(450, 0.5, 'triangle', 0.05, 900, 0.14, 0.08)
+    s.nota(620, 0.4, 'sine', 0.04, 560, 0.62, 0.05)
+  },
+  // carta SUPER: impacto dramático e uma subida que cresce (~1,2 s)
+  superAtivar: (s) => {
+    s.ruido(0.07, 0.4, 0, 9000)
+    s.tom(98, 0.7, 'sawtooth', 0.22, 30)
+    s.tom(49, 1.0, 'sine', 0.45, 24)
+    s.ruido(0.6, 0.3, 0, 800)
+    s.nota(160, 1.0, 'sawtooth', 0.07, 1800, 0.2, 0.7)
+    s.nota(240, 1.0, 'square', 0.04, 2400, 0.2, 0.7)
+    s.nota(320, 0.95, 'triangle', 0.06, 3200, 0.25, 0.65)
+    s.ruido(0.25, 0.12, 0.95, 7000)
+  },
+  // corte rápido da SUPER (whoosh + lâmina)
+  superCorte: (s) => {
+    s.ruido(0.18, 0.28, 0, 6000)
+    s.tom(1600, 0.16, 'sawtooth', 0.06, 300)
+    s.tom(3000, 0.07, 'sine', 0.05, 2600, 0.05)
+    s.tom(120, 0.12, 'square', 0.1, 50, 0.04)
   },
 }

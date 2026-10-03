@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import { LARGURA, ALTURA, CORES, FONTE } from '../../../constants.js'
-import { tocar } from '../../../audio.js'
+import { tocar, reforcarGrave } from '../../../audio.js'
 import { CORES_FESTA, chuvaConfete, canhoesConfete } from '../../../effects/festa.js'
 import { particulas } from '../../../effects/particulas.js'
 import { ignorarNasCaixas } from '../../../recorte.js'
@@ -12,6 +12,7 @@ import { transformarTela, restaurarTela } from './pontaCabeca.js'
 // centro, ~a cada BATIDA_MS, câmeras das caixas juntas: transformarTela) e as
 // bordas das caixas trocam de cor como arco-íris. Balões sobem pelas caixas:
 // são balas lentas (dano baixo) que estouram quando encostam no coração.
+// A música ganha grave (reforcarGrave(GRAVE_DB)) enquanto a festa dura.
 
 const BATIDA_MS = 450
 const PULSO_ZOOM = 0.022 // quanto a tela "pula" em cada batida
@@ -20,6 +21,7 @@ const CANHAO_MS = 5200 // canhões de confete a cada
 const BALAO = { intervalo: 1150, velocidade: { min: 42, max: 62 }, raio: 9, dano: 2, balanco: 22 }
 const HOLOFOTES = 4
 const BOLA_Y = 46 // onde a bola de discoteca para
+const GRAVE_DB = 9 // realce de graves da música durante a festa
 
 // cor do arco-íris para a fase k (0..1)
 const arcoIris = (k) => Phaser.Display.Color.HSVToRGB(((k % 1) + 1) % 1, 0.75, 1).color
@@ -170,6 +172,7 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
   }
 
   function encerrar() {
+    if (ativo) reforcarGrave(0)
     ativo = false
     desligar()
     for (const o of [...vivos]) {
@@ -191,6 +194,7 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
       batida = 0
       proximoBalao = [entre(300, 700), entre(600, 1000)]
       tocar(arena, 'festa')
+      reforcarGrave(GRAVE_DB)
       proximoSom = SOM_MS
       criarBola()
       criarHolofotes()

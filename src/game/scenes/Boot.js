@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { ASSETS } from '../assets.js'
 import { gerarTexturas } from '../arte/texturas.js'
+import { IMAGENS_SUPER, SONS_SUPER } from '../pvp/super/sprites/index.js'
 
 // Carrega os arquivos que estiverem no manifesto (assets.js), gera por
 // código o resto e espera a fonte pixelada antes de começar
@@ -12,6 +13,12 @@ export default class Boot extends Phaser.Scene {
   preload() {
     for (const [chave, arquivo] of Object.entries(ASSETS.texturas)) if (arquivo) this.load.image(chave, arquivo)
     for (const [nome, arquivo] of Object.entries(ASSETS.sons)) if (arquivo) this.load.audio(`som-${nome}`, arquivo)
+    // cartas SUPER (pvp/super/sprites/<personagem>.js)
+    for (const { chave, arquivo, quadro } of IMAGENS_SUPER) {
+      if (quadro) this.load.spritesheet(chave, arquivo, { frameWidth: quadro.largura, frameHeight: quadro.altura })
+      else this.load.image(chave, arquivo)
+    }
+    for (const { nome, arquivo } of SONS_SUPER) this.load.audio(`som-${nome}`, arquivo)
     // .mid não passa pelo Phaser: quem toca é game/midi.js
     for (const [nome, arquivo] of Object.entries(ASSETS.musicas)) if (arquivo && !/\.midi?$/i.test(arquivo)) this.load.audio(`musica-${nome}`, arquivo)
   }

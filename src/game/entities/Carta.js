@@ -14,12 +14,13 @@ import { shake } from '../effects/shake.js'
 //     id,          identificador único da carta no baralho
 //     personagem,  id em data/personagens.js (cor da faixa e do verso)
 //     naipe,       'espadas' | 'copas' | 'ouros' | 'paus'
-//     valor,       1..13 (1 = Ás, 11 = J, 12 = Q, 13 = K)
+//     valor,       1..13 (1 = Ás, 11 = J, 12 = Q, 13 = K) ou 14 (SUPER ★)
 //     nome,        nome da habilidade (aparece na faixa de baixo)
 //     descricao,   texto do efeito (aparece na legenda da carta ampliada)
 //     custo,       energia (gema no canto superior direito)
 //   }
-//   Rótulos: A, 2..10, J, Q, K. Naipe = tipo da carta:
+//   Rótulos: A, 2..10, J, Q, K, ★ (SUPER: moldura arco-íris, estrela e a
+//   palavra SUPER no miolo, brilhos coloridos). Naipe = tipo da carta:
 //     ♠ espadas ataque   ♦ ouros controle   ♣ paus armadilha   ♥ copas suporte
 //   Copas e ouros são vermelhos; espadas e paus, escuros.
 //
@@ -43,7 +44,7 @@ import { shake } from '../effects/shake.js'
 //   ampliada     número: já nasce ampliada nesse fator, com a legenda visível
 //   foco         { subida, escala } do estado com o cursor em cima (em px da carta base)
 
-export const ROTULOS = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }
+export const ROTULOS = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K', 14: '★' }
 export const rotuloValor = (valor) => ROTULOS[valor] ?? String(valor)
 export const TIPOS = { espadas: 'ATAQUE', ouros: 'CONTROLE', paus: 'ARMADILHA', copas: 'SUPORTE' }
 export const SIMBOLOS = { espadas: '♠', copas: '♥', ouros: '♦', paus: '♣' }
@@ -69,6 +70,9 @@ const corBrilhoNaipe = (naipe) => (naipe === 'copas' || naipe === 'ouros' ? 0xff
 // Profundidades usadas pela carta fora da mão
 const PROF = { voo: 90, impacto: 95 }
 const TAU = Math.PI * 2
+const VALOR_SUPER = 14
+// faixas da moldura arco-íris da carta SUPER (de fora para dentro) e cores dos brilhos
+const ARCO_IRIS = [0xff4a5a, 0xffa23a, 0xffe14a, 0x5ae06a, 0x4ab8ff, 0xa66bff]
 const BASE = 70 // largura de referência: todas as medidas abaixo são em "u" (largura / 70)
 
 // ---------- formas de naipe (vetoriais: nítidas em qualquer escala) ----------
@@ -147,6 +151,15 @@ function pontosEstrela(r) {
   })
 }
 
+// Estrela de 5 pontas com ponta para cima (carta SUPER)
+function pontosEstrela5(r) {
+  return Array.from({ length: 10 }, (_, i) => {
+    const raio = i % 2 ? r * 0.45 : r
+    const a = -Math.PI / 2 + (i * Math.PI) / 5
+    return { x: Math.cos(a) * raio, y: Math.sin(a) * raio }
+  })
+}
+
 // mistura duas cores 0xRRGGBB (t = 0 -> a, 1 -> b)
 function misturar(a, b, t) {
   const ca = Phaser.Display.Color.IntegerToColor(a)
@@ -173,6 +186,7 @@ export default class Carta extends Phaser.GameObjects.Container {
     this.mao = null // Mao dona da carta (preenchido por Mao)
     this._escala = 1 // escala do corpo (o flip mexe só no scaleX)
     this._virando = false
+    this.super = dados.valor === VALOR_SUPER
     this.especial = dados.valor === 1 || dados.valor >= 11
 
     scene.textures.get('carta-brilho')?.setFilter(Phaser.Textures.FilterMode.LINEAR)
@@ -235,13 +249,22 @@ export default class Carta extends Phaser.GameObjects.Container {
     g.fillRoundedRect(-hw, -hh, w, h, 6 * u)
     g.fillStyle(CORES_CARTA.papel, 1)
     g.fillRoundedRect(-hw + 1.2 * u, -hh + 1.2 * u, w - 2.4 * u, h - 2.4 * u, 5 * u)
-    // fio interno
-    g.lineStyle(0.8 * u, CORES_CARTA.papelSombra, 1)
-    g.strokeRoundedRect(-hw + 3.2 * u, -hh + 3.2 * u, w - 6.4 * u, h - 6.4 * u, 3.5 * u)
+    // fio interno (SUPER: moldura arco-íris)
+    if (this.super) {
+      ARCO_IRIS.forEach((c, i) => {
+        g.lineStyle(0.75 * u, c, 1)
+        const d = (1.6 + i * 0.7) * u
+        g.strokeRoundedRect(-hw + d, -hh + d, w - d * 2, h - d * 2, Math.max(1, 5 * u - i * 0.4 * u))
+      })
+    } else {
+      g.lineStyle(0.8 * u, CORES_CARTA.papelSombra, 1)
+      g.strokeRoundedRect(-hw + 3.2 * u, -hh + 3.2 * u, w - 6.4 * u, h - 6.4 * u, 3.5 * u)
+    }
 
-    // miolo: figura, Ás ou naipes
+    // miolo: SUPER, figura, Ás ou naipes
     const cy = -7 * u
-    if (dados.valor === 1) this.desenharAs(g, cy)
+    if (this.super) this.desenharSuper(g, cy)
+    else if (dados.valor === 1) this.desenharAs(g, cy)
     else if (dados.valor >= 11) this.desenharFigura(g, cy)
     else this.desenharPips(g, cy)
 
@@ -268,6 +291,16 @@ export default class Carta extends Phaser.GameObjects.Container {
     const tamRotulo = (rotulo.length > 1 ? 10.5 : 12.5) * u
     const cx = hw - 8 * u
     for (const lado of [-1, 1]) {
+      if (this.super) {
+        // SUPER: estrela dourada no lugar do valor e do naipe
+        const sx = cx * lado
+        const sy = (hh - 12 * u) * lado
+        g.fillStyle(CORES_CARTA.ouroEscuro, 1)
+        g.fillPoints(pontosEstrela5(6.4 * u).map((p) => ({ x: sx + p.x, y: sy + p.y * lado })), true)
+        g.fillStyle(CORES_CARTA.ouro, 1)
+        g.fillPoints(pontosEstrela5(5.2 * u).map((p) => ({ x: sx + p.x, y: sy + p.y * lado })), true)
+        continue
+      }
       const t = this.texto(cx * lado, (hh - 3 * u) * lado, rotulo, tamRotulo, corHex, { stroke: corHex, strokeThickness: 0.6 * u })
       t.setOrigin(0.5, 0).setRotation(lado === 1 ? Math.PI : 0)
       this.frente.add(t)
@@ -392,6 +425,76 @@ export default class Carta extends Phaser.GameObjects.Container {
     desenharNaipe(g, dados.naipe, 0, cy + 8 * u, 9.6 * u, cor)
     g.fillStyle(0xffffff, 0.3)
     g.fillEllipse(-3 * u, cy + 4 * u, 3 * u, 5 * u)
+  }
+
+  // SUPER: janela "cósmica" com raios arco-íris, estrela grande dourada na cor
+  // do personagem e a palavra SUPER embaixo
+  desenharSuper(g, cy) {
+    const { u } = this
+    const x0 = -22 * u
+    const y0 = cy - 25 * u
+    const fw = 44 * u
+    const fh = 47 * u
+    const cx = 0
+    const sy = cy - 5 * u
+    g.fillStyle(0x140c26, 1)
+    g.fillRect(x0, y0, fw, fh)
+    // arte própria do personagem (pvp/super/sprites/<personagem>.js, chave super-<personagem>-carta):
+    // ocupa a janela inteira (proporção 44x47) e ganha só a moldura e a palavra SUPER por cima
+    const arte = `super-${this.dados.personagem}-carta`
+    if (this.scene.textures.exists(arte)) {
+      const img = this.scene.add.image(cx, y0 + fh / 2, arte)
+      img.setScale(Math.min(fw / img.width, fh / img.height))
+      const moldura = this.scene.add.graphics()
+      moldura.lineStyle(1.4 * u, CORES_CARTA.ouro, 1)
+      moldura.strokeRect(x0, y0, fw, fh)
+      moldura.lineStyle(0.6 * u, CORES_CARTA.ouroEscuro, 1)
+      moldura.strokeRect(x0 + 2 * u, y0 + 2 * u, fw - 4 * u, fh - 4 * u)
+      const palavra = this.texto(cx, y0 + fh - 7.5 * u, 'SUPER', 9.5 * u, '#ffe14a', { stroke: '#5a2a00', strokeThickness: 2.2 * u }).setOrigin(0.5)
+      this.frente.add([img, moldura, palavra])
+      return
+    }
+    // raios arco-íris saindo da estrela (recortados na janela pelo comprimento)
+    const raios = 18
+    for (let i = 0; i < raios; i++) {
+      const a = (i * TAU) / raios
+      const l = 30 * u
+      const larg = 0.09
+      const pts = [
+        { x: cx, y: sy },
+        { x: cx + Math.cos(a - larg) * l, y: sy + Math.sin(a - larg) * l },
+        { x: cx + Math.cos(a + larg) * l, y: sy + Math.sin(a + larg) * l },
+      ].map((p) => ({ x: Phaser.Math.Clamp(p.x, x0, x0 + fw), y: Phaser.Math.Clamp(p.y, y0, y0 + fh) }))
+      g.fillStyle(ARCO_IRIS[i % ARCO_IRIS.length], 0.35)
+      g.fillPoints(pts, true)
+    }
+    // estrelinhas do fundo
+    for (const [px, py, r] of [[-17, -21, 1], [15, -19, 1.3], [-14, 12, 1.1], [17, 9, 0.9], [-6, -23, 0.7], [8, 15, 0.8]]) {
+      g.fillStyle(0xffffff, 0.85)
+      g.fillPoints(pontosEstrela(r * 2.2 * u).map((p) => ({ x: p.x + px * u, y: p.y + cy + py * u })), true)
+    }
+    // halo na cor do personagem
+    g.fillStyle(this.corPersonagem, 0.35)
+    g.fillCircle(cx, sy, 15 * u)
+    g.fillStyle(this.corPersonagem, 0.25)
+    g.fillCircle(cx, sy, 19 * u)
+    // estrela grande: contorno escuro, ouro e reflexo
+    g.fillStyle(CORES_CARTA.ouroEscuro, 1)
+    g.fillPoints(pontosEstrela5(15 * u).map((p) => ({ x: cx + p.x, y: sy + p.y })), true)
+    g.fillStyle(CORES_CARTA.ouro, 1)
+    g.fillPoints(pontosEstrela5(13.2 * u).map((p) => ({ x: cx + p.x, y: sy + p.y })), true)
+    g.fillStyle(CORES_CARTA.ouroClaro, 1)
+    g.fillPoints(pontosEstrela5(7 * u).map((p) => ({ x: cx + p.x, y: sy + p.y })), true)
+    g.fillStyle(this.corPersonagem, 1)
+    g.fillCircle(cx, sy + 0.5 * u, 2.4 * u)
+    // moldura dupla dourada
+    g.lineStyle(1.4 * u, CORES_CARTA.ouro, 1)
+    g.strokeRect(x0, y0, fw, fh)
+    g.lineStyle(0.6 * u, CORES_CARTA.ouroEscuro, 1)
+    g.strokeRect(x0 + 2 * u, y0 + 2 * u, fw - 4 * u, fh - 4 * u)
+    // SUPER
+    const palavra = this.texto(cx, y0 + fh - 7.5 * u, 'SUPER', 9.5 * u, '#ffe14a', { stroke: '#5a2a00', strokeThickness: 2.2 * u }).setOrigin(0.5)
+    this.frente.add(palavra)
   }
 
   desenharEmblema(g, x, y, cor) {
@@ -525,7 +628,8 @@ export default class Carta extends Phaser.GameObjects.Container {
     const c = this.scene.add.container(0, this.altura / 2 + 5 * u).setAlpha(0).setVisible(false)
     const cor = corDoNaipe(dados.naipe)
     const corClara = '#' + corBrilhoNaipe(dados.naipe).toString(16).padStart(6, '0')
-    const tipo = this.texto(0, 3 * u, `${SIMBOLOS[dados.naipe] ?? ''} ${TIPOS[dados.naipe] ?? ''} · ${rotuloValor(dados.valor)}`, 5 * u, corClara).setOrigin(0.5, 0)
+    const rotuloTipo = this.super ? '★ SUPER · imparável' : `${SIMBOLOS[dados.naipe] ?? ''} ${TIPOS[dados.naipe] ?? ''} · ${rotuloValor(dados.valor)}`
+    const tipo = this.texto(0, 3 * u, rotuloTipo, 5 * u, this.super ? '#ffe14a' : corClara).setOrigin(0.5, 0)
     const desc = this.texto(0, 10 * u, dados.descricao ?? '', 4.6 * u, '#ffffff', {
       align: 'center',
       wordWrap: { width: largura - 8 * u, useAdvancedWrap: true },
@@ -535,7 +639,7 @@ export default class Carta extends Phaser.GameObjects.Container {
     const g = this.scene.add.graphics()
     g.fillStyle(0x0b0914, 0.94)
     g.fillRoundedRect(-largura / 2, 0, largura, altura, 3 * u)
-    g.lineStyle(0.8 * u, cor === CORES_CARTA.vermelho ? 0xff5a70 : 0x9a8ad8, 1)
+    g.lineStyle(0.8 * u, this.super ? CORES_CARTA.ouro : cor === CORES_CARTA.vermelho ? 0xff5a70 : 0x9a8ad8, 1)
     g.strokeRoundedRect(-largura / 2, 0, largura, altura, 3 * u)
     c.add([g, tipo, desc])
     this.corpo.add(c)
@@ -547,13 +651,14 @@ export default class Carta extends Phaser.GameObjects.Container {
   iniciarBrilhos() {
     const { u } = this
     const ouro = this.dados.valor === 1 ? 0xffffff : CORES_CARTA.ouroClaro
+    let k = 0
     this.timerBrilhos = this.scene.time.addEvent({
-      delay: this.dados.valor === 1 ? 260 : 420,
+      delay: this.super ? 170 : this.dados.valor === 1 ? 260 : 420,
       loop: true,
       callback: () => {
         if (!this.visible || this.virada || !this.scene) return
         const g = this.scene.add.graphics()
-        g.fillStyle(ouro, 1)
+        g.fillStyle(this.super ? ARCO_IRIS[k++ % ARCO_IRIS.length] : ouro, 1)
         g.fillPoints(pontosEstrela(3.2 * u), true)
         g.setPosition(Phaser.Math.FloatBetween(-24, 24) * u, Phaser.Math.FloatBetween(-34, 18) * u)
         g.setScale(0).setBlendMode(Phaser.BlendModes.ADD)
@@ -582,6 +687,21 @@ export default class Carta extends Phaser.GameObjects.Container {
       this.pulso = this.scene.tweens.add({ targets: this.brilho, scale: this.brilho.scale * 1.05, duration: 420, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
     } else if (this.especial && !this.virada && !this.indisponivel) {
       const as = this.dados.valor === 1
+      if (this.super) {
+        // SUPER: brilho forte que passeia pelas cores do arco-íris
+        this.brilho.setTint(ARCO_IRIS[0]).setAlpha(0.5)
+        let i = 0
+        this.pulso = this.scene.tweens.add({
+          targets: this.brilho,
+          alpha: 0.95,
+          duration: 380,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+          onYoyo: () => this.brilho.setTint(ARCO_IRIS[++i % ARCO_IRIS.length]),
+        })
+        return
+      }
       this.brilho.setTint(as ? 0xfff2c0 : CORES_CARTA.ouro)
       this.brilho.setAlpha(as ? 0.35 : 0.15)
       this.pulso = this.scene.tweens.add({ targets: this.brilho, alpha: as ? 0.75 : 0.4, duration: as ? 520 : 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })

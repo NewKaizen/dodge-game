@@ -5,7 +5,7 @@
 // Formato da carta (o visual e as regras contam com exatamente estes campos):
 //   { id, personagem, naipe, valor, nome, descricao, custo }
 //   naipe: 'espadas' | 'copas' | 'ouros' | 'paus'
-//   valor: 1..13 (1 = Ás, 11 = J, 12 = Q, 13 = K)
+//   valor: 1..14 (1 = Ás, 11 = J, 12 = Q, 13 = K, 14 = SUPER)
 //   id:    '<personagem>-<naipe>-<valor>' (ex.: 'kris-espadas-7')
 //
 // Naipe = tipo de carta:
@@ -16,6 +16,8 @@
 //              manda só um ataque fraquinho para o adversário
 // Valor = força: quanto maior, mais rápido, denso e longo (4 a 7 s) e mais dano.
 // Ás = carta especial (um por naipe em todo baralho; ver ESPECIAIS e regras.js).
+// SUPER (valor 14, ★) = uma por baralho: ataque exclusivo do personagem, custa 10
+// (a energia máxima), imparável (♦ Anular não cancela, ♠ Espelho não reflete).
 
 // ---------- tabelas gerais ----------
 
@@ -24,12 +26,24 @@ export const SIMBOLOS = { espadas: '♠', copas: '♥', ouros: '♦', paus: '♣
 export const PERSONAGENS_PVP = ['kris', 'susie', 'ralsei', 'noelle', 'berdly', 'dess', 'asriel']
 
 // Custo em energia por valor: 2-4 barato, 5-8 médio, 9-10/J alto, Q/K muito alto, Ás especial
-export const CUSTOS = { 1: 3, 2: 1, 3: 1, 4: 1, 5: 2, 6: 2, 7: 2, 8: 2, 9: 3, 10: 3, 11: 3, 12: 4, 13: 5 }
+export const CUSTOS = { 1: 3, 2: 1, 3: 1, 4: 1, 5: 2, 6: 2, 7: 2, 8: 2, 9: 3, 10: 3, 11: 3, 12: 4, 13: 5, 14: 10 }
 export const custoDoValor = (valor) => CUSTOS[valor] ?? 99
 
 export function nomeDoValor(valor) {
-  return { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }[valor] ?? String(valor)
+  return { 1: 'A', 11: 'J', 12: 'Q', 13: 'K', 14: '★' }[valor] ?? String(valor)
 }
+
+// Carta SUPER: uma por baralho (id '<personagem>-espadas-14'), sai na compra normal.
+// Custa a energia máxima e é imparável (ver resolverRodada em regras.js).
+export const SUPER = { valor: 14, custo: 10 }
+export function ehSuper(carta) {
+  return carta?.valor === SUPER.valor
+}
+// Dano por bala do SUPER (já com DIFICULDADE_PVP.dano; o mesmo de um K♠)
+const DANO_SUPER = 13
+// Cada SUPER tem 3 fases de FASE_SUPER ms ativos (~9 s no total, mais os respiros)
+const FASE_SUPER = 3000
+const fs = (o = {}) => ({ duracao: FASE_SUPER, ...o })
 
 // Os quatro Ases especiais (mesmo efeito em todo personagem, nome temático muda)
 //   espelho          ♠ o ataque que o adversário jogou volta para a caixa DELE
@@ -196,6 +210,8 @@ const TEXTOS = {
 //   hp          HP de reserva caso PERSONAGENS (data/personagens.js) não tenha o personagem
 //   principal   padrão usado pelos Ases que mandam ataque ({ espadas, ouros, paus })
 //   leve        ataque fraquinho das cartas de copas
+//   super       { nome, texto, criar(A) } -> a carta SUPER ('<personagem>-espadas-14'),
+//               3 fases de ~3 s com força 1 (padrões de P com duracao: FASE_SUPER)
 //   receitas    { chave: { texto, criar(A, t) } } -> ataques próprios
 //   cartas      [naipe, valor, nome, receita | efeitos de copas, extras?]
 //               extras: { inverter: ms }  (controles invertidos na caixa do adversário;
@@ -220,6 +236,11 @@ const BARALHOS = {
       formacao: r('Lasers alternados numa caixa apertada', (A, t) => apertar(A, t, P.lasers(A, t, { orientacao: 'alternar', quantidade: 1 }))),
       alma: r('Rajadas miradas numa caixa apertada', (A, t) => apertar(A, t, P.mira(A, t))),
       emboscada: r('Forcado e chão rachado', (A, t) => A.juntos(P.forcado(A, t, { esparso: 1.4 }), P.rachaduras(A, t, { esparso: 1.9, ramos: 3 }))),
+    },
+    super: {
+      nome: 'Alma Determinada',
+      texto: 'Estocadas com colunas de espada, lasers alternados numa caixa apertada e o forcado com rajadas miradas',
+      criar: (A) => A.superKris()
     },
     cartas: [
       ['espadas', 1, 'Reflexo da Lâmina'],
@@ -259,6 +280,11 @@ const BARALHOS = {
         A.sequencia(P.colunas(A, t, { duracao: metade(t) }), P.foice(A, t, { duracao: metade(t), varridas: 2, aviso: 600, avisoVolta: 450, faiscas: 3 }))),
       dinamite: r('Bombas e chão rachado', (A, t) => A.juntos(P.bombas(A, t, { esparso: 1.4 }), P.rachaduras(A, t, { esparso: 1.6 }))),
     },
+    super: {
+      nome: 'Machado Colossal',
+      texto: 'Pisões, o machado gigante com faíscas e a dinamite que racha o chão',
+      criar: (A) => A.superSusie()
+    },
     cartas: [
       ['espadas', 1, 'Revide Selvagem'],
       ['espadas', 2, 'Cabeçada', 'colunas'],
@@ -292,6 +318,11 @@ const BARALHOS = {
       ninar: r('Carrossel lento numa caixa apertada', (A, t) => apertar(A, t, P.carrossel(A, t * 0.5))),
       sono: r('Anéis numa caixa apertada', (A, t) => apertar(A, t, P.anel(A, t, { mirar: 0.2 }))),
       laco: r('Divisores e anel', (A, t) => A.juntos(P.divisores(A, t, { esparso: 1.3 }), P.anel(A, t, { esparso: 1.6 }))),
+    },
+    super: {
+      nome: 'Valsa Real',
+      texto: 'Carrossel de anéis, anel com projéteis que se dividem e uma espiral de copas',
+      criar: (A) => A.superRalsei()
     },
     cartas: [
       ['espadas', 1, 'Lição Invertida'],
@@ -329,6 +360,11 @@ const BARALHOS = {
       inverno: r('Raios de gelo cruzados numa caixa apertada', (A, t) => apertar(A, t, P.lasers(A, t, { orientacao: 'alternar' }))),
       pingentes: r('Pingentes de gelo despencam', (A, t) => P.colunas(A, t, { forma: 'losango' })),
       avalanche: r('Pingentes e neve', (A, t) => A.juntos(P.colunas(A, t, { esparso: 1.4, forma: 'losango' }), P.neve(A, t, { esparso: 1.8, caixa: null }))),
+    },
+    super: {
+      nome: 'Inverno Absoluto',
+      texto: 'Neve em cascata, raios de gelo verticais e pingentes com um anel de gelo',
+      criar: (A) => A.superNoelle()
     },
     cartas: [
       ['espadas', 1, 'Espelho de Gelo'],
@@ -368,6 +404,11 @@ const BARALHOS = {
       corrente: r('Paredes de vento vindo da esquerda', (A, t) => P.ondas(A, t, { direcao: 'direita' })),
       ciclone: r('Paredes de vento que descem', (A, t) => P.ondas(A, t, { direcao: 'baixo', abertura: 72 })),
     },
+    super: {
+      nome: 'Furacão Genial',
+      texto: 'Vento da esquerda, estocadas numa caixa apertada e lasers em cruz com rajadas miradas',
+      criar: (A) => A.superBerdly()
+    },
     cartas: [
       ['espadas', 1, 'Réplica Brilhante'],
       ['espadas', 3, 'Bicada', 'mira'],
@@ -405,6 +446,11 @@ const BARALHOS = {
       amplificador: r('Paredes sonoras que descem', (A, t) => P.ondas(A, t, { direcao: 'baixo', abertura: 72 })),
       palco: r('Bombas e ondas sonoras', (A, t) => A.juntos(P.bombas(A, t, { esparso: 1.4 }), P.ondas(A, t, { esparso: 1.6 }))),
     },
+    super: {
+      nome: 'Turnê Final',
+      texto: 'Ondas sonoras, bolas rebatidas e o palco explosivo',
+      criar: (A) => A.superDess()
+    },
     cartas: [
       ['espadas', 1, 'Rebatida'],
       ['espadas', 2, 'Nota Solta', 'quicantes'],
@@ -428,7 +474,8 @@ const BARALHOS = {
     ],
   },
 
-  // Asriel: equilibrado, cheio de figuras. Estrelas, espadas do caos, galáxias.
+  // Asriel: equilibrado, com mais figuras que os outros (6; eram 12 antes do
+  // balanceamento de 2026-10-02). Estrelas, espadas do caos, galáxias.
   asriel: {
     tema: { formas: ['losango', 'copas', 'bola'], cores: { losango: 0xfff07a, copas: 0xff8ad8, bola: 0x9ad8ff, barra: 0xffffff }, cor: 0xfff07a },
     hp: 95,
@@ -437,36 +484,42 @@ const BARALHOS = {
     receitas: {
       buster: r('Lâmina do caos vai e volta, depois chuva de estrelas', (A, t) =>
         A.sequencia(P.foice(A, t, { duracao: metade(t), varridas: 2, aviso: 600, avisoVolta: 450 }), P.chuva(A, t, { duracao: metade(t) }))),
-      goner: r('Espiral de estrelas com chuva', (A, t) => A.juntos(P.espiral(A, t, { esparso: 1.3 }), P.chuva(A, t, { esparso: 2.2, caixa: null }))),
+      goner: r('Espiral de estrelas com chuva', (A, t) => A.juntos(P.espiral(A, t, { esparso: 1.5 }), P.chuva(A, t, { esparso: 2.6, caixa: null }))),
       shocker: r('Raios verticais numa caixa apertada', (A, t) => apertar(A, t, P.lasers(A, t, { orientacao: 'vertical', quantidade: 1 }))),
       tempo: r('Espiral que inverte com rajadas miradas numa caixa apertada', (A, t) =>
-        apertar(A, t * 0.6, A.juntos(P.espiral(A, t * 0.6, { esparso: 1.3, caixa: null }), P.mira(A, t, { esparso: 2.2, caixa: null, rajada: 2 })))),
-      final: r('Estrelas miradas, cruz giratória e colapso que explode', (A, t) => apertar(A, t * 0.3, P.caosFinal(A, t))),
+        apertar(A, t * 0.6, A.juntos(P.espiral(A, t * 0.6, { esparso: 1.5, caixa: null }), P.mira(A, t, { esparso: 2.6, caixa: null, rajada: 2 })))),
+      final: r('Estrelas miradas, cruz giratória e colapso que explode', (A, t) => apertar(A, t * 0.3, P.caosFinal(A, t, { esparso: 1.2 }))),
       meteoros: r('Bombas com chuva de estrelas', (A, t) => A.juntos(P.bombas(A, t, { esparso: 1.3 }), P.chuva(A, t, { esparso: 2, caixa: null }))),
       raio: r('Lasers em cruz', (A, t) => P.lasers(A, t, { orientacao: 'cruz', intervalo: lerp(1500, 1250, t) })),
       supernova: r('Bombas e projéteis que se dividem', (A, t) => A.juntos(P.bombas(A, t, { esparso: 1.3 }), P.divisores(A, t, { esparso: 1.5 }))),
     },
+    // a 3ª fase é o Caos Final encurtado (o colapso ainda explode: fica com 50% do tempo)
+    super: {
+      nome: 'Supernova Arco-Íris',
+      texto: 'Chuva de estrelas, espiral com chuva e o Caos Final',
+      criar: (A) => A.superAsriel()
+    },
     cartas: [
       ['espadas', 1, 'Hiper Espelho'],
-      ['espadas', 6, 'Star Blazing', 'chuva'],
-      ['espadas', 11, 'Chaos Saber', 'foice'],
-      ['espadas', 12, 'Chaos Buster', 'buster'],
+      ['espadas', 4, 'Star Blazing', 'chuva'],
+      ['espadas', 8, 'Chaos Saber', 'foice'],
+      ['espadas', 11, 'Chaos Buster', 'buster'],
       ['espadas', 13, 'Hyper Goner', 'goner'],
       ['ouros', 1, 'Apagar'],
-      ['ouros', 5, 'Shocker Breaker', 'shocker'],
-      ['ouros', 11, 'Galáxia', 'carrossel'],
+      ['ouros', 3, 'Shocker Breaker', 'shocker'],
+      ['ouros', 7, 'Galáxia', 'carrossel'],
       ['ouros', 12, 'Tempo Parado', 'tempo', { inverter: 1500 }],
       ['ouros', 13, 'Caos Final', 'final', { inverter: 2000 }],
       ['paus', 1, 'Pegar Alma'],
       ['paus', 4, 'Estrela Cadente', 'bombas'],
-      ['paus', 11, 'Chuva de Meteoros', 'meteoros'],
-      ['paus', 12, 'Raio Caótico', 'raio'],
+      ['paus', 8, 'Chuva de Meteoros', 'meteoros'],
+      ['paus', 10, 'Raio Caótico', 'raio'],
       ['paus', 13, 'Supernova', 'supernova'],
       ['copas', 1, 'Salvar'],
-      ['copas', 7, 'Lembrança', ['cura']],
-      ['copas', 11, 'Amizade', ['escudo', 'energia']],
-      ['copas', 12, 'Esperança', ['cura', 'compra']],
-      ['copas', 13, 'Sonho', ['cura', 'escudo', 'energia']],
+      ['copas', 5, 'Lembrança', ['cura']],
+      ['copas', 8, 'Amizade', ['escudo', 'energia']],
+      ['copas', 10, 'Esperança', ['cura', 'compra']],
+      ['copas', 12, 'Sonho', ['cura', 'escudo']],
     ],
   },
 }
@@ -487,7 +540,7 @@ const idDe = (personagem, naipe, valor) => `${personagem}-${naipe}-${valor}`
 
 function montar(personagem) {
   const def = BARALHOS[personagem]
-  return def.cartas.map(([naipe, valor, nome, receita, extras = {}]) => {
+  const normais = def.cartas.map(([naipe, valor, nome, receita, extras = {}]) => {
     const id = idDe(personagem, naipe, valor)
     const especial = valor === 1 ? ESPECIAIS[naipe] : null
     let descricao
@@ -506,11 +559,23 @@ function montar(personagem) {
     DETALHES[id] = { receita: especial ? null : naipe === 'copas' ? null : receita, efeitos, especial, inverter: extras.inverter ?? 0 }
     return { id, personagem, naipe, valor, nome, descricao, custo: custoDoValor(valor) }
   })
+  // a carta SUPER entra no baralho como as outras
+  const id = idDe(personagem, 'espadas', SUPER.valor)
+  DETALHES[id] = { receita: null, efeitos: null, especial: null, inverter: 0, super: true }
+  const superCarta = { id, personagem, naipe: 'espadas', valor: SUPER.valor, nome: def.super.nome, descricao: `SUPER: ${def.super.texto}. Imparável: não pode ser anulada nem refletida.`, custo: SUPER.custo }
+  return [...normais, superCarta]
 }
 
 export const CARTAS = Object.fromEntries(Object.keys(BARALHOS).map((p) => [p, montar(p)]))
 export const TEMAS = Object.fromEntries(Object.entries(BARALHOS).map(([p, def]) => [p, def.tema]))
 export const HP_RESERVA = Object.fromEntries(Object.entries(BARALHOS).map(([p, def]) => [p, def.hp]))
+
+// { nome, descricao, cor } da carta SUPER do personagem (cor = cor do tema do baralho)
+export function superDoPersonagem(personagem) {
+  const carta = CARTAS[personagem]?.find(ehSuper)
+  if (!carta) throw new Error(`personagem sem baralho: ${personagem}`)
+  return { nome: carta.nome, descricao: carta.descricao, cor: BARALHOS[personagem].tema.cor }
+}
 
 export function cartasDoPersonagem(personagem) {
   const lista = CARTAS[personagem]
@@ -531,8 +596,9 @@ export function efeitosDaCarta(carta) {
 // ---------- carta -> ataque ----------
 
 // Dano de cada bala do ataque da carta (antes do escudo de quem recebe)
-//   com DIFICULDADE_PVP.dano 1,3: espadas 4..13, paus 4..12, ouros 4..10, copas 3
+//   com DIFICULDADE_PVP.dano 1,3: espadas 4..13, paus 4..12, ouros 4..10, copas 3, SUPER 13
 export function danoDaCarta(carta) {
+  if (ehSuper(carta)) return DANO_SUPER
   const especial = especialDaCarta(carta)
   const valor = especial ? VALOR_DO_ESPECIAL[especial] ?? 0 : carta.valor
   const naipe = especial === 'espelho' ? 'espadas' : carta.naipe
@@ -569,7 +635,9 @@ export function ataqueDaCarta(carta, contexto = {}) {
 
   let ataque
   if (det.especial === 'segundaChance') return null
-  if (det.especial) {
+  if (det.super) {
+    ataque = def.super.criar(A)
+  } else if (det.especial) {
     const naipe = det.especial === 'espelho' ? 'espadas' : carta.naipe
     ataque = criarReceita(A, def, def.principal[naipe], forca(VALOR_DO_ESPECIAL[det.especial]))
   } else if (carta.naipe === 'copas') {

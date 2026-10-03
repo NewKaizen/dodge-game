@@ -16,13 +16,14 @@
 //   acelera tudo a cada 5 rodadas (fatorAceleracao(estado.rodada))
 //   ... os dois desviam; a cena chama aplicarDano(estado, j, dano) a cada acerto
 //   ... e registrarGrazes(estado, j, n) para a energia dos grazes
+//   ... e registrarPerfeito(estado, j, caixa.carta) quando j passa por um ataque sem levar dano
 //   fimDaRodada(estado)                           -> vencedor ('p1' | 'p2' | 'empate' | null)
 //
 // Jogadores são índices: 0 = P1, 1 = P2.
 
 import { PERSONAGENS } from '../data/personagens.js'
 import { criarBaralho, completarMao, comprar, descartar, tirarDaMao, cartaNaMao, criarRng, inteiro, MAO } from './baralho.js'
-import { CUSTOS, HP_RESERVA, especialDaCarta, efeitosDaCarta, resumoDoAtaque } from './cartas.js'
+import { CUSTOS, HP_RESERVA, especialDaCarta, efeitosDaCarta, resumoDoAtaque, ehSuper } from './cartas.js'
 
 export { CUSTOS, custoDoValor } from './cartas.js'
 
@@ -35,15 +36,17 @@ export { CUSTOS, custoDoValor } from './cartas.js'
 export const ENERGIA = { inicial: 3, porRodada: 2, maxima: 10, grazesPorPonto: 5, passar: 1 }
 
 // fatorHp multiplica o HP de PERSONAGENS (ou HP_RESERVA de cartas.js) no PvP
+// ajusteHp: multiplicador extra por personagem, só no PvP (balanceamento sem mexer no co-op)
+//   asriel 0,9: 100 -> 90 HP (o baralho dele já era o mais forte)
 // segundaChance: fração do HP máximo curada pelo Ás de copas
-export const PVP = { fatorHp: 1, segundaChance: 0.25 }
+export const PVP = { fatorHp: 1, ajusteHp: { asriel: 0.9 }, segundaChance: 0.25 }
 
 export const ID_JOGADOR = ['p1', 'p2']
 const outro = (j) => 1 - j
 
 export function hpInicial(personagem) {
   const base = PERSONAGENS[personagem]?.hp ?? HP_RESERVA[personagem] ?? 100
-  return Math.round(base * PVP.fatorHp)
+  return Math.round(base * PVP.fatorHp * (PVP.ajusteHp[personagem] ?? 1))
 }
 
 // ---------- partida ----------
@@ -119,6 +122,8 @@ const mandaAtaque = (carta) => carta && especialDaCarta(carta) !== 'segundaChanc
 //      ataque do outro para a caixa dele (sem nada para devolver, manda um eco)
 //   5. o escudo de quem recebe reduz o dano por bala daquele ataque (e é gasto)
 //   6. ♣ Roubo pega uma carta sorteada da mão do outro
+// SUPER (valor 14) é imparável: o Anular não cancela e o Espelho não reflete
+// (com Espelho do outro lado, o Espelho manda o eco dele e o SUPER vai normal).
 export function resolverRodada(estado, jogadaP1, jogadaP2) {
   if (estado.vencedor) throw new Error('a partida já acabou')
   const jogadas = [jogadaP1, jogadaP2]
@@ -148,7 +153,7 @@ export function resolverRodada(estado, jogadaP1, jogadaP2) {
   const especiais = cartas.map(especialDaCarta)
 
   // 2. anular
-  const anulada = [0, 1].map((j) => Boolean(cartas[j]) && especiais[outro(j)] === 'anular')
+  const anulada = [0, 1].map((j) => Boolean(cartas[j]) && especiais[outro(j)] === 'anular' && !ehSuper(cartas[j]))
   anulada.forEach((a, j) => a && eventos.push(`${cartas[j].nome} (${ID_JOGADOR[j]}) foi anulada`))
   const valendo = (j) => (cartas[j] && !anulada[j] ? cartas[j] : null)
 
@@ -190,11 +195,11 @@ export function resolverRodada(estado, jogadaP1, jogadaP2) {
     if (especiais[j] === 'espelho') {
       // reflete o ataque do outro (se houver um que dê para refletir); senão, eco
       const doOutro = valendo(adv)
-      if (mandaAtaque(doOutro) && especiais[adv] !== 'espelho') continue // o reflexo é montado pelo outro lado
+      if (mandaAtaque(doOutro) && especiais[adv] !== 'espelho' && !ehSuper(doOutro)) continue // o reflexo é montado pelo outro lado
       caixas[adv] = montarCaixa(carta, j, false)
       continue
     }
-    if (espelho(adv)) {
+    if (espelho(adv) && !ehSuper(carta)) {
       caixas[j] = montarCaixa(carta, j, true) // volta para quem jogou
       eventos.push(`${cartas[adv].nome} devolveu ${carta.nome} para ${ID_JOGADOR[j]}`)
     } else {
@@ -223,7 +228,7 @@ export function resolverRodada(estado, jogadaP1, jogadaP2) {
   estado.fase = 'esquiva'
   const resultado = {
     rodada: estado.rodada,
-    jogadas: cartas.map((c, j) => ({ carta: c, especial: especiais[j], anulada: anulada[j], passou: !c })),
+    jogadas: cartas.map((c, j) => ({ carta: c, especial: especiais[j], anulada: anulada[j], passou: !c, super: ehSuper(c) })),
     caixas,
     efeitos,
     eventos,
@@ -297,6 +302,25 @@ export function registrarGrazes(estado, j, n = 1) {
       ganho++
     }
   }
+  return ganho
+}
+
+// Desvio perfeito (passar por um ataque inteiro sem levar dano): energia pela
+// carta daquele ataque. 2-8 -> 1, 9 a Q -> 2, K e SUPER -> 3, Ás que manda
+// ataque (espelho/eco, anular, roubo) -> 1. Copas e caixa vazia (null) -> 0.
+export function energiaPerfeito(carta) {
+  if (!carta || carta.naipe === 'copas') return 0
+  if (ehSuper(carta) || carta.valor === 13) return 3
+  if (carta.valor === 1) return especialDaCarta(carta) ? 1 : 0
+  if (carta.valor >= 9) return 2
+  return carta.valor >= 2 ? 1 : 0
+}
+
+// Dá a energia do desvio perfeito ao jogador j (respeita ENERGIA.maxima). Devolve a energia ganha de fato.
+export function registrarPerfeito(estado, j, carta) {
+  const jog = estado.jogadores[j]
+  const ganho = Math.max(0, Math.min(energiaPerfeito(carta), ENERGIA.maxima - jog.energia))
+  jog.energia += ganho
   return ganho
 }
 

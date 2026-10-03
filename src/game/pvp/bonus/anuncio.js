@@ -1,12 +1,14 @@
 import { ALTURA, FONTE, LARGURA, corTexto } from '../../constants.js'
-import { tocar } from '../../audio.js'
+import { tocar, abaixarMusica, restaurarMusica } from '../../audio.js'
 import { ignorarNasCaixas } from '../../recorte.js'
 import { shake } from '../../effects/shake.js'
 import { fogoArtificio } from '../../effects/festa.js'
 
-// A revelação do bonus round (~3,3s): a tela escurece, o selo "BONUS ROUND!"
-// cai com tremor e explosões, e uma roleta passa pelos nomes dos eventos,
-// desacelerando até parar no sorteado (brilho na cor dele + descrição).
+// A revelação do bonus round (~3,8s, depois da escolha das cartas): a tela
+// escurece e a música abaixa, o selo "BONUS ROUND!" cai com tremor e
+// explosões, e uma roleta de cassino (bolinha rolando + tiques) passa pelos
+// nomes dos eventos, desacelerando até parar no sorteado (brilho na cor dele
+// + descrição). A música volta ao normal no fim.
 // Resolve quando tudo sumiu. Não deixa nada para trás; se a cena sair no
 // meio (arena.saindo ou shutdown), limpa e resolve na hora.
 //
@@ -17,7 +19,9 @@ const Y_SELO = 150
 const Y_ROLETA = 270
 const Y_DESCRICAO = 316
 const LARGURA_ROLETA = 430
-const GIROS = 12 // nomes que passam na roleta (o último é o sorteado)
+const GIROS = 16 // nomes que passam na roleta (o último é o sorteado)
+// ms que o nome k fica na roleta (começa rápido e desacelera)
+const tempoDoGiro = (k) => 38 + 250 * (k / (GIROS - 1)) ** 2.2
 
 export async function anunciarBonus(arena, evento, { eventos = [evento], rng = Math.random } = {}) {
   const objetos = []
@@ -70,6 +74,7 @@ export async function anunciarBonus(arena, evento, { eventos = [evento], rng = M
   try {
     // ---------- tela escurece ----------
     const veu = novo(arena.add.rectangle(0, 0, LARGURA, ALTURA, 0x000000).setOrigin(0).setAlpha(0).setDepth(PROF))
+    abaixarMusica(0.35)
     tocar(arena, 'bonusRound')
     await tween({ targets: veu, alpha: 0.78, duration: 220 })
     if (!vivo()) return
@@ -104,13 +109,16 @@ export async function anunciarBonus(arena, evento, { eventos = [evento], rng = M
     const acima = texto(LARGURA / 2, Y_ROLETA - 34, '', 13, '#ffffff').setAlpha(0.3)
     const abaixo = texto(LARGURA / 2, Y_ROLETA + 34, '', 13, '#ffffff').setAlpha(0.3)
     const nome = texto(LARGURA / 2, Y_ROLETA, '', 24, '#ffffff')
+    // o giro todo da roda (o relógio da cena pode estar acelerado: morte súbita)
+    let total = 0
+    for (let k = 0; k < GIROS - 1; k++) total += tempoDoGiro(k)
+    tocar(arena, 'roletaGiro', { duracao: total / 1000 / Math.max(0.1, arena.time.timeScale || 1) + 0.1 })
     for (let k = 0; k < GIROS; k++) {
       const ev = k === GIROS - 1 ? evento : nomeEm(k)
       nome.setText(ev.nome).setColor(corTexto(ev.cor ?? 0xffffff)).setY(Y_ROLETA - 12).setScale(1)
       acima.setText(k < GIROS - 1 ? nomeEm(k + 1).nome : '')
       abaixo.setText(k > 0 ? nomeEm(k - 1).nome : '')
-      const p = k / (GIROS - 1)
-      const ms = 38 + 250 * p ** 2.2
+      const ms = tempoDoGiro(k)
       arena.tweens.add({ targets: nome, y: Y_ROLETA, duration: Math.min(ms, 90), ease: 'Quad.easeOut' })
       if (k < GIROS - 1) {
         tocar(arena, 'roleta')
@@ -141,6 +149,7 @@ export async function anunciarBonus(arena, evento, { eventos = [evento], rng = M
     arena.tweens.killTweensOf(selo)
     await tween({ targets: objetos.slice(), alpha: 0, duration: 260 })
   } finally {
+    restaurarMusica()
     limpar()
   }
 }

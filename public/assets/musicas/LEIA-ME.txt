@@ -13,6 +13,17 @@ Coloque aqui as músicas em MIDI (.mid), com o nome da tela ou do chefe:
   pvp.mid          partida PvP (música de fundo da arena)   (sem o arquivo: jevil.mid)
   pvpResultado.mid tela de resultado do PvP    (sem o arquivo: vitoria.mid)
 
+  Cartas SUPER do PvP (música especial de cada personagem; toca em loop
+  enquanto o SUPER acontece e depois a música de batalha volta do ponto onde
+  parou). Sem o arquivo, a música de batalha simplesmente continua:
+  super_kris.mid
+  super_susie.mid
+  super_ralsei.mid
+  super_noelle.mid
+  super_berdly.mid
+  super_dess.mid
+  super_asriel.mid
+
 Não precisa mexer em código: o jogo procura <nome>.mid aqui sozinho e toca em
 loop com o soundfont (public/assets/audio/soundfont.sf3). Sem o arquivo, fica
 em silêncio (ou toca a reserva, nas do PvP). Para usar outro nome ou um .ogg, aponte em src/game/assets.js

@@ -189,6 +189,14 @@ export const ASSETS = {
     bumerangue: null,
     pavio: null,
     duelo: null,
+    // efeitos especiais (SUPER, apagão, desvio perfeito). Com arquivo próprio,
+    // aponte para ele, ex.: aplausos: 'assets/audio/aplausos.mp3'.
+    // 'chuva' é um som CONTÍNUO: o arquivo toca em loop enquanto o apagão dura
+    trovao: 'assets/audio/trovao.ogg',
+    aplausos: 'assets/audio/aplausos.ogg',
+    chuva: 'assets/audio/chuva.ogg',
+    superAtivar: null,
+    superCorte: null,
   },
 
   musicas: {

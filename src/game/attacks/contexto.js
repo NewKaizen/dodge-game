@@ -54,7 +54,9 @@ export default class ContextoAtaque {
 
   bala(opcoes) {
     const forma = opcoes.forma ?? this.forma(0)
-    return this.balas.criar({ dano: this.dano, cor: this.cor(forma), origem: this.nome, ...opcoes, forma })
+    // com textura própria (sprites dos SUPERs) a cor do tema não pinta a bala
+    const cor = opcoes.textura ? undefined : this.cor(forma)
+    return this.balas.criar({ dano: this.dano, cor, origem: this.nome, ...opcoes, forma })
   }
 
   aviso(forma, depois) {
