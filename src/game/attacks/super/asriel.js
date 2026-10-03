@@ -4,92 +4,135 @@ import { tocar } from '../../audio.js'
 import { shake } from '../../effects/shake.js'
 import { particulas } from '../../effects/particulas.js'
 
-// SUPER de Asriel: SINGULARIDADE RADIANTE. Dois atos, um o espelho do outro:
+// SUPER de Asriel: SINGULARIDADE RADIANTE. A única carta do jogo que mexe no
+// coração sem ser bala: a gravidade dele é de verdade.
 //
-//   I. O Vazio (1ª metade). Uma singularidade nasce no meio da caixa e CRESCE
-//      em pulsos (cada pulso pisca antes de valer, como um buraco negro
-//      "respirando"); o anel que sobra até a borda é sempre >= lacunaMinima
-//      (a zona de escape). Ao mesmo tempo, estrelas nascem fora da caixa e
-//      são PUXADAS para o centro: nascem paradas e piscando (telegrafo
-//      normal) e, ao valer, aceleram em linha reta até o meio -- é o único
-//      ataque do jogo com esse "puxão" (nunca mexe no coração de verdade,
-//      só nas balas que convergem até ele).
-//   II. A Supernova (2ª metade). O vazio implode num instante (COLAPSO) e no
-//      mesmo ponto nasce a supernova. Em cada onda, pontos de luz (nós de
-//      constelação) acendem num círculo em volta do centro e disparam um
-//      raio reto para fora -- o oposto do ato 1: agora tudo é empurrado para
-//      longe. Cada onda gira os raios, então o vão entre eles nunca fica no
-//      mesmo lugar duas vezes seguidas.
+//   I. O Vazio (1ª metade). Um buraco negro nasce no meio da caixa, cresce em
+//      pulsos e PUXA o coração para si (o puxão entra direto na posição, como
+//      a correnteza de um rio: dá para nadar contra, nunca é mais forte que o
+//      coração). Cada pulso aperta o puxão. Estrelas descem em BRAÇOS DE
+//      ESPIRAL (um disco de acreção): nascem na borda, giram em volta do
+//      vazio cada vez mais rápido conforme chegam perto (como planetas) e
+//      somem engolidas por ele.
+//   II. A Supernova (2ª metade). O vazio implode e explode: o puxão VIRA
+//      empurrão (o coração é jogado contra as paredes) enquanto anéis de
+//      estrelas arco-íris se expandem do centro, cada um com uma brecha. A
+//      brecha muda de lugar a cada anel: é preciso correr pela borda (contra
+//      o empurrão) até ela. O último anel é duplo.
 //
 // Justiça:
-//   - cada pulso do vazio pisca `vazio.aviso` (>= telegrafoMs) no tamanho que
-//     vai valer antes de crescer de verdade; o raio máximo é calculado para
-//     sempre sobrar um anel de pelo menos `a.lacunaMinima` até a borda mais
-//     perto (ver `raioMax` em iniciar) -- a zona de escape fica nas bordas;
-//   - as estrelas da chuva nascem fora da caixa já piscando (telegrafo padrão
-//     de `a.bala`) e só aceleram depois disso: dá pra ver de onde vêm e por
-//     onde vão passar antes delas se moverem;
-//   - os raios da supernova piscam uma linha (`a.aviso`) do nó até a borda da
-//     caixa por `estouro.aviso` antes de valer; o vão entre dois raios
-//     vizinhos (medido onde eles nascem) é validado com `a.lacuna`.
+//   - o puxão/empurrão nunca passa de `forcaMax` px/s (o coração anda
+//     CORACAO.velocidadePadrao = 180): sempre dá para fugir; só começa depois
+//     do primeiro pulso piscar, e para nas pausas de respiro;
+//   - o vazio pisca no tamanho novo (`aviso`) antes de cada pulso, e o raio
+//     máximo sempre deixa um anel >= lacunaMinima até a borda mais perto;
+//   - as estrelas da espiral nascem paradas e piscando (aviso de a.bala); no
+//     mesmo braço, duas estrelas seguidas ficam a mais de `lacunaMinima` uma
+//     da outra ao longo do caminho;
+//   - cada anel da supernova nasce parado e piscando como um círculo de nós
+//     com a brecha já visível, e a brecha anda no máximo `passoBrecha` rad
+//     de um anel para o outro.
 //
-// Config (objetos parciais completam com o padrão):
-//   vazio    { fracoes, tempos, aviso, margem }  -- os pulsos de crescimento
-//   chuva    { inicio, intervalo1, n1, intervalo2, n2, velocidade, aceleracao, aviso }
-//   estouro  { ondas, raios, giro, aviso, intervalo, raioNo, velocidade, aceleracao }
+// Config: vazio, espiral, nova (objetos parciais completam com PADRAO)
 const ARCO = [0xff4a5a, 0xffa23a, 0xffe14a, 0x5ae06a, 0x4ab8ff, 0xa66bff]
+const TAU = Math.PI * 2
 
 const PADRAO = {
-  vazio: { fracoes: [0.4, 0.62, 0.82, 1], tempos: [0, 1250, 2500, 3650], aviso: 650, margem: 8 },
-  chuva: { inicio: 450, intervalo1: 430, n1: 5, intervalo2: 250, n2: 7, velocidade: 55, aceleracao: 130, aviso: 500 },
-  estouro: { ondas: 3, raios: 6, giro: Math.PI / 6, aviso: 620, intervalo: 780, raioNo: 50, velocidade: 150, aceleracao: 90 },
+  vazio: { fracoes: [0.32, 0.55, 0.78, 1], tempos: [0, 1150, 2300, 3400], aviso: 650, margem: 6, forcas: [28, 46, 62, 74] },
+  espiral: { bracos: 3, inicio: 500, intervalo: 560, giroBracos: 0.72, velRadial: 34, velTangencial: 70, omegaMax: 5.5, aviso: 520 },
+  nova: { aneis: 5, intervalo: 720, estrelas: 18, abertura: 1.25, passoBrecha: 0.85, velocidade: 105, aviso: 520, raioNo: 40, empurrao: 58, duracaoEmpurrao: 3600 },
+  forcaMax: 80,
 }
 
 export default definirAtaque({
   nome: 'superAsriel',
-  padrao: { duracao: 9000, vazio: {}, chuva: {}, estouro: {} },
+  padrao: { duracao: 9000, vazio: {}, espiral: {}, nova: {} },
   iniciar(a, cfg) {
     const V = { ...PADRAO.vazio, ...cfg.vazio }
-    const C = { ...PADRAO.chuva, ...cfg.chuva }
-    const E = { ...PADRAO.estouro, ...cfg.estouro }
+    const S = { ...PADRAO.espiral, ...cfg.espiral }
+    const N = { ...PADRAO.nova, ...cfg.nova }
+    const forcaMax = cfg.forcaMax ?? PADRAO.forcaMax
     const metade = cfg.duracao / 2
     const l = a.caixa
     const cx = l.centerX
     const cy = l.centerY
 
+    // gravidade: > 0 puxa para o centro, < 0 empurra para fora (px/s)
+    const g = { forca: 0, raioVazio: 0, ativo: true }
+    a.aoAtualizar((dt) => puxar(a, g, cx, cy, Phaser.Math.Clamp(g.forca, -forcaMax, forcaMax), dt))
+
     // ---------- I. o vazio cresce e puxa ----------
-    // raio máximo: sempre sobra um anel >= lacunaMinima até a borda mais perto
     const folga = Math.min(l.width, l.height) / 2
     const raioMax = Math.max(20, folga - a.lacunaMinima - V.margem)
     a.lacuna(folga - raioMax, 'anel de fuga em volta do vazio')
 
-    const vazio = { bala: null, ativo: true }
     const buraco = a.decoracao(a.cena.add.image(cx, cy, 'super-asriel-buraco', 0).setDepth(3).setScale(0).setAlpha(0))
     a.cena.tweens.add({ targets: buraco, alpha: 1, duration: 200 })
     a.aoAtualizar((dt, t) => buraco.scene && buraco.setFrame(Math.floor(t / 90) % 6))
+    const disco = criarDisco(a, cx, cy, Math.hypot(l.width, l.height) / 2)
+    a.aoAtualizar((dt) => girarDisco(disco, g, dt))
 
-    V.tempos.forEach((t, i) => a.depois(t, () => crescerVazio(a, V, cx, cy, raioMax * V.fracoes[i], vazio, buraco)))
+    const vazio = { bala: null }
+    V.tempos.forEach((t, i) => a.depois(t, () => crescerVazio(a, V, cx, cy, raioMax * V.fracoes[i], V.forcas[i], vazio, buraco, g)))
 
-    // chuva de estrelas puxadas para o centro (ritmo acelera com o tempo)
-    a.aCada(C.intervalo1, (i) => chuvaEstrela(a, C, cx, cy, i), C.n1, C.inicio)
-    a.aCada(C.intervalo2, (i) => chuvaEstrela(a, C, cx, cy, C.n1 + i), C.n2, C.inicio + C.n1 * C.intervalo1)
+    // braços da espiral: uma estrela por braço a cada `intervalo`; os braços giram devagar
+    const n = Math.max(1, Math.floor((metade - S.inicio - 300) / S.intervalo))
+    a.aCada(S.intervalo, (i) => {
+      for (let k = 0; k < S.bracos; k++) estrelaEspiral(a, S, cx, cy, g, (k * TAU) / S.bracos + i * S.giroBracos, i + k)
+    }, n, S.inicio)
+    // distância entre duas estrelas seguidas do mesmo braço logo que a nova nasce (na borda):
+    // o braço girou `giroBracos`, a anterior andou um pouco para dentro e para frente
+    const r0 = Math.hypot(l.width, l.height) / 2
+    const T = S.intervalo / 1000
+    a.lacuna(Math.hypot(r0 * (S.giroBracos - (S.velTangencial / r0) * T), S.velRadial * T), 'estrelas seguidas no braço da espiral')
 
     // ---------- II. colapso -> supernova ----------
-    a.depois(metade, () => colapsar(a, vazio, buraco, cx, cy))
-    const raioNo = Math.max(E.raioNo, a.lacunaMinima + 6)
-    for (let onda = 0; onda < E.ondas; onda++) {
-      a.depois(metade + 350 + onda * E.intervalo, () => ondaEstouro(a, E, cx, cy, onda, raioNo))
+    a.depois(metade, () => {
+      colapsar(a, vazio, buraco, disco, cx, cy, g)
+      g.forca = -N.empurrao
+      a.depois(N.duracaoEmpurrao, () => (g.forca = 0))
+    })
+    let brecha = a.aleatorio(0, TAU)
+    for (let k = 0; k < N.aneis; k++) {
+      const ultimo = k === N.aneis - 1
+      a.depois(metade + 380 + k * N.intervalo, () => {
+        brecha += a.escolher([-1, 1]) * a.aleatorio(N.passoBrecha * 0.45, N.passoBrecha)
+        anelNova(a, N, cx, cy, brecha, k, 0)
+        // o último anel é duplo: um segundo anel colado, com a mesma brecha
+        if (ultimo) a.depois(170, () => anelNova(a, N, cx, cy, brecha, k + 1, 0.5))
+      })
     }
+    // a brecha medida onde ela é menor (logo que o anel sai, no raio dos nós)
+    a.lacuna(N.abertura * N.raioNo, 'brecha do anel da supernova')
   },
 })
 
+// ---------- gravidade de verdade: mexe no coração ----------
+
+function puxar(a, g, cx, cy, forca, dt) {
+  if (!forca) return
+  const passo = (forca * dt) / 1000
+  for (const c of a.coracoes) {
+    if (!c.ativo) continue
+    const dx = cx - c.x
+    const dy = cy - c.y
+    const d = Math.hypot(dx, dy)
+    if (d < 1) continue
+    // puxando: não arrasta para dentro do próprio vazio (para na borda dele)
+    const mover = forca > 0 ? Math.min(passo, Math.max(0, d - g.raioVazio)) : passo
+    c.x += (dx / d) * mover
+    c.y += (dy / d) * mover
+    c.ajustar()
+  }
+}
+
 // ---------- ato I: o vazio ----------
 
-function crescerVazio(a, cfg, cx, cy, raio, estado, buraco) {
+function crescerVazio(a, cfg, cx, cy, raio, forca, estado, buraco, g) {
   a.aviso({ tipo: 'circulo', x: cx, y: cy, raio, ms: cfg.aviso }, () => {
-    if (!estado.ativo) return
+    if (!g.ativo) return
     tocar(a.cena, 'super-asriel-pulso')
-    shake(a.cena, 90, 0.004)
+    shake(a.cena, 110, 0.005)
     if (estado.bala) {
       estado.bala.inofensiva = true
       estado.bala.vida = 1
@@ -97,95 +140,121 @@ function crescerVazio(a, cfg, cx, cy, raio, estado, buraco) {
     const bala = a.bala({ x: cx, y: cy, raio, jaAvisada: true, atravessa: true, pulso: 0.05, vida: 999999 })
     bala.sprite.setVisible(false) // quem desenha é o buraco (decoração) por baixo
     estado.bala = bala
+    g.raioVazio = raio
+    g.forca = forca
     const escala = (raio * 2) / buraco.width
     a.cena.tweens.add({ targets: buraco, scaleX: escala, scaleY: escala, duration: 300, ease: 'Back.Out' })
-    particulas(a.cena, cx, cy, { cor: 0xd9d9ff, quantidade: 8, velocidade: 90, vida: 320 })
+    particulas(a.cena, cx, cy, { cor: 0xd9d9ff, quantidade: 10, velocidade: 100, vida: 320 })
   })
 }
 
-// uma estrela nasce fora da caixa, pisca parada e, ao valer, acelera reto até o centro
-function chuvaEstrela(a, cfg, cx, cy, i) {
+// estrela que desce em espiral: raio diminui, e gira mais rápido quanto mais perto
+// (velocidade tangencial = L / r, como um planeta), até ser engolida
+function estrelaEspiral(a, cfg, cx, cy, g, ang0, i) {
   const l = a.caixa
-  const borda = Math.hypot(l.width, l.height) / 2 + 34
-  const ang = a.aleatorio(0, Math.PI * 2)
-  const x0 = cx + Math.cos(ang) * borda
-  const y0 = cy + Math.sin(ang) * borda
-  const dir = Math.atan2(cy - y0, cx - x0)
+  const r0 = Math.hypot(l.width, l.height) / 2 + 6
+  const L = cfg.velTangencial * r0
+  const fator = () => a.balas.fatorVelocidade ?? 1
+  const p = { r: r0, ang: ang0 }
   a.bala({
-    x: x0,
-    y: y0,
-    vx: Math.cos(dir) * cfg.velocidade,
-    vy: Math.sin(dir) * cfg.velocidade,
-    ax: Math.cos(dir) * cfg.aceleracao,
-    ay: Math.sin(dir) * cfg.aceleracao,
+    x: cx + Math.cos(ang0) * r0,
+    y: cy + Math.sin(ang0) * r0,
     raio: 6,
     textura: 'super-asriel-estrelas',
     quadro: i % 6,
-    tamanho: 18,
+    tamanho: 17,
     aviso: cfg.aviso,
-    girar: 5,
-    vida: 3400,
+    girar: 4,
+    vida: 9000,
+    atualizar: (b, dt) => {
+      // o colapso engole o que ainda estava caindo
+      if (!g.ativo) {
+        b.morta = true
+        particulas(a.cena, b.x, b.y, { cor: 0xffffff, quantidade: 3, velocidade: 80, vida: 200 })
+        return
+      }
+      const s = (dt / 1000) * fator()
+      p.r -= cfg.velRadial * s
+      p.ang += Math.min(cfg.omegaMax, L / (p.r * p.r)) * s
+      b.x = cx + Math.cos(p.ang) * p.r
+      b.y = cy + Math.sin(p.ang) * p.r
+      if (p.r <= g.raioVazio * 0.85 || p.r < 4) {
+        b.morta = true
+        particulas(a.cena, b.x, b.y, { cor: 0xb8a8ff, quantidade: 4, velocidade: 60, vida: 220 })
+      }
+    },
   })
+}
+
+// disco de acreção: pontinhos decorativos girando para dentro (mostram a força do puxão)
+function criarDisco(a, cx, cy, raio) {
+  const pontos = []
+  for (let k = 0; k < 22; k++) {
+    const img = a.decoracao(a.cena.add.image(cx, cy, 'super-asriel-no', 0).setDepth(2).setScale(0.35).setAlpha(0).setTint(ARCO[k % ARCO.length]))
+    pontos.push({ img, r: a.aleatorio(raio * 0.3, raio), ang: a.aleatorio(0, TAU) })
+  }
+  return { pontos, cx, cy, raio }
+}
+
+function girarDisco(d, g, dt) {
+  if (!d.pontos.length) return
+  const forca = Math.max(0, g.forca)
+  const s = dt / 1000
+  for (const p of d.pontos) {
+    p.r -= (10 + forca * 0.9) * s
+    p.ang += (40 + forca) / Math.max(20, p.r) * s * 3
+    if (p.r <= g.raioVazio + 2) p.r = d.raio
+    p.img.setPosition(d.cx + Math.cos(p.ang) * p.r, d.cy + Math.sin(p.ang) * p.r)
+    p.img.setAlpha(forca ? Math.min(0.75, 0.2 + forca / 120) : 0)
+  }
 }
 
 // ---------- transição: o vazio implode ----------
 
-function colapsar(a, estado, buraco, cx, cy) {
-  estado.ativo = false
+function colapsar(a, estado, buraco, disco, cx, cy, g) {
+  g.ativo = false
+  g.raioVazio = 0
   if (estado.bala) {
     estado.bala.inofensiva = true
     estado.bala.vida = 1
   }
+  for (const p of disco.pontos) a.cena.tweens.add({ targets: p.img, x: cx, y: cy, alpha: 0, duration: 220, ease: 'Cubic.easeIn' })
+  disco.pontos = []
   tocar(a.cena, 'super-asriel-colapso')
-  shake(a.cena, 220, 0.013)
+  shake(a.cena, 260, 0.015)
   a.cena.tweens.killTweensOf(buraco)
   a.cena.tweens.add({ targets: buraco, scale: 0, angle: 280, duration: 260, ease: 'Cubic.easeIn', onComplete: () => buraco.setVisible(false) })
   const nova = a.decoracao(a.cena.add.image(cx, cy, 'super-asriel-nova').setDepth(3).setScale(0).setAlpha(0.95).setBlendMode(Phaser.BlendModes.ADD))
-  a.cena.tweens.add({ targets: nova, scale: 1.5, duration: 260, delay: 180, ease: 'Back.Out' })
-  a.cena.tweens.add({ targets: nova, scale: 1.25, duration: 650, delay: 440, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
-  particulas(a.cena, cx, cy, { cor: 0xffffff, quantidade: 22, velocidade: 170, vida: 420 })
+  a.cena.tweens.add({ targets: nova, scale: 1.6, duration: 260, delay: 180, ease: 'Back.Out' })
+  a.cena.tweens.add({ targets: nova, scale: 1.25, duration: 600, delay: 440, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+  a.depois(380, () => tocar(a.cena, 'super-asriel-estoura'))
+  particulas(a.cena, cx, cy, { cor: 0xffffff, quantidade: 26, velocidade: 190, vida: 440 })
 }
 
-// ---------- ato II: a supernova ----------
+// ---------- ato II: anéis da supernova ----------
 
-// uma onda: `raios` nós acendem num círculo e cada um dispara uma estrela reta para fora
-function ondaEstouro(a, cfg, cx, cy, onda, raioNo) {
-  const base = onda * cfg.giro
-  for (let k = 0; k < cfg.raios; k++) {
-    const ang = base + (k * Math.PI * 2) / cfg.raios
-    const cor = ARCO[k % ARCO.length]
-    const nx = cx + Math.cos(ang) * raioNo
-    const ny = cy + Math.sin(ang) * raioNo
-    const no = a.decoracao(a.cena.add.image(nx, ny, 'super-asriel-no', 0).setDepth(4).setTint(cor).setScale(0.6).setAlpha(0))
-    a.cena.tweens.add({ targets: no, alpha: 1, scale: 1.2, duration: 160, ease: 'Back.Out' })
-    const pulsar = a.cena.tweens.add({ targets: no, scale: 1.45, duration: 220, delay: 180, yoyo: true, repeat: -1 })
-
-    const comp = Math.hypot(a.caixa.width, a.caixa.height)
-    a.aviso(
-      { tipo: 'linha', x1: nx, y1: ny, x2: nx + Math.cos(ang) * comp, y2: ny + Math.sin(ang) * comp, espessura: 3, ms: cfg.aviso },
-      () => {
-        pulsar.stop()
-        a.cena.tweens.add({ targets: no, alpha: 0, scale: 1.8, duration: 160 })
-        tocar(a.cena, 'super-asriel-estoura')
-        a.bala({
-          x: nx,
-          y: ny,
-          vx: Math.cos(ang) * cfg.velocidade,
-          vy: Math.sin(ang) * cfg.velocidade,
-          ax: Math.cos(ang) * cfg.aceleracao,
-          ay: Math.sin(ang) * cfg.aceleracao,
-          raio: 7,
-          textura: 'super-asriel-estrelas',
-          quadro: k % 6,
-          tamanho: 20,
-          jaAvisada: true,
-          girar: 6,
-          vida: 2200,
-        })
-        particulas(a.cena, nx, ny, { cor, quantidade: 6, velocidade: 110, vida: 260 })
-      },
-    )
+// `estrelas` nós num círculo em volta do centro, menos os da brecha; piscam
+// parados e depois saem juntos para fora (o anel cresce mantendo a brecha)
+function anelNova(a, cfg, cx, cy, brecha, k, defasagem) {
+  const passo = TAU / cfg.estrelas
+  tocar(a.cena, 'super-asriel-pulso')
+  for (let i = 0; i < cfg.estrelas; i++) {
+    const ang = brecha + cfg.abertura / 2 + (defasagem + i) * passo
+    // fora da brecha: o anel cobre TAU - abertura
+    const rel = (((ang - brecha) % TAU) + TAU) % TAU
+    if (rel < cfg.abertura / 2 || rel > TAU - cfg.abertura / 2) continue
+    a.bala({
+      x: cx + Math.cos(ang) * cfg.raioNo,
+      y: cy + Math.sin(ang) * cfg.raioNo,
+      vx: Math.cos(ang) * cfg.velocidade,
+      vy: Math.sin(ang) * cfg.velocidade,
+      raio: 6,
+      textura: 'super-asriel-estrelas',
+      quadro: (i + k) % 6,
+      tamanho: 17,
+      aviso: cfg.aviso,
+      girar: 6,
+      vida: 2600,
+    })
   }
-  // vão entre dois raios vizinhos, medido perto do centro (onde eles nascem): só cresce dali para fora
-  a.lacuna(raioNo, 'vão entre raios da supernova')
 }

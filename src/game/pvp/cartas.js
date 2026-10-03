@@ -321,7 +321,7 @@ const BARALHOS = {
     },
     super: {
       nome: 'Último Capítulo',
-      texto: 'Sopros de fogo em leque pelos cantos, uma moldura de espinhos com a janela sempre deslizando e, no fim, a sombra de um dragão ondulando fogo pela caixa',
+      texto: 'Sopros de fogo em leque pelos cantos, uma moldura de espinhos que vai fechando com brasas caindo pelo meio e, no fim, a sombra de um dragão ondulando fogo pela caixa',
       criar: (A) => A.superRalsei()
     },
     cartas: [
@@ -406,7 +406,7 @@ const BARALHOS = {
     },
     super: {
       nome: 'Prova Irrefutável',
-      texto: 'Um redemoinho de lâminas de vento que acelera e lança rajadas de páginas a cada volta, até o giro dourado e o corte final da resposta certa',
+      texto: 'Um redemoinho de lâminas que passeia pela caixa num 8 e cresce a cada volta (o ego inflando), até o giro dourado e o corte final da resposta certa',
       criar: (A) => A.superBerdly()
     },
     cartas: [
@@ -496,7 +496,7 @@ const BARALHOS = {
     // a 3ª fase é o Caos Final encurtado (o colapso ainda explode: fica com 50% do tempo)
     super: {
       nome: 'Singularidade Radiante',
-      texto: 'Um vazio que cresce e puxa as estrelas para o centro, depois implode numa supernova que dispara raios arco-íris para fora',
+      texto: 'Um buraco negro que puxa o seu coração enquanto estrelas descem em espiral, depois implode numa supernova que empurra para fora com anéis arco-íris',
       criar: (A) => A.superAsriel()
     },
     cartas: [

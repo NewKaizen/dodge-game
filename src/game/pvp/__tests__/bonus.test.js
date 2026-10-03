@@ -1,7 +1,7 @@
 // node --test src/game/pvp/__tests__/
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { BONUS, EVENTOS, EVENTO, ehRodadaBonus, sortearEvento, transformarMalucas, desfazerMalucas, ARMAS, armaDaCarta, podeJogarDuelo, resolverDuelo } from '../bonus.js'
+import { BONUS, EVENTOS, EVENTO, ehRodadaBonus, adiarBonus, sortearEvento, transformarMalucas, desfazerMalucas, ARMAS, armaDaCarta, podeJogarDuelo, resolverDuelo } from '../bonus.js'
 import { criarPartida, iniciarRodada, resolverRodada, podeJogar } from '../regras.js'
 import { criarRng, totalDeCartas } from '../baralho.js'
 
@@ -16,6 +16,22 @@ test('bonus: a cada 3 rodadas (3ª, 6ª, 9ª...)', () => {
   for (const r of [0, 1, 2, 4, 5, 7]) assert.equal(ehRodadaBonus(r), false, `rodada ${r}`)
   for (const r of [3, 6, 9, 30]) assert.equal(ehRodadaBonus(r), true, `rodada ${r}`)
   assert.equal(ehRodadaBonus(-3), false)
+})
+
+test('bonus: SUPER na mesa adia o bonus round', () => {
+  const estado = partida('adiar')
+  const naMao = (j) => estado.jogadores[j].baralho.mao
+  const comum = (j) => naMao(j).find((c) => c.valor !== 14).id
+  // coloca o SUPER do P2 na mão (troca pela primeira carta)
+  const b = estado.jogadores[1].baralho
+  const i = b.monte.findIndex((c) => c.valor === 14)
+  if (i >= 0) b.mao[0] = b.monte.splice(i, 1, b.mao[0])[0]
+  const superP2 = naMao(1).find((c) => c.valor === 14).id
+
+  assert.equal(adiarBonus(estado, [comum(0), comum(1)]), false)
+  assert.equal(adiarBonus(estado, [null, null]), false)
+  assert.equal(adiarBonus(estado, [null, superP2]), true)
+  assert.equal(adiarBonus(estado, [comum(0), superP2]), true)
 })
 
 test('bonus: eventos têm o formato que a arena espera', () => {

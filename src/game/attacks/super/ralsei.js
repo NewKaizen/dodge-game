@@ -13,12 +13,12 @@ import { particulas } from '../../effects/particulas.js'
 //      exato pisca mostrando onde o fogo vai sair; só então saem rajadas de
 //      chamas verdes cobrindo APENAS aquela fatia angular -- o resto da
 //      caixa, inclusive o próprio canto, fica sempre livre.
-//   II. Moldura de espinhos. Espinhos brotam em toda a borda da caixa. Uma
-//      única "janela" (onde os espinhos continuam brotos, inofensivos)
-//      desliza sem parar ao redor do perímetro inteiro -- dá pra segui-la
-//      raspando a borda. De vez em quando a moldura "floresce" (os espinhos
-//      crescem bem mais) por um instante; mesmo no pico, o meio da caixa
-//      nunca é alcançado: sempre dá pra recuar para o centro.
+//   II. Moldura de espinhos. Espinhos brotam em toda a borda da caixa e a
+//      moldura vai FECHANDO devagar (os espinhos crescem para dentro). Uma
+//      "janela" (onde eles continuam brotos, inofensivos) desliza pela borda.
+//      De vez em quando a moldura "floresce" (cresce bem mais) por um
+//      instante. E pelo miolo que sobra caem brasas balançando, como folhas
+//      de um livro pegando fogo: ficar parado no meio não basta.
 //   III. Sombra do dragão. As páginas se fecham; atrás da caixa cresce a
 //      sombra de um dragão (só as asas e os olhos -- nunca o Ralsei em si) e
 //      um fio de fogo verde, em vez de avançar reto, ONDULA como uma cobra
@@ -32,9 +32,11 @@ import { particulas } from '../../effects/particulas.js'
 //     fica livre: `a.lacuna`);
 //   - os espinhos nascem brotos (inofensivos) e piscam por `avisoMoldura` ms
 //     antes de valer; a "janela" (onde eles continuam brotos) tem pelo menos
-//     LACUNA_MINIMA de arco e nunca para de deslizar; o raio de pico de cada
-//     florescer fica bem abaixo de meia caixa (`a.lacuna`: o núcleo sempre
-//     livre) e também pisca (`avisoPulso`) antes de crescer;
+//     LACUNA_MINIMA de arco e nunca para de deslizar; a moldura fecha devagar
+//     (bem mais devagar que o coração) e nem no pico de um florescer passa
+//     do raio do pulso, bem abaixo de meia caixa (`a.lacuna`: o núcleo sempre
+//     existe), e o florescer pisca (`avisoPulso`) antes de crescer; as brasas
+//     nascem paradas e piscando e caem devagar, uma de cada vez;
 //   - o fio de fogo nasce todo de uma vez, parado e piscando por
 //     `avisoInvocacao` ms antes de ondular; cada "conta" é só um pingo de
 //     fogo (não uma parede): sempre dá pra contornar pela lateral, e o
@@ -79,6 +81,8 @@ export default definirAtaque({
         [1500, 480, 260],
       ],
       duracaoAtiva: 2500,
+      fechar: 0.72, // até onde a moldura fecha sozinha (fração do raio do pulso)
+      brasas: { intervalo: 300, velocidade: 78, balanco: 16, aviso: 420, raio: 6 },
     },
     dragao: {
       inicio: 6200,
@@ -266,20 +270,50 @@ function montarMoldura(a, cfg, M) {
     espinhos.push(esp)
   }
 
-  const m = { espinhos, perimetro, gapArco, raioBase: M.raioBase, raioPulso, raioAtivo: M.raioBase, nasceuEm: null, avisoM, duracaoAtiva: M.duracaoAtiva, voltas: M.voltas }
+  const raioFechado = M.raioBase + (raioPulso - M.raioBase) * M.fechar
+  const m = { espinhos, perimetro, gapArco, raioBase: M.raioBase, raioPulso, raioFechado, pulsando: false, nasceuEm: null, avisoM, duracaoAtiva: M.duracaoAtiva, voltas: M.voltas }
 
   for (const [ini, avisoPulso, dur] of M.pulsos) {
     const ap = Math.max(ATAQUE.telegrafoMs, avisoPulso)
     a.depois(avisoM + ini, () => shake(a.cena, 60, 0.003))
     a.depois(avisoM + ini + ap, () => {
-      m.raioAtivo = raioPulso
+      m.pulsando = true
       tocar(a.cena, 'super-ralsei-espinho')
       shake(a.cena, 130, 0.007)
     })
-    a.depois(avisoM + ini + ap + dur, () => (m.raioAtivo = M.raioBase))
+    a.depois(avisoM + ini + ap + dur, () => (m.pulsando = false))
   }
 
+  // brasas caindo pelo miolo (fora do alcance da moldura no pico)
+  const B = M.brasas
+  const miolo = { esq: l.left + raioPulso + B.raio, dir: l.right - raioPulso - B.raio }
+  a.aCada(B.intervalo, () => brasa(a, B, miolo), Math.floor(M.duracaoAtiva / B.intervalo), avisoM)
+
   return m
+}
+
+function brasa(a, B, miolo) {
+  const l = a.caixa
+  const x0 = a.aleatorio(miolo.esq, miolo.dir)
+  const fase = a.aleatorio(0, Math.PI * 2)
+  let t = 0
+  a.bala({
+    x: x0,
+    y: l.top + B.raio + 2,
+    vy: B.velocidade,
+    raio: B.raio,
+    textura: 'super-ralsei-chama',
+    quadro: a.inteiro(0, 2),
+    tamanho: B.raio * 2.6,
+    aviso: Math.max(ATAQUE.telegrafoMs, B.aviso),
+    pulso: 0.15,
+    vida: (l.height / B.velocidade) * 1000 + 300,
+    // balança de um lado para o outro enquanto cai (folha pegando fogo)
+    atualizar: (b, dt) => {
+      t += dt / 1000
+      b.x = x0 + Math.sin(fase + t * 4) * B.balanco
+    },
+  })
 }
 
 // chamado todo frame (ativo = ms já ativos do ataque inteiro, sem contar pausas)
@@ -288,13 +322,16 @@ function atualizarMoldura(m, ativo) {
   const decorrido = ativo - m.nasceuEm - m.avisoM
   if (decorrido < 0) return
   const gapS = ((decorrido / m.duracaoAtiva) * m.voltas * m.perimetro) % m.perimetro
+  // a moldura fecha devagar; no florescer vai até o raio do pulso
+  const fechando = m.raioBase + (m.raioFechado - m.raioBase) * Math.min(1, decorrido / m.duracaoAtiva)
+  const raioAtivo = m.pulsando ? m.raioPulso : fechando
   for (const esp of m.espinhos) {
     if (esp.morta) continue
     const d = Math.abs(esp.s - gapS)
     const distCirc = Math.min(d, m.perimetro - d)
     const seguro = distCirc < m.gapArco / 2
     esp.sprite.setFrame(seguro ? 0 : 1)
-    const raio = seguro ? Math.min(3, m.raioBase) : m.raioAtivo
+    const raio = seguro ? Math.min(3, m.raioBase) : raioAtivo
     esp.raio = raio
     esp.escalaX = esp.escalaY = esp.unidade * raio
     esp.inofensiva = seguro
