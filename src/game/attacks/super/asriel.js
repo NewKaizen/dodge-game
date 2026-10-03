@@ -1,3 +1,4 @@
+import Phaser from 'phaser'
 import { definirAtaque } from '../definir.js'
 import { tocar } from '../../audio.js'
 import { shake } from '../../effects/shake.js'
@@ -139,7 +140,7 @@ function colapsar(a, estado, buraco, cx, cy) {
   shake(a.cena, 220, 0.013)
   a.cena.tweens.killTweensOf(buraco)
   a.cena.tweens.add({ targets: buraco, scale: 0, angle: 280, duration: 260, ease: 'Cubic.easeIn', onComplete: () => buraco.setVisible(false) })
-  const nova = a.decoracao(a.cena.add.image(cx, cy, 'super-asriel-nova').setDepth(3).setScale(0).setAlpha(0.95).setBlendMode('ADD'))
+  const nova = a.decoracao(a.cena.add.image(cx, cy, 'super-asriel-nova').setDepth(3).setScale(0).setAlpha(0.95).setBlendMode(Phaser.BlendModes.ADD))
   a.cena.tweens.add({ targets: nova, scale: 1.5, duration: 260, delay: 180, ease: 'Back.Out' })
   a.cena.tweens.add({ targets: nova, scale: 1.25, duration: 650, delay: 440, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
   particulas(a.cena, cx, cy, { cor: 0xffffff, quantidade: 22, velocidade: 170, vida: 420 })
