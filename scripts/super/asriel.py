@@ -1,19 +1,31 @@
 #!/usr/bin/env python3
-"""Sprites do SUPER do Asriel ("Supernova Arco-Íris"), em pixel art.
+"""Sprites e sons do SUPER do Asriel ("Singularidade Radiante"), em pixel art.
 
 Uso (na raiz do projeto):  python3 scripts/super/asriel.py
-Saída determinística em public/assets/sprites/super/asriel/:
+Precisa do Pillow e do numpy. Saída determinística (sementes fixas).
+
+Sprites em public/assets/sprites/super/asriel/:
   estrelas.png   spritesheet 6 quadros 16x16: estrela de 5 pontas em cada cor do arco-íris
-  no.png         spritesheet 4 quadros 12x12: nó de constelação piscando (branco, pinta-se no jogo)
+                 (a chuva que cai para dentro do vazio e os raios da supernova)
+  no.png         spritesheet 4 quadros 16x16: glint branco piscando (pinta-se da cor do raio
+                 no jogo) -- marca os pontos da constelação que disparam a supernova
   buraco.png     spritesheet 6 quadros 64x64: buraco negro com o disco arco-íris girando
+                 (cresce em volta do coração ao longo do 1º ato)
   nova.png       64x64: o clarão da supernova (núcleo branco com raios coloridos)
   carta.png      132x141: arte da carta (galáxia, constelação e a supernova)
+
+Sons em public/assets/audio/super/asriel/:
+  pulso.wav      o vazio pulsa e cresce (grave abafado, como um coração colapsando)
+  colapso.wav    o vazio implode num ponto só (sucção que termina num estalo seco)
+  estoura.wav    um raio da supernova dispara (zap cristalino, cintilante)
 """
-import math, os, random
+import math, os, random, wave
+import numpy as np
 from PIL import Image
 
 RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SAIDA = os.path.join(RAIZ, 'public', 'assets', 'sprites', 'super', 'asriel')
+SAIDA_SOM = os.path.join(RAIZ, 'public', 'assets', 'audio', 'super', 'asriel')
 os.makedirs(SAIDA, exist_ok=True)
 
 ARCO = [(255, 74, 90), (255, 162, 58), (255, 225, 74), (90, 224, 106), (74, 184, 255), (166, 107, 255)]
@@ -91,22 +103,29 @@ def folha_estrelas():
 
 
 def folha_nos():
-    n = 12
+    """Glint de 4 pontas (nó da constelação): núcleo branco sólido + raios finos
+    + halo suave. Pintável (setTint) com a cor do raio da supernova no jogo."""
+    n = 16
+    c = (n - 1) / 2
     folha = Image.new('RGBA', (n * 4, n), (0, 0, 0, 0))
-    for q, tam in enumerate([5, 6, 5, 4]):
+    for q, tam in enumerate([7.5, 6, 7.5, 5]):  # pulsa: grande, médio, grande, pequeno
         img = Image.new('RGBA', (n, n), (0, 0, 0, 0))
         px = img.load()
-        c = n // 2
         for y in range(n):
             for x in range(n):
-                dx, dy = abs(x - c), abs(y - c)
-                # brilho de 4 pontas
-                if (dx == 0 and dy <= tam) or (dy == 0 and dx <= tam):
-                    px[x, y] = (255, 255, 255, 255 if max(dx, dy) < tam - 1 else 150)
-                elif dx + dy <= 2:
+                dx, dy = x - c, y - c
+                ortogonal = (abs(dy) < 0.8 and abs(dx) <= tam) or (abs(dx) < 0.8 and abs(dy) <= tam)
+                diagonal = abs(abs(dx) - abs(dy)) < 0.8 and max(abs(dx), abs(dy)) <= tam * 0.55
+                nucleo = math.hypot(dx, dy) <= 1.6
+                if nucleo:
                     px[x, y] = (255, 255, 255, 255)
-                elif dx == dy and dx <= tam // 2:
-                    px[x, y] = (220, 220, 255, 120)
+                elif ortogonal:
+                    d = math.hypot(dx, dy) / tam
+                    a = int(255 * max(0, 1 - d) ** 0.6)
+                    px[x, y] = (255, 255, 255, a) if a > 40 else (200, 220, 255, a)
+                elif diagonal:
+                    d = max(abs(dx), abs(dy)) / (tam * 0.55)
+                    px[x, y] = (210, 225, 255, int(150 * max(0, 1 - d)))
         folha.paste(img, (q * n, 0))
     folha.save(os.path.join(SAIDA, 'no.png'))
 
@@ -229,10 +248,66 @@ def carta():
     img.save(os.path.join(SAIDA, 'carta.png'))
 
 
-if __name__ == '__main__':
+# ---------- sons ----------
+
+TAXA = 22050
+
+
+def salvar_som(nome, s):
+    os.makedirs(SAIDA_SOM, exist_ok=True)
+    s = s / (np.max(np.abs(s)) + 1e-9) * 0.7  # pico ~ -3 dBFS
+    dados = (s * 32767).astype(np.int16)
+    with wave.open(os.path.join(SAIDA_SOM, nome + '.wav'), 'wb') as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(TAXA)
+        w.writeframes(dados.tobytes())
+
+
+def passa_baixa(s, k):
+    janela = np.ones(k) / k
+    return np.convolve(s, janela, mode='same')
+
+
+def sons():
+    rng = np.random.default_rng(23)
+
+    # pulso: o vazio cresce -- baque grave e abafado, como uma batida de coração estranha
+    t = np.arange(int(TAXA * 0.55)) / TAXA
+    f = 55 * np.exp(-t * 7) + 32
+    grave = np.sin(2 * np.pi * np.cumsum(f) / TAXA) * np.exp(-t * 6.5)
+    sopro = passa_baixa(rng.standard_normal(len(t)), 30) * np.exp(-t * 10) * 0.5
+    salvar_som('pulso', grave * 1.1 + sopro)
+
+    # colapso: sucção que sobe de tom (sendo puxada para dentro) e termina num estalo seco
+    t = np.arange(int(TAXA * 0.75)) / TAXA
+    suga = passa_baixa(rng.standard_normal(len(t)), 24) * np.exp(t * 1.5) * np.clip(1 - t / 0.6, 0, 1)
+    f = 180 + 500 * np.clip(t / 0.55, 0, 1) ** 2
+    zumbido = np.sin(2 * np.pi * np.cumsum(f) / TAXA) * np.clip(t / 0.3, 0, 1) * 0.35
+    estalo = np.zeros(len(t))
+    i0 = int(TAXA * 0.55)
+    janela = min(900, len(t) - i0)
+    if janela > 0:
+        estalo[i0:i0 + janela] = rng.standard_normal(janela) * np.exp(-np.arange(janela) / 40)
+    salvar_som('colapso', suga * 0.8 + zumbido + estalo * 1.3)
+
+    # estoura: zap cristalino e cintilante (um raio da supernova disparando)
+    t = np.arange(int(TAXA * 0.4)) / TAXA
+    f = 2400 * np.exp(-t * 3) + 500
+    zap = np.sin(2 * np.pi * np.cumsum(f) / TAXA) * np.exp(-t * 9)
+    brilho = sum(np.sin(2 * np.pi * h * 1400 * t) for h in (1, 1.5, 2.3)) / 3 * np.exp(-t * 14) * 0.4
+    salvar_som('estoura', zap * 0.9 + brilho)
+
+
+def main():
     folha_estrelas()
     folha_nos()
     folha_buraco()
     nova()
     carta()
-    print('ok:', sorted(os.listdir(SAIDA)))
+    sons()
+    print('ok:', sorted(os.listdir(SAIDA)), sorted(os.listdir(SAIDA_SOM)))
+
+
+if __name__ == '__main__':
+    main()
