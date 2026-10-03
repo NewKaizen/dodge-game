@@ -14,7 +14,7 @@ import { criarPartida, iniciarRodada, podeJogar, resolverRodada, aplicarDano, re
 import { escolherJogada, NIVEIS_BOT, NIVEL_BOT_PADRAO } from '../pvp/bot.js'
 import { EsquivaBot } from '../pvp/botEsquiva.js'
 import { criarRng, aleatorio, inteiro } from '../pvp/baralho.js'
-import { EVENTOS, EVENTO, ehRodadaBonus, sortearEvento, transformarMalucas, desfazerMalucas, podeJogarDuelo, resolverDuelo } from '../pvp/bonus.js'
+import { EVENTOS, EVENTO, ehRodadaBonus, adiarBonus, sortearEvento, transformarMalucas, desfazerMalucas, podeJogarDuelo, resolverDuelo } from '../pvp/bonus.js'
 import { EFEITOS } from '../pvp/bonus/eventos/index.js'
 import { anunciarBonus } from '../pvp/bonus/anuncio.js'
 import Duelo from '../pvp/bonus/Duelo.js'
@@ -64,7 +64,8 @@ import { anunciarSuper } from '../pvp/super/anuncio.js'
 // Bonus round (pvp/bonus.js, a cada 3 rodadas: 3ª, 6ª...): no começo da
 // rodada o selo "BONUS ROUND: ???" avisa; DEPOIS da escolha das cartas uma
 // roleta (pvp/bonus/anuncio.js, música abaixada + som de cassino) sorteia um
-// evento caótico. Só caos, sem prêmio. Conforme evento.cartas:
+// evento caótico. Só caos, sem prêmio. Se alguém jogou o SUPER não tem roleta:
+// o bonus fica para a próxima rodada (adiarBonus). Conforme evento.cartas:
 //   'normal'   rodada de sempre; o efeito (pvp/bonus/eventos/) bagunça a
 //              esquiva, que acontece mesmo se ninguém atacar (caixa "vazia")
 //   'malucas'  na revelação cada carta vira outra sorteada (transformarMalucas)
@@ -443,7 +444,7 @@ export default class PvpArena extends Phaser.Scene {
       let jogadas = await this.escolha()
       if (this.saindo) return
       // bonus round: o evento só é revelado agora, com as cartas já escolhidas
-      await this.sortearBonus()
+      await this.sortearBonus(jogadas)
       if (this.saindo) return
       if (this.bonus?.cartas === 'duelo') {
         const duelo = resolverDuelo(this.estado, jogadas[0], jogadas[1], this.rngBonus)
@@ -542,11 +543,18 @@ export default class PvpArena extends Phaser.Scene {
     this.tweens.add({ targets: this.textoBonus, scale: { from: 1.6, to: 1 }, duration: 260, ease: 'Back.easeOut' })
   }
 
-  // Depois da escolha das cartas: roleta e o nome do evento no selo do alto
-  async sortearBonus() {
+  // Depois da escolha das cartas: roleta e o nome do evento no selo do alto.
+  // Com SUPER na mesa não tem roleta: o bonus passa para a próxima rodada
+  async sortearBonus(jogadas) {
     const forcado = this.bonusPendente
     this.bonusPendente = null
     if (!forcado) return
+    if (adiarBonus(this.estado, jogadas)) {
+      this.bonusProximo = forcado
+      this.textoBonus.setText('★ BONUS ADIADO: SUPER! ★').setColor(TEXTO.normal).setAlpha(1)
+      this.tweens.add({ targets: this.textoBonus, alpha: 0, delay: 1800, duration: 300 })
+      return
+    }
     this.fase = 'bonus'
     const evento = EVENTO[forcado] ?? EVENTO[this.bonusForcado] ?? sortearEvento(this.rngBonus, { anterior: this.bonusAnterior })
     this.bonus = evento

@@ -38,6 +38,12 @@ export function ehRodadaBonus(rodada, cfg = BONUS) {
   return rodada > 0 && rodada % cfg.aCadaRodadas === 0
 }
 
+// Alguém escolheu o SUPER (ids das escolhas, null = passou)? Então o bonus
+// round fica para a próxima rodada: duelo e cartas malucas engoliriam o SUPER
+export function adiarBonus(estado, ids) {
+  return ids.some((id, j) => id && ehSuper(estado.jogadores[j].baralho.mao.find((c) => c.id === id)))
+}
+
 // Sorteia o evento da rodada bônus. Não repete o anterior (se houver outro).
 //   disponiveis  ids permitidos (padrão: todos)
 export function sortearEvento(rng, { anterior = null, disponiveis = EVENTOS.map((ev) => ev.id) } = {}) {
