@@ -6,16 +6,16 @@ import { CARTAS, PERSONAGENS_PVP, NAIPES, CUSTOS, custoDoValor, ataqueDaCarta, d
 
 // Biblioteca falsa com a mesma forma de attacks/index.js: usa o definir.js de
 // verdade (que roda em Node) e padrões vazios que só guardam a config
-const NOMES = ['rain', 'sides', 'spiral', 'aimed', 'colunas', 'ondas', 'lasers', 'quicantes', 'anel', 'divisores', 'carrossel', 'foice', 'bombas', 'caminhonete', 'brasas', 'forcado', 'rachaduras', 'caosFinal', 'superKris', 'superSusie', 'superRalsei', 'superNoelle', 'superBerdly', 'superDess', 'superAsriel']
 const configs = []
-const A = { juntos, sequencia, comCaixa }
-for (const nome of NOMES) {
+// qualquer nome vale: os ataques exclusivos das cartas (attacks/habilidades/) também
+const falso = (nome) => {
   const padrao = definirAtaque({ nome, padrao: {}, iniciar() {} })
-  A[nome] = (cfg = {}) => {
+  return (cfg = {}) => {
     configs.push({ nome, cfg })
     return padrao(cfg)
   }
 }
+const A = new Proxy({ juntos, sequencia, comCaixa }, { get: (alvo, nome) => (nome in alvo || typeof nome !== 'string' ? alvo[nome] : (alvo[nome] = falso(nome))) })
 
 const todas = Object.values(CARTAS).flat()
 // as cartas "normais" (sem o SUPER, que tem regras próprias: ver super.test.js)
@@ -137,4 +137,18 @@ test('caixaFixa tira a mudança de caixa', () => {
   const c = CARTAS.kris.find((x) => x.id === 'kris-ouros-5') // caixa apertada
   assert.ok(ataqueDaCarta(c, { ataques: A }).caixa)
   assert.equal(ataqueDaCarta(c, { ataques: A, caixaFixa: true }).caixa, null)
+})
+
+// A biblioteca falsa aceita qualquer nome, então conferimos pelo texto dos
+// arquivos: todo A.<ataque>(...) dos baralhos tem que existir em attacks/
+test('todo ataque usado nos baralhos existe em attacks/', async () => {
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+  const raiz = path.resolve(import.meta.dirname, '../..')
+  const ler = (pasta) => fs.readdirSync(pasta, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? ler(path.join(pasta, e.name)) : e.name.endsWith('.js') ? [path.join(pasta, e.name)] : []))
+  const declarados = new Set(['juntos', 'sequencia', 'comCaixa'])
+  for (const arq of ler(path.join(raiz, 'attacks'))) for (const [, nome] of fs.readFileSync(arq, 'utf8').matchAll(/nome: '(\w+)'/g)) declarados.add(nome)
+  for (const arq of [...ler(path.join(raiz, 'pvp/baralhos')), path.join(raiz, 'pvp/padroes.js')]) {
+    for (const [, nome] of fs.readFileSync(arq, 'utf8').matchAll(/\bA\.(\w+)\(/g)) assert.ok(declarados.has(nome), `${path.basename(arq)}: A.${nome} não existe em attacks/`)
+  }
 })
