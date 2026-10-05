@@ -14,7 +14,7 @@ import { particulas } from '../../effects/particulas.js'
 //   ralseiBolinho         ♣ cupcakes no chão: a vela queima, estouram num chafariz de
 //                           granulado e a cereja voa em arco no coração
 //   ralseiFiosLa          ♣ novelos rolam quicando e desenrolam um fio que fica no rastro
-//   ralseiLacoFita        ♣ uma fita em laço se aperta em direção ao nó; foge pelo vão
+//   ralseiLacoFita        ♣ uma fita em laço se aperta em volta do coração; foge pelo vão
 //
 // Justiça: tudo nasce piscando (aviso das balas, >= ATAQUE.telegrafoMs) ou sai
 // de algo que já piscou (rastro da estrela, fio do novelo, granulado do bolinho);
@@ -507,44 +507,42 @@ const ralseiFiosLa = definirAtaque({
 // nó e é por ele que se escapa. O lacinho fica no chão um tempo depois.
 const ralseiLacoFita = definirAtaque({
   nome: 'ralseiLacoFita',
-  padrao: { duracao: 6000, intervalo: 2300, raio: 58, vao: 116, aviso: 650, tempoApertar: 1300, pedaco: 13, espessura: 6, lacoFica: 900, aperto: 0.9 },
+  padrao: { duracao: 6000, intervalo: 2300, raio: 58, vao: 70, aviso: 650, tempoApertar: 1300, pedaco: 13, espessura: 6, lacoFica: 900, aperto: 0.9 },
   iniciar(a, cfg) {
     const aviso = Math.max(ATAQUE.telegrafoMs, cfg.aviso)
     const R = cfg.raio
     const meioVao = Math.asin(Math.min(1, cfg.vao / (2 * R)))
-    // o vão (corda) encolhe junto com o laço; o coração passa por ele mais ou menos na metade do aperto
-    a.lacuna((cfg.vao - 2 * (1 + cfg.espessura / 2)) * (1 - cfg.aperto * 0.5), 'vão da fita no meio do aperto')
+    // o laço aperta em direção ao centro: o vão (corda) encolhe junto; é preciso sair por ele logo no começo
+    a.lacuna(cfg.vao - cfg.espessura, 'vão da fita quando ela começa a apertar')
 
-    a.aCada(cfg.intervalo, (i) => {
+    a.aCada(cfg.intervalo, () => {
       const l = a.caixa
       const alvo = a.alvo()
-      // centro um pouco deslocado do coração: parado, ele não fica no caminho do vão
+      // centro um pouco deslocado do coração (parado, ele fica no caminho da fita)
       const desvio = a.aleatorio(0, Math.PI * 2)
       const cx = limitar(alvo.x + Math.cos(desvio) * 22, l.left + 12, l.right - 12)
       const cy = limitar(alvo.y + Math.sin(desvio) * 22, l.top + 12, l.bottom - 12)
-      // nó dentro da caixa
-      let angNo = a.aleatorio(0, Math.PI * 2)
+      // o vão aponta para onde há mais caixa livre (nunca para a parede); o nó fica do lado oposto
+      let angVao = 0
       for (let k = 0; k < 16; k++) {
-        const nx = cx + Math.cos(angNo) * R
-        const ny = cy + Math.sin(angNo) * R
-        if (nx > l.left + 14 && nx < l.right - 14 && ny > l.top + 14 && ny < l.bottom - 14) break
-        angNo = a.aleatorio(0, Math.PI * 2)
+        const ang = (k / 16) * Math.PI * 2
+        if (ateABorda(l, cx, cy, ang) > ateABorda(l, cx, cy, angVao)) angVao = ang
       }
+      const angNo = angVao + Math.PI
       const no = { x: cx + Math.cos(angNo) * R, y: cy + Math.sin(angNo) * R }
+      const aperto = (b) => 1 - cfg.aperto * suave(limitar((b.idade - b.aviso) / cfg.tempoApertar, 0, 1))
 
-      // a fita: o círculo menos o arco do vão (do lado oposto ao nó)
+      // a fita: o círculo menos o arco do vão
       const arco = Math.PI * 2 - 2 * meioVao
       const n = Math.max(6, Math.ceil((arco * R) / cfg.pedaco))
       const comp = (arco * R) / n + 2
-      const inicio = angNo + Math.PI + meioVao
+      const inicio = angVao + meioVao
       for (let j = 0; j < n; j++) {
         const fi = inicio + ((j + 0.5) / n) * arco
-        const px = cx + Math.cos(fi) * R
-        const py = cy + Math.sin(fi) * R
         let escala = null
         a.bala({
-          x: px,
-          y: py,
+          x: cx + Math.cos(fi) * R,
+          y: cy + Math.sin(fi) * R,
           comprimento: comp,
           espessura: cfg.espessura,
           angulo: fi + Math.PI / 2,
@@ -554,10 +552,9 @@ const ralseiLacoFita = definirAtaque({
           vida: cfg.tempoApertar + 60,
           atualizar: (b) => {
             escala ??= b.sprite.scaleX
-            const p = limitar((b.idade - b.aviso) / cfg.tempoApertar, 0, 1)
-            const k = 1 - cfg.aperto * suave(p)
-            b.x = no.x + (px - no.x) * k
-            b.y = no.y + (py - no.y) * k
+            const k = aperto(b)
+            b.x = cx + Math.cos(fi) * R * k
+            b.y = cy + Math.sin(fi) * R * k
             b.comprimento = comp * k
             b.sprite.setScale(escala * k, escala)
           },
@@ -580,6 +577,9 @@ const ralseiLacoFita = definirAtaque({
             puxou = true
             tocar(a.cena, 'hab-ralsei-fita')
           }
+          const k = aperto(b)
+          b.x = cx + Math.cos(angNo) * R * k
+          b.y = cy + Math.sin(angNo) * R * k
           b.sprite.setRotation(Math.sin(b.idade / 90) * 0.15)
           if (b.vida < 300) b.sprite.setAlpha(Math.max(0.2, b.vida / 300))
         },

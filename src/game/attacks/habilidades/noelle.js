@@ -384,7 +384,8 @@ export default {
             mira -= 1
             const alvo = a.alvo()
             const i = Math.min(faixas - 1, Math.max(0, Math.floor((alvo.x - l.left) / passo)))
-            if (livres.includes(i)) escolhidas.push({ i, prof: Math.min(maxProf, Math.max(alvo.y - l.top + 18, l.height * 0.4)) })
+            // a mirada desce até perto do chão: ficar parado embaixo não salva (é só uma faixa: dá um passo pro lado)
+            if (livres.includes(i)) escolhidas.push({ i, prof: l.height - 6 })
           }
           while (escolhidas.length < Math.min(cfg.quantidade, livres.length)) {
             const i = a.escolher(livres)
@@ -397,7 +398,7 @@ export default {
             ocupadas.set(i, a.tempo + aviso + total + 100)
             const x = l.left + passo * (i + 0.5)
             const largura = 18
-            a.aviso({ tipo: 'area', x: x - largura / 2, y: l.top, largura, altura: prof, ms: aviso }, () => crescerEstalactite(a, cfg, x, prof, comprimento, total))
+            a.aviso({ tipo: 'area', x: x - largura / 2, y: l.top, largura, altura: prof, ms: aviso }, () => crescerEstalactite(a, cfg, x, prof, Math.max(comprimento, prof + 6), total))
           }
         },
         Infinity,

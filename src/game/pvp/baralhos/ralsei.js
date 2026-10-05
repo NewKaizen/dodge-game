@@ -26,7 +26,7 @@ export default {
     fios: r('Novelos de lã rolam quicando e desenrolam um fio preso na parede', (A, t) =>
       A.ralseiFiosLa({ duracao: duracaoDe(t), intervalo: lerp(2100, 1500, t), velocidade: lerp(115, 150, t), quiques: t >= 0.6 ? 3 : 2, comprimento: lerp(80, 120, t) }),
     ),
-    laco: r('Uma fita dá um laço em volta do coração e se aperta em direção ao nó: fuja pelo vão; o lacinho fica no chão', (A, t) =>
+    laco: r('Uma fita dá um laço em volta do coração e se aperta: fuja pelo vão antes que feche; o lacinho fica no chão', (A, t) =>
       A.ralseiLacoFita({ duracao: duracaoDe(t), intervalo: lerp(2600, 2000, t), raio: lerp(54, 62, t), tempoApertar: lerp(1500, 1200, t) }),
     ),
   },
