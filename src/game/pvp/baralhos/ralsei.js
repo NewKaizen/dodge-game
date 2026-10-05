@@ -15,7 +15,7 @@ export default {
       A.ralseiCoroEstrelas({ duracao: duracaoDe(t), cantores: t >= 0.5 ? 5 : 4, intervalo: lerp(560, 420, t), velocidade: lerp(125, 170, t), voz: t >= 0.6 ? 3 : 1, coroCheio: t >= 0.6 }),
     ),
     ninar: r('Numa caixa apertada, as notas de uma canção de ninar atravessam a pauta subindo e descendo com a melodia', (A, t) =>
-      apertar(A, t, A.ralseiCancaoNinar({ duracao: duracaoDe(t), velocidade: lerp(95, 125, t), espaco: lerp(70, 62, t), vozes: t >= 0.4 ? 2 : 1 })),
+      apertar(A, t, A.ralseiCancaoNinar({ duracao: duracaoDe(t), velocidade: lerp(95, 125, t), espaco: lerp(72, 64, t), vozes: t >= 0.4 ? 2 : 1 })),
     ),
     sono: r('Numa caixa apertada, trios de "Z" brotam do chão e sobem em zigue-zague, crescendo', (A, t) =>
       apertar(A, t, A.ralseiFeiticoSono({ duracao: duracaoDe(t), intervalo: lerp(1000, 720, t), velocidade: lerp(55, 80, t) })),

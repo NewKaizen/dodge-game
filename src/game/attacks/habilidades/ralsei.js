@@ -147,15 +147,18 @@ const ralseiCoroEstrelas = definirAtaque({
           if (b.cantaAte && b.idade > b.cantaAte) {
             b.cantaAte = 0
             b.sprite.setFrame(0)
+            b.escalaX = b.escalaY = b.base
           }
         },
       })
+      est.base = est.escalaX
       coro.push(est)
     }
 
     const cantar = (est, voz, abertura) => {
       if (est.morta) return
       est.sprite.setFrame(1)
+      est.escalaX = est.escalaY = est.base * 1.25 // incha ao cantar
       est.cantaAte = est.idade + 320
       const alvo = a.alvo()
       const dir = Math.atan2(alvo.y - est.y, alvo.x - est.x)
@@ -199,7 +202,7 @@ const ralseiCoroEstrelas = definirAtaque({
 const MELODIA = [2, 2, 4, 2, 2, 4, 2, 4, 7, 6, 5, 5, 4, -1, 1, 2, 3, 1, 2, 3, 1, 3, 6, 5, 4, 6, 7, -1]
 const ralseiCancaoNinar = definirAtaque({
   nome: 'ralseiCancaoNinar',
-  padrao: { duracao: 5000, velocidade: 105, espaco: 66, vozes: 2, raio: 6 },
+  padrao: { duracao: 5000, velocidade: 105, espaco: 66, vozes: 2, raio: 7 },
   iniciar(a, cfg) {
     const l = a.caixa
     const graus = 7
