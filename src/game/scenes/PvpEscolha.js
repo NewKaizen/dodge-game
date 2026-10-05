@@ -20,6 +20,17 @@ const NOMES_NIVEL = { facil: 'FÁCIL', normal: 'NORMAL', dificil: 'DIFÍCIL' }
 // Transição "P1 VS P2" (ms desde a confirmação do segundo jogador)
 const VS = { entrada: 120, batida: 560, espelho: 760, saida: 1500, fim: 1760 }
 
+// Põe `conteudo` no texto sem passar de `largura`: diminui a fonte (até
+// 3 px a menos) e, se ainda não couber, corta com reticências
+function caber(texto, conteudo, largura, tamanho) {
+  for (let t = tamanho; t >= tamanho - 3; t--) {
+    texto.setFontSize(t).setText(conteudo)
+    if (texto.width <= largura) return
+  }
+  let corte = conteudo.length
+  while (corte > 1 && texto.width > largura) texto.setText(`${conteudo.slice(0, --corte).trimEnd()}…`)
+}
+
 // Escolha de personagem do PvP (Modo -> PvpEscolha -> PvpArena).
 //   2 jogadores: cada um tem seu cursor (cor da alma) e confirma o seu ao
 //                mesmo tempo; os dois PODEM pegar o mesmo personagem (espelho).
@@ -384,7 +395,8 @@ export default class PvpEscolha extends Phaser.Scene {
     p.hp.setText(`HP ${perfil.hp}`)
     p.coracaoHp.setX(p.hp.x - p.hp.width - 11)
     p.estiloRotulo.setText(perfil.estilo.rotulo).setColor(corTexto(perfil.estilo.cor))
-    p.estiloFrase.setText(perfil.estilo.frase).setX(p.estiloRotulo.x + p.estiloRotulo.width + 8)
+    p.estiloFrase.setX(p.estiloRotulo.x + p.estiloRotulo.width + 8)
+    caber(p.estiloFrase, perfil.estilo.frase, p.x + p.largura - 10 - p.estiloFrase.x, 12)
 
     const textura = this.textures.exists(id) ? id : 'coracao'
     p.sprite.setTexture(textura).setScale(3).clearTint()
@@ -415,8 +427,8 @@ export default class PvpEscolha extends Phaser.Scene {
       const corNaipe = COR_NAIPE[carta.naipe]
       linha.valor.setText(rotuloCarta(carta)).setColor(corTexto(corNaipe))
       desenharNaipe(p.naipesFortes, carta.naipe, p.x + 38, linha.ly, 6, corNaipe)
-      linha.nome.setText(carta.nome)
       linha.tipo.setText(`custo ${carta.custo}`).setColor('#8a8aa0')
+      caber(linha.nome, carta.nome, linha.tipo.x - linha.tipo.width - 8 - linha.nome.x, 14)
     })
   }
 

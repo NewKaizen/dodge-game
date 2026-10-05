@@ -26,9 +26,9 @@ const MODOS = [
   },
 ]
 
-// Tela do modo de jogo, logo depois do Menu: CO-OP (Menu -> Modo -> EscolhaParty
+// Tela do modo de jogo, logo depois do Menu (B volta para ele): CO-OP (Menu -> Modo -> EscolhaParty
 // -> Selecao -> Dificuldade -> Battle) ou PVP (PvpEscolha -> PvpArena -> PvpResultado).
-// A: confirmar · ← →: escolher
+// A: confirmar · ← →: escolher · B: voltar ao Menu
 export default class Modo extends Phaser.Scene {
   constructor() {
     super('Modo')
@@ -36,7 +36,7 @@ export default class Modo extends Phaser.Scene {
 
   create() {
     this.controles = new Controles(this)
-    this.controles.onBotao((_, botao) => botao === 'A' && this.confirmar())
+    this.controles.onBotao((_, botao) => (botao === 'A' ? this.confirmar() : botao === 'B' && this.voltar()))
     this.saindo = false
     const texto = (x, y, conteudo, tamanho, cor = TEXTO.normal, extra = {}) =>
       this.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra }).setOrigin(0.5)
@@ -66,7 +66,7 @@ export default class Modo extends Phaser.Scene {
     })
 
     this.cursor = this.add.image(0, 0, 'coracao').setTint(CORES.almas[0]).setScale(1.8)
-    texto(LARGURA / 2, ALTURA - 30, '← → escolher     A: confirmar', 14, TEXTO.desabilitado, { strokeThickness: 0 })
+    texto(LARGURA / 2, ALTURA - 30, '← → escolher     A: confirmar     B: voltar', 14, TEXTO.desabilitado, { strokeThickness: 0 })
 
     const ultimo = MODOS.findIndex((m) => m.id === this.registry.get('modo'))
     this.selecionar(Math.max(0, ultimo), false)
@@ -105,6 +105,14 @@ export default class Modo extends Phaser.Scene {
     this.cameras.main.flash(200, 255, 255, 255)
     this.cameras.main.fadeOut(300, 0, 0, 0)
     this.time.delayedCall(320, () => this.scene.start(modo.cena))
+  }
+
+  voltar() {
+    if (this.saindo) return
+    this.saindo = true
+    tocar(this, 'cancelar')
+    this.cameras.main.fadeOut(220, 0, 0, 0)
+    this.time.delayedCall(240, () => this.scene.start('Menu'))
   }
 
   update(time, delta) {

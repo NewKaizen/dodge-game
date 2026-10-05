@@ -25,8 +25,8 @@ export const TIPO_NAIPE = { espadas: 'ATAQUE', copas: 'SUPORTE', ouros: 'CONTROL
 const ESTILOS = {
   espadas: { rotulo: 'AGRESSIVO', frase: 'muito ataque direto', cor: 0xff6a5a },
   copas: { rotulo: 'SUPORTE', frase: 'cura, escudo e fôlego', cor: 0x6be08a },
-  ouros: { rotulo: 'CONTROLE', frase: 'acelera e aperta a caixa', cor: 0xffb040 },
-  paus: { rotulo: 'ARMADILHEIRO', frase: 'bombas, lasers e truques', cor: 0x6fd8a0 },
+  ouros: { rotulo: 'CONTROLE', frase: 'aperta e acelera', cor: 0xffb040 },
+  paus: { rotulo: 'ARMADILHEIRO', frase: 'bombas e truques', cor: 0x6fd8a0 },
 }
 const PUXADO = { espadas: 'ataque', copas: 'suporte', ouros: 'controle', paus: 'armadilha' }
 
@@ -55,7 +55,7 @@ function estiloDe(naipes, figuras, total) {
   if (folga >= 2) {
     const base = ESTILOS[primeiro]
     // um segundo naipe acima dos outros vira um "puxado para"
-    const extra = naipes[segundo] > naipes[ordem[2]] ? `, puxado para ${PUXADO[segundo]}` : ''
+    const extra = naipes[segundo] > naipes[ordem[2]] ? ` + ${PUXADO[segundo]}` : ''
     return { ...base, frase: base.frase + extra }
   }
   if (total && figuras / total >= 0.5) return { rotulo: 'IMPREVISÍVEL', frase: 'cheio de figuras fortes', cor: 0xfff07a }

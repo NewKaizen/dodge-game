@@ -1,13 +1,11 @@
 <script>
   import Conectar from './ui/Conectar.svelte'
   import Game from './ui/Game.svelte'
-  import Debug from './ui/Debug.svelte'
 </script>
 
 <main>
   <Conectar />
   <Game />
-  <Debug />
 </main>
 
 <style>

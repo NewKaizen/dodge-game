@@ -18,6 +18,7 @@ import forcado from './forcado.js'
 import rachaduras from './rachaduras.js'
 import caosFinal from './caosFinal.js'
 import { ataquesSuper } from './super/index.js'
+import { ataquesHabilidades } from './habilidades/index.js'
 
 // Todos os ataques disponíveis. Para criar um novo, copie um arquivo desta
 // pasta, mude nome/padrao/iniciar e adicione aqui.
@@ -57,6 +58,7 @@ export const ataques = {
   rachaduras,
   caosFinal,
   ...ataquesSuper, // superKris, superSusie... (cartas SUPER)
+  ...ataquesHabilidades, // krisEstocadaDupla, susieCabecada... (cartas normais, ver habilidades/)
   juntos,
   sequencia,
   comCaixa,

@@ -12,6 +12,7 @@ import Dificuldade from './scenes/Dificuldade.js'
 import Battle from './scenes/Battle.js'
 import Vitoria from './scenes/Vitoria.js'
 import Pausa from './scenes/Pausa.js'
+import Config from './scenes/Config.js'
 import GameOver from './scenes/GameOver.js'
 import Entrada from './scenes/Entrada.js'
 import TesteCartas from './scenes/TesteCartas.js'
@@ -29,6 +30,6 @@ export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCs
     roundPixels: true,
     scale: { mode: Phaser.Scale.NONE, zoom: zoomCss },
     // TesteCartas e PvpArenaTeste: telas de teste do PvP (no dev: debugJogo.jogo.scene.start('...'))
-    scene: [Boot, Menu, Modo, EscolhaParty, PvpEscolha, PvpArena, PvpResultado, Selecao, Dificuldade, Battle, Vitoria, GameOver, Entrada, Pausa, TesteCartas, PvpArenaTeste],
+    scene: [Boot, Menu, Modo, EscolhaParty, PvpEscolha, PvpArena, PvpResultado, Selecao, Dificuldade, Battle, Vitoria, GameOver, Entrada, Pausa, Config, TesteCartas, PvpArenaTeste],
   }
 }

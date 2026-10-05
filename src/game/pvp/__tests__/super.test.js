@@ -10,10 +10,9 @@ import { criarRng } from '../baralho.js'
 import { PERSONAGENS } from '../../data/personagens.js'
 
 // Biblioteca falsa (mesma ideia de cartas.test.js)
-const NOMES = ['rain', 'sides', 'spiral', 'aimed', 'colunas', 'ondas', 'lasers', 'quicantes', 'anel', 'divisores', 'carrossel', 'foice', 'bombas', 'caminhonete', 'brasas', 'forcado', 'rachaduras', 'caosFinal', 'superKris', 'superSusie', 'superRalsei', 'superNoelle', 'superBerdly', 'superDess', 'superAsriel']
-const A = { juntos, sequencia, comCaixa }
-// os SUPERs de verdade (attacks/super/) duram ~9 s ativos
-for (const nome of NOMES) A[nome] = definirAtaque({ nome, padrao: nome.startsWith('super') ? { duracao: 9000 } : {}, iniciar() {} })
+// qualquer nome vale; os SUPERs de verdade (attacks/super/) duram ~9 s ativos
+const falso = (nome) => definirAtaque({ nome, padrao: nome.startsWith('super') ? { duracao: 9000 } : {}, iniciar() {} })
+const A = new Proxy({ juntos, sequencia, comCaixa }, { get: (alvo, nome) => (nome in alvo || typeof nome !== 'string' ? alvo[nome] : (alvo[nome] = falso(nome))) })
 
 function naMao(estado, j, id) {
   const b = estado.jogadores[j].baralho
