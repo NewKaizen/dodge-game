@@ -11,7 +11,7 @@ export default {
     cores: { chama: 0xff8a1c, bola: 0xffd24c, barra: 0xd8d8e0 },
     cor: 0xff8a1c,
   },
-  hp: 520,
+  hp: 320,
   danoBala: 12,
   leve: (A) => A.brasas({ duracao: 4000, intervalo: 700 }),
   fases: [

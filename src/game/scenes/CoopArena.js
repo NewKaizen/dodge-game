@@ -31,6 +31,7 @@ import {
   fimDaRodadaCoop,
 } from '../coop/regras.js'
 import { escolherJogadaCoop } from '../coop/bot.js'
+import { superNoChefe } from '../coop/superNoChefe.js'
 import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
@@ -50,7 +51,9 @@ import { particulas } from '../effects/particulas.js'
 //   'arremesso'  as cartas do chefe voam para as caixas; as de ataque dos
 //                jogadores ficam CARREGANDO embaixo do chefe
 //   'esquiva'    cada um desvia na sua caixa; HP 0 = caiu (a outra caixa segue)
-//   'contra'     as cartas carregadas voam no chefe (crítico, combo, par, armadilha)
+//   'contra'     as cartas carregadas voam no chefe (crítico, combo, par, armadilha);
+//                o SUPER tem o efeito do personagem em cima do chefe (coop/superNoChefe.js)
+//                e os dois SUPER juntos viram o SUPER COMBO
 //   'fim'        fase nova do chefe? vitória (Vitoria) ou os dois caídos (GameOver)
 //
 //   scene.start('CoopArena', { chefe: 'king', nivel: 'facil', semente? })
@@ -264,8 +267,9 @@ export default class CoopArena extends PvpArena {
     this.inimigo.atualizar(c.hp, c.hpMax)
     const partes = []
     if (c.guarda != null) partes.push(`GUARDA -${Math.round((1 - c.guarda) * 100)}%`)
-    if (c.fase >= 1) partes.push(`SUPER ${'★'.repeat(c.carga)}${'☆'.repeat(c.cargaMax - c.carga)}`)
-    this.textoChefe.setText(partes.join('  ')).setColor(c.carga >= c.cargaMax - 1 && c.fase >= 1 ? '#ff6a4a' : '#ffd23c')
+    const faltam = c.cargaMax - c.carga
+    partes.push(faltam <= 1 ? 'SUPER DO CHEFE NA PRÓXIMA!' : `SUPER DO CHEFE EM ${faltam}`)
+    this.textoChefe.setText(partes.join('  ')).setColor(faltam <= 1 ? '#ff6a4a' : '#ffd23c')
   }
 
   // quem caiu: personagem deitado, placar apagado
@@ -809,33 +813,39 @@ export default class CoopArena extends PvpArena {
     this.fase = 'contra'
     const vivos = r.golpes.map((g, j) => (this.estado.jogadores[j].caido ? null : g))
     const combo = comboDosGolpes(vivos)
-    if (combo) {
-      this.combos++
-      tocar(this, 'combo')
-      flashTela(this, 0xffd23c, 0.2, 200)
-      this.mostrarBanner(combo === 'par' ? 'PAR!  x1.5' : 'COMBO!  x1.25', '#ffd23c', { y: 236, tamanho: 30, ms: 900 })
-      await this.esperar(700)
-    }
-    for (const g of lista) {
-      const carta = this.armadas[g.j]
-      this.armadas[g.j] = null
-      if (!carta) continue
-      this.tweens.killTweensOf(carta)
-      const carga = carta.carga
-      if (g.falhou) {
-        carga?.destroy()
-        this.tirarDaMesa(carta)
-        continue
+    if (combo === 'super') await this.superCombo(lista)
+    else {
+      if (combo) {
+        this.combos++
+        tocar(this, 'combo')
+        flashTela(this, 0xffd23c, 0.2, 200)
+        this.mostrarBanner(combo === 'par' ? 'PAR!  x1.5' : 'COMBO!  x1.25', '#ffd23c', { y: 236, tamanho: 30, ms: 900 })
+        await this.esperar(700)
       }
-      g.multiplicadores.forEach(([nome, fator], k) =>
-        this.etiquetaEm(ARMADA[g.j].x, ARMADA[g.j].y - 44 - k * 15, `${nome} x${Number(fator.toFixed(2))}`, nome === 'GUARDA' ? TEXTO.guarda : '#ffd23c', { tamanho: 11, ms: 700 }),
-      )
-      carga?.destroy()
-      this.personagemPula(g.j)
-      await this.esperar(g.multiplicadores.length ? 380 : 120)
-      await carta.arremessar({ x: CHEFE.x, y: CHEFE.y }, { duracao: 300, aoImpacto: () => this.golpeNoChefe(g) })
-      await this.esperar(260)
-      if (this.estado.chefe.hp <= 0) break
+      for (const g of lista) {
+        const carta = this.armadas[g.j]
+        this.armadas[g.j] = null
+        if (!carta) continue
+        this.tweens.killTweensOf(carta)
+        const carga = carta.carga
+        if (g.falhou) {
+          carga?.destroy()
+          this.tirarDaMesa(carta)
+          continue
+        }
+        this.mostrarMultiplicadores(g)
+        carga?.destroy()
+        this.personagemPula(g.j)
+        await this.esperar(g.multiplicadores.length ? 380 : 120)
+        if (g.golpe.tipo === 'super') {
+          await carta.arremessar({ x: CHEFE.x, y: CHEFE.y }, { duracao: 300 })
+          await superNoChefe(this, carta.dados.personagem, () => this.golpeNoChefe(g))
+        } else {
+          await carta.arremessar({ x: CHEFE.x, y: CHEFE.y }, { duracao: 300, aoImpacto: () => this.golpeNoChefe(g) })
+          await this.esperar(260)
+        }
+        if (this.estado.chefe.hp <= 0) break
+      }
     }
     // sobrou alguma (o chefe caiu antes): some
     this.armadas.forEach((c) => {
@@ -845,6 +855,53 @@ export default class CoopArena extends PvpArena {
     })
     this.armadas = [null, null]
     await this.esperar(400)
+  }
+
+  mostrarMultiplicadores(g) {
+    g.multiplicadores.forEach(([nome, fator], k) =>
+      this.etiquetaEm(ARMADA[g.j].x, ARMADA[g.j].y - 44 - k * 15, `${nome} x${Number(fator.toFixed(2))}`, nome === 'GUARDA' ? TEXTO.guarda : '#ffd23c', { tamanho: 11, ms: 700 }),
+    )
+  }
+
+  // Os dois jogaram SUPER: as duas cartas voam juntas, os dois efeitos
+  // acontecem ao mesmo tempo em cima do chefe e fecham com uma explosão arco-íris
+  async superCombo(lista) {
+    this.combos++
+    tocar(this, 'superAtivar')
+    flashTela(this, 0xffffff, 0.5, 260)
+    shake(this, 300, 0.012)
+    this.mostrarBanner(`SUPER COMBO!!  x${COOP.superCombo}`, '#ffe9a0', { y: 236, tamanho: 34, ms: 1300 })
+    const arco = [0xff4a5a, 0xffa23a, 0xffe14a, 0x5ae06a, 0x4ab8ff, 0xa66bff]
+    arco.forEach((cor, k) => this.time.delayedCall(k * 110, () => this.banner.setColor(corTexto(cor))))
+    lista.forEach((g) => {
+      this.mostrarMultiplicadores(g)
+      this.personagemPula(g.j)
+    })
+    await this.esperar(1000)
+    const total = { dano: 0 }
+    await Promise.all(
+      lista.map(async (g) => {
+        const carta = this.armadas[g.j]
+        this.armadas[g.j] = null
+        if (!carta) return
+        this.tweens.killTweensOf(carta)
+        carta.carga?.destroy()
+        await carta.arremessar({ x: CHEFE.x, y: CHEFE.y }, { duracao: 300 })
+        await superNoChefe(this, carta.dados.personagem, () => {
+          total.dano += g.dano
+          this.golpeNoChefe(g)
+        })
+      }),
+    )
+    if (this.saindo) return
+    // o final: a explosão das duas forças juntas
+    tocar(this, 'estouro')
+    flashTela(this, 0xffffff, 0.7, 320)
+    shake(this, 520, 0.03)
+    arco.forEach((cor, k) => this.time.delayedCall(k * 60, () => particulas(this, CHEFE.x, CHEFE.y, { cor, quantidade: 22, velocidade: 360, vida: 800, escala: 1.8 })))
+    numero(this, CHEFE.x, CHEFE.y - 90, `${total.dano}!!`, '#ffe9a0', { tamanho: 34 })
+    this.inimigo.dano(1)
+    await this.esperar(900)
   }
 
   golpeNoChefe(g) {
@@ -858,7 +915,8 @@ export default class CoopArena extends PvpArena {
     const forte = g.golpe.tipo === 'super' || critico
     tocar(this, forte ? 'critico' : 'golpe')
     this.inimigo.dano(Math.min(1, g.dano / 60))
-    numero(this, CHEFE.x + (g.j ? 16 : -16), CHEFE.y - 40, String(g.dano), forte ? '#ffd23c' : '#ffffff', { tamanho: forte ? 26 : 20, desvio: 10 })
+    const tamanho = g.golpe.tipo === 'super' ? 32 : forte ? 26 : 20
+    numero(this, CHEFE.x + (g.j ? 16 : -16), CHEFE.y - 40, String(g.dano), forte ? '#ffd23c' : '#ffffff', { tamanho, desvio: 10 })
     particulas(this, CHEFE.x, CHEFE.y, { cor: CORES.almas[g.j], quantidade: forte ? 30 : 14, velocidade: forte ? 240 : 150 })
     shake(this, forte ? 220 : 110, forte ? 0.012 : 0.006)
     if (forte) flashTela(this, 0xffffff, 0.25, 160)
@@ -898,7 +956,7 @@ export default class CoopArena extends PvpArena {
     shake(this, 420, 0.012)
     this.inimigo.dano(0.8)
     this.mostrarBanner(`FASE ${f + 1}!`, corTexto(this.defChefe.tema.cor), { y: 236, tamanho: 30, ms: 1500 })
-    this.etiquetaEm(LARGURA / 2, 268, f === 1 ? 'cartas novas no baralho do chefe · o SUPER dele começa a carregar' : 'cartas novas no baralho do chefe', TEXTO.normal, {
+    this.etiquetaEm(LARGURA / 2, 268, 'cartas novas no baralho do chefe', TEXTO.normal, {
       atraso: 250,
       tamanho: 11,
       ms: 1400,

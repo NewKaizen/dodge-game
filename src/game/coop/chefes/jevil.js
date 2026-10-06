@@ -25,7 +25,7 @@ export default {
     },
     cor: 0xffffff,
   },
-  hp: 500,
+  hp: 310,
   danoBala: 13,
   leve: (A) => A.quicantes({ forma: 'ouros', duracao: 4000, intervalo: 1500, velocidade: 150 }),
   fases: [

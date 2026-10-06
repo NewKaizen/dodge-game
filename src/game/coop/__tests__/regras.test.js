@@ -217,6 +217,37 @@ test('SUPER do chefe: carga cheia nas duas caixas e imparável', () => {
   assert.equal(r.golpes[0].tipo, 'eco')
 })
 
+test('SUPER do chefe sai a cada COOP.cargaSuper rodadas, desde a 1ª fase', () => {
+  const e = nova()
+  const rodadasComSuper = []
+  for (let r = 1; r <= COOP.cargaSuper * 2; r++) {
+    if (iniciarRodadaCoop(e).some((ev) => ev.tipo === 'superChefe')) rodadasComSuper.push(r)
+    resolverRodadaCoop(e, null, null)
+    fimDaRodadaCoop(e)
+  }
+  assert.deepEqual(rodadasComSuper, [COOP.cargaSuper, COOP.cargaSuper * 2])
+})
+
+test('SUPER no CO-OP: custo e dano do CO-OP; os dois juntos = SUPER COMBO', () => {
+  const e = nova()
+  const supers = e.jogadores.map((jog) => jog.baralho.monte.find((c) => c.valor === 14))
+  assert.ok(supers.every((c) => c.custo === COOP.custoSuper))
+  assert.equal(CARTAS.kris.find((c) => c.valor === 14).custo, 10) // o PvP não muda
+  iniciarRodadaCoop(e)
+  const ids = supers.map((c, j) => {
+    e.jogadores[j].baralho.mao.push(c)
+    e.jogadores[j].energia = COOP.custoSuper
+    return c.id
+  })
+  const r = resolverRodadaCoop(e, ...ids)
+  assert.equal(comboDosGolpes(r.golpes), 'super')
+  const lista = calcularGolpes(e, r.golpes)
+  assert.ok(lista.every((g) => g.dano === Math.round(COOP.superGolpe * COOP.superCombo)))
+  assert.ok(lista.every((g) => g.multiplicadores.some(([nome]) => nome === 'SUPER COMBO')))
+  // só um SUPER: sem combo
+  assert.equal(comboDosGolpes([r.golpes[0], null]), null)
+})
+
 test('♦ deixa a carta do chefe mais lenta; Q/K nas duas caixas', () => {
   const e = nova()
   iniciarRodadaCoop(e)
