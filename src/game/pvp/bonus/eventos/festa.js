@@ -56,38 +56,31 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
 
   const criarBola = () => {
     fio = guardar(arena.add.rectangle(LARGURA / 2, 0, 2, 1, 0xcccccc).setOrigin(0.5, 0).setDepth(64))
-    if (arena.textures.exists('bonus-bola-disco')) {
-      bola = arena.add.image(LARGURA / 2, -40, 'bonus-bola-disco')
-      bola.setScale(44 / Math.max(1, bola.width))
-    } else {
-      bola = arena.add.circle(LARGURA / 2, -40, 20, 0xd8d8e8).setStrokeStyle(2, 0xffffff)
-    }
+    bola = arena.add.image(LARGURA / 2, -40, 'bonus-bola-disco')
+    bola.setScale(44 / Math.max(1, bola.width))
     guardar(bola).setDepth(65)
     arena.tweens.add({ targets: bola, y: BOLA_Y, duration: 1100, ease: 'Bounce.easeOut' })
     // raios saindo da bola (girando)
-    if (arena.textures.exists('raio')) {
-      const lista = []
-      for (let i = 0; i < 10; i++) {
-        lista.push(
-          arena.add
-            .image(0, 0, 'raio')
-            .setOrigin(0.5, 1)
-            .setScale(0.8, 2.4)
-            .setRotation((i / 10) * Math.PI * 2)
-            .setTint(CORES_FESTA[i % CORES_FESTA.length])
-            .setBlendMode(Phaser.BlendModes.ADD),
-        )
-      }
-      raios = guardar(arena.add.container(LARGURA / 2, -40, lista).setDepth(2).setAlpha(0.13))
+    const lista = []
+    for (let i = 0; i < 10; i++) {
+      lista.push(
+        arena.add
+          .image(0, 0, 'raio')
+          .setOrigin(0.5, 1)
+          .setScale(0.8, 2.4)
+          .setRotation((i / 10) * Math.PI * 2)
+          .setTint(CORES_FESTA[i % CORES_FESTA.length])
+          .setBlendMode(Phaser.BlendModes.ADD),
+      )
     }
+    raios = guardar(arena.add.container(LARGURA / 2, -40, lista).setDepth(2).setAlpha(0.13))
   }
 
   const criarHolofotes = () => {
-    const tem = arena.textures.exists('bonus-holofote')
     for (let i = 0; i < HOLOFOTES; i++) {
       const cor = CORES_FESTA[(i * 2) % (CORES_FESTA.length - 1)] // sem o branco
-      const h = tem ? arena.add.image(0, 0, 'bonus-holofote').setTint(cor) : arena.add.circle(0, 0, 32, cor)
-      h.setScale((tem ? 150 / Math.max(1, h.width) : 2.3) * entre(0.85, 1.15)).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
+      const h = arena.add.image(0, 0, 'bonus-holofote').setTint(cor)
+      h.setScale((150 / Math.max(1, h.width)) * entre(0.85, 1.15)).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
       h.setData('fase', entre(0, Math.PI * 2)).setData('vel', entre(0.6, 1.1) * (i % 2 ? 1 : -1))
       guardar(h).setDepth(93)
       arena.tweens.add({ targets: h, alpha: 0.32, duration: 500 })
@@ -122,12 +115,10 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
       },
     })
     // a bala nasce com a textura bala-bola: troca pelo balão (o tamanho da colisão não muda)
-    if (arena.textures.exists('bonus-balao')) {
-      const s = bala.sprite.setTexture('bonus-balao').setOrigin(0.5, 0.4)
-      s.setScale((BALAO.raio * 2.6) / Math.max(1, s.width))
-      bala.escalaX = s.scaleX
-      bala.escalaY = s.scaleY
-    }
+    const s = bala.sprite.setTexture('bonus-balao').setOrigin(0.5, 0.4)
+    s.setScale((BALAO.raio * 2.6) / Math.max(1, s.width))
+    bala.escalaX = s.scaleX
+    bala.escalaY = s.scaleY
     baloes.push({ j, bala, cor })
   }
 
@@ -215,7 +206,7 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
       if (bola) {
         bola.rotation = Math.sin(t / 300) * 0.25
         fio.setSize(2, Math.max(1, bola.y - 18))
-        if (raios) raios.setPosition(bola.x, bola.y).setRotation(t / 1400)
+        raios.setPosition(bola.x, bola.y).setRotation(t / 1400)
         if (sorte() < delta / 160) particulas(arena, bola.x + entre(-18, 18), bola.y + entre(-18, 18), { cor: escolher(CORES_FESTA), quantidade: 3, velocidade: 60, vida: 300 })
       }
 

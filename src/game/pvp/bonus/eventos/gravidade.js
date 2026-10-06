@@ -14,19 +14,9 @@ const DIRECOES = Array.from({ length: 8 }, (_, k) => ({ x: Math.round(Math.cos((
 
 // Seta na cor `cor` apontando para a DIREITA, centrada, com `tamanho` px de comprimento
 function criarSeta(arena, tamanho, cor) {
-  if (arena.textures.exists('bonus-seta')) {
-    const img = arena.add.image(0, 0, 'bonus-seta').setTint(cor)
-    img.setScale(tamanho / Math.max(1, img.width))
-    return img
-  }
-  const g = arena.add.graphics()
-  const m = tamanho / 2
-  const ponta = tamanho * 0.42
-  const haste = tamanho * 0.14
-  g.fillStyle(cor, 1)
-  g.fillRect(-m, -haste, tamanho - ponta, haste * 2)
-  g.fillTriangle(m - ponta, -tamanho * 0.36, m, 0, m - ponta, tamanho * 0.36)
-  return g
+  const img = arena.add.image(0, 0, 'bonus-seta').setTint(cor)
+  img.setScale(tamanho / Math.max(1, img.width))
+  return img
 }
 
 export default function criar(arena, { rng }) {

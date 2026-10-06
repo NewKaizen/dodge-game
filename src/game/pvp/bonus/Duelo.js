@@ -69,94 +69,6 @@ const MEIO = CORACAO.tamanho / 2
 const ARMA_ICONE = { tiro: 'tiro', espada: 'espada', bumerangue: 'bumerangue', explosao: 'bomba' }
 const PROFUNDIDADE = { fundo: 2, aviso: 3, borda: 4, rotulo: 5, bomba: 6, tiro: 7, seta: 9, golpe: 10, coracao: 11, explosao: 13, texto: 40, contagem: 96 }
 
-// Texturas reserva (se os PNGs bonus-* ainda não existirem)
-function tela(largura, altura, desenhar) {
-  const c = document.createElement('canvas')
-  c.width = largura
-  c.height = altura
-  desenhar(c.getContext('2d'))
-  return c
-}
-const RESERVAS = {
-  tiro: () =>
-    tela(12, 12, (g) => {
-      g.fillStyle = '#ffffff'
-      g.beginPath()
-      g.arc(6, 6, 5, 0, Math.PI * 2)
-      g.fill()
-    }),
-  espada: () =>
-    tela(52, 12, (g) => {
-      g.fillStyle = '#9a9a9a'
-      g.fillRect(0, 4, 9, 4)
-      g.fillStyle = '#ffffff'
-      g.fillRect(9, 0, 3, 12)
-      g.beginPath()
-      g.moveTo(12, 3)
-      g.lineTo(44, 3)
-      g.lineTo(52, 6)
-      g.lineTo(44, 9)
-      g.lineTo(12, 9)
-      g.closePath()
-      g.fill()
-    }),
-  bumerangue: () =>
-    tela(22, 22, (g) => {
-      g.strokeStyle = '#ffffff'
-      g.lineWidth = 5
-      g.lineCap = 'round'
-      g.beginPath()
-      g.moveTo(3, 18)
-      g.lineTo(11, 4)
-      g.lineTo(19, 18)
-      g.stroke()
-    }),
-  bomba: () =>
-    tela(22, 24, (g) => {
-      g.strokeStyle = '#c08040'
-      g.lineWidth = 2
-      g.beginPath()
-      g.moveTo(11, 8)
-      g.quadraticCurveTo(13, 2, 18, 3)
-      g.stroke()
-      g.fillStyle = '#ffd040'
-      g.beginPath()
-      g.arc(18, 3, 2.5, 0, Math.PI * 2)
-      g.fill()
-      g.fillStyle = '#1c1c24'
-      g.beginPath()
-      g.arc(11, 15, 8, 0, Math.PI * 2)
-      g.fill()
-      g.fillStyle = '#5a5a70'
-      g.beginPath()
-      g.arc(8, 12, 2.5, 0, Math.PI * 2)
-      g.fill()
-    }),
-  seta: () =>
-    tela(10, 10, (g) => {
-      g.fillStyle = '#ffffff'
-      g.beginPath()
-      g.moveTo(0, 0)
-      g.lineTo(10, 5)
-      g.lineTo(0, 10)
-      g.lineTo(3, 5)
-      g.closePath()
-      g.fill()
-    }),
-  explosao: () =>
-    tela(64, 64, (g) => {
-      const r = g.createRadialGradient(32, 32, 2, 32, 32, 31)
-      r.addColorStop(0, '#ffffff')
-      r.addColorStop(0.3, '#ffe060')
-      r.addColorStop(0.7, '#ff7a1a')
-      r.addColorStop(1, 'rgba(255,60,20,0)')
-      g.fillStyle = r
-      g.beginPath()
-      g.arc(32, 32, 32, 0, Math.PI * 2)
-      g.fill()
-    }),
-}
-
 const limitar = (v, a, b) => Math.max(a, Math.min(b, v))
 const outro = (j) => 1 - j
 
@@ -213,15 +125,6 @@ export default class Duelo {
     }
   }
 
-  // chave da textura: o PNG do bonus se existir; senão uma reserva desenhada aqui
-  chave(nome) {
-    const t = this.arena.textures
-    if (t.exists(`bonus-${nome}`)) return `bonus-${nome}`
-    const reserva = `duelo-reserva-${nome}`
-    if (!t.exists(reserva)) t.addCanvas(reserva, RESERVAS[nome]())
-    return reserva
-  }
-
   registrar(obj) {
     this.objetos.add(obj)
     return obj
@@ -234,8 +137,9 @@ export default class Duelo {
     obj.destroy()
   }
 
+  // sprite do PNG bonus-<nome> (assets.js)
   imagem(nome, x, y, { cor = null, tamanho = null, profundidade = PROFUNDIDADE.tiro } = {}) {
-    const img = this.registrar(this.arena.add.image(x, y, this.chave(nome)).setDepth(profundidade))
+    const img = this.registrar(this.arena.add.image(x, y, `bonus-${nome}`).setDepth(profundidade))
     if (cor !== null) img.setTint(cor)
     if (tamanho) img.setScale(tamanho / Math.max(img.width, img.height))
     return img
@@ -769,12 +673,11 @@ export default class Duelo {
     tocar(a, 'explosaoGrande')
     shake(a, 220, 0.012)
     particulas(a, b.x, b.y, { cor: 0xffa040, quantidade: 22, velocidade: 200, vida: 500 })
-    // visual: os 8 quadros do PNG ou a bola de fogo reserva crescendo
-    const quadros = a.textures.exists('bonus-explosao-0')
-    const sprite = this.registrar(a.add.image(b.x, b.y, quadros ? 'bonus-explosao-0' : this.chave('explosao')).setDepth(PROFUNDIDADE.explosao))
+    // visual: os 8 quadros do PNG (bonus-explosao-0..7)
+    const sprite = this.registrar(a.add.image(b.x, b.y, 'bonus-explosao-0').setDepth(PROFUNDIDADE.explosao))
     const tamanho = b.raio * 2.4
     sprite.setScale(tamanho / Math.max(sprite.width, sprite.height))
-    this.explosoes.push({ x: b.x, y: b.y, idade: 0, quadros, sprite, escala: sprite.scale })
+    this.explosoes.push({ x: b.x, y: b.y, idade: 0, sprite })
     // machuca QUALQUER coração no raio (o dono também!)
     for (const c of this.coracoes) {
       if (c.ko) continue
@@ -788,13 +691,8 @@ export default class Duelo {
     const dur = ARMAS_DUELO.explosao.explosaoMs
     e.idade += dt
     const t = Math.min(1, e.idade / dur)
-    if (e.quadros) {
-      const k = Math.min(7, Math.floor(t * 8))
-      const chave = `bonus-explosao-${k}`
-      if (this.arena.textures.exists(chave) && e.sprite.texture.key !== chave) e.sprite.setTexture(chave)
-    } else {
-      e.sprite.setScale(e.escala * (0.4 + 0.8 * Math.sqrt(t))).setAlpha(1 - t * t)
-    }
+    const chave = `bonus-explosao-${Math.min(7, Math.floor(t * 8))}`
+    if (e.sprite.texture.key !== chave) e.sprite.setTexture(chave)
     if (t >= 1) {
       e.morto = true
       this.soltar(e.sprite)

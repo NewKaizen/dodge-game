@@ -80,13 +80,8 @@ export async function anunciarBonus(arena, evento, { eventos = [evento], rng = M
     if (!vivo()) return
 
     // ---------- selo "BONUS ROUND!" ----------
-    let selo
-    if (arena.textures.exists('bonus-selo')) {
-      selo = novo(arena.add.image(LARGURA / 2, Y_SELO, 'bonus-selo').setDepth(PROF + 3))
-      selo.setScale(Math.min(380 / Math.max(1, selo.width), 150 / Math.max(1, selo.height)))
-    } else {
-      selo = texto(LARGURA / 2, Y_SELO, 'BONUS ROUND!', 48, '#ffe040', { strokeThickness: 8 }).setDepth(PROF + 3)
-    }
+    const selo = novo(arena.add.image(LARGURA / 2, Y_SELO, 'bonus-selo').setDepth(PROF + 3))
+    selo.setScale(Math.min(380 / Math.max(1, selo.width), 150 / Math.max(1, selo.height)))
     const escalaSelo = selo.scale
     selo.setScale(escalaSelo * 3.2).setAlpha(0).setAngle(-12)
     await tween({ targets: selo, scale: escalaSelo, alpha: 1, angle: -4, duration: 260, ease: 'Back.easeIn' })
@@ -154,10 +149,9 @@ export async function anunciarBonus(arena, evento, { eventos = [evento], rng = M
   }
 }
 
-// Explosões em volta do selo: quadros bonus-explosao-0..7 (se existirem) e fogos
+// Explosões em volta do selo: quadros bonus-explosao-0..7 e fogos
 function explosoes(arena, selo, novo, rng) {
   const quadros = Array.from({ length: 8 }, (_, k) => `bonus-explosao-${k}`)
-  const temQuadros = quadros.every((q) => arena.textures.exists(q))
   const meiaL = (selo.displayWidth || 300) / 2
   const meiaA = (selo.displayHeight || 60) / 2
   const pontos = [
@@ -171,17 +165,15 @@ function explosoes(arena, selo, novo, rng) {
     const y = selo.y + dy + (rng() - 0.5) * 18
     arena.time.delayedCall(i * 70, () => {
       if (arena.saindo || !selo.scene) return
-      if (temQuadros) {
-        const img = novo(arena.add.image(x, y, quadros[0]).setDepth(PROF + 2))
-        img.setScale(90 / Math.max(1, img.width))
-        arena.tweens.addCounter({
-          from: 0,
-          to: quadros.length - 1,
-          duration: 420,
-          onUpdate: (tw) => img.scene && img.setTexture(quadros[Math.round(tw.getValue())]),
-          onComplete: () => img.scene && img.setVisible(false),
-        })
-      }
+      const img = novo(arena.add.image(x, y, quadros[0]).setDepth(PROF + 2))
+      img.setScale(90 / Math.max(1, img.width))
+      arena.tweens.addCounter({
+        from: 0,
+        to: quadros.length - 1,
+        duration: 420,
+        onUpdate: (tw) => img.scene && img.setTexture(quadros[Math.round(tw.getValue())]),
+        onComplete: () => img.scene && img.setVisible(false),
+      })
       fogoArtificio(arena, x, y, [0xffe040, 0xff7a1a, 0xff4fd8, 0x6dd0ff][i % 4], { quantidade: 18, profundidade: PROF + 2 })
     })
   })

@@ -24,13 +24,11 @@ const COR = 0xff7a1a
 const ANIM = 'bonus-explosao'
 const QUADROS = 8
 
-// Animação dos quadros (uma vez por jogo; só se todos os quadros existirem)
+// Animação dos quadros (criada uma vez por jogo)
 function animacaoExplosao(arena) {
-  if (arena.anims.exists(ANIM)) return true
+  if (arena.anims.exists(ANIM)) return
   const chaves = Array.from({ length: QUADROS }, (_, k) => `bonus-explosao-${k}`)
-  if (!chaves.every((c) => arena.textures.exists(c))) return false
   arena.anims.create({ key: ANIM, frames: chaves.map((key) => ({ key })), frameRate: 22, repeat: 0 })
-  return true
 }
 
 export default function criar(arena, { rng, aceleracao = 1 } = {}) {
@@ -69,22 +67,12 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
   // ---------- visual da explosão (objeto de tela: só a câmera principal) ----------
 
   const explosaoVisual = (x, y, tamanho, profundidade = 95) => {
-    if (animacaoExplosao(arena)) {
-      const s = guardar(arena.add.sprite(x, y, 'bonus-explosao-0').setDepth(profundidade))
-      s.setScale(tamanho / Math.max(1, s.width)).setRotation(entre(0, Math.PI * 2))
-      ignorarNasCaixas(arena, s)
-      s.play(ANIM)
-      s.once('animationcomplete', () => s.destroy())
-    } else {
-      // plano B: clarão que cresce e some
-      const textura = arena.textures.exists('brilho') ? 'brilho' : null
-      const c = textura
-        ? arena.add.image(x, y, textura).setTint(COR).setBlendMode(Phaser.BlendModes.ADD)
-        : arena.add.circle(x, y, 32, COR, 0.9)
-      guardar(c).setDepth(profundidade).setScale(0.2)
-      ignorarNasCaixas(arena, c)
-      arena.tweens.add({ targets: c, scale: tamanho / 50, alpha: 0, duration: 380, ease: 'Quad.easeOut', onComplete: () => c.destroy() })
-    }
+    animacaoExplosao(arena)
+    const s = guardar(arena.add.sprite(x, y, 'bonus-explosao-0').setDepth(profundidade))
+    s.setScale(tamanho / Math.max(1, s.width)).setRotation(entre(0, Math.PI * 2))
+    ignorarNasCaixas(arena, s)
+    s.play(ANIM)
+    s.once('animationcomplete', () => s.destroy())
     // anel de choque
     const anel = guardar(arena.add.circle(x, y, tamanho * 0.3).setStrokeStyle(3, 0xffe040, 0.9).setDepth(profundidade))
     ignorarNasCaixas(arena, anel)
@@ -95,9 +83,8 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
   // ---------- bombas nas caixas ----------
 
   const criarMira = (pista, x, y) => {
-    const tem = arena.textures.exists('bonus-alvo')
-    const mira = tem ? arena.add.image(x, y, 'bonus-alvo').setTint(0xff3030) : arena.add.circle(x, y, RAIO).setStrokeStyle(2, 0xff3030)
-    if (tem) mira.setScale((RAIO * 2.2) / Math.max(1, mira.width))
+    const mira = arena.add.image(x, y, 'bonus-alvo').setTint(0xff3030)
+    mira.setScale((RAIO * 2.2) / Math.max(1, mira.width))
     mira.setDepth(6).setData('escala', mira.scale)
     // área de perigo (preenchida aos poucos até a explosão)
     const area = arena.add.circle(x, y, RAIO, 0xff3030, 0.12).setDepth(4)
@@ -121,8 +108,7 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
     }
     const { mira, area } = criarMira(pista, x, y)
     // a bomba cai do alto da tela (de fora das caixas: câmera principal)
-    const tem = arena.textures.exists('bonus-bomba')
-    const bomba = tem ? arena.add.image(x, -30, 'bonus-bomba').setScale(1.4) : arena.add.circle(x, -30, 9, 0x222222).setStrokeStyle(2, 0xff7a1a)
+    const bomba = arena.add.image(x, -30, 'bonus-bomba').setScale(1.4)
     guardar(bomba).setDepth(94)
     ignorarNasCaixas(arena, bomba)
     bombas.push({ j, x, y, t: 0, mira, area, bomba, giro: entre(-9, 9) })
