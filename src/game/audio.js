@@ -1,6 +1,6 @@
 import { ASSETS } from './assets.js'
 import { AUDIO } from './constants.js'
-import { tocarMidi, pararMidi, pausarMidi, retomarMidi, setVolumeMidi, distorcerMidi, setVelocidadeMidi, setGraveMidi, tempoMidi, existeMidi, estadoMidi } from './midi.js'
+import { tocarMidi, pararMidi, pausarMidi, retomarMidi, setVolumeMidi, setVelocidadeMidi, setGraveMidi, tempoMidi, existeMidi, estadoMidi } from './midi.js'
 
 // Sons: se assets.js tiver um arquivo, toca o arquivo; senão sintetiza com WebAudio.
 // Músicas: arquivo .mid toca com soundfont (midi.js); .ogg/.mp3 tocam direto.
@@ -404,50 +404,6 @@ const CONTINUOS = {
       }
     }
   },
-}
-
-// Fim de luta: distorce a música tocando (fita perdendo força, filtro
-// fechando) e para. Serve para .mid (midi.js) e .ogg/.mp3 (rate + detune do
-// Phaser). Sem música tocando, resolve na hora.
-//   opcoes.suave    chefe poupado: cai menos e termina em fade, sem estalo
-//   opcoes.sombrio  party derrotada: despenca muito, abafa e some, sem estalo
-// Devolve Promise<boolean> (true se havia música); aceita também um callback.
-export function distorcerEParar(ms = 1600, opcoes = {}, aoTerminar) {
-  const estalo = () => {
-    const c = ligado && obterContexto()
-    if (c) SINTESE.estalo(sintetizador(c))
-  }
-  const promessa = musicaAtual ? distorcerArquivo(ms, opcoes, estalo) : distorcerMidi(ms, { ...opcoes, aoCortar: estalo })
-  if (aoTerminar) promessa.then(aoTerminar)
-  return promessa
-}
-
-// Versão para música em arquivo (som do Phaser)
-function distorcerArquivo(ms, { suave = false, sombrio = false }, estalo) {
-  const som = musicaAtual
-  musicaAtual = null // a próxima musica() começa limpa (outro objeto de som)
-  if (!som.isPlaying) {
-    som.destroy()
-    return Promise.resolve(false)
-  }
-  const volume = som.volume
-  const cfg = sombrio ? { ritmo: 0.85, cents: -2400 } : suave ? { ritmo: 0.4, cents: -300 } : { ritmo: 0.75, cents: -900 }
-  return new Promise((resolver) => {
-    const inicio = performance.now()
-    const passo = setInterval(() => {
-      const p = Math.min(1, (performance.now() - inicio) / ms)
-      som.setRate(Math.max(0.1, 1 - cfg.ritmo * p ** 1.4))
-      som.setDetune(cfg.cents * p ** 2 + Math.sin(p * 38) * 35 * p)
-      if (suave) som.setVolume(volume * (1 - p))
-      if (sombrio) som.setVolume(volume * Math.min(1, (1 - p) / 0.55))
-      if (p < 1) return
-      clearInterval(passo)
-      som.stop()
-      som.destroy()
-      if (!suave && !sombrio) estalo()
-      resolver(true)
-    }, 30)
-  })
 }
 
 function obterContexto() {

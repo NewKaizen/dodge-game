@@ -63,5 +63,3 @@ export const ataques = {
   sequencia,
   comCaixa,
 }
-
-export const PADROES = Object.keys(ataques).filter((nome) => !['juntos', 'sequencia', 'comCaixa'].includes(nome))

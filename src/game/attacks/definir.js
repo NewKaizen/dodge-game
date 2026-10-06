@@ -59,20 +59,8 @@ export function sequencia(...lista) {
     corpo: iniciar,
     iniciar,
     filhos: lista,
-    // "reduz uma onda": com 2+ ondas perde a última; com uma só, encurta ela
-    encurtar: (fator) => (lista.length > 1 ? sequencia(...lista.slice(0, -1)) : sequencia(encurtar(lista[0], fator))),
   }
 }
-
-// Versão mais curta do ataque (fator < 1), usada pelo DEFEND e por ACTs.
-// Ataque simples ou `juntos`: fica com `fator` do tempo ativo (respiros
-// mantidos, mínimo ATIVA_MINIMA). `sequencia`: perde a última onda.
-export function encurtar(ataque, fator) {
-  if (!(fator < 0.999)) return ataque
-  return ataque.encurtar?.(fator) ?? ataque
-}
-
-const ATIVA_MINIMA = 1500
 
 // ---------- ondas e respiros ----------
 
@@ -96,7 +84,6 @@ function onda({ nome, ativa, corpo, respiro, caixa = null }) {
     corpo,
     respiro: r,
     caixa: normalizarCaixa(caixa),
-    encurtar: (fator) => onda({ nome, ativa: Math.max(ATIVA_MINIMA, Math.round(ativa * fator)), corpo, respiro, caixa }),
     comCaixa: (nova) => onda({ nome, ativa, corpo, respiro, caixa: nova }),
     iniciar: (a) => {
       const w = a.limitar(duracao)
