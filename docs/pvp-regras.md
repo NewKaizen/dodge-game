@@ -212,4 +212,4 @@ A lista completa (nome, valor, custo, descrição) sai de `CARTAS` em `cartas.js
 
 ## Justiça dos ataques
 
-Todas as cartas dos 7 personagens (134) foram rodadas na batalha co-op com `testarAtaque`: 0 avisos `[telegrafo]`; 1 aviso `[rota de fuga]` conhecido (Cabos Enrolados, Dess 10♣, lasers — já existia antes da revisão de 2026-10-02). As figuras (J/Q/K) também passaram com o aperto do co-op por cima (velocidade ×1,15, densidade ×1,2). Os SUPERs usam os mesmos padrões com força 1 (as faixas já validadas), só encadeados em 3 fases.
+Todas as cartas dos 7 personagens (134) foram rodadas numa caixa de esquiva (ver `docs/ataques.md`, Testar): 0 avisos `[telegrafo]`; 1 aviso `[rota de fuga]` conhecido (Cabos Enrolados, Dess 10♣, lasers — já existia antes da revisão de 2026-10-02). As figuras (J/Q/K) também passaram com o aperto do co-op por cima (velocidade ×1,15, densidade ×1,2). Os SUPERs usam os mesmos padrões com força 1 (as faixas já validadas), só encadeados em 3 fases.

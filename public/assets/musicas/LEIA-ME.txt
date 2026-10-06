@@ -1,35 +1,24 @@
-Coloque aqui as músicas em MIDI (.mid), com o nome da tela ou do chefe:
+Músicas em MIDI (.mid), com o nome da tela ou do chefe. O jogo procura
+<nome>.mid aqui e toca em loop com o soundfont (public/assets/audio/soundfont.sf3).
 
-  menu.mid       menu inicial (sem o arquivo: jevil.mid). Quer usar .mp3/.ogg?
-                 Coloque aqui (ex.: menu.mp3) e aponte em src/game/assets.js:
-                   musicas: { menu: 'assets/musicas/menu.mp3', ... }
-                 O nome que aparece no canto do menu fica em
-                   tituloMusicaMenu: 'NOME DA MÚSICA'   (mesmo arquivo)
-  selecao.mid    tela de escolha do chefe
-  king.mid       batalha do Chaos King
-  queen.mid      batalha da Queen
-  jevil.mid      batalha do Jevil
-  coronel.mid    batalha do Coronel Caçamba
-  vitoria.mid    tela de vitória
-  gameover.mid   tela de game over (opcional)
+  menu.mid         menu inicial (ainda não existe: enquanto isso toca jevil.mid).
+                   O nome que aparece no canto do menu fica em
+                   src/game/assets.js, tituloMusicaMenu.
+  selecao.mid      escolha de party, de chefe e de nível do CO-OP
+  king.mid         luta contra o Chaos King
+  queen.mid        luta contra a Queen
+  jevil.mid        luta contra o Jevil
+  coronel.mid      luta contra o Coronel Caçamba
+  vitoria.mid      tela de vitória do CO-OP
+  gameover.mid     tela de game over
+  pvpEscolha.mid   escolha de lutador do PvP
+  pvp.mid          partida PvP
+  pvpResultado.mid resultado do PvP (ainda não existe: enquanto isso toca vitoria.mid)
 
-  Modo PvP (cada um tem uma reserva enquanto o arquivo não existir):
-  pvpEscolha.mid   escolha de lutador do PvP   (sem o arquivo: selecao.mid)
-  pvp.mid          partida PvP (música de fundo da arena)   (sem o arquivo: jevil.mid)
-  pvpResultado.mid tela de resultado do PvP    (sem o arquivo: vitoria.mid)
+  Cartas SUPER (música especial de cada personagem; toca em loop enquanto o
+  SUPER acontece e depois a música da luta volta do ponto onde parou). Sem o
+  arquivo, a música da luta simplesmente continua (falta o da Kris):
+  super_kris.mid  super_susie.mid  super_ralsei.mid  super_noelle.mid
+  super_berdly.mid  super_dess.mid  super_asriel.mid
 
-  Cartas SUPER do PvP (música especial de cada personagem; toca em loop
-  enquanto o SUPER acontece e depois a música de batalha volta do ponto onde
-  parou). Sem o arquivo, a música de batalha simplesmente continua:
-  super_kris.mid
-  super_susie.mid
-  super_ralsei.mid
-  super_noelle.mid
-  super_berdly.mid
-  super_dess.mid
-  super_asriel.mid
-
-Não precisa mexer em código: o jogo procura <nome>.mid aqui sozinho e toca em
-loop com o soundfont (public/assets/audio/soundfont.sf3). Sem o arquivo, fica
-em silêncio (ou toca a reserva, nas do PvP). Para usar outro nome ou um .ogg, aponte em src/game/assets.js
-(ASSETS.musicas). Volume da música: AUDIO.musica em src/game/constants.js.
+Volume da música: AUDIO.musica em src/game/constants.js.

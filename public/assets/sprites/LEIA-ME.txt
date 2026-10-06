@@ -1,44 +1,12 @@
-Coloque aqui os desenhos (PNG) dos personagens que estão usando o boneco
-genérico (manequim colorido com a inicial no peito): ralsei, noelle, berdly,
-dess e asriel. Também serve para trocar kris e susie.
+Sprites em PNG gerados por script (python3 + Pillow, na raiz do projeto):
 
-COMO TROCAR
-  1. Salve o PNG aqui, ex.: public/assets/sprites/ralsei.png
-  2. Em src/game/assets.js, em ASSETS.texturas, troque o null pelo caminho
-     (relativo a public/):
-         ralsei: 'assets/sprites/ralsei.png',
-         'icone-ralsei': 'assets/sprites/icone-ralsei.png',
-  3. Pronto. Chave com null continua sendo o boneco gerado por código.
-     Dá para trocar só o sprite e deixar o ícone (ou o contrário).
+  bonus/   bonus rounds do PvP: scripts/gerar_sprites_bonus.py
+           (as chaves e o uso de cada um: src/game/pvp/bonus/LEIA-ME.md)
+  super/   cartas SUPER do PvP: scripts/super/<personagem>.py
+  habilidades/  ataques das cartas: scripts/habilidades/<personagem>.py
+  menu/    menu inicial: scripts/menu/{sala,telao,logo}.py
 
-SPRITE DA BATALHA  (chave = id do personagem: ralsei, noelle, berdly...)
-  - Desenhe em ESCALA 1, pixel a pixel: o jogo amplia 3x sozinho
-    (ESCALA.personagem em src/game/arte/texturas.js) e sem suavizar
-    (pixelArt: true).
-  - Tamanho recomendado: 16 a 20 px de largura x 24 px de altura, igual a
-    kris/susie (16x24) e ao boneco (17x24). Na tela vira ~48-60 x 72 px.
-    Um PNG maior também é ampliado 3x, então NÃO mande 48x72 já ampliado.
-  - Fundo transparente. Personagem virado para a DIREITA (para o chefe),
-    em pé, centralizado: o jogo usa o centro da imagem como posição.
-  - Deixe 1 linha vazia embaixo dos pés (como os outros sprites).
-  - Cores livres: o sprite não é pintado pelo jogo (só pisca branco ao
-    levar dano e fica cinza e deitado quando cai).
-
-ÍCONE DO PAINEL  (chave = icone-<id>, ex.: icone-ralsei)
-  - Aparece no painel de HP e na barra do FIGHT, ampliado 2x
-    (ESCALA.icone).
-  - Tamanho recomendado: até 16 px de largura x 10 a 12 px de altura
-    (o de kris/susie é a cabeça, 16x10; o do boneco é 11x11).
-    Mais de 12 px de altura começa a encostar na borda do painel.
-  - Fundo transparente, colorido (não é pintado pelo jogo).
-
-A cor do painel, da barra de HP e do nome vem de `cor` em
-src/game/data/personagens.js, não do PNG.
-
-BONUS ROUNDS DO PVP  (pasta bonus/)
-  - Os PNGs de public/assets/sprites/bonus/ (explosão, alvo, bomba, bola de
-    discoteca, balão, tiro, espada, bumerangue, seta, holofote e o selo
-    "BONUS ROUND!") são gerados por scripts/gerar_sprites_bonus.py
-    (python3 + Pillow). Para mudar, edite o script e rode de novo na raiz:
-        python3 scripts/gerar_sprites_bonus.py
-    As chaves e o uso de cada um estão em src/game/pvp/bonus/LEIA-ME.md.
+Os personagens, os chefes, as balas e o resto da interface são pixel art
+desenhada por código: src/game/arte/sprites.js (mapas) e
+src/game/arte/texturas.js (geradores). Os sprites são desenhados em escala 1
+e ampliados no jogo (ESCALA em arte/texturas.js), sem suavizar.
