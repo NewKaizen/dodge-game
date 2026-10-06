@@ -5,6 +5,7 @@ import Menu from './scenes/Menu.js'
 import EscolhaParty from './scenes/EscolhaParty.js'
 import PvpEscolha from './scenes/PvpEscolha.js'
 import PvpArena from './scenes/PvpArena.js'
+import CoopArena from './scenes/CoopArena.js'
 import PvpResultado from './scenes/PvpResultado.js'
 import Selecao from './scenes/Selecao.js'
 import Dificuldade from './scenes/Dificuldade.js'
@@ -29,6 +30,6 @@ export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCs
     roundPixels: true,
     scale: { mode: Phaser.Scale.NONE, zoom: zoomCss },
     // TesteCartas e PvpArenaTeste: telas de teste do PvP (no dev: debugJogo.jogo.scene.start('...'))
-    scene: [Boot, Menu, EscolhaParty, PvpEscolha, PvpArena, PvpResultado, Selecao, Dificuldade, Battle, Vitoria, GameOver, Entrada, Pausa, Config, TesteCartas, PvpArenaTeste],
+    scene: [Boot, Menu, EscolhaParty, PvpEscolha, PvpArena, PvpResultado, Selecao, Dificuldade, CoopArena, Battle, Vitoria, GameOver, Entrada, Pausa, Config, TesteCartas, PvpArenaTeste],
   }
 }

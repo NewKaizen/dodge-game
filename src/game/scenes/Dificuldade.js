@@ -14,7 +14,8 @@ const CHEFE = { x: 138, y: 200 }
 // ao clímax: DIFÍCIL segura a tensão um pouco mais e explode mais forte.
 const ENTRADA = { climax: 900, porNivel: 100, depois: 360 }
 
-// Tela do nível da luta, depois de escolher o chefe (Selecao -> Dificuldade -> Battle).
+// Tela do nível da luta, depois de escolher o chefe (Selecao -> Dificuldade -> CoopArena,
+// o CO-OP de cartas; a Battle clássica continua no jogo, fora do fluxo).
 // FÁCIL é o chefe como ele é; MÉDIO e DIFÍCIL só apertam (números em NIVEIS).
 // A: lutar · B: voltar para a escolha do chefe
 export default class Dificuldade extends Phaser.Scene {
@@ -208,7 +209,7 @@ export default class Dificuldade extends Phaser.Scene {
     })
 
     this.time.delayedCall(climax + ENTRADA.depois, () => {
-      this.scene.start('Battle', { chefe: this.idChefe, nivel })
+      this.scene.start('CoopArena', { chefe: this.idChefe, nivel })
       this.scene.launch('Entrada', { nivel })
     })
   }

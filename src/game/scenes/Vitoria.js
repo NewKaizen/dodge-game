@@ -52,8 +52,9 @@ export default class Vitoria extends Phaser.Scene {
     super('Vitoria')
   }
 
-  create({ chefe, modo, turnos = 0, estatisticas = null }) {
+  create({ chefe, modo, turnos = 0, estatisticas = null, cena = 'Battle' }) {
     this.idChefe = chefe
+    this.cenaLuta = cena // A: revanche nesta cena (CoopArena no CO-OP de cartas)
     this.def = CHEFES[chefe]
     this.modo = modo
     this.poupado = modo === 'spare'
@@ -126,7 +127,7 @@ export default class Vitoria extends Phaser.Scene {
     this.saindo = true
     tocar(this, 'confirmar')
     this.cameras.main.fadeOut(250, 0, 0, 0)
-    this.time.delayedCall(260, () => this.scene.start(botao === 'A' ? 'Battle' : 'Selecao', { chefe: this.idChefe }))
+    this.time.delayedCall(260, () => this.scene.start(botao === 'A' ? this.cenaLuta : 'Selecao', { chefe: this.idChefe }))
   }
 
   // ---------- etapas ----------
