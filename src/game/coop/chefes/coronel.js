@@ -39,7 +39,7 @@ export default {
       cartas: [
         ['espadas', 13, 'Engarrafamento', (A) => A.caminhonete({ faixas: 4, ocupar: 2, intervalo: 1500 })],
         ['ouros', 12, 'Primos de Caminhonete', (A) => A.juntos(A.caminhonete({ intervalo: 1700 }), A.aimed({ forma: 'chama', intervalo: 1300, velocidade: 190 })), { inverter: true }],
-        ['paus', 13, 'Rodeio Completo', (A) => A.sequencia(A.brasas({ duracao: 3000, intervalo: 180 }), A.forcado({ duracao: 3000, intervalo: 900, parada: 180 }), A.caminhonete({ duracao: 3500, velocidade: 460 }))],
+        ['paus', 13, 'Rodeio Completo', (A) => A.sequencia(A.brasas({ duracao: 2400, intervalo: 180 }), A.forcado({ duracao: 2400, intervalo: 900, parada: 180 }), A.caminhonete({ duracao: 2800, velocidade: 460 }))],
         ['paus', 12, 'Churrasqueira Turbo', (A) => A.juntos(A.forcado({ intervalo: 1300 }), A.brasas({ intervalo: 300, estouro: 3 }))],
       ],
     },

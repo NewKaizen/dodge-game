@@ -204,7 +204,7 @@ export default class CoopArena extends PvpArena {
     this.inimigo.atualizar(this.alvoChefe)
     this.inimigo.nome.setFontSize(13).setStroke('#000000', 3)
     this.textoChefe = this.add
-      .text(CHEFE.x, 124, '', { fontFamily: FONTE, fontSize: '10px', color: '#ffd23c', stroke: '#000000', strokeThickness: 3, align: 'center' })
+      .text(CHEFE.x, 115, '', { fontFamily: FONTE, fontSize: '9px', color: '#ffd23c', stroke: '#000000', strokeThickness: 3, align: 'center' })
       .setOrigin(0.5)
       .setDepth(30)
     this.balao = new Balao(this)

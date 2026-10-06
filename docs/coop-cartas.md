@@ -31,9 +31,9 @@ Fluxo: Menu → CO-OP → EscolhaParty → Selecao (chefe) → Dificuldade (nív
 
 | Carta | Efeito no CO-OP |
 |---|---|
-| ♠ espadas | golpe forte: 5 + 2,2 × valor |
-| ♦ ouros | golpe médio (3 + 1,4 × valor) e **atrasa** a carta do chefe na sua caixa (balas 15% mais lentas; Q/K atrasam as duas caixas) |
-| ♣ paus | golpe 4 + 1,6 × valor, **+6% por graze** na esquiva (até +60%) |
+| ♠ espadas | golpe forte: 6 + 2,6 × valor (2 → 11, K → 40) |
+| ♦ ouros | golpe médio (4 + 1,8 × valor) e **atrasa** a carta do chefe na sua caixa (balas 15% mais lentas; Q/K atrasam as duas caixas) |
+| ♣ paus | golpe 5 + 2 × valor, **+6% por graze** na esquiva (até +60%) |
 | ♥ copas | suporte: **cura e escudo valem para os dois**; energia e compra para quem jogou. Cura **levanta** o parceiro caído |
 | ★ SUPER | animação do personagem, golpe de 60 e **varre** a carta do chefe da sua caixa |
 | A♠ Espelho | a carta do chefe na sua caixa volta e acerta o chefe |
@@ -53,7 +53,13 @@ O SUPER do chefe não pode ser anulado, refletido, roubado nem varrido.
 - Dano por bala: `danoBala` do chefe, escalado pelo valor da carta e pelo nível.
 - **SUPER do chefe** (★): a partir da 2ª fase, uma barra de carga sobe 1 por
   rodada; cheia, o chefe joga o SUPER nas duas caixas ao mesmo tempo.
-- HP próprio do modo cartas (`hp` no baralho do chefe) × nível.
+- HP próprio do modo cartas (`hp` no baralho do chefe) × nível (`NIVEIS.hp`):
+  King 340, Queen 420, Jevil 500, Coronel 520 no FÁCIL.
+- Dano por bala das cartas do chefe: `danoBala` × 0,6 (2) a 1,0 (K); SUPER × 1,1;
+  o ataque fraquinho do ♥ × 0,35; tudo × `NIVEIS.dano`.
+
+Todos os números ficam em `COOP` e `GOLPE` (`coop/regras.js`) e `DANO_CHEFE`
+(`coop/cartasChefe.js`).
 
 ## Caídos
 
@@ -71,11 +77,22 @@ rodadas (30% do HP), ou antes, com uma cura de copas do parceiro.
 | `src/game/scenes/CoopArena.js` | a cena (estende a PvpArena: mesma escolha de cartas) |
 | `src/game/coop/__tests__/` | testes |
 
+A Battle clássica (FIGHT/ACT/ITEM) continua no código, mas saiu do fluxo do
+menu: a Dificuldade agora abre a CoopArena. Vitoria e GameOver recebem `cena`
+para a revanche (padrão 'Battle').
+
+## Testes
+
+- `npm test` roda também `src/game/coop/__tests__/` (regras, cartas dos chefes,
+  CPU aliada e uma partida simulada até o fim contra cada chefe).
+- No navegador (dev): `window.coopArena` (`estadoDebug()`, `setHp(j, hp)`,
+  `setHpChefe(hp)`, `forcarMao(j, ids)`).
+
 ## Progresso
 
-- [ ] regras + testes
-- [ ] baralhos dos 4 chefes
-- [ ] CoopArena (layout, chefe, intenções, arremesso, esquiva, contra-ataque, caídos, fases, SUPER do chefe)
-- [ ] CPU aliada
-- [ ] fluxo (Dificuldade → CoopArena, revanche, pausa, dicas do game over)
-- [ ] teste no navegador (1 e 2 jogadores, vitória e derrota, os 4 chefes)
+- [x] regras + testes
+- [x] baralhos dos 4 chefes (as 63 cartas rodam na caixa sem avisos de justiça)
+- [x] CoopArena (layout, chefe, intenções, arremesso, esquiva, contra-ataque, caídos, fases, SUPER do chefe)
+- [x] CPU aliada
+- [x] fluxo (Dificuldade → CoopArena, revanche, pausa, dicas do game over)
+- [x] teste no navegador (1 e 2 jogadores, vitória e derrota, troca de fase, SUPER do chefe, cair e levantar)
