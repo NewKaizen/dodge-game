@@ -47,7 +47,7 @@ export default class Selecao extends Phaser.Scene {
 
     const atual = ORDEM_CHEFES.indexOf(this.registry.get('chefe'))
     this.selecionar(Math.max(0, atual), false)
-    musica(this, 'selecao')
+    musica('selecao')
     this.cameras.main.fadeIn(250)
   }
 

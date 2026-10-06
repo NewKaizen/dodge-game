@@ -180,7 +180,7 @@ export default class CoopArena extends PvpArena {
       if (window.coopArena === this) delete window.coopArena
     })
 
-    musica(this, this.defChefe.musica)
+    musica(this.defChefe.musica)
     this.cameras.main.fadeIn(300)
     this.partida()
   }

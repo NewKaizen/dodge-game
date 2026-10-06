@@ -65,7 +65,7 @@ export default class EscolhaParty extends Phaser.Scene {
     this.registry.events.on('changedata-numJogadores', aoMudar)
     this.events.once('shutdown', () => this.registry.events.off('changedata-numJogadores', aoMudar))
 
-    musica(this, 'selecao')
+    musica('selecao')
     this.cameras.main.fadeIn(250)
   }
 

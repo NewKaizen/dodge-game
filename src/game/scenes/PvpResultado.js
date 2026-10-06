@@ -106,7 +106,7 @@ export default class PvpResultado extends Phaser.Scene {
     const em = (t, f) => e.push({ t, f })
     em(TEMPO.subida, (r) => this.subida(r))
     em(TEMPO.estouro, (r) => this.estouro(r))
-    em(TEMPO.musica, () => musica(this, 'pvpResultado', 'vitoria'))
+    em(TEMPO.musica, () => musica('pvpResultado', 'vitoria'))
     em(TEMPO.lutadores, (r) => this.entrarLutadores(r))
     em(TEMPO.painel, (r) => this.abrirPainel(r))
     LINHAS.forEach((linha, i) => em(TEMPO.painel + 300 + i * TEMPO.linha, (r) => this.mostrarLinha(linha, i, r)))

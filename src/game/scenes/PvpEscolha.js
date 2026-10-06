@@ -88,7 +88,7 @@ export default class PvpEscolha extends Phaser.Scene {
     this.registry.events.on('changedata-numJogadores', aoMudar)
     this.events.once('shutdown', () => this.registry.events.off('changedata-numJogadores', aoMudar))
 
-    musica(this, 'pvpEscolha', 'selecao')
+    musica('pvpEscolha')
     this.cameras.main.fadeIn(250)
   }
 

@@ -79,7 +79,7 @@ export default class Dificuldade extends Phaser.Scene {
 
     const ultimo = ORDEM_NIVEIS.indexOf(this.registry.get('nivel'))
     this.selecionar(Math.max(0, ultimo), false)
-    musica(this, 'selecao')
+    musica('selecao')
     this.cameras.main.fadeIn(250)
   }
 

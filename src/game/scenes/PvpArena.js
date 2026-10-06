@@ -82,7 +82,7 @@ import { anunciarSuper } from '../pvp/super/anuncio.js'
 // Com 1 jogador no painel, o P2 é a CPU (pvp/bot.js escolhe a carta,
 // pvp/botEsquiva.js desvia). Nível: registry 'pvpNivelBot' (tela PvpEscolha, ↑/↓).
 //
-// Música: musica('pvp'), ou seja public/assets/musicas/pvp.mid; sem o arquivo, toca a do Jevil.
+// Música: public/assets/musicas/pvp.mid.
 //
 // No dev: debugJogo.jogo.scene.start('PvpArena', { p1: 'susie', p2: 'noelle' })
 // e window.pvpArena (estadoDebug, forcarMao, setHp) para os testes.
@@ -220,7 +220,7 @@ export default class PvpArena extends Phaser.Scene {
       if (window.pvpArena === this) delete window.pvpArena
     })
 
-    musica(this, 'pvp', 'jevil')
+    musica('pvp')
     this.cameras.main.fadeIn(300)
     this.partida()
   }
@@ -1160,7 +1160,7 @@ export default class PvpArena extends Phaser.Scene {
       if (this.saindo) return
     }
     const personagem = r.jogadas[lados[lados.length - 1]].carta.personagem
-    const tocou = await tocarMusicaEspecial(this, `super_${personagem}`)
+    const tocou = await tocarMusicaEspecial(`super_${personagem}`)
     if (!tocou) return
     this.musicaEspecial = personagem
     // a cena saiu enquanto conferia o arquivo: devolve a música na hora
@@ -1170,7 +1170,7 @@ export default class PvpArena extends Phaser.Scene {
   voltarDaMusicaEspecial() {
     if (!this.musicaEspecial) return
     this.musicaEspecial = null
-    voltarMusicaNormal(this)
+    voltarMusicaNormal()
   }
 
   // ---------- arremesso ----------

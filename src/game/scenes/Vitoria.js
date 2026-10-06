@@ -92,7 +92,7 @@ export default class Vitoria extends Phaser.Scene {
     const em = (t, f) => e.push({ t, f })
     em(TEMPO.subida, (r) => this.subida(r))
     em(TEMPO.estouro, (r) => this.estouro(r))
-    em(TEMPO.musica, () => musica(this, 'vitoria'))
+    em(TEMPO.musica, () => musica('vitoria'))
     em(TEMPO.mensagem, (r) => this.mensagem(r))
     em(TEMPO.party, (r) => this.entrarParty(r))
     em(TEMPO.painel, (r) => this.abrirPainel(r))

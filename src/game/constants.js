@@ -3,8 +3,8 @@ import { ASSETS } from './assets.js'
 export const LARGURA = 640
 export const ALTURA = 480
 
-// Fonte pixelada (arquivos em assets.js); monospace enquanto não carrega
-export const FONTE = `"${ASSETS.fonte.familia}", monospace`
+// Fonte pixelada (arquivo em assets.js; a Boot espera ela carregar)
+export const FONTE = `"${ASSETS.fonte.familia}"`
 
 export const CORES = {
   fundo: 0x000000,

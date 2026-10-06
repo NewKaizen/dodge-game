@@ -16,9 +16,8 @@ import { criarLogo } from '../menu/logo.js'
 // opção escolhida faz; sem joystick conectado, as opções ficam apagadas e a
 // linha vira um aviso pedindo para conectar.
 //
-// Música: ASSETS.musicas.menu (public/assets/musicas/menu.mid, ou o arquivo
-// apontado em assets.js); sem ela, toca a do Jevil. O nome no canto de cima
-// vem de ASSETS.tituloMusicaMenu.
+// Música: public/assets/musicas/menu.mid; sem o arquivo, toca a do Jevil. O
+// nome no canto de cima vem de ASSETS.tituloMusicaMenu.
 //
 // As peças ficam em game/menu/ (layout.js, sala.js, telao.js, logo.js).
 //   cima/baixo escolher · A confirmar
@@ -53,7 +52,7 @@ export default class Menu extends Phaser.Scene {
     this.montarOpcoes()
     this.montarCantos()
 
-    musica(this, 'menu', 'jevil')
+    musica('menu', 'jevil')
     this.cameras.main.fadeIn(rapido ? 220 : 500)
     this.abrir(rapido)
 
@@ -129,7 +128,7 @@ export default class Menu extends Phaser.Scene {
   montarCantos() {
     const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor })
     const y = 22
-    const nome = this.add.text(LARGURA - 14, y, ASSETS.tituloMusicaMenu ?? '', estilo(11, '#c8c8d8')).setOrigin(1, 0.5).setDepth(30)
+    const nome = this.add.text(LARGURA - 14, y, ASSETS.tituloMusicaMenu, estilo(11, '#c8c8d8')).setOrigin(1, 0.5).setDepth(30)
     const xBarras = nome.x - nome.width - 26
     this.add.rectangle(xBarras - 8, y - 11, LARGURA - xBarras - 6 + 8, 22, 0x000000, 0.45).setOrigin(0).setDepth(29)
     this.barras = [0, 1, 2, 3].map((i) =>

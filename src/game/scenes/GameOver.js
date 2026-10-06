@@ -96,7 +96,7 @@ export default class GameOver extends Phaser.Scene {
     this.proximoSino = TEMPO.sino
 
     pararMusica()
-    musica(this, 'gameover') // por baixo da ambientação sintetizada (ronco, lamento, sino)
+    musica('gameover') // por baixo da ambientação sintetizada (ronco, lamento, sino)
     this.cameras.main.setBackgroundColor(0x000000)
     this.criarCenario()
     this.etapas = this.montarEtapas()

@@ -10,7 +10,7 @@ import { AUDIO } from './constants.js'
 // Arquivos (em public/):
 //   assets/audio/soundfont.sf3                    banco de instrumentos (GeneralUser GS em SF3, ver SOUNDFONT-LICENCA.txt)
 //   assets/audio/spessasynth_processor.min.js     processador do AudioWorklet (mesma versão da lib!)
-//   assets/musicas/<nome>.mid                     as músicas (ver ASSETS.musicas em assets.js)
+//   assets/musicas/<nome>.mid                     as músicas
 
 const SOUNDFONT = 'assets/audio/soundfont.sf3'
 const PROCESSADOR = 'assets/audio/spessasynth_processor.min.js'
