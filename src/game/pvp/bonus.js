@@ -104,10 +104,10 @@ export function desfazerMalucas(estado, trocas) {
 // ---------- duelo ----------
 
 // Naipe -> arma do duelo
-//   ♥ copas    tiro        projéteis em linha reta, recarga curta
+//   ♥ copas    tiro        projéteis em linha reta, recarga curta (todas com mira automática)
 //   ♠ espadas  espada      golpe corpo a corpo em arco na frente do coração
-//   ♦ ouros    bumerangue  vai na direção do movimento e volta para o dono
-//   ♣ paus     explosao    bomba com pavio que explode em área; recarga MAIOR
+//   ♦ ouros    bumerangue  vai até o outro e volta para o dono
+//   ♣ paus     explosao    3 bombas em leque com pavio, explodem em área e soltam estilhaços
 export const ARMAS = { copas: 'tiro', espadas: 'espada', ouros: 'bumerangue', paus: 'explosao' }
 const LISTA_ARMAS = ['tiro', 'espada', 'bumerangue', 'explosao']
 

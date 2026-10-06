@@ -30,7 +30,9 @@ import { BotDuelo, difAngulo } from './botDuelo.js'
 //
 // Dano: cada acerto chama arena.acertou(j, dano) (HUD, placar, estatísticas).
 // O duelo cuida dos i-frames de cada coração (DUELO.invencivelMs, piscando).
-// Mira: a direção do último movimento (8 direções), mostrada pela setinha.
+// Mira AUTOMÁTICA: toda arma sai na direção do outro coração (a setinha
+// mostra); o jogador só se mexe e aperta A. O tiro ainda adianta um pouco
+// para onde o outro está indo; a bomba cai em cima dele.
 // Tudo é desenhado na câmera principal (sem câmera de recorte): os objetos
 // ficam presos dentro da caixa à mão.
 
@@ -42,26 +44,30 @@ const DUELO = {
   invencivelMs: 700,
   fimMs: 900, // depois de um K.O. a luta ainda corre isso (dá para os dois caírem)
   hitbox: 6, // raio do coração para os golpes do duelo
-  zonaMorta: 30, // joystick abaixo disso não muda a mira
   bufferMs: 160, // A apertado um pouco antes da recarga acabar ainda sai
   contagemMs: 520,
 }
 
 // Cada arma. `*Extra` é o que a força 1 (carta mais forte) soma.
-//   tiro        projétil reto e rápido; recarga curta; dano pequeno
+//   tiro        projétil reto e rápido; recarga curta; dano pequeno; mira com
+//               `antecipa` do movimento do outro (0 = no ponto onde ele está)
 //   espada      arco de `arco` graus na frente; preparo curto (telegrafa), depois o golpe;
 //               o golpe também DESTRÓI tiros do inimigo e rebate o bumerangue;
 //               quem golpeia anda a `lentidao` da velocidade durante o golpe e o
 //               acerto empurra o outro `empurrao` px (dá tempo de fugir)
-//   bumerangue  vai desacelerando até `distancia` e volta para o dono (persegue);
-//               acerta uma vez na ida e uma na volta; recarga = até voltar (mín. recargaMs)
-//   explosao    joga a bomba `distancia` à frente; pavio piscando; explode em `raio`
-//               e machuca QUALQUER coração no raio, inclusive o dono. Recarga maior.
+//   bumerangue  vai até o outro (no máximo `distancia`), desacelerando, e volta
+//               perseguindo o dono; acerta uma vez na ida e uma na volta;
+//               recarga = até voltar (mín. recargaMs)
+//   explosao    `bombas` em leque (a do meio cai onde o outro vai estar, com
+//               `antecipa` do movimento dele, até `distancia`;
+//               as outras a `leque` px dos lados); pavio piscando; cada uma
+//               explode em `raio` e solta `estilhacos` em volta (cada um causa
+//               `fatorEstilhaco` do dano; a espada quebra). Não machuca o dono.
 const ARMAS_DUELO = {
-  tiro: { nome: 'TIRO', recargaMs: 340, velocidade: 290, velocidadeExtra: 90, raio: 4 },
+  tiro: { nome: 'TIRO', recargaMs: 260, velocidade: 300, velocidadeExtra: 90, raio: 5, antecipa: 0.6 },
   espada: { nome: 'ESPADA', recargaMs: 650, alcance: 36, alcanceExtra: 12, arco: 120, preparoMs: 90, golpeMs: 150, lentidao: 0.45, empurrao: 26 },
-  bumerangue: { nome: 'BUMERANGUE', recargaMs: 650, distancia: 160, distanciaExtra: 50, velocidade: 380, raio: 7, vidaMaxMs: 3500 },
-  explosao: { nome: 'EXPLOSÃO', recargaMs: 1900, distancia: 90, vooMs: 260, pavioMs: 850, raio: 48, raioExtra: 10, explosaoMs: 420 },
+  bumerangue: { nome: 'BUMERANGUE', recargaMs: 500, distancia: 200, distanciaExtra: 60, velocidade: 400, raio: 8, vidaMaxMs: 3500 },
+  explosao: { nome: 'EXPLOSÃO', recargaMs: 900, distancia: 260, vooMs: 280, pavioMs: 600, raio: 50, raioExtra: 10, explosaoMs: 420, bombas: 3, leque: 52, antecipa: 0.7, estilhacos: 5, velocidadeEstilhaco: 190, fatorEstilhaco: 0.6 },
 }
 
 const MEIO = CORACAO.tamanho / 2
@@ -359,7 +365,7 @@ export default class Duelo {
     a.tweens.add({ targets: sprite, scale: ESCALA.coracao, duration: 260, ease: 'Back.easeOut' })
     particulas(a, x, y, { cor, quantidade: 10, velocidade: 90 })
     const dir = { x: j ? -1 : 1, y: 0 }
-    return { j, x, y, dir, angulo: Math.atan2(dir.y, dir.x), cor, sprite, seta, barra, ko: false, invencivelMs: 0, recargaMs: 0, recargaTotal: 1, pedidoMs: 0, golpe: null, ladoGolpe: 1, levou: 0, danoLevado: 0, deu: 0 }
+    return { j, x, y, dir, angulo: Math.atan2(dir.y, dir.x), cor, sprite, seta, barra, ko: false, invencivelMs: 0, recargaMs: 0, recargaTotal: 1, pedidoMs: 0, golpe: null, ladoGolpe: 1, vx: 0, vy: 0, levou: 0, danoLevado: 0, deu: 0 }
   }
 
   // fim: "FIM DO DUELO!", tudo some e a caixa fecha
@@ -464,10 +470,19 @@ export default class Duelo {
   atirar(j) {
     const c = this.coracoes[j]
     const p = this.params[j]
-    const x = c.x + c.dir.x * 10
-    const y = c.y + c.dir.y * 10
-    const sprite = this.imagem('tiro', x, y, { cor: c.cor, tamanho: p.raio * 2.6, profundidade: PROFUNDIDADE.tiro }).setRotation(c.angulo)
-    this.tiros.push({ tipo: 'tiro', dono: j, x, y, vx: c.dir.x * p.velocidade, vy: c.dir.y * p.velocidade, raio: p.raio, sprite })
+    // mira adiantada: onde o outro vai estar quando o tiro chegar (uma parte disso)
+    const alvo = this.coracoes[outro(j)]
+    let ang = c.angulo
+    if (alvo && !alvo.ko) {
+      const voo = Math.hypot(alvo.x - c.x, alvo.y - c.y) / p.velocidade
+      ang = Math.atan2(alvo.y + alvo.vy * voo * p.antecipa - c.y, alvo.x + alvo.vx * voo * p.antecipa - c.x)
+    }
+    const dx = Math.cos(ang)
+    const dy = Math.sin(ang)
+    const x = c.x + dx * 10
+    const y = c.y + dy * 10
+    const sprite = this.imagem('tiro', x, y, { cor: c.cor, tamanho: p.raio * 2.6, profundidade: PROFUNDIDADE.tiro }).setRotation(ang)
+    this.tiros.push({ tipo: 'tiro', dono: j, x, y, vx: dx * p.velocidade, vy: dy * p.velocidade, raio: p.raio, sprite })
     tocar(this.arena, 'tiro')
     // coice: o coração "pula" para trás no visual
     c.sprite.setScale(ESCALA.coracao * 1.25)
@@ -561,8 +576,10 @@ export default class Duelo {
     const x = c.x + c.dir.x * 10
     const y = c.y + c.dir.y * 10
     const sprite = this.imagem('bumerangue', x, y, { cor: c.cor, tamanho: p.raio * 2.6, profundidade: PROFUNDIDADE.tiro })
-    // desacelera até parar em `distancia`: v² = 2·a·d
-    const desaceleracao = (p.velocidade * p.velocidade) / (2 * p.distancia)
+    // vai até um pouco depois do outro (no máximo `distancia`), desacelerando: v² = 2·a·d
+    const alvo = this.coracoes[outro(j)]
+    const ate = alvo && !alvo.ko ? limitar(Math.hypot(alvo.x - c.x, alvo.y - c.y) + 30, 70, p.distancia) : p.distancia
+    const desaceleracao = (p.velocidade * p.velocidade) / (2 * ate)
     this.bumerangues.push({ tipo: 'bumerangue', dono: j, x, y, vx: c.dir.x * p.velocidade, vy: c.dir.y * p.velocidade, v: p.velocidade, a: desaceleracao, raio: p.raio, fase: 'ida', acertou: false, idade: 0, sprite })
     tocar(this.arena, 'bumerangue')
   }
@@ -621,13 +638,29 @@ export default class Duelo {
     const c = this.coracoes[j]
     const p = this.params[j]
     const m = 12
-    const alvo = {
-      x: limitar(c.x + c.dir.x * p.distancia, this.area.left + m, this.area.right - m),
-      y: limitar(c.y + c.dir.y * p.distancia, this.area.top + m, this.area.bottom - m),
+    // mira adiantada: onde o outro vai estar quando a bomba explodir (uma parte disso)
+    const outroC = this.coracoes[outro(j)]
+    let dir = c.dir
+    let dist = p.distancia
+    if (outroC && !outroC.ko) {
+      const t = ((p.vooMs + p.pavioMs) / 1000) * p.antecipa
+      const fx = outroC.x + outroC.vx * t - c.x
+      const fy = outroC.y + outroC.vy * t - c.y
+      const d = Math.hypot(fx, fy) || 1
+      dir = { x: fx / d, y: fy / d }
+      dist = Math.min(p.distancia, d)
     }
-    const sprite = this.imagem('bomba', c.x, c.y, { tamanho: 20, profundidade: PROFUNDIDADE.bomba })
-    const aviso = this.registrar(this.arena.add.graphics().setDepth(PROFUNDIDADE.aviso))
-    this.bombas.push({ tipo: 'bomba', dono: j, x0: c.x, y0: c.y, alvo, x: c.x, y: c.y, raio: p.raio, estado: 'voo', idade: 0, sprite, aviso, escala: sprite.scale })
+    // leque: uma bomba em cima do outro e as outras dos lados (perpendicular ao arremesso)
+    for (let k = 0; k < p.bombas; k++) {
+      const lado = k === 0 ? 0 : (k % 2 ? 1 : -1) * Math.ceil(k / 2) * p.leque
+      const alvo = {
+        x: limitar(c.x + dir.x * dist - dir.y * lado, this.area.left + m, this.area.right - m),
+        y: limitar(c.y + dir.y * dist + dir.x * lado, this.area.top + m, this.area.bottom - m),
+      }
+      const sprite = this.imagem('bomba', c.x, c.y, { tamanho: k ? 16 : 20, profundidade: PROFUNDIDADE.bomba })
+      const aviso = this.registrar(this.arena.add.graphics().setDepth(PROFUNDIDADE.aviso))
+      this.bombas.push({ tipo: 'bomba', dono: j, x0: c.x, y0: c.y, alvo, x: c.x, y: c.y, raio: p.raio, estado: 'voo', idade: 0, sprite, aviso, escala: sprite.scale })
+    }
     tocar(this.arena, 'voo')
   }
 
@@ -678,13 +711,23 @@ export default class Duelo {
     const tamanho = b.raio * 2.4
     sprite.setScale(tamanho / Math.max(sprite.width, sprite.height))
     this.explosoes.push({ x: b.x, y: b.y, idade: 0, sprite })
-    // machuca QUALQUER coração no raio (o dono também!)
+    // machuca o outro coração no raio (o dono não)
     for (const c of this.coracoes) {
-      if (c.ko) continue
+      if (c.ko || c.j === b.dono) continue
       if (Math.hypot(c.x - b.x, c.y - b.y) <= b.raio + DUELO.hitbox) this.ferir(c.j, b.dono, b.x, b.y)
     }
     // e apaga os tiros que estavam no raio
     for (const t of this.tiros) if (Math.hypot(t.x - b.x, t.y - b.y) <= b.raio) t.morto = true
+    // estilhaços em volta (giram um pouco a cada bomba)
+    const p = this.params[b.dono]
+    const giro = Math.random() * Math.PI
+    for (let k = 0; k < p.estilhacos; k++) {
+      const ang = giro + (k * Math.PI * 2) / p.estilhacos
+      const x = b.x + Math.cos(ang) * b.raio * 0.5
+      const y = b.y + Math.sin(ang) * b.raio * 0.5
+      const sprite = this.imagem('tiro', x, y, { cor: 0xffa040, tamanho: 10, profundidade: PROFUNDIDADE.tiro }).setRotation(ang)
+      this.tiros.push({ tipo: 'estilhaco', dono: b.dono, x, y, vx: Math.cos(ang) * p.velocidadeEstilhaco, vy: Math.sin(ang) * p.velocidadeEstilhaco, raio: 4, fator: p.fatorEstilhaco, sprite })
+    }
   }
 
   atualizarExplosao(e, dt) {
@@ -708,11 +751,12 @@ export default class Duelo {
   // ---------- dano ----------
 
   // o lado `j` levou um golpe do lado `de` (de === j: a própria bomba)
-  ferir(j, de, x, y) {
+  // fator: fração do dano da arma (estilhaço da bomba)
+  ferir(j, de, x, y, fator = 1) {
     const c = this.coracoes[j]
     if (!c || c.ko || c.invencivelMs > 0) return false
     if (this.estagio !== 'luta' && this.estagio !== 'final') return false
-    const dano = this.armas[de].dano
+    const dano = Math.max(1, Math.round(this.armas[de].dano * fator))
     const ok = this.arena.acertou?.(j, dano)
     if (ok === false) return false
     c.invencivelMs = DUELO.invencivelMs
@@ -784,6 +828,7 @@ export default class Duelo {
         atacar = r.atacar
       } else joy = this.arena.controles?.joy(j) ?? { x: 0, y: 0 }
       if (mexe) this.mover(c, joy, dt)
+      this.mirar(c)
       c.invencivelMs = Math.max(0, c.invencivelMs - dt)
       if (!lutando) continue
       c.recargaMs = Math.max(0, c.recargaMs - dt)
@@ -823,15 +868,22 @@ export default class Duelo {
       jy /= n
     }
     const passo = this.velocidade * (c.golpe ? this.params[c.j].lentidao : 1) * (dt / 1000)
+    const x0 = c.x
+    const y0 = c.y
     c.x = limitar(c.x + jx * passo, this.limites.left, this.limites.right)
     c.y = limitar(c.y + jy * passo, this.limites.top, this.limites.bottom)
-    // mira: 8 direções, do último movimento de verdade
-    if (Math.hypot(joy?.x ?? 0, joy?.y ?? 0) >= DUELO.zonaMorta) {
-      const k = Math.round(Math.atan2(jy, jx) / (Math.PI / 4))
-      const ang = (k * Math.PI) / 4
-      c.angulo = ang
-      c.dir = { x: Math.round(Math.cos(ang) * 1e6) / 1e6, y: Math.round(Math.sin(ang) * 1e6) / 1e6 }
-    }
+    // velocidade (px/s), para a mira adiantada do tiro
+    c.vx = dt > 0 ? ((c.x - x0) * 1000) / dt : 0
+    c.vy = dt > 0 ? ((c.y - y0) * 1000) / dt : 0
+  }
+
+  // mira automática: sempre virado para o outro coração (a espada no meio do
+  // golpe mantém a direção em que começou)
+  mirar(c) {
+    const alvo = this.coracoes[outro(c.j)]
+    if (!alvo || alvo.ko || c.golpe) return
+    c.angulo = Math.atan2(alvo.y - c.y, alvo.x - c.x)
+    c.dir = { x: Math.cos(c.angulo), y: Math.sin(c.angulo) }
   }
 
   atualizarTiros(dt) {
@@ -847,7 +899,7 @@ export default class Duelo {
       }
       const alvo = this.coracoes[outro(t.dono)]
       if (alvo && !alvo.ko && Math.hypot(alvo.x - t.x, alvo.y - t.y) < t.raio + DUELO.hitbox) {
-        if (this.ferir(alvo.j, t.dono, t.x, t.y)) t.morto = true
+        if (this.ferir(alvo.j, t.dono, t.x, t.y, t.fator)) t.morto = true
       }
     }
   }
@@ -921,7 +973,7 @@ export default class Duelo {
       if (ini.golpe || (!euEspada && this.pronto(ini.j))) perigos.push({ x: ini.x, y: ini.y, raio: this.params[ini.j].alcance + (euEspada ? 6 : 20), peso: euEspada ? 0.3 : 0.8 })
     }
     return {
-      eu: { x: eu.x, y: eu.y, dir: eu.dir, arma: this.armas[j].arma, pronto: this.pronto(j), velocidade: this.velocidade, alcance: this.params[j].alcance },
+      eu: { x: eu.x, y: eu.y, arma: this.armas[j].arma, pronto: this.pronto(j), velocidade: this.velocidade, alcance: this.params[j].alcance },
       inimigo: ini ? { x: ini.x, y: ini.y, ko: ini.ko, arma: this.armas[ini.j].arma, pronto: this.pronto(ini.j), alcance: this.params[ini.j].alcance } : null,
       limites: this.limites,
       perigos,
