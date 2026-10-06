@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import Controles from '../controles.js'
 import { CHEFES } from '../data/chefes/index.js'
+import { BARALHOS_CHEFES } from '../coop/chefes/index.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { ESCALA } from '../arte/texturas.js'
 import { tocar, musica, pararMusica } from '../audio.js'
@@ -64,7 +65,7 @@ export default class Dificuldade extends Phaser.Scene {
         .text(esquerda, y - OPCAO.altura / 2 + 8, nivel.rotulo, { fontFamily: FONTE, fontSize: '22px', color: nivel.cor, stroke: '#000000', strokeThickness: 3 })
         .setOrigin(0, 0)
       const detalhes = this.add
-        .text(esquerda, y - OPCAO.altura / 2 + 36, this.descrever(nivel, def).join('\n'), {
+        .text(esquerda, y - OPCAO.altura / 2 + 36, this.descrever(nivel).join('\n'), {
           fontFamily: FONTE,
           fontSize: '14px',
           color: TEXTO.normal,
@@ -83,16 +84,12 @@ export default class Dificuldade extends Phaser.Scene {
     this.cameras.main.fadeIn(250)
   }
 
-  // Linhas do que o nível muda para este chefe
-  descrever(nivel, def) {
-    if (!nivel.caos) return ['O chefe como ele é.', 'Nada muda: ritmo, dano e HP normais.']
+  // Linhas do que o nível muda para este chefe (HP do modo cartas)
+  descrever(nivel) {
+    const hp = Math.round(BARALHOS_CHEFES[this.idChefe].hp * nivel.hp)
+    if (nivel.dano === 1) return ['O chefe como ele é.', `Ritmo e dano normais. HP do chefe ${hp}.`]
     const mais = (f) => `+${Math.round((f - 1) * 100)}%`
-    const caos = nivel.caos.chance >= 1 ? 'em TODO turno' : `em ${Math.round(nivel.caos.chance * 100)}% dos turnos`
-    return [
-      `Balas ${mais(nivel.velocidade)} rápidas, ${mais(nivel.densidade)} frequentes`,
-      `Dano ${mais(nivel.dano)}   HP do chefe ${Math.round(def.hp * nivel.hp)} (${mais(nivel.hp)})`,
-      `CAOS: tiros extras ${caos}`,
-    ]
+    return [`Balas ${mais(nivel.velocidade)} rápidas, ${mais(nivel.densidade)} frequentes`, `Dano ${mais(nivel.dano)}   HP do chefe ${hp} (${mais(nivel.hp)})`]
   }
 
   selecionar(indice, comSom = true) {

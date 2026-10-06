@@ -3,7 +3,9 @@ import Controles from '../controles.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { tocar, musica } from '../audio.js'
-import { CORES, FIGHT, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
+import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
+import { perfilPvp, rotuloCarta } from '../pvp/perfil.js'
+import { superDoPersonagem, SIMBOLOS } from '../pvp/cartas.js'
 
 // Área da grade de personagens e dos painéis de detalhes (px)
 const GRADE = { topo: 72, base: 282, esquerda: 20, direita: 620, espaco: 8, larguraMax: 180, alturaMax: 200 }
@@ -141,7 +143,7 @@ export default class EscolhaParty extends Phaser.Scene {
     sprite.escalaBase = escala
   }
 
-  // Um painel de detalhes por cursor: o personagem em cima dele (nome, números e habilidades)
+  // Um painel de detalhes por cursor: o personagem em cima dele (nome, HP e baralho)
   montarDetalhes() {
     const d = DETALHE
     const total = this.numJogadores
@@ -166,7 +168,7 @@ export default class EscolhaParty extends Phaser.Scene {
           })
         }
       }
-      // situação deste cursor (PRONTO, já escolhido...), na linha do rótulo do ACT
+      // situação deste cursor (PRONTO, já escolhido...), na linha do estilo
       const rodape = this.add.text(x + largura - 10, d.y + 33, '', estilo(12)).setOrigin(1, 0)
       return { moldura, cabeca, numeros, rotulo, linhas, rodape }
     })
@@ -304,27 +306,19 @@ export default class EscolhaParty extends Phaser.Scene {
     const corJogador = solo ? CORES.selecionado : CORES.almas[j]
     p.moldura.setStrokeStyle(2, corJogador, 0.8)
     p.cabeca.setText(solo ? def.nome.toUpperCase() : `P${j + 1}  ${def.nome.toUpperCase()}`).setColor(corTexto(def.cor))
-    // (com 2 painéis não cabe o FIGHT ao lado de um nome comprido)
-    p.numeros.setText(`HP ${def.hp}  DEF ${def.defesa ?? 0}${solo ? `  FIGHT ${def.fight?.dano ?? FIGHT.dano}` : ''}`)
-
-    const act = def.act ?? {}
-    // quem usa os ACTs do chefe ganha uma linha a mais na lista
-    const lista = [...(act.usaActsDoInimigo ? [{ nome: '+ ACTs do chefe' }] : []), ...(act.lista ?? [])]
-    p.rotulo.setText(act.rotulo ?? 'ACT')
-    const cabem = p.linhas.length
-    const mostrar = lista.length > cabem ? lista.slice(0, cabem - 1) : lista
+    // o baralho do personagem: estilo, SUPER, naipes e as cartas mais fortes
+    const perfil = perfilPvp(id)
+    p.numeros.setText(`HP ${perfil.hp}`)
+    p.rotulo.setText(perfil.estilo.rotulo).setColor(corTexto(perfil.estilo.cor))
+    const { naipes } = perfil
+    const lista = [
+      { nome: `★ ${superDoPersonagem(id).nome}`, custo: '10' },
+      { nome: `♠${naipes.espadas}  ♥${naipes.copas}  ♦${naipes.ouros}  ♣${naipes.paus}`, custo: '' },
+      ...perfil.fortes.map((c) => ({ nome: `${rotuloCarta(c)}${SIMBOLOS[c.naipe]} ${c.nome}`, custo: String(c.custo) })),
+    ]
     p.linhas.forEach((l, k) => {
-      const item = mostrar[k]
-      if (item) {
-        l.nome.setText(item.nome)
-        l.custo.setText(item.custoTP ? `${item.custoTP}%` : '')
-      } else if (k === mostrar.length && lista.length > mostrar.length) {
-        l.nome.setText(`+ ${lista.length - mostrar.length} mais...`)
-        l.custo.setText('')
-      } else {
-        l.nome.setText(k === 0 && !lista.length ? '(sem habilidades próprias)' : '')
-        l.custo.setText('')
-      }
+      l.nome.setText(lista[k]?.nome ?? '')
+      l.custo.setText(lista[k]?.custo ?? '')
     })
 
     // rodapé: o que falta para este jogador

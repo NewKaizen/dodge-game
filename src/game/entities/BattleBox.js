@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { LAYOUT, CAIXA, CAIXA_DINAMICA, CORES } from '../constants.js'
+import { CAIXA, CAIXA_DINAMICA, CORES } from '../constants.js'
 import { tocar } from '../audio.js'
 import { ajustarCamera } from '../resolucao.js'
 import { caixasDe, registrarCaixa, removerCaixa, ignorarNasCaixas } from '../recorte.js'
@@ -8,18 +8,17 @@ import { caixasDe, registrarCaixa, removerCaixa, ignorarNasCaixas } from '../rec
 // encolhe no fim). Pode mudar de forma no meio do turno (mudarPara), sempre
 // com uma pré-visualização antes, e volta ao padrão quando fecha.
 //
-// Pode haver várias caixas na mesma cena (arena PvP: pvp/Pista.js). Opções
-// (todas opcionais; sem elas é a caixa do co-op, igual a antes):
-//   x, y              centro padrão (LAYOUT.caixa)
-//   largura, altura   tamanho padrão (CAIXA)
+// Cada Pista (pvp/Pista.js) tem a sua. Opções:
+//   x, y              centro padrão
+//   largura, altura   tamanho padrão
 //   dinamica          limites da caixa dinâmica, mesclados em CAIXA_DINAMICA
 //                     (larguraMin/Max, alturaMin/Max, deslocMax, campo)
-//   cor               cor da borda (CORES.caixa)
+//   cor               cor da borda
 // As formas pedidas pelos ataques ({ largura, altura, x, y }) são pensadas
 // para a caixa padrão CAIXA; numa caixa de outro tamanho elas são escaladas
 // na mesma proporção (ver destinoDe).
 export default class BattleBox {
-  constructor(scene, { x = LAYOUT.caixa.x, y = LAYOUT.caixa.y, largura = CAIXA.largura, altura = CAIXA.altura, dinamica = {}, cor = CORES.caixa } = {}) {
+  constructor(scene, { x, y, largura, altura, dinamica, cor }) {
     this.scene = scene
     this.base = { x, y, largura, altura } // centro e tamanho padrão
     this.dinamica = { ...CAIXA_DINAMICA, ...dinamica }

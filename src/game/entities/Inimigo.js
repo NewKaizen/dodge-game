@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CORES, FONTE, MERCY_MAX } from '../constants.js'
+import { CORES, FONTE } from '../constants.js'
 import { ESCALA } from '../arte/texturas.js'
 import { particulas } from '../effects/particulas.js'
 import { flashTela } from '../effects/flash.js'
@@ -10,9 +10,8 @@ import { ignorarNasCaixas } from '../recorte.js'
 const LARGURA_BARRA = 100
 const TREMOR_MS = 750 // tempo tremendo antes de estourar (no relógio da cena: a câmera lenta estica)
 
-// Chefe na cena: sprite com animação parada (idle), piscar/tremer ao levar
-// dano e barras de HP (aparece depois do Check ou do primeiro dano) e MERCY
-// (aparece quando sobe)
+// Chefe na arena do CO-OP: sprite com animação parada (idle), nome, barra de
+// HP, piscar/tremer ao levar dano e estourar em pedaços quando cai
 export default class Inimigo {
   constructor(scene, x, y, def) {
     this.scene = scene
@@ -31,22 +30,10 @@ export default class Inimigo {
       scene.add.rectangle(bx, by, LARGURA_BARRA, 6, CORES.hpChefe).setOrigin(0),
       scene.add.text(bx - 4, by + 3, 'HP', pequeno).setOrigin(1, 0.5),
     ]
-    this.mercy = [
-      scene.add.rectangle(bx, by + 11, LARGURA_BARRA, 6, 0x3a2a00).setOrigin(0),
-      scene.add.rectangle(bx, by + 11, LARGURA_BARRA, 6, CORES.mercy).setOrigin(0),
-      scene.add.text(bx + LARGURA_BARRA + 4, by + 14, '', pequeno).setOrigin(0, 0.5),
-    ]
-    this.rotuloMercy = def.rotuloMercy ?? 'MERCY'
-    this.hp.forEach((o) => o.setVisible(false))
-    this.mercy.forEach((o) => o.setVisible(false))
   }
 
-  atualizar(chefe) {
-    this.hp[1].setScale(Math.max(0, chefe.hp) / chefe.max, 1)
-    this.hp.forEach((o) => o.setVisible(chefe.revelado && chefe.ativo))
-    this.mercy[1].setScale(chefe.mercy / MERCY_MAX, 1)
-    this.mercy[2].setText(`${this.rotuloMercy} ${Math.floor(chefe.mercy)}%`)
-    this.mercy.forEach((o) => o.setVisible(chefe.mercy > 0 && chefe.ativo))
+  atualizar(hp, max) {
+    this.hp[1].setScale(Math.max(0, hp) / max, 1)
   }
 
   // intensidade 0..1 (escala com o dano do golpe): amplitude e duração do tremor
@@ -65,18 +52,11 @@ export default class Inimigo {
     })
   }
 
-  // Poupado sobe e some; derrotado treme cada vez mais e estoura em pedaços
-  sumir(poupado) {
+  // Derrotado: some a barra e o sprite treme até estourar
+  sumir() {
     this.idle.stop()
-    ;[...this.hp, ...this.mercy, this.nome].forEach((o) => o.setVisible(false))
-    if (!poupado) return this.desfazer()
-    this.scene.tweens.add({
-      targets: this.sprite,
-      alpha: 0,
-      y: this.y + (poupado ? -30 : 0),
-      scaleX: poupado ? this.sprite.scaleX : this.sprite.scaleX * 1.4,
-      duration: poupado ? 900 : 700,
-    })
+    ;[...this.hp, this.nome].forEach((o) => o.setVisible(false))
+    this.desfazer()
   }
 
   // Morte: pisca branco/vermelho tremendo com força crescente e, no auge,

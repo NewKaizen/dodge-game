@@ -200,8 +200,6 @@ export default class CoopArena extends PvpArena {
   criarChefe() {
     const def = this.defChefe
     this.inimigo = new Inimigo(this, CHEFE.x, CHEFE.y, def)
-    this.alvoChefe = { hp: this.estado.chefe.hp, max: this.estado.chefe.hpMax, revelado: true, ativo: true, mercy: 0 }
-    this.inimigo.atualizar(this.alvoChefe)
     this.inimigo.nome.setFontSize(13).setStroke('#000000', 3)
     this.textoChefe = this.add
       .text(CHEFE.x, 115, '', { fontFamily: FONTE, fontSize: '9px', color: '#ffd23c', stroke: '#000000', strokeThickness: 3, align: 'center' })
@@ -263,8 +261,7 @@ export default class CoopArena extends PvpArena {
 
   atualizarChefe() {
     const c = this.estado.chefe
-    this.alvoChefe.hp = c.hp
-    this.inimigo.atualizar(this.alvoChefe)
+    this.inimigo.atualizar(c.hp, c.hpMax)
     const partes = []
     if (c.guarda != null) partes.push(`GUARDA -${Math.round((1 - c.guarda) * 100)}%`)
     if (c.fase >= 1) partes.push(`SUPER ${'★'.repeat(c.carga)}${'☆'.repeat(c.cargaMax - c.carga)}`)
@@ -922,7 +919,7 @@ export default class CoopArena extends PvpArena {
     }
     if (vencedor === 'vitoria') {
       this.balao.esconder()
-      this.inimigo.sumir(false)
+      this.inimigo.sumir()
       tocar(this, 'vitoria')
       await this.esperar(1100)
       this.mostrarBanner('VITÓRIA!', TEXTO.selecionado, { y: 236, tamanho: 36 })
