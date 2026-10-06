@@ -5,7 +5,7 @@ const CARROSSEL_RAPIDO = (giroDentro, giroFora) => [
 ]
 
 export default {
-  hp: 330,
+  hp: 500,
   danoBala: 13,
   leve: (A) => A.quicantes({ forma: 'ouros', duracao: 4000, intervalo: 1500, velocidade: 150 }),
   fases: [

@@ -1,7 +1,7 @@
 // Chaos King no CO-OP de cartas (FÁCIL): os ataques do modo clássico viram
 // cartas. Formato: ver o comentário em coop/chefes/index.js.
 export default {
-  hp: 230,
+  hp: 340,
   danoBala: 7, // o mesmo do modo clássico (data/chefes/king.js)
   leve: (A) => A.rain({ duracao: 4000, intervalo: 520, velocidade: 110 }),
   fases: [

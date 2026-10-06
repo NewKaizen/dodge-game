@@ -123,14 +123,18 @@ const MESA = [
 const ESCALA_MESA = 1.45
 const COLUNA = [150, 262] // y das cartas na coluna entre as caixas, antes do arremesso
 
+// posições da mesa, para a CoopArena (CO-OP de cartas) usar as mesmas
+export const LAYOUT_PVP = { PISTA, CENTROS, MAOS, MAO_ESCONDIDA, PASSAR, PREVIAS, ESCALA_MESA, HP_BAIXO }
+
 const outro = (j) => 1 - j
 // bonus round: o "ataque" da caixa que não recebeu carta (só o evento bagunça ela)
 const ATAQUE_VAZIO = { nome: 'bonus', duracao: 5000, caixa: null, iniciar() {} }
 const VENCEDOR = { p1: 1, p2: 2, empate: 0 }
 
 export default class PvpArena extends Phaser.Scene {
-  constructor() {
-    super('PvpArena')
+  // a CoopArena (CO-OP de cartas) estende esta cena com outra chave
+  constructor(chave = 'PvpArena') {
+    super(chave)
   }
 
   init(dados) {
@@ -883,7 +887,7 @@ export default class PvpArena extends Phaser.Scene {
     const id =
       this.bonus?.cartas === 'duelo'
         ? mao0[inteiro(this.rngBot, 0, mao0.length - 1)]?.id ?? null
-        : escolherJogada(this.estado, j, { nivel: this.nivelBot, rng: this.rngBot })
+        : this.decidirJogadaCpu(j)
     await this.esperar(sorte(CPU.pensarMin, CPU.pensarMax))
     const mao = this.maos[j]
     const ladoPassar = PASSAR[j].lado
@@ -905,6 +909,11 @@ export default class PvpArena extends Phaser.Scene {
     const ok = id && mao.selecionada?.dados.id === id && !this.noPassar[j] && this.podeJogarAgora(j, id).ok
     tocar(this, 'cpu')
     this.escolher(j, ok ? id : null)
+  }
+
+  // carta que a CPU vai jogar (id ou null para passar); a CoopArena troca pela CPU aliada
+  decidirJogadaCpu(j) {
+    return escolherJogada(this.estado, j, { nivel: this.nivelBot, rng: this.rngBot })
   }
 
   desfazer(m) {

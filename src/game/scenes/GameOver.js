@@ -70,6 +70,15 @@ const DICAS = [
   'Fique de olho no aviso antes de cada ataque: a caixa mostra para onde vai mudar.',
   'Alguns chefes podem ser poupados: encha o MERCY com ACTs e use SPARE.',
 ]
+// dicas do CO-OP de cartas (CoopArena)
+const DICAS_CARTAS = [
+  'O naipe da carta virada do chefe avisa o que vem: com ♠ forte chegando, um escudo de copas protege os dois.',
+  'Passar pelo ataque sem levar dano deixa o seu golpe CRÍTICO (x1,5) e ainda dá energia.',
+  'Os dois atacando com o mesmo naipe fazem COMBO; com o mesmo valor, PAR. Combinem as cartas!',
+  'Caiu? Uma carta de cura do parceiro te levanta na hora. Sem cura, você volta sozinho em 2 rodadas.',
+  'A barra ★ embaixo do HP do chefe é o SUPER dele. O Ás de ouros tira carga dela.',
+  'A armadilha (♣) fica mais forte a cada graze. Passe raspando!',
+]
 const DICA_NIVEL = 'Está difícil demais? Em B dá para escolher o chefe de novo e trocar o nível.'
 
 const estilo = (tamanho, cor = TEXTO.normal, extra = {}) => ({
@@ -86,8 +95,9 @@ export default class GameOver extends Phaser.Scene {
     super('GameOver')
   }
 
-  create({ chefe, estatisticas = null, hpChefe = null, hpMaxChefe = null } = {}) {
+  create({ chefe, estatisticas = null, hpChefe = null, hpMaxChefe = null, cena = 'Battle' } = {}) {
     this.idChefe = chefe
+    this.cenaLuta = cena // A: tentar de novo nesta cena (CoopArena no CO-OP de cartas)
     this.def = CHEFES[chefe] ?? null
     this.stats = estatisticas
     this.nivel = estatisticas?.nivel ?? (NIVEIS[this.registry.get('nivel')] ? this.registry.get('nivel') : 'facil')
@@ -196,7 +206,7 @@ export default class GameOver extends Phaser.Scene {
     tocar(this, 'confirmar')
     this.cameras.main.fadeOut(300, 0, 0, 0)
     this.time.delayedCall(320, () => {
-      if (botao === 'A') this.scene.start('Battle', { chefe: this.idChefe, nivel: this.nivel })
+      if (botao === 'A') this.scene.start(this.cenaLuta, { chefe: this.idChefe, nivel: this.nivel })
       else this.scene.start('Selecao', { chefe: this.idChefe })
     })
   }
@@ -361,7 +371,7 @@ export default class GameOver extends Phaser.Scene {
   }
 
   dica(rapido) {
-    const dicas = this.nivel !== 'facil' && Math.random() < 0.3 ? [DICA_NIVEL] : DICAS
+    const dicas = this.nivel !== 'facil' && Math.random() < 0.3 ? [DICA_NIVEL] : this.cenaLuta === 'CoopArena' ? DICAS_CARTAS : DICAS
     const texto = Phaser.Utils.Array.GetRandom(dicas)
     const y = 368
     const caixa = this.add.rectangle(LARGURA / 2, y, 560, 52, CORES.painel, 0.85).setStrokeStyle(2, 0x5a2a30).setDepth(9)
