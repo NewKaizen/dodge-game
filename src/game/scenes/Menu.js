@@ -87,7 +87,7 @@ export default class Menu extends Phaser.Scene {
     const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 5 })
     this.linhas = OPCOES.map((o, i) => this.add.text(POS.x, POS.y + i * POS.passo, o.rotulo, estilo(26, o.cor)).setOrigin(0, 0.5))
     this.seta = this.add.text(0, 0, '◀', estilo(22, '#ffffff')).setOrigin(0, 0.5)
-    this.aviso = this.add.text(POS.x, POS.y + OPCOES.length * POS.passo + 6, '', estilo(12, TEXTO.desabilitado)).setOrigin(0, 0.5)
+    this.aviso = this.add.text(POS.x, POS.y + OPCOES.length * POS.passo - 6, '', { ...estilo(12, TEXTO.desabilitado), lineSpacing: 4 }).setOrigin(0, 0)
     this.painel.add([...this.linhas, this.seta, this.aviso])
   }
 
@@ -104,7 +104,7 @@ export default class Menu extends Phaser.Scene {
     })
     const l = this.linhas[this.indice]
     this.seta.setVisible(ativo).setColor(OPCOES[this.indice].cor).setPosition(POS.x + 8 + l.width + 12, l.y)
-    this.aviso.setText(ativo ? '' : 'conecte o joystick ou use o SIMULADOR (TECLADO) aí em cima')
+    this.aviso.setText(ativo ? '' : 'conecte o joystick ou use o\nSIMULADOR (TECLADO) aí em cima ↑')
   }
 
   selecionar(indice) {

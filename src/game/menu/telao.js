@@ -114,7 +114,7 @@ const ONDAS = [
       const e = c.emissores[k % 2]
       for (let i = 0; i < 7; i++) {
         const a = (i / 7) * Math.PI * 2 + k
-        c.soltar({ x: e.x, y: e.y, vx: Math.cos(a) * 46, vy: Math.sin(a) * 46, textura: 'bala-bola', cor: 0xffffff, r: 3.8 })
+        c.soltar({ x: e.x, y: e.y, vx: Math.cos(a) * 46, vy: Math.sin(a) * 46, textura: 'bala-bola', cor: 0xffffff, r: 3.2 })
       }
     },
   },
@@ -443,7 +443,6 @@ export function criarTelao(cena, tela) {
   const ferir = (a) => {
     if (a.inv > 0) return
     a.inv = 1
-    a.golpes = (a.golpes ?? 0) + 1 // TMPDEBUG
     a.img.setTintMode(Phaser.TintModes.FILL).setTint(0xffffff)
     cena.time.delayedCall(70, () => a.img.active && a.img.setTintMode(Phaser.TintModes.MULTIPLY).setTint(a.cor))
   }
@@ -708,6 +707,5 @@ export function criarTelao(cena, tela) {
     cor: () => estado.corAtual,
     explodir,
     atualizar,
-    _debug: () => ({ golpes: almas.map((a) => a.golpes ?? 0), onda: onda.nome, vivas: balas.filter((b) => b.vivo).length }), // TMPDEBUG
   }
 }
