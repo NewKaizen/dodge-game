@@ -5,7 +5,7 @@
 // Carta do chefe (mesmo formato das cartas do PvP, para a Carta desenhar):
 //   { id, personagem: <chefe>, chefe, naipe, valor, nome, descricao, custo: 0, fase }
 //   SUPER do chefe: valor 14, naipe 'espadas', id '<chefe>-super'
-import { BARALHOS_CHEFES } from './chefes/index.js'
+import { CHEFES } from './chefes/index.js'
 import { ehSuper } from '../pvp/cartas.js'
 
 export const TIPOS_CHEFE = { espadas: 'ATAQUE', ouros: 'CONTROLE', paus: 'ARMADILHA', copas: 'SE CURA' }
@@ -19,7 +19,7 @@ const RITMO_OUROS = 0.15
 const forcaChefe = (valor) => Math.min(1, Math.max(0, (valor - 2) / 11))
 
 function montarCartasDoChefe(chefe) {
-  const def = BARALHOS_CHEFES[chefe]
+  const def = CHEFES[chefe]
   if (!def) throw new Error(`chefe sem baralho de cartas: ${chefe}`)
   const fases = def.fases.map((fase, f) =>
     fase.cartas.map(([naipe, valor, nome, ataque, extras = {}], i) => {
@@ -40,11 +40,11 @@ function montarCartasDoChefe(chefe) {
   return { fases, super: sup }
 }
 
-export const CARTAS_CHEFES = Object.fromEntries(Object.keys(BARALHOS_CHEFES).map((c) => [c, montarCartasDoChefe(c)]))
+export const CARTAS_CHEFES = Object.fromEntries(Object.keys(CHEFES).map((c) => [c, montarCartasDoChefe(c)]))
 
 // A linha da definição de uma carta do chefe ([naipe, valor, nome, ataque, extras])
 function definicao(carta) {
-  const def = BARALHOS_CHEFES[carta.chefe]
+  const def = CHEFES[carta.chefe]
   if (!def) throw new Error(`carta de chefe desconhecida: ${carta.id}`)
   if (ehSuper(carta)) return null
   const [, f, i] = /-f(\d+)-(\d+)$/.exec(carta.id) ?? []
@@ -68,7 +68,7 @@ export function inverteControles(carta) {
 // Dano por bala da carta do chefe: danoBala do baralho dele escalado pelo
 // valor da carta; `fatorNivel` = NIVEIS[nivel].dano
 export function danoDaCartaChefe(carta, fatorNivel = 1) {
-  const { danoBala } = BARALHOS_CHEFES[carta.chefe]
+  const { danoBala } = CHEFES[carta.chefe]
   let fator
   if (ehSuper(carta)) fator = DANO_CHEFE.super
   else if (carta.naipe === 'copas') fator = DANO_CHEFE.leve
@@ -92,7 +92,7 @@ export function poderDaCartaChefe(carta, fatorNivel = 1) {
 export function ataqueDaCartaChefe(carta, contexto = {}) {
   const A = contexto.ataques
   if (!A) throw new Error('ataqueDaCartaChefe: passe contexto.ataques (attacks/index.js)')
-  const def = BARALHOS_CHEFES[carta.chefe]
+  const def = CHEFES[carta.chefe]
   if (ehSuper(carta)) return def.super.criar(A)
   if (carta.naipe === 'copas') return def.leve(A)
   return definicao(carta)[3](A)
@@ -100,7 +100,7 @@ export function ataqueDaCartaChefe(carta, contexto = {}) {
 
 // Fase do chefe pela fração de HP (a última fase cujo limite já foi alcançado)
 export function faseDoChefe(chefe, fracao) {
-  const fases = BARALHOS_CHEFES[chefe].fases
+  const fases = CHEFES[chefe].fases
   let fase = 0
   fases.forEach((f, i) => {
     if (fracao <= f.hp) fase = i
@@ -109,6 +109,6 @@ export function faseDoChefe(chefe, fracao) {
 }
 
 export function superDoChefe(chefe) {
-  const def = BARALHOS_CHEFES[chefe]
+  const def = CHEFES[chefe]
   return { nome: def.super.nome, texto: def.super.texto }
 }

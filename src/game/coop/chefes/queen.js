@@ -1,11 +1,24 @@
-// Queen no CO-OP de cartas (MÉDIO). Formato: ver coop/chefes/index.js.
+// Queen (MÉDIO). Formato: ver o comentário em coop/chefes/index.js.
 export default {
+  nome: 'Queen',
+  dificuldade: 'medio',
+  sprite: 'queen',
+  fundo: 'queen',
+  musica: 'queen',
+  desafio: { velocidade: 1.12, densidade: 1.15 },
+  textoInicial: 'Queen aparece num holograma gigante!',
+  tema: {
+    formas: ['hex'],
+    cores: { hex: 0x40f0ff, barra: 0xff4fc8, bola: 0x40f0ff },
+    cor: 0x40f0ff,
+  },
   hp: 420,
   danoBala: 11,
   leve: (A) => A.ondas({ duracao: 4000, velocidade: 110, intervalo: 1300 }),
   fases: [
     {
       hp: 1,
+      falas: ['Carregando... a sua derrota!', 'Ha! Ha! Ha!', 'Sintam o poder do Wi-Fi!'],
       cartas: [
         ['espadas', 4, 'Onda de Dados', (A) => A.ondas({ velocidade: 130, intervalo: 850 })],
         ['paus', 5, 'Pop-up Saltitante', (A) => A.quicantes({ intervalo: 1000, velocidade: 150 })],
@@ -15,6 +28,9 @@ export default {
     },
     {
       hp: 0.66,
+      entrada: 'Atualizando para a versão 2.0!',
+      velocidadeFundo: 1.4,
+      falas: ['Versão 2.0! Muito melhor!', 'Vocês não têm memória suficiente!', 'Dancem, dancem!'],
       cartas: [
         ['ouros', 8, 'Feixe Duplo', (A) => A.lasers({ quantidade: 2, orientacao: 'alternar', intervalo: 1100 })],
         ['espadas', 9, 'Banda Larga', (A) => A.ondas({ velocidade: 170, intervalo: 700, amplitude: 50, direcao: 'direita' })],
@@ -24,6 +40,9 @@ export default {
     },
     {
       hp: 0.33,
+      entrada: 'Modo turbo ativado! Tentem acompanhar!',
+      velocidadeFundo: 1.9,
+      falas: ['TURBO!', 'Eu não travo! Eu NÃO TRAVO!', 'Reiniciando... ataque!'],
       cartas: [
         ['ouros', 12, 'Cruz de Dados', (A) => A.sequencia(A.lasers({ orientacao: 'cruz', duracao: 3300, intervalo: 1100 }), A.ondas({ duracao: 3500, velocidade: 210, intervalo: 650, amplitude: 55 })), { inverter: true }],
         ['paus', 11, 'Sobrecarga', (A) => A.juntos(A.lasers({ intervalo: 1500 }), A.quicantes({ intervalo: 1200, velocidade: 180 }))],

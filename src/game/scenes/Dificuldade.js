@@ -1,7 +1,6 @@
 import Phaser from 'phaser'
 import Controles from '../controles.js'
-import { CHEFES } from '../data/chefes/index.js'
-import { BARALHOS_CHEFES } from '../coop/chefes/index.js'
+import { CHEFES } from '../coop/chefes/index.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { ESCALA } from '../arte/texturas.js'
 import { tocar, musica, pararMusica } from '../audio.js'
@@ -86,7 +85,7 @@ export default class Dificuldade extends Phaser.Scene {
 
   // Linhas do que o nível muda para este chefe (HP do modo cartas)
   descrever(nivel) {
-    const hp = Math.round(BARALHOS_CHEFES[this.idChefe].hp * nivel.hp)
+    const hp = Math.round(CHEFES[this.idChefe].hp * nivel.hp)
     if (nivel.dano === 1) return ['O chefe como ele é.', `Ritmo e dano normais. HP do chefe ${hp}.`]
     const mais = (f) => `+${Math.round((f - 1) * 100)}%`
     return [`Balas ${mais(nivel.velocidade)} rápidas, ${mais(nivel.densidade)} frequentes`, `Dano ${mais(nivel.dano)}   HP do chefe ${hp} (${mais(nivel.hp)})`]

@@ -3,7 +3,7 @@ import { LARGURA, FONTE, CORES } from '../constants.js'
 import Controles from '../controles.js'
 import Pista from '../pvp/Pista.js'
 import { ataques } from '../attacks/index.js'
-import { CHEFES } from '../data/chefes/index.js'
+import { CHEFES } from '../coop/chefes/index.js'
 import { debug } from '../debug.js'
 
 // Protótipo do modo PvP (cena de teste, sem fluxo de jogo): duas pistas

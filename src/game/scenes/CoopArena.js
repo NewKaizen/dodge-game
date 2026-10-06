@@ -4,7 +4,7 @@ import Controles from '../controles.js'
 import { tocar, musica, velocidadeMusica, pausarMusica } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
-import { CHEFES } from '../data/chefes/index.js'
+import { CHEFES } from '../coop/chefes/index.js'
 import { partyDe } from '../data/batalha.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { ataques } from '../attacks/index.js'
@@ -365,7 +365,7 @@ export default class CoopArena extends PvpArena {
     tocar(this, 'impacto')
     shake(this, 180, 0.012)
     this.inimigo.dano(0.3)
-    this.falar(this.defChefe.textoInicial?.replace(/^\*\s*/, '') ?? '', 1800)
+    this.falar(this.defChefe.textoInicial, 1800)
     await this.esperar(1300)
     await this.tween({ targets: [dupla, vs, chefe], alpha: 0, duration: 260 })
     ;[dupla, vs, chefe].forEach((t) => t.destroy())

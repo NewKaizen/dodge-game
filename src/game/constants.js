@@ -55,7 +55,6 @@ export const CORACAO = { tamanho: 16, hitbox: 5, graze: 22, velocidadePadrao: 18
 export const TEMPOS = {
   invencivelMs: 850,
   letraMs: 22, // velocidade do texto digitado
-  balaoMs: 1600, // tempo mínimo da fala do chefe na tela
 }
 
 // Dificuldades (os chefes apontam para uma chave daqui)
@@ -69,10 +68,9 @@ export const DIFICULDADES = {
 
 // Aperto geral, vale para TODOS os chefes (em cima do que cada chefe define).
 //   velocidade, densidade   multiplicam o ritmo de todo ataque (balas mais rápidas, disparos mais frequentes)
-//   dano                    multiplica o danoBala de cada chefe
 //   velocidadeMax           multiplica o teto de velocidade da dificuldade
 // Tudo 1 = jogo como era antes.
-export const DESAFIO = { velocidade: 1.15, densidade: 1.2, dano: 1.5, velocidadeMax: 1.2 }
+export const DESAFIO = { velocidade: 1.15, densidade: 1.2, velocidadeMax: 1.2 }
 
 // Nível da luta, escolhido na tela Dificuldade (depois do chefe). NÃO é a
 // mesma coisa que DIFICULDADES (a classificação base de cada chefe): o nível

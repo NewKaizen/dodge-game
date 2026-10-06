@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import Controles from '../controles.js'
-import { CHEFES, ORDEM_CHEFES } from '../data/chefes/index.js'
+import { CHEFES, ORDEM_CHEFES } from '../coop/chefes/index.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { ESCALA } from '../arte/texturas.js'
 import { tocar, musica } from '../audio.js'

@@ -22,7 +22,7 @@ import { NIVEIS } from '../constants.js'
 import { criarBaralho, completarMao, comprar, descartar, cartaNaMao, criarRng, embaralhar, MAO } from '../pvp/baralho.js'
 import { ENERGIA, hpInicial, aplicarDano, curar } from '../pvp/regras.js'
 import { especialDaCarta, efeitosDaCarta, ehSuper } from '../pvp/cartas.js'
-import { BARALHOS_CHEFES } from './chefes/index.js'
+import { CHEFES } from './chefes/index.js'
 import { CARTAS_CHEFES, faseDoChefe, suporteDoChefe, danoDaCartaChefe, ritmoDaCartaChefe, inverteControles, poderDaCartaChefe } from './cartasChefe.js'
 
 
@@ -92,7 +92,7 @@ const outro = (j) => 1 - j
 // ---------- partida ----------
 
 export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coop' }) {
-  const def = BARALHOS_CHEFES[chefe]
+  const def = CHEFES[chefe]
   if (!def) throw new Error(`chefe sem baralho de cartas: ${chefe}`)
   const niv = NIVEIS[nivel] ?? NIVEIS.facil
   const rng = criarRng(`${semente}:coop`)

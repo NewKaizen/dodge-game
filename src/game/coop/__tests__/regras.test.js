@@ -16,12 +16,12 @@ import {
   descricaoCoop,
 } from '../regras.js'
 import { CARTAS_CHEFES, ataqueDaCartaChefe, danoDaCartaChefe, faseDoChefe } from '../cartasChefe.js'
-import { BARALHOS_CHEFES } from '../chefes/index.js'
+import { CHEFES } from '../chefes/index.js'
 import { escolherJogadaCoop } from '../bot.js'
 import { CARTAS } from '../../pvp/cartas.js'
 import { criarRng } from '../../pvp/baralho.js'
 
-const CHEFES = Object.keys(BARALHOS_CHEFES)
+const IDS = Object.keys(CHEFES)
 const nova = (opcoes = {}) => criarPartidaCoop({ party: ['kris', 'susie'], chefe: 'king', semente: 'teste', ...opcoes })
 const carta = (id) => {
   const [p] = id.split('-')
@@ -45,8 +45,8 @@ function intencao(estado, j, valor, naipe = 'espadas') {
 const A = new Proxy({}, { get: (_, nome) => (...args) => ({ nome, args }) })
 
 test('todo chefe tem baralho em todas as fases, com SUPER e ataques montáveis', () => {
-  for (const id of CHEFES) {
-    const def = BARALHOS_CHEFES[id]
+  for (const id of IDS) {
+    const def = CHEFES[id]
     assert.ok(def.hp > 0 && def.danoBala > 0, id)
     assert.equal(def.fases[0].hp, 1, `${id}: a primeira fase começa em hp 1`)
     const { fases, super: sup } = CARTAS_CHEFES[id]
@@ -80,7 +80,7 @@ test('dano do chefe sobe com o valor e com o nível', () => {
 
 test('partida nova: HP do chefe pelo nível, sem intenções', () => {
   const e = nova({ nivel: 'dificil' })
-  assert.equal(e.chefe.hp, Math.round(BARALHOS_CHEFES.king.hp * 1.4))
+  assert.equal(e.chefe.hp, Math.round(CHEFES.king.hp * 1.4))
   assert.deepEqual(e.chefe.intencoes, [null, null])
   assert.equal(e.jogadores[0].personagem, 'kris')
 })
@@ -285,7 +285,7 @@ test('CPU aliada: levanta o parceiro caído e joga carta válida', () => {
 })
 
 test('partida simulada inteira termina (bots dos dois lados)', () => {
-  for (const chefe of CHEFES) {
+  for (const chefe of IDS) {
     const e = criarPartidaCoop({ party: ['ralsei', 'dess'], chefe, semente: `sim-${chefe}` })
     const rng = criarRng('sim')
     let fim = null

@@ -134,8 +134,4 @@ export default class Inimigo {
     tocar(scene, 'estouro')
   }
 
-  // Ponto onde fica a ponta do balão de fala
-  get boca() {
-    return { x: this.x - 52, y: this.y - 34 }
-  }
 }

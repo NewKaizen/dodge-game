@@ -104,7 +104,7 @@ export default class EscolhaParty extends Phaser.Scene {
       const x = LARGURA / 2 + (coluna - (naLinha - 1) / 2) * (largura + g.espaco)
       const y = topo + linha * (altura + g.espaco) + altura / 2
       const moldura = this.add.rectangle(x, y, largura, altura, CORES.painel, 0.88).setStrokeStyle(2, def.cor, 0.55)
-      const textura = this.textures.exists(id) ? id : 'coracao'
+      const textura = id
       const nomeGrande = def.nome.length <= 8
 
       let sprite
@@ -113,17 +113,15 @@ export default class EscolhaParty extends Phaser.Scene {
         sprite = this.add.image(x, y - 16, textura)
         this.encaixar(sprite, largura - 20, altura - 50)
         this.texto(x, y + altura / 2 - 30, def.nome.toUpperCase(), nomeGrande ? 16 : 13, corTexto(def.cor))
-        this.texto(x, y + altura / 2 - 12, `HP ${def.hp}  DEF ${def.defesa ?? 0}`, 12, TEXTO.normal, { strokeThickness: 0 })
+        this.texto(x, y + altura / 2 - 12, `HP ${def.hp}`, 12, TEXTO.normal, { strokeThickness: 0 })
       } else {
         // horizontal (muitos personagens): sprite à esquerda
         const esquerda = x - largura / 2
         sprite = this.add.image(esquerda + 24, y, textura)
         this.encaixar(sprite, 40, altura - 10)
         this.add.text(esquerda + 48, y - 2, def.nome.toUpperCase(), { fontFamily: FONTE, fontSize: nomeGrande ? '14px' : '12px', color: corTexto(def.cor) }).setOrigin(0, 1)
-        this.add.text(esquerda + 48, y + 2, `HP ${def.hp} DEF ${def.defesa ?? 0}`, { fontFamily: FONTE, fontSize: '11px', color: TEXTO.normal }).setOrigin(0, 0)
+        this.add.text(esquerda + 48, y + 2, `HP ${def.hp}`, { fontFamily: FONTE, fontSize: '11px', color: TEXTO.normal }).setOrigin(0, 0)
       }
-      // sem sprite ainda: coração na cor do personagem, sem dominar o card
-      if (textura === 'coracao') sprite.setTint(def.cor).setScale(Math.min(2, sprite.escalaBase)).escalaBase = sprite.scale
 
       // selo de escolhido: "1º"/"2º" (1 jogador) ou "P1"/"P2" (2 jogadores)
       // (no meio do topo; os corações dos cursores ficam nos cantos)
