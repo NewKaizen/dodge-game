@@ -59,9 +59,9 @@ export const COOP = {
 
 // Dano base do contra-ataque de cada naipe, pelo valor da carta
 export const GOLPE = {
-  espadas: (v) => Math.round(5 + 2.2 * v), // 2 -> 9, 9 -> 25, K -> 34
-  ouros: (v) => Math.round(3 + 1.4 * v), // 2 -> 6, K -> 21
-  paus: (v) => Math.round(4 + 1.6 * v), // 2 -> 7, K -> 25 (+ grazes)
+  espadas: (v) => Math.round(6 + 2.6 * v), // 2 -> 11, 9 -> 29, K -> 40
+  ouros: (v) => Math.round(4 + 1.8 * v), // 2 -> 8, K -> 27
+  paus: (v) => Math.round(5 + 2 * v), // 2 -> 9, K -> 31 (+ grazes)
 }
 const ECO = 7 // Espelho sem nada para refletir: golpe de um 7♠
 

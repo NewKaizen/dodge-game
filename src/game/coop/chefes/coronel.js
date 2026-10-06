@@ -1,6 +1,6 @@
 // Coronel Caçamba no CO-OP de cartas (EXTREMO). Formato: ver coop/chefes/index.js.
 export default {
-  hp: 480,
+  hp: 340,
   danoBala: 12,
   leve: (A) => A.brasas({ duracao: 4000, intervalo: 700 }),
   fases: [

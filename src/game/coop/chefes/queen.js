@@ -1,6 +1,6 @@
 // Queen no CO-OP de cartas (MÉDIO). Formato: ver coop/chefes/index.js.
 export default {
-  hp: 380,
+  hp: 280,
   danoBala: 11,
   leve: (A) => A.ondas({ duracao: 4000, velocidade: 110, intervalo: 1300 }),
   fases: [

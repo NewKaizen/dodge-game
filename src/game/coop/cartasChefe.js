@@ -12,7 +12,7 @@ export const TIPOS_CHEFE = { espadas: 'ATAQUE', ouros: 'CONTROLE', paus: 'ARMADI
 
 // Dano por bala das cartas do chefe: danoBala do chefe (modo clássico) vezes
 // esta faixa (2 -> minimo, K -> maximo); o SUPER usa `super`
-export const DANO_CHEFE = { minimo: 0.75, maximo: 1.25, super: 1.35, leve: 0.4 }
+export const DANO_CHEFE = { minimo: 0.6, maximo: 1, super: 1.1, leve: 0.35 }
 // ♦ do chefe deixa as balas mais rápidas (como o ♦ do PvP)
 export const RITMO_OUROS = 0.15
 
