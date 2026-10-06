@@ -13,6 +13,7 @@ import {
   comboDosGolpes,
   aplicarGolpe,
   fimDaRodadaCoop,
+  descricaoCoop,
 } from '../regras.js'
 import { CARTAS_CHEFES, ataqueDaCartaChefe, danoDaCartaChefe, faseDoChefe } from '../cartasChefe.js'
 import { BARALHOS_CHEFES } from '../chefes/index.js'
@@ -299,4 +300,16 @@ test('partida simulada inteira termina (bots dos dois lados)', () => {
     }
     assert.ok(fim, `${chefe}: a luta não acabou`)
   }
+})
+
+test('as cartas dos jogadores trazem o texto do CO-OP', () => {
+  const e = nova()
+  const todas = e.jogadores.flatMap((jog) => jog.baralho.monte)
+  assert.ok(todas.every((c) => c.descricao === descricaoCoop(c)))
+  assert.match(descricaoCoop(carta('kris-copas-10')), /VOCÊ E NO PARCEIRO.*levanta/)
+  assert.match(descricaoCoop(carta('kris-copas-7')), /DOIS/)
+  assert.match(descricaoCoop(carta('kris-copas-1')), /PARCEIRO/)
+  assert.match(descricaoCoop(carta('kris-espadas-9')), new RegExp(`golpe de ${GOLPE.espadas(9)}`))
+  // a carta original do PvP não muda
+  assert.doesNotMatch(CARTAS.kris.find((c) => c.id === 'kris-copas-10').descricao, /PARCEIRO/)
 })

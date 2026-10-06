@@ -34,7 +34,7 @@ Fluxo: Menu → CO-OP → EscolhaParty → Selecao (chefe) → Dificuldade (nív
 | ♠ espadas | golpe forte: 6 + 2,6 × valor (2 → 11, K → 40) |
 | ♦ ouros | golpe médio (4 + 1,8 × valor) e **atrasa** a carta do chefe na sua caixa (balas 15% mais lentas; Q/K atrasam as duas caixas) |
 | ♣ paus | golpe 5 + 2 × valor, **+6% por graze** na esquiva (até +60%) |
-| ♥ copas | suporte: **cura e escudo valem para os dois**; energia e compra para quem jogou. Cura **levanta** o parceiro caído |
+| ♥ copas | suporte: **cura e escudo valem para os dois** (o texto da carta no CO-OP avisa: `descricaoCoop` em `coop/regras.js`); energia e compra para quem jogou. Cura **levanta** o parceiro caído |
 | ★ SUPER | animação do personagem, golpe de 60 e **varre** a carta do chefe da sua caixa |
 | A♠ Espelho | a carta do chefe na sua caixa volta e acerta o chefe |
 | A♦ Anular | cancela a carta do chefe na sua caixa e tira 2 da carga do SUPER dele |

@@ -65,6 +65,29 @@ export const GOLPE = {
 }
 const ECO = 7 // Espelho sem nada para refletir: golpe de um 7♠
 
+const pct = (f) => `${Math.round(f * 100)}%`
+
+// Texto da carta no CO-OP (a prévia ampliada mostra este no lugar do texto do PvP)
+export function descricaoCoop(carta) {
+  if (ehSuper(carta)) return `SUPER: golpe de ${COOP.superGolpe} no chefe e varre a carta dele da sua caixa (o SUPER do chefe não sai).`
+  const especial = especialDaCarta(carta)
+  if (especial === 'espelho') return `ESPECIAL: a carta do chefe na sua caixa volta e acerta ele. Sem nada para refletir (ou contra o SUPER dele), golpe de ${GOLPE.espadas(ECO)}.`
+  if (especial === 'anular') return `ESPECIAL: cancela a carta do chefe na sua caixa e tira ${COOP.anularCarga} da carga do SUPER dele.`
+  if (especial === 'roubo') return `ESPECIAL: rouba a carta do chefe que ia no parceiro (a caixa dele fica livre) e você ganha +${COOP.rouboEnergia} de energia.`
+  if (especial === 'segundaChance') return `ESPECIAL: VOCÊ E O PARCEIRO curam ${pct(COOP.segundaChance)} do HP máximo e ninguém cai nesta rodada. Levanta o parceiro caído.`
+  const v = carta.valor
+  if (carta.naipe === 'espadas') return `Contra-ataque: golpe de ${GOLPE.espadas(v)} no chefe depois da esquiva (CRÍTICO x${COOP.critico} se você não levar dano).`
+  if (carta.naipe === 'ouros') return `Contra-ataque: golpe de ${GOLPE.ouros(v)} e a carta do chefe ${v >= 12 ? 'nas DUAS caixas fica' : 'na sua caixa fica'} mais lenta.`
+  if (carta.naipe === 'paus') return `Armadilha: golpe de ${GOLPE.paus(v)} no chefe, +${pct(COOP.grazeArmadilha)} a cada graze na esquiva (até +${pct(COOP.grazeArmadilhaMax)}).`
+  const ef = efeitosDaCarta(carta) ?? {}
+  const partes = []
+  if (ef.cura) partes.push(`cura ${ef.cura} HP em VOCÊ E NO PARCEIRO (levanta o parceiro caído)`)
+  if (ef.escudo) partes.push(`escudo nos DOIS: o próximo ataque causa ${pct(ef.escudo)} do dano`)
+  if (ef.energia) partes.push(`+${ef.energia} de energia para você`)
+  if (ef.compra) partes.push(`você compra ${ef.compra} carta${ef.compra > 1 ? 's' : ''}`)
+  return `Suporte: ${partes.join('; ')}.`
+}
+
 export const ID_JOGADOR = ['p1', 'p2']
 const outro = (j) => 1 - j
 
@@ -91,6 +114,10 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
       baralho: criarBaralho(personagem, `${semente}:${ID_JOGADOR[j]}`),
     }
   }
+  const comTextoCoop = (jog) => {
+    for (const carta of jog.baralho.monte) carta.descricao = descricaoCoop(carta)
+    return jog
+  }
   const hpChefe = Math.round(def.hp * niv.hp)
   return {
     modo: 'coop',
@@ -100,7 +127,7 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
     rodada: 0,
     fase: 'inicio',
     rng,
-    jogadores: [jogador(party[0], 0), jogador(party[1] ?? party[0], 1)],
+    jogadores: [comTextoCoop(jogador(party[0], 0)), comTextoCoop(jogador(party[1] ?? party[0], 1))],
     chefe: {
       id: chefe,
       hp: hpChefe,
