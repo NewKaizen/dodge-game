@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import Controles from '../controles.js'
 import { tocar, musica } from '../audio.js'
+import { ASSETS } from '../assets.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 import { BATIDA, TELA, LOGO, OPCOES as POS } from '../menu/layout.js'
 import { criarSala } from '../menu/sala.js'
@@ -10,17 +11,25 @@ import { criarLogo } from '../menu/logo.js'
 // Tela inicial: um quarto escuro e calmo, com o caos preso no telão da parede
 // (uma luta de balas rolando) e a luz dele iluminando a sala e as silhuetas
 // dos lutadores. Logo no canto de cima à esquerda, opções alinhadas à
-// esquerda. JOGAR (-> Modo): a luz do telão engole a sala. CONFIGURAÇÕES (-> Config).
-// Sem joystick conectado, as opções ficam apagadas e um aviso pede para conectar.
+// esquerda. CO-OP (-> EscolhaParty) e PVP (-> PvpEscolha): a luz do telão engole
+// a sala. CONFIGURAÇÕES (-> Config). Embaixo da lista, uma linha diz o que a
+// opção escolhida faz; sem joystick conectado, as opções ficam apagadas e a
+// linha vira um aviso pedindo para conectar.
+//
+// Música: ASSETS.musicas.menu (public/assets/musicas/menu.mid, ou o arquivo
+// apontado em assets.js); sem ela, toca a do Jevil. O nome no canto de cima
+// vem de ASSETS.tituloMusicaMenu.
 //
 // As peças ficam em game/menu/ (layout.js, sala.js, telao.js, logo.js).
 //   cima/baixo escolher · A confirmar
 export const TITULO = 'DODGE'
 const SUBTITULO = 'DESVIE OU CAIA'
-const MUSICA = 'THE WORLD REVOLVING'
+// Para onde vai o PVP: a escolha de personagem (PvpEscolha -> PvpArena -> PvpResultado)
+export const CENA_PVP = 'PvpEscolha'
 const OPCOES = [
-  { id: 'jogar', rotulo: 'JOGAR', cor: '#ff3d6e' },
-  { id: 'config', rotulo: 'CONFIGURAÇÕES', cor: '#3fd6c8' },
+  { id: 'coop', rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty', dica: 'enfrentem um chefe lado a lado' },
+  { id: 'pvp', rotulo: 'PVP', cor: '#ff3d6e', cena: CENA_PVP, dica: 'duelo de cartas: quem desvia, vence' },
+  { id: 'config', rotulo: 'CONFIGURAÇÕES', cor: '#f2c14e', cena: 'Config', dica: 'som, velocidade e tela cheia' },
 ]
 
 export default class Menu extends Phaser.Scene {
@@ -34,7 +43,7 @@ export default class Menu extends Phaser.Scene {
     this.saindo = false
     this.pronto = false
     this.batidas = 0
-    this.indice = this.registry.get('menuIndice') ?? 0 // volta na opção de onde saiu
+    this.indice = Math.min(this.registry.get('menuIndice') ?? 0, OPCOES.length - 1) // volta na opção de onde saiu
     const rapido = Boolean(this.registry.get('menuVisto'))
     this.registry.set('menuVisto', true)
 
@@ -44,7 +53,7 @@ export default class Menu extends Phaser.Scene {
     this.montarOpcoes()
     this.montarCantos()
 
-    musica(this, 'jevil', 'selecao')
+    musica(this, 'menu', 'jevil')
     this.cameras.main.fadeIn(rapido ? 220 : 500)
     this.abrir(rapido)
 
@@ -104,7 +113,9 @@ export default class Menu extends Phaser.Scene {
     })
     const l = this.linhas[this.indice]
     this.seta.setVisible(ativo).setColor(OPCOES[this.indice].cor).setPosition(POS.x + 8 + l.width + 12, l.y)
-    this.aviso.setText(ativo ? '' : 'conecte o joystick ou use o\nSIMULADOR (TECLADO) aí em cima ↑')
+    this.aviso
+      .setText(ativo ? OPCOES[this.indice].dica : 'conecte o joystick ou use o\nSIMULADOR (TECLADO) aí em cima ↑')
+      .setColor(ativo ? '#9a9ab0' : TEXTO.desabilitado)
   }
 
   selecionar(indice) {
@@ -118,7 +129,7 @@ export default class Menu extends Phaser.Scene {
   montarCantos() {
     const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor })
     const y = 22
-    const nome = this.add.text(LARGURA - 14, y, MUSICA, estilo(11, '#c8c8d8')).setOrigin(1, 0.5).setDepth(30)
+    const nome = this.add.text(LARGURA - 14, y, ASSETS.tituloMusicaMenu ?? '', estilo(11, '#c8c8d8')).setOrigin(1, 0.5).setDepth(30)
     const xBarras = nome.x - nome.width - 26
     this.add.rectangle(xBarras - 8, y - 11, LARGURA - xBarras - 6 + 8, 22, 0x000000, 0.45).setOrigin(0).setDepth(29)
     this.barras = [0, 1, 2, 3].map((i) =>
@@ -136,19 +147,20 @@ export default class Menu extends Phaser.Scene {
   confirmar() {
     if (this.saindo || !this.pronto || !this.conectado) return
     this.saindo = true
-    const opcao = OPCOES[this.indice].id
+    const opcao = OPCOES[this.indice]
     this.registry.set('menuIndice', this.indice)
-    if (opcao === 'config') {
+    if (opcao.id === 'config') {
       tocar(this, 'confirmar')
       this.cameras.main.fadeOut(220, 0, 0, 0)
       this.time.delayedCall(240, () => this.scene.start('Config', { voltar: 'Menu' }))
       return
     }
-    // JOGAR: o logo e as opções somem e a luz do telão engole a sala
+    // CO-OP/PVP: o logo e as opções somem e a luz do telão engole a sala
+    this.registry.set('modo', opcao.id)
     tocar(this, 'superAtivar')
     this.logo.sair()
     this.tweens.add({ targets: this.painel, x: -60, alpha: 0, duration: 220, ease: 'Cubic.easeIn' })
-    this.telao.explodir().then(() => this.scene.isActive() && this.scene.start('Modo'))
+    this.telao.explodir().then(() => this.scene.isActive() && this.scene.start(opcao.cena))
   }
 
   update(time, delta) {

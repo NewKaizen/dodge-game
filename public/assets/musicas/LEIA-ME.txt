@@ -1,5 +1,10 @@
 Coloque aqui as músicas em MIDI (.mid), com o nome da tela ou do chefe:
 
+  menu.mid       menu inicial (sem o arquivo: jevil.mid). Quer usar .mp3/.ogg?
+                 Coloque aqui (ex.: menu.mp3) e aponte em src/game/assets.js:
+                   musicas: { menu: 'assets/musicas/menu.mp3', ... }
+                 O nome que aparece no canto do menu fica em
+                   tituloMusicaMenu: 'NOME DA MÚSICA'   (mesmo arquivo)
   selecao.mid    tela de escolha do chefe
   king.mid       batalha do Chaos King
   queen.mid      batalha da Queen
