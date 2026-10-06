@@ -5,7 +5,7 @@ import { criarFundo } from '../backgrounds/index.js'
 import { tocar, musica } from '../audio.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 import { perfilPvp, rotuloCarta } from '../pvp/perfil.js'
-import { superDoPersonagem, SIMBOLOS } from '../pvp/cartas.js'
+import { SIMBOLOS } from '../pvp/cartas.js'
 
 // Área da grade de personagens e dos painéis de detalhes (px)
 const GRADE = { topo: 72, base: 282, esquerda: 20, direita: 620, espaco: 8, larguraMax: 180, alturaMax: 200 }
@@ -304,13 +304,12 @@ export default class EscolhaParty extends Phaser.Scene {
     const corJogador = solo ? CORES.selecionado : CORES.almas[j]
     p.moldura.setStrokeStyle(2, corJogador, 0.8)
     p.cabeca.setText(solo ? def.nome.toUpperCase() : `P${j + 1}  ${def.nome.toUpperCase()}`).setColor(corTexto(def.cor))
-    // o baralho do personagem: estilo, SUPER, naipes e as cartas mais fortes
+    // o baralho do personagem: estilo, naipes e as cartas mais fortes (o SUPER primeiro)
     const perfil = perfilPvp(id)
     p.numeros.setText(`HP ${perfil.hp}`)
     p.rotulo.setText(perfil.estilo.rotulo).setColor(corTexto(perfil.estilo.cor))
     const { naipes } = perfil
     const lista = [
-      { nome: `★ ${superDoPersonagem(id).nome}`, custo: '10' },
       { nome: `♠${naipes.espadas}  ♥${naipes.copas}  ♦${naipes.ouros}  ♣${naipes.paus}`, custo: '' },
       ...perfil.fortes.map((c) => ({ nome: `${rotuloCarta(c)}${SIMBOLOS[c.naipe]} ${c.nome}`, custo: String(c.custo) })),
     ]

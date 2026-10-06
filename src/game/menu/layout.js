@@ -7,5 +7,4 @@ export const BATIDA = 468 // ms (~128 bpm)
 export const TELA = { x: 300, y: 46, largura: 310, altura: 196 } // o telão na parede (área de dentro, sem a moldura)
 export const LOGO = { x: 34, y: 30, largura: 250, altura: 170 } // canto de cima à esquerda
 export const OPCOES = { x: 58, y: 300, passo: 40 } // lista alinhada à esquerda
-export const CHAO = 330 // y onde a parede encontra o chão
 export const PES = 452 // y dos pés das silhuetas
