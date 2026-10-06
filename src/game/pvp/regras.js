@@ -25,7 +25,6 @@ import { PERSONAGENS } from '../data/personagens.js'
 import { criarBaralho, completarMao, comprar, descartar, tirarDaMao, cartaNaMao, criarRng, inteiro, MAO } from './baralho.js'
 import { CUSTOS, HP_RESERVA, especialDaCarta, efeitosDaCarta, resumoDoAtaque, ehSuper } from './cartas.js'
 
-export { CUSTOS, custoDoValor } from './cartas.js'
 
 // Energia de cada jogador
 //   inicial          energia na 1ª rodada
@@ -41,7 +40,7 @@ export const ENERGIA = { inicial: 3, porRodada: 2, maxima: 10, grazesPorPonto: 5
 // segundaChance: fração do HP máximo curada pelo Ás de copas
 export const PVP = { fatorHp: 1, ajusteHp: { asriel: 0.9 }, segundaChance: 0.25 }
 
-export const ID_JOGADOR = ['p1', 'p2']
+const ID_JOGADOR = ['p1', 'p2']
 const outro = (j) => 1 - j
 
 export function hpInicial(personagem) {

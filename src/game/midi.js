@@ -69,8 +69,6 @@ export function setVelocidadeMidi(fator, ms = 600) {
   }, 30)
 }
 
-export const velocidadeMidi = () => velocidade
-
 // Realce de graves (dB no lowshelf de ~180 Hz; 0 = normal), ex.: o MODO FESTA
 // "batendo" mais forte. Rampa suave; fica valendo para as próximas músicas
 // até alguém pedir 0 (restaurar() não mexe nele).

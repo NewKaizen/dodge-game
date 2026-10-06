@@ -107,7 +107,7 @@ function onda({ nome, ativa, corpo, respiro, caixa = null }) {
 }
 
 // Tempo de relógio (com as pausas) necessário para `ativa` ms de ataque
-export function paraRelogio(respiro, ativa) {
+function paraRelogio(respiro, ativa) {
   let relogio = ativa
   for (const [ini, fim] of respiro?.pausas ?? []) if (ini < relogio) relogio += fim - ini
   return relogio
@@ -116,7 +116,7 @@ export function paraRelogio(respiro, ativa) {
 // ---------- caixa dinâmica ----------
 
 // ms de pré-visualização + transição antes de uma onda que muda a caixa
-export const PREPARO_CAIXA_MS = CAIXA_DINAMICA.avisoMs + CAIXA_DINAMICA.transicaoMs
+const PREPARO_CAIXA_MS = CAIXA_DINAMICA.avisoMs + CAIXA_DINAMICA.transicaoMs
 
 // Forma de caixa sem redundância: null quando é igual à padrão
 function normalizarCaixa(c) {

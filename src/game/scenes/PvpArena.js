@@ -87,7 +87,7 @@ import { anunciarSuper } from '../pvp/super/anuncio.js'
 // No dev: debugJogo.jogo.scene.start('PvpArena', { p1: 'susie', p2: 'noelle' })
 // e window.pvpArena (estadoDebug, forcarMao, setHp) para os testes.
 
-export const TEMPO = { escolha: 15000 }
+const TEMPO = { escolha: 15000 }
 
 // CPU: quanto ela "pensa" antes de mexer o cursor e quanto leva cada passo dele (ms)
 const CPU = { pensarMin: 700, pensarMax: 1700, passoMin: 150, passoMax: 260 }

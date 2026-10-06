@@ -12,4 +12,3 @@ export function ataqueDaCartaNoJogo(carta, opcoes = {}) {
   return ataqueDaCarta(carta, { ataques, ...opcoes })
 }
 
-export { ataques }

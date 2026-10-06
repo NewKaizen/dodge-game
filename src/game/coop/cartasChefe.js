@@ -12,13 +12,13 @@ export const TIPOS_CHEFE = { espadas: 'ATAQUE', ouros: 'CONTROLE', paus: 'ARMADI
 
 // Dano por bala das cartas do chefe: danoBala do chefe (modo clássico) vezes
 // esta faixa (2 -> minimo, K -> maximo); o SUPER usa `super`
-export const DANO_CHEFE = { minimo: 0.6, maximo: 1, super: 1.1, leve: 0.35 }
+const DANO_CHEFE = { minimo: 0.6, maximo: 1, super: 1.1, leve: 0.35 }
 // ♦ do chefe deixa as balas mais rápidas (como o ♦ do PvP)
-export const RITMO_OUROS = 0.15
+const RITMO_OUROS = 0.15
 
 const forcaChefe = (valor) => Math.min(1, Math.max(0, (valor - 2) / 11))
 
-export function montarCartasDoChefe(chefe) {
+function montarCartasDoChefe(chefe) {
   const def = BARALHOS_CHEFES[chefe]
   if (!def) throw new Error(`chefe sem baralho de cartas: ${chefe}`)
   const fases = def.fases.map((fase, f) =>

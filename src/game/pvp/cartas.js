@@ -54,7 +54,7 @@ const fs = (o = {}) => ({ duracao: FASE_SUPER, ...o })
 //                      (ela passa a ser sua) e manda um ataque leve de paus (força 5)
 //   segundaChance    ♥ cura 25% do HP máximo e, nesta rodada, o HP não passa de 1
 //                      (não dá para perder na rodada em que foi jogada); não manda ataque
-export const ESPECIAIS = { espadas: 'espelho', ouros: 'anular', paus: 'roubo', copas: 'segundaChance' }
+const ESPECIAIS = { espadas: 'espelho', ouros: 'anular', paus: 'roubo', copas: 'segundaChance' }
 export const especialDaCarta = (carta) => (carta?.valor === 1 ? ESPECIAIS[carta.naipe] : null)
 
 // Força usada pelo ataque que o Ás manda (eco do espelho, anular, roubo)
@@ -79,7 +79,7 @@ export const forca = (valor) => {
 // ---------- efeitos de copas ----------
 
 // Quanto cada efeito de copas vale, pelo valor da carta
-export const EFEITOS_COPAS = {
+const EFEITOS_COPAS = {
   cura: (v) => ({ cura: Math.round(4 + v * 1.5) }), // 2 -> 7 HP, 10 -> 19, K -> 24
   escudo: (v) => ({ escudo: v <= 6 ? 0.6 : v <= 10 ? 0.5 : 0.35 }), // fator do dano do próximo ataque recebido
   energia: (v) => ({ energia: v <= 6 ? 1 : v <= 10 ? 2 : 3 }),
@@ -158,7 +158,7 @@ export function cartasDoPersonagem(personagem) {
 }
 
 // Detalhes de uma carta pelos campos (vale também para cópias com id trocado, ex. carta roubada)
-export function detalhesDaCarta(carta) {
+function detalhesDaCarta(carta) {
   return DETALHES[idDe(carta.personagem, carta.naipe, carta.valor)] ?? null
 }
 

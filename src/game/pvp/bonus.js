@@ -109,11 +109,11 @@ export function desfazerMalucas(estado, trocas) {
 //   ♦ ouros    bumerangue  vai na direção do movimento e volta para o dono
 //   ♣ paus     explosao    bomba com pavio que explode em área; recarga MAIOR
 export const ARMAS = { copas: 'tiro', espadas: 'espada', ouros: 'bumerangue', paus: 'explosao' }
-export const LISTA_ARMAS = ['tiro', 'espada', 'bumerangue', 'explosao']
+const LISTA_ARMAS = ['tiro', 'espada', 'bumerangue', 'explosao']
 
 // Dano base por acerto de cada arma (força 0) e quanto a força da carta soma (força 1).
 // Num duelo de 15 s a espada acerta muito: com mais que isto um duelo decide a partida
-export const DANO_ARMA = {
+const DANO_ARMA = {
   tiro: { base: 2, extra: 2 },
   espada: { base: 3, extra: 3 },
   bumerangue: { base: 2, extra: 3 },

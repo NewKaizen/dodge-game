@@ -34,7 +34,7 @@ import { BotDuelo, difAngulo } from './botDuelo.js'
 // Tudo é desenhado na câmera principal (sem câmera de recorte): os objetos
 // ficam presos dentro da caixa à mão.
 
-export const DUELO = {
+const DUELO = {
   duracaoMs: 15000, // tempo de luta (encurta com a morte súbita, até duracaoMinMs)
   duracaoMinMs: 9000,
   caixa: { x: 320, y: 200, largura: 430, altura: 228 }, // dentro de y 74..334
@@ -57,7 +57,7 @@ export const DUELO = {
 //               acerta uma vez na ida e uma na volta; recarga = até voltar (mín. recargaMs)
 //   explosao    joga a bomba `distancia` à frente; pavio piscando; explode em `raio`
 //               e machuca QUALQUER coração no raio, inclusive o dono. Recarga maior.
-export const ARMAS_DUELO = {
+const ARMAS_DUELO = {
   tiro: { nome: 'TIRO', recargaMs: 340, velocidade: 290, velocidadeExtra: 90, raio: 4 },
   espada: { nome: 'ESPADA', recargaMs: 650, alcance: 36, alcanceExtra: 12, arco: 120, preparoMs: 90, golpeMs: 150, lentidao: 0.45, empurrao: 26 },
   bumerangue: { nome: 'BUMERANGUE', recargaMs: 650, distancia: 160, distanciaExtra: 50, velocidade: 380, raio: 7, vidaMaxMs: 3500 },
