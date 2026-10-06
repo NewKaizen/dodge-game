@@ -634,7 +634,7 @@ export default class PvpArena extends Phaser.Scene {
     if (this.saindo) return
     this.fase = 'duelo'
     this.ko = [false, false]
-    this.dica.setText(this.cpu === null ? 'mexa para mirar   A: atacar' : 'mexa para mirar   A: atacar   (a CPU também luta!)')
+    this.dica.setText(this.cpu === null ? 'mira automática   A: atacar' : 'mira automática   A: atacar   (a CPU também luta!)')
     this.duelo = new Duelo(this, { armas: r.armas, cpu: this.cpu, nivelBot: this.nivelBot, semente: `${this.semente}:duelo:${this.estado.rodada}`, aceleracao: this.aceleracao })
     await this.duelo.rodar()
     this.duelo = null

@@ -8,10 +8,9 @@
 // ou direto, sem tempo de reação:  decidir(estado, NIVEIS_DUELO.normal, rng)
 //
 // estado (montado pelo Duelo a cada frame):
-//   eu        { x, y, dir: { x, y }, arma, pronto, velocidade, alcance }
-//             pronto: a arma pode atacar agora; alcance: distância "boa" da arma
-//             (espada: alcance do golpe; tiro/bumerangue: quanto a coisa voa;
-//             explosao: onde a bomba cai)
+//   eu        { x, y, arma, pronto, velocidade, alcance }
+//             pronto: a arma pode atacar agora; alcance: até onde a arma chega
+//             (espada: o golpe; tiro: a caixa toda; bumerangue/explosao: distância máxima)
 //   inimigo   { x, y, arma, pronto, ko, alcance }
 //   limites   { left, right, top, bottom }  (área em que o centro do coração anda)
 //   perigos   [{ x, y, vx, vy, raio, desdeMs?, ateMs?, peso? }] o que machuca o bot:
@@ -20,34 +19,29 @@
 //   hitbox    raio do coração
 //
 // Como decide: escolhe uma POSIÇÃO-ALVO conforme a arma (espada: colar no
-// inimigo; tiro: ficar alinhado com ele numa das 8 direções a meia distância;
-// bumerangue: alinhado e mais perto; explosao: chegar à distância da bomba e,
-// com a bomba no chão, fugir), testa 16 direções + ficar parado simulando os
-// perigos por `horizonteMs` (como pvp/botEsquiva.js) e fica com a mais barata.
-// Ataca quando a arma está pronta e o inimigo está na mira (o coração mira na
-// direção do último movimento, então o bot "vira" para ele no mesmo frame).
-// Os níveis erram de propósito: reagem mais devagar, miram pior, hesitam.
+// inimigo; tiro: meia distância; bumerangue: mais perto; explosao: dentro do
+// alcance da bomba e, recarregando, longe), testa 16 direções + ficar parado
+// simulando os perigos por `horizonteMs` (como pvp/botEsquiva.js) e fica com
+// a mais barata. A mira é automática (Duelo.js): ataca quando a arma está
+// pronta e o inimigo está no alcance.
+// Os níveis erram de propósito: reagem mais devagar, andam errado, hesitam.
 
 // decidirMs   tempo de reação (reavalia de quanto em quanto tempo)
 // horizonteMs quanto à frente enxerga os perigos
 // margem      folga (px) além da hitbox que tenta manter dos perigos
 // medo        peso dos perigos (fácil liga menos para eles)
 // erro        chance, por decisão, de andar numa direção sorteada
-// mira        tolerância (rad) entre a direção do inimigo e a mira na hora de atacar
 // gatilho     chance de atacar quando dá (o resto é hesitação)
 // lapso       chance, a cada decisão, de "se distrair" e manter o joystick sem olhar nada
 // lapsoMs     por quanto tempo (é o que faz a CPU levar golpes como gente)
 export const NIVEIS_DUELO = {
-  facil: { decidirMs: 230, horizonteMs: 260, margem: 3, medo: 0.55, erro: 0.18, mira: 0.3, gatilho: 0.4, lapso: 0.14, lapsoMs: 650 },
-  normal: { decidirMs: 140, horizonteMs: 380, margem: 6, medo: 0.85, erro: 0.07, mira: 0.18, gatilho: 0.7, lapso: 0.07, lapsoMs: 480 },
-  dificil: { decidirMs: 75, horizonteMs: 520, margem: 9, medo: 1, erro: 0.02, mira: 0.11, gatilho: 0.95, lapso: 0.015, lapsoMs: 300 },
+  facil: { decidirMs: 230, horizonteMs: 260, margem: 3, medo: 0.55, erro: 0.18, gatilho: 0.4, lapso: 0.14, lapsoMs: 650 },
+  normal: { decidirMs: 140, horizonteMs: 380, margem: 6, medo: 0.85, erro: 0.07, gatilho: 0.7, lapso: 0.07, lapsoMs: 480 },
+  dificil: { decidirMs: 75, horizonteMs: 520, margem: 9, medo: 1, erro: 0.02, gatilho: 0.95, lapso: 0.015, lapsoMs: 300 },
 }
 
 const PASSO_MS = 40
-const OITO = Array.from({ length: 8 }, (_, k) => ({ x: Math.round(Math.cos((k * Math.PI) / 4) * 1e6) / 1e6, y: Math.round(Math.sin((k * Math.PI) / 4) * 1e6) / 1e6 }))
 const DIRECOES = [{ x: 0, y: 0 }, ...Array.from({ length: 16 }, (_, k) => ({ x: Math.cos((k * Math.PI) / 8), y: Math.sin((k * Math.PI) / 8) }))]
-// intensidade do joystick quando só vira para mirar (passa da zona morta, anda pouco)
-const JOY_MIRA = 45
 
 const limitar = (v, a, b) => Math.max(a, Math.min(b, v))
 
@@ -59,18 +53,6 @@ export function difAngulo(a, b) {
   return d
 }
 
-// Uma das 8 direções (vetor unitário) mais perto do ângulo
-export function direcao8(angulo) {
-  const k = ((Math.round(angulo / (Math.PI / 4)) % 8) + 8) % 8
-  return OITO[k]
-}
-
-// Quanto o ângulo (rad) foge da direção de 8 mais próxima
-function desvioDe8(angulo) {
-  const d = direcao8(angulo)
-  return Math.abs(difAngulo(angulo, Math.atan2(d.y, d.x)))
-}
-
 // Onde o bot quer estar (conforme a arma) -> { x, y }
 export function alvoDoBot(estado) {
   const { eu, inimigo, limites, perigos = [] } = estado
@@ -80,19 +62,13 @@ export function alvoDoBot(estado) {
   const dentro = (p, folga = 10) => p.x >= limites.left + folga && p.x <= limites.right - folga && p.y >= limites.top + folga && p.y <= limites.bottom - folga
   const prender = (p) => ({ x: limitar(p.x, limites.left, limites.right), y: limitar(p.y, limites.top, limites.bottom) })
 
-  // um ponto alinhado com o inimigo numa das 8 direções, a `dist` dele, o mais perto de mim
-  const alinhado = (dist) => {
-    let melhor = null
-    let menor = Infinity
-    for (const d of OITO) {
-      const p = { x: inimigo.x + d.x * dist, y: inimigo.y + d.y * dist }
-      const custo = Math.hypot(p.x - eu.x, p.y - eu.y) + (dentro(p) ? 0 : 400)
-      if (custo < menor) {
-        menor = custo
-        melhor = p
-      }
-    }
-    return prender(melhor)
+  // um ponto a `dist` do inimigo, do meu lado (se cair fora da caixa, do lado oposto)
+  const aDistancia = (dist) => {
+    const dx = eu.x - inimigo.x
+    const dy = eu.y - inimigo.y
+    const d = Math.hypot(dx, dy) || 1
+    const p = { x: inimigo.x + (dx / d) * dist, y: inimigo.y + (dy / d) * dist }
+    return prender(dentro(p) ? p : { x: inimigo.x - (dx / d) * dist, y: inimigo.y - (dy / d) * dist })
   }
 
   // contra espada, armas de longe ficam mais longe
@@ -109,9 +85,9 @@ export function alvoDoBot(estado) {
       return { x: eu.x + ((inimigo.x - eu.x) / d) * parar, y: eu.y + ((inimigo.y - eu.y) / d) * parar }
     }
     case 'tiro':
-      return alinhado(limitar(eu.alcance * 0.55, 90, 170) + recuo)
+      return aDistancia(130 + recuo)
     case 'bumerangue':
-      return alinhado(limitar(eu.alcance * 0.7, 70, 140) + recuo * 0.6)
+      return aDistancia(limitar(eu.alcance * 0.6, 80, 150) + recuo * 0.6)
     case 'explosao': {
       // bomba minha no chão: fica longe dela (e do inimigo, deixa ele cair)
       const minha = perigos.find((p) => p.bomba && p.minha)
@@ -122,33 +98,26 @@ export function alvoDoBot(estado) {
         const d = Math.hypot(dx, dy) || 1
         return prender({ x: eu.x + (dx / d) * 90, y: eu.y + (dy / d) * 90 })
       }
-      return alinhado(eu.alcance)
+      return aDistancia(limitar(eu.alcance * 0.6, 100, 170))
     }
     default:
       return { x: cx, y: cy }
   }
 }
 
-// O ataque acerta se sair agora (mirando na direção de 8 mais perto do inimigo)?
-export function podeAcertar(estado, cfg) {
+// Vale atacar agora? (a mira é automática: basta o inimigo estar no alcance)
+export function podeAcertar(estado) {
   const { eu, inimigo } = estado
   if (!inimigo || inimigo.ko || !eu.pronto) return false
-  const dx = inimigo.x - eu.x
-  const dy = inimigo.y - eu.y
-  const d = Math.hypot(dx, dy)
-  const angulo = Math.atan2(dy, dx)
-  const desvio = desvioDe8(angulo)
+  const d = Math.hypot(inimigo.x - eu.x, inimigo.y - eu.y)
   switch (eu.arma) {
     case 'espada':
-      // arco largo: basta estar no alcance (a lâmina varre ±60° da mira)
-      return d <= eu.alcance + 10 && desvio <= Math.PI / 4 + cfg.mira
+      return d <= eu.alcance + 10
     case 'tiro':
-      return d <= 380 && desvio <= cfg.mira * (1 + 25 / Math.max(25, d))
+      return d <= 380
     case 'bumerangue':
-      return d <= eu.alcance + 20 && desvio <= cfg.mira * 1.4
     case 'explosao':
-      // a bomba cai a `alcance` na frente: o inimigo tem que estar perto de onde ela cai
-      return d >= eu.alcance * 0.45 && d <= eu.alcance * 1.5 && desvio <= cfg.mira * 2.5
+      return d <= eu.alcance
     default:
       return false
   }
@@ -176,17 +145,16 @@ export function decidir(estado, cfg = NIVEIS_DUELO.normal, rng = Math.random, an
   const parado = { joy: { x: 0, y: 0 }, atacar: false }
   if (!eu) return parado
 
-  // atacar: vira para o inimigo (direção de 8) e solta o golpe neste frame
-  if (inimigo && !inimigo.ko && eu.pronto && podeAcertar(estado, cfg) && rng() < cfg.gatilho) {
-    const d = direcao8(Math.atan2(inimigo.y - eu.y, inimigo.x - eu.x))
-    // espada avança junto (golpe mais fundo); armas de longe só viram
-    const forca = eu.arma === 'espada' ? 100 : JOY_MIRA
-    return { joy: { x: Math.round(d.x * forca), y: Math.round(d.y * forca) }, atacar: true }
+  const atacar = Boolean(inimigo && !inimigo.ko && podeAcertar(estado) && rng() < cfg.gatilho)
+  // espada: avança junto com o golpe (golpe mais fundo)
+  if (atacar && eu.arma === 'espada') {
+    const d = Math.hypot(inimigo.x - eu.x, inimigo.y - eu.y) || 1
+    return { joy: { x: Math.round(((inimigo.x - eu.x) / d) * 100), y: Math.round(((inimigo.y - eu.y) / d) * 100) }, atacar }
   }
 
   if (rng() < cfg.erro) {
     const d = DIRECOES[1 + Math.floor(rng() * 16)]
-    return { joy: { x: Math.round(d.x * 100), y: Math.round(d.y * 100) }, atacar: false }
+    return { joy: { x: Math.round(d.x * 100), y: Math.round(d.y * 100) }, atacar }
   }
 
   const alvo = alvoDoBot(estado)
@@ -228,13 +196,7 @@ export function decidir(estado, cfg = NIVEIS_DUELO.normal, rng = Math.random, an
       melhor = d
     }
   }
-  // chegou no alvo e nada perigoso: fica parado virado para o inimigo (mira pronta)
-  if (melhor === DIRECOES[0] && inimigo && !inimigo.ko) {
-    const d = direcao8(Math.atan2(inimigo.y - eu.y, inimigo.x - eu.x))
-    const virado = Math.abs(eu.dir?.x - d.x) < 0.01 && Math.abs(eu.dir?.y - d.y) < 0.01
-    if (!virado) return { joy: { x: Math.round(d.x * JOY_MIRA * 0.8), y: Math.round(d.y * JOY_MIRA * 0.8) }, atacar: false }
-  }
-  return { joy: { x: Math.round(melhor.x * 100), y: Math.round(melhor.y * 100) }, atacar: false }
+  return { joy: { x: Math.round(melhor.x * 100), y: Math.round(melhor.y * 100) }, atacar }
 }
 
 // Com tempo de reação: reavalia a cada cfg.decidirMs; entre uma decisão e
