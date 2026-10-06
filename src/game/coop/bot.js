@@ -7,7 +7,6 @@
 // baixo (dela ou do parceiro), cura; senão, o golpe que mais tira do chefe
 // por energia. Guarda energia para o próprio SUPER quando está perto.
 import { especialDaCarta, efeitosDaCarta, ehSuper } from '../pvp/cartas.js'
-import { ENERGIA } from '../pvp/regras.js'
 import { aleatorio } from '../pvp/baralho.js'
 import { GOLPE } from './regras.js'
 
@@ -49,9 +48,9 @@ export function escolherJogadaCoop(estado, j, { rng = null } = {}) {
   notas.sort((a, b) => b.nota - a.nota)
   const melhor = notas[0]
   // com o SUPER na mão e perto da energia dele, junta energia (se não for emergência)
-  const temSuper = jog.baralho.mao.some(ehSuper)
+  const superNaMao = jog.baralho.mao.find(ehSuper)
   const emergencia = melhor && melhor.nota >= 40
-  if (temSuper && !ehSuper(melhor?.carta) && jog.energia >= ENERGIA.maxima - 4 && !emergencia) return null
+  if (superNaMao && !ehSuper(melhor?.carta) && jog.energia >= superNaMao.custo - 4 && !emergencia) return null
   if (!melhor || melhor.nota < 5) return null
   return melhor.carta.id
 }

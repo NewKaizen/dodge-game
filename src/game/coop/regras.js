@@ -34,7 +34,9 @@ import { CARTAS_CHEFES, faseDoChefe, suporteDoChefe, danoDaCartaChefe, ritmoDaCa
 //   grazeArmadilha   ♣: cada graze na esquiva soma esta fração ao golpe (até grazeArmadilhaMax)
 //   lentidao         ♦: fator da velocidade das balas do chefe na caixa de quem jogou (Q/K: nas duas)
 //   superGolpe       dano base do SUPER de um jogador
-//   cargaSuper       rodadas para encher a carga do SUPER do chefe (da 2ª fase em diante)
+//   custoSuper       energia do SUPER no CO-OP (no PvP custa 10)
+//   superCombo       os dois jogam SUPER na mesma rodada: cada SUPER multiplica por isto
+//   cargaSuper       o SUPER do chefe sai a cada tantas rodadas (a carga sobe 1 por rodada)
 //   rouboEnergia     energia que o A♣ dá
 //   anularCarga      quanto o A♦ tira da carga do SUPER do chefe
 //   segundaChance    fração do HP máx que o A♥ cura nos dois
@@ -48,8 +50,10 @@ export const COOP = {
   grazeArmadilha: 0.06,
   grazeArmadilhaMax: 0.6,
   lentidao: 0.85,
-  superGolpe: 60,
-  cargaSuper: 4,
+  superGolpe: 180,
+  custoSuper: 8,
+  superCombo: 1.5,
+  cargaSuper: 10,
   rouboEnergia: 2,
   anularCarga: 2,
   segundaChance: 0.25,
@@ -57,9 +61,9 @@ export const COOP = {
 
 // Dano base do contra-ataque de cada naipe, pelo valor da carta
 export const GOLPE = {
-  espadas: (v) => Math.round(6 + 2.6 * v), // 2 -> 11, 9 -> 29, K -> 40
-  ouros: (v) => Math.round(4 + 1.8 * v), // 2 -> 8, K -> 27
-  paus: (v) => Math.round(5 + 2 * v), // 2 -> 9, K -> 31 (+ grazes)
+  espadas: (v) => Math.round(8 + 3.2 * v), // 2 -> 14, 9 -> 37, K -> 50
+  ouros: (v) => Math.round(5 + 2.2 * v), // 2 -> 9, K -> 34
+  paus: (v) => Math.round(6 + 2.5 * v), // 2 -> 11, K -> 39 (+ grazes)
 }
 const ECO = 7 // Espelho sem nada para refletir: golpe de um 7♠
 
@@ -67,7 +71,7 @@ const pct = (f) => `${Math.round(f * 100)}%`
 
 // Texto da carta no CO-OP (a prévia ampliada mostra este no lugar do texto do PvP)
 export function descricaoCoop(carta) {
-  if (ehSuper(carta)) return `SUPER: golpe de ${COOP.superGolpe} no chefe e varre a carta dele da sua caixa (o SUPER do chefe não sai).`
+  if (ehSuper(carta)) return `SUPER: golpe de ${COOP.superGolpe} no chefe e varre a carta dele da sua caixa (o SUPER do chefe não sai). Os dois com SUPER na mesma rodada: SUPER COMBO x${COOP.superCombo}!`
   const especial = especialDaCarta(carta)
   if (especial === 'espelho') return `ESPECIAL: a carta do chefe na sua caixa volta e acerta ele. Sem nada para refletir (ou contra o SUPER dele), golpe de ${GOLPE.espadas(ECO)}.`
   if (especial === 'anular') return `ESPECIAL: cancela a carta do chefe na sua caixa e tira ${COOP.anularCarga} da carga do SUPER dele.`
@@ -113,7 +117,10 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
     }
   }
   const comTextoCoop = (jog) => {
-    for (const carta of jog.baralho.monte) carta.descricao = descricaoCoop(carta)
+    for (const carta of jog.baralho.monte) {
+      if (ehSuper(carta)) carta.custo = COOP.custoSuper
+      carta.descricao = descricaoCoop(carta)
+    }
     return jog
   }
   const hpChefe = Math.round(def.hp * niv.hp)
@@ -132,7 +139,7 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
       hpMax: hpChefe,
       fase: 0,
       guarda: null, // fator do dano do próximo contra-ataque (♥ do chefe)
-      carga: 0, // carga do SUPER (da 2ª fase em diante)
+      carga: 0, // carga do SUPER: cheia a cada COOP.cargaSuper rodadas
       cargaMax: COOP.cargaSuper,
       monte: embaralhar(CARTAS_CHEFES[chefe].fases[0].map((c) => ({ ...c })), rng),
       descarte: [],
@@ -171,7 +178,7 @@ function derrubar(estado, j) {
 const emPe = (estado) => [0, 1].filter((j) => !estado.jogadores[j].caido)
 
 // Começo da rodada: quem caiu há tempo suficiente volta, energia e mãos (como
-// no PvP), a carga do SUPER do chefe sobe e ele escolhe uma carta para cada
+// no PvP), a carga do SUPER do chefe sobe (cheia: SUPER nas duas caixas) e ele escolhe uma carta para cada
 // jogador em pé (as intenções). Devolve os eventos ({ tipo, j? }).
 export function iniciarRodadaCoop(estado) {
   if (estado.vencedor) return []
@@ -190,8 +197,8 @@ export function iniciarRodadaCoop(estado) {
   const c = estado.chefe
   c.intencoes = [null, null]
   const alvos = emPe(estado)
-  if (c.fase >= 1) c.carga = Math.min(c.cargaMax, c.carga + 1)
-  if (c.fase >= 1 && c.carga >= c.cargaMax && alvos.length) {
+  c.carga = Math.min(c.cargaMax, c.carga + 1)
+  if (c.carga >= c.cargaMax && alvos.length) {
     c.carga = 0
     for (const j of alvos) c.intencoes[j] = { ...CARTAS_CHEFES[c.id].super }
     eventos.push({ tipo: 'superChefe' })
@@ -431,10 +438,11 @@ export function aplicarDanoCoop(estado, j, dano) {
 
 // ---------- contra-ataque ----------
 
-// Combo da rodada entre os dois golpes de carta comum: 'par' (mesmo valor),
-// 'combo' (mesmo naipe) ou null
+// Combo da rodada entre os dois golpes: 'super' (os dois SUPER), 'par' (cartas
+// comuns de mesmo valor), 'combo' (mesmo naipe) ou null
 export function comboDosGolpes(golpes) {
   const [a, b] = golpes
+  if (a?.tipo === 'super' && b?.tipo === 'super') return 'super'
   const comum = (g) => g && GOLPE[g.tipo]
   if (!comum(a) || !comum(b)) return null
   if (a.carta.valor === b.carta.valor) return 'par'
@@ -458,6 +466,7 @@ export function calcularGolpes(estado, golpes, desempenho = []) {
       if (golpe.tipo === 'paus' && d.grazes) mult.push([`+${d.grazes} GRAZE`, 1 + Math.min(COOP.grazeArmadilhaMax, d.grazes * COOP.grazeArmadilha)])
       if (combo === 'par' && GOLPE[golpe.tipo]) mult.push(['PAR', COOP.par])
       if (combo === 'combo' && GOLPE[golpe.tipo]) mult.push(['COMBO', COOP.combo])
+      if (combo === 'super') mult.push(['SUPER COMBO', COOP.superCombo])
       if (guarda != null) mult.push(['GUARDA', guarda])
       const fator = mult.reduce((m, [, f]) => m * f, 1)
       return { j, golpe, dano: Math.max(1, Math.round(golpe.base * fator)), falhou: false, multiplicadores: mult }

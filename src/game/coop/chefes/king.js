@@ -12,7 +12,7 @@ export default {
     cores: { losango: 0xb48cff, coroa: 0xffd23c, barra: 0xd8c8ff, bola: 0xb48cff },
     cor: 0xb48cff,
   },
-  hp: 340,
+  hp: 240,
   danoBala: 7,
   leve: (A) => A.rain({ duracao: 4000, intervalo: 520, velocidade: 110 }),
   fases: [

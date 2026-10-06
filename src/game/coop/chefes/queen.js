@@ -12,7 +12,7 @@ export default {
     cores: { hex: 0x40f0ff, barra: 0xff4fc8, bola: 0x40f0ff },
     cor: 0x40f0ff,
   },
-  hp: 420,
+  hp: 270,
   danoBala: 11,
   leve: (A) => A.ondas({ duracao: 4000, velocidade: 110, intervalo: 1300 }),
   fases: [
