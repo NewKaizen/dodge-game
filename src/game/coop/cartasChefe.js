@@ -1,6 +1,5 @@
 // Cartas dos chefes no CO-OP de cartas. Lógica pura: os ataques recebem a
-// biblioteca attacks/ por parâmetro (no jogo: ataqueDaCartaChefeNoJogo, em
-// coop/ataquesDoChefe.js).
+// biblioteca attacks/ por parâmetro (a CoopArena passa a de attacks/index.js).
 //
 // Carta do chefe (mesmo formato das cartas do PvP, para a Carta desenhar):
 //   { id, personagem: <chefe>, chefe, naipe, valor, nome, descricao, custo: 0, fase }
@@ -10,7 +9,7 @@ import { ehSuper } from '../pvp/cartas.js'
 
 export const TIPOS_CHEFE = { espadas: 'ATAQUE', ouros: 'CONTROLE', paus: 'ARMADILHA', copas: 'SE CURA' }
 
-// Dano por bala das cartas do chefe: danoBala do chefe (modo clássico) vezes
+// Dano por bala das cartas do chefe: danoBala do chefe vezes
 // esta faixa (2 -> minimo, K -> maximo); o SUPER usa `super`
 const DANO_CHEFE = { minimo: 0.6, maximo: 1, super: 1.1, leve: 0.35 }
 // ♦ do chefe deixa as balas mais rápidas (como o ♦ do PvP)

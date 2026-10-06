@@ -42,7 +42,7 @@ export function juntos(...lista) {
 
 // Um ataque depois do outro. Cada onda respira por conta própria.
 export function sequencia(...lista) {
-  // a caixa da 1ª onda quem prepara é quem inicia a sequência (Battle); aqui só as trocas entre ondas
+  // a caixa da 1ª onda quem prepara é quem inicia a sequência (Pista.rodar); aqui só as trocas entre ondas
   const anteriores = lista.map((at, i) => (i === 0 ? at.caixa : lista[i - 1].caixa))
   const inicios = []
   let total = 0

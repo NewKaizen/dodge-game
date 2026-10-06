@@ -17,7 +17,7 @@ export function registrarDebug(game) {
     jogo: game, // o Phaser.Game (inspeção no console)
     musica: () => estadoMidi(), // { tocando, tempo, contexto }
     cena: () => game.scene.getScenes(true).map((s) => s.scene.key),
-    // dados com que uma cena foi iniciada (ex.: modo da vitória)
+    // dados com que uma cena foi iniciada (ex.: as estatísticas da vitória)
     dadosCena: (chave) => game.scene.getScene(chave)?.sys.settings.data ?? null,
   }
 }

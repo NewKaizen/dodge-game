@@ -65,7 +65,7 @@ export default class Selecao extends Phaser.Scene {
     this.cursor.setPosition(c.x, c.y - CARTA.altura / 2 - 18)
     this.fundo?.destruir()
     this.fundo = criarFundo(this, CHEFES[ORDEM_CHEFES[this.indice]].fundo)
-    this.fundo.escurecer(true)
+    this.fundo.escurecer()
   }
 
   confirmar() {

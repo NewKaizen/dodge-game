@@ -294,7 +294,7 @@ const SINTESE = {
     s.ruido(0.1, 0.3, 0, 4000)
     s.tom(880, 0.12, 'square', 0.14, 1760, 0.04)
   },
-  // combo completo do FIGHT: arpejo rápido subindo + estalo
+  // COMBO/PAR no contra-ataque do CO-OP: arpejo rápido subindo + estalo
   combo: (s) => {
     s.ruido(0.06, 0.2, 0, 5000)
     const notas = [587, 740, 988, 1318]

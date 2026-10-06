@@ -142,7 +142,6 @@ function montar(personagem) {
 
 export const CARTAS = Object.fromEntries(Object.keys(BARALHOS).map((p) => [p, montar(p)]))
 export const TEMAS = Object.fromEntries(Object.entries(BARALHOS).map(([p, def]) => [p, def.tema]))
-export const HP_RESERVA = Object.fromEntries(Object.entries(BARALHOS).map(([p, def]) => [p, def.hp]))
 
 // { nome, descricao, cor } da carta SUPER do personagem (cor = cor do tema do baralho)
 export function superDoPersonagem(personagem) {

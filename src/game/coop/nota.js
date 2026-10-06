@@ -5,7 +5,7 @@
 //   - dano recebido: até -45 (proporcional ao HP total da party; sem dano = +10)
 //   - turnos: -2 por turno acima de 8 (até -16)
 //   - quem terminou caído: -6 cada
-//   + grazes: +0,5 cada (até +12)   + combos perfeitos: +3 cada (até +12)
+//   + grazes: +0,5 cada (até +12)   + combos e pares: +3 cada (até +12)
 //   + nível: MÉDIO +8, DIFÍCIL +16
 // S >= 90   A >= 75   B >= 55   C abaixo
 const RANKS = [

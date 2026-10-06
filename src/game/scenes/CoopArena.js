@@ -246,7 +246,7 @@ export default class CoopArena extends PvpArena {
     })
   }
 
-  // ritmo base da luta (o aperto do co-op clássico, do chefe e do nível)
+  // ritmo base da luta (o aperto geral DESAFIO, o do chefe e o do nível)
   get ritmoBase() {
     const d = this.defChefe.desafio ?? {}
     return {
@@ -943,13 +943,10 @@ export default class CoopArena extends PvpArena {
     return {
       danoCausado: soma('danoCausado'),
       danoRecebido: soma('danoRecebido'),
-      acertosRecebidos: 0,
       maiorGolpe: Math.max(...this.estatisticas.map((e) => e.maiorGolpe)),
-      golpes: soma('golpes'),
       criticos: soma('criticos'),
       combos: this.combos,
       grazes: soma('grazes'),
-      tpGasto: 0,
       tempoMs: Math.max(0, this.time.now - this.inicioLuta),
       turnos: this.estado.rodada,
       nivel: this.idNivel,

@@ -39,7 +39,7 @@ export default class Dificuldade extends Phaser.Scene {
       this.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra }).setOrigin(0.5)
 
     this.fundo = criarFundo(this, def.fundo)
-    this.fundo.escurecer(true)
+    this.fundo.escurecer()
 
     texto(LARGURA / 2, 36, 'ESCOLHA O NÍVEL', 28, TEXTO.normal, { strokeThickness: 4 })
 

@@ -4,7 +4,6 @@ import { P, r, apertar, lerp, caixaApertada, duracaoDe } from '../padroes.js'
 
 export default {
   tema: { formas: ['losango', 'bola'], cores: { losango: 0x3fd0ff, bola: 0x8fe0ff, barra: 0xa0e8ff }, cor: 0x3fd0ff },
-  hp: 90,
   principal: { espadas: 'mira', ouros: 'estocadas', paus: 'ondas' },
   leve: (A) => A.aimed({ duracao: 4000, intervalo: 1600, velocidade: 110, rajada: 2 }),
   receitas: {

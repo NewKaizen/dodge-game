@@ -75,7 +75,7 @@ export default class Vitoria extends Phaser.Scene {
 
   criarCenario() {
     this.fundo = criarFundo(this, this.def.fundo)
-    this.fundo.escurecer(true)
+    this.fundo.escurecer()
     // véu escuro: começa quase preto (silêncio) e abre no estouro
     this.veu = this.add.rectangle(0, 0, LARGURA, ALTURA, 0x000000).setOrigin(0).setDepth(-4).setAlpha(0.88)
 

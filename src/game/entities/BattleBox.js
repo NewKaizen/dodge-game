@@ -4,8 +4,8 @@ import { tocar } from '../audio.js'
 import { ajustarCamera } from '../resolucao.js'
 import { caixasDe, registrarCaixa, removerCaixa, ignorarNasCaixas } from '../recorte.js'
 
-// A caixa branca onde os corações desviam (expande no turno inimigo e
-// encolhe no fim). Pode mudar de forma no meio do turno (mudarPara), sempre
+// A caixa branca onde os corações desviam (abre para o ataque e fecha no
+// fim). Pode mudar de forma no meio do turno (mudarPara), sempre
 // com uma pré-visualização antes, e volta ao padrão quando fecha.
 //
 // Cada Pista (pvp/Pista.js) tem a sua. Opções:
@@ -132,7 +132,7 @@ export default class BattleBox {
 
   // Muda a caixa para `forma` (null = padrão): primeiro a pré-visualização
   // (avisoMs), depois a transição (transicaoMs). Devolve false se já estava assim.
-  // O tempo anda em atualizar(dt), o MESMO relógio do ataque (Battle chama os dois
+  // O tempo anda em atualizar(dt), o MESMO relógio do ataque (a Pista chama os dois
   // juntos): assim as balas só começam depois da caixa parar, em qualquer FPS.
   mudarPara(forma, { aviso = CAIXA_DINAMICA.avisoMs, transicao = CAIXA_DINAMICA.transicaoMs, aoTerminar } = {}) {
     this.cancelarMudanca()

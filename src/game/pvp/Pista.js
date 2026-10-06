@@ -173,7 +173,7 @@ export default class Pista {
       nome: ataque.nome,
     })
 
-    // igual ao turno inimigo da Battle: se o ataque pede outra caixa, o aviso
+    // se o ataque pede outra caixa, o aviso
     // e a mudança acontecem no respiro inicial e o ataque só começa depois
     const preparo = preparoCaixa(null, ataque.caixa)
     const inicio = Math.max(ATAQUE.respiroMs, preparo)

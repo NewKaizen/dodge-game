@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { LARGURA, ALTURA } from '../constants.js'
 
-// Peças da transição de entrada na batalha (Dificuldade -> Battle):
+// Peças da transição de entrada na luta (Dificuldade -> CoopArena):
 // rachaduras de vidro, estilhaços voando e faixas diagonais correndo.
 // Tudo desenhado no mundo 640x480 da cena que chamar.
 

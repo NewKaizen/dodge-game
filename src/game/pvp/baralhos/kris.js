@@ -4,7 +4,6 @@ import { P, r, apertar, duracaoDe, lerp } from '../padroes.js'
 
 export default {
   tema: { formas: ['espadas', 'losango'], cores: { espadas: 0x4aa8ff, losango: 0x9fd0ff, barra: 0xbfe0ff, bola: 0x4aa8ff }, cor: 0x4aa8ff },
-  hp: 90,
   principal: { espadas: 'estocadas', ouros: 'mira', paus: 'forcado' },
   leve: (A) => A.sides({ duracao: 4000, intervalo: 1500, velocidade: 140, eco: 0 }),
   receitas: {

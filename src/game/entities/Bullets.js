@@ -6,7 +6,7 @@ import { avisar } from '../attacks/validacao.js'
 const MARGEM = 160 // distância fora da caixa em que a bala é removida
 const ESCALA_BARRA = 32 / 24 // textura bala-barra: miolo de 24px numa tela de 32px
 
-// Balas do turno inimigo: aviso (telegrafo), movimento, colisão e graze.
+// Balas de uma Pista: aviso (telegrafo), movimento, colisão e graze.
 //
 // Opções de a.bala({...}):
 //   x, y               posição inicial
@@ -42,8 +42,8 @@ export default class Balas {
   criar(o) {
     const tipo = o.comprimento !== undefined ? 'segmento' : o.largura !== undefined ? 'retangulo' : 'circulo'
     const forma = o.forma ?? (tipo === 'circulo' ? 'bola' : 'barra')
-    const propria = o.textura && this.scene.textures.exists(o.textura)
-    const textura = propria ? o.textura : this.scene.textures.exists(`bala-${forma}`) ? `bala-${forma}` : 'bala-bola'
+    const propria = Boolean(o.textura) // sprite próprio (habilidades/SUPER); senão a bala branca da forma
+    const textura = o.textura ?? `bala-${forma}`
     const sprite = this.scene.add.image(o.x, o.y, textura, propria ? o.quadro : undefined).setDepth(5)
     if (!propria) sprite.setTint(o.cor ?? CORES.bala)
     else if (o.cor !== undefined) sprite.setTint(o.cor)

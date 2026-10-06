@@ -11,7 +11,7 @@ export function processarLinha(linha) {
   const [tipo, ...args] = texto.split(/\s+/)
 
   jogo.update((s) => {
-    const novo = { ...s, ultimoEvento: texto }
+    const novo = { ...s }
     switch (tipo.toUpperCase()) {
       case 'JOY': {
         // JOY <x> <y>  ou  JOY <jogador> <x> <y>

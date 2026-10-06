@@ -114,7 +114,6 @@ export const TEXTOS = {
 //
 // Cada personagem:
 //   tema        formas/cores das balas (a cena passa para o ContextoAtaque)
-//   hp          HP de reserva caso PERSONAGENS (data/personagens.js) não tenha o personagem
 //   principal   padrão usado pelos Ases que mandam ataque ({ espadas, ouros, paus })
 //   leve        ataque fraquinho das cartas de copas
 //   super       { nome, texto, criar(A) } -> a carta SUPER ('<personagem>-espadas-14'),

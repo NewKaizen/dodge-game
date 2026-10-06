@@ -35,7 +35,7 @@ export default class EscolhaParty extends Phaser.Scene {
       this.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra }).setOrigin(0.5)
 
     this.fundo = criarFundo(this, 'king')
-    this.fundo.escurecer(true)
+    this.fundo.escurecer()
 
     this.texto(LARGURA / 2, 28, 'ESCOLHA A PARTY', 28, TEXTO.normal, { strokeThickness: 4 })
     this.status = this.texto(LARGURA / 2, 56, '', 14, TEXTO.selecionado)

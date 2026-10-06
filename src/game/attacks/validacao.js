@@ -16,7 +16,7 @@ export function avisar(chave, mensagem) {
   console.warn(mensagem)
 }
 
-// Chamado a cada turno inimigo para os avisos voltarem a aparecer
+// Chamado a cada ataque (Pista.rodar) para os avisos voltarem a aparecer
 export function novaRodada() {
   jaAvisados.clear()
 }
