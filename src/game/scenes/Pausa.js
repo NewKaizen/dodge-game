@@ -3,13 +3,12 @@ import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 import Controles from '../controles.js'
 import { tocar, pararMusica } from '../audio.js'
 
-// Menu de pause por cima da batalha (botão C: tecla C/Esc, ou BTN C no joystick).
-// A Battle fica congelada (scene.pause) e a música parada no ponto em que
-// estava; "Continuar" devolve tudo exatamente de onde parou.
-// Outra cena pode reaproveitar o menu (ex.: PvpArena) passando nos dados:
-//   cena        chave da cena pausada (padrão 'Battle'; ela precisa de retomarDaPausa())
-//   recomecar   dados para reiniciar essa cena (padrão { chefe })
-//   sair        cena de destino do "SAIR" (padrão 'Selecao')
+// Menu de pause por cima da luta (botão C: tecla C/Esc, ou BTN C no joystick).
+// A arena fica congelada (scene.pause) e a música parada no ponto em que
+// estava; "Continuar" devolve tudo exatamente de onde parou. Dados:
+//   cena        chave da cena pausada (CoopArena ou PvpArena; precisa de retomarDaPausa())
+//   recomecar   dados para reiniciar essa cena
+//   sair        cena de destino do "SAIR"
 //   subtitulo   texto embaixo de PAUSA (padrão "contra <nome>")
 //
 //   C ou B     continuar
@@ -28,11 +27,10 @@ export default class Pausa extends Phaser.Scene {
   }
 
   init(dados) {
-    this.idChefe = dados.chefe
     this.nomeChefe = dados.nome ?? ''
-    this.cenaPausada = dados.cena ?? 'Battle'
-    this.dadosRecomecar = dados.recomecar ?? { chefe: this.idChefe }
-    this.destinoSair = dados.sair ?? 'Selecao'
+    this.cenaPausada = dados.cena
+    this.dadosRecomecar = dados.recomecar
+    this.destinoSair = dados.sair
     this.subtitulo = dados.subtitulo ?? (this.nomeChefe ? `contra ${this.nomeChefe}` : '')
   }
 

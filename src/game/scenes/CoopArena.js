@@ -916,7 +916,6 @@ export default class CoopArena extends PvpArena {
     const dados = {
       chefe: this.idChefe,
       turnos: this.estado.rodada,
-      cena: 'CoopArena',
       estatisticas: this.resumo(),
       hpChefe: this.estado.chefe.hp,
       hpMaxChefe: this.estado.chefe.hpMax,
@@ -938,10 +937,10 @@ export default class CoopArena extends PvpArena {
     this.saindo = true
     this.cameras.main.fadeOut(400, 0, 0, 0)
     await new Promise((r) => this.time.delayedCall(420, r))
-    this.scene.start(vencedor === 'vitoria' ? 'Vitoria' : 'GameOver', { ...dados, modo: 'luta' })
+    this.scene.start(vencedor === 'vitoria' ? 'Vitoria' : 'GameOver', dados)
   }
 
-  // números da luta no formato da tela de vitória (battle/estatisticas.js)
+  // números da luta para as telas de vitória e game over (nota em coop/nota.js)
   resumo() {
     const soma = (campo) => this.estatisticas.reduce((t, e) => t + (e[campo] ?? 0), 0)
     return {
@@ -975,7 +974,6 @@ export default class CoopArena extends PvpArena {
     pausarMusica()
     this.scene.launch('Pausa', {
       cena: 'CoopArena',
-      chefe: this.idChefe,
       nome: this.defChefe.nome,
       recomecar: { chefe: this.idChefe, nivel: this.idNivel },
       sair: 'Selecao',

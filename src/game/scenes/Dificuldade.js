@@ -14,8 +14,7 @@ const CHEFE = { x: 138, y: 200 }
 // ao clímax: DIFÍCIL segura a tensão um pouco mais e explode mais forte.
 const ENTRADA = { climax: 900, porNivel: 100, depois: 360 }
 
-// Tela do nível da luta, depois de escolher o chefe (Selecao -> Dificuldade -> CoopArena,
-// o CO-OP de cartas; a Battle clássica continua no jogo, fora do fluxo).
+// Tela do nível da luta, depois de escolher o chefe (Selecao -> Dificuldade -> CoopArena).
 // FÁCIL é o chefe como ele é; MÉDIO e DIFÍCIL só apertam (números em NIVEIS).
 // A: lutar · B: voltar para a escolha do chefe
 export default class Dificuldade extends Phaser.Scene {
@@ -122,7 +121,7 @@ export default class Dificuldade extends Phaser.Scene {
 
   // "Agora é pra valer": a música corta, a tela congela, o chefe avança
   // tremendo, o vidro trinca, faixas da cor do nível correm, e tudo estoura.
-  // A Battle começa por baixo da cena Entrada, que abre a tela ao meio.
+  // A CoopArena começa por baixo da cena Entrada, que abre a tela ao meio.
   entrar(nivel) {
     const k = this.indice // 0 FÁCIL, 1 MÉDIO, 2 DIFÍCIL
     const cor = corNumero(NIVEIS[nivel].cor)
