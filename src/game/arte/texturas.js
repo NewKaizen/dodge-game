@@ -1,27 +1,17 @@
-import { ASSETS } from '../assets.js'
-import { SPRITES, CORACAO_MAPA, RACHADURA, ICONES, boneco, iconeBoneco } from './sprites.js'
+import { SPRITES, CORACAO_MAPA } from './sprites.js'
 import { PERSONAGENS } from '../data/personagens.js'
 
 // Escala em que cada sprite de pixel art aparece no jogo
-export const ESCALA = { personagem: 3, chefe: 4, icone: 2, coracao: 1.4 }
+export const ESCALA = { personagem: 3, chefe: 4, coracao: 1.4 }
 
 // Tamanho do "miolo" das texturas de bala (a borda restante é o brilho).
 // Uma bala de raio r é desenhada com escala r / RAIO_BALA.
 export const RAIO_BALA = 10
 const TAM_BALA = 32
 
-// Gera por código todas as texturas do manifesto que não vieram de arquivo
+// Desenha por código as texturas de GERADORES (personagens, chefes, balas, interface)
 export function gerarTexturas(scene) {
-  for (const [chave, arquivo] of Object.entries(ASSETS.texturas)) {
-    if (arquivo && scene.textures.exists(chave)) continue
-    const gerar = GERADORES[chave]
-    if (!gerar) {
-      console.warn(`[assets] sem gerador para a textura "${chave}"`)
-      continue
-    }
-    if (scene.textures.exists(chave)) scene.textures.remove(chave)
-    scene.textures.addCanvas(chave, gerar())
-  }
+  for (const [chave, gerar] of Object.entries(GERADORES)) scene.textures.addCanvas(chave, gerar())
 }
 
 // ---------- utilitários de desenho ----------
@@ -281,23 +271,8 @@ function poligonoPreenchido(g, pontos) {
   g.fill()
 }
 
-// Coração inteiro, rachado ou uma das metades (game over)
-function coracao(parte) {
-  const branco = { '#': '#ffffff', k: '#2a0a10' }
-  const mapa = CORACAO_MAPA.map((linha, y) =>
-    [...linha]
-      .map((ch, x) => {
-        if (ch !== '#') return '.'
-        const corte = RACHADURA[y]
-        if (parte === 'rachado') return x === corte ? 'k' : '#'
-        if (parte === 'esq') return x < corte ? '#' : '.'
-        if (parte === 'dir') return x > corte ? '#' : '.'
-        return '#'
-      })
-      .join(''),
-  )
-  return pixelArt(mapa, branco)
-}
+// Coração do jogador (branco: o jogo pinta com a cor de cada um)
+const coracao = () => pixelArt(CORACAO_MAPA, { '#': '#ffffff' })
 
 // ---------- fundos ----------
 
@@ -350,16 +325,7 @@ function cidade(perto) {
 // ---------- tabela de geradores (uma entrada por chave de assets.js) ----------
 
 const sprite = (id) => () => pixelArt(SPRITES[id].mapa, SPRITES[id].paleta, id)
-const icone = (id) => () => pixelArt(ICONES[id], { '#': '#ffffff' }, `icone-${id}`)
 const bala = (forma) => () => formaBrilhante(FORMAS[forma])
-
-// Personagem sem pixel art própria em SPRITES: boneco genérico na cor dele com
-// a inicial do nome (placeholder; troque por PNG em assets.js)
-const desenhoBoneco = (id, fazer) => () => {
-  const def = PERSONAGENS[id]
-  const { mapa, paleta } = fazer(def.cor, def.nome[0])
-  return pixelArt(mapa, paleta, id)
-}
 
 // Pixel art apoiada no chão: tira as linhas vazias de baixo e completa em cima
 // até a altura padrão (o sprite é centrado, então assim os pés de todos ficam
@@ -373,29 +339,11 @@ function apoiarNoChao(mapa, altura) {
   return [...Array(Math.max(0, altura - corpo.length)).fill(vazia), ...corpo]
 }
 const spriteNoChao = (id, altura) => () => pixelArt(apoiarNoChao(SPRITES[id].mapa, altura), SPRITES[id].paleta, id)
-// ícone do HUD: a cabeça (as 10 primeiras linhas com desenho)
-const iconeDaCabeca = (id) => () => {
-  const mapa = SPRITES[id].mapa
-  const ini = Math.max(0, mapa.findIndex((l) => !vaziaLinha(l)))
-  return pixelArt(mapa.slice(ini, ini + 10), SPRITES[id].paleta)
-}
-// Personagem com pixel art em SPRITES usa ela; sem, vira o boneco genérico
-const bonecos = Object.fromEntries(
-  Object.keys(PERSONAGENS).flatMap((id) =>
-    SPRITES[id]
-      ? [
-          [id, spriteNoChao(id, 24)],
-          [`icone-${id}`, iconeDaCabeca(id)],
-        ]
-      : [
-          [id, desenhoBoneco(id, boneco)],
-          [`icone-${id}`, desenhoBoneco(id, iconeBoneco)],
-        ],
-  ),
-)
+// personagens jogáveis, com os pés na mesma linha
+const personagens = Object.fromEntries(Object.keys(PERSONAGENS).map((id) => [id, spriteNoChao(id, 24)]))
 
 const GERADORES = {
-  ...bonecos, // personagens jogáveis e os ícones deles
+  ...personagens,
   king: sprite('king'),
   queen: sprite('queen'),
   jevil: sprite('jevil'),
@@ -403,16 +351,7 @@ const GERADORES = {
   // colorida: a caminhonete usa cor 0xffffff na bala para não ser pintada pelo tema
   'bala-caminhonete': sprite('caminhonete'),
 
-  coracao: () => coracao('inteiro'),
-  'coracao-rachado': () => coracao('rachado'),
-  'coracao-esq': () => coracao('esq'),
-  'coracao-dir': () => coracao('dir'),
-  'icone-fight': icone('fight'),
-  'icone-act': icone('act'),
-  'icone-magic': icone('magic'),
-  'icone-item': icone('item'),
-  'icone-spare': icone('spare'),
-  'icone-defend': icone('defend'),
+  coracao,
   faisca: () => degrade(8, [[0, 'rgba(255,255,255,1)'], [1, 'rgba(255,255,255,0)']]),
   brilho: () => degrade(64, [[0, 'rgba(255,255,255,0.9)'], [0.4, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']]),
   // vinheta branca (pintada com tint): centro livre, bordas e cantos fechando

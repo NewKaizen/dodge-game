@@ -46,8 +46,7 @@ O SUPER do chefe não pode ser anulado, refletido, roubado nem varrido.
 ## Chefe
 
 - Baralho por fase (`src/game/coop/chefes/<id>.js`): cada fase do chefe embaralha
-  cartas novas. Cada carta tem naipe, valor, nome e ataque (os mesmos ataques do
-  chefe no modo clássico, da biblioteca `attacks/`).
+  cartas novas. Cada carta tem naipe, valor, nome e ataque (da biblioteca `attacks/`).
 - ♥ do chefe: ele se cura e/ou levanta a **guarda** (o próximo contra-ataque
   causa menos dano) e manda só um ataque fraco.
 - Dano por bala: `danoBala` do chefe, escalado pelo valor da carta e pelo nível.
@@ -71,15 +70,11 @@ rodadas (30% do HP), ou antes, com uma cura de copas do parceiro.
 | Arquivo | O que faz |
 |---|---|
 | `src/game/coop/regras.js` | regras puras (testáveis em Node): partida, intenções, resolução, golpes, caídos, fases |
-| `src/game/coop/chefes/` | baralhos dos 4 chefes |
+| `src/game/coop/chefes/` | os 4 chefes: dados (nome, arte, música, falas, tema) e baralho por fase |
 | `src/game/coop/cartasChefe.js` | cartas do chefe → ataque (com a biblioteca injetada) |
 | `src/game/coop/bot.js` | CPU aliada (1 jogador) |
 | `src/game/scenes/CoopArena.js` | a cena (estende a PvpArena: mesma escolha de cartas) |
 | `src/game/coop/__tests__/` | testes |
-
-A Battle clássica (FIGHT/ACT/ITEM) continua no código, mas saiu do fluxo do
-menu: a Dificuldade agora abre a CoopArena. Vitoria e GameOver recebem `cena`
-para a revanche (padrão 'Battle').
 
 ## Testes
 
@@ -87,12 +82,3 @@ para a revanche (padrão 'Battle').
   CPU aliada e uma partida simulada até o fim contra cada chefe).
 - No navegador (dev): `window.coopArena` (`estadoDebug()`, `setHp(j, hp)`,
   `setHpChefe(hp)`, `forcarMao(j, ids)`).
-
-## Progresso
-
-- [x] regras + testes
-- [x] baralhos dos 4 chefes (as 63 cartas rodam na caixa sem avisos de justiça)
-- [x] CoopArena (layout, chefe, intenções, arremesso, esquiva, contra-ataque, caídos, fases, SUPER do chefe)
-- [x] CPU aliada
-- [x] fluxo (Dificuldade → CoopArena, revanche, pausa, dicas do game over)
-- [x] teste no navegador (1 e 2 jogadores, vitória e derrota, troca de fase, SUPER do chefe, cair e levantar)

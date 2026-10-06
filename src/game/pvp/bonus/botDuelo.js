@@ -47,7 +47,7 @@ const PASSO_MS = 40
 const OITO = Array.from({ length: 8 }, (_, k) => ({ x: Math.round(Math.cos((k * Math.PI) / 4) * 1e6) / 1e6, y: Math.round(Math.sin((k * Math.PI) / 4) * 1e6) / 1e6 }))
 const DIRECOES = [{ x: 0, y: 0 }, ...Array.from({ length: 16 }, (_, k) => ({ x: Math.cos((k * Math.PI) / 8), y: Math.sin((k * Math.PI) / 8) }))]
 // intensidade do joystick quando só vira para mirar (passa da zona morta, anda pouco)
-export const JOY_MIRA = 45
+const JOY_MIRA = 45
 
 const limitar = (v, a, b) => Math.max(a, Math.min(b, v))
 
@@ -66,7 +66,7 @@ export function direcao8(angulo) {
 }
 
 // Quanto o ângulo (rad) foge da direção de 8 mais próxima
-export function desvioDe8(angulo) {
+function desvioDe8(angulo) {
   const d = direcao8(angulo)
   return Math.abs(difAngulo(angulo, Math.atan2(d.y, d.x)))
 }

@@ -5,7 +5,6 @@ import { P, r, apertar, lerp, duracaoDe } from '../padroes.js'
 
 export default {
   tema: { formas: ['losango', 'copas', 'bola'], cores: { losango: 0xfff07a, copas: 0xff8ad8, bola: 0x9ad8ff, barra: 0xffffff }, cor: 0xfff07a },
-  hp: 95,
   principal: { espadas: 'chuva', ouros: 'carrossel', paus: 'bombas' },
   leve: (A) => A.rain({ duracao: 4000, intervalo: 520, velocidade: 105, mirar: 0.3 }),
   receitas: {

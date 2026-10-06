@@ -1,12 +1,24 @@
-// Chaos King no CO-OP de cartas (FÁCIL): os ataques do modo clássico viram
-// cartas. Formato: ver o comentário em coop/chefes/index.js.
+// Chaos King (FÁCIL). Formato: ver o comentário em coop/chefes/index.js.
 export default {
+  nome: 'Chaos King',
+  dificuldade: 'facil',
+  sprite: 'king',
+  fundo: 'king',
+  musica: 'king',
+  desafio: { velocidade: 1.15, densidade: 1.2 },
+  textoInicial: 'O Chaos King bloqueia o caminho!',
+  tema: {
+    formas: ['losango', 'coroa'],
+    cores: { losango: 0xb48cff, coroa: 0xffd23c, barra: 0xd8c8ff, bola: 0xb48cff },
+    cor: 0xb48cff,
+  },
   hp: 340,
-  danoBala: 7, // o mesmo do modo clássico (data/chefes/king.js)
+  danoBala: 7,
   leve: (A) => A.rain({ duracao: 4000, intervalo: 520, velocidade: 110 }),
   fases: [
     {
       hp: 1,
+      falas: ['Ajoelhem-se diante da coroa!', 'Um peão ousa me desafiar?', 'Xeque! Hahaha!'],
       cartas: [
         ['espadas', 3, 'Chuva de Peões', (A) => A.rain({ intervalo: 260, velocidade: 120 })],
         ['paus', 4, 'Torres em Marcha', (A) => A.colunas({ quantidade: 2, velocidade: 140, intervalo: 1500 })],
@@ -17,6 +29,9 @@ export default {
     },
     {
       hp: 0.5,
+      entrada: 'Chega de brincadeira! Agora é xeque-mate!',
+      velocidadeFundo: 1.4,
+      falas: ['Minhas torres vão esmagar vocês!', 'Curvem-se!', 'Isso é traição!'],
       cartas: [
         ['espadas', 9, 'Xeque', (A) => A.juntos(A.rain({ intervalo: 340, velocidade: 130 }), A.aimed({ intervalo: 1400, velocidade: 130 }))],
         ['paus', 10, 'Roque', (A) => A.colunas({ quantidade: 3, velocidade: 160, intervalo: 1200 })],

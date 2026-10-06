@@ -56,7 +56,7 @@ export default class Config extends Phaser.Scene {
       this.tweens.add({ targets: veu, alpha: 0.6, duration: 140 })
     } else {
       this.fundo = criarFundo(this, 'queen')
-      this.fundo.escurecer(true)
+      this.fundo.escurecer()
       this.cameras.main.fadeIn(220)
     }
 

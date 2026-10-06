@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import Controles from '../controles.js'
-import { CHEFES } from '../data/chefes/index.js'
+import { CHEFES } from '../coop/chefes/index.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { ESCALA } from '../arte/texturas.js'
 import { tocar, musica, pararMusica } from '../audio.js'
@@ -14,8 +14,7 @@ const CHEFE = { x: 138, y: 200 }
 // ao clímax: DIFÍCIL segura a tensão um pouco mais e explode mais forte.
 const ENTRADA = { climax: 900, porNivel: 100, depois: 360 }
 
-// Tela do nível da luta, depois de escolher o chefe (Selecao -> Dificuldade -> CoopArena,
-// o CO-OP de cartas; a Battle clássica continua no jogo, fora do fluxo).
+// Tela do nível da luta, depois de escolher o chefe (Selecao -> Dificuldade -> CoopArena).
 // FÁCIL é o chefe como ele é; MÉDIO e DIFÍCIL só apertam (números em NIVEIS).
 // A: lutar · B: voltar para a escolha do chefe
 export default class Dificuldade extends Phaser.Scene {
@@ -40,7 +39,7 @@ export default class Dificuldade extends Phaser.Scene {
       this.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra }).setOrigin(0.5)
 
     this.fundo = criarFundo(this, def.fundo)
-    this.fundo.escurecer(true)
+    this.fundo.escurecer()
 
     texto(LARGURA / 2, 36, 'ESCOLHA O NÍVEL', 28, TEXTO.normal, { strokeThickness: 4 })
 
@@ -65,7 +64,7 @@ export default class Dificuldade extends Phaser.Scene {
         .text(esquerda, y - OPCAO.altura / 2 + 8, nivel.rotulo, { fontFamily: FONTE, fontSize: '22px', color: nivel.cor, stroke: '#000000', strokeThickness: 3 })
         .setOrigin(0, 0)
       const detalhes = this.add
-        .text(esquerda, y - OPCAO.altura / 2 + 36, this.descrever(nivel, def).join('\n'), {
+        .text(esquerda, y - OPCAO.altura / 2 + 36, this.descrever(nivel).join('\n'), {
           fontFamily: FONTE,
           fontSize: '14px',
           color: TEXTO.normal,
@@ -80,20 +79,16 @@ export default class Dificuldade extends Phaser.Scene {
 
     const ultimo = ORDEM_NIVEIS.indexOf(this.registry.get('nivel'))
     this.selecionar(Math.max(0, ultimo), false)
-    musica(this, 'selecao')
+    musica('selecao')
     this.cameras.main.fadeIn(250)
   }
 
-  // Linhas do que o nível muda para este chefe
-  descrever(nivel, def) {
-    if (!nivel.caos) return ['O chefe como ele é.', 'Nada muda: ritmo, dano e HP normais.']
+  // Linhas do que o nível muda para este chefe (HP do modo cartas)
+  descrever(nivel) {
+    const hp = Math.round(CHEFES[this.idChefe].hp * nivel.hp)
+    if (nivel.dano === 1) return ['O chefe como ele é.', `Ritmo e dano normais. HP do chefe ${hp}.`]
     const mais = (f) => `+${Math.round((f - 1) * 100)}%`
-    const caos = nivel.caos.chance >= 1 ? 'em TODO turno' : `em ${Math.round(nivel.caos.chance * 100)}% dos turnos`
-    return [
-      `Balas ${mais(nivel.velocidade)} rápidas, ${mais(nivel.densidade)} frequentes`,
-      `Dano ${mais(nivel.dano)}   HP do chefe ${Math.round(def.hp * nivel.hp)} (${mais(nivel.hp)})`,
-      `CAOS: tiros extras ${caos}`,
-    ]
+    return [`Balas ${mais(nivel.velocidade)} rápidas, ${mais(nivel.densidade)} frequentes`, `Dano ${mais(nivel.dano)}   HP do chefe ${hp} (${mais(nivel.hp)})`]
   }
 
   selecionar(indice, comSom = true) {
@@ -122,7 +117,7 @@ export default class Dificuldade extends Phaser.Scene {
 
   // "Agora é pra valer": a música corta, a tela congela, o chefe avança
   // tremendo, o vidro trinca, faixas da cor do nível correm, e tudo estoura.
-  // A Battle começa por baixo da cena Entrada, que abre a tela ao meio.
+  // A CoopArena começa por baixo da cena Entrada, que abre a tela ao meio.
   entrar(nivel) {
     const k = this.indice // 0 FÁCIL, 1 MÉDIO, 2 DIFÍCIL
     const cor = corNumero(NIVEIS[nivel].cor)

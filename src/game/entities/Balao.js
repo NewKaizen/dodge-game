@@ -3,8 +3,7 @@ import { tocar } from '../audio.js'
 
 const LARGURA_MAX = 170
 
-// Balão de fala do chefe (com digitação). Fica na tela até `terminou`:
-// passou TEMPOS.balaoMs depois de digitar tudo, ou alguém apertou A.
+// Balão de fala do chefe (com digitação). Quem mostra decide quando esconder.
 export default class Balao {
   constructor(scene) {
     this.scene = scene
@@ -15,7 +14,6 @@ export default class Balao {
     this.completo = ''
     this.letras = 0
     this.acumulado = 0
-    this.restante = 0
     this.esconder()
   }
 
@@ -24,7 +22,6 @@ export default class Balao {
     this.completo = texto
     this.letras = 0
     this.acumulado = 0
-    this.restante = TEMPOS.balaoMs
     this.texto.setText(texto)
     const w = Math.min(LARGURA_MAX, this.texto.width + 18)
     const h = this.texto.height + 14
@@ -46,16 +43,10 @@ export default class Balao {
     return this.letras < this.completo.length
   }
 
-  get terminou() {
-    return !this.digitando && this.restante <= 0
-  }
 
   atualizar(dt) {
     if (!this.grafico.visible) return
-    if (!this.digitando) {
-      this.restante -= dt
-      return
-    }
+    if (!this.digitando) return
     this.acumulado += dt
     const novas = Math.floor(this.acumulado / TEMPOS.letraMs)
     if (!novas) return
@@ -65,15 +56,6 @@ export default class Balao {
     if (this.letras % 3 === 0) tocar(this.scene, 'texto')
   }
 
-  // A: completa o texto ou fecha
-  avancar() {
-    if (this.digitando) {
-      this.letras = this.completo.length
-      this.texto.setText(this.completo)
-    } else {
-      this.restante = 0
-    }
-  }
 
   esconder() {
     this.grafico.setVisible(false)

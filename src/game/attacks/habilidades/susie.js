@@ -56,7 +56,7 @@ function invisivel(b) {
 // dentro (`profundidade` da caixa, por `cravado` ms) com um BONK e, da ponta
 // do amassado, saem `estrelas` estrelinhas de tontura que giram em espiral
 // para fora (piscam paradas antes de valer). A outra metade da caixa fica livre.
-export const susieCabecada = definirAtaque({
+const susieCabecada = definirAtaque({
   nome: 'susieCabecada',
   padrao: { duracao: 5000, intervalo: 1200, aviso: 600, profundidade: 0.5, largura: 46, cravado: 380, estrelas: 4, raioEstrela: 6, velocidade: 50, voltaEstrela: 80 },
   iniciar(a, cfg) {
@@ -153,7 +153,7 @@ function estrelinhas(a, cfg, ponta, dir, i) {
 // numa onda que corre para os dois lados a `velocidade` px/s. O tremor solta
 // `cascalhos` do teto (um em cima do coração), que piscam antes de cair.
 // O alto da caixa (>= LACUNA_MINIMA) nunca é atingido pela onda.
-export const susiePisao = definirAtaque({
+const susiePisao = definirAtaque({
   nome: 'susiePisao',
   padrao: { duracao: 5000, intervalo: 1400, aviso: 600, alturas: [0.34, 0.48], velocidade: 150, passo: 16, subida: 110, erguido: 200, cascalhos: 1, velocidadeCascalho: 90, gravidade: 260 },
   iniciar(a, cfg) {
@@ -243,7 +243,7 @@ function pilar(a, cfg, x, H, n) {
 // `voltas` voltas (cada uma em `volta` ms), deixando um rastro roxo. O cabo e
 // a cabeça machucam; bem no eixo (`interno` px) não. O próximo giro só vale
 // depois que o anterior termina, e sempre sobra uma faixa livre do lado.
-export const susieGiro = definirAtaque({
+const susieGiro = definirAtaque({
   nome: 'susieGiro',
   padrao: { duracao: 5500, aviso: 650, raio: 66, volta: 1150, voltas: 1.1, interno: 14, raioCabeca: 11, espessuraCabo: 5, folga: 200, deslocamento: 0.45 },
   iniciar(a, cfg) {
@@ -335,7 +335,7 @@ export const susieGiro = definirAtaque({
 // Depois de `encarar` ms o olhar TRAVA (a linha pisca por `trava` ms, parada)
 // e dispara `tiros` raios amarelos por ela. Então a marca troca de lugar
 // (para a borda mais longe do coração) e recomeça.
-export const susieEncarar = definirAtaque({
+const susieEncarar = definirAtaque({
   nome: 'susieEncarar',
   padrao: { duracao: 5000, olhos: 1, encarar: 700, trava: 450, rastrear: 1.8, tiros: 3, cadencia: 110, velocidade: 190, raio: 4, pausa: 150 },
   iniciar(a, cfg) {
@@ -443,7 +443,7 @@ export const susieEncarar = definirAtaque({
 // atravessa a caixa a `velocidade` px/s, com um vão de `lacuna` px. Enquanto
 // a onda passa, o rugido EMPURRA os corações no sentido dela (`empurrao`
 // px/s, menos que a velocidade do coração). Uma onda por vez.
-export const susieRugido = definirAtaque({
+const susieRugido = definirAtaque({
   nome: 'susieRugido',
   padrao: { duracao: 5000, aviso: 500, velocidade: 120, lacuna: 58, passo: 13, curva: 22, empurrao: 50, raio: 6, pausa: 150 },
   iniciar(a, cfg) {
@@ -524,7 +524,7 @@ export const susieRugido = definirAtaque({
 // (`pavio` ms) e então: PUF, uma nuvem de pó de giz fica no lugar por `nuvem`
 // ms e `fragmentos` pedaços de giz se espalham em cruz (um deles na direção do
 // coração), freiam e ficam no chão por `chao` ms antes de sumir.
-export const susieBombaGiz = definirAtaque({
+const susieBombaGiz = definirAtaque({
   nome: 'susieBombaGiz',
   padrao: { duracao: 5000, intervalo: 1600, pavio: 1100, fragmentos: 4, velocidade: 130, alcance: 85, chao: 1100, nuvem: 520, raioNuvem: 22, raioGiz: 4, mirar: 0.5, perto: 58, distancia: 70 },
   iniciar(a, cfg) {

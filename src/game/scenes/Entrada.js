@@ -4,10 +4,10 @@ import { corNumero } from '../effects/entrada.js'
 
 const CORTE = { segmentos: 9, pontaMax: 22 } // zigue-zague da linha onde a tela "abre"
 
-// Abertura da batalha: sobreposição por cima da Battle. Começa com a tela
+// Abertura da batalha: sobreposição por cima da CoopArena. Começa com a tela
 // preta partida por uma fenda brilhante na diagonal; as duas metades se
-// afastam e revelam a luta. Lançada pela Dificuldade junto com a Battle
-// (a Battle não precisa saber de nada), e se desliga sozinha no fim.
+// afastam e revelam a luta. Lançada pela Dificuldade junto com a CoopArena
+// (que só espera ela terminar), e se desliga sozinha no fim.
 export default class Entrada extends Phaser.Scene {
   constructor() {
     super('Entrada')

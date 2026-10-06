@@ -1,10 +1,10 @@
 import Phaser from 'phaser'
 import Controles from '../controles.js'
-import { CHEFES } from '../data/chefes/index.js'
+import { CHEFES } from '../coop/chefes/index.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { ESCALA } from '../arte/texturas.js'
 import { tocar, musica } from '../audio.js'
-import { calcularRank, formatarTempo } from '../battle/estatisticas.js'
+import { calcularRank, formatarTempo } from '../coop/nota.js'
 import { partyDe } from '../data/batalha.js'
 import { fogoArtificio, canhoesConfete, chuvaConfete, raiosDeLuz, CORES_FESTA } from '../effects/festa.js'
 import { shake } from '../effects/shake.js'
@@ -33,7 +33,6 @@ const TEMPO = {
 
 const PAINEL = { x: 196, y: 140, largura: 248, altura: 246, linhaY: 156, espaco: 23 }
 const NOTA = { x: 548, y: 248 }
-const COR_POUPADO = '#ffe040'
 const COR_DERROTADO = '#ff4050'
 
 const estilo = (tamanho, cor = TEXTO.normal, extra = {}) => ({
@@ -45,28 +44,24 @@ const estilo = (tamanho, cor = TEXTO.normal, extra = {}) => ({
   ...extra,
 })
 
-const VAZIO = { danoCausado: 0, danoRecebido: 0, maiorGolpe: 0, combos: 0, grazes: 0, tpGasto: 0, tempoMs: 0, caidosNoFim: 0, hpMaxParty: 0 }
 
 export default class Vitoria extends Phaser.Scene {
   constructor() {
     super('Vitoria')
   }
 
-  create({ chefe, modo, turnos = 0, estatisticas = null, cena = 'Battle' }) {
+  // estatisticas: CoopArena.resumo()
+  create({ chefe, estatisticas }) {
     this.idChefe = chefe
-    this.cenaLuta = cena // A: revanche nesta cena (CoopArena no CO-OP de cartas)
     this.def = CHEFES[chefe]
-    this.modo = modo
-    this.poupado = modo === 'spare'
     this.saindo = false
     this.liberado = false
     this.relogio = 0
     this.contadores = []
     this.ultimoTic = 0
 
-    const nivel = estatisticas?.nivel ?? (NIVEIS[this.registry.get('nivel')] ? this.registry.get('nivel') : 'facil')
-    this.stats = { ...VAZIO, ...estatisticas, turnos: estatisticas?.turnos ?? turnos, nivel }
-    this.rank = calcularRank(this.stats, modo)
+    this.stats = estatisticas
+    this.rank = calcularRank(this.stats)
 
     this.criarCenario()
     this.etapas = this.montarEtapas()
@@ -80,11 +75,11 @@ export default class Vitoria extends Phaser.Scene {
 
   criarCenario() {
     this.fundo = criarFundo(this, this.def.fundo)
-    this.fundo.escurecer(true)
+    this.fundo.escurecer()
     // véu escuro: começa quase preto (silêncio) e abre no estouro
     this.veu = this.add.rectangle(0, 0, LARGURA, ALTURA, 0x000000).setOrigin(0).setDepth(-4).setAlpha(0.88)
 
-    const corRaio = this.poupado ? 0xffe040 : 0xff9a40
+    const corRaio = 0xff9a40
     this.raios = raiosDeLuz(this, LARGURA / 2, 70, { cor: corRaio, alpha: 0.2, profundidade: -3 })
     // halo atrás do título
     this.halo = this.add.image(LARGURA / 2, 66, 'brilho').setScale(0).setTint(corRaio).setBlendMode(Phaser.BlendModes.ADD).setDepth(-1)
@@ -97,7 +92,7 @@ export default class Vitoria extends Phaser.Scene {
     const em = (t, f) => e.push({ t, f })
     em(TEMPO.subida, (r) => this.subida(r))
     em(TEMPO.estouro, (r) => this.estouro(r))
-    em(TEMPO.musica, () => musica(this, 'vitoria'))
+    em(TEMPO.musica, () => musica('vitoria'))
     em(TEMPO.mensagem, (r) => this.mensagem(r))
     em(TEMPO.party, (r) => this.entrarParty(r))
     em(TEMPO.painel, (r) => this.abrirPainel(r))
@@ -127,7 +122,7 @@ export default class Vitoria extends Phaser.Scene {
     this.saindo = true
     tocar(this, 'confirmar')
     this.cameras.main.fadeOut(250, 0, 0, 0)
-    this.time.delayedCall(260, () => this.scene.start(botao === 'A' ? this.cenaLuta : 'Selecao', { chefe: this.idChefe }))
+    this.time.delayedCall(260, () => this.scene.start(botao === 'A' ? 'CoopArena' : 'Selecao', { chefe: this.idChefe }))
   }
 
   // ---------- etapas ----------
@@ -175,7 +170,7 @@ export default class Vitoria extends Phaser.Scene {
         speedX: { min: -15, max: 15 },
         lifespan: 3200,
         scale: { start: 1.3, end: 0 },
-        tint: [0xffe040, 0xffffff, this.poupado ? 0x3cff6a : 0xff8a1a],
+        tint: [0xffe040, 0xffffff, 0xff8a1a],
         frequency: 60,
         blendMode: 'ADD',
       })
@@ -211,10 +206,10 @@ export default class Vitoria extends Phaser.Scene {
   }
 
   criarTitulo(rapido) {
-    const cor = this.poupado ? TEXTO.selecionado : '#ffffff'
+    const cor = '#ffffff'
     // brilho: cópia em ADD atrás do título, pulsando
     this.tituloBrilho = this.add
-      .text(LARGURA / 2, 66, 'VITÓRIA!', estilo(60, this.poupado ? '#fff0a0' : '#ffd0a0', { strokeThickness: 0 }))
+      .text(LARGURA / 2, 66, 'VITÓRIA!', estilo(60, '#ffd0a0', { strokeThickness: 0 }))
       .setOrigin(0.5)
       .setDepth(9)
       .setBlendMode(Phaser.BlendModes.ADD)
@@ -224,7 +219,7 @@ export default class Vitoria extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(10)
       .setShadow(0, 5, '#7a2a00', 0, true, false)
-    if (!this.poupado) this.titulo.setTint(0xffffff, 0xffffff, 0xffd060, 0xffd060)
+    this.titulo.setTint(0xffffff, 0xffffff, 0xffd060, 0xffd060)
 
     const pulsar = () => {
       this.tweens.add({ targets: this.titulo, scale: 1.05, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
@@ -253,9 +248,9 @@ export default class Vitoria extends Phaser.Scene {
 
   mensagem(rapido) {
     const nome = this.def.nome
-    const texto = this.poupado ? `Vocês pouparam ${nome}. A gentileza venceu!` : `${nome} caiu! Ninguém segura essa dupla!`
+    const texto = `${nome} caiu! Ninguém segura essa dupla!`
     const t = this.add
-      .text(LARGURA / 2, 114, texto, estilo(18, this.poupado ? TEXTO.cura : TEXTO.normal))
+      .text(LARGURA / 2, 114, texto, estilo(18, TEXTO.normal))
       .setOrigin(0.5)
       .setDepth(10)
     if (rapido) return
@@ -266,30 +261,14 @@ export default class Vitoria extends Phaser.Scene {
   // Chefe (retrato à esquerda) e party comemorando embaixo dele
   entrarParty(rapido) {
     const chefe = this.add.image(108, 192, this.def.sprite).setScale(ESCALA.chefe * 0.62).setDepth(5)
-    if (this.poupado) {
-      this.tweens.add({ targets: chefe, y: 184, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
-      // coraçõezinhos subindo do chefe poupado
-      this.add
-        .particles(108, 168, 'coracao', {
-          x: { min: -26, max: 26 },
-          speedY: { min: -40, max: -20 },
-          lifespan: 1600,
-          scale: { start: 0.7, end: 0.2 },
-          alpha: { start: 0.9, end: 0 },
-          tint: [0xff6fa8, 0xffe040],
-          frequency: 420,
-        })
-        .setDepth(5)
-    } else {
-      chefe.setTint(0x6a6a6a).setAlpha(0.6).setAngle(-12)
-      this.tweens.add({ targets: chefe, angle: -9, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
-    }
+    chefe.setTint(0x6a6a6a).setAlpha(0.6).setAngle(-12)
+    this.tweens.add({ targets: chefe, angle: -9, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
 
     const chao = 358
     // a party que lutou (registry 'party'), lado a lado embaixo do chefe
     const party = partyDe(this.registry)
     const membros = party.map((id, i) => ({
-      textura: this.textures.exists(id) ? id : 'coracao',
+      textura: id,
       x: 108 + (i - (party.length - 1) / 2) * Math.min(68, 150 / Math.max(1, party.length - 1)),
       atraso: i * 210,
     }))
@@ -338,16 +317,16 @@ export default class Vitoria extends Phaser.Scene {
     const s = this.stats
     const nivel = NIVEIS[s.nivel] ?? NIVEIS.facil
     return [
-      { rotulo: 'Resultado', texto: this.poupado ? 'POUPADO' : 'DERROTADO', cor: this.poupado ? COR_POUPADO : COR_DERROTADO },
+      { rotulo: 'Resultado', texto: 'DERROTADO', cor: COR_DERROTADO },
       { rotulo: 'Nível', texto: nivel.rotulo, cor: nivel.cor },
       { rotulo: 'Turnos', valor: s.turnos },
       { rotulo: 'Tempo', valor: Math.round(s.tempoMs / 1000), formatar: (v) => formatarTempo(v * 1000) },
       { rotulo: 'Dano causado', valor: s.danoCausado, cor: '#ffffff' },
       { rotulo: 'Maior golpe', valor: s.maiorGolpe, cor: TEXTO.selecionado },
-      { rotulo: 'Combos perfeitos', valor: s.combos, cor: TEXTO.comando },
+      { rotulo: 'Combos e pares', valor: s.combos, cor: TEXTO.comando },
       { rotulo: 'Grazes', valor: s.grazes, cor: TEXTO.guarda },
       { rotulo: 'Dano recebido', valor: s.danoRecebido, cor: s.danoRecebido ? TEXTO.caido : TEXTO.cura },
-      { rotulo: 'TP gasto', valor: s.tpGasto, formatar: (v) => `${v}%`, cor: TEXTO.comando },
+      { rotulo: 'Críticos', valor: s.criticos, cor: TEXTO.selecionado },
     ]
   }
 

@@ -3,10 +3,8 @@ import { CORES, FONTE, TEXTO, LARGURA, corTexto } from '../constants.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { CORES_CARTA } from '../entities/Carta.js'
 import { ENERGIA } from './regras.js'
+import { ignorarNasCaixas } from '../recorte.js'
 
-// Selo "VELOCIDADE x1.24" da morte súbita (o mesmo do co-op): a arena põe um
-// no alto, no meio, entre os dois placares (é da partida, não de um jogador)
-export { IndicadorVelocidade } from '../entities/Hud.js'
 
 // Placar de um jogador na arena PvP (canto de cima): P1/P2, nome do
 // personagem na cor dele, barra de HP, gemas de energia e os estados de
@@ -172,5 +170,35 @@ export default class HudPvp {
     this.cena.tweens.add({ targets: c, x: { from: this.s * 4, to: 0 }, duration: 50, repeat: 2, yoyo: true, onComplete: () => c.setPosition(0, 0) })
     this.barra.setFillStyle(0xffffff)
     this.cena.time.delayedCall(90, () => this.barra.setFillStyle(this.corBarra))
+  }
+}
+
+// Selo pequeno e fixo com o fator da morte súbita (ACELERACAO em constants.js):
+// "VELOCIDADE x1.24". Escondido enquanto o fator é 1. Usado nas arenas PvP e CO-OP.
+//
+//   const ind = new IndicadorVelocidade(cena, x, y, { origem: [0.5, 0], tamanho: 11 })
+//   ind.set(1.24)   mostra (com um pulo quando o valor muda)
+export class IndicadorVelocidade {
+  constructor(cena, x, y, { origem = [0.5, 0], tamanho = 11, profundidade = 70 } = {}) {
+    this.cena = cena
+    this.fator = 1
+    this.texto = cena.add
+      .text(x, y, '', { fontFamily: FONTE, fontSize: `${tamanho}px`, color: '#ff9a3a', stroke: '#000000', strokeThickness: 3 })
+      .setOrigin(...origem)
+      .setDepth(profundidade)
+      .setVisible(false)
+    ignorarNasCaixas(cena, this.texto)
+  }
+
+  set(fator, animado = true) {
+    const mudou = fator !== this.fator
+    this.fator = fator
+    this.texto.setVisible(fator > 1.001)
+    this.texto.setText(`VELOCIDADE x${fator.toFixed(2)}`)
+    if (!animado || !mudou || fator <= 1.001) return
+    const t = this.texto
+    this.cena.tweens.killTweensOf(t)
+    t.setScale(1).setColor('#ffffff')
+    this.cena.tweens.add({ targets: t, scale: { from: 1.8, to: 1 }, duration: 320, ease: 'Back.easeOut', onComplete: () => t.setColor('#ff9a3a') })
   }
 }

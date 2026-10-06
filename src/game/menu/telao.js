@@ -250,33 +250,22 @@ export function criarTelao(cena, tela) {
   const cy = T.y + T.altura / 2
   const dir = T.x + T.largura
   const baixo = T.y + T.altura
-  const temSprites = cena.textures.exists('menu-telao-moldura')
 
   // ---------- peças fixas ----------
-  const halo = cena.add.image(cx, cy + 6, temSprites ? 'menu-telao-brilho' : '__WHITE').setDepth(P.halo).setBlendMode(Phaser.BlendModes.ADD)
+  const halo = cena.add.image(cx, cy + 6, 'menu-telao-brilho').setDepth(P.halo).setBlendMode(Phaser.BlendModes.ADD)
   halo.setDisplaySize(T.largura + 150, T.altura + 130).setAlpha(0)
   cena.add.rectangle(T.x, T.y, T.largura, T.altura, 0x04050b).setOrigin(0).setDepth(P.fundo)
-  const grade = temSprites
-    ? cena.add.tileSprite(T.x, T.y, T.largura, T.altura, 'menu-telao-grade').setOrigin(0).setDepth(P.fundo).setAlpha(0.1)
-    : null
+  const grade = cena.add.tileSprite(T.x, T.y, T.largura, T.altura, 'menu-telao-grade').setOrigin(0).setDepth(P.fundo).setAlpha(0.1)
   const gCaixa = cena.add.graphics().setDepth(P.caixa)
   const gLaser = cena.add.graphics().setDepth(P.laser)
   const gTampa = cena.add.graphics().setDepth(P.tampa)
   const gGlitch = cena.add.graphics().setDepth(P.chiado)
-  const chiado = temSprites
-    ? cena.add.sprite(T.x, T.y, 'menu-telao-chiado', 0).setOrigin(0).setScale(2).setDepth(P.chiado).setAlpha(0).setVisible(false)
-    : null
-  if (temSprites) {
-    cena.add.image(T.x, T.y, 'menu-telao-vidro').setOrigin(0).setDepth(P.vidro)
-    cena.add.image(T.x + MOLDURA.x, T.y + MOLDURA.y, 'menu-telao-moldura').setOrigin(0).setDepth(P.moldura)
-  } else {
-    cena.add.rectangle(T.x, T.y, T.largura, T.altura).setOrigin(0).setDepth(P.moldura).setStrokeStyle(16, 0x10121c)
-  }
-  const reflexo = temSprites
-    ? cena.add.image(T.x + MOLDURA.x, T.y + MOLDURA.y, 'menu-telao-reflexo').setOrigin(0).setDepth(P.reflexo).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
-    : null
+  const chiado = cena.add.sprite(T.x, T.y, 'menu-telao-chiado', 0).setOrigin(0).setScale(2).setDepth(P.chiado).setAlpha(0).setVisible(false)
+  cena.add.image(T.x, T.y, 'menu-telao-vidro').setOrigin(0).setDepth(P.vidro)
+  cena.add.image(T.x + MOLDURA.x, T.y + MOLDURA.y, 'menu-telao-moldura').setOrigin(0).setDepth(P.moldura)
+  const reflexo = cena.add.image(T.x + MOLDURA.x, T.y + MOLDURA.y, 'menu-telao-reflexo').setOrigin(0).setDepth(P.reflexo).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
   const led = cena.add.rectangle(T.x + MOLDURA.x + LED.x, T.y + MOLDURA.y + LED.y, 3, 3, 0x6a0c14).setOrigin(0).setDepth(P.led)
-  const ledBrilho = cena.add.image(led.x + 1.5, led.y + 1.5, temSprites ? 'menu-telao-brilho' : '__WHITE').setDepth(P.led).setDisplaySize(12, 12).setBlendMode(Phaser.BlendModes.ADD).setTint(0xff2030).setAlpha(0.35)
+  const ledBrilho = cena.add.image(led.x + 1.5, led.y + 1.5, 'menu-telao-brilho').setDepth(P.led).setDisplaySize(12, 12).setBlendMode(Phaser.BlendModes.ADD).setTint(0xff2030).setAlpha(0.35)
   const gLuz = cena.add.graphics().setDepth(P.luz)
 
   // ---------- balas (conjunto fixo, reaproveitado) ----------
@@ -285,7 +274,7 @@ export function criarTelao(cena, tela) {
     const b = balas.find((b) => !b.vivo)
     if (!b) return null
     Object.assign(b, { vivo: true, x, y, vx, vy, r, giro, onda, t: 0, escala: r / RAIO_BALA })
-    b.img.setTexture(cena.textures.exists(textura) ? textura : 'bala-bola').setTint(cor).setRotation(0).setPosition(x, y).setScale(0).setAlpha(1).setVisible(true)
+    b.img.setTexture(textura).setTint(cor).setRotation(0).setPosition(x, y).setScale(0).setAlpha(1).setVisible(true)
     return b
   }
   const matar = (b) => {
@@ -487,8 +476,8 @@ export function criarTelao(cena, tela) {
 
   const desenharGlitch = (dt) => {
     gGlitch.clear()
-    if (estado.glitch <= 0 || !chiado) {
-      if (chiado?.visible && estado.brancura <= 0 && !estado.chiadoFixo) chiado.setVisible(false)
+    if (estado.glitch <= 0) {
+      if (chiado.visible && estado.brancura <= 0 && !estado.chiadoFixo) chiado.setVisible(false)
       return
     }
     estado.glitch -= dt
@@ -563,13 +552,11 @@ export function criarTelao(cena, tela) {
     estado.pulso = Math.max(0, estado.pulso - dt * 2.6)
     const viva = misturar(estado.corOnda, 0xffffff, Math.min(1, estado.pulso * 0.35 + estado.brancura))
     estado.corAtual = misturar(0x000000, viva, estado.luzLigada)
-    if (grade) {
-      grade.tilePositionX += dt * 9
-      grade.tilePositionY += dt * 6
-      grade.setTint(estado.corOnda).setAlpha((0.08 + estado.pulso * 0.06) * estado.luzLigada)
-    }
+    grade.tilePositionX += dt * 9
+    grade.tilePositionY += dt * 6
+    grade.setTint(estado.corOnda).setAlpha((0.08 + estado.pulso * 0.06) * estado.luzLigada)
     halo.setTint(estado.corAtual).setAlpha((0.14 + estado.pulso * 0.06) * estado.luzLigada + estado.brancura * 0.25)
-    reflexo?.setTint(estado.corAtual).setAlpha((0.5 + estado.pulso * 0.25) * estado.luzLigada + estado.brancura * 0.4)
+    reflexo.setTint(estado.corAtual).setAlpha((0.5 + estado.pulso * 0.25) * estado.luzLigada + estado.brancura * 0.4)
 
     // chiado / glitch de vez em quando
     if (estado.ligado && !estado.explodindo) {
@@ -579,7 +566,7 @@ export function criarTelao(cena, tela) {
         estado.proxGlitch = sorte(5, 11)
       }
     }
-    if (estado.chiadoFixo) chiado?.setFrame(Phaser.Math.Between(0, 3))
+    if (estado.chiadoFixo) chiado.setFrame(Phaser.Math.Between(0, 3))
     desenharGlitch(dt)
   }
 
@@ -634,7 +621,7 @@ export function criarTelao(cena, tela) {
           onUpdate: () => desenharTampa(true),
           onComplete: () => {
             // ...e abre na vertical
-            chiado?.setVisible(true).setAlpha(0.45)
+            chiado.setVisible(true).setAlpha(0.45)
             estado.chiadoFixo = true
             cena.tweens.add({
               targets: fase,
@@ -659,8 +646,7 @@ export function criarTelao(cena, tela) {
                     estado.brancura = 0
                   },
                 })
-                if (chiado) cena.tweens.add({ targets: chiado, alpha: 0, duration: 420, onComplete: () => (estado.chiadoFixo = false) })
-                else estado.chiadoFixo = false
+                cena.tweens.add({ targets: chiado, alpha: 0, duration: 420, onComplete: () => (estado.chiadoFixo = false) })
                 cena.time.delayedCall(200, resolver)
               },
             })
@@ -675,7 +661,7 @@ export function criarTelao(cena, tela) {
       estado.explodindo = true
       estado.glitch = 0
       lasers.length = 0
-      const luz = cena.add.image(cx, cy, temSprites ? 'menu-telao-brilho' : '__WHITE').setDepth(P.luz).setBlendMode(Phaser.BlendModes.ADD)
+      const luz = cena.add.image(cx, cy, 'menu-telao-brilho').setDepth(P.luz).setBlendMode(Phaser.BlendModes.ADD)
       luz.setDisplaySize(T.largura * 1.2, T.altura * 1.4).setAlpha(0.9)
       const p = { tela: 0, sala: 0 }
       const desenhar = () => {

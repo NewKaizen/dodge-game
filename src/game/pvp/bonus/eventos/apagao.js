@@ -11,7 +11,7 @@ import { flashTela } from '../../../effects/flash.js'
 // depois de cada relâmpago (a luz chega antes do som, como na vida real).
 //
 // O escuro de cada caixa é uma imagem preta com um furo suave (textura feita
-// uma vez a partir de bonus-holofote, ou de um degradê) que segue o coração,
+// uma vez a partir de bonus-holofote) que segue o coração,
 // mais 4 retângulos pretos em volta dela cobrindo o resto. Tudo recortado na
 // caixa (pista.caixa.recortar): a câmera da caixa só mostra o que está dentro,
 // então a caixa pode mudar de forma/lugar sem problema.
@@ -28,9 +28,8 @@ const TROVAO_MAX = 400
 
 // Textura 128x128 preta com um furo transparente suave no meio
 function texturaLuz(arena) {
-  const holofote = arena.textures.exists('bonus-holofote')
-  const chave = holofote ? 'bonus-apagao-luz-h' : 'bonus-apagao-luz-g'
-  if (arena.textures.exists(chave)) return chave
+  const chave = 'bonus-apagao-luz-h'
+  if (arena.textures.exists(chave)) return chave // já gerada num apagão anterior
   const n = 128
   const canvas = document.createElement('canvas')
   canvas.width = n
@@ -39,17 +38,7 @@ function texturaLuz(arena) {
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, n, n)
   ctx.globalCompositeOperation = 'destination-out'
-  if (holofote) {
-    ctx.drawImage(arena.textures.get('bonus-holofote').getSourceImage(), 0, 0, n, n)
-  } else {
-    const grad = ctx.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2)
-    grad.addColorStop(0, 'rgba(0,0,0,1)')
-    grad.addColorStop(0.45, 'rgba(0,0,0,1)')
-    grad.addColorStop(0.8, 'rgba(0,0,0,0.45)')
-    grad.addColorStop(1, 'rgba(0,0,0,0)')
-    ctx.fillStyle = grad
-    ctx.fillRect(0, 0, n, n)
-  }
+  ctx.drawImage(arena.textures.get('bonus-holofote').getSourceImage(), 0, 0, n, n)
   arena.textures.addCanvas(chave, canvas)
   return chave
 }
@@ -151,7 +140,7 @@ export default function criar(arena, { rng }) {
         const bordas = [0, 1, 2, 3].map(() => arena.add.rectangle(0, 0, 1, 1, 0x000000).setOrigin(0).setDepth(9.5))
         const avisos = arena.add.graphics().setDepth(9.6)
         // brilho fraquinho no chão da caixa, para o círculo de luz aparecer mesmo sem balas perto
-        const brilho = arena.add.image(0, 0, arena.textures.exists('bonus-holofote') ? 'bonus-holofote' : 'brilho').setTint(0xfff0c0).setDepth(2)
+        const brilho = arena.add.image(0, 0, 'bonus-holofote').setTint(0xfff0c0).setDepth(2)
         pista.caixa.recortar(luz, ...bordas, avisos, brilho)
         return { pista, luz, bordas, avisos, brilho }
       })

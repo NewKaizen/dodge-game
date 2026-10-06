@@ -42,7 +42,7 @@ export function juntos(...lista) {
 
 // Um ataque depois do outro. Cada onda respira por conta própria.
 export function sequencia(...lista) {
-  // a caixa da 1ª onda quem prepara é quem inicia a sequência (Battle); aqui só as trocas entre ondas
+  // a caixa da 1ª onda quem prepara é quem inicia a sequência (Pista.rodar); aqui só as trocas entre ondas
   const anteriores = lista.map((at, i) => (i === 0 ? at.caixa : lista[i - 1].caixa))
   const inicios = []
   let total = 0
@@ -59,20 +59,8 @@ export function sequencia(...lista) {
     corpo: iniciar,
     iniciar,
     filhos: lista,
-    // "reduz uma onda": com 2+ ondas perde a última; com uma só, encurta ela
-    encurtar: (fator) => (lista.length > 1 ? sequencia(...lista.slice(0, -1)) : sequencia(encurtar(lista[0], fator))),
   }
 }
-
-// Versão mais curta do ataque (fator < 1), usada pelo DEFEND e por ACTs.
-// Ataque simples ou `juntos`: fica com `fator` do tempo ativo (respiros
-// mantidos, mínimo ATIVA_MINIMA). `sequencia`: perde a última onda.
-export function encurtar(ataque, fator) {
-  if (!(fator < 0.999)) return ataque
-  return ataque.encurtar?.(fator) ?? ataque
-}
-
-const ATIVA_MINIMA = 1500
 
 // ---------- ondas e respiros ----------
 
@@ -96,7 +84,6 @@ function onda({ nome, ativa, corpo, respiro, caixa = null }) {
     corpo,
     respiro: r,
     caixa: normalizarCaixa(caixa),
-    encurtar: (fator) => onda({ nome, ativa: Math.max(ATIVA_MINIMA, Math.round(ativa * fator)), corpo, respiro, caixa }),
     comCaixa: (nova) => onda({ nome, ativa, corpo, respiro, caixa: nova }),
     iniciar: (a) => {
       const w = a.limitar(duracao)
@@ -107,7 +94,7 @@ function onda({ nome, ativa, corpo, respiro, caixa = null }) {
 }
 
 // Tempo de relógio (com as pausas) necessário para `ativa` ms de ataque
-export function paraRelogio(respiro, ativa) {
+function paraRelogio(respiro, ativa) {
   let relogio = ativa
   for (const [ini, fim] of respiro?.pausas ?? []) if (ini < relogio) relogio += fim - ini
   return relogio
@@ -116,7 +103,7 @@ export function paraRelogio(respiro, ativa) {
 // ---------- caixa dinâmica ----------
 
 // ms de pré-visualização + transição antes de uma onda que muda a caixa
-export const PREPARO_CAIXA_MS = CAIXA_DINAMICA.avisoMs + CAIXA_DINAMICA.transicaoMs
+const PREPARO_CAIXA_MS = CAIXA_DINAMICA.avisoMs + CAIXA_DINAMICA.transicaoMs
 
 // Forma de caixa sem redundância: null quando é igual à padrão
 function normalizarCaixa(c) {

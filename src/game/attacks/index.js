@@ -34,10 +34,6 @@ import { ataquesHabilidades } from './habilidades/index.js'
 // por ATAQUE.telegrafoMs antes de valer (ou vem depois de um a.aviso), toda
 // parede declara suas lacunas com a.parede(), e a velocidade é limitada pela
 // dificuldade do chefe.
-//
-// No console do navegador (modo dev, durante a batalha):
-//   testarAtaque(ataques.spiral({ bracos: 5 }))
-//   listarAtaques()
 export const ataques = {
   rain,
   sides,
@@ -63,5 +59,3 @@ export const ataques = {
   sequencia,
   comCaixa,
 }
-
-export const PADROES = Object.keys(ataques).filter((nome) => !['juntos', 'sequencia', 'comCaixa'].includes(nome))

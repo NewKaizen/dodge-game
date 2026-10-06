@@ -4,7 +4,7 @@ import Controles from '../controles.js'
 import { tocar, musica, velocidadeMusica, pausarMusica } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
-import { CHEFES } from '../data/chefes/index.js'
+import { CHEFES } from '../coop/chefes/index.js'
 import { partyDe } from '../data/batalha.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { ataques } from '../attacks/index.js'
@@ -180,7 +180,7 @@ export default class CoopArena extends PvpArena {
       if (window.coopArena === this) delete window.coopArena
     })
 
-    musica(this, this.defChefe.musica)
+    musica(this.defChefe.musica)
     this.cameras.main.fadeIn(300)
     this.partida()
   }
@@ -200,8 +200,6 @@ export default class CoopArena extends PvpArena {
   criarChefe() {
     const def = this.defChefe
     this.inimigo = new Inimigo(this, CHEFE.x, CHEFE.y, def)
-    this.alvoChefe = { hp: this.estado.chefe.hp, max: this.estado.chefe.hpMax, revelado: true, ativo: true, mercy: 0 }
-    this.inimigo.atualizar(this.alvoChefe)
     this.inimigo.nome.setFontSize(13).setStroke('#000000', 3)
     this.textoChefe = this.add
       .text(CHEFE.x, 115, '', { fontFamily: FONTE, fontSize: '9px', color: '#ffd23c', stroke: '#000000', strokeThickness: 3, align: 'center' })
@@ -248,7 +246,7 @@ export default class CoopArena extends PvpArena {
     })
   }
 
-  // ritmo base da luta (o aperto do co-op clássico, do chefe e do nível)
+  // ritmo base da luta (o aperto geral DESAFIO, o do chefe e o do nível)
   get ritmoBase() {
     const d = this.defChefe.desafio ?? {}
     return {
@@ -263,8 +261,7 @@ export default class CoopArena extends PvpArena {
 
   atualizarChefe() {
     const c = this.estado.chefe
-    this.alvoChefe.hp = c.hp
-    this.inimigo.atualizar(this.alvoChefe)
+    this.inimigo.atualizar(c.hp, c.hpMax)
     const partes = []
     if (c.guarda != null) partes.push(`GUARDA -${Math.round((1 - c.guarda) * 100)}%`)
     if (c.fase >= 1) partes.push(`SUPER ${'★'.repeat(c.carga)}${'☆'.repeat(c.cargaMax - c.carga)}`)
@@ -368,7 +365,7 @@ export default class CoopArena extends PvpArena {
     tocar(this, 'impacto')
     shake(this, 180, 0.012)
     this.inimigo.dano(0.3)
-    this.falar(this.defChefe.textoInicial?.replace(/^\*\s*/, '') ?? '', 1800)
+    this.falar(this.defChefe.textoInicial, 1800)
     await this.esperar(1300)
     await this.tween({ targets: [dupla, vs, chefe], alpha: 0, duration: 260 })
     ;[dupla, vs, chefe].forEach((t) => t.destroy())
@@ -916,14 +913,13 @@ export default class CoopArena extends PvpArena {
     const dados = {
       chefe: this.idChefe,
       turnos: this.estado.rodada,
-      cena: 'CoopArena',
       estatisticas: this.resumo(),
       hpChefe: this.estado.chefe.hp,
       hpMaxChefe: this.estado.chefe.hpMax,
     }
     if (vencedor === 'vitoria') {
       this.balao.esconder()
-      this.inimigo.sumir(false)
+      this.inimigo.sumir()
       tocar(this, 'vitoria')
       await this.esperar(1100)
       this.mostrarBanner('VITÓRIA!', TEXTO.selecionado, { y: 236, tamanho: 36 })
@@ -938,22 +934,19 @@ export default class CoopArena extends PvpArena {
     this.saindo = true
     this.cameras.main.fadeOut(400, 0, 0, 0)
     await new Promise((r) => this.time.delayedCall(420, r))
-    this.scene.start(vencedor === 'vitoria' ? 'Vitoria' : 'GameOver', { ...dados, modo: 'luta' })
+    this.scene.start(vencedor === 'vitoria' ? 'Vitoria' : 'GameOver', dados)
   }
 
-  // números da luta no formato da tela de vitória (battle/estatisticas.js)
+  // números da luta para as telas de vitória e game over (nota em coop/nota.js)
   resumo() {
     const soma = (campo) => this.estatisticas.reduce((t, e) => t + (e[campo] ?? 0), 0)
     return {
       danoCausado: soma('danoCausado'),
       danoRecebido: soma('danoRecebido'),
-      acertosRecebidos: 0,
       maiorGolpe: Math.max(...this.estatisticas.map((e) => e.maiorGolpe)),
-      golpes: soma('golpes'),
       criticos: soma('criticos'),
       combos: this.combos,
       grazes: soma('grazes'),
-      tpGasto: 0,
       tempoMs: Math.max(0, this.time.now - this.inicioLuta),
       turnos: this.estado.rodada,
       nivel: this.idNivel,
@@ -975,7 +968,6 @@ export default class CoopArena extends PvpArena {
     pausarMusica()
     this.scene.launch('Pausa', {
       cena: 'CoopArena',
-      chefe: this.idChefe,
       nome: this.defChefe.nome,
       recomecar: { chefe: this.idChefe, nivel: this.idNivel },
       sair: 'Selecao',

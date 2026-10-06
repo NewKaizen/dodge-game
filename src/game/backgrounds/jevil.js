@@ -1,4 +1,4 @@
-import { LARGURA, ALTURA, LAYOUT } from '../constants.js'
+import { LARGURA, ALTURA } from '../constants.js'
 
 const FATIAS = 16
 const CORES_FATIAS = [0x2a1050, 0x0e2a55]
@@ -12,7 +12,7 @@ export default function jevil(scene, objetos) {
     objetos.push(o)
     return o.setDepth(-10)
   }
-  const { x: cx, y: cy } = LAYOUT.caixa
+  const [cx, cy] = [LARGURA / 2, 175] // centro do carrossel
   add(scene.add.rectangle(0, 0, LARGURA, ALTURA, 0x0a0418).setOrigin(0))
   const espiral = add(scene.add.graphics())
   const aneis = add(scene.add.graphics())

@@ -23,9 +23,8 @@
 
 import { PERSONAGENS } from '../data/personagens.js'
 import { criarBaralho, completarMao, comprar, descartar, tirarDaMao, cartaNaMao, criarRng, inteiro, MAO } from './baralho.js'
-import { CUSTOS, HP_RESERVA, especialDaCarta, efeitosDaCarta, resumoDoAtaque, ehSuper } from './cartas.js'
+import { especialDaCarta, efeitosDaCarta, resumoDoAtaque, ehSuper } from './cartas.js'
 
-export { CUSTOS, custoDoValor } from './cartas.js'
 
 // Energia de cada jogador
 //   inicial          energia na 1ª rodada
@@ -35,17 +34,17 @@ export { CUSTOS, custoDoValor } from './cartas.js'
 //   passar           bônus para quem passa a vez (não joga carta)
 export const ENERGIA = { inicial: 3, porRodada: 2, maxima: 10, grazesPorPonto: 5, passar: 1 }
 
-// fatorHp multiplica o HP de PERSONAGENS (ou HP_RESERVA de cartas.js) no PvP
+// fatorHp multiplica o HP de PERSONAGENS no PvP
 // ajusteHp: multiplicador extra por personagem, só no PvP (balanceamento sem mexer no co-op)
 //   asriel 0,9: 100 -> 90 HP (o baralho dele já era o mais forte)
 // segundaChance: fração do HP máximo curada pelo Ás de copas
 export const PVP = { fatorHp: 1, ajusteHp: { asriel: 0.9 }, segundaChance: 0.25 }
 
-export const ID_JOGADOR = ['p1', 'p2']
+const ID_JOGADOR = ['p1', 'p2']
 const outro = (j) => 1 - j
 
 export function hpInicial(personagem) {
-  const base = PERSONAGENS[personagem]?.hp ?? HP_RESERVA[personagem] ?? 100
+  const base = PERSONAGENS[personagem].hp
   return Math.round(base * PVP.fatorHp * (PVP.ajusteHp[personagem] ?? 1))
 }
 

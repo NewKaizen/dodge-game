@@ -8,7 +8,6 @@ const notaSolta = (t) => ({ duracao: duracaoDe(t), intervalo: lerp(650, 420, t),
 
 export default {
   tema: { formas: ['ouros', 'bola'], cores: { ouros: 0xff8a4a, bola: 0xffc08a, barra: 0xffa86a }, cor: 0xff8a4a },
-  hp: 100,
   principal: { espadas: 'quicantes', ouros: 'lasers', paus: 'bombas' },
   leve: (A) => A.quicantes({ duracao: 4000, intervalo: 1700, velocidade: 120, quiques: 3 }),
   receitas: {

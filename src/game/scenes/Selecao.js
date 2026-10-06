@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import Controles from '../controles.js'
-import { CHEFES, ORDEM_CHEFES } from '../data/chefes/index.js'
+import { CHEFES, ORDEM_CHEFES } from '../coop/chefes/index.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { ESCALA } from '../arte/texturas.js'
 import { tocar, musica } from '../audio.js'
@@ -47,7 +47,7 @@ export default class Selecao extends Phaser.Scene {
 
     const atual = ORDEM_CHEFES.indexOf(this.registry.get('chefe'))
     this.selecionar(Math.max(0, atual), false)
-    musica(this, 'selecao')
+    musica('selecao')
     this.cameras.main.fadeIn(250)
   }
 
@@ -65,7 +65,7 @@ export default class Selecao extends Phaser.Scene {
     this.cursor.setPosition(c.x, c.y - CARTA.altura / 2 - 18)
     this.fundo?.destruir()
     this.fundo = criarFundo(this, CHEFES[ORDEM_CHEFES[this.indice]].fundo)
-    this.fundo.escurecer(true)
+    this.fundo.escurecer()
   }
 
   confirmar() {

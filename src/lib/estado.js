@@ -26,13 +26,12 @@ const salvo = lerConfig()
 export const jogo = writable({
   conectado: false,
   fonte: null, // 'serial' | 'simulador'
-  numJogadores: 1, // lido quando a batalha começa
+  numJogadores: 1, // as telas de escolha recomeçam quando muda
   jogadores: Array.from({ length: MAX_JOGADORES }, () => ({ joy: { x: 0, y: 0 } })),
   botao: null, // último botão apertado: { jogador, botao: 'A' | 'B' | 'C', id } (C = pause)
   velocidade: salvo.velocidade, // px/s do coração
   som: salvo.som,
   volume: salvo.volume, // { musica, efeitos } em %
-  ultimoEvento: null,
 })
 
 let configSalva = null

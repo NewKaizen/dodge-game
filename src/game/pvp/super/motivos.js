@@ -260,5 +260,5 @@ function padrao(arena, m) {
   for (let i = 0; i < 6; i++) m.depois(i * 220, () => m.faiscas(sorte(80, LARGURA - 80), m.cy + sorte(-80, 80), m.cor, 18))
 }
 
-export const MOTIVOS = { kris, susie, ralsei, noelle, berdly, dess, asriel }
+const MOTIVOS = { kris, susie, ralsei, noelle, berdly, dess, asriel }
 export const motivoDe = (personagem) => MOTIVOS[personagem] ?? padrao

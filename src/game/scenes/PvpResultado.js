@@ -93,7 +93,7 @@ export default class PvpResultado extends Phaser.Scene {
 
   criarCenario() {
     this.fundo = criarFundo(this, 'queen')
-    this.fundo.escurecer(true)
+    this.fundo.escurecer()
     this.veu = this.add.rectangle(0, 0, LARGURA, ALTURA, 0x000000).setOrigin(0).setDepth(-4).setAlpha(0.9)
     this.raios = raiosDeLuz(this, LARGURA / 2, 52, { cor: this.corNumero, alpha: this.empate ? 0.08 : 0.2, profundidade: -3 })
     this.halo = this.add.image(LARGURA / 2, 52, 'brilho').setScale(0).setTint(this.corNumero).setBlendMode(Phaser.BlendModes.ADD).setDepth(-1)
@@ -106,7 +106,7 @@ export default class PvpResultado extends Phaser.Scene {
     const em = (t, f) => e.push({ t, f })
     em(TEMPO.subida, (r) => this.subida(r))
     em(TEMPO.estouro, (r) => this.estouro(r))
-    em(TEMPO.musica, () => musica(this, 'pvpResultado', 'vitoria'))
+    em(TEMPO.musica, () => musica('pvpResultado', 'vitoria'))
     em(TEMPO.lutadores, (r) => this.entrarLutadores(r))
     em(TEMPO.painel, (r) => this.abrirPainel(r))
     LINHAS.forEach((linha, i) => em(TEMPO.painel + 300 + i * TEMPO.linha, (r) => this.mostrarLinha(linha, i, r)))
@@ -252,11 +252,9 @@ export default class PvpResultado extends Phaser.Scene {
       const def = PERSONAGENS[id]
       const x = LUTADOR.x[k]
       const lado = k === 0 ? -1 : 1
-      const textura = this.textures.exists(id) ? id : 'coracao'
       const venceu = this.vencedor === j
       const sombra = this.add.ellipse(x, chao + 2, 58, 12, 0x000000, 0.5).setDepth(4)
-      const s = this.add.image(x, chao, textura).setOrigin(0.5, 1).setScale(escala).setDepth(5).setFlipX(k === 1)
-      if (textura === 'coracao') s.setTint(def.cor)
+      const s = this.add.image(x, chao, id).setOrigin(0.5, 1).setScale(escala).setDepth(5).setFlipX(k === 1)
       this.add.text(x, chao + 22, this.rotulo(j), estilo(15, TEXTO_JOGADOR[k])).setOrigin(0.5).setDepth(5)
       this.add.text(x, chao + 44, def.nome.toUpperCase(), estilo(18, venceu || this.empate ? corTexto(def.cor) : '#8a8a8a')).setOrigin(0.5).setDepth(5)
 

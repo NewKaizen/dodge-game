@@ -5,7 +5,6 @@ import { P, r, apertar, metade, duracaoDe, lerp } from '../padroes.js'
 
 export default {
   tema: { formas: ['hex', 'bola'], cores: { hex: 0xb05cff, bola: 0xd9a0ff, barra: 0xc890ff, foice: 0xe0c0ff }, cor: 0xb05cff },
-  hp: 110,
   principal: { espadas: 'foice', ouros: 'mira', paus: 'bombas' },
   leve: (A) => A.colunas({ duracao: 4000, quantidade: 1, velocidade: 130, intervalo: 1700, mirar: 0 }),
   receitas: {

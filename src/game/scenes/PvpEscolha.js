@@ -62,7 +62,7 @@ export default class PvpEscolha extends Phaser.Scene {
       this.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra }).setOrigin(0.5)
 
     this.fundo = criarFundo(this, 'queen')
-    this.fundo.escurecer(true)
+    this.fundo.escurecer()
 
     this.texto(LARGURA / 2, 22, 'PVP  ·  ESCOLHA O LUTADOR', 24, TEXTO.normal, { strokeThickness: 4 })
     this.status = this.texto(LARGURA / 2, 46, '', 13, TEXTO.selecionado)
@@ -88,7 +88,7 @@ export default class PvpEscolha extends Phaser.Scene {
     this.registry.events.on('changedata-numJogadores', aoMudar)
     this.events.once('shutdown', () => this.registry.events.off('changedata-numJogadores', aoMudar))
 
-    musica(this, 'pvpEscolha', 'selecao')
+    musica('pvpEscolha')
     this.cameras.main.fadeIn(250)
   }
 
@@ -159,11 +159,9 @@ export default class PvpEscolha extends Phaser.Scene {
       const x = LARGURA / 2 + (coluna - (naLinha - 1) / 2) * (largura + g.espaco)
       const y = topo + linha * (altura + g.espaco) + altura / 2
       const moldura = this.add.rectangle(x, y, largura, altura, CORES.painel, 0.88).setStrokeStyle(2, def.cor, 0.55)
-      const textura = this.textures.exists(id) ? id : 'coracao'
-      const sprite = this.add.image(x, y - 8, textura)
+      const sprite = this.add.image(x, y - 8, id)
       sprite.escalaBase = Math.max(1, Math.floor(Math.min((largura - 16) / sprite.width, (altura - 44) / sprite.height)))
       sprite.setScale(sprite.escalaBase)
-      if (textura === 'coracao') sprite.setTint(def.cor)
       this.texto(x, y + altura / 2 - 13, def.nome.toUpperCase(), def.nome.length <= 6 ? 14 : 12, corTexto(def.cor))
       // selos "P1"/"P2" de quem confirmou, no canto do jogador (no lugar do coração)
       const selos = [0, 1].map((j) => {
@@ -398,9 +396,7 @@ export default class PvpEscolha extends Phaser.Scene {
     p.estiloFrase.setX(p.estiloRotulo.x + p.estiloRotulo.width + 8)
     caber(p.estiloFrase, perfil.estilo.frase, p.x + p.largura - 10 - p.estiloFrase.x, 12)
 
-    const textura = this.textures.exists(id) ? id : 'coracao'
-    p.sprite.setTexture(textura).setScale(3).clearTint()
-    if (textura === 'coracao') p.sprite.setTint(def.cor)
+    p.sprite.setTexture(id).setScale(3).clearTint()
     this.tweens.killTweensOf(p.sprite)
     p.sprite.setY(p.y + 150).setAlpha(0).setX(p.x + 36)
     this.tweens.add({ targets: p.sprite, x: p.x + 48, alpha: 1, duration: 140, ease: 'Quad.easeOut' })
@@ -471,10 +467,8 @@ export default class PvpEscolha extends Phaser.Scene {
       const def = PERSONAGENS[id]
       const lado = j === 0 ? -1 : 1
       const x = LARGURA / 2 + lado * 170
-      const textura = this.textures.exists(id) ? id : 'coracao'
       const sombra = this.add.ellipse(x, chao + 3, 80, 16, 0x000000, 0.6).setDepth(topo + 4)
-      const sprite = this.add.image(x, chao, textura).setOrigin(0.5, 1).setScale(5).setDepth(topo + 5).setFlipX(j === 1)
-      if (textura === 'coracao') sprite.setTint(def.cor)
+      const sprite = this.add.image(x, chao, id).setOrigin(0.5, 1).setScale(5).setDepth(topo + 5).setFlipX(j === 1)
       const etiqueta = this.add
         .text(x, chao + 26, this.rotulo(j), { fontFamily: FONTE, fontSize: '18px', color: TEXTO_JOGADOR[j], stroke: '#000000', strokeThickness: 4 })
         .setOrigin(0.5)

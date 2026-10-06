@@ -25,7 +25,7 @@
 //             até CONFUSAO_RESIDUAL dela (o bot "se acostuma", como gente)
 // lapso       chance, a cada decisão, de "se distrair" e seguir na mesma direção
 // lapsoMs     por quanto tempo (é o que faz a CPU tomar dano como gente)
-export const NIVEIS_ESQUIVA = {
+const NIVEIS_ESQUIVA = {
   facil: { decidirMs: 200, horizonteMs: 240, margem: 2, erro: 0.25, confusao: 0.4, adaptaMs: 4000, lapso: 0.1, lapsoMs: 650 },
   normal: { decidirMs: 130, horizonteMs: 330, margem: 5, erro: 0.1, confusao: 0.25, adaptaMs: 2500, lapso: 0.05, lapsoMs: 500 },
   dificil: { decidirMs: 70, horizonteMs: 520, margem: 9, erro: 0.02, confusao: 0.08, adaptaMs: 1500, lapso: 0.008, lapsoMs: 300 },

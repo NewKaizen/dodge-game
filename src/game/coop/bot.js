@@ -13,7 +13,7 @@ import { GOLPE } from './regras.js'
 
 const fracao = (jog) => (jog.caido ? 0 : jog.hp / jog.hpMax)
 
-export function notaDaCartaCoop(estado, j, carta) {
+function notaDaCartaCoop(estado, j, carta) {
   const jog = estado.jogadores[j]
   const parceiro = estado.jogadores[1 - j]
   const intencao = estado.chefe.intencoes[j]

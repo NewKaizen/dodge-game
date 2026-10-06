@@ -21,7 +21,7 @@
   {#each Array.from({ length: MAX_JOGADORES }, (_, i) => i + 1) as n}
     <button class:ativo={$jogo.numJogadores === n} onclick={() => ($jogo.numJogadores = n)}>{n}</button>
   {/each}
-  <span class="dica">(vale a partir da próxima batalha)</span>
+  <span class="dica">(vale a partir da próxima partida)</span>
 </div>
 
 <div class="conectar">

@@ -9,16 +9,14 @@ export const LACUNA_MINIMA = CORACAO.tamanho * ATAQUE.lacunaMinima
 
 const DEV = import.meta.env.DEV
 const jaAvisados = new Set()
-export const estatisticas = { paredes: 0, checagens: 0, avisos: 0 }
 
 export function avisar(chave, mensagem) {
   if (!DEV || jaAvisados.has(chave)) return
   jaAvisados.add(chave)
-  estatisticas.avisos++
   console.warn(mensagem)
 }
 
-// Chamado a cada turno inimigo para os avisos voltarem a aparecer
+// Chamado a cada ataque (Pista.rodar) para os avisos voltarem a aparecer
 export function novaRodada() {
   jaAvisados.clear()
 }
@@ -44,7 +42,6 @@ export function lacunasLivres(ini, fim, ocupados) {
 // Passe `lacunas` já prontas ou os trechos `ocupados` pelas balas.
 export function validarParede({ padrao, eixo, limites, lacunas, ocupados = [] }) {
   if (!DEV) return true
-  estatisticas.paredes++
   const [ini, fim] = eixo === 'x' ? [limites.left, limites.right] : [limites.top, limites.bottom]
   const livres = lacunas ?? lacunasLivres(ini, fim, ocupados)
   const maior = Math.max(0, ...livres.map(([a, b]) => Math.min(b, fim) - Math.max(a, ini)))
@@ -59,7 +56,6 @@ export function validarParede({ padrao, eixo, limites, lacunas, ocupados = [] })
 // Abertura isolada (ex.: vão de um anel)
 export function validarLacuna(padrao, tamanho, descricao = 'abertura') {
   if (!DEV) return true
-  estatisticas.paredes++
   if (tamanho >= LACUNA_MINIMA) return true
   avisar(
     `lacuna:${padrao}:${descricao}`,
@@ -72,7 +68,6 @@ export function validarLacuna(padrao, tamanho, descricao = 'abertura') {
 // LACUNA_MINIMA dentro da caixa
 export function validarEspacoLivre({ padrao, limites, balas, tempo }) {
   if (!DEV) return true
-  estatisticas.checagens++
   const r = LACUNA_MINIMA / 2
   const perigosas = balas.lista.filter((b) => balas.perigosa(b))
   for (let y = limites.top + r; y <= limites.bottom - r; y += 6) {

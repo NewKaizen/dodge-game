@@ -22,11 +22,9 @@ import { NIVEIS } from '../constants.js'
 import { criarBaralho, completarMao, comprar, descartar, cartaNaMao, criarRng, embaralhar, MAO } from '../pvp/baralho.js'
 import { ENERGIA, hpInicial, aplicarDano, curar } from '../pvp/regras.js'
 import { especialDaCarta, efeitosDaCarta, ehSuper } from '../pvp/cartas.js'
-import { BARALHOS_CHEFES } from './chefes/index.js'
+import { CHEFES } from './chefes/index.js'
 import { CARTAS_CHEFES, faseDoChefe, suporteDoChefe, danoDaCartaChefe, ritmoDaCartaChefe, inverteControles, poderDaCartaChefe } from './cartasChefe.js'
 
-export { ENERGIA } from '../pvp/regras.js'
-export { registrarGrazes, registrarPerfeito, energiaPerfeito } from '../pvp/regras.js'
 
 // Números do CO-OP
 //   retornoRodadas   quem cai fica de fora tantas rodadas e volta sozinho com retornoHp do HP máx
@@ -88,13 +86,13 @@ export function descricaoCoop(carta) {
   return `Suporte: ${partes.join('; ')}.`
 }
 
-export const ID_JOGADOR = ['p1', 'p2']
+const ID_JOGADOR = ['p1', 'p2']
 const outro = (j) => 1 - j
 
 // ---------- partida ----------
 
 export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coop' }) {
-  const def = BARALHOS_CHEFES[chefe]
+  const def = CHEFES[chefe]
   if (!def) throw new Error(`chefe sem baralho de cartas: ${chefe}`)
   const niv = NIVEIS[nivel] ?? NIVEIS.facil
   const rng = criarRng(`${semente}:coop`)
@@ -170,7 +168,7 @@ function derrubar(estado, j) {
   jog.voltaEm = estado.rodada + COOP.retornoRodadas + 1
 }
 
-export const emPe = (estado) => [0, 1].filter((j) => !estado.jogadores[j].caido)
+const emPe = (estado) => [0, 1].filter((j) => !estado.jogadores[j].caido)
 
 // Começo da rodada: quem caiu há tempo suficiente volta, energia e mãos (como
 // no PvP), a carga do SUPER do chefe sobe e ele escolhe uma carta para cada
@@ -227,12 +225,6 @@ export function podeJogarCoop(estado, j, jogada) {
   if (!carta) return { ok: false, motivo: 'carta não está na mão' }
   if (carta.custo > jog.energia) return { ok: false, motivo: `energia insuficiente (custa ${carta.custo}, tem ${jog.energia})` }
   return { ok: true, motivo: null }
-}
-
-export function cartasJogaveisCoop(estado, j) {
-  const jog = estado.jogadores[j]
-  if (jog.caido) return []
-  return jog.baralho.mao.filter((c) => c.custo <= jog.energia)
 }
 
 function novoEfeito() {

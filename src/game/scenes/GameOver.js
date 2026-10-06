@@ -1,20 +1,18 @@
 import Phaser from 'phaser'
 import Controles from '../controles.js'
-import { CHEFES } from '../data/chefes/index.js'
+import { CHEFES } from '../coop/chefes/index.js'
 import { ESCALA } from '../arte/texturas.js'
 import { tocar, musica, pararMusica } from '../audio.js'
-import { formatarTempo } from '../battle/estatisticas.js'
+import { formatarTempo } from '../coop/nota.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, NIVEIS } from '../constants.js'
 
-// Tela de game over (o coração já se partiu na Battle, effects/derrota.js).
+// Tela de game over (os dois caíram na CoopArena).
 // Em etapas: ronco grave no escuro -> letras de GAME OVER despencando uma a
 // uma -> o chefe vencedor aparece rindo ao fundo -> mensagem -> quanto faltava
 // do chefe -> dica -> opções. Cinzas caem e brasas sobem o tempo todo.
 // A ou B durante a animação pula para o fim. Depois:
 //   A: tentar de novo (mesmo chefe e nível) · B: escolher outro chefe
 
-// Música de fundo opcional (a ambientação sintetizada toca de qualquer jeito: ronco, lamento e um sino ao longe)
-const MUSICA = 'gameover' // toca public/assets/musicas/gameover.mid se existir (sem o arquivo, silêncio)
 
 const TEMPO = {
   ronco: 100,
@@ -61,17 +59,6 @@ const MENSAGENS = {
 }
 
 const DICAS = [
-  'Use DEFEND quando o HP apertar: o dano cai pela metade, o próximo ataque vem mais fraco e ainda rende TP.',
-  'Passar raspando nas balas (graze) enche a barra de TP. Coragem conta pontos!',
-  'O TP guardado paga as ações especiais do ACT e as magias. Não deixe a barra parada.',
-  'No FIGHT, acerte todas as barras bem no centro para fechar o combo e bater mais forte.',
-  'Quem cai se levanta sozinho depois de alguns turnos. Proteja quem ainda está em pé.',
-  'Cure com ITEM antes de alguém cair: é bem mais rápido do que esperar a pessoa levantar.',
-  'Fique de olho no aviso antes de cada ataque: a caixa mostra para onde vai mudar.',
-  'Alguns chefes podem ser poupados: encha o MERCY com ACTs e use SPARE.',
-]
-// dicas do CO-OP de cartas (CoopArena)
-const DICAS_CARTAS = [
   'O naipe da carta virada do chefe avisa o que vem: com ♠ forte chegando, um escudo de copas protege os dois.',
   'Passar pelo ataque sem levar dano deixa o seu golpe CRÍTICO (x1,5) e ainda dá energia.',
   'Os dois atacando com o mesmo naipe fazem COMBO; com o mesmo valor, PAR. Combinem as cartas!',
@@ -95,13 +82,13 @@ export default class GameOver extends Phaser.Scene {
     super('GameOver')
   }
 
-  create({ chefe, estatisticas = null, hpChefe = null, hpMaxChefe = null, cena = 'Battle' } = {}) {
+  // estatisticas: CoopArena.resumo(); hpChefe/hpMaxChefe: quanto faltava do chefe
+  create({ chefe, estatisticas, hpChefe, hpMaxChefe }) {
     this.idChefe = chefe
-    this.cenaLuta = cena // A: tentar de novo nesta cena (CoopArena no CO-OP de cartas)
-    this.def = CHEFES[chefe] ?? null
+    this.def = CHEFES[chefe]
     this.stats = estatisticas
-    this.nivel = estatisticas?.nivel ?? (NIVEIS[this.registry.get('nivel')] ? this.registry.get('nivel') : 'facil')
-    this.hp = hpChefe != null && hpMaxChefe ? { atual: hpChefe, max: hpMaxChefe } : null
+    this.nivel = estatisticas.nivel
+    this.hp = { atual: hpChefe, max: hpMaxChefe }
     this.saindo = false
     this.liberado = false
     this.relogio = 0
@@ -109,7 +96,7 @@ export default class GameOver extends Phaser.Scene {
     this.proximoSino = TEMPO.sino
 
     pararMusica()
-    if (MUSICA) musica(this, MUSICA)
+    musica('gameover') // por baixo da ambientação sintetizada (ronco, lamento, sino)
     this.cameras.main.setBackgroundColor(0x000000)
     this.criarCenario()
     this.etapas = this.montarEtapas()
@@ -206,7 +193,7 @@ export default class GameOver extends Phaser.Scene {
     tocar(this, 'confirmar')
     this.cameras.main.fadeOut(300, 0, 0, 0)
     this.time.delayedCall(320, () => {
-      if (botao === 'A') this.scene.start(this.cenaLuta, { chefe: this.idChefe, nivel: this.nivel })
+      if (botao === 'A') this.scene.start('CoopArena', { chefe: this.idChefe, nivel: this.nivel })
       else this.scene.start('Selecao', { chefe: this.idChefe })
     })
   }
@@ -280,7 +267,6 @@ export default class GameOver extends Phaser.Scene {
   // ---------- chefe ao fundo ----------
 
   chefeRindo(rapido) {
-    if (!this.def) return
     const escala = ESCALA.chefe * 1.5
     const x = LARGURA / 2
     const y = 150
@@ -327,7 +313,7 @@ export default class GameOver extends Phaser.Scene {
     const cx = LARGURA / 2
     const y = 252
     const objetos = []
-    if (this.hp && this.def) {
+    {
       const resto = Phaser.Math.Clamp(this.hp.atual / this.hp.max, 0, 1)
       const pct = Math.max(resto > 0 ? 1 : 0, Math.round(resto * 100))
       const frase = resto <= 0.25 ? 'Faltou muito pouco!' : resto <= 0.5 ? 'Já passaram da metade!' : 'Agora vocês conhecem os ataques.'
@@ -350,7 +336,7 @@ export default class GameOver extends Phaser.Scene {
       }
       objetos.push(this.add.text(cx, y + 46, frase, estilo(15, resto <= 0.25 ? TEXTO.selecionado : '#b0a0a0')).setOrigin(0.5))
     }
-    if (this.stats) {
+    {
       const s = this.stats
       const nivel = NIVEIS[this.nivel] ?? NIVEIS.facil
       const linha = `Turnos ${s.turnos}   ·   Tempo ${formatarTempo(s.tempoMs)}   ·   Grazes ${s.grazes}   ·   `
@@ -371,7 +357,7 @@ export default class GameOver extends Phaser.Scene {
   }
 
   dica(rapido) {
-    const dicas = this.nivel !== 'facil' && Math.random() < 0.3 ? [DICA_NIVEL] : this.cenaLuta === 'CoopArena' ? DICAS_CARTAS : DICAS
+    const dicas = this.nivel !== 'facil' && Math.random() < 0.3 ? [DICA_NIVEL] : DICAS
     const texto = Phaser.Utils.Array.GetRandom(dicas)
     const y = 368
     const caixa = this.add.rectangle(LARGURA / 2, y, 560, 52, CORES.painel, 0.85).setStrokeStyle(2, 0x5a2a30).setDepth(9)

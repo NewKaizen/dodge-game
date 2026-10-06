@@ -4,7 +4,6 @@ import { r, apertar, duracaoDe, lerp } from '../padroes.js'
 
 export default {
   tema: { formas: ['copas', 'bola'], cores: { copas: 0x4dd68a, bola: 0xa8f0c0, barra: 0x8fe8b0 }, cor: 0x4dd68a },
-  hp: 80,
   principal: { espadas: 'anel', ouros: 'carrossel', paus: 'divisores' },
   leve: (A) => A.anel({ duracao: 4000, intervalo: 2800, quantidade: 16, abertura: 1.4, tempoFechar: 1700 }),
   receitas: {

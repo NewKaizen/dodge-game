@@ -3,7 +3,9 @@ import Controles from '../controles.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { tocar, musica } from '../audio.js'
-import { CORES, FIGHT, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
+import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
+import { perfilPvp, rotuloCarta } from '../pvp/perfil.js'
+import { SIMBOLOS } from '../pvp/cartas.js'
 
 // Área da grade de personagens e dos painéis de detalhes (px)
 const GRADE = { topo: 72, base: 282, esquerda: 20, direita: 620, espaco: 8, larguraMax: 180, alturaMax: 200 }
@@ -33,7 +35,7 @@ export default class EscolhaParty extends Phaser.Scene {
       this.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra }).setOrigin(0.5)
 
     this.fundo = criarFundo(this, 'king')
-    this.fundo.escurecer(true)
+    this.fundo.escurecer()
 
     this.texto(LARGURA / 2, 28, 'ESCOLHA A PARTY', 28, TEXTO.normal, { strokeThickness: 4 })
     this.status = this.texto(LARGURA / 2, 56, '', 14, TEXTO.selecionado)
@@ -63,7 +65,7 @@ export default class EscolhaParty extends Phaser.Scene {
     this.registry.events.on('changedata-numJogadores', aoMudar)
     this.events.once('shutdown', () => this.registry.events.off('changedata-numJogadores', aoMudar))
 
-    musica(this, 'selecao')
+    musica('selecao')
     this.cameras.main.fadeIn(250)
   }
 
@@ -102,7 +104,7 @@ export default class EscolhaParty extends Phaser.Scene {
       const x = LARGURA / 2 + (coluna - (naLinha - 1) / 2) * (largura + g.espaco)
       const y = topo + linha * (altura + g.espaco) + altura / 2
       const moldura = this.add.rectangle(x, y, largura, altura, CORES.painel, 0.88).setStrokeStyle(2, def.cor, 0.55)
-      const textura = this.textures.exists(id) ? id : 'coracao'
+      const textura = id
       const nomeGrande = def.nome.length <= 8
 
       let sprite
@@ -111,17 +113,15 @@ export default class EscolhaParty extends Phaser.Scene {
         sprite = this.add.image(x, y - 16, textura)
         this.encaixar(sprite, largura - 20, altura - 50)
         this.texto(x, y + altura / 2 - 30, def.nome.toUpperCase(), nomeGrande ? 16 : 13, corTexto(def.cor))
-        this.texto(x, y + altura / 2 - 12, `HP ${def.hp}  DEF ${def.defesa ?? 0}`, 12, TEXTO.normal, { strokeThickness: 0 })
+        this.texto(x, y + altura / 2 - 12, `HP ${def.hp}`, 12, TEXTO.normal, { strokeThickness: 0 })
       } else {
         // horizontal (muitos personagens): sprite à esquerda
         const esquerda = x - largura / 2
         sprite = this.add.image(esquerda + 24, y, textura)
         this.encaixar(sprite, 40, altura - 10)
         this.add.text(esquerda + 48, y - 2, def.nome.toUpperCase(), { fontFamily: FONTE, fontSize: nomeGrande ? '14px' : '12px', color: corTexto(def.cor) }).setOrigin(0, 1)
-        this.add.text(esquerda + 48, y + 2, `HP ${def.hp} DEF ${def.defesa ?? 0}`, { fontFamily: FONTE, fontSize: '11px', color: TEXTO.normal }).setOrigin(0, 0)
+        this.add.text(esquerda + 48, y + 2, `HP ${def.hp}`, { fontFamily: FONTE, fontSize: '11px', color: TEXTO.normal }).setOrigin(0, 0)
       }
-      // sem sprite ainda: coração na cor do personagem, sem dominar o card
-      if (textura === 'coracao') sprite.setTint(def.cor).setScale(Math.min(2, sprite.escalaBase)).escalaBase = sprite.scale
 
       // selo de escolhido: "1º"/"2º" (1 jogador) ou "P1"/"P2" (2 jogadores)
       // (no meio do topo; os corações dos cursores ficam nos cantos)
@@ -141,7 +141,7 @@ export default class EscolhaParty extends Phaser.Scene {
     sprite.escalaBase = escala
   }
 
-  // Um painel de detalhes por cursor: o personagem em cima dele (nome, números e habilidades)
+  // Um painel de detalhes por cursor: o personagem em cima dele (nome, HP e baralho)
   montarDetalhes() {
     const d = DETALHE
     const total = this.numJogadores
@@ -166,7 +166,7 @@ export default class EscolhaParty extends Phaser.Scene {
           })
         }
       }
-      // situação deste cursor (PRONTO, já escolhido...), na linha do rótulo do ACT
+      // situação deste cursor (PRONTO, já escolhido...), na linha do estilo
       const rodape = this.add.text(x + largura - 10, d.y + 33, '', estilo(12)).setOrigin(1, 0)
       return { moldura, cabeca, numeros, rotulo, linhas, rodape }
     })
@@ -304,27 +304,18 @@ export default class EscolhaParty extends Phaser.Scene {
     const corJogador = solo ? CORES.selecionado : CORES.almas[j]
     p.moldura.setStrokeStyle(2, corJogador, 0.8)
     p.cabeca.setText(solo ? def.nome.toUpperCase() : `P${j + 1}  ${def.nome.toUpperCase()}`).setColor(corTexto(def.cor))
-    // (com 2 painéis não cabe o FIGHT ao lado de um nome comprido)
-    p.numeros.setText(`HP ${def.hp}  DEF ${def.defesa ?? 0}${solo ? `  FIGHT ${def.fight?.dano ?? FIGHT.dano}` : ''}`)
-
-    const act = def.act ?? {}
-    // quem usa os ACTs do chefe ganha uma linha a mais na lista
-    const lista = [...(act.usaActsDoInimigo ? [{ nome: '+ ACTs do chefe' }] : []), ...(act.lista ?? [])]
-    p.rotulo.setText(act.rotulo ?? 'ACT')
-    const cabem = p.linhas.length
-    const mostrar = lista.length > cabem ? lista.slice(0, cabem - 1) : lista
+    // o baralho do personagem: estilo, naipes e as cartas mais fortes (o SUPER primeiro)
+    const perfil = perfilPvp(id)
+    p.numeros.setText(`HP ${perfil.hp}`)
+    p.rotulo.setText(perfil.estilo.rotulo).setColor(corTexto(perfil.estilo.cor))
+    const { naipes } = perfil
+    const lista = [
+      { nome: `♠${naipes.espadas}  ♥${naipes.copas}  ♦${naipes.ouros}  ♣${naipes.paus}`, custo: '' },
+      ...perfil.fortes.map((c) => ({ nome: `${rotuloCarta(c)}${SIMBOLOS[c.naipe]} ${c.nome}`, custo: String(c.custo) })),
+    ]
     p.linhas.forEach((l, k) => {
-      const item = mostrar[k]
-      if (item) {
-        l.nome.setText(item.nome)
-        l.custo.setText(item.custoTP ? `${item.custoTP}%` : '')
-      } else if (k === mostrar.length && lista.length > mostrar.length) {
-        l.nome.setText(`+ ${lista.length - mostrar.length} mais...`)
-        l.custo.setText('')
-      } else {
-        l.nome.setText(k === 0 && !lista.length ? '(sem habilidades próprias)' : '')
-        l.custo.setText('')
-      }
+      l.nome.setText(lista[k]?.nome ?? '')
+      l.custo.setText(lista[k]?.custo ?? '')
     })
 
     // rodapé: o que falta para este jogador

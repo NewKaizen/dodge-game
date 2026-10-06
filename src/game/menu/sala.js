@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import { LARGURA, ALTURA } from '../constants.js'
-import { BATIDA, CHAO, PES } from './layout.js'
+import { LARGURA } from '../constants.js'
+import { BATIDA, PES } from './layout.js'
 
 // O quarto escuro do menu: parede, chão, a luz que o telão joga no chão e as
 // silhuetas dos sete lutadores assistindo a tela (contornadas pela luz dela).
@@ -56,7 +56,6 @@ const POEIRA = 16
 const AREA_POEIRA = { x0: 300, x1: 630, y0: 250, y1: 446 }
 
 export function criarSala(cena, { tela } = {}) {
-  if (!cena.textures.exists('menu-sala-fundo')) return provisoria(cena)
   const centroTela = tela ? tela.x + tela.largura / 2 : LARGURA * 0.7
 
   cena.add.image(0, 0, 'menu-sala-fundo').setOrigin(0).setDepth(0)
@@ -64,7 +63,7 @@ export function criarSala(cena, { tela } = {}) {
   const luzChao = cena.add.image(0, 0, 'menu-sala-luz-chao').setOrigin(0).setDepth(2).setBlendMode(Phaser.BlendModes.ADD)
   cena.add.image(0, 0, 'menu-sala-vinheta').setOrigin(0).setDepth(9)
 
-  const figuras = ELENCO.filter((d) => cena.textures.exists(d.id)).map((d) => figura(cena, d, centroTela))
+  const figuras = ELENCO.map((d) => figura(cena, d, centroTela))
 
   const poeira = Array.from({ length: POEIRA }, (_, i) => {
     const img = cena.add.image(0, 0, 'menu-sala-poeira').setDepth(7).setBlendMode(Phaser.BlendModes.ADD)
@@ -203,11 +202,4 @@ function misturar(a, b, t) {
 
 function brilhoDe(cor) {
   return Math.max((cor >> 16) & 0xff, (cor >> 8) & 0xff, cor & 0xff) / 255
-}
-
-// sem a arte carregada: parede e chão lisos (não deixa o menu quebrar)
-function provisoria(cena) {
-  cena.add.rectangle(0, 0, LARGURA, CHAO, 0x12142a).setOrigin(0).setDepth(0)
-  cena.add.rectangle(0, CHAO, LARGURA, ALTURA - CHAO, 0x0a0b14).setOrigin(0).setDepth(0)
-  return { iluminar() {}, batida() {}, atualizar() {} }
 }

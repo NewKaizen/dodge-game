@@ -13,8 +13,8 @@ export const metade = (t) => Math.round(duracaoDe(t) / 2) // cada onda de uma se
 // Os números ficam dentro das faixas já usadas pelos chefes (king fácil em
 // t = 0 até jevil/queen difícil em t = 1), sem avisos de justiça.
 
-export const esp = (o) => o.esparso ?? 1
-export const sem = (o) => {
+const esp = (o) => o.esparso ?? 1
+const sem = (o) => {
   const { esparso, ...resto } = o
   return resto
 }
@@ -114,7 +114,6 @@ export const TEXTOS = {
 //
 // Cada personagem:
 //   tema        formas/cores das balas (a cena passa para o ContextoAtaque)
-//   hp          HP de reserva caso PERSONAGENS (data/personagens.js) não tenha o personagem
 //   principal   padrão usado pelos Ases que mandam ataque ({ espadas, ouros, paus })
 //   leve        ataque fraquinho das cartas de copas
 //   super       { nome, texto, criar(A) } -> a carta SUPER ('<personagem>-espadas-14'),

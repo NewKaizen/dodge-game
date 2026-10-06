@@ -44,7 +44,7 @@ import { shake } from '../effects/shake.js'
 //   ampliada     número: já nasce ampliada nesse fator, com a legenda visível
 //   foco         { subida, escala } do estado com o cursor em cima (em px da carta base)
 
-export const ROTULOS = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K', 14: '★' }
+const ROTULOS = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K', 14: '★' }
 export const rotuloValor = (valor) => ROTULOS[valor] ?? String(valor)
 export const TIPOS = { espadas: 'ATAQUE', ouros: 'CONTROLE', paus: 'ARMADILHA', copas: 'SUPORTE' }
 export const SIMBOLOS = { espadas: '♠', copas: '♥', ouros: '♦', paus: '♣' }
@@ -63,7 +63,7 @@ export const CORES_CARTA = {
   gemaSem: 0x8a2a3a,
   verso: 0x161226,
 }
-export const corDoNaipe = (naipe) => (naipe === 'copas' || naipe === 'ouros' ? CORES_CARTA.vermelho : CORES_CARTA.escuro)
+const corDoNaipe = (naipe) => (naipe === 'copas' || naipe === 'ouros' ? CORES_CARTA.vermelho : CORES_CARTA.escuro)
 // versão clara (rastro e faíscas em fundo escuro)
 const corBrilhoNaipe = (naipe) => (naipe === 'copas' || naipe === 'ouros' ? 0xff5a70 : 0xb8a8ff)
 
@@ -1033,7 +1033,7 @@ export default class Carta extends Phaser.GameObjects.Container {
 }
 
 // Estilhaço da carta no alvo: clarão, anel, naipe fantasma, cacos e faíscas
-export function impactoCarta(scene, x, y, { naipe = 'espadas', largura = 70, especial = false } = {}) {
+function impactoCarta(scene, x, y, { naipe = 'espadas', largura = 70, especial = false } = {}) {
   const u = largura / BASE
   const cor = corBrilhoNaipe(naipe)
   tocar(scene, 'cartaImpacto')
