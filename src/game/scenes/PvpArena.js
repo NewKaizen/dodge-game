@@ -1461,7 +1461,7 @@ export default class PvpArena extends Phaser.Scene {
     pausarMusica()
     this.scene.pause()
     const nomes = this.ids.map((id) => PERSONAGENS[id]?.nome ?? id)
-    this.scene.launch('Pausa', { cena: 'PvpArena', recomecar: { p1: this.ids[0], p2: this.ids[1] }, sair: 'Modo', subtitulo: `${nomes[0]} x ${nomes[1]}` })
+    this.scene.launch('Pausa', { cena: 'PvpArena', recomecar: { p1: this.ids[0], p2: this.ids[1] }, sair: 'Menu', subtitulo: `${nomes[0]} x ${nomes[1]}` })
     this.scene.bringToTop('Pausa') // a Pausa vem antes da arena na lista de cenas: sem isso, ela ficaria por baixo
   }
 

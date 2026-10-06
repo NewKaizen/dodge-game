@@ -200,6 +200,7 @@ export const ASSETS = {
   },
 
   musicas: {
+    menu: null, // menu inicial (sem o arquivo: jevil). Ex.: 'assets/musicas/menu.mp3'
     selecao: null,
     king: null,
     queen: null,
@@ -210,4 +211,7 @@ export const ASSETS = {
     pvp: null, // partida PvP (sem o arquivo: jevil)
     pvpResultado: null, // resultado do PvP (sem o arquivo: vitoria)
   },
+
+  // nome que aparece no canto de cima do menu inicial (troque junto com a música 'menu')
+  tituloMusicaMenu: 'THE WORLD REVOLVING',
 }

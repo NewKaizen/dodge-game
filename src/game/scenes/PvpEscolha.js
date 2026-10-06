@@ -31,13 +31,13 @@ function caber(texto, conteudo, largura, tamanho) {
   while (corte > 1 && texto.width > largura) texto.setText(`${conteudo.slice(0, --corte).trimEnd()}…`)
 }
 
-// Escolha de personagem do PvP (Modo -> PvpEscolha -> PvpArena).
+// Escolha de personagem do PvP (Menu -> PvpEscolha -> PvpArena).
 //   2 jogadores: cada um tem seu cursor (cor da alma) e confirma o seu ao
 //                mesmo tempo; os dois PODEM pegar o mesmo personagem (espelho).
-//                B desfaz a própria escolha; sem nada para desfazer, volta ao Modo.
+//                B desfaz a própria escolha; sem nada para desfazer, volta ao Menu.
 //   1 jogador:   contra a CPU: o controle escolhe o próprio lutador (P1) e
 //                depois o da CPU (P2); ↑/↓ trocam o nível da CPU (fácil,
-//                normal, difícil). B desfaz o último; sem nada escolhido, volta ao Modo.
+//                normal, difícil). B desfaz o último; sem nada escolhido, volta ao Menu.
 // O painel de cada jogador mostra o personagem em foco: HP no PvP, a
 // composição do baralho por naipe, as 3 cartas mais fortes e o estilo.
 // Quando os dois confirmam: "P1 VS P2", grava registry 'pvp' = { p1, p2 }
@@ -294,7 +294,7 @@ export default class PvpEscolha extends Phaser.Scene {
     this.saindo = true
     tocar(this, 'cancelar')
     this.cameras.main.fadeOut(200, 0, 0, 0)
-    this.time.delayedCall(220, () => this.scene.start('Modo'))
+    this.time.delayedCall(220, () => this.scene.start('Menu'))
   }
 
   // ---------- navegação ----------

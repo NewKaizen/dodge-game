@@ -11,13 +11,13 @@ const DETALHE = { y: 290, altura: 150, espaco: 8, linha: 17, linhasPorColuna: 5 
 const TAMANHO_PARTY = 2 // com 1 jogador ele escolhe todos; com 2, cada um escolhe 1
 const CHAVE_SALVA = 'dodge-party' // última party (também fica no registry)
 
-// Escolha da party do CO-OP (Modo -> EscolhaParty -> Selecao).
+// Escolha da party do CO-OP (Menu -> EscolhaParty -> Selecao).
 // Lista TODOS os personagens de data/personagens.js, na ordem do arquivo.
 //   1 jogador:  escolhe o 1º e o 2º personagem (sem repetir); B desfaz o último
 //   2 jogadores: cada um tem seu cursor (cor da alma) e escolhe 1 ao mesmo tempo;
 //                B desfaz a própria escolha
 // Quando todos confirmam, grava registry 'party' (ids na ordem; party[0] é do
-// jogador 1) e segue para a escolha do chefe. B sem nada para desfazer: volta ao Modo.
+// jogador 1) e segue para a escolha do chefe. B sem nada para desfazer: volta ao Menu.
 export default class EscolhaParty extends Phaser.Scene {
   constructor() {
     super('EscolhaParty')
@@ -232,7 +232,7 @@ export default class EscolhaParty extends Phaser.Scene {
     this.saindo = true
     tocar(this, 'cancelar')
     this.cameras.main.fadeOut(200, 0, 0, 0)
-    this.time.delayedCall(220, () => this.scene.start('Modo'))
+    this.time.delayedCall(220, () => this.scene.start('Menu'))
   }
 
   // ---------- navegação ----------

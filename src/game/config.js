@@ -2,7 +2,6 @@ import Phaser from 'phaser'
 import { LARGURA, ALTURA, CORES } from './constants.js'
 import Boot from './scenes/Boot.js'
 import Menu from './scenes/Menu.js'
-import Modo from './scenes/Modo.js'
 import EscolhaParty from './scenes/EscolhaParty.js'
 import PvpEscolha from './scenes/PvpEscolha.js'
 import PvpArena from './scenes/PvpArena.js'
@@ -30,6 +29,6 @@ export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCs
     roundPixels: true,
     scale: { mode: Phaser.Scale.NONE, zoom: zoomCss },
     // TesteCartas e PvpArenaTeste: telas de teste do PvP (no dev: debugJogo.jogo.scene.start('...'))
-    scene: [Boot, Menu, Modo, EscolhaParty, PvpEscolha, PvpArena, PvpResultado, Selecao, Dificuldade, Battle, Vitoria, GameOver, Entrada, Pausa, Config, TesteCartas, PvpArenaTeste],
+    scene: [Boot, Menu, EscolhaParty, PvpEscolha, PvpArena, PvpResultado, Selecao, Dificuldade, Battle, Vitoria, GameOver, Entrada, Pausa, Config, TesteCartas, PvpArenaTeste],
   }
 }

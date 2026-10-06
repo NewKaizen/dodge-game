@@ -127,7 +127,7 @@ function montarPalco(a) {
         .image(x, l.centerY, 'super-dess-traste', i % 2)
         .setDisplaySize(larguraReal - 3, l.height)
         .setDepth(2)
-        .setAlpha(0.3),
+        .setAlpha(0.14),
     )
     trastes.push({ x, img })
   }
@@ -160,7 +160,7 @@ function acorde(a, cfg, palco, lanes, aviso, cor) {
     const nota = a.decoracao(a.cena.add.image(x, l.top - 12, 'super-dess-nota').setDepth(6).setTint(cor).setScale(0).setAlpha(0.95))
     a.cena.tweens.add({ targets: nota, scale: 1.4, y: l.bottom - 10, duration: aviso, ease: 'Cubic.easeIn' })
     a.cena.tweens.add({ targets: nota, angle: 360, duration: aviso, ease: 'Linear' })
-    a.cena.tweens.add({ targets: traste, alpha: 0.68, duration: aviso * 0.85, ease: 'Sine.easeIn' })
+    a.cena.tweens.add({ targets: traste, alpha: 0.4, duration: aviso * 0.85, ease: 'Sine.easeIn' })
 
     a.aviso(
       { tipo: 'area', x: x - palco.larguraReal / 2 + 3, y: l.top, largura: palco.larguraReal - 6, altura: l.height, ms: aviso },
@@ -169,26 +169,28 @@ function acorde(a, cfg, palco, lanes, aviso, cor) {
         shake(a.cena, 70, 0.004)
         a.cena.tweens.killTweensOf(nota)
         nota.destroy()
-        a.cena.tweens.add({ targets: traste, alpha: 0.25, duration: 220 })
-        a.bala({
+        a.cena.tweens.add({ targets: traste, alpha: 0.14, duration: 220 })
+        const golpe = a.bala({
           x,
           y: l.centerY,
           largura: palco.larguraReal - 6,
           altura: l.height - 4,
           textura: 'super-dess-impacto',
-          tamanho: Math.max(palco.larguraReal, l.height) - 4,
           cor,
           jaAvisada: true,
           vida: 220,
           atravessa: true,
           pulso: 0,
+          // meio transparente: o coração continua visível através do golpe
           atualizar: (b) => {
-            if (b.vida < 110) {
-              b.inofensiva = true
-              b.sprite.setAlpha(Math.max(0, b.vida / 110))
-            }
+            if (b.vida < 110) b.inofensiva = true
+            b.sprite.setAlpha(0.72 * Math.min(1, b.vida / 110))
           },
         })
+        // o desenho do golpe tem exatamente o tamanho da faixa que machuca (a textura é quadrada)
+        golpe.sprite.setDisplaySize(palco.larguraReal - 6, l.height - 4)
+        golpe.escalaX = golpe.sprite.scaleX
+        golpe.escalaY = golpe.sprite.scaleY
         particulas(a.cena, x, l.centerY, { cor, quantidade: 7, velocidade: 150, vida: 300 })
       },
     )
@@ -202,7 +204,7 @@ function montarLuzes(a) {
   const cores = [0xff5070, 0xffb03a, 0xffe14a]
   return cores.map((cor, k) => {
     const x = l.left + l.width * (0.2 + k * 0.3)
-    const g = a.decoracao(a.cena.add.graphics().setDepth(1).setPosition(x, l.top - 6).setAlpha(0.5))
+    const g = a.decoracao(a.cena.add.graphics().setDepth(1).setPosition(x, l.top - 6).setAlpha(0.25))
     g.fillStyle(cor, 0.16)
     g.fillTriangle(0, 0, -l.width * 0.22, l.height + 14, l.width * 0.22, l.height + 14)
     return g
