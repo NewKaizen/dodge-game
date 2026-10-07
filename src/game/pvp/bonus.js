@@ -30,10 +30,10 @@ export const EVENTOS = [
   { id: 'apagao', nome: 'APAGÃO', descricao: 'as luzes caíram: só dá pra ver em volta do coração!', cartas: 'normal', cor: 0xffe040 },
   { id: 'gravidade', nome: 'GRAVIDADE MALUCA', descricao: 'a gravidade muda de lado o tempo todo!', cartas: 'normal', cor: 0x3cff6a },
   { id: 'trocado', nome: 'CORAÇÃO TROCADO', descricao: 'os corações trocam de caixa: desvie do SEU ataque!', cartas: 'normal', cor: 0xff8aa8 },
-  { id: 'pcEscola', nome: 'PC DA ESCOLA', descricao: 'o jogo roda a 10 FPS... e às vezes trava!', cartas: 'normal', cor: 0x9ab0c8 },
+  { id: 'pcEscola', nome: 'PC DA ESCOLA', descricao: 'tela pixelada rodando a 10 FPS... e às vezes trava!', cartas: 'normal', cor: 0x9ab0c8 },
   { id: 'aquario', nome: 'AQUÁRIO', descricao: 'as caixas enchem de água: o coração boia (segure ↓ para afundar)', cartas: 'normal', cor: 0x2a9fff },
   { id: 'cogumelo', nome: 'COGUMELO MALUCO', descricao: 'o coração vira GIGANTE e MINI (e a música junto)!', cartas: 'normal', cor: 0xff4a4a },
-  { id: 'estatua', nome: 'BATATINHA FRITA 1, 2, 3!', descricao: 'quando a caixa congelar, PARE! Quem se mexer leva dano', cartas: 'normal', cor: 0x7fd8ff },
+  { id: 'estatua', nome: 'DANÇA DA ESTÁTUA', descricao: 'a música parou? ESTÁTUA! Quem a luz pegar se mexendo leva dano', cartas: 'normal', cor: 0x7fd8ff },
   { id: 'gelo', nome: 'PISTA DE GELO', descricao: 'o coração escorrega: difícil de frear!', cartas: 'normal', cor: 0xbfefff },
   { id: 'terremoto', nome: 'TERREMOTO', descricao: 'a terra treme, joga o coração e derruba pedras!', cartas: 'normal', cor: 0xc8a070 },
 ]

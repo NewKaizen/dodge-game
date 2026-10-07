@@ -51,8 +51,11 @@ export default class Heart {
     this.hitbox = CORACAO.hitbox * fator
     this.graze = CORACAO.graze * fator
     this.anel.setRadius(this.graze)
+    // o "pop" do dano voltaria ao tamanho antigo: mata os tweens do sprite e
+    // refaz o pisca dos i-frames que ainda faltam
     this.scene.tweens.killTweensOf(this.sprite)
-    this.sprite.setScale(ESCALA.coracao * fator)
+    this.sprite.setScale(ESCALA.coracao * fator).setAlpha(1)
+    if (this.ativo && this.invencivelMs > 0) flash(this.scene, this.sprite, this.invencivelMs)
     this.ajustar()
   }
 

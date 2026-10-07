@@ -28,12 +28,13 @@ export default function criar(arena) {
   const cogumelo = (pista, cor) => {
     const c = pista.coracoes[0]
     if (!c?.ativo) return
-    const g = arena.add.graphics().setDepth(14).setPosition(c.x, c.y - 24)
+    const g = arena.add.graphics().setDepth(14).setPosition(c.x, c.y - 24).setScale(1.5)
     g.fillStyle(0xfff1d6, 1).fillRect(-4, 0, 8, 8)
     g.fillStyle(cor, 1).fillEllipse(0, 0, 22, 14)
     g.fillStyle(0xffffff, 1).fillCircle(-5, -2, 2.5).fillCircle(5, -1, 2).fillCircle(0, -5, 1.6)
     pista.caixa.recortar(g)
-    arena.tweens.add({ targets: g, y: c.y - 44, alpha: 0, duration: 520, ease: 'Quad.easeOut', onComplete: () => g.destroy() })
+    arena.tweens.add({ targets: g, y: c.y - 48, duration: 520, ease: 'Quad.easeOut' })
+    arena.tweens.add({ targets: g, alpha: 0, delay: 320, duration: 200, onComplete: () => g.destroy() })
   }
 
   const aplicar = (nome) => {

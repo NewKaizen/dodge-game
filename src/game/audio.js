@@ -1,5 +1,5 @@
 import { AUDIO } from './constants.js'
-import { tocarMidi, pararMidi, pausarMidi, retomarMidi, setVolumeMidi, setVelocidadeMidi, setGraveMidi, setTomMidi, tempoMidi, existeMidi, estadoMidi } from './midi.js'
+import { tocarMidi, pararMidi, pausarMidi, retomarMidi, cortarMidi, setVolumeMidi, setVelocidadeMidi, setGraveMidi, setTomMidi, tempoMidi, existeMidi, estadoMidi } from './midi.js'
 
 // Sons: arquivo carregado pela Boot (som-<nome>: ASSETS.sons e os manifestos
 // de SUPER/habilidades/menu) ou sintetizado com WebAudio (SINTESE).
@@ -80,6 +80,10 @@ export const velocidadeMusica = (fator = 1) => setVelocidadeMidi(fator)
 export const pausarMusica = () => pausarMidi()
 export const retomarMusica = () => retomarMidi()
 
+// Corte SECO da música (true) e a volta do mesmo ponto (false), ex.: a DANÇA DA
+// ESTÁTUA. Não briga com o pause do menu. Fica valendo até pedirem false: sempre desfaça.
+export const cortarMusica = (cortar = true) => cortarMidi(cortar)
+
 export function pararMusica() {
   esquecerEspecial()
   pararMidi()
@@ -128,13 +132,13 @@ function esquecerEspecial() {
   guardada = null
 }
 
-// Realce de graves na música (dB num lowshelf de ~180 Hz; 0 = normal), ex.: o
-// MODO FESTA. Fica valendo até alguém pedir 0.
 // Tom da música em semitons (0 = normal), sem mudar o andamento. Ex.: o
 // COGUMELO MALUCO deixa a música grave com o coração gigante e aguda com o mini.
 // Fica valendo até alguém pedir 0: sempre desfaça.
 export const tomMusica = (semitons = 0) => setTomMidi(semitons)
 
+// Realce de graves na música (dB num lowshelf de ~180 Hz; 0 = normal), ex.: o
+// MODO FESTA. Fica valendo até alguém pedir 0.
 export function reforcarGrave(db = 0, ms = 400) {
   setGraveMidi(db, ms)
 }
@@ -661,15 +665,13 @@ const SINTESE = {
   // COGUMELO MALUCO: subida (crescer) e descida (encolher) de videogame
   crescer: (s) => [262, 330, 392, 523, 659, 784].forEach((f, i) => s.tom(f, 0.07, 'square', 0.06, f, i * 0.05)),
   encolher: (s) => [784, 659, 523, 392, 330, 262].forEach((f, i) => s.tom(f * 1.5, 0.06, 'square', 0.06, f * 1.5, i * 0.045)),
-  // BATATINHA FRITA: "1, 2, 3!" (três bipes subindo) / congelou / alguém se mexeu
-  batatinha: (s) => [523, 659, 784].forEach((f, i) => s.tom(f, 0.12, 'square', 0.08, f, i * 0.18)),
-  estatua: (s) => {
-    s.tom(1568, 0.5, 'triangle', 0.09, 1568)
-    s.ruido(0.3, 0.08, 0, 5000)
-  },
-  mexeu: (s) => {
-    s.tom(110, 0.35, 'sawtooth', 0.12, 100)
-    s.tom(116, 0.35, 'sawtooth', 0.1, 104)
+  // DANÇA DA ESTÁTUA: alarme de vigia quando o holofote pega alguém se mexendo
+  pego: (s) => {
+    for (let i = 0; i < 3; i++) {
+      s.tom(880, 0.14, 'square', 0.07, 880, i * 0.28)
+      s.tom(660, 0.14, 'square', 0.07, 660, i * 0.28 + 0.14)
+    }
+    s.tom(110, 0.35, 'sawtooth', 0.12, 80)
   },
   // PISTA DE GELO: cristais tilintando / patins raspando
   congelar: (s) => [1760, 2093, 2637, 3136].forEach((f, i) => s.tom(f, 0.3, 'sine', 0.05, f * 0.98, i * 0.06)),
