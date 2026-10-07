@@ -287,7 +287,8 @@ export default class PvpArena extends Phaser.Scene {
     if (this.cpu !== null) this.textoTreino.setText(`VS CPU · ${{ facil: 'fácil', normal: 'normal', dificil: 'difícil' }[this.nivelBot]}`)
     // morte súbita: logo abaixo do "VS CPU" (escondido enquanto for x1)
     // bonus round: nome do evento enquanto a rodada dura
-    this.textoBonus = texto(70, 11, TEXTO.selecionado).setOrigin(0.5)
+    // (com a CPU o selo de velocidade ocupa a linha de baixo do "VS CPU": o do bônus desce)
+    this.textoBonus = texto(this.cpu !== null ? 81 : 70, 11, TEXTO.selecionado).setOrigin(0.5)
     this.indicadorVelocidade = new IndicadorVelocidade(this, LARGURA / 2, this.cpu !== null ? 61 : 50, { tamanho: 10 })
   }
 

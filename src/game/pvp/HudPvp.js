@@ -179,11 +179,12 @@ export default class HudPvp {
   comboQuebrou() {
     this.setSequencia(0, false)
     const t = this.cena.add
-      .text(this.x0, this.yCombo, 'COMBO QUEBROU', { fontFamily: FONTE, fontSize: '10px', color: '#ff6a7a', stroke: '#000000', strokeThickness: 2 })
+      .text(this.x0, this.yCombo, 'COMBO QUEBROU', { fontFamily: FONTE, fontSize: '9px', color: '#ff6a7a', stroke: '#000000', strokeThickness: 2 })
       .setOrigin(this.direita ? 1 : 0, 0)
     this.container.add(t)
-    this.cena.tweens.add({ targets: t, x: { from: this.x0 + this.s * 3, to: this.x0 }, duration: 45, yoyo: true, repeat: 2 })
-    this.cena.tweens.add({ targets: t, y: this.yCombo + 8, alpha: 0, delay: 650, duration: 350, onComplete: () => t.destroy() })
+    this.cena.tweens.add({ targets: t, x: { from: t.x + this.s * 3, to: t.x }, duration: 45, yoyo: true, repeat: 2 })
+    // some no lugar: descendo, cruzava o número de dano que sai da barra de HP
+    this.cena.tweens.add({ targets: t, alpha: 0, delay: 650, duration: 350, onComplete: () => t.destroy() })
   }
 
   setEscudo(fator) {
