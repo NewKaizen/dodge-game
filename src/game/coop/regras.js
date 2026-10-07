@@ -13,7 +13,11 @@
 //     r.caixas[j]   o que o jogador j desvia: { carta (do chefe), dano, ritmo, inverter, escudo, lento } ou null
 //     r.golpes[j]   o contra-ataque do jogador j: { carta, tipo, base } ou null
 //   ... esquiva: aplicarDanoCoop(estado, j, dano) a cada acerto (HP 0 = caiu),
-//       registrarGrazes / registrarPerfeito do PvP
+//       registrarGrazes / registrarPerfeitoCombo do PvP (reexportados aqui)
+//       COMBO DE PERFEITOS igual ao PvP: rodadas seguidas com desvio perfeito
+//       multiplicam a ENERGIA do perfeito (x1, x2, x3, x4 = COMBO_PERFEITO.teto);
+//       todo acerto (aplicarDanoCoop) zera. O CRÍTICO do contra-ataque continua
+//       x1,5 fixo: o combo não mexe no golpe
 //   const lista = calcularGolpes(estado, r.golpes, desempenho)   desempenho[j] = { perfeito, grazes }
 //   lista.forEach((g) => aplicarGolpe(estado, g.dano))
 //   fimDaRodadaCoop(estado)            -> { vencedor: 'vitoria' | 'derrota' | null, novaFase }
@@ -21,6 +25,9 @@
 import { NIVEIS } from '../constants.js'
 import { criarBaralho, completarMao, comprar, descartar, cartaNaMao, criarRng, embaralhar, MAO } from '../pvp/baralho.js'
 import { ENERGIA, hpInicial, aplicarDano, curar } from '../pvp/regras.js'
+
+// o combo de perfeitos é o mesmo do PvP (mesmo formato de jogadores)
+export { COMBO_PERFEITO, multiplicadorPerfeito, registrarPerfeitoCombo, quebrarSequencia } from '../pvp/regras.js'
 import { especialDaCarta, efeitosDaCarta, ehSuper } from '../pvp/cartas.js'
 import { CHEFES } from './chefes/index.js'
 import { CARTAS_CHEFES, faseDoChefe, suporteDoChefe, danoDaCartaChefe, ritmoDaCartaChefe, inverteControles, poderDaCartaChefe } from './cartasChefe.js'
@@ -113,6 +120,8 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
       protegido: false,
       caido: false,
       voltaEm: null, // rodada em que volta sozinho (caído)
+      sequencia: 0, // combo de perfeitos (pvp/regras.js: registrarPerfeitoCombo)
+      maiorSequencia: 0,
       baralho: criarBaralho(personagem, `${semente}:${ID_JOGADOR[j]}`),
     }
   }
@@ -172,6 +181,7 @@ function derrubar(estado, j) {
   jog.caido = true
   jog.hp = 0
   jog.escudo = null
+  jog.sequencia = 0 // caiu: o combo de perfeitos acaba
   jog.voltaEm = estado.rodada + COOP.retornoRodadas + 1
 }
 
