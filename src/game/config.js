@@ -14,6 +14,7 @@ import Pausa from './scenes/Pausa.js'
 import Config from './scenes/Config.js'
 import GameOver from './scenes/GameOver.js'
 import Entrada from './scenes/Entrada.js'
+import Grimorio from './scenes/Grimorio.js'
 
 // tamanho: { largura, altura, zoomCss } de prepararResolucao() (resolucao.js)
 export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCss = 1 } = {}) {
@@ -26,6 +27,6 @@ export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCs
     pixelArt: true,
     roundPixels: true,
     scale: { mode: Phaser.Scale.NONE, zoom: zoomCss },
-    scene: [Boot, Menu, EscolhaParty, PvpEscolha, PvpArena, PvpResultado, Selecao, Dificuldade, CoopArena, Vitoria, GameOver, Entrada, Pausa, Config],
+    scene: [Boot, Menu, EscolhaParty, PvpEscolha, PvpArena, PvpResultado, Selecao, Dificuldade, CoopArena, Vitoria, GameOver, Entrada, Pausa, Config, Grimorio],
   }
 }
