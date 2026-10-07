@@ -23,7 +23,7 @@ Testes: `npm test` (ou `node --test src/game/pvp/__tests__/*.test.js`).
    5. o escudo de quem recebe reduz o dano por bala daquele ataque (e é gasto);
    6. ♣ Roubo pega uma carta sorteada da mão do outro.
 4. A cena roda `caixas[j]` (o que o jogador j desvia): `{ carta, de, refletida, dano, ritmo, inverterMs, escudo }`. O ataque em si vem de `ataqueDaCartaNoJogo(caixa.carta)` (`null` = caixa calma).
-5. Durante a esquiva: `aplicarDano(estado, j, caixa.dano)` a cada acerto, `registrarGrazes(estado, j, n)` (+1 de energia a cada 5 grazes) e, no fim, `registrarPerfeito(estado, j, caixa.carta)` se j passou pelo ataque sem levar dano.
+5. Durante a esquiva: `aplicarDano(estado, j, caixa.dano)` a cada acerto (também zera o combo de perfeitos), `registrarGrazes(estado, j, n)` (+1 de energia a cada 5 grazes) e, no fim, `registrarPerfeitoCombo(estado, j, caixa.carta)` se j passou pelo ataque sem levar dano (ver [Combo de perfeitos](#combo-de-perfeitos)).
 6. `fimDaRodada(estado)` → `'p1' | 'p2' | 'empate' | null`. HP corrido: perde quem zerar; os dois juntos = empate.
 
 O estado é JSON puro (`structuredClone`/`JSON.stringify` funcionam) e a partida é determinística pela semente (`criarPartida({ p1, p2, semente })`).
@@ -37,7 +37,7 @@ O estado é JSON puro (`structuredClone`/`JSON.stringify` funcionam) e a partida
 | Teto (o que sobra acumula) | 10 |
 | Grazes | +1 a cada 5 |
 | Passar a vez | +1 |
-| Desvio perfeito | +1 a +3 (pela carta do ataque, ver abaixo) |
+| Desvio perfeito | +1 a +3 (pela carta do ataque, ver abaixo) × combo de perfeitos (x1 a x4) |
 
 ## Dificuldade das cartas
 
@@ -106,6 +106,25 @@ Passar por um ataque inteiro sem levar dano dá aplausos e energia, pela carta d
 | K e SUPER | +3 |
 | Ás que manda ataque (Espelho/eco, Anular, Roubo) | +1 |
 | copas, Ás de copas, caixa vazia | 0 |
+
+### Combo de perfeitos
+
+Cada jogador tem uma **sequência** (`jog.sequencia`): quantas rodadas **seguidas** ele fez desvio perfeito. A energia do perfeito é multiplicada pelo combo (`registrarPerfeitoCombo(estado, j, carta)` → `{ ganho, base, multiplicador, sequencia }`; `registrarPerfeito` devolve só o `ganho`):
+
+| Perfeito seguido | Multiplicador | Exemplo (9-Q, base +2) |
+|---|---|---|
+| 1º | x1 | +2 |
+| 2º | x2 | +4 |
+| 3º | x3 | +6 |
+| 4º em diante | x4 (teto, `COMBO_PERFEITO.teto`) | +8 |
+
+- O ganho sempre respeita o teto de energia (10). Com a energia cheia o perfeito **ainda conta** para o combo (ganho 0, "ENERGIA CHEIA!").
+- Depois do teto a sequência continua contando (recorde em `jog.maiorSequencia`), mas o multiplicador fica em x4.
+- **Quebra:** qualquer acerto (`aplicarDano` chama `quebrarSequencia`), mesmo se o escudo ou a segunda chance zerarem o dano. Vale para a esquiva, os eventos do bonus round e o duelo.
+- **Rodada sem caixa para desviar** (o adversário passou, jogou copas ou um Ás de copas, ou o ataque foi anulado): **não conta e não quebra**, a sequência fica como estava. O mesmo para a caixa "só caos" do bonus round e para o duelo sem levar dano.
+- Uma chamada por rodada por jogador (cada coração passa por uma caixa só).
+
+Na arena: "PERFEITO!" (x1), "PERFEITO x2!", "PERFEITO x3!!", "PERFEITO x4!!!": o texto cresce e ganha brilho a cada nível (o teto pisca em arco-íris), "+6 ENERGIA (2 x3)". Os aplausos (`aplausos`) se sobrepõem uma vez por nível com atrasos pequenos (plateia maior); x2 ganha os canhões de confete, x3 uma tremida leve, clarão dourado e `estouroFesta`, x4 a chuva de confete e a `fanfarra`. Mais fogos a cada nível (3, 5, 7, 9). O HUD de cada jogador mostra discretamente o combo atual embaixo das gemas ("PERFEITO x3", "PERFEITO x4 MÁX") e, quando um acerto quebra, um "COMBO QUEBROU" pequeno. `pvpArena.estadoDebug()` traz `combos` (multiplicador da rodada) e `jogadores[j].sequencia`.
 
 ## Naipes
 

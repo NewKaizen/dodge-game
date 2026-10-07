@@ -51,6 +51,8 @@ import { particulas } from '../effects/particulas.js'
 //   'arremesso'  as cartas do chefe voam para as caixas; as de ataque dos
 //                jogadores ficam CARREGANDO embaixo do chefe
 //   'esquiva'    cada um desvia na sua caixa; HP 0 = caiu (a outra caixa segue)
+//                desvio perfeito: energia x combo de perfeitos (igual ao PvP,
+//                festa e HUD da PvpArena) + CRÍTICO no contra-ataque (fixo)
 //   'contra'     as cartas carregadas voam no chefe (crítico, combo, par, armadilha);
 //                o SUPER tem o efeito do personagem em cima do chefe (coop/superNoChefe.js)
 //                e os dois SUPER juntos viram o SUPER COMBO
@@ -143,12 +145,13 @@ export default class CoopArena extends PvpArena {
     this.musicaEspecial = null
     this.acertosRodada = [0, 0]
     this.perfeitosRodada = [null, null]
+    this.combosRodada = [null, null] // multiplicador do combo de perfeitos nesta rodada
     this.grazesRodada = [0, 0]
     this.intencoesVisuais = [null, null]
     this.armadas = [null, null]
     this.inicioLuta = this.time.now
     velocidadeMusica(1)
-    this.estatisticas = [0, 1].map(() => ({ danoCausado: 0, danoRecebido: 0, cartasJogadas: 0, maiorCarta: null, grazes: 0, ases: 0, passes: 0, perfeitos: 0, supers: 0, maiorGolpe: 0, golpes: 0, criticos: 0 }))
+    this.estatisticas = [0, 1].map(() => ({ danoCausado: 0, danoRecebido: 0, cartasJogadas: 0, maiorCarta: null, grazes: 0, ases: 0, passes: 0, perfeitos: 0, maiorSequencia: 0, supers: 0, maiorGolpe: 0, golpes: 0, criticos: 0 }))
     this.combos = 0
 
     this.desenharFundo()
@@ -719,6 +722,7 @@ export default class CoopArena extends PvpArena {
     this.grazesRodada = [0, 0]
     this.acertosRodada = [0, 0]
     this.perfeitosRodada = [null, null]
+    this.combosRodada = [null, null]
     this.perfeitoCoop = [false, false]
     this.esquivaBot?.reiniciar()
     if (!r.caixas.some(Boolean)) return
@@ -734,6 +738,8 @@ export default class CoopArena extends PvpArena {
       return this.pistas[j].rodar(ataque, { dano: caixa.dano, ritmo, semente: `${this.semente}:${this.estado.rodada}:${j}`, aceleracao: this.aceleracao })
     })
     await Promise.all(promessas.filter(Boolean))
+    // perfeitoCoop = CRÍTICO no contra-ataque (x1,5 fixo, o combo de perfeitos não mexe nele);
+    // registrarDesviosPerfeitos (da PvpArena) = energia do perfeito x combo
     for (const j of [0, 1]) this.perfeitoCoop[j] = comAtaque[j] && !this.acertosRodada[j] && !this.ko[j] && !this.estado.jogadores[j].caido
     const perfeitos = this.registrarDesviosPerfeitos(r, comAtaque)
     this.invertido = [0, 0]
@@ -744,15 +750,15 @@ export default class CoopArena extends PvpArena {
     tocar(this, 'caixaFechar')
     await Promise.all(this.pistas.map((p) => p.esconder()))
     if (this.saindo || !perfeitos.length) return
-    tocar(this, 'aplausos')
-    perfeitos.forEach((p) => this.festejarPerfeito(p))
-    await this.esperar(1000)
+    await this.festejarPerfeitos(perfeitos)
   }
 
   acertou(j, dano) {
     if (this.fase !== 'esquiva' || this.ko[j] || debug.invencivel) return false
     this.acertosRodada[j]++
-    const efetivo = aplicarDanoCoop(this.estado, j, dano)
+    const sequenciaAntes = this.estado.jogadores[j].sequencia ?? 0
+    const efetivo = aplicarDanoCoop(this.estado, j, dano) // também quebra o combo de perfeitos
+    this.comboQuebrou(j, sequenciaAntes)
     const jog = this.estado.jogadores[j]
     this.estatisticas[j].danoRecebido += efetivo
     const hud = this.huds[j]
@@ -1004,6 +1010,7 @@ export default class CoopArena extends PvpArena {
       maiorGolpe: Math.max(...this.estatisticas.map((e) => e.maiorGolpe)),
       criticos: soma('criticos'),
       combos: this.combos,
+      maiorSequencia: Math.max(...this.estatisticas.map((e) => e.maiorSequencia ?? 0)), // combo de perfeitos
       grazes: soma('grazes'),
       tempoMs: Math.max(0, this.time.now - this.inicioLuta),
       turnos: this.estado.rodada,
@@ -1063,6 +1070,7 @@ export default class CoopArena extends PvpArena {
         hp: jog.hp,
         hpMax: jog.hpMax,
         energia: jog.energia,
+        sequencia: jog.sequencia ?? 0,
         caido: jog.caido,
         mao: jog.baralho.mao.map((x) => x.id),
         rodando: this.pistas[j].ataque?.nome ?? null,
@@ -1070,6 +1078,9 @@ export default class CoopArena extends PvpArena {
         balas: this.pistas[j].balas.lista.length,
       })),
       armadas: this.armadas.map((x) => x?.dados.id ?? null),
+      perfeitos: [...this.perfeitosRodada],
+      combos: [...this.combosRodada],
+      acertosRodada: [...this.acertosRodada],
       estatisticas: this.resumo(),
     }
   }
