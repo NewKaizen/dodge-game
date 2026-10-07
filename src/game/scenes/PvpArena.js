@@ -1524,9 +1524,11 @@ export default class PvpArena extends Phaser.Scene {
         this.invertido[j] = 0
         if (!this.ko[dono]) this.avisoPista[j].setText('')
       }
-      // bonus round: o evento pode mexer no joystick (gravidade...)
+      // bonus round: o evento pode mexer no joystick (gravidade...) e no
+      // relógio da pista (passo: 0 = congelada neste frame, ex.: estátua, PC da escola)
       if (this.efeitoBonus?.joy) joy = this.efeitoBonus.joy(j, joy) ?? joy
-      pista.atualizar(delta, joy)
+      const passo = this.efeitoBonus?.passo ? this.efeitoBonus.passo(j, delta, joy) : delta
+      if (passo > 0) pista.atualizar(passo, joy)
     })
     this.efeitoBonus?.atualizar?.(delta)
     if (this.fase === 'duelo') this.duelo?.atualizar(delta)

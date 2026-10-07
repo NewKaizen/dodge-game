@@ -12,6 +12,7 @@ export default class Heart {
     this.jogador = jogador
     this.hitbox = CORACAO.hitbox
     this.graze = CORACAO.graze
+    this.tamanho = 1 // setTamanho(): coração gigante/mini (sprite, hitbox e graze juntos)
     this.x = 0
     this.y = 0
     this.ativo = false
@@ -44,6 +45,17 @@ export default class Heart {
     this.anel.setVisible(false)
   }
 
+  // Fator de tamanho (1 = normal): sprite, hitbox, graze e a margem da caixa
+  setTamanho(fator = 1) {
+    this.tamanho = fator
+    this.hitbox = CORACAO.hitbox * fator
+    this.graze = CORACAO.graze * fator
+    this.anel.setRadius(this.graze)
+    this.scene.tweens.killTweensOf(this.sprite)
+    this.sprite.setScale(ESCALA.coracao * fator)
+    this.ajustar()
+  }
+
   tick(dt) {
     if (this.invencivelMs > 0) this.invencivelMs -= dt
   }
@@ -57,7 +69,7 @@ export default class Heart {
 
     const passo = velocidade * (delta / 1000)
     const r = this.caixa.limites
-    const meio = CORACAO.tamanho / 2
+    const meio = (CORACAO.tamanho * this.tamanho) / 2
     this.x = Phaser.Math.Clamp(this.x + dir.x * passo, r.left + meio, r.right - meio)
     this.y = Phaser.Math.Clamp(this.y + dir.y * passo, r.top + meio, r.bottom - meio)
     this.posicionar()
@@ -66,7 +78,7 @@ export default class Heart {
   // Depois que a caixa muda de tamanho: traz o coração para dentro dela
   ajustar() {
     const r = this.caixa.limites
-    const meio = CORACAO.tamanho / 2
+    const meio = (CORACAO.tamanho * this.tamanho) / 2
     this.x = Phaser.Math.Clamp(this.x, r.left + meio, r.right - meio)
     this.y = Phaser.Math.Clamp(this.y, r.top + meio, r.bottom - meio)
     this.posicionar()
@@ -93,7 +105,7 @@ export default class Heart {
     this.invencivelMs = duracaoMs
     flash(this.scene, this.sprite, duracaoMs)
     // "pop": o coração incha e volta, junto do flash e do tremor
-    this.sprite.setScale(ESCALA.coracao * 1.9)
-    this.scene.tweens.add({ targets: this.sprite, scale: ESCALA.coracao, duration: 180, ease: 'Back.easeOut' })
+    this.sprite.setScale(ESCALA.coracao * this.tamanho * 1.9)
+    this.scene.tweens.add({ targets: this.sprite, scale: ESCALA.coracao * this.tamanho, duration: 180, ease: 'Back.easeOut' })
   }
 }

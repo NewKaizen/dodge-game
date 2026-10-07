@@ -27,6 +27,7 @@ let volume = 1 // slider "volume da música" (0 a 1)
 let velocidade = 1 // andamento pedido pelo jogo (setVelocidadeMidi): sobrevive à troca de música
 let rampa = null // setInterval da rampa de andamento em andamento
 let graveDb = 0 // realce de graves pedido (setGraveMidi): sobrevive à troca de música
+let tom = 0 // semitons pedidos (setTomMidi): sobrevive à troca de música
 
 const alvo = () => AUDIO.volume * AUDIO.musica * volume
 
@@ -78,6 +79,14 @@ export function setGraveMidi(db = 0, ms = 400) {
   g.cancelScheduledValues(t)
   g.setValueAtTime(g.value, t)
   g.linearRampToValueAtTime(graveDb, t + Math.max(0.01, ms / 1000))
+}
+
+// Tom da música em semitons (0 = normal; -7 = bem mais grave), sem mudar o
+// andamento (Master Coarse Tuning: SysEx universal). Fica valendo para as
+// próximas músicas até alguém pedir 0. Bateria não muda (canal de percussão).
+export function setTomMidi(semitons = 0) {
+  tom = Math.max(-24, Math.min(24, Math.round(Number(semitons) || 0)))
+  if (motor) motor.synth.systemExclusive([0x7f, 0x7f, 0x04, 0x04, 0x00, 64 + tom, 0xf7])
 }
 
 // Segundo atual (posição na música) do sequenciador; 0 sem música
@@ -170,6 +179,7 @@ export async function tocarMidi(ctx, url, { inicio = 0 } = {}) {
   m.seq.loopCount = Infinity // loop infinito (a doc da lib fala em -1, mas o motor só repete com Infinity)
   m.seq.playbackRate = velocidade // andamento da morte súbita (setVelocidadeMidi)
   m.seq.play()
+  if (tom) setTomMidi(tom)
   if (inicio > 0) m.seq.currentTime = inicio // a mensagem vai na fila depois do play: pula para o ponto
   const t = m.ctx.currentTime
   m.ganho.gain.cancelScheduledValues(t)
