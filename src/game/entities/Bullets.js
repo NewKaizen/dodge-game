@@ -166,19 +166,34 @@ export default class Balas {
         continue
       }
       if (b.inofensiva) continue
+      this.tocar(b, coracoes, aoAcertar, aoGrazear)
+    }
+    this.recolher()
+  }
 
-      for (const c of coracoes) {
-        if (!c.ativo) continue
-        const folga = this.folga(b, c.x, c.y)
-        if (folga <= c.hitbox) {
-          if (aoAcertar(c, b) && !b.atravessa) b.morta = true
-        } else if (folga <= c.graze && !b.grazeados.has(c)) {
-          b.grazeados.add(c)
-          aoGrazear(c, b)
-        }
+  // Só colisão/graze, sem andar nem envelhecer as balas: pista congelada
+  // (Pista.congelada, DANÇA DA ESTÁTUA). O coração anda, as balas paradas
+  // continuam machucando.
+  colidir(coracoes, aoAcertar, aoGrazear) {
+    for (const b of this.lista) if (this.perigosa(b)) this.tocar(b, coracoes, aoAcertar, aoGrazear)
+    this.recolher()
+  }
+
+  tocar(b, coracoes, aoAcertar, aoGrazear) {
+    for (const c of coracoes) {
+      if (!c.ativo) continue
+      const folga = this.folga(b, c.x, c.y)
+      if (folga <= c.hitbox) {
+        if (aoAcertar(c, b) && !b.atravessa) b.morta = true
+      } else if (folga <= c.graze && !b.grazeados.has(c)) {
+        b.grazeados.add(c)
+        aoGrazear(c, b)
       }
     }
+  }
 
+  // tira da lista (e da tela) as balas mortas
+  recolher() {
     for (const b of this.lista) {
       if (!b.morta) continue
       b.sprite.destroy()

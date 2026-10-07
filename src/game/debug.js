@@ -15,7 +15,7 @@ export function registrarDebug(game) {
     set: (opcoes) => Object.assign(debug, opcoes),
     config: debug,
     jogo: game, // o Phaser.Game (inspeção no console)
-    musica: () => estadoMidi(), // { tocando, tempo, contexto }
+    musica: () => estadoMidi(), // { tocando, tempo, contexto, cortada, pausada, tom }
     cena: () => game.scene.getScenes(true).map((s) => s.scene.key),
     // dados com que uma cena foi iniciada (ex.: as estatísticas da vitória)
     dadosCena: (chave) => game.scene.getScene(chave)?.sys.settings.data ?? null,

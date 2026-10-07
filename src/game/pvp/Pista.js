@@ -45,6 +45,9 @@ import { tocar } from '../audio.js'
 //   pista.destruir()
 //
 //   pista.fatorCoracao                   multiplica a velocidade do coração (morte súbita; padrão 1)
+//   pista.congelada                      true = só o coração anda: caixa, ataque (ctx) e balas ficam
+//                                        parados no lugar (as balas paradas ainda acertam/grazeiam).
+//                                        Ex.: DANÇA DA ESTÁTUA. Quem liga desliga.
 //   pista.atacando                       o ataque em si já começou (passou o respiro/preparo inicial)
 //                                        e ainda não acabou
 //
@@ -76,6 +79,7 @@ export default class Pista {
     this.velocidadeMaxBase = velocidadeMax
     this.balas.velocidadeMax = velocidadeMax
     this.fatorCoracao = 1
+    this.congelada = false
     this.coracoes = this.jogadores.map((j) => new Heart(cena, this.caixa, cor ?? CORES.almas[j] ?? CORES.almas[0], j))
     this.caixa.aoMudar = () => this.coracoes.forEach((c) => c.ativo && c.ajustar()) // a caixa empurra os corações
 
@@ -233,6 +237,12 @@ export default class Pista {
   passo(dt, joy) {
     const velocidade = this.velocidadeCoracao
     for (const c of this.coracoes) if (c.ativo) c.update(typeof joy === 'function' ? joy(c.jogador) : joy, velocidade, dt)
+
+    if (this.congelada) {
+      // o tempo do ataque não passa (nem a duração dele): só o coração encosta nas balas paradas
+      if (this.ataque) this.balas.colidir(this.coracoes, (coracao, bala) => this.acertou(coracao, bala), (coracao, bala) => this.grazeou(coracao, bala))
+      return
+    }
 
     this.caixa.atualizar(dt) // aviso/transição da caixa no mesmo relógio do ataque
     const at = this.ataque

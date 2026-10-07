@@ -23,6 +23,8 @@ let atual = null // url da música tocando
 let pedido = 0 // descarta pedidos antigos quando a música muda no meio do carregamento
 const arquivos = new Map() // url -> Promise<ArrayBuffer | null>
 let pausada = false // menu de pause aberto (pausarMidi)
+let cortada = false // corte seco pedido pelo jogo (cortarMidi), independente do pause
+let silencio = 0 // descarta a pausa agendada por um silenciar() que já foi desfeito
 let volume = 1 // slider "volume da música" (0 a 1)
 let velocidade = 1 // andamento pedido pelo jogo (setVelocidadeMidi): sobrevive à troca de música
 let rampa = null // setInterval da rampa de andamento em andamento
@@ -30,11 +32,12 @@ let graveDb = 0 // realce de graves pedido (setGraveMidi): sobrevive à troca de
 let tom = 0 // semitons pedidos (setTomMidi): sobrevive à troca de música
 
 const alvo = () => AUDIO.volume * AUDIO.musica * volume
+const calada = () => pausada || cortada // pause do menu OU corte do jogo
 
 // Slider do painel: muda o volume na hora (suave, sem estalo)
 export function setVolumeMidi(v) {
   volume = v
-  if (!motor || !atual || pausada) return
+  if (!motor || !atual || calada()) return
   const t = motor.ctx.currentTime
   motor.ganho.gain.cancelScheduledValues(t)
   motor.ganho.gain.setTargetAtTime(alvo(), t, 0.05)
@@ -82,11 +85,12 @@ export function setGraveMidi(db = 0, ms = 400) {
 }
 
 // Tom da música em semitons (0 = normal; -7 = bem mais grave), sem mudar o
-// andamento (Master Coarse Tuning: SysEx universal). Fica valendo para as
-// próximas músicas até alguém pedir 0. Bateria não muda (canal de percussão).
+// andamento. Usa o keyShift de SISTEMA do sintetizador (só a API mexe nele:
+// nenhum reset/SysEx do .mid desfaz). Fica valendo para as próximas músicas
+// até alguém pedir 0. Bateria não muda. Cada troca corta as notas que estavam soando.
 export function setTomMidi(semitons = 0) {
   tom = Math.max(-24, Math.min(24, Math.round(Number(semitons) || 0)))
-  if (motor) motor.synth.systemExclusive([0x7f, 0x7f, 0x04, 0x04, 0x00, 64 + tom, 0xf7])
+  if (motor && motor.synth.systemParameters.keyShift !== tom) motor.synth.setSystemParameter('keyShift', tom)
 }
 
 // Segundo atual (posição na música) do sequenciador; 0 sem música
@@ -119,6 +123,7 @@ function preparar(ctx) {
     const banco = await (await fetch(SOUNDFONT)).arrayBuffer()
     await synth.soundBankManager.addSoundBank(banco, 'principal')
     await synth.isReady
+    if (tom) synth.setSystemParameter('keyShift', tom)
     const seq = new Sequencer(synth)
     motor = { ctx, synth, seq, ganho, grave }
     return motor
@@ -179,46 +184,70 @@ export async function tocarMidi(ctx, url, { inicio = 0 } = {}) {
   m.seq.loopCount = Infinity // loop infinito (a doc da lib fala em -1, mas o motor só repete com Infinity)
   m.seq.playbackRate = velocidade // andamento da morte súbita (setVelocidadeMidi)
   m.seq.play()
-  if (tom) setTomMidi(tom)
   if (inicio > 0) m.seq.currentTime = inicio // a mensagem vai na fila depois do play: pula para o ponto
   const t = m.ctx.currentTime
   m.ganho.gain.cancelScheduledValues(t)
   m.ganho.gain.setValueAtTime(0, t)
-  m.ganho.gain.linearRampToValueAtTime(alvo(), t + FADE_S)
+  m.ganho.gain.linearRampToValueAtTime(calada() ? 0 : alvo(), t + FADE_S) // cortada: toca muda até voltar
   atual = url
   return true
+}
+
+// Silencia (rampa de `s` segundos) e depois congela o sequenciador onde está
+function silenciar(s) {
+  const { ctx, seq, synth, ganho } = motor
+  const t = ctx.currentTime
+  ganho.gain.cancelScheduledValues(t)
+  ganho.gain.setValueAtTime(ganho.gain.value, t)
+  ganho.gain.linearRampToValueAtTime(0, t + s)
+  const meu = ++silencio
+  setTimeout(() => {
+    if (meu !== silencio || !calada()) return
+    seq.pause()
+    synth.stopAll(true)
+  }, s * 1000 + 20)
+}
+
+// Continua do mesmo ponto, subindo o volume em `s` segundos
+function soar(s) {
+  silencio++
+  const { ctx, seq, ganho } = motor
+  if (seq.paused) seq.play() // play() num sequenciador tocando desalinha o relógio do lado de cá
+  const t = ctx.currentTime
+  ganho.gain.cancelScheduledValues(t)
+  ganho.gain.setValueAtTime(ganho.gain.value, t)
+  ganho.gain.linearRampToValueAtTime(alvo(), t + s)
 }
 
 // Pause do jogo: congela a música onde está (e abafa rápido); retomarMidi continua do mesmo ponto
 export function pausarMidi() {
   if (!motor || !atual || pausada) return
   pausada = true
-  const { ctx, seq, synth, ganho } = motor
-  const t = ctx.currentTime
-  ganho.gain.cancelScheduledValues(t)
-  ganho.gain.setValueAtTime(ganho.gain.value, t)
-  ganho.gain.linearRampToValueAtTime(0, t + 0.08)
-  setTimeout(() => {
-    if (!pausada) return
-    seq.pause()
-    synth.stopAll(true)
-  }, 100)
+  if (!cortada) silenciar(0.08)
 }
 
 export function retomarMidi() {
   if (!motor || !pausada) return
   pausada = false
-  if (!atual) return
-  const { ctx, seq, ganho } = motor
-  seq.play()
-  const t = ctx.currentTime
-  ganho.gain.cancelScheduledValues(t)
-  ganho.gain.setValueAtTime(0, t)
-  ganho.gain.linearRampToValueAtTime(alvo(), t + 0.25)
+  if (atual && !cortada) soar(0.25)
+}
+
+// Corte SECO da música (cortar = true) e a volta do mesmo ponto (false), ex.:
+// a DANÇA DA ESTÁTUA. Independe do pause do menu (pausar/retomar no meio de um
+// corte não traz a música de volta). Fica valendo até alguém pedir false,
+// inclusive para a próxima música: sempre desfaça.
+export function cortarMidi(cortar = true) {
+  cortar = Boolean(cortar)
+  if (cortada === cortar) return
+  cortada = cortar
+  if (!motor || !atual || pausada) return
+  if (cortar) silenciar(0.012)
+  else soar(0.03)
 }
 
 export function pararMidi() {
   pausada = false
+  silencio++
   pedido++
   atual = null
   if (!motor) return
@@ -235,7 +264,7 @@ export function pararMidi() {
   }, FADE_S * 1000 + 30)
 }
 
-// Diagnóstico (debugJogo.musica()): o que está tocando e em que segundo
+// Diagnóstico (debugJogo.musica()): o que está tocando, em que segundo e se está cortada/pausada
 export function estadoMidi() {
-  return { tocando: atual, velocidade, tempo: motor ? Math.round(motor.seq.currentTime * 10) / 10 : null, contexto: motor?.ctx.state ?? null }
+  return { tocando: atual, velocidade, cortada, pausada, tom: motor ? motor.synth.systemParameters.keyShift : tom, tempo: motor ? Math.round(motor.seq.currentTime * 10) / 10 : null, contexto: motor?.ctx.state ?? null }
 }
