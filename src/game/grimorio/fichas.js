@@ -149,7 +149,7 @@ function fichaDoChefe(carta) {
   const sup = ehSuper(carta)
   const def = CHEFES[carta.chefe]
   const tipo = sup ? '★ SUPER DO CHEFE' : `${SIMBOLOS[carta.naipe]} ${TIPOS_CHEFE[carta.naipe]} · ${nomeDoValor(carta.valor)}`
-  const numeros = [{ rotulo: 'QUANDO', valor: sup ? `a cada ${COOP.cargaSuper} rodadas (fase 2+)` : `fase ${carta.fase + 1} de ${def.fases.length}` }]
+  const numeros = [{ rotulo: 'QUANDO', valor: sup ? `a cada ${COOP.cargaSuper} rodadas` : `fase ${carta.fase + 1} de ${def.fases.length}` }]
   numeros.push({ rotulo: 'DANO', valor: `${danoDaCartaChefe(carta)} por bala (FÁCIL)` })
   const ritmo = ritmoDaCartaChefe(carta)
   if (ritmo.velocidade > 1.005) numeros.push({ rotulo: 'BALAS', valor: `+${pct(ritmo.velocidade - 1)} rápidas` })
