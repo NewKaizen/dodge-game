@@ -142,6 +142,6 @@ Outros recursos de audio.js usados pelos eventos:
 | `pcEscola` | caixas pixeladas (filtro Blocky na câmera da caixa), 6–14 FPS aos trancos, travadas com "Não está respondendo" | `passo` + filtro |
 | `aquario` | câmera lenta, o coração boia (segure ↓ para afundar), inércia, peixes e bolhas | `passo` (×0,72) + `joy` |
 | `cogumelo` | coração GIGANTE (2,3×) / MINI (0,5×) alternando, a música desce/sobe de tom junto | `setTamanho` + `tomMusica` |
-| `estatua` | DANÇA DA ESTÁTUA: a música para do nada (`cortarMusica`), as pistas congelam (`pista.congelada`) e um holofote de vigia varre cada caixa; quem se mexer sob a luz é PEGO (30% do HP máximo, uma vez por parada; `arena.acertou`). A CPU obedece em ~80% das paradas. `efeitoBonus.estadoDebug()` mostra a parada e as luzes | `cortarMusica` + `congelada` + `joy` (CPU) |
+| `estatua` | DANÇA DA ESTÁTUA: a música para do nada (`cortarMusica`), as pistas congelam (`pista.congelada`) e um holofote de vigia PERSEGUE o coração em cada caixa (mais lento que ele); quem se mexer sob a luz é PEGO (30% do HP máximo, uma vez por parada; `arena.acertou`). A CPU obedece em ~80% das paradas. `efeitoBonus.estadoDebug()` mostra a parada e as luzes | `cortarMusica` + `congelada` + `joy` (CPU) |
 | `gelo` | o coração desliza (inércia no joystick), flocos e reflexos | `joy` |
 | `terremoto` | ronco de aviso, tremor, empurrão no coração e pedras caindo (balas) | `joy` + `balas.criar` |

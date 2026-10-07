@@ -10,9 +10,10 @@ import { shake } from '../../../effects/shake.js'
 // aviso nenhum (corte seco). Esse é o sinal. Com a música parada:
 //   - as balas e o ataque CONGELAM (pista.congelada), mas o coração continua
 //     livre para andar (e as balas paradas continuam machucando);
-//   - um HOLOFOTE de vigia (estilo stealth) varre cada caixa. Quem se MEXER com
-//     a luz em cima do coração é PEGO: leva 30% do HP máximo (uma vez por
-//     parada). Mexer FORA da luz pode: é só não ser visto.
+//   - um HOLOFOTE de vigia (estilo stealth) acende longe e PERSEGUE o coração.
+//     Quem se MEXER com a luz em cima do coração é PEGO: leva 30% do HP máximo
+//     (uma vez por parada). Fugir da luz pode (ela é mais lenta), mas quando
+//     ela alcança é ficar paradinho.
 // Depois a música volta (do mesmo ponto) e tudo descongela.
 // Visual: notinhas dançando entre as caixas enquanto a música toca (somem no
 // corte, junto com ela), o feixe e o círculo da luz (amarelo; laranja quando
@@ -25,9 +26,7 @@ const PRIMEIRA = { min: 1500, max: 2600 } // ms até a primeira parada
 const PARADA = { min: 2600, max: 3600 } // ms de música parada
 const ACENDE_MS = 380 // a luz acende devagar: só vigia depois de acesa (tempo de reação)
 const RAIO = 38 // raio (px) da área vigiada
-const VELOCIDADE = 105 // px/s da luz varrendo a caixa
-const PAUSA_LUZ = { min: 120, max: 380 } // ms parada em cada ponto da ronda
-const CHANCE_CACAR = 0.45 // chance do próximo ponto da ronda ser em cima do coração
+const VELOCIDADE = 115 // px/s da luz perseguindo o coração (o coração anda ~180)
 const MEXEU_PX = 4 // px andados sob a luz até contar como "se mexeu" (tremidinha passa)
 const DANO_HP = 0.3 // fração do HP máximo de quem é pego
 const CPU_OBEDECE = 0.8 // chance da CPU ficar paradinha numa parada
@@ -48,7 +47,7 @@ export default function criar(arena, { rng }) {
   let cpuPercebeEm = 0 // distraída: quando ela finalmente para
   let notas = null // notinhas dançando entre as caixas (Graphics)
   let textos = []
-  // por pista: { pista, luz, feixe, aro, x, y, alvo, esperaAte, ultimo, mexeu, pego }
+  // por pista: { pista, luz, feixe, aro, x, y, alvo, ultimo, mexeu, pego }
   let vigias = []
 
   const dono = (j) => arena.donoDaPista?.(j) ?? j
@@ -84,7 +83,7 @@ export default function criar(arena, { rng }) {
     // contorno da área vigiada (por cima de tudo menos o coração)
     const aro = arena.add.graphics().setDepth(9)
     pista.caixa.recortar(luz, feixe, aro)
-    const vigia = { pista, luz, feixe, aro, x: 0, y: 0, alvo: null, esperaAte: 0, ultimo: null, mexeu: 0, pego: false, alpha: 0 }
+    const vigia = { pista, luz, feixe, aro, x: 0, y: 0, alvo: null, ultimo: null, mexeu: 0, pego: false, alpha: 0 }
     luz.setAlpha(0) // feixe e aro: o alpha vai no desenho (desenharVigia)
     return vigia
   }
@@ -102,23 +101,16 @@ export default function criar(arena, { rng }) {
     v.x = melhor.x
     v.y = melhor.y
     v.alvo = null
-    v.esperaAte = 0
   }
 
-  const novoAlvo = (v) => {
-    const l = v.pista.caixa.limites
-    const c = v.pista.coracoes[0]
-    const m = RAIO * 0.5
-    if (c?.ativo && sorte() < CHANCE_CACAR) {
-      v.alvo = { x: Phaser.Math.Clamp(c.x + entre(-24, 24), l.left + m, l.right - m), y: Phaser.Math.Clamp(c.y + entre(-24, 24), l.top + m, l.bottom - m) }
-    } else {
-      v.alvo = { x: entre(l.left + m, l.right - m), y: entre(l.top + m, l.bottom - m) }
-    }
-  }
-
+  // A luz SEMPRE vai atrás do coração (mais lenta que ele: dá para fugir dela,
+  // mas quando ela chega em cima é ficar parado). Sem coração (caído), fica onde está.
   const moverLuz = (v, delta) => {
-    if (t < v.esperaAte) return
-    if (!v.alvo) novoAlvo(v)
+    const c = v.pista.coracoes[0]
+    if (!c?.ativo) return
+    const l = v.pista.caixa.limites
+    const m = RAIO * 0.5
+    v.alvo = { x: Phaser.Math.Clamp(c.x, l.left + m, l.right - m), y: Phaser.Math.Clamp(c.y, l.top + m, l.bottom - m) }
     const dx = v.alvo.x - v.x
     const dy = v.alvo.y - v.y
     const d = Math.hypot(dx, dy)
@@ -126,8 +118,6 @@ export default function criar(arena, { rng }) {
     if (d <= passo) {
       v.x = v.alvo.x
       v.y = v.alvo.y
-      v.alvo = null
-      v.esperaAte = t + entre(PAUSA_LUZ.min, PAUSA_LUZ.max)
     } else {
       v.x += (dx / d) * passo
       v.y += (dy / d) * passo
