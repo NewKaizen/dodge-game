@@ -19,7 +19,7 @@ const FPS = { min: 6, max: 14 }
 const TROCA_FPS_MS = 1300 // de quanto em quanto tempo o FPS muda
 const TRAVADA = { aCada: { min: 3200, max: 4800 }, dura: { min: 260, max: 420 } }
 const AMARELO = '#ffe040'
-const PIXEL = 4 // lado do "pixel" da tela de baixa resolução, em px do jogo
+const PIXEL = 2.5 // lado do "pixel" da tela de baixa resolução, em px do jogo (4 era pixelado demais)
 
 // O canvas desenha na resolução real da tela (resolucao.js): o bloco do
 // filtro é em pixels de verdade, então escala junto
@@ -70,7 +70,7 @@ export default function criar(arena, { rng }) {
         // linhas de monitor de tubo: listras escuras finas na caixa toda
         // (uma listra a cada 2 "pixels" grandes, para casar com o filtro)
         const linhas = arena.add.graphics().setDepth(12)
-        linhas.fillStyle(0x000000, 0.2)
+        linhas.fillStyle(0x000000, 0.16)
         for (let y = 0; y < 480; y += PIXEL * 2) linhas.fillRect(0, y, LARGURA, PIXEL)
         const contador = arena.add.text(0, 0, '', { fontFamily: FONTE, fontSize: '11px', color: AMARELO, stroke: '#000000', strokeThickness: 3 }).setOrigin(0, 1).setDepth(41)
         pista.caixa.recortar(linhas)
