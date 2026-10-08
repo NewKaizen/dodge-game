@@ -16,7 +16,8 @@ import {
   descricaoCoop,
 } from '../regras.js'
 import { CARTAS_CHEFES, ataqueDaCartaChefe, danoDaCartaChefe, faseDoChefe } from '../cartasChefe.js'
-import { CHEFES } from '../chefes/index.js'
+import { CHEFES, nivelDoChefe } from '../chefes/index.js'
+import { NIVEIS } from '../../constants.js'
 import { escolherJogadaCoop } from '../bot.js'
 import { CARTAS } from '../../pvp/cartas.js'
 import { criarRng } from '../../pvp/baralho.js'
@@ -80,9 +81,17 @@ test('dano do chefe sobe com o valor e com o nível', () => {
 
 test('partida nova: HP do chefe pelo nível, sem intenções', () => {
   const e = nova({ nivel: 'dificil' })
-  assert.equal(e.chefe.hp, Math.round(CHEFES.king.hp * 1.4))
+  assert.equal(e.chefe.hp, Math.round(CHEFES.king.hp * nivelDoChefe('king', 'dificil').hp))
   assert.deepEqual(e.chefe.intencoes, [null, null])
   assert.equal(e.jogadores[0].personagem, 'kris')
+})
+
+test('nível do chefe: NIVEIS vezes o ajuste do chefe naquele nível', () => {
+  const ajuste = CHEFES.king.niveis?.dificil ?? {}
+  const nivel = nivelDoChefe('king', 'dificil')
+  for (const k of ['velocidade', 'densidade', 'velocidadeMax', 'dano', 'hp']) assert.equal(nivel[k], NIVEIS.dificil[k] * (ajuste[k] ?? 1))
+  assert.equal(nivelDoChefe('king', 'facil').hp, NIVEIS.facil.hp * (CHEFES.king.niveis?.facil?.hp ?? 1))
+  assert.equal(nivelDoChefe('king', 'dificil').rotulo, NIVEIS.dificil.rotulo)
 })
 
 test('início da rodada: energia, mãos e uma intenção para cada um', () => {

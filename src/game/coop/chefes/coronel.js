@@ -13,6 +13,8 @@ export default {
   },
   hp: 320,
   danoBala: 12,
+  // DIFÍCIL: mais dano e mais HP
+  niveis: { dificil: { dano: 2.05, hp: 1.12 } },
   leve: (A) => A.brasas({ duracao: 4000, intervalo: 700 }),
   fases: [
     {

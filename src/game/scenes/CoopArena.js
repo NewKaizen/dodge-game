@@ -4,7 +4,7 @@ import Controles from '../controles.js'
 import { tocar, musica, velocidadeMusica, pausarMusica } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
-import { CHEFES } from '../coop/chefes/index.js'
+import { CHEFES, nivelDoChefe } from '../coop/chefes/index.js'
 import { partyDe } from '../data/batalha.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { ataques } from '../attacks/index.js'
@@ -110,7 +110,7 @@ export default class CoopArena extends PvpArena {
     this.registry.set('chefe', this.idChefe)
     this.registry.set('nivel', this.idNivel)
     this.defChefe = CHEFES[this.idChefe]
-    this.nivel = NIVEIS[this.idNivel]
+    this.nivel = nivelDoChefe(this.idChefe, this.idNivel)
     const party = partyDe(this.registry)
     this.ids = [party[0], party[1] ?? party[0]]
 

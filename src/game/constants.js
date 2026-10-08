@@ -94,11 +94,11 @@ export const NIVEIS = {
   dificil: {
     rotulo: 'DIFÍCIL',
     cor: '#ff5a6a',
-    velocidade: 1.2,
-    densidade: 1.3,
-    velocidadeMax: 1.1,
-    dano: 1.5,
-    hp: 1.4,
+    velocidade: 1.45,
+    densidade: 1.6,
+    velocidadeMax: 1.3,
+    dano: 2,
+    hp: 1.9,
     fundo: 1.9,
   },
 }
