@@ -90,13 +90,16 @@ O SUPER do chefe não pode ser anulado, refletido, roubado nem varrido.
   (`niveis` no arquivo do chefe). Vale para ritmo (velocidade e densidade das
   balas), teto de velocidade, dano e HP. Hoje só o DIFÍCIL tem ajuste por chefe:
 
-  | DIFÍCIL | ritmo (vel./dens./teto) | dano | HP |
-  |---|---|---|---|
-  | base (`NIVEIS.dificil`) | ×1,45 / ×1,6 / ×1,3 | ×2 | ×1,9 |
-  | King | base × 1,5 / 1,7 / 1,4 | base × 2,7 | base × 1,25 (570) |
-  | Queen | base | base | base × 0,85 (436) |
-  | Jevil | base | base × 2 | base × 1,2 (707) |
-  | Coronel | base | base × 2,05 | base × 1,12 (681) |
+  | DIFÍCIL | ritmo (vel./dens./teto) | dano | HP | por acerto (carta mais forte / SUPER) |
+  |---|---|---|---|---|
+  | base (`NIVEIS.dificil`) | ×1,45 / ×1,6 / ×1,3 | ×2 | ×1,9 | |
+  | King | base × 1,5 / 1,7 / 1,4 | base × 1,8 | base × 1,2 (547) | 18 / 23 |
+  | Queen | base × 0,97 / 0,95 / 1 | base | base × 0,85 (436) | 17 / 20 |
+  | Jevil | base × 1,15 / 1,25 / 1,1 | base × 1,15 | base × 1,1 (648) | 22 / 27 |
+  | Coronel | base × 1,15 / 1,3 / 1,1 | base × 1,2 | base × 1,05 (638) | 22 / 26 |
+
+  A dificuldade vem do RITMO (balas mais rápidas e densas), não de dano
+  inflado: nenhum acerto passa de ~27 (os personagens têm 80 a 110 de HP).
 
 ### Balanceamento medido (`scripts/balanceamento/`)
 
@@ -107,17 +110,17 @@ e a medição guarda os acertos de cada rodada. `simularCoop.mjs` joga partidas
 inteiras com as regras e a CPU aliada, sorteando os acertos de cada caixa
 dessas amostras.
 
-Vitórias no DIFÍCIL (600 partidas por linha; antes → depois do ajuste de
-2026-10-08):
+Vitórias no DIFÍCIL (600 partidas por linha; antes do ajuste → depois):
 
 | Chefe | Dupla perfeita | Um de cada | Dupla média |
 |---|---|---|---|
-| King | 100% → 96% | 100% → 63% | 100% → 6% |
-| Queen | 100% → 78% | 99% → 38% | 51% → 5% |
-| Jevil | 100% → 83% | 100% → 44% | 72% → 0% |
-| Coronel | 100% → 73% | 98% → 28% | 55% → 0% |
+| King | 100% → 100% | 100% → 91% | 100% → 19% |
+| Queen | 100% → 100% | 99% → 81% | 51% → 13% |
+| Jevil | 100% → 94% | 100% → 71% | 72% → 7% |
+| Coronel | 100% → 97% | 98% → 66% | 55% → 3% |
 
-Lutas de ~9 a 11 rodadas. Antes, a dupla perfeita terminava com 80-96% do HP.
+Lutas de ~9 a 14 rodadas. A dupla "perfeita" (o bot difícil desviando) erra
+quase nada; "um de cada" é o mais parecido com uma dupla de gente.
 FÁCIL e MÉDIO não mudaram.
 
 Todos os números ficam em `COOP` e `GOLPE` (`coop/regras.js`), `DANO_CHEFE`

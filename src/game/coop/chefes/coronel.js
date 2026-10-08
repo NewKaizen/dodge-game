@@ -13,8 +13,8 @@ export default {
   },
   hp: 320,
   danoBala: 12,
-  // DIFÍCIL: mais dano e mais HP
-  niveis: { dificil: { dano: 2.05, hp: 1.12 } },
+  // DIFÍCIL: padrões mais rápidos e densos, um pouco mais de dano (SUPER ~26 por acerto)
+  niveis: { dificil: { velocidade: 1.15, densidade: 1.3, velocidadeMax: 1.1, dano: 1.2, hp: 1.05 } },
   leve: (A) => A.brasas({ duracao: 4000, intervalo: 700 }),
   fases: [
     {
@@ -50,7 +50,7 @@ export default {
         ['espadas', 10, 'Pé na Tábua', (A) => A.caminhonete({ intervalo: 1500, velocidade: 440 })],
         ['paus', 11, 'Rodovia em Chamas', (A) => A.juntos(A.caminhonete({ intervalo: 2400, re: 0 }), A.brasas({ intervalo: 420 }))],
         ['espadas', 11, 'Atropela e Espeta', (A) => A.sequencia(A.forcado({ duracao: 3500, intervalo: 1000 }), A.caminhonete({ duracao: 3500 }))],
-        ['ouros', 10, 'Fogo Cruzado', (A) => A.juntos(A.spiral({ velocidade: 140, bracos: 4 }), A.forcado({ intervalo: 1900 }))],
+        ['ouros', 10, 'Fogo Cruzado', (A) => A.juntos(A.spiral({ velocidade: 140, bracos: 3 }), A.forcado({ intervalo: 1900 }))], // 3 braços: com o forcado, sempre sobra rota de fuga no DIFÍCIL
         ['copas', 9, 'Pit Stop', null, { cura: 22, guarda: 0.6 }],
       ],
     },
