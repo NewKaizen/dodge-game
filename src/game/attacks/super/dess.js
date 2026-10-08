@@ -18,22 +18,33 @@ import { particulas } from '../../effects/particulas.js'
 //
 // Justiça:
 //   - todo acorde pisca a faixa do traste por `aviso` ms (a nota cai visível
-//     por cima, decorativa) antes de valer: a.aviso() + a.parede() (eixo x,
-//     ocupados = trastes acesos) garantem que sobra sempre pelo menos um
-//     traste inteiro livre (>= a.lacunaMinima: é assim que os trastes nascem);
+//     por cima, decorativa) antes de valer;
+//   - os avisos se sobrepõem (o próximo acorde começa a piscar antes do
+//     anterior bater), então a conta é feita com TODOS os trastes acesos ao
+//     mesmo tempo (os que ainda piscam + os que estão batendo): um traste
+//     só acende se, somado aos outros, ainda sobrar pelo menos um traste
+//     inteiro apagado (a.parede com eixo x valida essa soma). Antes, cada
+//     acorde deixava um traste livre, mas a soma dos avisos podia acender o
+//     braço inteiro;
 //   - o acorde em si dura pouco (sai suave: vira inofensivo e desaparece);
 //   - a onda de choque final nasce no centro, parada e piscando por
 //     `avisoClimax` ms (pode ficar em cima dela à vontade) antes de abrir um
 //     vão angular (sorteado perto do coração, nunca embaixo dele) e sair
 //     correndo para fora: o vão vale em QUALQUER raio, então dá tempo de se
-//     posicionar nele enquanto a onda ainda está parada.
+//     posicionar nele enquanto a onda ainda está parada. A segunda onda abre
+//     o vão perto do da primeira (no máximo `desvioVao` rad), e não do outro
+//     lado da caixa.
 //
 // Config:
 //   bpm            andamento do show (define o tempo de cada batida)
 //   aviso          aviso de cada nota da Levada (ms)
 //   avisoAcorde    aviso dos acordes (2 trastes) do Refrão
 //   avisoSolo      aviso de cada nota do Solo (mais rápido, mas nunca < telegrafoMs)
+//   notaSolo       fração do tempo entre duas notas do Solo (0.5 = meio tempo)
+//   bendSolo       a cada quantas notas do Solo vem um bend (2 trastes)
 //   avisoClimax    aviso das ondas de choque do Mergulho
+//   intervaloOndas ms entre as duas ondas de choque
+//   desvioVao      quanto o vão da 2ª onda pode se afastar do da 1ª (rad)
 //   fases          { verso, refrao, solo, climax } ms de cada parte (soma = duracao)
 const CORES_SHOW = [0xff5070, 0xffb03a, 0xffe14a, 0xffffff]
 
@@ -44,13 +55,18 @@ export default definirAtaque({
     bpm: 128,
     aviso: 650,
     avisoAcorde: 720,
-    avisoSolo: 520,
-    avisoClimax: 650,
+    avisoSolo: 600,
+    notaSolo: 0.62,
+    bendSolo: 5,
+    avisoClimax: 700,
+    intervaloOndas: 480,
+    desvioVao: 0.55,
     fases: { verso: 2500, refrao: 2500, solo: 2200, climax: 1800 },
   },
   iniciar(a, cfg) {
     const beat = Math.round(60000 / cfg.bpm)
     const palco = montarPalco(a)
+    palco.acesos = new Array(palco.lanes).fill(0) // avisos/golpes em andamento em cada traste
     const luzes = montarLuzes(a)
     let k = 0
     const corDoGolpe = () => CORES_SHOW[k++ % CORES_SHOW.length]
@@ -62,8 +78,8 @@ export default definirAtaque({
     a.aCada(
       beat,
       () => {
-        const lane = escolherTrastes(a, palco, 1, 0.5)[0]
-        acorde(a, cfg, palco, [lane], Math.max(ATAQUE.telegrafoMs, cfg.aviso), corDoGolpe())
+        const lanes = escolherTrastes(a, palco, 1, 0.5)
+        acorde(a, cfg, palco, lanes, Math.max(ATAQUE.telegrafoMs, cfg.aviso), corDoGolpe())
         ondaAmp(a, a.escolher([-1, 1]))
       },
       Math.max(1, Math.round(cfg.fases.verso / beat)),
@@ -86,19 +102,19 @@ export default definirAtaque({
 
     // ---------- III. Solo: escala correndo pelo braço ----------
     a.depois(cfg.fases.verso + cfg.fases.refrao, () => {
-      const meioBeat = beat / 2
+      const passoNota = beat * cfg.notaSolo
       let atual = Math.floor(palco.lanes / 2)
       let dir = 1
       a.aCada(
-        meioBeat,
+        passoNota,
         (i) => {
           atual += dir
           if (atual <= 0 || atual >= palco.lanes - 1) dir *= -1
-          const bend = palco.lanes > 3 && i % 5 === 4
+          const bend = palco.lanes > 3 && i % cfg.bendSolo === cfg.bendSolo - 1
           const trastes = bend ? [...new Set([atual, limitar(atual + dir, 0, palco.lanes - 1)])] : [atual]
-          acorde(a, cfg, palco, trastes, Math.max(ATAQUE.telegrafoMs, cfg.avisoSolo), corDoGolpe())
+          acorde(a, cfg, palco, livres(palco, trastes), Math.max(ATAQUE.telegrafoMs, cfg.avisoSolo), corDoGolpe())
         },
-        Math.max(1, Math.round(cfg.fases.solo / meioBeat) - 1),
+        Math.max(1, Math.round(cfg.fases.solo / passoNota) - 1),
       )
     })
 
@@ -138,21 +154,43 @@ function trasteDoAlvo(palco, alvo) {
   return limitar(Math.floor((alvo.x - palco.left) / palco.larguraReal), 0, palco.lanes - 1)
 }
 
-// sorteia `qtd` trastes ativos (sempre sobra pelo menos 1 traste inteiro livre)
+// Dos trastes pedidos, só os que podem acender sem apagar a última rota:
+// somados aos que já estão acesos (piscando ou batendo), sempre sobra pelo
+// menos um traste inteiro apagado
+function livres(palco, pedidos) {
+  const ok = []
+  for (const i of pedidos) {
+    const acesos = palco.acesos.filter((n, k) => n > 0 || ok.includes(k) || k === i).length
+    if (acesos <= palco.lanes - 1) ok.push(i)
+  }
+  return ok
+}
+
+// sorteia até `qtd` trastes para acender (contando os que já estão acesos,
+// sempre sobra pelo menos 1 traste inteiro apagado); prefere os que já estão
+// acesos ou colados neles, para o braço não acender inteiro
 function escolherTrastes(a, palco, qtd, mirar) {
   const total = palco.lanes
   const n = Math.min(qtd, total - 1)
-  const indices = new Set()
-  if (a.aleatorio(0, 1) < mirar) indices.add(trasteDoAlvo(palco, a.alvo()))
-  while (indices.size < n) indices.add(a.inteiro(0, total - 1))
-  return [...indices]
+  const indices = []
+  if (a.aleatorio(0, 1) < mirar) indices.push(...livres(palco, [trasteDoAlvo(palco, a.alvo())]))
+  for (let tentativa = 0; indices.length < n && tentativa < 12; tentativa++) {
+    const i = a.inteiro(0, total - 1)
+    if (!indices.includes(i)) indices.push(...livres(palco, [...indices, i]).filter((k) => !indices.includes(k)))
+  }
+  return indices
 }
 
 // ---------- o acorde: a nota cai, o traste acende, o golpe bate ----------
 
 function acorde(a, cfg, palco, lanes, aviso, cor) {
   const l = a.caixa
-  a.parede({ eixo: 'x', ocupados: lanes.map((i) => [palco.left + i * palco.larguraReal, palco.left + (i + 1) * palco.larguraReal]) })
+  if (!lanes.length) return
+  for (const i of lanes) palco.acesos[i]++
+  // a parede é a soma de tudo que está aceso agora (este acorde + os anteriores ainda piscando/batendo)
+  const ocupados = []
+  palco.acesos.forEach((n, i) => n > 0 && ocupados.push([palco.left + i * palco.larguraReal, palco.left + (i + 1) * palco.larguraReal]))
+  a.parede({ eixo: 'x', ocupados })
 
   for (const i of lanes) {
     const x = palco.trastes[i].x
@@ -183,7 +221,10 @@ function acorde(a, cfg, palco, lanes, aviso, cor) {
           pulso: 0,
           // meio transparente: o coração continua visível através do golpe
           atualizar: (b) => {
-            if (b.vida < 110) b.inofensiva = true
+            if (b.vida < 110 && !b.inofensiva) {
+              b.inofensiva = true
+              palco.acesos[i]-- // o traste apaga: já pode acender de novo
+            }
             b.sprite.setAlpha(0.72 * Math.min(1, b.vida / 110))
           },
         })
@@ -237,17 +278,19 @@ function climax(a, cfg, palco) {
     a.cena.add.image(cx, l.top - 50, 'super-dess-guitarra').setDepth(8).setScale(0.9).setAngle(-16).setAlpha(0.97),
   )
   tocar(a.cena, 'super-dess-mergulho')
+  let vao = null
   a.cena.tweens.add({ targets: guitarra, y: cy, angle: 0, duration: 420, ease: 'Cubic.easeIn' })
 
-  a.depois(420, () => {
+  // onde a guitarra crava pisca enquanto ela cai (a pancada do centro também é avisada)
+  a.aviso({ tipo: 'circulo', x: cx, y: cy, raio: 18, ms: Math.max(ATAQUE.telegrafoMs, 420), cor: 0xffe14a }, () => {
     tocar(a.cena, 'super-dess-estouro')
     shake(a.cena, 220, 0.014)
     particulas(a.cena, cx, cy, { cor: 0xffe14a, quantidade: 22, velocidade: 210, vida: 420 })
     a.cena.tweens.add({ targets: guitarra, angle: 6, duration: 50, yoyo: true, repeat: 6 })
     a.bala({ x: cx, y: cy, raio: 15, textura: 'super-dess-impacto', tamanho: 50, cor: 0xffe14a, jaAvisada: true, atravessa: true, vida: 180, pulso: 0 })
-    anelChoque(a, cfg, cx, cy)
+    vao = anelChoque(a, cfg, cx, cy)
   })
-  a.depois(420 + 320, () => anelChoque(a, cfg, cx, cy))
+  a.depois(420 + cfg.intervaloOndas, () => anelChoque(a, cfg, cx, cy, vao))
 
   a.depois(cfg.fases.climax - 180, () => {
     a.cena.tweens.add({ targets: guitarra, alpha: 0, scale: 1.3, duration: 260 })
@@ -256,15 +299,16 @@ function climax(a, cfg, palco) {
 
 // onda de choque circular que nasce no centro (parada, piscando) e sai
 // correndo para fora com um vão angular (vale em qualquer raio: dá pra entrar
-// nele enquanto a onda ainda está parada, piscando)
-function anelChoque(a, cfg, cx, cy) {
+// nele enquanto a onda ainda está parada, piscando). Com `vaoAnterior`, o vão
+// fica perto do da onda anterior (devolve o vão, para a próxima)
+function anelChoque(a, cfg, cx, cy, vaoAnterior = null) {
   const l = a.caixa
   const alvo = a.alvo()
   const raio = Math.hypot(l.width, l.height) / 2 + 30
   const quantidade = 18
   const abertura = 1.0
   const angAlvo = Math.atan2(alvo.y - cy, alvo.x - cx)
-  const vao = angAlvo + a.escolher([-1, 1]) * a.aleatorio(0.8, 1.7)
+  const vao = vaoAnterior === null ? angAlvo + a.escolher([-1, 1]) * a.aleatorio(0.8, 1.7) : vaoAnterior + a.escolher([-1, 1]) * a.aleatorio(0.2, cfg.desvioVao)
   a.lacuna(abertura * raio * 0.5, 'vão da onda de choque')
   const aviso = Math.max(ATAQUE.telegrafoMs, cfg.avisoClimax)
   const passo = (Math.PI * 2 - abertura) / (quantidade - 1)
@@ -287,4 +331,5 @@ function anelChoque(a, cfg, cx, cy) {
       atravessa: true,
     })
   }
+  return vao
 }

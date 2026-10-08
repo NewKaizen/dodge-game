@@ -23,7 +23,9 @@ import { particulas } from '../../effects/particulas.js'
 // Justiça:
 //   - o puxão/empurrão nunca passa de `forcaMax` px/s (o coração anda
 //     CORACAO.velocidadePadrao = 180): sempre dá para fugir; só começa depois
-//     do primeiro pulso piscar, e para nas pausas de respiro;
+//     do primeiro pulso piscar, e para nas pausas de respiro; o puxão para
+//     `FOLGA_PUXAO` px antes da borda do vazio (sozinho, nunca encosta o
+//     coração nele: quem machuca é o vazio crescer, e isso pisca antes);
 //   - o vazio pisca no tamanho novo (`aviso`) antes de cada pulso, e o raio
 //     máximo sempre deixa um anel >= lacunaMinima até a borda mais perto;
 //   - as estrelas da espiral nascem paradas e piscando (aviso de a.bala); no
@@ -36,10 +38,11 @@ import { particulas } from '../../effects/particulas.js'
 // Config: vazio, espiral, nova (objetos parciais completam com PADRAO)
 const ARCO = [0xff4a5a, 0xffa23a, 0xffe14a, 0x5ae06a, 0x4ab8ff, 0xa66bff]
 const TAU = Math.PI * 2
+const FOLGA_PUXAO = 6 // px entre o coração e a borda do vazio onde o puxão para
 
 const PADRAO = {
   vazio: { fracoes: [0.32, 0.55, 0.78, 1], tempos: [0, 1150, 2300, 3400], aviso: 650, margem: 6, forcas: [28, 46, 62, 74] },
-  espiral: { bracos: 3, inicio: 500, intervalo: 560, giroBracos: 0.72, velRadial: 34, velTangencial: 70, omegaMax: 5.5, aviso: 520 },
+  espiral: { bracos: 3, inicio: 500, intervalo: 620, giroBracos: 0.72, velRadial: 34, velTangencial: 70, omegaMax: 4.2, aviso: 520 },
   nova: { aneis: 5, intervalo: 720, estrelas: 18, abertura: 1.25, passoBrecha: 0.85, velocidade: 105, aviso: 520, raioNo: 40, empurrao: 58, duracaoEmpurrao: 3600 },
   forcaMax: 80,
 }
@@ -118,8 +121,10 @@ function puxar(a, g, cx, cy, forca, dt) {
     const dy = cy - c.y
     const d = Math.hypot(dx, dy)
     if (d < 1) continue
-    // puxando: não arrasta para dentro do próprio vazio (para na borda dele)
-    const mover = forca > 0 ? Math.min(passo, Math.max(0, d - g.raioVazio)) : passo
+    // puxando: não arrasta para dentro do próprio vazio. Para um pouco antes
+    // da borda dele (hitbox + folga): o puxão sozinho nunca causa dano
+    const borda = g.raioVazio + (c.hitbox ?? 5) + FOLGA_PUXAO
+    const mover = forca > 0 ? Math.min(passo, Math.max(0, d - borda)) : passo
     c.x += (dx / d) * mover
     c.y += (dy / d) * mover
     c.ajustar()

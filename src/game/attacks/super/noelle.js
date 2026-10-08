@@ -28,10 +28,14 @@ import { particulas } from '../../effects/particulas.js'
 //     antes de quebrar de vez; nunca quebra "no escuro";
 //   - uma queda (mirada ou por ficar parado) só acontece se sobrar mais placas
 //     inteiras que o mínimo da fase (`minimoSeguras` no Ato I,
-//     `minimoSeguraNevasca` na nevasca) — sempre sobra pelo menos uma placa
-//     inteira, e cada placa tem lado >= LACUNA_MINIMA;
+//     `minimoSeguraNevasca` na nevasca) — sempre sobram placas inteiras
+//     (2 no fim: com 1 só o coração ficava ilhado), e cada placa tem lado
+//     >= LACUNA_MINIMA;
+//   - o abismo machuca só no miolo da placa quebrada: entre dois buracos fica
+//     uma beirada (ABISMO_FOLGA) por onde dá para atravessar com cuidado;
 //   - a estrela final sempre deixa duas lanças vizinhas de fora (a brecha),
-//     orientada para perto de onde o coração está quando o aviso começa.
+//     orientada para a placa inteira mais perto do coração quando o aviso
+//     começa; nenhuma lança atravessa essa placa.
 //
 // Config:
 //   avisoQueda            ms de aviso do pingente caindo até bater na placa
@@ -48,12 +52,12 @@ export default definirAtaque({
   padrao: {
     duracao: 9000,
     avisoQueda: 520,
-    avisoRacha: 620,
-    parado: 1450,
+    avisoRacha: 560,
+    parado: 1300,
     quedas: [350, 1250, 2150, 3050, 3950, 4800],
-    quedasNevasca: [5900, 6500, 7100, 7700],
+    quedasNevasca: [5800, 6300, 6800, 7300, 7800],
     minimoSeguras: 3,
-    minimoSeguraNevasca: 1,
+    minimoSeguraNevasca: 2,
     nevasca: 5300,
     fimNevasca: 7900,
     raios: 8,
@@ -202,6 +206,10 @@ function impactoPingente(a, cfg, grade, tile) {
   )
 }
 
+// o abismo machuca um pouco para dentro da placa: entre dois buracos sobra uma
+// beirada de ABISMO_FOLGA px por onde o coração (hitbox 5) ainda passa com cuidado
+const ABISMO_FOLGA = 14
+
 // a placa quebra de vez: vira um abismo que machuca pelo resto do ataque (não volta)
 function quebrarPlaca(a, tile) {
   if (tile.estado === 'quebrada') return
@@ -215,7 +223,7 @@ function quebrarPlaca(a, tile) {
   }
   tile.img.setTexture('super-noelle-buraco').setAlpha(0.95)
   particulas(a.cena, tile.x, tile.y, { cor: 0xeaf7ff, quantidade: 14, velocidade: 170, vida: 420 })
-  invisivel(a.bala({ x: tile.x, y: tile.y, largura: tile.w - 10, altura: tile.h - 10, jaAvisada: true, atravessa: true, pulso: 0 }))
+  invisivel(a.bala({ x: tile.x, y: tile.y, largura: tile.w - ABISMO_FOLGA, altura: tile.h - ABISMO_FOLGA, jaAvisada: true, atravessa: true, pulso: 0 }))
 }
 
 // ---------- ato II: a nevasca ----------
@@ -268,8 +276,14 @@ function estilhacar(a, cfg, grade) {
   const cy = l.centerY
   const raios = cfg.raios
   const passo = (Math.PI * 2) / raios
+  // a brecha mira a placa inteira mais perto do coração (não o coração em si:
+  // em cima de um buraco a brecha não salvaria ninguém), e nenhuma lança
+  // atravessa essa placa
   const alvo = a.alvo()
-  const gapIndex = Math.round(Math.atan2(alvo.y - cy, alvo.x - cx) / passo)
+  const seguras = segurasRestantes(grade)
+  const refugio = seguras.length ? seguras.reduce((p, q) => (Math.hypot(q.x - alvo.x, q.y - alvo.y) < Math.hypot(p.x - alvo.x, p.y - alvo.y) ? q : p)) : alvo
+  const gapIndex = Math.round(Math.atan2(refugio.y - cy, refugio.x - cx) / passo)
+  const folgaRefugio = a.lacunaMinima / 2 + 8
   const aviso = Math.max(ATAQUE.telegrafoMs, cfg.avisoEstrela)
   const comp = Math.hypot(l.width, l.height) / 2 + 24
 
@@ -281,8 +295,15 @@ function estilhacar(a, cfg, grade) {
     const ang = i * passo
     const x2 = cx + Math.cos(ang) * comp
     const y2 = cy + Math.sin(ang) * comp
+    if (distanciaAoRaio(refugio, cx, cy, ang, comp) < folgaRefugio) continue
     a.aviso({ tipo: 'linha', x1: cx, y1: cy, x2, y2, espessura: 14, ms: aviso }, () => dispararRaio(a, cx, cy, ang, comp))
   }
+}
+
+// distância de um ponto até a lança (segmento do centro até `comp` no ângulo `ang`)
+function distanciaAoRaio(p, cx, cy, ang, comp) {
+  const t = Math.max(0, Math.min(comp, (p.x - cx) * Math.cos(ang) + (p.y - cy) * Math.sin(ang)))
+  return Math.hypot(p.x - (cx + Math.cos(ang) * t), p.y - (cy + Math.sin(ang) * t))
 }
 
 function dispararRaio(a, cx, cy, ang, comp) {

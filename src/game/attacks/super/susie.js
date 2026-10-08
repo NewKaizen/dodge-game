@@ -16,8 +16,8 @@ import { particulas } from '../../effects/particulas.js'
 //      vizinha). Depois a Susie arranca o machado e os buracos se fecham.
 //   2. Rude Buster: meias-luas de energia roxa varrem a caixa de uma borda à
 //      outra. As faixas que vão ser varridas piscam antes (o vão fica apagado):
-//      vão embaixo, vão em cima, vão no meio e, por fim, uma de cima para
-//      baixo com o vão do outro lado da caixa.
+//      vão embaixo, vão em cima, vão no meio, vão do outro lado da caixa e,
+//      por fim, uma de cima para baixo com o vão do outro lado da caixa.
 //
 // Justiça:
 //   - a coluna da machadada pisca `aviso` ms (sombra crescendo) antes de valer;
@@ -34,8 +34,8 @@ import { particulas } from '../../effects/particulas.js'
 //   buster      { inicios, aviso, avisoFinal, velocidade, lacuna }
 //   empurrao    { velocidade, ms }
 const PADRAO = {
-  machadadas: { inicios: [150, 1450, 2750], aviso: 700, cravado: 900, pedras: 3, velocidadePedra: 100, avisoPedra: 420, avisoBuraco: 600, buraco: 1500 },
-  buster: { inicios: [4550, 5500, 6450, 7450], aviso: 650, avisoFinal: 800, velocidade: 280, lacuna: 64 },
+  machadadas: { inicios: [150, 1150, 2150, 3150], aviso: 620, cravado: 900, pedras: 4, velocidadePedra: 125, avisoPedra: 420, avisoBuraco: 560, buraco: 1600 },
+  buster: { inicios: [4400, 5200, 6000, 6800, 7650], aviso: 600, avisoFinal: 750, velocidade: 310, lacuna: 60 },
   empurrao: { velocidade: 110, ms: 220 },
 }
 
@@ -44,6 +44,7 @@ const PLANOS = [
   { de: 'esquerda', vao: 'baixo' },
   { de: 'direita', vao: 'cima' },
   { de: 'esquerda', vao: 'meio' },
+  { de: 'direita', vao: 'longe' },
   { de: 'cima', vao: 'longe' },
 ]
 

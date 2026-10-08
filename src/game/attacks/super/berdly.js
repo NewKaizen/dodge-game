@@ -38,6 +38,9 @@ import { particulas } from '../../effects/particulas.js'
 //     e o caminho dele é mostrado antes;
 //   - cada página da rajada nasce no centro já com o aviso mínimo piscando
 //     antes de voar; são poucas e se espalham em leque, nunca uma parede;
+//   - a lâmina final é rápida demais para fugir depois que começa a girar:
+//     durante o aviso dela pisca o círculo INTEIRO que ela vai varrer (não só
+//     a lâmina parada), e os cantos da caixa ficam fora dele;
 //   - o corte final telegrafa a linha inteira (como os cortes do Kris) antes
 //     de valer.
 //
@@ -51,6 +54,7 @@ import { particulas } from '../../effects/particulas.js'
 //   velocidadePagina, avisoPagina, girarPagina
 //   pausaFinal       ms de silêncio entre o redemoinho sumir e o giro final começar
 //   avisoGiroFinal   ms de aviso da lâmina final antes dela começar a girar
+//   escalaFinal      tamanho da lâmina final (x a lâmina da última volta)
 //   omegaFinal       rad/s do giro final
 //   voltasFinais     quantas voltas o giro final dá antes do corte
 //   avisoCorteFinal  ms de aviso do corte final
@@ -60,21 +64,22 @@ export default definirAtaque({
     duracao: 9000,
     pas: 3,
     avisoPas: 650,
-    omegaInicial: 3.7,
+    omegaInicial: 3.5,
     bonusPorVolta: 0.1,
     voltas: 3,
-    rajadaBase: 7,
+    rajadaBase: 8,
     rajadaPasso: 1,
-    velocidadePagina: 150,
+    velocidadePagina: 165,
     avisoPagina: 420,
     girarPagina: 6,
-    pausaFinal: 400,
-    avisoGiroFinal: 600,
-    omegaFinal: 9,
+    pausaFinal: 300,
+    avisoGiroFinal: 650,
+    escalaFinal: 1.05,
+    omegaFinal: 10,
     voltasFinais: 2,
-    avisoCorteFinal: 700,
+    avisoCorteFinal: 600,
     raio: 0.32, // fração do menor lado da caixa (comprimento da lâmina na 1ª volta)
-    oito: { ax: 0.27, ay: 0.2, periodo: 4200 }, // o 8 do pivô (frações da caixa, ms por volta do 8)
+    oito: { ax: 0.27, ay: 0.2, periodo: 4500 }, // o 8 do pivô (frações da caixa, ms por volta do 8)
   },
   iniciar(a, cfg) {
     const l = a.caixa
@@ -268,11 +273,13 @@ function desmontarOrbita(a, orbita) {
 // ---------- III. giro final: uma lâmina só, maior, dourada e bem mais rápida ----------
 
 function girarFinal(a, cfg, cx, cy, raioBase) {
-  const raio = raioBase * 1.18
+  const raio = raioBase * cfg.escalaFinal
   const espessura = Math.max(24, raio * 0.3)
   const aviso = Math.max(ATAQUE.telegrafoMs, cfg.avisoGiroFinal)
   tocar(a.cena, 'super-berdly-giro')
   particulas(a.cena, cx, cy, { cor: 0xd8f05a, quantidade: 16, velocidade: 140, vida: 380 })
+  // o círculo inteiro que a lâmina vai varrer pisca junto com ela: fora dele é seguro
+  a.aviso({ tipo: 'circulo', x: cx, y: cy, raio: raio + espessura / 2, ms: aviso, cor: 0xd8f05a })
 
   const bala = a.bala({
     x: cx + raio / 2,
