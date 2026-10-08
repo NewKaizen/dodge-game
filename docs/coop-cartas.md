@@ -81,16 +81,47 @@ O SUPER do chefe não pode ser anulado, refletido, roubado nem varrido.
 - **SUPER do chefe** (★): a carga sobe 1 por rodada desde o começo e enche a
   cada **10 rodadas** (rodada 10, 20...): o chefe joga o SUPER nas duas caixas
   ao mesmo tempo. O alto da mesa mostra quantas rodadas faltam.
-- HP próprio do modo cartas (`hp` no baralho do chefe) × nível (`NIVEIS.hp`):
+- HP próprio do modo cartas (`hp` no baralho do chefe) × nível:
   King 240, Queen 270, Jevil 310, Coronel 320 no FÁCIL.
 - Dano por bala das cartas do chefe: `danoBala` × 0,45 (2) a 0,75 (K); SUPER × 0,9;
-  o ataque fraquinho do ♥ × 0,3; tudo × `NIVEIS.dano`.
+  o ataque fraquinho do ♥ × 0,3; tudo × o dano do nível.
+- **Nível da luta** (`nivelDoChefe(chefe, nivel)` em `coop/chefes/index.js`):
+  `NIVEIS[nivel]` (`constants.js`) vezes o ajuste do chefe naquele nível
+  (`niveis` no arquivo do chefe). Vale para ritmo (velocidade e densidade das
+  balas), teto de velocidade, dano e HP. Hoje só o DIFÍCIL tem ajuste por chefe:
 
-Balanceamento (simulação com os bots, ~2,5 acertos por caixa, nível FÁCIL):
-King ~7 rodadas, Queen/Jevil/Coronel ~9-10 rodadas, vitória de 60% a 100%.
+  | DIFÍCIL | ritmo (vel./dens./teto) | dano | HP |
+  |---|---|---|---|
+  | base (`NIVEIS.dificil`) | ×1,45 / ×1,6 / ×1,3 | ×2 | ×1,9 |
+  | King | base × 1,5 / 1,7 / 1,4 | base × 2,7 | base × 1,25 (570) |
+  | Queen | base | base | base × 0,85 (436) |
+  | Jevil | base | base × 2 | base × 1,2 (707) |
+  | Coronel | base | base × 2,05 | base × 1,12 (681) |
 
-Todos os números ficam em `COOP` e `GOLPE` (`coop/regras.js`) e `DANO_CHEFE`
-(`coop/cartasChefe.js`).
+### Balanceamento medido (`scripts/balanceamento/`)
+
+`medirChefes.mjs` roda cada carta de cada chefe numa caixa do tamanho da
+arena, com o ritmo, o teto e o dano de verdade de cada nível. O EsquivaBot
+desvia como um jogador "perfeito" (bot difícil) e como um "médio" (bot normal),
+e a medição guarda os acertos de cada rodada. `simularCoop.mjs` joga partidas
+inteiras com as regras e a CPU aliada, sorteando os acertos de cada caixa
+dessas amostras.
+
+Vitórias no DIFÍCIL (600 partidas por linha; antes → depois do ajuste de
+2026-10-08):
+
+| Chefe | Dupla perfeita | Um de cada | Dupla média |
+|---|---|---|---|
+| King | 100% → 96% | 100% → 63% | 100% → 6% |
+| Queen | 100% → 78% | 99% → 38% | 51% → 5% |
+| Jevil | 100% → 83% | 100% → 44% | 72% → 0% |
+| Coronel | 100% → 73% | 98% → 28% | 55% → 0% |
+
+Lutas de ~9 a 11 rodadas. Antes, a dupla perfeita terminava com 80-96% do HP.
+FÁCIL e MÉDIO não mudaram.
+
+Todos os números ficam em `COOP` e `GOLPE` (`coop/regras.js`), `DANO_CHEFE`
+(`coop/cartasChefe.js`), `NIVEIS` (`constants.js`) e `niveis` de cada chefe.
 
 ## Caídos
 

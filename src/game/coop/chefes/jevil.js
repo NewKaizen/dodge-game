@@ -27,6 +27,8 @@ export default {
   },
   hp: 310,
   danoBala: 13,
+  // DIFÍCIL: mais dano e mais HP (os padrões dele são os mais fáceis de ler)
+  niveis: { dificil: { dano: 2, hp: 1.2 } },
   leve: (A) => A.quicantes({ forma: 'ouros', duracao: 4000, intervalo: 1500, velocidade: 150 }),
   fases: [
     {
@@ -60,7 +62,7 @@ export default {
       cartas: [
         ['ouros', 11, 'Carrossel Maluco', (A) => A.juntos(A.carrossel({ aneis: CARROSSEL_RAPIDO(1.5, -1.1) }), A.divisores({ intervalo: 1600, forma: 'paus' }))],
         ['espadas', 10, 'Lâmina Louca', (A) => A.foice({ varridas: 4, travessia: 1500 })],
-        ['paus', 10, 'Chuva de Naipes', (A) => A.juntos(A.anel({ forma: 'copas', intervalo: 2200 }), A.rain({ forma: 'espadas', intervalo: 380, velocidade: 170 }))],
+        ['paus', 10, 'Chuva de Naipes', (A) => A.juntos(A.anel({ forma: 'copas', intervalo: 2400 }), A.rain({ forma: 'espadas', intervalo: 460, velocidade: 170 }))], // chuva espaçada: com o anel, sempre sobra rota de fuga no DIFÍCIL
         ['paus', 9, 'BUM!', (A) => A.bombas({ intervalo: 1100, fragmentos: 10, velocidade: 160 })],
         ['copas', 9, 'Gargalhada', null, { cura: 22, guarda: 0.6 }],
       ],

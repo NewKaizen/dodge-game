@@ -51,6 +51,15 @@ node scripts/balanceamento/resumo.mjs depois.json antes.json     # tabelas (DETA
 
 Os números da última rodada estão em `docs/pvp-regras.md` ("Balanceamento medido com o bot").
 
+Para os chefes do CO-OP (cada carta em cada nível, e partidas inteiras sorteando os acertos medidos):
+
+```sh
+node scripts/balanceamento/medirChefes.mjs chefes.json 6                  # [sementes] [chefes: king,jevil] [niveis: facil,medio,dificil]
+node scripts/balanceamento/simularCoop.mjs chefes.json 600                # % de vitória por chefe e nível (dupla perfeita, mista e média)
+```
+
+Os números estão em `docs/coop-cartas.md` ("Balanceamento medido").
+
 ## Músicas (MIDI)
 
 Solte `<nome>.mid` em `public/assets/musicas/` (veja o `LEIA-ME.txt` de lá). O jogo toca com um soundfont General MIDI (`game/midi.js`, biblioteca spessasynth_lib), em loop e com fade entre as músicas. `debugJogo.musica()` mostra o que está tocando.

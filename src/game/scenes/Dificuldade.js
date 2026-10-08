@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import Controles from '../controles.js'
-import { CHEFES } from '../coop/chefes/index.js'
+import { CHEFES, nivelDoChefe } from '../coop/chefes/index.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { ESCALA } from '../arte/texturas.js'
 import { tocar, musica, pararMusica } from '../audio.js'
@@ -56,7 +56,7 @@ export default class Dificuldade extends Phaser.Scene {
 
     // opções, à direita
     this.opcoes = ORDEM_NIVEIS.map((id, i) => {
-      const nivel = NIVEIS[id]
+      const nivel = nivelDoChefe(this.idChefe, id)
       const y = OPCAO.y + i * OPCAO.passo
       const esquerda = OPCAO.x - OPCAO.largura / 2 + 14
       const moldura = this.add.rectangle(OPCAO.x, y, OPCAO.largura, OPCAO.altura, CORES.painel, 0.88).setStrokeStyle(3, 0x505050)

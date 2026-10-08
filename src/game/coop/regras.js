@@ -29,7 +29,7 @@ import { ENERGIA, hpInicial, aplicarDano, curar } from '../pvp/regras.js'
 // o combo de perfeitos é o mesmo do PvP (mesmo formato de jogadores)
 export { COMBO_PERFEITO, multiplicadorPerfeito, registrarPerfeitoCombo, quebrarSequencia } from '../pvp/regras.js'
 import { especialDaCarta, efeitosDaCarta, ehSuper } from '../pvp/cartas.js'
-import { CHEFES } from './chefes/index.js'
+import { CHEFES, nivelDoChefe } from './chefes/index.js'
 import { CARTAS_CHEFES, faseDoChefe, suporteDoChefe, danoDaCartaChefe, ritmoDaCartaChefe, inverteControles, poderDaCartaChefe } from './cartasChefe.js'
 
 
@@ -105,7 +105,7 @@ const outro = (j) => 1 - j
 export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coop' }) {
   const def = CHEFES[chefe]
   if (!def) throw new Error(`chefe sem baralho de cartas: ${chefe}`)
-  const niv = NIVEIS[nivel] ?? NIVEIS.facil
+  const niv = nivelDoChefe(chefe, nivel)
   const rng = criarRng(`${semente}:coop`)
   const jogador = (personagem, j) => {
     const hp = hpInicial(personagem)

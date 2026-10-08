@@ -14,6 +14,8 @@ export default {
   },
   hp: 270,
   danoBala: 11,
+  // DIFÍCIL: os padrões da Queen já ficam muito densos no difícil: um pouco menos de HP
+  niveis: { dificil: { hp: 0.85 } },
   leve: (A) => A.ondas({ duracao: 4000, velocidade: 110, intervalo: 1300 }),
   fases: [
     {

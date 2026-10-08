@@ -2,6 +2,7 @@ import king from './king.js'
 import queen from './queen.js'
 import jevil from './jevil.js'
 import coronel from './coronel.js'
+import { NIVEIS } from '../../constants.js'
 
 // Chefes do CO-OP de cartas, na ordem da tela de seleção. Lógica pura: os
 // ataques recebem a biblioteca attacks/ como parâmetro A (como no PvP).
@@ -22,7 +23,20 @@ import coronel from './coronel.js'
 //                              ♥ (ataque null): extras { cura, guarda } — o chefe se cura e a
 //                                guarda reduz o próximo contra-ataque (fator do dano); manda `leve`
 //                              extras.inverter: inverte os controles durante o ataque
-//   super                    { nome, texto, criar: (A) => ataque } SUPER do chefe, da 2ª
-//                            fase em diante (barra de carga): vai nas duas caixas
+//   niveis                   opcional { <nivel>: { velocidade, densidade, velocidadeMax, dano, hp } }:
+//                            ajuste deste chefe em cima de NIVEIS naquele nível (nivelDoChefe)
+//   super                    { nome, texto, criar: (A) => ataque } SUPER do chefe (barra de
+//                            carga, a cada COOP.cargaSuper rodadas): vai nas duas caixas
 export const CHEFES = { king, queen, jevil, coronel }
+
+const FATORES = ['velocidade', 'densidade', 'velocidadeMax', 'dano', 'hp']
+
+// O nível da luta contra este chefe: NIVEIS[nivel] vezes o ajuste do chefe
+// naquele nível (def.niveis). Use isto (e não NIVEIS direto) para ritmo, teto
+// de velocidade, dano e HP. rotulo, cor e fundo vêm do NIVEIS.
+export function nivelDoChefe(chefe, nivel) {
+  const base = NIVEIS[nivel] ?? NIVEIS.facil
+  const ajuste = CHEFES[chefe]?.niveis?.[nivel] ?? {}
+  return { ...base, ...Object.fromEntries(FATORES.map((k) => [k, base[k] * (ajuste[k] ?? 1)])) }
+}
 export const ORDEM_CHEFES = ['king', 'queen', 'jevil', 'coronel']
