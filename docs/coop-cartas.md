@@ -96,7 +96,7 @@ O SUPER do chefe não pode ser anulado, refletido, roubado nem varrido.
   | King | base × 1,5 / 1,7 / 1,4 | base × 1,8 | base × 1,2 (547) | 18 / 23 |
   | Queen | base × 0,97 / 0,95 / 1 | base | base × 0,85 (436) | 17 / 20 |
   | Jevil | base × 1,15 / 1,25 / 1,1 | base × 1,15 | base × 1,1 (648) | 22 / 27 |
-  | Coronel | base × 1,15 / 1,3 / 1,1 | base × 1,2 | base × 1,05 (638) | 22 / 26 |
+  | Coronel | base | base × 1,1 | base × 0,9 (547) | 20 / 24 |
 
   A dificuldade vem do RITMO (balas mais rápidas e densas), não de dano
   inflado: nenhum acerto passa de ~27 (os personagens têm 80 a 110 de HP).
@@ -117,7 +117,13 @@ Vitórias no DIFÍCIL (600 partidas por linha; antes do ajuste → depois):
 | King | 100% → 100% | 100% → 91% | 100% → 19% |
 | Queen | 100% → 100% | 99% → 81% | 51% → 13% |
 | Jevil | 100% → 94% | 100% → 71% | 72% → 7% |
-| Coronel | 100% → 97% | 98% → 66% | 55% → 3% |
+| Coronel | 100% → 89% | 98% → 55% | 55% → 2% |
+
+Coronel com o TRÂNSITO (caminhonete estilo Frogger: faixas em fila, vãos
+garantidos, faróis avisando e ré com luz de freio) e o FORCADO novo (estoca
+de cima/de baixo, crava e espirra palha); "Atropela e Espeta" é o forcado
+estocando no meio do trânsito. Esses ataques já apertam sozinhos, então o
+Coronel não tem ritmo extra no DIFÍCIL.
 
 Lutas de ~9 a 14 rodadas. A dupla "perfeita" (o bot difícil desviando) erra
 quase nada; "um de cada" é o mais parecido com uma dupla de gente.

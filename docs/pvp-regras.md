@@ -151,7 +151,7 @@ Efeitos de copas (cada carta junta um ou mais):
 Ficar parado não é mais uma estratégia: quase todo padrão tem uma parte mirada no coração (`mirar` nos ataques, sobe com a força da carta).
 
 - `foice` (Giro do Machado, Machadada, Chaos Saber...): machado bumerangue que mira a faixa do coração, volta pelo outro lado, alterna varridas horizontais e verticais e solta faíscas.
-- `forcado`: o forcado segue a fileira do coração enquanto está parado lá dentro; a cada 3 estocadas vem a pinça (um de cada lado, vãos desencontrados).
+- `forcado`: o forcado de 3 dentes estoca de cima (e de baixo, alternando) na coluna do coração e crava; o vão entre os dentes é seguro e, na cravada, a palha espirra pelos lados. A cada 3 estocadas vem a pinça (um de cima e um de baixo, vãos desencontrados).
 - `rachaduras` (Chão Rachado, Dinamite, Emboscada): o chão racha passando pelo coração e solta espinhos; nas cartas fortes, estilhaços.
 - `carrossel`: os anéis respiram forte, invertem o giro (piscam antes), o centro persegue o coração e atiram balas miradas.
 - `caosFinal` (Caos Final, K♦ do Asriel): estrelas miradas → cruz do caos giratória → anel que colapsa no coração e explode.

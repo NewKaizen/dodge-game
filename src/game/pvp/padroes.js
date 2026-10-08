@@ -71,7 +71,7 @@ export const P = {
   bombas: (A, t, o = {}) =>
     A.bombas({ duracao: duracaoDe(t), intervalo: lerp(1800, 1150, t) * esp(o), fragmentos: t >= 0.6 ? 10 : 8, velocidade: lerp(120, 160, t), mirar: 0.4 + 0.3 * t, ...sem(o) }),
   forcado: (A, t, o = {}) =>
-    A.forcado({ duracao: duracaoDe(t), intervalo: lerp(1800, 1200, t) * esp(o), parada: lerp(300, 200, t), rastrear: lerp(40, 75, t), profundidade: t >= 0.4 ? 0.2 : 0.1, pinca: t >= 0.55 ? 3 : 0, ...sem(o) }),
+    A.forcado({ duracao: duracaoDe(t), intervalo: lerp(1500, 1100, t) * esp(o), parada: lerp(320, 220, t), profundidade: t >= 0.4 ? 0.28 : 0.18, palha: 3, velocidadePalha: lerp(110, 140, t), pinca: t >= 0.55 ? 3 : 0, ...sem(o) }),
   rachaduras: (A, t, o = {}) =>
     A.rachaduras({ duracao: duracaoDe(t), intervalo: lerp(1350, 850, t) * esp(o), ramos: t >= 0.75 ? 5 : t >= 0.45 ? 4 : 3, comprimento: lerp(85, 110, t), aviso: lerp(700, 560, t), fragmentos: t >= 0.6 ? 3 : 0, velocidade: lerp(100, 140, t), ...sem(o) }),
   // finalização em 3 fases; pensado para t alto (com duracao < ~6000 o colapso não chega a explodir)
@@ -105,7 +105,7 @@ export const TEXTOS = {
   carrossel: 'Anéis que giram, invertem e perseguem o coração',
   foice: 'Machado bumerangue mira a faixa do coração e volta',
   bombas: 'Bombas com contagem que explodem em estilhaços',
-  forcado: 'Forcado entra pela lateral e persegue sua fileira',
+  forcado: 'Forcado estoca de cima e de baixo na sua coluna, crava e espirra palha (o vão entre os dentes é seguro)',
   rachaduras: 'O chão racha sob o coração e solta espinhos',
   caosFinal: 'Estrelas, cruz do caos e colapso final',
 }
