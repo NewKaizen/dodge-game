@@ -307,3 +307,11 @@ O Asriel ainda dá um pouco mais de dano por carta porque tem mais figuras (o da
 | 3♦ Shocker Breaker | 1,1 → 0,75 | raios mais espaçados; na caixa apertada a corrente perde a 3ª coluna se ela fechar a rota de fuga |
 
 A carta mais difícil do jogo agora é o K♠ Show de Rock da Dess (3 acertos no bot médio, ~40 de dano), fora deste ajuste.
+
+**2026-10-08: K♠ Show de Rock refeito** (`dessShow` em `attacks/habilidades/dess.js`). Saíram as
+paredes do riff com notas teleguiadas; entrou a ESTRADA DE NOTAS do show (estilo Guitar Hero):
+4 cordas coloridas, acordes caindo no ritmo com sempre uma corda livre (que anda no máximo uma
+casa por batida), colcheias no contratempo fora do caminho livre e pirotecnia no refrão numa
+corda longe da livre. Medido (24 sementes): bot médio **~40 → 11,4** (0,88 acerto), perfeito 2,2;
+nenhum aviso do validador. Fica na faixa das cartas fortes da Dess (Solo 11, Amplificador 11,
+Palco Explosivo 16,5, Feedback 20).
