@@ -23,7 +23,7 @@ Testes: `npm test` (ou `node --test src/game/pvp/__tests__/*.test.js`).
    5. o escudo de quem recebe reduz o dano por bala daquele ataque (e é gasto);
    6. ♣ Roubo pega uma carta sorteada da mão do outro.
 4. A cena roda `caixas[j]` (o que o jogador j desvia): `{ carta, de, refletida, dano, ritmo, inverterMs, escudo }`. O ataque em si vem de `ataqueDaCartaNoJogo(caixa.carta)` (`null` = caixa calma).
-5. Durante a esquiva: `aplicarDano(estado, j, caixa.dano)` a cada acerto, `registrarGrazes(estado, j, n)` (+1 de energia a cada 5 grazes) e, no fim, `registrarPerfeito(estado, j, caixa.carta)` se j passou pelo ataque sem levar dano.
+5. Durante a esquiva: `aplicarDano(estado, j, caixa.dano)` a cada acerto (também zera o combo de perfeitos), `registrarGrazes(estado, j, n)` (+1 de energia a cada 5 grazes) e, no fim, `registrarPerfeitoCombo(estado, j, caixa.carta)` se j passou pelo ataque sem levar dano (ver [Combo de perfeitos](#combo-de-perfeitos)).
 6. `fimDaRodada(estado)` → `'p1' | 'p2' | 'empate' | null`. HP corrido: perde quem zerar; os dois juntos = empate.
 
 O estado é JSON puro (`structuredClone`/`JSON.stringify` funcionam) e a partida é determinística pela semente (`criarPartida({ p1, p2, semente })`).
@@ -37,7 +37,7 @@ O estado é JSON puro (`structuredClone`/`JSON.stringify` funcionam) e a partida
 | Teto (o que sobra acumula) | 10 |
 | Grazes | +1 a cada 5 |
 | Passar a vez | +1 |
-| Desvio perfeito | +1 a +3 (pela carta do ataque, ver abaixo) |
+| Desvio perfeito | +1 a +3 (pela carta do ataque, ver abaixo) × combo de perfeitos (x1 a x4) |
 
 ## Dificuldade das cartas
 
@@ -107,6 +107,25 @@ Passar por um ataque inteiro sem levar dano dá aplausos e energia, pela carta d
 | Ás que manda ataque (Espelho/eco, Anular, Roubo) | +1 |
 | copas, Ás de copas, caixa vazia | 0 |
 
+### Combo de perfeitos
+
+Cada jogador tem uma **sequência** (`jog.sequencia`): quantas rodadas **seguidas** ele fez desvio perfeito. A energia do perfeito é multiplicada pelo combo (`registrarPerfeitoCombo(estado, j, carta)` → `{ ganho, base, multiplicador, sequencia }`; `registrarPerfeito` devolve só o `ganho`):
+
+| Perfeito seguido | Multiplicador | Exemplo (9-Q, base +2) |
+|---|---|---|
+| 1º | x1 | +2 |
+| 2º | x2 | +4 |
+| 3º | x3 | +6 |
+| 4º em diante | x4 (teto, `COMBO_PERFEITO.teto`) | +8 |
+
+- O ganho sempre respeita o teto de energia (10). Com a energia cheia o perfeito **ainda conta** para o combo (ganho 0, "ENERGIA CHEIA!").
+- Depois do teto a sequência continua contando (recorde em `jog.maiorSequencia`), mas o multiplicador fica em x4.
+- **Quebra:** qualquer acerto (`aplicarDano` chama `quebrarSequencia`), mesmo se o escudo ou a segunda chance zerarem o dano. Vale para a esquiva, os eventos do bonus round e o duelo.
+- **Rodada sem caixa para desviar** (o adversário passou, jogou copas ou um Ás de copas, ou o ataque foi anulado): **não conta e não quebra**, a sequência fica como estava. O mesmo para a caixa "só caos" do bonus round e para o duelo sem levar dano.
+- Uma chamada por rodada por jogador (cada coração passa por uma caixa só).
+
+Na arena: "PERFEITO!" (x1), "PERFEITO x2!", "PERFEITO x3!!", "PERFEITO x4!!!": o texto cresce e ganha brilho a cada nível (o teto pisca em arco-íris), "+6 ENERGIA (2 x3)". Os aplausos (`aplausos`) se sobrepõem uma vez por nível com atrasos pequenos (plateia maior); x2 ganha os canhões de confete, x3 uma tremida leve, clarão dourado e `estouroFesta`, x4 a chuva de confete e a `fanfarra`. Mais fogos a cada nível (3, 5, 7, 9). O HUD de cada jogador mostra discretamente o combo atual embaixo das gemas ("PERFEITO x3", "PERFEITO x4 MÁX") e, quando um acerto quebra, um "COMBO QUEBROU" pequeno. `pvpArena.estadoDebug()` traz `combos` (multiplicador da rodada) e `jogadores[j].sequencia`.
+
 ## Naipes
 
 | Naipe | Tipo | Ataque na caixa do adversário | Dano por bala |
@@ -154,6 +173,12 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Apagão | normais | escuridão: só se enxerga em volta do coração (com relâmpagos de vez em quando) |
 | Gravidade maluca | normais | uma gravidade puxa o coração e muda de lado a cada ~2 s, com aviso |
 | Coração trocado | normais | os corações trocam de caixa: cada um desvia do próprio ataque |
+| PC da escola | normais | as caixas ficam pixeladas (baixa resolução) e rodam a 6–14 FPS, aos trancos; de vez em quando o PC trava ("Não está respondendo") |
+| Aquário | normais | as caixas enchem de água: tudo em câmera lenta, o coração boia (segure ↓ para afundar) e tem inércia de água |
+| Cogumelo maluco | normais | o coração alterna entre GIGANTE (hitbox enorme, música grave) e MINI (hitbox mínima, música aguda), com pisca-pisca de aviso |
+| Dança da estátua | normais | a música PARA de repente, sem aviso: balas e ataque congelam, o coração não. Um holofote de vigia PERSEGUE o coração de cada um (é mais lento: dá para fugir); quem se mexer com a luz em cima do coração é PEGO (30% do HP máximo, uma vez por parada). Mexer fora da luz pode. A música volta e tudo descongela |
+| Pista de gelo | normais | o coração escorrega: demora para acelerar, demora para frear e desliza quando você solta |
+| Terremoto | normais | a terra treme (ronco de aviso antes): a tela sacode, o coração é empurrado e pedras caem do teto das caixas |
 | Cartas malucas | viram outras | na revelação cada carta vira uma carta sorteada de qualquer personagem (mesmo custo); o SUPER não vira (é imparável). Depois da rodada o baralho volta ao normal |
 | Duelo | viram armas | a carta escolhida vira a arma, sem gastar energia. Uma caixa só para os dois: ♥ tiro, ♠ espada, ♦ bumerangue, ♣ explosão (3 bombas em leque com estilhaços). Mira automática: é só se mexer e apertar A; o valor da carta aumenta o dano. Passar dá uma arma sorteada, fraca |
 
@@ -213,3 +238,62 @@ A lista completa (nome, valor, custo, descrição) sai de `CARTAS` em `cartas.js
 ## Justiça dos ataques
 
 Todas as cartas dos 7 personagens (134) foram rodadas numa caixa de esquiva (ver `docs/ataques.md`, Testar): 0 avisos `[telegrafo]`; 1 aviso `[rota de fuga]` conhecido (Cabos Enrolados, Dess 10♣, lasers — já existia antes da revisão de 2026-10-02). As figuras (J/Q/K) também passaram com o aperto do co-op por cima (velocidade ×1,15, densidade ×1,2). Os SUPERs usam os mesmos padrões com força 1 (as faixas já validadas), só encadeados em 3 fases.
+
+Na medição de 2026-10-07 (abaixo; 79 cartas de ataque e 7 SUPERs, 12 a 24 sementes cada) o validador não deu nenhum aviso. Três avisos antigos sumiram: Zero Absoluto (SUPER da Noelle, sem espaço livre na estrela final), Shocker Breaker (Asriel 3♦, a corrente de 3 raios fechava a caixa apertada) e Caos Final (Asriel K♦, raro, na cruz).
+
+## Balanceamento medido com o bot (2026-10-07)
+
+`scripts/balanceamento/medir.mjs` roda cada carta numa Pista do tamanho da do PvP (220×170), com o ritmo e o dano de verdade da carta (controles invertidos inclusos), e o `EsquivaBot` desviando. Precisa do jogo em `npm run dev` e do Playwright; `resumo.mjs` monta as tabelas.
+
+- **Bot "perfeito"** = nível `dificil`; **bot "médio"** = nível `normal` (reage em 130 ms, erra 10%, se distrai 5%).
+- O bot da CPU só enxerga balas. Na medição ele também vê o que um jogador vê: os avisos de área (`a.aviso`), o movimento das balas que andam sozinhas e o disco que uma lâmina varre ao girar em volta de uma ponta. A CPU do jogo não mudou.
+- Dano esperado = acertos × dano por bala (o coração fica 850 ms invencível depois de cada acerto). SUPER: 13 por bala.
+
+SUPERs (dano médio por SUPER, 24 sementes; antes → depois):
+
+| SUPER | Bot perfeito | Bot médio | O que mudou |
+|---|---|---|---|
+| Kris · Alma Determinada | 3 → 3 | 21 → 34 | 6 peças no tabuleiro (eram 4), aviso das casas 750 → 580 ms; rastro mais denso e duradouro; eco nasce 1,4 s atrás (era 1,8) e chega mais perto; 3 cortes finais (eram 2) |
+| Susie · Machado Colossal | 5 → 18 | 30 → 37 | 4 machadadas (eram 3), aviso 700 → 620 ms, 4 pedras mais rápidas; 5 Rude Busters (o novo tem o vão do outro lado), meias-luas 280 → 310 px/s |
+| Ralsei · Último Capítulo | 16 → 21 | 32 → 40 | 7 chamas por rajada nos sopros (eram 6) |
+| Noelle · Zero Absoluto | 29 → 9 | 41 → 39 | sobram 2 placas inteiras na nevasca (era 1: o coração ficava ilhado entre buracos); o buraco machuca só no miolo da placa (beirada de 14 px); a brecha da estrela final mira a placa inteira mais perto e nenhuma lança a atravessa; nevasca com 5 pingentes (eram 4), racha em 560 ms |
+| Berdly · Prova Irrefutável | 21 → 18 | 42 → 39 | redemoinho 3,7 → 3,5 rad/s com o 8 mais lento; o giro final pisca o círculo inteiro que vai varrer e a lâmina final é menor (×1,05 em vez de ×1,18); rajadas de páginas um pouco maiores |
+| Dess · Último Bis | 22 → 11 | 46 → 39 | ver abaixo |
+| Asriel · Singularidade Radiante | 25 → 15 | 49 → 35 | o puxão para antes da borda do vazio (sozinho nunca encosta o coração nele); estrelas da espiral mais espaçadas (560 → 620 ms) e giro máximo 5,5 → 4,2 rad/s |
+| **Faixa** | **3 a 29** → **3 a 21** | **21 a 49** → **34 a 40** | |
+
+SUPER da Dess mais justo:
+
+- os avisos dos acordes se sobrepõem (o próximo pisca antes do anterior bater); agora a conta de "sobra um traste livre" soma todos os trastes acesos ao mesmo tempo (antes cada acorde deixava um livre, mas a soma podia acender o braço inteiro);
+- a pancada da guitarra no centro, que não tinha aviso, agora pisca enquanto a guitarra cai;
+- Solo um pouco mais lento (nota a cada 0,62 tempo, era 0,5) com aviso de 600 ms (era 520) e bend a cada 5 notas;
+- a 2ª onda de choque abre o vão perto do da 1ª (até 0,55 rad) e vem 480 ms depois (eram 320 ms com o vão em qualquer lugar).
+
+O Kris continua o SUPER mais fácil para o bot perfeito (é sobre o próprio caminho do coração: quem joga bem nunca é pego); com o bot médio ele ficou na faixa dos outros.
+
+Cartas de ataque (♠ ♦ ♣ de 2 a K, sem Ases; 12 sementes; média por carta):
+
+| Personagem | Cartas | Dano/carta (médio) | Acertos/carta (médio) | Dano/carta (perfeito) |
+|---|---|---|---|---|
+| Kris | 12 | 7,7 | 0,86 | 0,9 |
+| Susie | 13 | 10,0 | 1,13 | 1,5 |
+| Ralsei | 8 | 10,3 | 1,26 | 1,5 |
+| Noelle | 9 | 7,9 | 0,85 | 1,0 |
+| Berdly | 12 | 9,2 | 1,20 | 1,0 |
+| Dess | 13 | 12,6 | 1,41 | 2,9 |
+| **média dos 6** | | **9,6** | **1,12** | |
+| Asriel antes | 12 | 13,2 | 1,42 | 1,4 |
+| **Asriel depois** | 12 | **10,2** | **1,12** | 1,3 |
+
+O Asriel ainda dá um pouco mais de dano por carta porque tem mais figuras (o dano por bala sobe com o valor); acertos por carta ficaram na média. O que mudou no baralho dele:
+
+| Carta | Acertos (médio) antes → depois | Mudança |
+|---|---|---|
+| K♦ Caos Final | 3,4 → 2,1 | estrelas 360 → 420 ms e mais lentas, cruz 1,1 → 0,9 rad/s, tiros a cada 1,2 s (era 1,08), colapso mais lento com 8 estilhaços (eram 10) |
+| Q♦ Tempo Parado | 1,9 → 1,4 | estrelas mais espaçadas e lentas, ponteiros 185 → 170 px/s |
+| K♠ Hyper Goner | 1,75 → 1,0 | losangos a cada 390 ms (eram 330), um pouco mais lentos |
+| 8♠ Chaos Saber | 1,7 → 1,3 | aviso do corte ~560 → ~670 ms (dá tempo de atravessar a caixa), corte duplo só a partir de t = 0,75 |
+| 10♣ Raio Caótico | 1,5 → 1,2 | lasers em cruz a cada ~1,5 s (era ~1,3) |
+| 3♦ Shocker Breaker | 1,1 → 0,75 | raios mais espaçados; na caixa apertada a corrente perde a 3ª coluna se ela fechar a rota de fuga |
+
+A carta mais difícil do jogo agora é o K♠ Show de Rock da Dess (3 acertos no bot médio, ~40 de dano), fora deste ajuste.

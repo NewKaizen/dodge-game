@@ -17,10 +17,10 @@ import { particulas } from '../../effects/particulas.js'
 //      lado, cavalo -> qualquer vizinha.
 //   II. Eco (2ª metade). O tabuleiro some e o ECO da alma (um coração
 //      fantasma azul com uma espada girando) nasce onde o coração estava
-//      quase 2 s atrás e REFAZ o caminho dele, cada vez mais perto (mas
+//      ~1,4 s atrás e REFAZ o caminho dele, cada vez mais perto (mas
 //      nunca menos de `atrasoMin` atrás). Ele também crava lâminas por onde
 //      passa. Ficar parado = o passado alcança você.
-//   III. Corte final. O eco para, mira e dá dois cortes que atravessam a
+//   III. Corte final. O eco para, mira e dá `cortes` cortes que atravessam a
 //      caixa inteira (em X), cada um com a linha piscando antes.
 //
 // Justiça:
@@ -48,27 +48,32 @@ import { particulas } from '../../effects/particulas.js'
 //   aceleracao     quanto o eco acelera por segundo (1 = mesma velocidade do coração)
 //   giroEco        rad/s da espada do eco
 //   avisoEco, avisoCorte
+//   cortes, intervaloCorte  quantos cortes finais e o ms entre eles
 export default definirAtaque({
   nome: 'superKris',
   padrao: {
     duracao: 9000,
-    passoRastro: 30,
+    passoRastro: 26,
     avisoRastro: 450,
-    vidaRastro: 1700,
-    parado: 1100,
+    vidaRastro: 2000,
+    parado: 950,
     golpes: [
       [150, 'cavalo'],
-      [1200, 'bispo'],
-      [2250, 'torre'],
-      [3300, 'cavalo'],
+      [850, 'bispo'],
+      [1550, 'torre'],
+      [2250, 'cavalo'],
+      [2950, 'bispo'],
+      [3650, 'torre'],
     ],
-    avisoCasa: 750,
-    atraso: 1800,
-    atrasoMin: 650,
-    aceleracao: 0.14,
-    giroEco: 3.4,
+    avisoCasa: 580,
+    atraso: 1400,
+    atrasoMin: 450,
+    aceleracao: 0.24,
+    giroEco: 4.2,
     avisoEco: 600,
-    avisoCorte: 700,
+    avisoCorte: 620,
+    cortes: 3,
+    intervaloCorte: 340,
   },
   iniciar(a, cfg) {
     const metade = cfg.duracao / 2
@@ -103,7 +108,7 @@ export default definirAtaque({
       for (const e of ecos) pararEco(a, e)
       cortar(a, cfg, ecos, 0)
     })
-    a.depois(inicioCorte + 380, () => cortar(a, cfg, ecos, 1))
+    for (let i = 1; i < cfg.cortes; i++) a.depois(inicioCorte + i * cfg.intervaloCorte, () => cortar(a, cfg, ecos, i))
 
     a.aoAtualizar((dt) => {
       ativo += dt
@@ -334,8 +339,8 @@ function andarEco(a, cfg, e, ativo, dt) {
       e.y = p.y
     }
     // o eco também crava lâminas por onde passa (com aviso, vida curta)
-    if (Math.hypot(e.x - e.marca.x, e.y - e.marca.y) >= cfg.passoRastro * 1.4) {
-      cravar(a, cfg, e.marca.x, e.marca.y, 1100)
+    if (Math.hypot(e.x - e.marca.x, e.y - e.marca.y) >= cfg.passoRastro * 1.15) {
+      cravar(a, cfg, e.marca.x, e.marca.y, 1400)
       e.marca = { x: e.x, y: e.y }
     }
   }
@@ -372,8 +377,8 @@ function cortar(a, cfg, ecos, i) {
     oy = alvo.y
     ang = i === 0 ? Math.PI / 4 : -Math.PI / 4
   }
-  // segunda lâmina cruza a primeira (o X)
-  if (i === 1) ang += 0.35
+  // as outras cruzam a primeira (o X), alternando o lado
+  if (i > 0) ang += i % 2 ? 0.35 : -0.35
   const comp = Math.hypot(l.width, l.height) + 40
   const dx = Math.cos(ang) * comp
   const dy = Math.sin(ang) * comp
@@ -405,7 +410,7 @@ function cortar(a, cfg, ecos, i) {
     b.escalaY = b.sprite.scaleY
     particulas(a.cena, alvo.x, alvo.y, { cor: 0xffffff, quantidade: 12, velocidade: 180, vida: 380 })
     // o último corte estilhaça o eco
-    if (i === 1) {
+    if (i === cfg.cortes - 1) {
       for (const e of ecos) {
         particulas(a.cena, e.x, e.y, { cor: 0x8fdcff, quantidade: 16, velocidade: 160, vida: 500 })
         for (const bala of [e.nucleo, e.espada]) {

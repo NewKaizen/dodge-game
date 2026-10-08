@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { CORES, FONTE, TEXTO, LARGURA, corTexto } from '../constants.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { CORES_CARTA } from '../entities/Carta.js'
-import { ENERGIA } from './regras.js'
+import { ENERGIA, COMBO_PERFEITO, multiplicadorPerfeito } from './regras.js'
 import { ignorarNasCaixas } from '../recorte.js'
 
 
@@ -16,6 +16,9 @@ import { ignorarNasCaixas } from '../recorte.js'
 //   hud.setEnergia(5)        gemas acesas; as novas piscam
 //   hud.setEscudo(0.6)       "ESCUDO -40%" (fator do dano; null apaga)
 //   hud.setProtegido(true)   "SEGUNDA CHANCE"
+//   hud.setSequencia(3)      combo de perfeitos: "PERFEITO x3" discreto embaixo das
+//                            gemas (0 apaga; no teto: "x4 MÁX")
+//   hud.comboQuebrou()       "COMBO QUEBROU" pequeno subindo do lugar do combo
 //   hud.tremer()             levou um golpe
 //   hud.pontoHp / hud.pontoEnergia   onde soltar números flutuantes
 const BARRA = { largura: 176, altura: 10 }
@@ -67,7 +70,12 @@ export default class HudPvp {
     this.gemas = cena.add.graphics()
     this.textoEnergia = texto(x0 + s * (ENERGIA.maxima * GEMA.passo + 6), this.yGemas - 7, '', 11, '#7fd8ff').setOrigin(origem, 0)
 
-    this.container.add([fundo, vazio, this.rastro, this.barra, tag, coracao, this.nome, this.estado, this.textoHp, this.gemas, this.textoEnergia])
+    // combo de perfeitos (rodadas seguidas com desvio perfeito), discreto embaixo das gemas
+    this.yCombo = this.yGemas + 9
+    this.sequencia = 0
+    this.textoCombo = texto(x0, this.yCombo, '', 10, '#ffd23c', { strokeThickness: 2 }).setOrigin(origem, 0).setVisible(false)
+
+    this.container.add([fundo, vazio, this.rastro, this.barra, tag, coracao, this.nome, this.estado, this.textoHp, this.gemas, this.textoEnergia, this.textoCombo])
     this.escudo = null
     this.protegido = false
     this.setHp(hpMax, false)
@@ -143,6 +151,40 @@ export default class HudPvp {
         this.cena.tweens.add({ targets: b, scale: 0.6, alpha: 0, duration: 420, delay: (i - Math.min(antes, energia)) * 50, onComplete: () => b.destroy() })
       }
     }
+  }
+
+  // Combo de perfeitos: mostra o multiplicador da sequência atual (0 = some)
+  setSequencia(sequencia, animado = true) {
+    const antes = this.sequencia
+    this.sequencia = sequencia
+    const t = this.textoCombo
+    this.cena.tweens.killTweensOf(t)
+    t.setScale(1).setAlpha(1)
+    if (!sequencia) {
+      if (animado && antes && t.visible) this.cena.tweens.add({ targets: t, alpha: 0, duration: 220, onComplete: () => t.setVisible(false).setAlpha(1) })
+      else t.setVisible(false)
+      return
+    }
+    const mult = multiplicadorPerfeito(sequencia)
+    const maximo = mult >= COMBO_PERFEITO.teto
+    t.setText(`PERFEITO x${mult}${maximo ? ' MÁX' : ''}`).setVisible(true)
+    t.setColor(maximo ? '#ff9ae8' : mult >= 3 ? '#ffb02e' : '#ffd23c')
+    if (animado && sequencia > antes) {
+      t.setColor('#ffffff')
+      this.cena.tweens.add({ targets: t, scale: { from: 1.7, to: 1 }, duration: 320, ease: 'Back.easeOut', onComplete: () => t.setColor(maximo ? '#ff9ae8' : mult >= 3 ? '#ffb02e' : '#ffd23c') })
+    }
+  }
+
+  // Levou um acerto com combo: "COMBO QUEBROU" pequeno sobe e some (e o combo apaga)
+  comboQuebrou() {
+    this.setSequencia(0, false)
+    const t = this.cena.add
+      .text(this.x0, this.yCombo, 'COMBO QUEBROU', { fontFamily: FONTE, fontSize: '9px', color: '#ff6a7a', stroke: '#000000', strokeThickness: 2 })
+      .setOrigin(this.direita ? 1 : 0, 0)
+    this.container.add(t)
+    this.cena.tweens.add({ targets: t, x: { from: t.x + this.s * 3, to: t.x }, duration: 45, yoyo: true, repeat: 2 })
+    // some no lugar: descendo, cruzava o número de dano que sai da barra de HP
+    this.cena.tweens.add({ targets: t, alpha: 0, delay: 650, duration: 350, onComplete: () => t.destroy() })
   }
 
   setEscudo(fator) {

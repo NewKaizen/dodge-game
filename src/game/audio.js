@@ -1,5 +1,5 @@
 import { AUDIO } from './constants.js'
-import { tocarMidi, pararMidi, pausarMidi, retomarMidi, setVolumeMidi, setVelocidadeMidi, setGraveMidi, tempoMidi, existeMidi, estadoMidi } from './midi.js'
+import { tocarMidi, pararMidi, pausarMidi, retomarMidi, cortarMidi, setVolumeMidi, setVelocidadeMidi, setGraveMidi, setTomMidi, tempoMidi, existeMidi, estadoMidi } from './midi.js'
 
 // Sons: arquivo carregado pela Boot (som-<nome>: ASSETS.sons e os manifestos
 // de SUPER/habilidades/menu) ou sintetizado com WebAudio (SINTESE).
@@ -80,6 +80,10 @@ export const velocidadeMusica = (fator = 1) => setVelocidadeMidi(fator)
 export const pausarMusica = () => pausarMidi()
 export const retomarMusica = () => retomarMidi()
 
+// Corte SECO da música (true) e a volta do mesmo ponto (false), ex.: a DANÇA DA
+// ESTÁTUA. Não briga com o pause do menu. Fica valendo até pedirem false: sempre desfaça.
+export const cortarMusica = (cortar = true) => cortarMidi(cortar)
+
 export function pararMusica() {
   esquecerEspecial()
   pararMidi()
@@ -127,6 +131,11 @@ function esquecerEspecial() {
   pedidoEspecial++
   guardada = null
 }
+
+// Tom da música em semitons (0 = normal), sem mudar o andamento. Ex.: o
+// COGUMELO MALUCO deixa a música grave com o coração gigante e aguda com o mini.
+// Fica valendo até alguém pedir 0: sempre desfaça.
+export const tomMusica = (semitons = 0) => setTomMidi(semitons)
 
 // Realce de graves na música (dB num lowshelf de ~180 Hz; 0 = normal), ex.: o
 // MODO FESTA. Fica valendo até alguém pedir 0.
@@ -634,6 +643,45 @@ const SINTESE = {
     s.tom(400, 0.12, 'square', 0.05, 1600)
     s.tom(1600, 0.12, 'square', 0.05, 400, 0.12)
     s.ruido(0.24, 0.08, 0, 4000)
+  },
+  // PC DA ESCOLA: o "tan-dan" de PC velho ligando, com chiado de cooler
+  pcLigando: (s) => {
+    s.ruido(0.5, 0.05, 0, 3000)
+    ;[523, 784, 659, 1046].forEach((f, i) => s.nota(f, 0.5, 'triangle', 0.07, f, 0.1 + i * 0.13, 0.04))
+  },
+  // travou: o "dóin" de erro duas vezes e o HD engasgando
+  travou: (s) => {
+    s.tom(220, 0.16, 'square', 0.08, 220)
+    s.tom(165, 0.22, 'square', 0.08, 165, 0.17)
+    for (let i = 0; i < 6; i++) s.ruido(0.02, 0.06, 0.05 + i * 0.05, 1800)
+  },
+  // AQUÁRIO: tchibum na água + borbulhar
+  tchibum: (s) => {
+    s.ruido(0.5, 0.25, 0, 1400)
+    s.tom(500, 0.25, 'sine', 0.12, 120)
+    ;[0.2, 0.28, 0.33, 0.4].forEach((d, i) => s.tom(600 + i * 150, 0.06, 'sine', 0.06, 1200 + i * 200, d))
+  },
+  bolha: (s) => s.tom(400 + Math.random() * 300, 0.07, 'sine', 0.05, 1100 + Math.random() * 400),
+  // COGUMELO MALUCO: subida (crescer) e descida (encolher) de videogame
+  crescer: (s) => [262, 330, 392, 523, 659, 784].forEach((f, i) => s.tom(f, 0.07, 'square', 0.06, f, i * 0.05)),
+  encolher: (s) => [784, 659, 523, 392, 330, 262].forEach((f, i) => s.tom(f * 1.5, 0.06, 'square', 0.06, f * 1.5, i * 0.045)),
+  // DANÇA DA ESTÁTUA: alarme de vigia quando o holofote pega alguém se mexendo
+  pego: (s) => {
+    for (let i = 0; i < 3; i++) {
+      s.tom(880, 0.14, 'square', 0.07, 880, i * 0.28)
+      s.tom(660, 0.14, 'square', 0.07, 660, i * 0.28 + 0.14)
+    }
+    s.tom(110, 0.35, 'sawtooth', 0.12, 80)
+  },
+  // PISTA DE GELO: cristais tilintando / patins raspando
+  congelar: (s) => [1760, 2093, 2637, 3136].forEach((f, i) => s.tom(f, 0.3, 'sine', 0.05, f * 0.98, i * 0.06)),
+  patins: (s) => s.ruido(0.22, 0.07, 0, 7000),
+  // TERREMOTO: ronco grave (aviso) e o tremor com pedras
+  ronco: (s) => s.nota(45, 0.7, 'sawtooth', 0.12, 38, 0, 0.3),
+  terremoto: (s) => {
+    s.ruido(0.9, 0.3, 0, 400)
+    s.tom(55, 0.8, 'sawtooth', 0.15, 30)
+    ;[0.15, 0.3, 0.42].forEach((d) => s.ruido(0.06, 0.15, d, 2500))
   },
   // carta maluca: "boing" de desenho animado
   maluca: (s) => {

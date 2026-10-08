@@ -17,6 +17,7 @@
 //   ... os dois desviam; a cena chama aplicarDano(estado, j, dano) a cada acerto
 //   ... e registrarGrazes(estado, j, n) para a energia dos grazes
 //   ... e registrarPerfeito(estado, j, caixa.carta) quando j passa por um ataque sem levar dano
+//       (COMBO DE PERFEITOS: rodadas seguidas multiplicam a energia; um acerto zera)
 //   fimDaRodada(estado)                           -> vencedor ('p1' | 'p2' | 'empate' | null)
 //
 // Jogadores são índices: 0 = P1, 1 = P2.
@@ -40,6 +41,17 @@ export const ENERGIA = { inicial: 3, porRodada: 2, maxima: 10, grazesPorPonto: 5
 // segundaChance: fração do HP máximo curada pelo Ás de copas
 export const PVP = { fatorHp: 1, ajusteHp: { asriel: 0.9 }, segundaChance: 0.25 }
 
+// Combo de perfeitos: jog.sequencia = rodadas SEGUIDAS com desvio perfeito.
+// O 1º perfeito é x1, o 2º seguido x2, o 3º x3... até o teto (x4): a partir
+// daí a sequência continua contando, mas o multiplicador fica em x4. O
+// multiplicador vale para a energia do perfeito (sempre respeitando
+// ENERGIA.maxima).
+//   teto   multiplicador máximo
+// Quebra: qualquer acerto (aplicarDano), mesmo que o escudo/2ª chance zerem o dano.
+// Rodada sem caixa para desviar (ou só com ataque que não dá energia de
+// perfeito, como copas): não conta e não quebra; a sequência fica como estava.
+export const COMBO_PERFEITO = { teto: 4 }
+
 const ID_JOGADOR = ['p1', 'p2']
 const outro = (j) => 1 - j
 
@@ -62,6 +74,8 @@ export function criarPartida({ p1, p2, semente = 'pvp' }) {
       grazes: 0, // grazes que ainda não viraram energia
       escudo: null, // fator do dano do próximo ataque recebido (copas)
       protegido: false, // Ás de copas: nesta rodada o HP não passa de 1
+      sequencia: 0, // combo de perfeitos: rodadas seguidas com desvio perfeito
+      maiorSequencia: 0,
       baralho: criarBaralho(personagem, `${semente}:${ID_JOGADOR[j]}`),
     }
   }
@@ -272,8 +286,10 @@ function roubar(estado, j) {
 
 // Aplica o dano de UM acerto (o escudo já vem embutido em caixa.dano).
 // Com o Ás de copas ativo, o HP não passa de 1. Devolve o dano efetivo.
+// Todo acerto quebra o combo de perfeitos (quebrarSequencia).
 export function aplicarDano(estado, j, dano) {
   const jog = estado.jogadores[j]
+  quebrarSequencia(estado, j)
   const minimo = jog.protegido ? 1 : 0
   const novo = Math.max(minimo, Math.min(jog.hp, jog.hp - Math.max(0, dano)))
   const efetivo = jog.hp - novo
@@ -315,12 +331,43 @@ export function energiaPerfeito(carta) {
   return carta.valor >= 2 ? 1 : 0
 }
 
-// Dá a energia do desvio perfeito ao jogador j (respeita ENERGIA.maxima). Devolve a energia ganha de fato.
-export function registrarPerfeito(estado, j, carta) {
+// Multiplicador do combo para uma sequência (1, 2, 3... até COMBO_PERFEITO.teto; 0 ou menos = x1)
+export function multiplicadorPerfeito(sequencia) {
+  return Math.max(1, Math.min(COMBO_PERFEITO.teto, Math.floor(sequencia) || 1))
+}
+
+// Desvio perfeito do jogador j nesta rodada (chame UMA vez por rodada): a
+// sequência sobe 1 e a energia da carta é multiplicada pelo combo (respeita
+// ENERGIA.maxima). Carta que não dá energia de perfeito (null, copas, Ás que
+// não ataca) não conta: nada muda.
+// Devolve { ganho, base, multiplicador, sequencia }: ganho = energia ganha de
+// fato; base = energiaPerfeito(carta); sequencia = a nova sequência.
+export function registrarPerfeitoCombo(estado, j, carta) {
   const jog = estado.jogadores[j]
-  const ganho = Math.max(0, Math.min(energiaPerfeito(carta), ENERGIA.maxima - jog.energia))
+  const base = energiaPerfeito(carta)
+  const sequenciaAtual = jog.sequencia ?? 0
+  if (!base) return { ganho: 0, base: 0, multiplicador: multiplicadorPerfeito(sequenciaAtual), sequencia: sequenciaAtual }
+  const sequencia = sequenciaAtual + 1
+  jog.sequencia = sequencia
+  jog.maiorSequencia = Math.max(jog.maiorSequencia ?? 0, sequencia)
+  const multiplicador = multiplicadorPerfeito(sequencia)
+  const ganho = Math.max(0, Math.min(base * multiplicador, ENERGIA.maxima - jog.energia))
   jog.energia += ganho
-  return ganho
+  return { ganho, base, multiplicador, sequencia }
+}
+
+// Igual a registrarPerfeitoCombo, devolvendo só a energia ganha de fato.
+export function registrarPerfeito(estado, j, carta) {
+  return registrarPerfeitoCombo(estado, j, carta).ganho
+}
+
+// Zera o combo de perfeitos do jogador j. Devolve a sequência que ele tinha
+// (0 = não havia nada para quebrar).
+export function quebrarSequencia(estado, j) {
+  const jog = estado.jogadores[j]
+  const antes = jog.sequencia ?? 0
+  jog.sequencia = 0
+  return antes
 }
 
 // 'p1' | 'p2' | 'empate' | null (HP corrido: perde quem zerar; os dois juntos = empate)

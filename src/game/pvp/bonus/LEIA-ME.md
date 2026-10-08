@@ -7,7 +7,8 @@ Regras puras (qual rodada é bônus, sorteio, cartas malucas, armas do duelo):
 pvp/bonus/
   anuncio.js          roleta "BONUS ROUND!" que sorteia o evento na frente de todo mundo
                       (depois da escolha das cartas; música abaixa e rola o som de cassino)
-  eventos/index.js    EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado }
+  eventos/index.js    EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado,
+                                 pcEscola, aquario, cogumelo, estatua, gelo, terremoto }
   eventos/<id>.js     um evento que bagunça a ESQUIVA normal (cartas 'normal')
   Duelo.js            o evento 'duelo' (substitui arremesso + esquiva)
   botDuelo.js         a CPU do duelo
@@ -26,11 +27,31 @@ export default function criar(arena, { rng, rodada, aceleracao }) {
   return {
     comecar() {},          // as caixas já estão abertas e os ataques começando
     atualizar(delta) {},   // todo frame da esquiva (delta em ms, já com debug.acelerar)
-    joy(j, joy) { return joy }, // opcional: muda o joystick {x, y} (-100..100) do lado j
-    terminar() {},         // fim da esquiva (ou saída da cena): DESFAZ TUDO (objetos, câmeras, tweens, timers)
+    joy(j, joy) { return joy }, // opcional: muda o joystick {x, y} (-100..100) da pista j
+    passo(j, delta, joy) { return delta }, // opcional: o relógio da pista j neste frame (ver abaixo)
+    terminar() {},         // fim da esquiva (ou saída da cena): DESFAZ TUDO (objetos, câmeras, filtros,
+                           // tweens, timers, música, pista.congelada, tamanho do coração)
   }
 }
 ```
+
+Ordem em cada frame (PvpArena.update): para cada pista j, `joy(j, joy)` -> `passo(j, delta, joy)`
+-> `pista.atualizar(passo, joy)`; depois `atualizar(delta)` uma vez. Ou seja: em `atualizar`
+os corações já andaram neste frame (dá para medir quanto cada um se mexeu).
+
+### Mexendo no tempo de uma pista
+
+Dois jeitos, para coisas diferentes:
+
+- **`passo(j, delta, joy)`**: quanto tempo a pista j anda neste frame, TUDO junto (coração,
+  caixa, ataque e balas). `delta` = normal; `delta * 0.72` = câmera lenta (AQUÁRIO);
+  `0` = a pista inteira congela, coração junto; devolver o tempo acumulado de uma vez = anda
+  aos trancos (PC DA ESCOLA). `Pista.atualizar` divide passos grandes em pedaços de ~20 ms,
+  então nenhuma bala atravessa o coração.
+- **`pista.congelada = true`**: só o CORAÇÃO anda. Caixa, ataque (`ctx`: timers, padrões,
+  a duração do ataque) e balas ficam parados no lugar, mas as balas paradas continuam
+  acertando e dando graze (`Balas.colidir`). Quem liga desliga (no `terminar()` também). Ex.:
+  DANÇA DA ESTÁTUA. Enfeites que o ataque anima com `cena.tweens` continuam se mexendo.
 
 O que o evento pode usar da arena:
 
@@ -43,6 +64,13 @@ O que o evento pode usar da arena:
 - `arena.coracoesTrocados = true` (CORAÇÃO TROCADO): o coração de cada jogador passa a
   valer na pista do outro (`arena.donoDaPista(j)` / `arena.pistaDe(p)`): joystick, dano,
   graze, K.O. e ♦ Q/K seguem o coração. Desligue no `terminar()`.
+- `pista.caixa.camera.filters.internal.addBlocky({ size })` (filtros de câmera do Phaser 4:
+  `addPixelate`, `addBlocky`, `addBlur`...; tire com `filters.internal.remove(filtro)`). O canvas
+  desenha na resolução real da tela: tamanhos em pixel do filtro são vezes `RES.escala`
+  (`game/resolucao.js`). Ex.: PC DA ESCOLA.
+- `coracao.setTamanho(fator)` (Heart): sprite, hitbox, graze e margem da caixa juntos
+  (1 = normal). Ex.: COGUMELO MALUCO. Volte para 1 no `terminar()`.
+- `arena.estado.jogadores[j].hpMax` (dano proporcional ao HP, ex.: 30% na DANÇA DA ESTÁTUA).
 - `arena.ko[j]`, `arena.cpu` (índice da CPU ou null), `arena.cameras.main`,
   `arena.add`, `arena.tweens`, `arena.time` (todos do Phaser).
 - `tocar(arena, nome)` (`game/audio.js`), `shake`, `flashTela`, `particulas`,
@@ -78,7 +106,9 @@ Na roleta o anúncio chama `abaixarMusica()` / `restaurarMusica()` (audio.js).
 `bonusRound`, `roleta`, `roletaFim`, `explosaoGrande`, `festa`, `virarMundo`,
 `apagao`, `gravidade`, `trocar`, `maluca`, `roletaGiro`, `tiro`, `espadada`, `bumerangue`,
 `pavio`, `duelo`, `trovao` (estalo + ronco ~2,5 s), `aplausos` (palmas + "uhuu", ~1,6 s:
-DESVIO PERFEITO), `superAtivar` e `superCorte` (carta SUPER).
+DESVIO PERFEITO), `superAtivar` e `superCorte` (carta SUPER), `pcLigando` e `travou` (PC DA
+ESCOLA), `tchibum` e `bolha` (AQUÁRIO), `crescer` e `encolher` (COGUMELO), `pego` (alarme da
+DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO).
 
 Outros recursos de audio.js usados pelos eventos:
 
@@ -89,5 +119,29 @@ Outros recursos de audio.js usados pelos eventos:
 - `reforcarGrave(db = 0, ms = 400)`: realce de graves (lowshelf ~180 Hz) na música .mid.
   O MODO FESTA pede `reforcarGrave(9)` no começo e `reforcarGrave(0)` ao encerrar
   (fica valendo até alguém pedir 0: sempre desfaça no `terminar()`).
+- `tomMusica(semitons)`: tom da música .mid sem mudar o andamento (keyShift de sistema do
+  sintetizador: nenhum reset do .mid desfaz). O COGUMELO pede -6 (gigante) / +6 (mini) e 0 no
+  fim. Cada troca corta as notas que estavam soando. Fica valendo até alguém pedir 0.
+- `cortarMusica(true/false)`: corte SECO da música (~12 ms, sem fade perceptível) e a volta
+  do mesmo ponto. Não briga com o pause do menu (pausar/retomar no meio de um corte não traz a
+  música de volta) e vale também para a próxima música: sempre peça `false` no `terminar()`.
+  `debugJogo.musica()` mostra `cortada`, `pausada` e `tom`.
 - `tocarMusicaEspecial(arena, nome)` / `voltarMusicaNormal(arena)`: música da carta
   SUPER (pausa a de batalha e volta de onde parou; ver public/assets/musicas/LEIA-ME.txt).
+
+## Eventos de esquiva
+
+| id | o que faz | como |
+|---|---|---|
+| `explosoes` | bombas com mira caem e explodem em área | balas + texturas `bonus-explosao-*` |
+| `festa` | bola de discoteca, holofotes, confete, balões | `reforcarGrave(9)` |
+| `pontaCabeca` | a tela gira 180° | câmeras |
+| `apagao` | escuro com um círculo de luz em volta do coração, relâmpagos | `somContinuo('chuva')` |
+| `gravidade` | uma força puxa o coração e troca de lado | `joy` |
+| `trocado` | os corações trocam de caixa | `arena.coracoesTrocados` |
+| `pcEscola` | caixas pixeladas (filtro Blocky na câmera da caixa), 6–14 FPS aos trancos, travadas com "Não está respondendo" | `passo` + filtro |
+| `aquario` | câmera lenta, o coração boia (segure ↓ para afundar), inércia, peixes e bolhas | `passo` (×0,72) + `joy` |
+| `cogumelo` | coração GIGANTE (2,3×) / MINI (0,5×) alternando, a música desce/sobe de tom junto | `setTamanho` + `tomMusica` |
+| `estatua` | DANÇA DA ESTÁTUA: a música para do nada (`cortarMusica`), as pistas congelam (`pista.congelada`) e um holofote de vigia PERSEGUE o coração em cada caixa (mais lento que ele); quem se mexer sob a luz é PEGO (30% do HP máximo, uma vez por parada; `arena.acertou`). A CPU obedece em ~80% das paradas. `efeitoBonus.estadoDebug()` mostra a parada e as luzes | `cortarMusica` + `congelada` + `joy` (CPU) |
+| `gelo` | o coração desliza (inércia no joystick), flocos e reflexos | `joy` |
+| `terremoto` | ronco de aviso, tremor, empurrão no coração e pedras caindo (balas) | `joy` + `balas.criar` |

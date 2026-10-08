@@ -10,7 +10,7 @@ import Pista from '../pvp/Pista.js'
 import HudPvp, { IndicadorVelocidade } from '../pvp/HudPvp.js'
 import { CARTAS, TEMAS, ehSuper, superDoPersonagem } from '../pvp/cartas.js'
 import { ataqueDaCartaNoJogo } from '../pvp/ataquesDasCartas.js'
-import { criarPartida, iniciarRodada, podeJogar, resolverRodada, aplicarDano, registrarGrazes, registrarPerfeito, energiaPerfeito, fimDaRodada, ENERGIA } from '../pvp/regras.js'
+import { criarPartida, iniciarRodada, podeJogar, resolverRodada, aplicarDano, registrarGrazes, registrarPerfeitoCombo, energiaPerfeito, fimDaRodada, ENERGIA, COMBO_PERFEITO } from '../pvp/regras.js'
 import { escolherJogada, NIVEIS_BOT, NIVEL_BOT_PADRAO } from '../pvp/bot.js'
 import { EsquivaBot } from '../pvp/botEsquiva.js'
 import { criarRng, aleatorio, inteiro } from '../pvp/baralho.js'
@@ -22,7 +22,7 @@ import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
-import { fogoArtificio } from '../effects/festa.js'
+import { fogoArtificio, canhoesConfete, chuvaConfete } from '../effects/festa.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
 
 // Partida PvP de cartas. Junta as peças de pvp/ (regras, baralho, cartas,
@@ -50,9 +50,16 @@ import { anunciarSuper } from '../pvp/super/anuncio.js'
 //   'esquiva'    as duas Pistas rodam ao mesmo tempo; acertos tiram HP do dono
 //                da pista (aplicarDano), grazes viram energia (registrarGrazes)
 //                DESVIO PERFEITO: quem passou por um ataque de verdade sem
-//                levar nenhum acerto ganha energia pela carta (registrarPerfeito:
+//                levar nenhum acerto ganha energia pela carta (registrarPerfeitoCombo:
 //                2-8 +1, 9-Q +2, K/SUPER +3, Ás que ataca +1), com aplausos,
 //                "PERFEITO!" e fogos quando as caixas fecham
+//                COMBO DE PERFEITOS (jog.sequencia em pvp/regras.js): perfeitos
+//                em rodadas seguidas multiplicam essa energia (x1, x2, x3, x4 =
+//                COMBO_PERFEITO.teto) e a festa cresce junto ("PERFEITO x2!",
+//                "x3!!": texto maior e mais brilhante, aplausos sobrepostos,
+//                mais fogos, confete, tremida). Todo acerto zera o combo
+//                ("COMBO QUEBROU" pequeno no HUD); rodada sem caixa não conta
+//                nem quebra. O combo atual fica no HUD ("PERFEITO x3")
 //   'duelo'      só no bonus round de duelo, no lugar de 'arremesso' e 'esquiva'
 //   'fim'        fimDaRodada: vencedor? -> 'resultado' (PvpResultado); senão volta ao 'inicio'
 //
@@ -182,8 +189,9 @@ export default class PvpArena extends Phaser.Scene {
     this.musicaEspecial = null // personagem cuja música SUPER está tocando (até o fim da rodada)
     this.acertosRodada = [0, 0] // acertos que cada jogador levou na esquiva (desvio perfeito)
     this.perfeitosRodada = [null, null] // energia ganha por desvio perfeito nesta rodada (null = não fez)
+    this.combosRodada = [null, null] // multiplicador do combo de perfeitos nesta rodada (null = não fez)
     velocidadeMusica(1) // começa no andamento normal (revanche/recomeçar também)
-    this.estatisticas = [0, 1].map(() => ({ danoCausado: 0, danoRecebido: 0, cartasJogadas: 0, maiorCarta: null, grazes: 0, ases: 0, passes: 0, perfeitos: 0, supers: 0 }))
+    this.estatisticas = [0, 1].map(() => ({ danoCausado: 0, danoRecebido: 0, cartasJogadas: 0, maiorCarta: null, grazes: 0, ases: 0, passes: 0, perfeitos: 0, maiorSequencia: 0, supers: 0 }))
 
     this.desenharFundo()
     this.criarPistas()
@@ -279,7 +287,8 @@ export default class PvpArena extends Phaser.Scene {
     if (this.cpu !== null) this.textoTreino.setText(`VS CPU · ${{ facil: 'fácil', normal: 'normal', dificil: 'difícil' }[this.nivelBot]}`)
     // morte súbita: logo abaixo do "VS CPU" (escondido enquanto for x1)
     // bonus round: nome do evento enquanto a rodada dura
-    this.textoBonus = texto(70, 11, TEXTO.selecionado).setOrigin(0.5)
+    // (com a CPU o selo de velocidade ocupa a linha de baixo do "VS CPU": o do bônus desce)
+    this.textoBonus = texto(this.cpu !== null ? 81 : 70, 11, TEXTO.selecionado).setOrigin(0.5)
     this.indicadorVelocidade = new IndicadorVelocidade(this, LARGURA / 2, this.cpu !== null ? 61 : 50, { tamanho: 10 })
   }
 
@@ -1266,6 +1275,7 @@ export default class PvpArena extends Phaser.Scene {
     this.grazesRodada = [0, 0]
     this.acertosRodada = [0, 0]
     this.perfeitosRodada = [null, null]
+    this.combosRodada = [null, null]
     this.esquivaBot?.reiniciar()
     const bonus = this.temEfeitoBonus
     if (!r.caixas.some(Boolean) && !bonus) return
@@ -1296,14 +1306,33 @@ export default class PvpArena extends Phaser.Scene {
     await Promise.all(this.pistas.map((p) => p.esconder()))
     if (this.saindo || !perfeitos.length) return
     // a festa vem com as caixas já fechadas (nada fica escondido atrás delas)
-    tocar(this, 'aplausos')
+    await this.festejarPerfeitos(perfeitos)
+  }
+
+  // A festa dos desvios perfeitos da rodada: aplausos no tamanho do maior
+  // combo e a comemoração de cada um
+  async festejarPerfeitos(perfeitos) {
+    const nivel = Math.max(...perfeitos.map((p) => p.multiplicador ?? 1))
+    this.aplaudir(nivel)
     perfeitos.forEach((p) => this.festejarPerfeito(p))
-    await this.esperar(1100)
+    await this.esperar(1100 + 260 * (nivel - 1))
+  }
+
+  // Aplausos do combo: x1 uma vez; cada nível sobrepõe mais uma salva (com um
+  // atraso pequeno, soa como uma plateia maior), x3+ ganha o estouro de festa
+  // e o teto a fanfarra. Só sons que já existem (audio.js)
+  aplaudir(nivel = 1) {
+    tocar(this, 'aplausos')
+    for (let k = 1; k < nivel; k++) this.time.delayedCall(150 * k + 40 * (k - 1), () => !this.saindo && tocar(this, 'aplausos'))
+    if (nivel >= 2) tocar(this, 'energia')
+    if (nivel >= 3) this.time.delayedCall(120, () => !this.saindo && tocar(this, 'estouroFesta'))
+    if (nivel >= COMBO_PERFEITO.teto) this.time.delayedCall(320, () => !this.saindo && tocar(this, 'fanfarra'))
   }
 
   // DESVIO PERFEITO: em cada pista com ataque de verdade, se o dono do coração
   // não levou nenhum acerto (e não caiu), ganha a energia da carta. Devolve a
-  // lista para festejarPerfeito ({ pista, dono, ganho })
+  // lista para festejarPerfeito ({ pista, dono, ganho, base, multiplicador, sequencia }).
+  // O combo de perfeitos (registrarPerfeitoCombo) sobe 1 e multiplica a energia
   registrarDesviosPerfeitos(r, comAtaque) {
     const lista = []
     for (const k of [0, 1]) {
@@ -1311,34 +1340,85 @@ export default class PvpArena extends Phaser.Scene {
       if (!caixa || !comAtaque[k]) continue
       const dono = this.donoDaPista(k)
       if (this.acertosRodada[dono] || this.ko[dono] || !energiaPerfeito(caixa.carta)) continue
-      const ganho = registrarPerfeito(this.estado, dono, caixa.carta)
-      this.perfeitosRodada[dono] = (this.perfeitosRodada[dono] ?? 0) + ganho
+      const combo = registrarPerfeitoCombo(this.estado, dono, caixa.carta)
+      this.perfeitosRodada[dono] = (this.perfeitosRodada[dono] ?? 0) + combo.ganho
+      this.combosRodada[dono] = combo.multiplicador
       this.estatisticas[dono].perfeitos++
-      lista.push({ pista: k, dono, ganho })
+      this.estatisticas[dono].maiorSequencia = Math.max(this.estatisticas[dono].maiorSequencia ?? 0, combo.sequencia)
+      lista.push({ pista: k, dono, ...combo })
     }
     return lista
   }
 
-  festejarPerfeito({ pista, dono, ganho }) {
+  // Comemoração de um desvio perfeito; cresce com o combo (multiplicador):
+  //   x1 "PERFEITO!"          3 fogos
+  //   x2 "PERFEITO x2!"       texto maior e com brilho, 5 fogos, canhões de confete
+  //   x3 "PERFEITO x3!!"      maior ainda, 7 fogos, tremida leve, clarão dourado
+  //   x4 "PERFEITO x4!!!"     (teto) arco-íris, chuva de confete
+  festejarPerfeito({ pista, dono, ganho, base, multiplicador = 1 }) {
     const x = CENTROS[pista]
     const y = PISTA.y
     const cor = CORES.almas[dono]
-    this.etiquetaEm(x, y - 18, 'PERFEITO!', TEXTO.selecionado, { tamanho: 26, ms: 1200 })
-    this.etiquetaEm(x, y + 16, ganho ? `+${ganho} ENERGIA` : 'ENERGIA CHEIA!', '#7fd8ff', { atraso: 200, tamanho: 13, ms: 1000 })
-    particulas(this, x, y, { cor, quantidade: 26, velocidade: 200 })
-    ;[-70, 0, 70].forEach((dx, i) =>
-      this.time.delayedCall(i * 160, () => !this.saindo && fogoArtificio(this, x + dx, y - 40 + (i % 2) * 24, undefined, { quantidade: 28, profundidade: 97 })),
-    )
+    const n = Math.max(1, multiplicador)
+    const teto = n >= COMBO_PERFEITO.teto
+    const titulo = n > 1 ? `PERFEITO x${n}${'!'.repeat(n - 1)}` : 'PERFEITO!'
+    const corTitulo = [TEXTO.selecionado, '#ffe14a', '#ffb02e', '#ffffff'][Math.min(n, 4) - 1]
+    const ms = 1200 + 200 * (n - 1)
+    // brilho atrás do texto (só com combo)
+    if (n > 1) {
+      const brilho = this.add.image(x, y - 18, 'brilho').setTint(teto ? 0xff9ae8 : 0xffd23c).setBlendMode(Phaser.BlendModes.ADD).setDepth(96).setAlpha(0).setScale(0.6)
+      this.tweens.add({ targets: brilho, alpha: 0.35 + 0.15 * n, scaleX: 1.6 + 0.5 * n, scaleY: 0.7 + 0.15 * n, duration: 220, ease: 'Quad.easeOut' })
+      this.tweens.add({ targets: brilho, alpha: 0, delay: ms, duration: 300, onComplete: () => brilho.destroy() })
+    }
+    const t = this.etiquetaEm(x, y - 18, titulo, corTitulo, { tamanho: 24 + 4 * (n - 1), ms })
+    if (n > 1) {
+      t.setShadow(0, 0, teto ? '#ff9ae8' : '#ffd23c', 6 + 4 * n, true, true)
+      // pulsa uma vez por nível
+      this.tweens.add({ targets: t, scale: 1.12, delay: 200, duration: 140, yoyo: true, repeat: n - 2, ease: 'Sine.easeInOut' })
+    }
+    if (teto) {
+      const arco = ['#ff4a5a', '#ffa23a', '#ffe14a', '#5ae06a', '#4ab8ff', '#a66bff']
+      arco.concat(arco).forEach((c, k) => this.time.delayedCall(k * 110, () => t.scene && t.setColor(c)))
+    }
+    const energia = ganho ? `+${ganho} ENERGIA${n > 1 && base ? ` (${base} x${n})` : ''}` : 'ENERGIA CHEIA!'
+    this.etiquetaEm(x, y + 14 + 2 * n, energia, '#7fd8ff', { atraso: 200, tamanho: 13, ms: ms - 200 })
+    particulas(this, x, y, { cor, quantidade: 26 + 10 * (n - 1), velocidade: 200 + 30 * (n - 1) })
+    // fogos: 3, 5, 7, 9 (espalhados pela pista e acima dela)
+    const fogos = 1 + 2 * n
+    for (let i = 0; i < fogos; i++) {
+      const dx = fogos === 1 ? 0 : -90 + (180 * i) / (fogos - 1)
+      const dy = -40 + (i % 2) * 24 - (i % 3 === 2 ? 30 : 0)
+      this.time.delayedCall(i * (480 / fogos), () => !this.saindo && fogoArtificio(this, x + dx, y + dy, undefined, { quantidade: 28 + 6 * (n - 1), profundidade: 97 }))
+    }
+    if (n >= 2) canhoesConfete(this, 14 * n, 96)
+    if (n >= 3) {
+      shake(this, 160 + 60 * (n - 3), 0.003 + 0.0015 * (n - 3))
+      flashTela(this, 0xffd23c, 0.08 + 0.04 * (n - 3), 200)
+    }
+    if (teto) {
+      const chuva = chuvaConfete(this, 96)
+      this.time.delayedCall(1400, () => chuva.scene && chuva.stop())
+      this.time.delayedCall(5200, () => chuva.scene && chuva.destroy())
+    }
     const hud = this.huds[dono]
     hud.setEnergia(this.estado.jogadores[dono].energia)
-    if (ganho) numero(this, hud.pontoEnergia.x, hud.pontoEnergia.y, `+${ganho}`, '#7fd8ff', { tamanho: 16 })
+    hud.setSequencia(this.estado.jogadores[dono].sequencia ?? 0)
+    if (ganho) numero(this, hud.pontoEnergia.x, hud.pontoEnergia.y, `+${ganho}`, '#7fd8ff', { tamanho: 16 + 2 * (n - 1) })
     this.maos[dono]?.setEnergia?.(this.energiaNaMao(dono))
+  }
+
+  // Levou acerto com combo de perfeitos: o HUD avisa "COMBO QUEBROU" (pequeno)
+  comboQuebrou(j, sequenciaAntes) {
+    if (!sequenciaAntes) return
+    this.huds[j].comboQuebrou()
   }
 
   acertou(j, dano) {
     if ((this.fase !== 'esquiva' && this.fase !== 'duelo') || this.ko[j] || debug.invencivel) return false
     this.acertosRodada[j]++ // levou acerto: sem desvio perfeito nesta rodada
-    const efetivo = aplicarDano(this.estado, j, dano)
+    const sequenciaAntes = this.estado.jogadores[j].sequencia ?? 0
+    const efetivo = aplicarDano(this.estado, j, dano) // também quebra o combo de perfeitos
+    this.comboQuebrou(j, sequenciaAntes)
     const jog = this.estado.jogadores[j]
     this.estatisticas[j].danoRecebido += efetivo
     this.estatisticas[outro(j)].danoCausado += efetivo
@@ -1524,9 +1604,11 @@ export default class PvpArena extends Phaser.Scene {
         this.invertido[j] = 0
         if (!this.ko[dono]) this.avisoPista[j].setText('')
       }
-      // bonus round: o evento pode mexer no joystick (gravidade...)
+      // bonus round: o evento pode mexer no joystick (gravidade...) e no
+      // relógio da pista (passo: 0 = congelada neste frame, ex.: estátua, PC da escola)
       if (this.efeitoBonus?.joy) joy = this.efeitoBonus.joy(j, joy) ?? joy
-      pista.atualizar(delta, joy)
+      const passo = this.efeitoBonus?.passo ? this.efeitoBonus.passo(j, delta, joy) : delta
+      if (passo > 0) pista.atualizar(passo, joy)
     })
     this.efeitoBonus?.atualizar?.(delta)
     if (this.fase === 'duelo') this.duelo?.atualizar(delta)
@@ -1602,6 +1684,7 @@ export default class PvpArena extends Phaser.Scene {
       efeitoBonus: Boolean(this.efeitoBonus),
       musicaEspecial: this.musicaEspecial,
       perfeitos: [...this.perfeitosRodada],
+      combos: [...this.combosRodada],
       acertosRodada: [...this.acertosRodada],
       duelo: this.duelo?.estadoDebug?.() ?? null,
       jogadores: this.estado.jogadores.map((jog, j) => {
@@ -1612,6 +1695,7 @@ export default class PvpArena extends Phaser.Scene {
           hp: jog.hp,
           hpMax: jog.hpMax,
           energia: jog.energia,
+          sequencia: jog.sequencia ?? 0,
           escudo: jog.escudo,
           protegido: jog.protegido,
           mao: jog.baralho.mao.map((c) => c.id),

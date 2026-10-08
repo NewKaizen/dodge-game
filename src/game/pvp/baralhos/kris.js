@@ -28,7 +28,7 @@ export default {
   },
   super: {
     nome: 'Alma Determinada',
-    texto: 'Estocadas com colunas de espada, lasers alternados numa caixa apertada e o forcado com rajadas miradas',
+    texto: 'A caixa vira um tabuleiro: espadas caem onde a peça de xadrez ataca e o seu rastro vira lâminas; depois o eco da sua alma refaz o seu caminho e fecha com cortes em X',
     criar: (A) => A.superKris()
   },
   cartas: [
