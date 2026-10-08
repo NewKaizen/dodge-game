@@ -227,7 +227,7 @@ Cara própria por personagem (padrões e tema das balas):
 |---|---|---|
 | Kris | estocadas, colunas em forma de espada, mira, lasers alternados, forcado | espadas/losango azuis |
 | Susie | machado (foice), pisões (colunas), investidas, bombas | hex/bola roxas |
-| Ralsei | anéis, carrossel, divisores, espiral | copas/bola verdes |
+| Ralsei | anéis, carrossel, estrelas de ioiô na fitinha (A♣, Empréstimo Educado), espiral | copas/bola verdes |
 | Noelle | neve lenta em cascata, raios de gelo, pingentes | losango/hex azul-gelo |
 | Berdly | mira, estocadas, ondas de vento, lasers em cruz | losango/bola ciano |
 | Dess | bolas quicando, ondas sonoras, lasers, bombas | ouros/bola laranja |
