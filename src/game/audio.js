@@ -644,6 +644,25 @@ const SINTESE = {
     s.tom(1600, 0.12, 'square', 0.05, 400, 0.12)
     s.ruido(0.24, 0.08, 0, 4000)
   },
+  // SNOWGRAVE (SUPER da Noelle): o frio chegando (vento grave e cristais),
+  // o nome (acorde gelado e sino) e o golpe final (gelo estourando)
+  snowgraveFrio: (s) => {
+    s.ruido(1.4, 0.08, 0, 900)
+    s.nota(110, 1.6, 'sine', 0.08, 98, 0, 0.5)
+    ;[1568, 2093, 2637].forEach((f, i) => s.tom(f, 0.6, 'sine', 0.03, f * 0.99, 0.4 + i * 0.22))
+  },
+  snowgrave: (s) => {
+    s.nota(55, 2.2, 'sawtooth', 0.09, 49, 0, 0.2)
+    s.nota(82, 2.2, 'sine', 0.12, 73, 0, 0.2)
+    ;[987, 1318, 1760, 2349, 3136].forEach((f, i) => s.tom(f, 1.2, 'sine', 0.05, f, 0.15 + i * 0.12))
+    s.ruido(1.8, 0.12, 0.1, 1600)
+  },
+  snowgraveFim: (s) => {
+    s.ruido(0.08, 0.4, 0, 9000)
+    s.ruido(1.1, 0.3, 0.02, 2600)
+    s.tom(2637, 0.5, 'triangle', 0.08, 1318)
+    s.tom(60, 0.9, 'sine', 0.35, 30)
+  },
   // PC DA ESCOLA: o "tan-dan" de PC velho ligando, com chiado de cooler
   pcLigando: (s) => {
     s.ruido(0.5, 0.05, 0, 3000)

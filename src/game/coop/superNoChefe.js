@@ -4,6 +4,8 @@ import { ignorarNasCaixas } from '../recorte.js'
 import { particulas } from '../effects/particulas.js'
 import { flashTela } from '../effects/flash.js'
 import { shake } from '../effects/shake.js'
+import { FONTE } from '../constants.js'
+import { garantirTexturas } from '../attacks/super/noelle.js'
 
 // O SUPER de cada personagem ACERTANDO o chefe no CO-OP: espadas cravando,
 // machado colossal, fogo, gelo, lâminas, ondas de choque, buraco negro.
@@ -194,53 +196,49 @@ async function ralsei(p, aoImpacto) {
   p.tween({ targets: dragao, alpha: 0, scale: 2.6, delay: 150, duration: 400 })
 }
 
-// ---------- Noelle: pingentes caem e o chefe vira um bloco de gelo ----------
+// ---------- Noelle: SNOWGRAVE (o selo, a nevasca e o túmulo de gelo) ----------
 async function noelle(p, aoImpacto) {
-  p.som('super-noelle-vento')
-  for (let i = 0; i < 9; i++) {
-    p.depois(i * 85, () => {
-      const x = p.x + sorte(-p.largura * 0.6, p.largura * 0.6)
-      const pingente = p.imagem(x, p.y - 230, 'super-noelle-pingente', { escala: 2.2 })
-      p.tween({
-        targets: pingente,
-        y: p.y + sorte(-p.altura * 0.3, p.altura * 0.3),
-        duration: 170,
-        ease: 'Quad.easeIn',
-        onComplete: () => {
-          p.som('super-noelle-tique')
-          p.faiscas(pingente.x, pingente.y + 30, 0xbfefff, 8, 140)
-          pingente.setAlpha(0.8)
-        },
-      })
+  garantirTexturas(p.arena)
+  p.som('snowgraveFrio')
+  // o selo de gelo se abre atrás do chefe, girando
+  const selo = p.imagem(p.x, p.y, 'super-noelle-selo', { escala: 0.1, prof: ATRAS }).setTint(0xbfe8ff).setAlpha(0.85)
+  p.tween({ targets: selo, scale: 2.6, duration: 700, ease: 'Back.easeOut' })
+  p.tween({ targets: selo, angle: -120, duration: 2000 })
+  // nevasca em volta do chefe
+  for (let i = 0; i < 40; i++) {
+    const floco = p.imagem(p.x + sorte(-200, 200), p.y - sorte(100, 220), 'super-noelle-floco', { escala: sorte(0.6, 1.4) }).setTint(0xeaf7ff)
+    p.tween({ targets: floco, y: floco.y + sorte(220, 340), x: floco.x - sorte(30, 90), angle: sorte(-180, 180), alpha: 0, duration: sorte(900, 1500), delay: i * 18 })
+  }
+  p.depois(300, () => p.tingir(0x9fd8ff))
+  await p.esperar(620)
+  // o nome, em gelo, por cima do chefe
+  p.som('snowgrave')
+  const nome = p.novo(
+    p.arena.add.text(p.x, p.y - p.altura / 2 - 34, 'SNOWGRAVE', { fontFamily: FONTE, fontSize: '22px', color: '#eaf7ff', stroke: '#0b2a55', strokeThickness: 6 }).setOrigin(0.5).setAlpha(0).setScale(1.8),
+    FRENTE + 2,
+  )
+  p.tween({ targets: nome, alpha: 1, scale: 1, duration: 360, ease: 'Back.easeOut' })
+  p.tingir(0x7fc8ff)
+  // colunas de gelo explodem do chão em volta e por baixo do chefe
+  for (let k = 0; k < 9; k++) {
+    p.depois(k * 55, () => {
+      const x = p.x + (k - 4) * (p.largura / 5)
+      const cristal = p.imagem(x, p.y + p.altura / 2 + 20, 'super-noelle-pingente', { escala: 1 }).setFlipY(true).setOrigin(0.5, 1).setScale(1.4, 0.1)
+      p.tween({ targets: cristal, scaleY: 2.6 + Math.abs(4 - k) * -0.25 + 1, duration: 130, ease: 'Back.easeOut' })
+      p.faiscas(x, p.y + p.altura / 2, 0xffffff, 6, 160)
+      if (k % 3 === 0) p.som('super-noelle-estilhaco')
     })
   }
-  // neve caindo
-  for (let i = 0; i < 26; i++) {
-    const floco = p.imagem(p.x + sorte(-180, 180), p.y - sorte(120, 200), 'faisca', { escala: sorte(0.8, 1.6) }).setTint(0xe8f8ff)
-    p.tween({ targets: floco, y: floco.y + sorte(200, 300), x: floco.x + sorte(-40, 40), alpha: 0, duration: sorte(1000, 1500) })
-  }
-  p.depois(500, () => p.tingir(0x9fd8ff))
-  await p.esperar(820)
-  // o bloco de gelo fecha em volta do chefe
-  const w = p.largura + 30
-  const h = p.altura + 24
-  const bloco = p.grafico()
-  bloco.fillStyle(0xbfefff, 0.42).fillRect(-w / 2, -h / 2, w, h)
-  bloco.lineStyle(3, 0xffffff, 0.9).strokeRect(-w / 2, -h / 2, w, h)
-  bloco.lineStyle(2, 0xffffff, 0.7).lineBetween(-w / 2 + 10, -h / 2 + 8, -w / 2 + 30, -h / 2 + 30).lineBetween(w / 2 - 26, h / 2 - 34, w / 2 - 10, h / 2 - 14)
-  bloco.setPosition(p.x, p.y).setScale(0.2).setAlpha(0)
-  p.tween({ targets: bloco, scale: 1, alpha: 1, duration: 220, ease: 'Back.easeOut' })
-  p.som('super-noelle-quebra')
-  p.tingir(0x7fc8ff)
-  await p.esperar(520)
-  // estilhaça
-  p.som('super-noelle-estilhaco')
-  bloco.destroy()
-  p.impacto(aoImpacto, { cor: 0xbfefff, forca: 0.02 })
-  p.imagem(p.x, p.y, 'super-noelle-impacto', { escala: 4.5 })
-  p.faiscas(p.x, p.y, 0xbfefff, 40, 320)
-  p.faiscas(p.x, p.y, 0xffffff, 24, 240)
-  p.depois(140, () => p.tingir(0xa8e0ff, 600)) // ainda gelado
+  await p.esperar(9 * 55 + 260)
+  // o túmulo se fecha e estilhaça
+  p.som('snowgraveFim')
+  p.impacto(aoImpacto, { cor: 0xffffff, forca: 0.026 })
+  p.imagem(p.x, p.y, 'super-noelle-impacto', { escala: 5.5 })
+  p.faiscas(p.x, p.y, 0xbfefff, 44, 340)
+  p.faiscas(p.x, p.y, 0xffffff, 30, 260)
+  p.tween({ targets: selo, scale: 4, alpha: 0, duration: 500 })
+  p.tween({ targets: nome, alpha: 0, delay: 300, duration: 300 })
+  p.depois(140, () => p.tingir(0xa8e0ff, 700)) // congelado ainda
 }
 
 // ---------- Berdly: lâminas em espiral e o raio da resposta certa ----------
