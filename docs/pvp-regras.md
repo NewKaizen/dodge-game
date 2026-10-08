@@ -262,6 +262,16 @@ SUPERs (dano médio por SUPER, 24 sementes; antes → depois):
 | Asriel · Singularidade Radiante | 25 → 15 | 49 → 35 | o puxão para antes da borda do vazio (sozinho nunca encosta o coração nele); estrelas da espiral mais espaçadas (560 → 620 ms) e giro máximo 5,5 → 4,2 rad/s |
 | **Faixa** | **3 a 29** → **3 a 21** | **21 a 49** → **34 a 40** | |
 
+**2026-10-08: o SUPER da Noelle virou SNOWGRAVE** (o Zero Absoluto saiu). Três
+atos: o selo de gelo girando solta flocos em espiral (o núcleo do selo
+machuca), a nevasca com paredes de estilhaços com uma brecha que serpenteia,
+e o SNOWGRAVE: colunas de gelo em duas levas (ímpares e pares, cada coluna
+com mais que a lacuna mínima) e o golpe final, em que só um buraco quadrado
+no aviso fica seguro. Medido com 24 sementes: perfeito 2,7, médio **34,1**
+(dentro da faixa 34–40 dos outros SUPERs), nenhum aviso do validador.
+Cinemática nova em `pvp/super/anuncios/noelle.js` e efeito novo no chefe do
+CO-OP (`coop/superNoChefe.js`).
+
 SUPER da Dess mais justo:
 
 - os avisos dos acordes se sobrepõem (o próximo pisca antes do anterior bater); agora a conta de "sobra um traste livre" soma todos os trastes acesos ao mesmo tempo (antes cada acorde deixava um livre, mas a soma podia acender o braço inteiro);

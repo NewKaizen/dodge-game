@@ -35,8 +35,8 @@ export default {
     ),
   },
   super: {
-    nome: 'Zero Absoluto',
-    texto: 'Pingentes que racham o chão em placas que nunca mais voltam, a nevasca que isola as últimas seguras e a estrela de gelo final',
+    nome: 'SNOWGRAVE',
+    texto: 'O frio chega: um selo de gelo gira soltando flocos, a nevasca atravessa a caixa em paredes de estilhaços e, no fim, colunas de gelo explodem do chão até só sobrar um lugar seguro',
     criar: (A) => A.superNoelle()
   },
   cartas: [
