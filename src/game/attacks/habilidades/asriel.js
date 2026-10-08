@@ -559,15 +559,30 @@ const asrielShockerBreaker = definirAtaque({
       a.aviso({ tipo: 'area', x: x - meia, y: l.top, largura: cfg.largura, altura: l.height, ms: aviso, cor: 0xfff07a }, () => cair(x))
     }
 
+    // maior trecho livre da caixa (em x) com essas colunas
+    const maiorLacuna = (xs) => {
+      const l = a.caixa
+      const ocupados = xs.map(faixa).sort((p, q) => p[0] - q[0])
+      let cursor = l.left
+      let maior = 0
+      for (const [p, q] of ocupados) {
+        maior = Math.max(maior, p - cursor)
+        cursor = Math.max(cursor, q)
+      }
+      return Math.max(maior, l.right - cursor)
+    }
+
     a.aCada(cfg.intervalo, (i) => {
       if (!cabe(a, aviso)) return
       const l = a.caixa
       const alvo = a.alvo()
       const presa = (x) => limitar(x, l.left + meia, l.right - meia)
       if (cfg.cadeia && i % cfg.cadeia === cfg.cadeia - 1) {
-        // corrente: começa no coração e vai para o lado com mais espaço
+        // corrente: começa no coração e vai para o lado com mais espaço; numa
+        // caixa apertada a 3ª coluna sai se ela não deixar uma rota de fuga
         const sentido = alvo.x < l.centerX ? 1 : -1
         const xs = [0, 1, 2].map((k) => presa(alvo.x + sentido * k * 48))
+        while (xs.length > 1 && maiorLacuna(xs) < a.lacunaMinima) xs.pop()
         a.parede({ eixo: 'x', ocupados: xs.map(faixa) })
         xs.forEach((x, k) => a.depois(k * 200, () => golpe(x)))
         return
@@ -575,14 +590,7 @@ const asrielShockerBreaker = definirAtaque({
       let xs = []
       for (let tentativa = 0; tentativa < 10; tentativa++) {
         xs = Array.from({ length: cfg.quantidade }, (_, k) => presa(k === 0 ? alvo.x : a.aleatorio(l.left, l.right)))
-        const ocupados = xs.map(faixa).sort((p, q) => p[0] - q[0])
-        let cursor = l.left
-        let maior = 0
-        for (const [p, q] of ocupados) {
-          maior = Math.max(maior, p - cursor)
-          cursor = Math.max(cursor, q)
-        }
-        if (Math.max(maior, l.right - cursor) >= a.lacunaMinima) break
+        if (maiorLacuna(xs) >= a.lacunaMinima) break
       }
       a.parede({ eixo: 'x', ocupados: xs.map(faixa) })
       xs.forEach(golpe)

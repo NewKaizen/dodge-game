@@ -66,7 +66,7 @@ export default definirAtaque({
     meiaAberturaSopro: Math.PI / 4.6,
     rajadasPorSopro: 3,
     intervaloRajada: 100,
-    chamasPorRajada: 6,
+    chamasPorRajada: 7,
     velocidadeChama: 150,
     raioChama: 7,
     moldura: {

@@ -42,6 +42,15 @@ const { ataques } = await import('/src/game/attacks/index.js')
 coopArena.pistas[0].rodar(ataques.foice({ varridas: 2 }), { dano: 1 })
 ```
 
+Para medir a dificuldade (dano que o bot de esquiva leva em cada carta, com várias sementes), com o jogo em `npm run dev`:
+
+```sh
+node scripts/balanceamento/medir.mjs depois.json supers 24      # ou cartas / tudo, e um filtro: asriel,dess ou asriel-ouros-13
+node scripts/balanceamento/resumo.mjs depois.json antes.json     # tabelas (DETALHE=all lista carta por carta)
+```
+
+Os números da última rodada estão em `docs/pvp-regras.md` ("Balanceamento medido com o bot").
+
 ## Músicas (MIDI)
 
 Solte `<nome>.mid` em `public/assets/musicas/` (veja o `LEIA-ME.txt` de lá). O jogo toca com um soundfont General MIDI (`game/midi.js`, biblioteca spessasynth_lib), em loop e com fade entre as músicas. `debugJogo.musica()` mostra o que está tocando.
