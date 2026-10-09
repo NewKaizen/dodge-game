@@ -10,6 +10,7 @@ pvp/bonus/
   eventos/index.js    EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado,
                                  pcEscola, aquario, cogumelo, estatua, gelo, terremoto,
                                  popups, lag, teclado, clone, telaAzul, cursor }
+                                 chuva, ventania, abelhas, vagalumes, polen, trepadeira }
   eventos/<id>.js     um evento que bagunça a ESQUIVA normal (cartas 'normal')
   Duelo.js            o evento 'duelo' (substitui arremesso + esquiva)
   botDuelo.js         a CPU do duelo
@@ -112,6 +113,15 @@ ESCOLA), `tchibum` e `bolha` (AQUÁRIO), `crescer` e `encolher` (COGUMELO), `peg
 DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO),
 `popup` e `fecharJanela` (POP-UPS), `lag` (LAG), `teclas` e `embaralhar` (TECLADO EMBARALHADO),
 `clonar` (CTRL+C CTRL+V), `telaAzul` e `reiniciar` (TELA AZUL), `ampulheta` e `clique` (CURSOR GIGANTE).
+DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO).
+Arena JARDIM: `pancada` e `poca` (CHUVA DE VERÃO), `ventoAviso` e `rajada` (VENTANIA), `zumbido` e
+`zumbidoBravo` (ENXAME), `anoitecer`, `grilo` e `vagalume` (VAGA-LUMES), `inspirar` (opção `{ altura }`)
+e `atchim` (ESPIRRO DE PÓLEN), `brotar` e `recuar` (TREPADEIRA).
+
+Texturas da arena JARDIM (`arte/jardim.js`, geradas em código: chame `texturasJardim(arena)`):
+`jardim-flor-0..5`, `jardim-girassol`, `jardim-borboleta`, `jardim-abelha`, `jardim-folha` (pintar),
+`jardim-petala` (pintar), `jardim-brilho` (círculo branco suave) e `jardim-vazio` (transparente: bala
+invisível cujo visual é do evento).
 
 Outros recursos de audio.js usados pelos eventos:
 
@@ -154,3 +164,9 @@ Outros recursos de audio.js usados pelos eventos:
 | `clone` | clone espelhado (`espelhar`) que as balas acertam: `balas.colidir([alvo])` + `pista.acertou(coracaoReal)` (i-frames e dano do dono); o espelho muda com aviso e carência | `balas.colidir` |
 | `telaAzul` | chuvisco de aviso, TELA AZUL congela a pista toda (`passo` = 0), reinicia, revela parado e volta com 480 ms de i-frames | `passo` |
 | `cursor` | cursor gigante persegue o coração, mira (ampulheta, anel fechando) e clica: bala redonda invisível com `aviso` = tempo da mira (a CPU enxerga); às vezes clique duplo | `balas.criar` |
+| `chuva` | (Jardim) CHUVA DE VERÃO: a chuva empurra o coração para baixo (PANCADAS avisadas com setas), poças com aviso onde o coração escorrega (inércia só dentro da poça) | `joy` + `somContinuo('chuva')` |
+| `ventania` | (Jardim) rajadas de vento em 8 direções, avisadas pelas folhas e por uma seta na borda; empurram o coração | `joy` |
+| `abelhas` | (Jardim) ENXAME: quem fica parado é notado ("?" e "!") e perseguido; andar despista. O enxame é uma bala invisível (`textura: 'jardim-vazio'`, `atravessa`) que só machuca atacando (`inofensiva` no resto) | `balas.criar` |
+| `vagalumes` | (Jardim) escuro com bolhas de luz que andam (vaga-lumes) e um brilho fraco no coração. O escuro é uma RenderTexture por caixa, pintada de preto e apagada (`erase`) nas luzes a cada frame | RenderTexture |
+| `polen` | (Jardim) ESPIRRO: "a..." "a... a..." com seta da direção e ATCHIM: tranco (joystick na direção + `pista.fatorCoracao` ×2,6 por 230 ms, devolvido no fim) | `joy` + `fatorCoracao` |
+| `trepadeira` | (Jardim) vinhas crescem de 1–2 bordas (faixa piscando antes) e encolhem a área; balas retangulares invisíveis do tamanho do corpo da vinha. A CPU ganha um empurrão para fora da faixa avisada | `balas.criar` + `joy` (CPU) |

@@ -21,5 +21,11 @@ import teclado from './teclado.js'
 import clone from './clone.js'
 import telaAzul from './telaAzul.js'
 import cursor from './cursor.js'
+import chuva from './chuva.js'
+import ventania from './ventania.js'
+import abelhas from './abelhas.js'
+import vagalumes from './vagalumes.js'
+import polen from './polen.js'
+import trepadeira from './trepadeira.js'
 
-export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, clone, telaAzul, cursor }
+export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, clone, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira }

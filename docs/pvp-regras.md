@@ -172,6 +172,8 @@ Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria 
 | Castelo | Rude Buster (`pvp.mid`) | os clássicos: explosões, apagão, gravidade, ponta-cabeça, coração trocado, aquário, gelo, terremoto |
 | Jardim | Seven Suns (`arena_jardim.mid`) | cogumelo, lago (aquário) + os do jardim |
 | Sala de Informática | `arena_informatica.mid` | PC da escola, queda de energia (apagão), pop-ups, lag, teclado embaralhado, Ctrl+C Ctrl+V, tela azul, cursor gigante |
+| Jardim | Seven Suns (`arena_jardim.mid`) | cogumelo, lago (aquário), chuva de verão, ventania, enxame, vaga-lumes, espirro de pólen, trepadeira |
+| Sala de Informática | `arena_informatica.mid` | PC da escola, queda de energia (apagão) + os da sala |
 | Palco | `arena_palco.mid` | festa, dança da estátua, pirotecnia (explosões) + os do palco |
 | Templo | `arena_templo.mid` | terremoto, gravidade, ponta-cabeça, tochas (apagão) + os do templo |
 | Coliseu | `arena_coliseu.mid` | coração trocado + os do coliseu |
@@ -204,6 +206,12 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Cursor gigante | normais | um cursor de mouse enorme persegue o coração (mais devagar que ele), para, mira (anel vermelho fechando, ampulheta) e clica: dano em área. Às vezes clique duplo |
 | Cartas malucas | viram outras | na revelação cada carta vira uma carta sorteada de qualquer personagem (mesmo custo); o SUPER não vira (é imparável). Depois da rodada o baralho volta ao normal |
 | Duelo | viram armas | a carta escolhida vira a arma, sem gastar energia. Uma caixa só para os dois: ♥ tiro, ♠ espada, ♦ bumerangue, ♣ explosão (3 bombas em leque com estilhaços). Mira automática: é só se mexer e apertar A; o valor da carta aumenta o dano. Passar dá uma arma sorteada, fraca |
+| Chuva de verão | normais | (Jardim) chove forte: a chuva empurra o coração para baixo (muito nas PANCADAS, avisadas com setas azuis) e poças aparecem no chão da caixa (contorno piscando antes); dentro da poça o coração escorrega como no gelo |
+| Ventania | normais | (Jardim) rajadas de vento empurram o coração; antes de cada uma as folhas começam a voar para o lado do vento e uma seta pisca na borda. A direção muda a cada rajada |
+| Enxame | normais | (Jardim) um enxame de abelhas passeia pela caixa; quem fica PARADO é notado ("?", depois "!") e perseguido (mais devagar que o coração). Andar um bom pedaço despista; a picada é dano pequeno (3) com i-frames |
+| Vaga-lumes | normais | (Jardim) anoitece: as caixas ficam no escuro e só os vaga-lumes iluminam, com bolhas de luz que ANDAM (rondam o coração, soltos); o coração tem só um brilho fraquinho e as balas avisando piscam no escuro |
+| Espirro de pólen | normais | (Jardim) o pólen junta em volta do coração: "a..." "a... a..." (uma seta mostra a direção) e ATCHIM: o coração dá um tranco rápido naquela direção |
+| Trepadeira | normais | (Jardim) vinhas com espinhos crescem de uma ou duas bordas (a faixa pisca antes) e encolhem a caixa; depois recuam e voltam em outro lado. Encostar na vinha = dano de bala (4) |
 
 ## Ases (cartas especiais, um por naipe em todo baralho, custo 3)
 

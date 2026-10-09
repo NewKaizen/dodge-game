@@ -50,7 +50,7 @@ export const ARENAS = [
     tituloMusica: 'Seven Suns',
     cor: 0x5fe08a,
     moldura: { cor: 0x2f6a3e, alpha: 0.35 },
-    bonus: [...GERAIS, 'cogumelo', { id: 'aquario', nome: 'LAGO', descricao: 'o jardim alaga: o coração boia (segure ↓ para afundar)' }],
+    bonus: [...GERAIS, 'cogumelo', { id: 'aquario', nome: 'LAGO', descricao: 'o jardim alaga: o coração boia (segure ↓ para afundar)' }, 'chuva', 'ventania', 'abelhas', 'vagalumes', 'polen', 'trepadeira'],
   },
   {
     id: 'informatica',

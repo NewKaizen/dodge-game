@@ -42,6 +42,12 @@ export const EVENTOS = [
   { id: 'clone', nome: 'CTRL+C CTRL+V', descricao: 'um clone espelhado do coração: se ele levar, você leva!', cartas: 'normal', cor: 0x7affc8 },
   { id: 'telaAzul', nome: 'TELA AZUL', descricao: 'a caixa trava na tela azul e reinicia (travada, ninguém leva dano)', cartas: 'normal', cor: 0x5a9aff },
   { id: 'cursor', nome: 'CURSOR GIGANTE', descricao: 'um cursor enorme persegue o coração e clica nele!', cartas: 'normal', cor: 0xffffff },
+  { id: 'chuva', nome: 'CHUVA DE VERÃO', descricao: 'a chuva empurra o coração pra baixo e as poças escorregam!', cartas: 'normal', cor: 0x6ab8ff },
+  { id: 'ventania', nome: 'VENTANIA', descricao: 'rajadas de vento empurram o coração (olhe as folhas!)', cartas: 'normal', cor: 0x9ae07a },
+  { id: 'abelhas', nome: 'ENXAME', descricao: 'ficou parado? as abelhas vêm atrás! (se mexer despista)', cartas: 'normal', cor: 0xffd23a },
+  { id: 'vagalumes', nome: 'VAGA-LUMES', descricao: 'anoiteceu: só os vaga-lumes iluminam a caixa!', cartas: 'normal', cor: 0xd8ff6a },
+  { id: 'polen', nome: 'ESPIRRO DE PÓLEN', descricao: 'a... a... ATCHIM! o espirro joga o coração longe', cartas: 'normal', cor: 0xffe680 },
+  { id: 'trepadeira', nome: 'TREPADEIRA', descricao: 'vinhas crescem das bordas e fecham a caixa: não encoste!', cartas: 'normal', cor: 0x3fbf5a },
 ]
 
 export const EVENTO = Object.fromEntries(EVENTOS.map((ev) => [ev.id, ev]))

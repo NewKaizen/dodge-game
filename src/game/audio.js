@@ -809,4 +809,65 @@ const SINTESE = {
     s.tom(180, 0.12, 'square', 0.1, 70)
     s.ruido(0.02, 0.15, 0.06, 4000)
   },
+  // ---------- arena JARDIM ----------
+  // CHUVA DE VERÃO: a pancada chegando (chiado que engrossa + ronco) e a poça se formando (plic-ploc)
+  pancada: (s) => {
+    s.ruido(1.2, 0.12, 0, 1800)
+    s.ruido(0.9, 0.08, 0.2, 5000)
+    s.nota(70, 1.1, 'sine', 0.12, 55, 0, 0.3)
+  },
+  poca: (s) => {
+    s.tom(900, 0.06, 'sine', 0.06, 1500)
+    s.tom(700, 0.07, 'sine', 0.05, 1300, 0.09)
+    s.tom(1100, 0.05, 'sine', 0.04, 1700, 0.16)
+  },
+  // VENTANIA: o vento juntando força (chiado que sobe) e a rajada
+  ventoAviso: (s) => [500, 900, 1500, 2400].forEach((corte, i) => s.ruido(0.3, 0.025 + i * 0.012, i * 0.13, corte)),
+  rajada: (s) => {
+    s.ruido(1.5, 0.16, 0, 1300)
+    s.ruido(1.1, 0.07, 0.15, 3800)
+    s.nota(90, 1.3, 'sine', 0.06, 70, 0, 0.2)
+  },
+  // ENXAME: zumbido (o enxame percebeu) e zumbido bravo (atacando)
+  zumbido: (s) => {
+    s.nota(180, 0.45, 'sawtooth', 0.04, 205, 0, 0.08)
+    s.nota(184, 0.45, 'square', 0.02, 210, 0, 0.08)
+  },
+  zumbidoBravo: (s) => {
+    for (let i = 0; i < 3; i++) s.nota(250 + i * 15, 0.16, 'sawtooth', 0.05, 300 + i * 15, i * 0.13, 0.03)
+    s.tom(820, 0.08, 'square', 0.04, 1200, 0.02)
+  },
+  // VAGA-LUMES: a noite caindo (acorde que desce), grilos e o "pling" dos vaga-lumes
+  anoitecer: (s) => {
+    ;[784, 659, 523, 392].forEach((f, i) => s.nota(f, 0.7, 'triangle', 0.05, f * 0.98, i * 0.16, 0.1))
+    s.nota(98, 1.4, 'sine', 0.1, 92, 0, 0.4)
+  },
+  grilo: (s) => {
+    for (let i = 0; i < 3; i++) s.tom(4300, 0.035, 'square', 0.018, 4100, i * 0.07)
+  },
+  vagalume: (s) => {
+    const f = 1568 + Math.random() * 1000
+    s.tom(f, 0.3, 'sine', 0.03, f * 1.01)
+    s.tom(f * 1.5, 0.2, 'sine', 0.015, f * 1.5, 0.05)
+  },
+  // ESPIRRO DE PÓLEN: "a..." (puxando o ar, cada vez mais agudo) e o ATCHIM
+  inspirar: (s, { altura = 0 } = {}) => {
+    s.nota(260 + altura * 120, 0.32, 'triangle', 0.06, 420 + altura * 160, 0, 0.18)
+    s.ruido(0.3, 0.03, 0, 2600)
+  },
+  atchim: (s) => {
+    s.ruido(0.06, 0.32, 0, 8000)
+    s.ruido(0.4, 0.22, 0.03, 3200)
+    s.tom(620, 0.14, 'square', 0.07, 240, 0.02)
+    s.tom(300, 0.25, 'triangle', 0.08, 150, 0.08)
+  },
+  // TREPADEIRA: as vinhas rangendo ao crescer e ao recuar
+  brotar: (s) => {
+    for (let i = 0; i < 5; i++) s.tom(85 + i * 18, 0.09, 'sawtooth', 0.045, 140 + i * 22, i * 0.09)
+    s.ruido(0.5, 0.04, 0, 900)
+  },
+  recuar: (s) => {
+    for (let i = 0; i < 4; i++) s.tom(200 - i * 25, 0.08, 'sawtooth', 0.035, 120 - i * 15, i * 0.07)
+    s.ruido(0.3, 0.03, 0, 700)
+  },
 }
