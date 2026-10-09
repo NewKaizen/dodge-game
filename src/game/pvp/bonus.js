@@ -36,6 +36,12 @@ export const EVENTOS = [
   { id: 'estatua', nome: 'DANÇA DA ESTÁTUA', descricao: 'a música parou? ESTÁTUA! Quem a luz pegar se mexendo leva dano', cartas: 'normal', cor: 0x7fd8ff },
   { id: 'gelo', nome: 'PISTA DE GELO', descricao: 'o coração escorrega: difícil de frear!', cartas: 'normal', cor: 0xbfefff },
   { id: 'terremoto', nome: 'TERREMOTO', descricao: 'a terra treme, joga o coração e derruba pedras!', cartas: 'normal', cor: 0xc8a070 },
+  { id: 'popups', nome: 'POP-UPS', descricao: 'propagandas tapam a caixa: passe o coração no [X] para fechar!', cartas: 'normal', cor: 0x5ad8ff },
+  { id: 'lag', nome: 'LAG', descricao: 'internet lenta: o coração obedece atrasado!', cartas: 'normal', cor: 0xffb040 },
+  { id: 'teclado', nome: 'TECLADO EMBARALHADO', descricao: 'as setas trocam de lugar: fique de olho no tecladinho!', cartas: 'normal', cor: 0xd8e0ff },
+  { id: 'clone', nome: 'CTRL+C CTRL+V', descricao: 'um clone espelhado do coração: se ele levar, você leva!', cartas: 'normal', cor: 0x7affc8 },
+  { id: 'telaAzul', nome: 'TELA AZUL', descricao: 'a caixa trava na tela azul e reinicia (travada, ninguém leva dano)', cartas: 'normal', cor: 0x5a9aff },
+  { id: 'cursor', nome: 'CURSOR GIGANTE', descricao: 'um cursor enorme persegue o coração e clica nele!', cartas: 'normal', cor: 0xffffff },
 ]
 
 export const EVENTO = Object.fromEntries(EVENTOS.map((ev) => [ev.id, ev]))

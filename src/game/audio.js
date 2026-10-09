@@ -759,4 +759,54 @@ const SINTESE = {
     s.tom(3000, 0.07, 'sine', 0.05, 2600, 0.05)
     s.tom(120, 0.12, 'square', 0.1, 50, 0.04)
   },
+  // SALA DE INFORMÁTICA (bônus da arena)
+  // POP-UPS: o "plim" de janela abrindo e o clique que fecha
+  popup: (s) => {
+    s.tom(1046, 0.12, 'triangle', 0.07, 1046)
+    s.tom(1568, 0.22, 'triangle', 0.06, 1568, 0.07)
+  },
+  fecharJanela: (s) => {
+    s.ruido(0.015, 0.12, 0, 6000)
+    s.tom(900, 0.07, 'square', 0.04, 450, 0.01)
+  },
+  // LAG: discador de internet (chiado e apitos) com a conexão caindo
+  lag: (s) => {
+    ;[1270, 2100, 1650, 2400, 980].forEach((f, i) => s.tom(f, 0.09, 'square', 0.03, f * 0.97, i * 0.09))
+    s.ruido(0.5, 0.05, 0.45, 5000)
+    s.tom(600, 0.3, 'triangle', 0.05, 200, 0.5)
+  },
+  // TECLADO EMBARALHADO: tique de aviso e as teclas trocando de lugar
+  teclas: (s) => {
+    s.ruido(0.02, 0.1, 0, 7000)
+    s.tom(1300, 0.03, 'square', 0.03, 1300)
+  },
+  embaralhar: (s) => {
+    for (let i = 0; i < 7; i++) s.ruido(0.018, 0.1, i * 0.035 + Math.random() * 0.01, 6000 + Math.random() * 3000)
+    s.tom(300, 0.25, 'square', 0.05, 1200, 0.02)
+  },
+  // CTRL+C CTRL+V: dois cliques de tecla e o "blup" da cópia aparecendo
+  clonar: (s) => {
+    s.ruido(0.015, 0.12, 0, 7000)
+    s.ruido(0.015, 0.12, 0.09, 7000)
+    s.tom(500, 0.16, 'sine', 0.08, 1300, 0.16)
+    s.tom(750, 0.16, 'sine', 0.05, 1950, 0.2)
+  },
+  // TELA AZUL: zumbido elétrico com acorde de erro; reiniciar: o "tan-dan" curtinho
+  telaAzul: (s) => {
+    s.tom(110, 0.6, 'sawtooth', 0.08, 108)
+    s.tom(220, 0.18, 'square', 0.06, 220)
+    s.tom(208, 0.3, 'square', 0.06, 208, 0.12)
+    s.ruido(0.06, 0.2, 0, 3000)
+  },
+  reiniciar: (s) => {
+    s.ruido(0.25, 0.04, 0, 3000)
+    ;[659, 988, 1318].forEach((f, i) => s.nota(f, 0.35, 'triangle', 0.06, f, 0.05 + i * 0.09, 0.03))
+  },
+  // CURSOR GIGANTE: tique da ampulheta e o clique pesado do mouse
+  ampulheta: (s) => s.tom(1900, 0.03, 'triangle', 0.035, 1700),
+  clique: (s) => {
+    s.ruido(0.03, 0.3, 0, 5000)
+    s.tom(180, 0.12, 'square', 0.1, 70)
+    s.ruido(0.02, 0.15, 0.06, 4000)
+  },
 }
