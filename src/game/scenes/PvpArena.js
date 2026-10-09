@@ -250,6 +250,9 @@ export default class PvpArena extends Phaser.Scene {
     this.events.once('shutdown', () => this.fundoArena?.destruir())
     const { cor, alpha } = this.arena.moldura
     const g = this.add.graphics().setDepth(-4)
+    // faixa escura atrás do HUD (HP, energia): o fundo pode ser cheio de detalhe ali em cima
+    g.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.7, 0.7, 0.25, 0.25)
+    g.fillRect(0, 0, LARGURA, 70)
     if (alpha > 0) {
       g.fillStyle(0x000000, alpha)
       g.fillRoundedRect(6, 66, LARGURA - 12, ALTURA - 72, 16)
