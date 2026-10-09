@@ -161,9 +161,26 @@ Ficar parado não é mais uma estratégia: quase todo padrão tem uma parte mira
 
 A cada 5 rodadas (rodadas 5, 10, 15, 20, 25) tudo fica 30% mais rápido, até ×2,5 na rodada 25 (`ACELERACAO` em `constants.js`): balas (velocidade e densidade), relógio da escolha (15 s → até 8 s), animações e música. O coração ganha metade do bônus para continuar dando para desviar. Aparece um aviso "VELOCIDADE ×1,3!" e o selo fica no HUD. No co-op a regra fica desligada (`ACELERACAO.coop = false`; com `true` ela vale por turno do chefe, por cima do `RITMO`).
 
+## Arenas (votação antes da partida)
+
+Depois da escolha dos lutadores (e do "VS"), os jogadores **votam na arena** (cena `PvpVoto`, dados em `pvp/arenas.js`). Cada um move o próprio coração entre os cartões e vota com A (B desfaz). Ganha a mais votada; **empate = roleta** entre as empatadas; o cartão **"?" (ALEATÓRIA)** vale como voto numa arena sorteada na hora da apuração; acabou o tempo (12 s), quem não votou fica de fora (ninguém votou = roleta entre todas). Contra a CPU só o P1 vota: a CPU segue o voto. A revanche (tela de resultado) e o "recomeçar" do pause mantêm a arena.
+
+Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria (`public/assets/musicas/<arena.musica>.mid`; sem o arquivo, toca o `pvp.mid`) e a **sua lista de rodadas bônus** (no mínimo 10; Duelo e Cartas Malucas estão em todas). Um evento pode ter nome próprio numa arena (o Apagão vira TOCHAS no Templo e QUEDA DE ENERGIA na Informática).
+
+| Arena | Música | Bônus |
+|---|---|---|
+| Castelo | Rude Buster (`pvp.mid`) | os clássicos: explosões, apagão, gravidade, ponta-cabeça, coração trocado, aquário, gelo, terremoto |
+| Jardim | Seven Suns (`arena_jardim.mid`) | cogumelo, lago (aquário), chuva de verão, ventania, enxame, vaga-lumes, espirro de pólen, trepadeira |
+| Sala de Informática | `arena_informatica.mid` | PC da escola, queda de energia (apagão), pop-ups, lag, teclado embaralhado, Ctrl+C Ctrl+V, tela azul, cursor gigante |
+| Palco | `arena_palco.mid` | festa, dança da estátua, pirotecnia (explosões), plateia arremessa, gelo seco, no ritmo, karaokê, mosh |
+| Templo | `arena_templo.mid` | terremoto, gravidade, ponta-cabeça, tochas (apagão), pedra rolante, armadilhas, areia movediça, relógio do tempo |
+| Coliseu | `arena_coliseu.mid` | coração trocado, arena encolhendo, leões, chuva de lanças, corrida de bigas, chão em brasas, polegar do imperador, rede do reciário |
+
+Testes: `scene.start('PvpVoto', { p1, p2 })` ou direto `scene.start('PvpArena', { p1, p2, arena: 'templo' })`.
+
 ## Bonus rounds (a cada 3 rodadas)
 
-Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento caótico **depois** que os dois escolhem as cartas (no Duelo, a carta escolhida vira a arma, sem gastar energia), que nunca repete o da rodada bônus anterior. Só caos, sem prêmio: ninguém ganha nada a mais, e o dano continua valendo. Nos eventos de esquiva, as duas caixas abrem mesmo que ninguém tenha atacado.
+Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento caótico **depois** que os dois escolhem as cartas (no Duelo, a carta escolhida vira a arma, sem gastar energia), que nunca repete o da rodada bônus anterior. A roleta só tem os eventos da arena da partida (veja Arenas). Só caos, sem prêmio: ninguém ganha nada a mais, e o dano continua valendo. Nos eventos de esquiva, as duas caixas abrem mesmo que ninguém tenha atacado.
 
 | Evento | Cartas | O que acontece |
 |---|---|---|
@@ -179,8 +196,36 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Dança da estátua | normais | a música PARA de repente, sem aviso: balas e ataque congelam, o coração não. Um holofote de vigia PERSEGUE o coração de cada um (é mais lento: dá para fugir); quem se mexer com a luz em cima do coração é PEGO (30% do HP máximo, uma vez por parada). Mexer fora da luz pode. A música volta e tudo descongela |
 | Pista de gelo | normais | o coração escorrega: demora para acelerar, demora para frear e desliza quando você solta |
 | Terremoto | normais | a terra treme (ronco de aviso antes): a tela sacode, o coração é empurrado e pedras caem do teto das caixas |
+| Pop-ups | normais | janelas de propaganda ("VOCÊ GANHOU!", "BAIXE MAIS RAM") abrem por cima das balas (por baixo do coração) e tapam a visão; passar o coração no [X] fecha. Nunca nascem em cima do coração, no máximo 2–3 por caixa, somem sozinhas em 7 s |
+| Lag | normais | o direcional chega atrasado 250–400 ms (o ping aparece em cima da caixa); um fantasma do coração mostra para onde ele vai. A CPU também sofre |
+| Teclado embaralhado | normais | as setas trocam de lugar (giros e espelhos: seta sempre vira seta) e o mapa muda a cada ~4 s, com 1,1 s de aviso; o tecladinho entre as caixas mostra sempre o mapa atual. A CPU demora um pouco para aprender cada mapa |
+| Ctrl+C Ctrl+V | normais | um clone espelhado do coração (lados, cima/baixo ou centro, com o eixo tracejado) anda junto; bala no clone conta como acerto no dono. O espelho muda de tempos em tempos, com aviso e um instante sem machucar |
+| Tela azul | normais | de vez em quando uma caixa chuvisca e dá TELA AZUL: a pista inteira congela (ninguém leva dano), reinicia, mostra tudo parado por um instante e volta com i-frames curtos |
+| Cursor gigante | normais | um cursor de mouse enorme persegue o coração (mais devagar que ele), para, mira (anel vermelho fechando, ampulheta) e clica: dano em área. Às vezes clique duplo |
+| Pedra rolante (Templo) | normais | ronco, tremor e a faixa por onde a pedra vai passar fica vermelha com setas no sentido dela (~1 s de aviso); aí uma pedra gigante atravessa a caixa rolando (bala, 5 de dano). Às vezes vem uma segunda em outra faixa: sempre sobra um terço da caixa livre |
+| Armadilhas (Templo) | normais | placas de pressão no chão (com setas ↔/↕): pisou, clique, a linha dela pisca e ~0,55 s depois dardos saem das duas paredes por ela. De tempos em tempos um padrão de lajes (colunas, faixas, xadrez, borda ou miolo) estala com as pontas brilhando nas frestas (~1 s) e os espinhos sobem por 0,6 s; sempre sobram lajes livres |
+| Areia movediça (Templo) | normais | poças de areia surgem (aviso, sem efeito ainda), prendem por uns segundos e secam. Dentro: o coração fica lento (42% no meio, 80% na borda) e é puxado para o centro; sair sempre dá. Não machuca |
+| Relógio do tempo (Templo) | normais | um relógio entre as caixas alterna o tempo do ATAQUE entre câmera lenta (×0,5) e acelerado (×1,5), com 1 s de aviso (tique-taque dispara, nome do próximo modo pisca). O coração anda sempre no ritmo normal; a música acompanha um pouco |
 | Cartas malucas | viram outras | na revelação cada carta vira uma carta sorteada de qualquer personagem (mesmo custo); o SUPER não vira (é imparável). Depois da rodada o baralho volta ao normal |
 | Duelo | viram armas | a carta escolhida vira a arma, sem gastar energia. Uma caixa só para os dois: ♥ tiro, ♠ espada, ♦ bumerangue, ♣ explosão (3 bombas em leque com estilhaços). Mira automática: é só se mexer e apertar A; o valor da carta aumenta o dano. Passar dá uma arma sorteada, fraca |
+| Chuva de verão | normais | (Jardim) chove forte: a chuva empurra o coração para baixo (muito nas PANCADAS, avisadas com setas azuis) e poças aparecem no chão da caixa (contorno piscando antes); dentro da poça o coração escorrega como no gelo |
+| Ventania | normais | (Jardim) rajadas de vento empurram o coração; antes de cada uma as folhas começam a voar para o lado do vento e uma seta pisca na borda. A direção muda a cada rajada |
+| Enxame | normais | (Jardim) um enxame de abelhas passeia pela caixa; quem fica PARADO é notado ("?", depois "!") e perseguido (mais devagar que o coração). Andar um bom pedaço despista; a picada é dano pequeno (3) com i-frames |
+| Vaga-lumes | normais | (Jardim) anoitece: as caixas ficam no escuro e só os vaga-lumes iluminam, com bolhas de luz que ANDAM (rondam o coração, soltos); o coração tem só um brilho fraquinho e as balas avisando piscam no escuro |
+| Espirro de pólen | normais | (Jardim) o pólen junta em volta do coração: "a..." "a... a..." (uma seta mostra a direção) e ATCHIM: o coração dá um tranco rápido naquela direção |
+| Trepadeira | normais | (Jardim) vinhas com espinhos crescem de uma ou duas bordas (a faixa pisca antes) e encolhem a caixa; depois recuam e voltam em outro lado. Encostar na vinha = dano de bala (4) |
+| Arena encolhendo (Coliseu) | normais | paliçadas com pontas de ferro entram pelas bordas das caixas (laterais, teto e chão, um canto ou as quatro), seguram e abrem de novo. Aviso: a faixa que vai fechar pisca em vermelho com setas. Não machucam, só empurram o coração; sempre sobra um miolo livre de pelo menos 84×66 px. As balas passam por cima |
+| Leões! (Coliseu) | normais | rugido e a faixa por onde o leão vai passar piscando; ele atravessa a caixa correndo (dano 5). Às vezes SALTA: a faixa tem um buraco com um arco tracejado, e quem estiver embaixo do salto não leva nada. Mais para o fim vêm dois de uma vez, em sentidos opostos |
+| Chuva de lanças (Coliseu) | normais | ondas de lanças: a sombra no chão cresce onde cada uma vai cair; ela crava (dano 4 na ponta) e fica em pé uns 2,6 s como obstáculo (encostar na haste: dano 3). Sempre espaçadas, no máximo 9 por caixa |
+| Corrida de bigas (Coliseu) | normais | a caixa vira pista com 3 faixas de sentidos alternados; bigas atravessam uma ou duas faixas por vez (dano 5), avisadas por poeira na entrada e pela faixa piscando. Sempre sobra pelo menos uma faixa livre |
+| Chão em brasas (Coliseu) | normais | o contrário da estátua: ficar PARADO esquenta a barra de CALOR (embaixo da caixa); a partir da metade ela pisca, sai fumaça e chia. Cheia: queima (3,5% do HP máximo, mínimo 2) e volta para 30%. Andando, esfria |
+| Polegar do imperador (Coliseu) | normais | o imperador sorteia uma regra numa roleta entre as caixas e mostra o polegar (pra cima = regra boa, pra baixo = ruim): controles invertidos, coração rápido, lento, mini, gigante ou caixa escura. Vale para os dois por ~3 s e ele sorteia outra |
+| Rede do reciário (Coliseu) | normais | um gladiador entre as caixas joga a rede, uma caixa por vez: círculo tracejado no chão avisa onde ela cai. Pegou: o coração fica PRESO (bem lento) até sacudir as setas 5 vezes (ou 1,8 s). Não dá dano |
+| Plateia arremessa | normais | (Palco) a plateia joga tomates, flores, ursinhos e baldes de pipoca no palco: uma sombra no chão da caixa avisa onde cai (~1 s antes), o objeto cai em cima dela e sai quicando pela caixa até sumir |
+| Gelo seco | normais | (Palco) uma fumaça densa sobe do chão e cobre a metade de baixo das caixas, ondulando (com jatos de CO2 de vez em quando); lá dentro as balas viram silhuetas escuras. Só visual, sem dano novo |
+| No ritmo | normais | (Palco) o coração só anda na batida (~140 BPM, metade de cada batida); entre as batidas fica parado. Para compensar ele anda mais rápido na janela e as caixas ficam 15% mais lentas. Anel que encolhe até o coração, borda pulsando, compasso e bumbo marcam a batida |
+| Karaokê | normais | (Palco) versos da música atravessam as caixas da direita para a esquerda; cada palavra é uma bala (com o "!" de aviso) e acende em rosa ao passar pelo meio da caixa, cantando uma nota. Dá para passar entre as palavras e entre as faixas dos versos |
+| Mosh | normais | (Palco) ondas de gente atravessam a caixa numa faixa (metade de cima, de baixo ou o meio) e empurram o coração; antes, a borda de entrada pisca na altura da faixa com setas. Não machuca: o perigo é ser jogado nas balas (dá para resistir ou sair da faixa) |
 
 ## Ases (cartas especiais, um por naipe em todo baralho, custo 3)
 

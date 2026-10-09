@@ -759,4 +759,267 @@ const SINTESE = {
     s.tom(3000, 0.07, 'sine', 0.05, 2600, 0.05)
     s.tom(120, 0.12, 'square', 0.1, 50, 0.04)
   },
+  // SALA DE INFORMÁTICA (bônus da arena)
+  // POP-UPS: o "plim" de janela abrindo e o clique que fecha
+  popup: (s) => {
+    s.tom(1046, 0.12, 'triangle', 0.07, 1046)
+    s.tom(1568, 0.22, 'triangle', 0.06, 1568, 0.07)
+  },
+  fecharJanela: (s) => {
+    s.ruido(0.015, 0.12, 0, 6000)
+    s.tom(900, 0.07, 'square', 0.04, 450, 0.01)
+  },
+  // LAG: discador de internet (chiado e apitos) com a conexão caindo
+  lag: (s) => {
+    ;[1270, 2100, 1650, 2400, 980].forEach((f, i) => s.tom(f, 0.09, 'square', 0.03, f * 0.97, i * 0.09))
+    s.ruido(0.5, 0.05, 0.45, 5000)
+    s.tom(600, 0.3, 'triangle', 0.05, 200, 0.5)
+  },
+  // TECLADO EMBARALHADO: tique de aviso e as teclas trocando de lugar
+  teclas: (s) => {
+    s.ruido(0.02, 0.1, 0, 7000)
+    s.tom(1300, 0.03, 'square', 0.03, 1300)
+  },
+  embaralhar: (s) => {
+    for (let i = 0; i < 7; i++) s.ruido(0.018, 0.1, i * 0.035 + Math.random() * 0.01, 6000 + Math.random() * 3000)
+    s.tom(300, 0.25, 'square', 0.05, 1200, 0.02)
+  },
+  // CTRL+C CTRL+V: dois cliques de tecla e o "blup" da cópia aparecendo
+  clonar: (s) => {
+    s.ruido(0.015, 0.12, 0, 7000)
+    s.ruido(0.015, 0.12, 0.09, 7000)
+    s.tom(500, 0.16, 'sine', 0.08, 1300, 0.16)
+    s.tom(750, 0.16, 'sine', 0.05, 1950, 0.2)
+  },
+  // TELA AZUL: zumbido elétrico com acorde de erro; reiniciar: o "tan-dan" curtinho
+  telaAzul: (s) => {
+    s.tom(110, 0.6, 'sawtooth', 0.08, 108)
+    s.tom(220, 0.18, 'square', 0.06, 220)
+    s.tom(208, 0.3, 'square', 0.06, 208, 0.12)
+    s.ruido(0.06, 0.2, 0, 3000)
+  },
+  reiniciar: (s) => {
+    s.ruido(0.25, 0.04, 0, 3000)
+    ;[659, 988, 1318].forEach((f, i) => s.nota(f, 0.35, 'triangle', 0.06, f, 0.05 + i * 0.09, 0.03))
+  },
+  // CURSOR GIGANTE: tique da ampulheta e o clique pesado do mouse
+  ampulheta: (s) => s.tom(1900, 0.03, 'triangle', 0.035, 1700),
+  clique: (s) => {
+    s.ruido(0.03, 0.3, 0, 5000)
+    s.tom(180, 0.12, 'square', 0.1, 70)
+    s.ruido(0.02, 0.15, 0.06, 4000)
+  },
+  // ---------- arena JARDIM ----------
+  // CHUVA DE VERÃO: a pancada chegando (chiado que engrossa + ronco) e a poça se formando (plic-ploc)
+  pancada: (s) => {
+    s.ruido(1.2, 0.12, 0, 1800)
+    s.ruido(0.9, 0.08, 0.2, 5000)
+    s.nota(70, 1.1, 'sine', 0.12, 55, 0, 0.3)
+  },
+  poca: (s) => {
+    s.tom(900, 0.06, 'sine', 0.06, 1500)
+    s.tom(700, 0.07, 'sine', 0.05, 1300, 0.09)
+    s.tom(1100, 0.05, 'sine', 0.04, 1700, 0.16)
+  },
+  // VENTANIA: o vento juntando força (chiado que sobe) e a rajada
+  ventoAviso: (s) => [500, 900, 1500, 2400].forEach((corte, i) => s.ruido(0.3, 0.025 + i * 0.012, i * 0.13, corte)),
+  rajada: (s) => {
+    s.ruido(1.5, 0.16, 0, 1300)
+    s.ruido(1.1, 0.07, 0.15, 3800)
+    s.nota(90, 1.3, 'sine', 0.06, 70, 0, 0.2)
+  },
+  // ENXAME: zumbido (o enxame percebeu) e zumbido bravo (atacando)
+  zumbido: (s) => {
+    s.nota(180, 0.45, 'sawtooth', 0.04, 205, 0, 0.08)
+    s.nota(184, 0.45, 'square', 0.02, 210, 0, 0.08)
+  },
+  zumbidoBravo: (s) => {
+    for (let i = 0; i < 3; i++) s.nota(250 + i * 15, 0.16, 'sawtooth', 0.05, 300 + i * 15, i * 0.13, 0.03)
+    s.tom(820, 0.08, 'square', 0.04, 1200, 0.02)
+  },
+  // VAGA-LUMES: a noite caindo (acorde que desce), grilos e o "pling" dos vaga-lumes
+  anoitecer: (s) => {
+    ;[784, 659, 523, 392].forEach((f, i) => s.nota(f, 0.7, 'triangle', 0.05, f * 0.98, i * 0.16, 0.1))
+    s.nota(98, 1.4, 'sine', 0.1, 92, 0, 0.4)
+  },
+  grilo: (s) => {
+    for (let i = 0; i < 3; i++) s.tom(4300, 0.035, 'square', 0.018, 4100, i * 0.07)
+  },
+  vagalume: (s) => {
+    const f = 1568 + Math.random() * 1000
+    s.tom(f, 0.3, 'sine', 0.03, f * 1.01)
+    s.tom(f * 1.5, 0.2, 'sine', 0.015, f * 1.5, 0.05)
+  },
+  // ESPIRRO DE PÓLEN: "a..." (puxando o ar, cada vez mais agudo) e o ATCHIM
+  inspirar: (s, { altura = 0 } = {}) => {
+    s.nota(260 + altura * 120, 0.32, 'triangle', 0.06, 420 + altura * 160, 0, 0.18)
+    s.ruido(0.3, 0.03, 0, 2600)
+  },
+  atchim: (s) => {
+    s.ruido(0.06, 0.32, 0, 8000)
+    s.ruido(0.4, 0.22, 0.03, 3200)
+    s.tom(620, 0.14, 'square', 0.07, 240, 0.02)
+    s.tom(300, 0.25, 'triangle', 0.08, 150, 0.08)
+  },
+  // TREPADEIRA: as vinhas rangendo ao crescer e ao recuar
+  brotar: (s) => {
+    for (let i = 0; i < 5; i++) s.tom(85 + i * 18, 0.09, 'sawtooth', 0.045, 140 + i * 22, i * 0.09)
+    s.ruido(0.5, 0.04, 0, 900)
+  },
+  recuar: (s) => {
+    for (let i = 0; i < 4; i++) s.tom(200 - i * 25, 0.08, 'sawtooth', 0.035, 120 - i * 15, i * 0.07)
+    s.ruido(0.3, 0.03, 0, 700)
+  },
+  // COLISEU: paredes de pedra arrastando (ARENA ENCOLHENDO)
+  muralha: (s) => {
+    s.ruido(0.9, 0.22, 0, 320)
+    s.nota(62, 0.9, 'sawtooth', 0.09, 48, 0, 0.1)
+    for (let i = 0; i < 5; i++) s.ruido(0.03, 0.08, 0.1 + i * 0.16 + Math.random() * 0.05, 1600)
+  },
+  // LEÕES: rugido (grave rasgado que sobe e cai)
+  rugido: (s) => {
+    s.ruido(0.8, 0.22, 0, 650)
+    s.nota(95, 0.85, 'sawtooth', 0.16, 62, 0, 0.12)
+    s.nota(190, 0.7, 'square', 0.05, 120, 0.05, 0.12)
+    s.tom(140, 0.35, 'sawtooth', 0.08, 180, 0)
+  },
+  // CHUVA DE LANÇAS: assobio caindo e a lança cravando na areia
+  assobio: (s) => s.tom(2200, 0.32, 'sine', 0.035, 700),
+  cravar: (s) => {
+    s.tom(170, 0.12, 'square', 0.1, 60)
+    s.ruido(0.08, 0.22, 0, 2200)
+    s.tom(1100, 0.09, 'triangle', 0.04, 760, 0.01)
+  },
+  // CORRIDA DE BIGAS: galope de cascos e o relincho
+  galope: (s) => {
+    for (let i = 0; i < 8; i++) {
+      const t = i * 0.085 + (i % 2) * 0.03
+      s.ruido(0.035, 0.16, t, 1400)
+      s.tom(95, 0.05, 'sine', 0.14, 60, t)
+    }
+  },
+  relincho: (s) => {
+    for (let i = 0; i < 6; i++) s.tom(820 + (i % 2) * 260, 0.08, 'sawtooth', 0.04, 960 + (i % 2) * 200, i * 0.07)
+    s.tom(700, 0.3, 'sawtooth', 0.04, 380, 0.42)
+  },
+  // CHÃO EM BRASAS: chiado de brasa e o "fuuu" da queimadura
+  chiado: (s) => {
+    s.ruido(0.35, 0.06, 0, 9000)
+    for (let i = 0; i < 4; i++) s.ruido(0.015, 0.1, 0.04 + i * 0.07 + Math.random() * 0.03, 7000)
+  },
+  queimou: (s) => {
+    s.ruido(0.55, 0.3, 0, 2600)
+    s.tom(320, 0.35, 'sawtooth', 0.1, 70)
+    s.tom(900, 0.12, 'square', 0.05, 300)
+  },
+  // POLEGAR DO IMPERADOR: a plateia vibra (pra cima) ou vaia (pra baixo)
+  polegarCima: (s) => {
+    s.ruido(1.1, 0.12, 0.05, 2800)
+    ;[523, 659, 784, 1046].forEach((f, i) => s.tom(f, 0.16, 'square', 0.06, f, i * 0.08))
+  },
+  polegarBaixo: (s) => {
+    s.nota(150, 1.0, 'sawtooth', 0.08, 105, 0, 0.25)
+    s.nota(158, 1.0, 'sawtooth', 0.06, 112, 0.03, 0.25)
+    s.ruido(1.0, 0.1, 0, 700)
+  },
+  // REDE DO RECIÁRIO: arremesso, a rede pegando e rasgando ao soltar
+  rede: (s) => {
+    s.ruido(0.4, 0.14, 0, 2400)
+    s.tom(280, 0.35, 'triangle', 0.05, 720)
+  },
+  redePegou: (s) => {
+    s.ruido(0.12, 0.22, 0, 1400)
+    s.tom(150, 0.22, 'square', 0.09, 90)
+    s.tom(620, 0.16, 'sawtooth', 0.03, 480, 0.08)
+  },
+  redeSoltou: (s) => {
+    s.ruido(0.18, 0.2, 0, 5200)
+    s.tom(420, 0.15, 'square', 0.05, 1400)
+  },
+  // PLATEIA ARREMESSA: o "fuuu" do objeto subindo da plateia e o baque no palco
+  arremesso: (s) => {
+    s.ruido(0.3, 0.05, 0, 2500)
+    s.tom(260, 0.3, 'triangle', 0.05, 780)
+  },
+  splat: (s) => {
+    s.ruido(0.16, 0.22, 0, 1400)
+    s.tom(200, 0.14, 'sine', 0.16, 60)
+    s.tom(900, 0.05, 'square', 0.03, 300, 0.02)
+  },
+  // GELO SECO: o chiado do jato de fumaça saindo do chão
+  fumaca: (s) => {
+    s.ruido(1.4, 0.12, 0, 5200)
+    s.ruido(1.8, 0.08, 0.1, 900)
+    s.nota(70, 1.6, 'sine', 0.08, 55, 0, 0.3)
+  },
+  // NO RITMO: bumbo + chimbal a cada batida (acento no começo do compasso)
+  batida: (s, { forte = false } = {}) => {
+    s.tom(forte ? 160 : 130, 0.16, 'sine', forte ? 0.32 : 0.22, 45)
+    s.ruido(0.03, forte ? 0.08 : 0.05, 0, 9000)
+  },
+  // KARAOKÊ: a nota "cantada" quando uma palavra acende (freq da melodia)
+  karaoke: (s, { freq = 660 } = {}) => {
+    s.tom(freq, 0.16, 'triangle', 0.06, freq)
+    s.tom(freq * 2, 0.08, 'sine', 0.02, freq * 2)
+  },
+  karaokeVerso: (s) => [784, 988, 1175, 1568].forEach((f, i) => s.tom(f, 0.12, 'triangle', 0.04, f, i * 0.05)),
+  // MOSH: o "ê-ê!" da galera avisando e o rugido da onda de gente passando
+  avisoOnda: (s) => {
+    s.tom(392, 0.09, 'square', 0.05, 392)
+    s.tom(523, 0.12, 'square', 0.05, 523, 0.12)
+  },
+  onda: (s) => {
+    s.ruido(0.9, 0.16, 0, 1500)
+    s.nota(196, 0.8, 'sawtooth', 0.05, 262, 0, 0.15)
+    s.nota(247, 0.8, 'sawtooth', 0.04, 330, 0.03, 0.15)
+    s.tom(80, 0.5, 'sine', 0.2, 45)
+  },
+  // TEMPLO / PEDRA ROLANTE: o ronco da pedra rolando (~1,3 s, com os baques do chão)
+  pedraRolando: (s) => {
+    s.ruido(1.3, 0.28, 0, 320)
+    s.nota(48, 1.3, 'sawtooth', 0.12, 36, 0, 0.15)
+    for (let i = 0; i < 6; i++) s.tom(70, 0.09, 'sine', 0.22, 40, 0.08 + i * 0.2)
+  },
+  // ARMADILHAS: o clique da placa de pressão / os dardos saindo / os espinhos subindo
+  cliquePlaca: (s) => {
+    s.tom(2200, 0.03, 'square', 0.08, 1400)
+    s.tom(900, 0.05, 'square', 0.06, 500, 0.04)
+    s.ruido(0.03, 0.12, 0, 6000)
+  },
+  dardo: (s) => {
+    s.ruido(0.12, 0.14, 0, 7000)
+    s.tom(1800, 0.1, 'triangle', 0.04, 700)
+  },
+  espinhos: (s) => {
+    s.ruido(0.05, 0.25, 0, 9000)
+    s.tom(2600, 0.25, 'triangle', 0.05, 2500)
+    s.tom(3900, 0.18, 'sine', 0.03, 3800, 0.01)
+    s.tom(180, 0.12, 'square', 0.08, 90)
+  },
+  // AREIA MOVEDIÇA: o chiado da areia (poça surgindo / coração afundando)
+  areia: (s) => {
+    s.ruido(0.5, 0.12, 0, 1800)
+    s.ruido(0.3, 0.06, 0.15, 900)
+    s.tom(140, 0.3, 'sine', 0.06, 90, 0.05)
+  },
+  // RELÓGIO DO TEMPO: tique e taque, e as viradas para lento / rápido
+  tique: (s) => {
+    s.tom(2400, 0.025, 'square', 0.05, 2000)
+    s.ruido(0.02, 0.08, 0, 8000)
+  },
+  taque: (s) => {
+    s.tom(1600, 0.03, 'square', 0.05, 1300)
+    s.ruido(0.02, 0.07, 0, 5000)
+  },
+  tempoLento: (s) => {
+    s.tom(880, 0.9, 'triangle', 0.08, 220)
+    s.tom(1320, 0.9, 'sine', 0.04, 330, 0.05)
+    s.nota(110, 1.0, 'sine', 0.12, 80, 0, 0.2)
+    ;[1568, 1318, 1046].forEach((f, i) => s.tom(f, 0.4, 'sine', 0.04, f, 0.1 + i * 0.18))
+  },
+  tempoRapido: (s) => {
+    s.tom(220, 0.5, 'sawtooth', 0.06, 1320)
+    s.tom(330, 0.5, 'square', 0.03, 1760, 0.03)
+    for (let i = 0; i < 6; i++) s.tom(2400, 0.02, 'square', 0.05, 2000, 0.3 + i * 0.05)
+  },
 }

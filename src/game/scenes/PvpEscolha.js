@@ -41,7 +41,7 @@ function caber(texto, conteudo, largura, tamanho) {
 // O painel de cada jogador mostra o personagem em foco: HP no PvP, a
 // composição do baralho por naipe, as 3 cartas mais fortes e o estilo.
 // Quando os dois confirmam: "P1 VS P2", grava registry 'pvp' = { p1, p2 }
-// e começa a PvpArena com { p1, p2 }.
+// e vai para a votação da arena (PvpVoto), que começa a PvpArena.
 export default class PvpEscolha extends Phaser.Scene {
   constructor() {
     super('PvpEscolha')
@@ -277,7 +277,7 @@ export default class PvpEscolha extends Phaser.Scene {
   terminar() {
     this.saindo = true
     const [p1, p2] = this.confirmados
-    this.registry.set('pvp', { p1, p2 })
+    this.registry.set('pvp', { ...this.registry.get('pvp'), p1, p2 })
     this.registry.set('pvpNivelBot', this.nivelBot)
     try {
       localStorage.setItem(CHAVE_SALVA, JSON.stringify({ p1, p2 }))
@@ -543,7 +543,7 @@ export default class PvpEscolha extends Phaser.Scene {
       metades.forEach((g, j) => this.tweens.add({ targets: g, alpha: 0.6, duration: 200 }))
       camera.fadeOut(240, 0, 0, 0)
     })
-    this.time.delayedCall(VS.fim, () => this.scene.start('PvpArena', { p1, p2 }))
+    this.time.delayedCall(VS.fim, () => this.scene.start('PvpVoto', { p1, p2 }))
   }
 
   update(time, delta) {

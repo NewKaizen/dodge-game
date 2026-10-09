@@ -12,7 +12,14 @@ Músicas em MIDI (.mid), com o nome da tela ou do chefe. O jogo procura
   vitoria.mid      tela de vitória do CO-OP
   gameover.mid     tela de game over
   pvpEscolha.mid   escolha de lutador do PvP
-  pvp.mid          partida PvP
+  pvp.mid          partida PvP na arena CASTELO (e a reserva das outras arenas)
+  arena_jardim.mid       arena JARDIM (Seven Suns)
+  arena_informatica.mid  arena SALA DE INFORMÁTICA
+  arena_palco.mid        arena PALCO
+  arena_templo.mid       arena TEMPLO
+  arena_coliseu.mid      arena COLISEU
+                   Sem o arquivo da arena, toca o pvp.mid. O nome que aparece na
+                   votação fica em src/game/pvp/arenas.js (tituloMusica).
   pvpResultado.mid resultado do PvP (ainda não existe: enquanto isso toca vitoria.mid)
 
   Cartas SUPER (música especial de cada personagem; toca em loop enquanto o
