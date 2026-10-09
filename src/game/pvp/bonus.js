@@ -55,6 +55,11 @@ export const EVENTOS = [
   { id: 'brasas', nome: 'CHÃO EM BRASAS', descricao: 'ficar parado queima: não pare de se mexer!', cartas: 'normal', cor: 0xff5a20 },
   { id: 'polegar', nome: 'POLEGAR DO IMPERADOR', descricao: 'o imperador decide as regras... e muda de ideia!', cartas: 'normal', cor: 0xb070ff },
   { id: 'rede', nome: 'REDE DO RECIÁRIO', descricao: 'fuja da rede! Se pegar, sacuda as setas para soltar', cartas: 'normal', cor: 0xe6d4a6 },
+  { id: 'plateia', nome: 'PLATEIA ARREMESSA', descricao: 'a galera joga coisas no palco: fuja das sombras!', cartas: 'normal', cor: 0xff6a5a },
+  { id: 'geloSeco', nome: 'GELO SECO', descricao: 'fumaça no chão: lá embaixo as balas viram vultos!', cartas: 'normal', cor: 0xc8b8ec },
+  { id: 'ritmo', nome: 'NO RITMO', descricao: 'o coração só anda na batida!', cartas: 'normal', cor: 0xff4fa8 },
+  { id: 'karaoke', nome: 'KARAOKÊ', descricao: 'a letra da música atravessa a caixa: passe entre as palavras!', cartas: 'normal', cor: 0xff5ab0 },
+  { id: 'mosh', nome: 'MOSH', descricao: 'ondas de gente empurram o coração de um lado pro outro!', cartas: 'normal', cor: 0xb06aff },
 ]
 
 export const EVENTO = Object.fromEntries(EVENTOS.map((ev) => [ev.id, ev]))

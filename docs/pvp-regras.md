@@ -174,7 +174,7 @@ Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria 
 | Sala de Informática | `arena_informatica.mid` | PC da escola, queda de energia (apagão), pop-ups, lag, teclado embaralhado, Ctrl+C Ctrl+V, tela azul, cursor gigante |
 | Jardim | Seven Suns (`arena_jardim.mid`) | cogumelo, lago (aquário), chuva de verão, ventania, enxame, vaga-lumes, espirro de pólen, trepadeira |
 | Sala de Informática | `arena_informatica.mid` | PC da escola, queda de energia (apagão) + os da sala |
-| Palco | `arena_palco.mid` | festa, dança da estátua, pirotecnia (explosões) + os do palco |
+| Palco | `arena_palco.mid` | festa, dança da estátua, pirotecnia (explosões), plateia arremessa, gelo seco, no ritmo, karaokê, mosh |
 | Templo | `arena_templo.mid` | terremoto, gravidade, ponta-cabeça, tochas (apagão) + os do templo |
 | Coliseu | `arena_coliseu.mid` | coração trocado + os do coliseu |
 
@@ -219,6 +219,11 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Chão em brasas (Coliseu) | normais | o contrário da estátua: ficar PARADO esquenta a barra de CALOR (embaixo da caixa); a partir da metade ela pisca, sai fumaça e chia. Cheia: queima (3,5% do HP máximo, mínimo 2) e volta para 30%. Andando, esfria |
 | Polegar do imperador (Coliseu) | normais | o imperador sorteia uma regra numa roleta entre as caixas e mostra o polegar (pra cima = regra boa, pra baixo = ruim): controles invertidos, coração rápido, lento, mini, gigante ou caixa escura. Vale para os dois por ~3 s e ele sorteia outra |
 | Rede do reciário (Coliseu) | normais | um gladiador entre as caixas joga a rede, uma caixa por vez: círculo tracejado no chão avisa onde ela cai. Pegou: o coração fica PRESO (bem lento) até sacudir as setas 5 vezes (ou 1,8 s). Não dá dano |
+| Plateia arremessa | normais | (Palco) a plateia joga tomates, flores, ursinhos e baldes de pipoca no palco: uma sombra no chão da caixa avisa onde cai (~1 s antes), o objeto cai em cima dela e sai quicando pela caixa até sumir |
+| Gelo seco | normais | (Palco) uma fumaça densa sobe do chão e cobre a metade de baixo das caixas, ondulando (com jatos de CO2 de vez em quando); lá dentro as balas viram silhuetas escuras. Só visual, sem dano novo |
+| No ritmo | normais | (Palco) o coração só anda na batida (~140 BPM, metade de cada batida); entre as batidas fica parado. Para compensar ele anda mais rápido na janela e as caixas ficam 15% mais lentas. Anel que encolhe até o coração, borda pulsando, compasso e bumbo marcam a batida |
+| Karaokê | normais | (Palco) versos da música atravessam as caixas da direita para a esquerda; cada palavra é uma bala (com o "!" de aviso) e acende em rosa ao passar pelo meio da caixa, cantando uma nota. Dá para passar entre as palavras e entre as faixas dos versos |
+| Mosh | normais | (Palco) ondas de gente atravessam a caixa numa faixa (metade de cima, de baixo ou o meio) e empurram o coração; antes, a borda de entrada pisca na altura da faixa com setas. Não machuca: o perigo é ser jogado nas balas (dá para resistir ou sair da faixa) |
 
 ## Ases (cartas especiais, um por naipe em todo baralho, custo 3)
 

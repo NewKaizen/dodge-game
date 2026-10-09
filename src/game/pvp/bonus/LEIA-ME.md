@@ -13,6 +13,7 @@ pvp/bonus/
                                  chuva, ventania, abelhas, vagalumes, polen, trepadeira }
                                  encolhendo, leoes, lancas, bigas, brasas, polegar, rede }
   eventos/arteColiseu.js  arte (texturas de canvas) e utilidades dos eventos do COLISEU
+                                 plateia, geloSeco, ritmo, karaoke, mosh }
   eventos/<id>.js     um evento que bagunça a ESQUIVA normal (cartas 'normal')
   Duelo.js            o evento 'duelo' (substitui arremesso + esquiva)
   botDuelo.js         a CPU do duelo
@@ -127,6 +128,8 @@ invisível cujo visual é do evento).
 DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO), `muralha` (ARENA ENCOLHENDO), `rugido` (LEÕES), `assobio` e `cravar`
 (CHUVA DE LANÇAS; `cravar` também é o baque das paredes e da rede no chão), `galope` e `relincho` (BIGAS),
 `chiado` e `queimou` (BRASAS), `polegarCima` e `polegarBaixo` (POLEGAR), `rede`, `redePegou` e `redeSoltou` (REDE).
+DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO), `arremesso` e `splat` (PLATEIA ARREMESSA), `fumaca` (GELO SECO),
+`batida` ({ forte }) (NO RITMO), `karaoke` ({ freq }) e `karaokeVerso` (KARAOKÊ), `avisoOnda` e `onda` (MOSH).
 
 Outros recursos de audio.js usados pelos eventos:
 
@@ -182,3 +185,8 @@ Outros recursos de audio.js usados pelos eventos:
 | `brasas` | CHÃO EM BRASAS: parado esquenta a barra de CALOR, cheia queima (dano pequeno, `arena.acertou`); a CPU dá voltinhas | `joy` (CPU) |
 | `polegar` | POLEGAR DO IMPERADOR: roleta de regras com o busto e o polegar; invertido (`joy`), rápido/lento (`pista.fatorCoracao`), mini/gigante (`setTamanho`), caixa escura (véu recortado seguindo o coração). `efeitoBonus.forcarRegra(id)` nos testes | `joy` + `fatorCoracao` + `setTamanho` |
 | `rede` | REDE DO RECIÁRIO: gladiador entre as caixas joga a rede (círculo avisado); preso = joystick ×0,16 até sacudir as setas 5× (ou 1,8 s); sem dano. A CPU sacode sozinha | `joy` |
+| `plateia` | PLATEIA ARREMESSA: sombra no chão da caixa avisa, o objeto (tomate, flor, ursinho, pipoca; texturas `bonus-plateia-*` geradas no canvas) voa da plateia e cai quicando. A bala nasce no começo do voo, invisível e avisando (`aviso` = voo), então a CPU vê onde vai cair | `balas.criar` (textura, `quicar`, `atualizar`) |
+| `geloSeco` | GELO SECO: fumaça cobre a metade de baixo das caixas; bala dentro dela vira silhueta (`setTint` + `TintModes.FILL`, devolvida ao sair e no `terminar()`) | Graphics + tint das balas |
+| `ritmo` | NO RITMO: o coração só anda na janela da batida (joy zerado fora dela, CPU também); `fatorCoracao` ×2 e `passo` ×0,85 compensam. Anel, halo da caixa, compasso e som `batida` | `joy` + `passo` + `fatorCoracao` |
+| `karaoke` | KARAOKÊ: versos (textos) correm pela caixa; cada palavra é bala retangular invisível com o texto seguindo; acende (`setCrop`) ao cruzar o meio e toca a nota `karaoke` | `balas.criar` (retângulo) |
+| `mosh` | MOSH: onda de gente numa faixa da caixa, com aviso na borda de entrada; empurra o coração dentro dela | `joy` |

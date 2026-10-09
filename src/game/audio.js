@@ -936,4 +936,42 @@ const SINTESE = {
     s.ruido(0.18, 0.2, 0, 5200)
     s.tom(420, 0.15, 'square', 0.05, 1400)
   },
+  // PLATEIA ARREMESSA: o "fuuu" do objeto subindo da plateia e o baque no palco
+  arremesso: (s) => {
+    s.ruido(0.3, 0.05, 0, 2500)
+    s.tom(260, 0.3, 'triangle', 0.05, 780)
+  },
+  splat: (s) => {
+    s.ruido(0.16, 0.22, 0, 1400)
+    s.tom(200, 0.14, 'sine', 0.16, 60)
+    s.tom(900, 0.05, 'square', 0.03, 300, 0.02)
+  },
+  // GELO SECO: o chiado do jato de fumaça saindo do chão
+  fumaca: (s) => {
+    s.ruido(1.4, 0.12, 0, 5200)
+    s.ruido(1.8, 0.08, 0.1, 900)
+    s.nota(70, 1.6, 'sine', 0.08, 55, 0, 0.3)
+  },
+  // NO RITMO: bumbo + chimbal a cada batida (acento no começo do compasso)
+  batida: (s, { forte = false } = {}) => {
+    s.tom(forte ? 160 : 130, 0.16, 'sine', forte ? 0.32 : 0.22, 45)
+    s.ruido(0.03, forte ? 0.08 : 0.05, 0, 9000)
+  },
+  // KARAOKÊ: a nota "cantada" quando uma palavra acende (freq da melodia)
+  karaoke: (s, { freq = 660 } = {}) => {
+    s.tom(freq, 0.16, 'triangle', 0.06, freq)
+    s.tom(freq * 2, 0.08, 'sine', 0.02, freq * 2)
+  },
+  karaokeVerso: (s) => [784, 988, 1175, 1568].forEach((f, i) => s.tom(f, 0.12, 'triangle', 0.04, f, i * 0.05)),
+  // MOSH: o "ê-ê!" da galera avisando e o rugido da onda de gente passando
+  avisoOnda: (s) => {
+    s.tom(392, 0.09, 'square', 0.05, 392)
+    s.tom(523, 0.12, 'square', 0.05, 523, 0.12)
+  },
+  onda: (s) => {
+    s.ruido(0.9, 0.16, 0, 1500)
+    s.nota(196, 0.8, 'sawtooth', 0.05, 262, 0, 0.15)
+    s.nota(247, 0.8, 'sawtooth', 0.04, 330, 0.03, 0.15)
+    s.tom(80, 0.5, 'sine', 0.2, 45)
+  },
 }

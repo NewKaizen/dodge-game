@@ -36,4 +36,10 @@ import brasas from './brasas.js'
 import polegar from './polegar.js'
 import rede from './rede.js'
 
-export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, clone, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira, encolhendo, leoes, lancas, bigas, brasas, polegar, rede }
+import plateia from './plateia.js'
+import geloSeco from './geloSeco.js'
+import ritmo from './ritmo.js'
+import karaoke from './karaoke.js'
+import mosh from './mosh.js'
+
+export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, clone, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira, encolhendo, leoes, lancas, bigas, brasas, polegar, rede, plateia, geloSeco, ritmo, karaoke, mosh }
