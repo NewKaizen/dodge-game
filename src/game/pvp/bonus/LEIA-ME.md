@@ -11,6 +11,8 @@ pvp/bonus/
                                  pcEscola, aquario, cogumelo, estatua, gelo, terremoto,
                                  popups, lag, teclado, clone, telaAzul, cursor }
                                  chuva, ventania, abelhas, vagalumes, polen, trepadeira }
+                                 encolhendo, leoes, lancas, bigas, brasas, polegar, rede }
+  eventos/arteColiseu.js  arte (texturas de canvas) e utilidades dos eventos do COLISEU
   eventos/<id>.js     um evento que bagunça a ESQUIVA normal (cartas 'normal')
   Duelo.js            o evento 'duelo' (substitui arremesso + esquiva)
   botDuelo.js         a CPU do duelo
@@ -122,6 +124,9 @@ Texturas da arena JARDIM (`arte/jardim.js`, geradas em código: chame `texturasJ
 `jardim-flor-0..5`, `jardim-girassol`, `jardim-borboleta`, `jardim-abelha`, `jardim-folha` (pintar),
 `jardim-petala` (pintar), `jardim-brilho` (círculo branco suave) e `jardim-vazio` (transparente: bala
 invisível cujo visual é do evento).
+DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO), `muralha` (ARENA ENCOLHENDO), `rugido` (LEÕES), `assobio` e `cravar`
+(CHUVA DE LANÇAS; `cravar` também é o baque das paredes e da rede no chão), `galope` e `relincho` (BIGAS),
+`chiado` e `queimou` (BRASAS), `polegarCima` e `polegarBaixo` (POLEGAR), `rede`, `redePegou` e `redeSoltou` (REDE).
 
 Outros recursos de audio.js usados pelos eventos:
 
@@ -170,3 +175,10 @@ Outros recursos de audio.js usados pelos eventos:
 | `vagalumes` | (Jardim) escuro com bolhas de luz que andam (vaga-lumes) e um brilho fraco no coração. O escuro é uma RenderTexture por caixa, pintada de preto e apagada (`erase`) nas luzes a cada frame | RenderTexture |
 | `polen` | (Jardim) ESPIRRO: "a..." "a... a..." com seta da direção e ATCHIM: tranco (joystick na direção + `pista.fatorCoracao` ×2,6 por 230 ms, devolvido no fim) | `joy` + `fatorCoracao` |
 | `trepadeira` | (Jardim) vinhas crescem de 1–2 bordas (faixa piscando antes) e encolhem a área; balas retangulares invisíveis do tamanho do corpo da vinha. A CPU ganha um empurrão para fora da faixa avisada | `balas.criar` + `joy` (CPU) |
+| `encolhendo` | ARENA ENCOLHENDO: paliçadas entram pelas bordas (aviso vermelho com setas), seguram e abrem; só empurram, sempre sobra um miolo livre. O coração usa um retângulo interno como limite (`coracao.caixa` vira `{ limites: interno }` durante o evento; volta no `terminar()`). A CPU é afastada das paredes no `joy` | `coracao.caixa` + `joy` (CPU) |
+| `leoes` | LEÕES!: rugido + faixa piscando, o leão atravessa (bala retangular com `aviso`, sprite próprio); no trecho do SALTO a bala fica `inofensiva` (buraco na faixa) | `balas.criar` |
+| `lancas` | CHUVA DE LANÇAS: sombra crescendo avisa, a lança crava (ponta = bala redonda curta) e a haste fica como obstáculo um tempo | `balas.criar` |
+| `bigas` | CORRIDA DE BIGAS: 3 faixas de sentidos alternados, bigas (balas retangulares) avisadas por poeira; nunca todas as faixas | `balas.criar` |
+| `brasas` | CHÃO EM BRASAS: parado esquenta a barra de CALOR, cheia queima (dano pequeno, `arena.acertou`); a CPU dá voltinhas | `joy` (CPU) |
+| `polegar` | POLEGAR DO IMPERADOR: roleta de regras com o busto e o polegar; invertido (`joy`), rápido/lento (`pista.fatorCoracao`), mini/gigante (`setTamanho`), caixa escura (véu recortado seguindo o coração). `efeitoBonus.forcarRegra(id)` nos testes | `joy` + `fatorCoracao` + `setTamanho` |
+| `rede` | REDE DO RECIÁRIO: gladiador entre as caixas joga a rede (círculo avisado); preso = joystick ×0,16 até sacudir as setas 5× (ou 1,8 s); sem dano. A CPU sacode sozinha | `joy` |

@@ -212,6 +212,13 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Vaga-lumes | normais | (Jardim) anoitece: as caixas ficam no escuro e só os vaga-lumes iluminam, com bolhas de luz que ANDAM (rondam o coração, soltos); o coração tem só um brilho fraquinho e as balas avisando piscam no escuro |
 | Espirro de pólen | normais | (Jardim) o pólen junta em volta do coração: "a..." "a... a..." (uma seta mostra a direção) e ATCHIM: o coração dá um tranco rápido naquela direção |
 | Trepadeira | normais | (Jardim) vinhas com espinhos crescem de uma ou duas bordas (a faixa pisca antes) e encolhem a caixa; depois recuam e voltam em outro lado. Encostar na vinha = dano de bala (4) |
+| Arena encolhendo (Coliseu) | normais | paliçadas com pontas de ferro entram pelas bordas das caixas (laterais, teto e chão, um canto ou as quatro), seguram e abrem de novo. Aviso: a faixa que vai fechar pisca em vermelho com setas. Não machucam, só empurram o coração; sempre sobra um miolo livre de pelo menos 84×66 px. As balas passam por cima |
+| Leões! (Coliseu) | normais | rugido e a faixa por onde o leão vai passar piscando; ele atravessa a caixa correndo (dano 5). Às vezes SALTA: a faixa tem um buraco com um arco tracejado, e quem estiver embaixo do salto não leva nada. Mais para o fim vêm dois de uma vez, em sentidos opostos |
+| Chuva de lanças (Coliseu) | normais | ondas de lanças: a sombra no chão cresce onde cada uma vai cair; ela crava (dano 4 na ponta) e fica em pé uns 2,6 s como obstáculo (encostar na haste: dano 3). Sempre espaçadas, no máximo 9 por caixa |
+| Corrida de bigas (Coliseu) | normais | a caixa vira pista com 3 faixas de sentidos alternados; bigas atravessam uma ou duas faixas por vez (dano 5), avisadas por poeira na entrada e pela faixa piscando. Sempre sobra pelo menos uma faixa livre |
+| Chão em brasas (Coliseu) | normais | o contrário da estátua: ficar PARADO esquenta a barra de CALOR (embaixo da caixa); a partir da metade ela pisca, sai fumaça e chia. Cheia: queima (3,5% do HP máximo, mínimo 2) e volta para 30%. Andando, esfria |
+| Polegar do imperador (Coliseu) | normais | o imperador sorteia uma regra numa roleta entre as caixas e mostra o polegar (pra cima = regra boa, pra baixo = ruim): controles invertidos, coração rápido, lento, mini, gigante ou caixa escura. Vale para os dois por ~3 s e ele sorteia outra |
+| Rede do reciário (Coliseu) | normais | um gladiador entre as caixas joga a rede, uma caixa por vez: círculo tracejado no chão avisa onde ela cai. Pegou: o coração fica PRESO (bem lento) até sacudir as setas 5 vezes (ou 1,8 s). Não dá dano |
 
 ## Ases (cartas especiais, um por naipe em todo baralho, custo 3)
 

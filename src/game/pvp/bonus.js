@@ -48,6 +48,13 @@ export const EVENTOS = [
   { id: 'vagalumes', nome: 'VAGA-LUMES', descricao: 'anoiteceu: só os vaga-lumes iluminam a caixa!', cartas: 'normal', cor: 0xd8ff6a },
   { id: 'polen', nome: 'ESPIRRO DE PÓLEN', descricao: 'a... a... ATCHIM! o espirro joga o coração longe', cartas: 'normal', cor: 0xffe680 },
   { id: 'trepadeira', nome: 'TREPADEIRA', descricao: 'vinhas crescem das bordas e fecham a caixa: não encoste!', cartas: 'normal', cor: 0x3fbf5a },
+  { id: 'encolhendo', nome: 'ARENA ENCOLHENDO', descricao: 'as paredes fecham devagar... e abrem de novo!', cartas: 'normal', cor: 0xc87a3a },
+  { id: 'leoes', nome: 'LEÕES!', descricao: 'soltaram as feras: leões atravessam a caixa correndo!', cartas: 'normal', cor: 0xffb040 },
+  { id: 'lancas', nome: 'CHUVA DE LANÇAS', descricao: 'olhe as sombras: lanças caem e ficam cravadas!', cartas: 'normal', cor: 0xd8dde4 },
+  { id: 'bigas', nome: 'CORRIDA DE BIGAS', descricao: 'carruagens disparam pelas faixas da caixa!', cartas: 'normal', cor: 0xe0a020 },
+  { id: 'brasas', nome: 'CHÃO EM BRASAS', descricao: 'ficar parado queima: não pare de se mexer!', cartas: 'normal', cor: 0xff5a20 },
+  { id: 'polegar', nome: 'POLEGAR DO IMPERADOR', descricao: 'o imperador decide as regras... e muda de ideia!', cartas: 'normal', cor: 0xb070ff },
+  { id: 'rede', nome: 'REDE DO RECIÁRIO', descricao: 'fuja da rede! Se pegar, sacuda as setas para soltar', cartas: 'normal', cor: 0xe6d4a6 },
 ]
 
 export const EVENTO = Object.fromEntries(EVENTOS.map((ev) => [ev.id, ev]))

@@ -94,7 +94,7 @@ export const ARENAS = [
     tituloMusica: null,
     cor: 0xff6a3a,
     moldura: { cor: 0x6a2a1a, alpha: 0.35 },
-    bonus: [...GERAIS, 'trocado'],
+    bonus: [...GERAIS, 'trocado', 'encolhendo', 'leoes', 'lancas', 'bigas', 'brasas', 'polegar', 'rede'],
   },
 ]
 

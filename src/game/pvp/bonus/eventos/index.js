@@ -28,4 +28,12 @@ import vagalumes from './vagalumes.js'
 import polen from './polen.js'
 import trepadeira from './trepadeira.js'
 
-export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, clone, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira }
+import encolhendo from './encolhendo.js'
+import leoes from './leoes.js'
+import lancas from './lancas.js'
+import bigas from './bigas.js'
+import brasas from './brasas.js'
+import polegar from './polegar.js'
+import rede from './rede.js'
+
+export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, clone, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira, encolhendo, leoes, lancas, bigas, brasas, polegar, rede }
