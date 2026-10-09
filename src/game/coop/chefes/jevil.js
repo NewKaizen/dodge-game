@@ -27,8 +27,9 @@ export default {
   },
   hp: 310,
   danoBala: 13,
-  // DIFÍCIL: mais dano e mais HP (os padrões dele são os mais fáceis de ler)
-  niveis: { dificil: { dano: 2, hp: 1.2 } },
+  // DIFÍCIL: padrões mais rápidos e densos (os dele são os mais fáceis de ler),
+  // um pouco mais de dano (SUPER ~27 por acerto)
+  niveis: { dificil: { velocidade: 1.15, densidade: 1.25, velocidadeMax: 1.1, dano: 1.15, hp: 1.1 } },
   leve: (A) => A.quicantes({ forma: 'ouros', duracao: 4000, intervalo: 1500, velocidade: 150 }),
   fases: [
     {

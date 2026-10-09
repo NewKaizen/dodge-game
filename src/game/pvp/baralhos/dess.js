@@ -11,7 +11,6 @@ export default {
   principal: { espadas: 'quicantes', ouros: 'lasers', paus: 'bombas' },
   leve: (A) => A.quicantes({ duracao: 4000, intervalo: 1700, velocidade: 120, quiques: 3 }),
   receitas: {
-    // Nota Solta (também entra no Show de Rock, mais espaçada)
     notaSolta: r('Notas soltas escapam pelas bordas e flutuam até o coração, balançando', (A, t) => A.dessNotaSolta(notaSolta(t))),
     taco: r('Um taco preso na parede varre meia-volta na altura do coração; o alcance pisca antes', (A, t) =>
       A.dessTaco({ duracao: duracaoDe(t), intervalo: lerp(1500, 1050, t), comprimento: lerp(120, 145, t), aviso: lerp(650, 520, t), varrida: lerp(520, 400, t) }),
@@ -22,8 +21,8 @@ export default {
     solo: r('A guitarra corre pela parede tocando a melodia: filas de notas sobem e descem de corda', (A, t) =>
       A.dessSolo({ duracao: duracaoDe(t), batida: lerp(300, 230, t), cadencia: lerp(75, 58, t), velocidade: lerp(150, 195, t), frase: t >= 0.6 ? 8 : 6 }),
     ),
-    show: r('Paredes sonoras do riff com notas soltas flutuando no meio', (A, t) =>
-      A.juntos(P.ondas(A, t, { esparso: 1.4 }), A.dessNotaSolta({ ...notaSolta(t), intervalo: lerp(650, 420, t) * 1.8 })),
+    show: r('A estrada de notas do show: acordes caem pelas 4 cordas no ritmo, sempre com uma corda livre; no refrão, labaredas sobem do palco', (A, t) =>
+      A.dessShow({ duracao: duracaoDe(t), batida: lerp(520, 370, t), velocidade: lerp(140, 185, t), livres: t >= 0.6 ? 1 : 2, pirotecnia: t >= 0.5 ? 5 : 0, troca: lerp(0.6, 0.85, t), colcheias: t >= 0.6 }),
     ),
     microfonia: r('Um microfone encosta na parede e solta um agudo serrilhado pela faixa do coração, numa caixa apertada', (A, t) =>
       apertar(A, t, A.dessMicrofonia({ duracao: duracaoDe(t), intervalo: lerp(1300, 900, t), aviso: lerp(620, 500, t), velocidade: lerp(260, 340, t), faiscas: t >= 0.6 ? 12 : 10, quantidade: t >= 0.75 ? 2 : 1 })),

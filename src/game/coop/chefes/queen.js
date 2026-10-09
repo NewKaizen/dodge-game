@@ -14,8 +14,9 @@ export default {
   },
   hp: 270,
   danoBala: 11,
-  // DIFÍCIL: os padrões da Queen já ficam muito densos no difícil: um pouco menos de HP
-  niveis: { dificil: { hp: 0.85 } },
+  // DIFÍCIL: os padrões da Queen já ficam muito densos no difícil: ritmo um
+  // pouco mais calmo que o dos outros e menos HP (fica entre o King e o Jevil)
+  niveis: { dificil: { velocidade: 0.97, densidade: 0.95, hp: 0.85 } },
   leve: (A) => A.ondas({ duracao: 4000, velocidade: 110, intervalo: 1300 }),
   fases: [
     {

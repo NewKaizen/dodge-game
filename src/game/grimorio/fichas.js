@@ -46,7 +46,7 @@ const TEXTO_ATAQUE = {
   forcado: TEXTOS.forcado,
   rachaduras: TEXTOS.rachaduras,
   caosFinal: TEXTOS.caosFinal,
-  caminhonete: 'Caminhonete desgovernada cruza a caixa pela faixa que os faróis acendem',
+  caminhonete: 'Trânsito de caminhonetes em fila pelas faixas (os faróis avisam); às vezes uma freia e volta de ré',
   brasas: 'Brasas sobem do chão balançando e estouram em fagulhas',
 }
 

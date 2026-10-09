@@ -16,7 +16,8 @@ import { shake } from '../../../effects/shake.js'
 //     ela alcança é ficar paradinho.
 // Depois a música volta (do mesmo ponto) e tudo descongela.
 // Visual: notinhas dançando entre as caixas enquanto a música toca (somem no
-// corte, junto com ela), o feixe e o círculo da luz (amarelo; laranja quando
+// corte, junto com ela), um "PARE!" gigante carimbado no meio de cada caixa
+// no instante do corte (não avisa antes: aparece junto com o silêncio), o feixe e o círculo da luz (amarelo; laranja quando
 // está em cima de alguém; vermelho quando pegou), "PEGO!" com flash e alarme.
 // A CPU obedece quase sempre (CPU_OBEDECE); às vezes se distrai e continua andando.
 // terminar() (fim da esquiva ou saída da cena) devolve a música e descongela tudo.
@@ -163,6 +164,22 @@ export default function criar(arena, { rng }) {
     return txt
   }
 
+  // "PARE!" gigante carimbado no meio da caixa no instante do corte. Fica por
+  // baixo do coração e da luz (dá para ver onde você está) e some sozinho.
+  const carimbarPare = (pista) => {
+    const l = pista.caixa.limites
+    const tamanho = Math.round(Math.min(96, l.width / 3.4, l.height / 1.9))
+    const txt = arena.add
+      .text(l.centerX, l.centerY, 'PARE!', { fontFamily: FONTE, fontSize: `${tamanho}px`, color: '#ff3048', stroke: '#ffffff', strokeThickness: Math.round(tamanho / 9) })
+      .setOrigin(0.5)
+      .setDepth(8)
+      .setAngle(-6)
+    pista.caixa.recortar(txt)
+    textos.push(txt)
+    arena.tweens.add({ targets: txt, scale: { from: 2.4, to: 1 }, alpha: { from: 0.4, to: 1 }, duration: 170, ease: 'Back.easeOut' })
+    arena.tweens.add({ targets: txt, alpha: 0, scale: 1.08, delay: 900, duration: 450, onComplete: () => txt.destroy() })
+  }
+
   // ---------- regras ----------
 
   const pararMusica = () => {
@@ -172,7 +189,10 @@ export default function criar(arena, { rng }) {
     cpuObedece = sorte() < CPU_OBEDECE
     cpuPercebeEm = t + entre(CPU_DISTRAIDA_MS.min, CPU_DISTRAIDA_MS.max)
     cortarMusica(true)
+    tocar(arena, 'carimbo')
+    shake(arena, 160, 0.006)
     for (const v of vigias) {
+      carimbarPare(v.pista)
       v.pista.congelada = true
       v.pego = false
       v.mexeu = 0

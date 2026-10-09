@@ -197,7 +197,7 @@ const resultado = await page.evaluate(
         const sup = ehSuper(c)
         if (modo === 'supers' && !sup) continue
         if (modo === 'cartas' && sup) continue
-        if (!sup && (c.valor === 1 || c.naipe === 'copas')) continue
+        if (!sup && (c.valor === 1 || c.naipe === 'copas') && !filtro.split(',').includes(c.id)) continue // Ás só quando pedido pelo id
         if (filtro.includes('-') && !filtro.split(',').includes(c.id)) continue
         cartas.push(c)
       }

@@ -681,4 +681,133 @@ function esticarCabo(a, cfg, p1, p2) {
   }
 }
 
-export default { dessNotaSolta, dessTaco, dessHomeRun, dessSolo, dessMicrofonia, dessPalheta, dessFeedback, dessFumaca, dessAmplificador, dessCabos }
+// ---------- ♠ Show de Rock ----------
+// A caixa vira a ESTRADA DE NOTAS do show (estilo Guitar Hero): 4 cordas
+// coloridas e uma linha de palco embaixo. No ritmo da música (uma batida a
+// cada `batida` ms) cai um ACORDE: notas em todas as cordas menos a(s)
+// livre(s). A corda livre anda no máximo uma casa por batida (com chance
+// `troca` de andar): sempre dá para acompanhar dançando. Nos refrões (a cada `pirotecnia` batidas) uma
+// labareda de pirotecnia sobe do palco numa corda longe da livre (pisca antes).
+// Com `colcheias`, no contratempo cai mais uma nota solta, numa corda que não
+// é a livre de agora nem a da próxima batida (o caminho continua existindo).
+//
+// Justiça: cada corda tem mais que LACUNA_MINIMA de largura; entre dois
+// acordes sobra mais que a lacuna na vertical (velocidade x batida); as notas
+// nascem piscando (aviso normal de bala); a pirotecnia nunca cai na corda
+// livre nem nas vizinhas dela, e a corda livre não muda enquanto ela queima.
+const dessShow = definirAtaque({
+  nome: 'dessShow',
+  padrao: { duracao: 6000, cordas: 4, batida: 480, velocidade: 150, livres: 1, pirotecnia: 8, troca: 0.66, colcheias: false, avisoFogo: 560, raio: 7 },
+  iniciar(a, cfg) {
+    const geo = () => {
+      const l = a.caixa
+      return { l, w: l.width / cfg.cordas, x: (k) => l.left + (k + 0.5) * (l.width / cfg.cordas) }
+    }
+    a.lacuna(geo().w, 'corda livre do show')
+    a.lacuna(cfg.velocidade * (cfg.batida / 1000) - cfg.raio * 2, 'espaço entre dois acordes')
+
+    // a estrada: cordas coloridas, palco embaixo pulsando na batida
+    const estrada = a.decoracao(a.cena.add.graphics().setDepth(1))
+    let pulso = 0
+    a.aoAtualizar((dt) => {
+      pulso = Math.max(0, pulso - dt / 260)
+      const { l, w } = geo()
+      estrada.clear().fillStyle(0x1a0c1c, 0.55).fillRect(l.left, l.top, l.width, l.height)
+      for (let k = 0; k < cfg.cordas; k++) {
+        const cor = CORES_SHOW[k % CORES_SHOW.length]
+        estrada.lineStyle(2, cor, 0.35).lineBetween(l.left + (k + 0.5) * w, l.top, l.left + (k + 0.5) * w, l.bottom)
+        if (k > 0) estrada.lineStyle(1, 0xffffff, 0.12).lineBetween(l.left + k * w, l.top, l.left + k * w, l.bottom)
+      }
+      estrada.fillStyle(ROSA, 0.25 + 0.55 * pulso).fillRect(l.left, l.bottom - 6, l.width, 6)
+    })
+
+    // a primeira corda livre é a do coração (ninguém começa encurralado)
+    let livre = limitar(Math.floor((a.alvo().x - geo().l.left) / geo().w), 0, cfg.cordas - 1)
+    let proxima = livre // a corda livre da próxima batida (decidida uma batida antes, para as colcheias)
+    let fogoAte = -1
+    a.aCada(
+      cfg.batida,
+      (i) => {
+        const { l, w, x } = geo()
+        pulso = 1
+        if (i % 2 === 0) tocar(a.cena, T('palheta'))
+        // a corda livre anda no máximo uma casa (parada enquanto a pirotecnia queima)
+        // (`troca` = chance de ela mudar de corda; nas bordas, volta para dentro)
+        livre = proxima
+        proxima = livre
+        if (a.tempo + cfg.batida >= fogoAte && a.aleatorio(0, 1) < cfg.troca) {
+          const passo = livre === 0 ? 1 : livre === cfg.cordas - 1 ? -1 : a.escolher([-1, 1])
+          proxima = limitar(livre + passo, 0, cfg.cordas - 1)
+        }
+        // contratempo: uma nota solta fora do caminho (nem a livre de agora, nem a próxima)
+        if (cfg.colcheias) {
+          const fora = [...Array(cfg.cordas).keys()].filter((k) => k !== livre && k !== proxima)
+          const agora = livre
+          const depois = proxima
+          if (fora.length)
+            a.depois(cfg.batida / 2, () => {
+              const g = geo()
+              const k = a.escolher(fora.filter((c) => c !== agora && c !== depois))
+              if (k === undefined) return
+              a.bala({ x: g.x(k), y: g.l.top + cfg.raio + 2, vy: cfg.velocidade, raio: cfg.raio - 1, textura: T('nota'), tamanho: 16, cor: 0xffffff, pulso: 0.06 })
+            })
+        }
+        const livresAgora = new Set([livre])
+        while (livresAgora.size < Math.min(cfg.livres, cfg.cordas - 1)) livresAgora.add(a.inteiro(0, cfg.cordas - 1))
+        const ocupados = []
+        for (let k = 0; k < cfg.cordas; k++) {
+          if (livresAgora.has(k)) continue
+          ocupados.push([l.left + k * w, l.left + (k + 1) * w])
+          a.bala({
+            x: x(k),
+            y: l.top + cfg.raio + 2,
+            vy: cfg.velocidade,
+            raio: cfg.raio,
+            textura: T('nota'),
+            tamanho: 20,
+            cor: CORES_SHOW[k % CORES_SHOW.length],
+            pulso: 0.06,
+          })
+        }
+        a.parede({ eixo: 'x', ocupados })
+
+        // refrão: pirotecnia numa corda longe da livre
+        if (cfg.pirotecnia > 0 && i > 0 && i % cfg.pirotecnia === 0) {
+          const longe = [...Array(cfg.cordas).keys()].filter((k) => Math.abs(k - livre) >= 2)
+          if (!longe.length) return
+          const k = a.escolher(longe)
+          const aviso = Math.max(560, cfg.avisoFogo)
+          fogoAte = a.tempo + aviso + 500
+          a.aviso({ tipo: 'area', x: l.left + k * w + 3, y: l.top, largura: w - 6, altura: l.height, ms: aviso, cor: 0xff8a3a }, () => {
+            const g = geo()
+            tocar(a.cena, T('grave'))
+            a.cena.cameras.main.shake(140, 0.005)
+            a.bala({
+              x: g.x(k),
+              y: g.l.centerY,
+              largura: g.w - 10,
+              altura: g.l.height,
+              forma: 'barra',
+              cor: 0xff8a3a,
+              jaAvisada: true,
+              atravessa: true,
+              vida: 440,
+              pulso: 0.15,
+              atualizar: (b) => {
+                if (b.vida < 160) {
+                  b.inofensiva = true
+                  b.sprite.setAlpha(Math.max(0, b.vida / 160))
+                }
+              },
+            })
+            for (let n = 0; n < 4; n++) particulas(a.cena, g.x(k), g.l.bottom - n * (g.l.height / 4), { cor: n % 2 ? 0xffe14a : 0xff8a3a, quantidade: 6, velocidade: 120, vida: 380 })
+          })
+        }
+      },
+      Infinity,
+      200,
+    )
+  },
+})
+
+export default { dessShow, dessNotaSolta, dessTaco, dessHomeRun, dessSolo, dessMicrofonia, dessPalheta, dessFeedback, dessFumaca, dessAmplificador, dessCabos }

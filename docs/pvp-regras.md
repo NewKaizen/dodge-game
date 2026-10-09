@@ -151,7 +151,7 @@ Efeitos de copas (cada carta junta um ou mais):
 Ficar parado não é mais uma estratégia: quase todo padrão tem uma parte mirada no coração (`mirar` nos ataques, sobe com a força da carta).
 
 - `foice` (Giro do Machado, Machadada, Chaos Saber...): machado bumerangue que mira a faixa do coração, volta pelo outro lado, alterna varridas horizontais e verticais e solta faíscas.
-- `forcado`: o forcado segue a fileira do coração enquanto está parado lá dentro; a cada 3 estocadas vem a pinça (um de cada lado, vãos desencontrados).
+- `forcado`: o forcado de 3 dentes estoca de cima (e de baixo, alternando) na coluna do coração e crava; o vão entre os dentes é seguro e, na cravada, a palha espirra pelos lados. A cada 3 estocadas vem a pinça (um de cima e um de baixo, vãos desencontrados).
 - `rachaduras` (Chão Rachado, Dinamite, Emboscada): o chão racha passando pelo coração e solta espinhos; nas cartas fortes, estilhaços.
 - `carrossel`: os anéis respiram forte, invertem o giro (piscam antes), o centro persegue o coração e atiram balas miradas.
 - `caosFinal` (Caos Final, K♦ do Asriel): estrelas miradas → cruz do caos giratória → anel que colapsa no coração e explode.
@@ -227,7 +227,7 @@ Cara própria por personagem (padrões e tema das balas):
 |---|---|---|
 | Kris | estocadas, colunas em forma de espada, mira, lasers alternados, forcado | espadas/losango azuis |
 | Susie | machado (foice), pisões (colunas), investidas, bombas | hex/bola roxas |
-| Ralsei | anéis, carrossel, divisores, espiral | copas/bola verdes |
+| Ralsei | anéis, carrossel, estrelas de ioiô na fitinha (A♣, Empréstimo Educado), espiral | copas/bola verdes |
 | Noelle | neve lenta em cascata, raios de gelo, pingentes | losango/hex azul-gelo |
 | Berdly | mira, estocadas, ondas de vento, lasers em cruz | losango/bola ciano |
 | Dess | bolas quicando, ondas sonoras, lasers, bombas | ouros/bola laranja |
@@ -307,3 +307,11 @@ O Asriel ainda dá um pouco mais de dano por carta porque tem mais figuras (o da
 | 3♦ Shocker Breaker | 1,1 → 0,75 | raios mais espaçados; na caixa apertada a corrente perde a 3ª coluna se ela fechar a rota de fuga |
 
 A carta mais difícil do jogo agora é o K♠ Show de Rock da Dess (3 acertos no bot médio, ~40 de dano), fora deste ajuste.
+
+**2026-10-08: K♠ Show de Rock refeito** (`dessShow` em `attacks/habilidades/dess.js`). Saíram as
+paredes do riff com notas teleguiadas; entrou a ESTRADA DE NOTAS do show (estilo Guitar Hero):
+4 cordas coloridas, acordes caindo no ritmo com sempre uma corda livre (que anda no máximo uma
+casa por batida), colcheias no contratempo fora do caminho livre e pirotecnia no refrão numa
+corda longe da livre. Medido (24 sementes): bot médio **~40 → 11,4** (0,88 acerto), perfeito 2,2;
+nenhum aviso do validador. Fica na faixa das cartas fortes da Dess (Solo 11, Amplificador 11,
+Palco Explosivo 16,5, Feedback 20).

@@ -4,7 +4,7 @@ import { r, apertar, duracaoDe, lerp } from '../padroes.js'
 
 export default {
   tema: { formas: ['copas', 'bola'], cores: { copas: 0x4dd68a, bola: 0xa8f0c0, barra: 0x8fe8b0 }, cor: 0x4dd68a },
-  principal: { espadas: 'anel', ouros: 'carrossel', paus: 'divisores' },
+  principal: { espadas: 'anel', ouros: 'carrossel', paus: 'emprestimo' },
   leve: (A) => A.anel({ duracao: 4000, intervalo: 2800, quantidade: 16, abertura: 1.4, tempoFechar: 1700 }),
   receitas: {
     estrela: r('Estrelas cadentes miradas no coração que deixam um rastro de brilhos parado no ar', (A, t) =>
@@ -27,6 +27,9 @@ export default {
     ),
     laco: r('Uma fita dá um laço em volta do coração e se aperta: fuja pelo vão antes que feche; o lacinho fica no chão', (A, t) =>
       A.ralseiLacoFita({ duracao: duracaoDe(t), intervalo: lerp(2600, 2000, t), raio: lerp(54, 62, t), tempoApertar: lerp(1500, 1200, t) }),
+    ),
+    emprestimo: r('Estrelas presas numa fitinha, como ioiô, vão até onde você estava, fazem uma reverência (soltando faíscas de juros) e voltam pelo mesmo caminho', (A, t) =>
+      A.ralseiEmprestimo({ duracao: duracaoDe(t), intervalo: lerp(1500, 1100, t), porVez: t >= 0.45 ? 2 : 1, velocidade: lerp(170, 220, t), parada: lerp(420, 320, t), juros: t >= 0.4 ? 4 : 0 }),
     ),
   },
   super: {

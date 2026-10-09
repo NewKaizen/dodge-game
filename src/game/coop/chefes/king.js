@@ -14,8 +14,9 @@ export default {
   },
   hp: 240,
   danoBala: 7,
-  // DIFÍCIL: o King é o chefe mais fraco de base; no difícil ele aperta mais
-  niveis: { dificil: { velocidade: 1.5, densidade: 1.7, velocidadeMax: 1.4, dano: 2.7, hp: 1.25 } },
+  // DIFÍCIL: o King é o chefe mais fraco de base (dano por bala baixo e padrões
+  // fáceis de ler): no difícil ele aperta bem mais o ritmo (SUPER ~23 por acerto)
+  niveis: { dificil: { velocidade: 1.5, densidade: 1.7, velocidadeMax: 1.4, dano: 1.8, hp: 1.2 } },
   leve: (A) => A.rain({ duracao: 4000, intervalo: 520, velocidade: 110 }),
   fases: [
     {

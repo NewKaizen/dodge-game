@@ -15,6 +15,8 @@ import { particulas } from '../../effects/particulas.js'
 //                           granulado e a cereja voa em arco no coração
 //   ralseiFiosLa          ♣ novelos rolam quicando e desenrolam um fio que fica no rastro
 //   ralseiLacoFita        ♣ uma fita em laço se aperta em volta do coração; foge pelo vão
+//   ralseiEmprestimo      ♣ (A♣) estrelas presas numa fitinha, como ioiô: vão até onde o
+//                           coração estava, fazem uma reverência e voltam pelo mesmo caminho
 //
 // Justiça: tudo nasce piscando (aviso das balas, >= ATAQUE.telegrafoMs) ou sai
 // de algo que já piscou (rastro da estrela, fio do novelo, granulado do bolinho);
@@ -588,6 +590,130 @@ const ralseiLacoFita = definirAtaque({
   },
 })
 
+// ---------- ♣ Empréstimo Educado (A♣) ----------
+// "Com licença, posso pegar emprestado?" Estrelas presas numa fitinha saem
+// das paredes do lado, como ioiô: vão até onde o coração estava (freando),
+// fazem uma reverência e VOLTAM pelo mesmo caminho, acelerando, devolvendo o
+// lugar. A fita fica esticada o tempo todo entre a parede e a estrela: ela
+// mostra por onde a estrela vai voltar (a fita em si não machuca).
+// Com `juros`, na reverência a estrela solta faíscas devagar em cruz.
+//
+// Justiça: o caminho pisca (linha) `aviso` ms antes de a estrela sair; a
+// volta é pelo mesmo caminho, marcado pela fita.
+//
+//   intervalo, porVez   ms entre lançamentos; estrelas por lançamento (a 2ª sai
+//                       do outro lado, `atraso` ms depois, mirando de novo)
+//   velocidade          px/s médios na ida (a volta é um pouco mais rápida)
+//   parada              ms da reverência no ponto do empréstimo
+//   juros               faíscas soltas na reverência (0 desliga)
+const ralseiEmprestimo = definirAtaque({
+  nome: 'ralseiEmprestimo',
+  padrao: { duracao: 5000, intervalo: 1300, porVez: 1, atraso: 380, velocidade: 190, parada: 380, juros: 0, velocidadeJuros: 70, raio: 8, aviso: 520 },
+  iniciar(a, cfg) {
+    const aviso = Math.max(ATAQUE.telegrafoMs, cfg.aviso)
+    const COR_FITA = 0x7fe0a0
+
+    const lancar = (daEsquerda) => {
+      const l = a.caixa
+      const m = cfg.raio + 4
+      const ox = daEsquerda ? l.left + 2 : l.right - 2
+      const oy = l.top + m + a.aleatorio(0, l.height - 2 * m)
+      const alvo = a.alvo()
+      const dx = limitar(alvo.x, l.left + m, l.right - m)
+      const dy = limitar(alvo.y, l.top + m, l.bottom - m)
+      const dist = Math.hypot(dx - ox, dy - oy)
+      if (dist < 30) return
+      a.aviso({ tipo: 'linha', x1: ox, y1: oy, x2: dx, y2: dy, espessura: cfg.raio * 2, ms: aviso }, () => {
+        tocar(a.cena, 'hab-ralsei-estrela')
+        const fita = a.decoracao(a.cena.add.graphics().setDepth(3))
+        const ida = (dist / cfg.velocidade) * 1000 * 1.4 // ease-out: sai rápido e freia
+        const volta = ida * 0.8
+        let relogio = 0
+        let fase = 'ida'
+        let curvou = false
+        a.bala({
+          x: ox,
+          y: oy,
+          raio: cfg.raio,
+          textura: `${T}estrela`,
+          quadro: 0,
+          tamanho: cfg.raio * 2.7,
+          jaAvisada: true,
+          atualizar: (b, dt) => {
+            relogio += dt * fv(a)
+            let p = 0
+            if (fase === 'ida') {
+              const q = Math.min(1, relogio / ida)
+              p = 1 - (1 - q) * (1 - q)
+              b.sprite.rotation += dt * 0.012
+              if (q >= 1) {
+                fase = 'parada'
+                relogio = 0
+              }
+            } else if (fase === 'parada') {
+              p = 1
+              // a reverência: inclina para a frente e volta, piscando o olhinho
+              const q = Math.min(1, relogio / cfg.parada)
+              b.sprite.setRotation(Math.sin(q * Math.PI) * 0.6 * (daEsquerda ? 1 : -1))
+              b.sprite.setFrame(q > 0.3 && q < 0.7 ? 1 : 0)
+              if (!curvou && q > 0.4) {
+                curvou = true
+                pagarJuros(b.x, b.y)
+              }
+              if (q >= 1) {
+                fase = 'volta'
+                relogio = 0
+              }
+            } else {
+              const q = Math.min(1, relogio / volta)
+              p = 1 - q * q
+              b.sprite.rotation -= dt * 0.015
+              if (q >= 1) {
+                b.morta = true
+                particulas(a.cena, ox, oy, { cor: 0xa8f0c0, quantidade: 6 })
+              }
+            }
+            b.x = ox + (dx - ox) * p
+            b.y = oy + (dy - oy) * p
+            fita.clear().lineStyle(2, COR_FITA, 0.55).lineBetween(ox, oy, b.x, b.y)
+            if (b.morta) fita.destroy()
+          },
+        })
+      })
+    }
+
+    // juros: faíscas lentas em cruz (giram um pouco a cada empréstimo)
+    let giro = 0
+    const pagarJuros = (x, y) => {
+      if (!(cfg.juros > 0)) return
+      giro += 0.5
+      for (let k = 0; k < cfg.juros; k++) {
+        const ang = giro + (k * Math.PI * 2) / cfg.juros
+        a.bala({
+          x: x + Math.cos(ang) * 6,
+          y: y + Math.sin(ang) * 6,
+          vx: Math.cos(ang) * cfg.velocidadeJuros,
+          vy: Math.sin(ang) * cfg.velocidadeJuros,
+          raio: 3.5,
+          textura: `${T}faisca`,
+          quadro: k % 3,
+          tamanho: 10,
+          girar: 3,
+          jaAvisada: true,
+          vida: 2200,
+        })
+      }
+    }
+
+    let n = 0
+    a.aCada(cfg.intervalo, () => {
+      const lado = n++ % 2 === 0
+      lancar(lado)
+      for (let k = 1; k < cfg.porVez; k++) a.depois(cfg.atraso * k, () => lancar(k % 2 ? !lado : lado))
+    }, Infinity, 200)
+  },
+})
+
 export default {
   ralseiEstrelaGentil,
   ralseiCoroEstrelas,
@@ -596,4 +722,5 @@ export default {
   ralseiBolinho,
   ralseiFiosLa,
   ralseiLacoFita,
+  ralseiEmprestimo,
 }
