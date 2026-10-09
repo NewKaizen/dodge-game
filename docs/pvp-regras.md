@@ -170,13 +170,11 @@ Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria 
 | Arena | Música | Bônus |
 |---|---|---|
 | Castelo | Rude Buster (`pvp.mid`) | os clássicos: explosões, apagão, gravidade, ponta-cabeça, coração trocado, aquário, gelo, terremoto |
-| Jardim | Seven Suns (`arena_jardim.mid`) | cogumelo, lago (aquário) + os do jardim |
-| Sala de Informática | `arena_informatica.mid` | PC da escola, queda de energia (apagão), pop-ups, lag, teclado embaralhado, Ctrl+C Ctrl+V, tela azul, cursor gigante |
 | Jardim | Seven Suns (`arena_jardim.mid`) | cogumelo, lago (aquário), chuva de verão, ventania, enxame, vaga-lumes, espirro de pólen, trepadeira |
-| Sala de Informática | `arena_informatica.mid` | PC da escola, queda de energia (apagão) + os da sala |
+| Sala de Informática | `arena_informatica.mid` | PC da escola, queda de energia (apagão), pop-ups, lag, teclado embaralhado, Ctrl+C Ctrl+V, tela azul, cursor gigante |
 | Palco | `arena_palco.mid` | festa, dança da estátua, pirotecnia (explosões), plateia arremessa, gelo seco, no ritmo, karaokê, mosh |
-| Templo | `arena_templo.mid` | terremoto, gravidade, ponta-cabeça, tochas (apagão) + os do templo |
-| Coliseu | `arena_coliseu.mid` | coração trocado + os do coliseu |
+| Templo | `arena_templo.mid` | terremoto, gravidade, ponta-cabeça, tochas (apagão), pedra rolante, armadilhas, areia movediça, relógio do tempo |
+| Coliseu | `arena_coliseu.mid` | coração trocado, arena encolhendo, leões, chuva de lanças, corrida de bigas, chão em brasas, polegar do imperador, rede do reciário |
 
 Testes: `scene.start('PvpVoto', { p1, p2 })` ou direto `scene.start('PvpArena', { p1, p2, arena: 'templo' })`.
 
@@ -204,6 +202,10 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Ctrl+C Ctrl+V | normais | um clone espelhado do coração (lados, cima/baixo ou centro, com o eixo tracejado) anda junto; bala no clone conta como acerto no dono. O espelho muda de tempos em tempos, com aviso e um instante sem machucar |
 | Tela azul | normais | de vez em quando uma caixa chuvisca e dá TELA AZUL: a pista inteira congela (ninguém leva dano), reinicia, mostra tudo parado por um instante e volta com i-frames curtos |
 | Cursor gigante | normais | um cursor de mouse enorme persegue o coração (mais devagar que ele), para, mira (anel vermelho fechando, ampulheta) e clica: dano em área. Às vezes clique duplo |
+| Pedra rolante (Templo) | normais | ronco, tremor e a faixa por onde a pedra vai passar fica vermelha com setas no sentido dela (~1 s de aviso); aí uma pedra gigante atravessa a caixa rolando (bala, 5 de dano). Às vezes vem uma segunda em outra faixa: sempre sobra um terço da caixa livre |
+| Armadilhas (Templo) | normais | placas de pressão no chão (com setas ↔/↕): pisou, clique, a linha dela pisca e ~0,55 s depois dardos saem das duas paredes por ela. De tempos em tempos um padrão de lajes (colunas, faixas, xadrez, borda ou miolo) estala com as pontas brilhando nas frestas (~1 s) e os espinhos sobem por 0,6 s; sempre sobram lajes livres |
+| Areia movediça (Templo) | normais | poças de areia surgem (aviso, sem efeito ainda), prendem por uns segundos e secam. Dentro: o coração fica lento (42% no meio, 80% na borda) e é puxado para o centro; sair sempre dá. Não machuca |
+| Relógio do tempo (Templo) | normais | um relógio entre as caixas alterna o tempo do ATAQUE entre câmera lenta (×0,5) e acelerado (×1,5), com 1 s de aviso (tique-taque dispara, nome do próximo modo pisca). O coração anda sempre no ritmo normal; a música acompanha um pouco |
 | Cartas malucas | viram outras | na revelação cada carta vira uma carta sorteada de qualquer personagem (mesmo custo); o SUPER não vira (é imparável). Depois da rodada o baralho volta ao normal |
 | Duelo | viram armas | a carta escolhida vira a arma, sem gastar energia. Uma caixa só para os dois: ♥ tiro, ♠ espada, ♦ bumerangue, ♣ explosão (3 bombas em leque com estilhaços). Mira automática: é só se mexer e apertar A; o valor da carta aumenta o dano. Passar dá uma arma sorteada, fraca |
 | Chuva de verão | normais | (Jardim) chove forte: a chuva empurra o coração para baixo (muito nas PANCADAS, avisadas com setas azuis) e poças aparecem no chão da caixa (contorno piscando antes); dentro da poça o coração escorrega como no gelo |

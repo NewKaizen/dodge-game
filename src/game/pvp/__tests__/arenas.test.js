@@ -1,7 +1,7 @@
 // node --test src/game/pvp/__tests__/
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ARENAS, ARENA, ALEATORIA, apurarVotos, eventosDaArena } from '../arenas.js'
+import { ARENAS, ARENA, ALEATORIA, BONUS_POR_ARENA, apurarVotos, eventosDaArena } from '../arenas.js'
 import { EVENTO } from '../bonus.js'
 import { criarRng } from '../baralho.js'
 
@@ -21,6 +21,15 @@ test('arenas: o nome próprio da arena vale só nela', () => {
   assert.equal(tochas.nome, 'TOCHAS')
   assert.equal(tochas.cartas, 'normal') // o resto vem do evento original
   assert.equal(eventosDaArena('castelo').find((e) => e.id === 'apagao').nome, EVENTO.apagao.nome)
+})
+
+test('arenas: o templo tem os bônus próprios dele (pedra, armadilhas, areia, relógio)', () => {
+  const ids = eventosDaArena('templo').map((e) => e.id)
+  for (const id of ['pedra', 'armadilhas', 'areia', 'relogio']) {
+    assert.ok(ids.includes(id), id)
+    assert.equal(EVENTO[id].cartas, 'normal')
+  }
+  assert.ok(ids.length >= 10)
 })
 
 test('arenas: a mais votada ganha', () => {
@@ -51,4 +60,8 @@ test('arenas: "?" vira uma arena sorteada; ninguém votou = qualquer uma', () =>
   const nada = apurarVotos([null, null], criarRng('n'))
   assert.ok(ARENA[nada.arena])
   assert.equal(nada.empatadas.length, ARENAS.length)
+})
+
+test('arenas: toda arena tem no mínimo BONUS_POR_ARENA rodadas bônus', () => {
+  for (const a of ARENAS) assert.ok(eventosDaArena(a.id).length >= BONUS_POR_ARENA, `${a.id}: ${eventosDaArena(a.id).length}`)
 })

@@ -974,4 +974,52 @@ const SINTESE = {
     s.nota(247, 0.8, 'sawtooth', 0.04, 330, 0.03, 0.15)
     s.tom(80, 0.5, 'sine', 0.2, 45)
   },
+  // TEMPLO / PEDRA ROLANTE: o ronco da pedra rolando (~1,3 s, com os baques do chão)
+  pedraRolando: (s) => {
+    s.ruido(1.3, 0.28, 0, 320)
+    s.nota(48, 1.3, 'sawtooth', 0.12, 36, 0, 0.15)
+    for (let i = 0; i < 6; i++) s.tom(70, 0.09, 'sine', 0.22, 40, 0.08 + i * 0.2)
+  },
+  // ARMADILHAS: o clique da placa de pressão / os dardos saindo / os espinhos subindo
+  cliquePlaca: (s) => {
+    s.tom(2200, 0.03, 'square', 0.08, 1400)
+    s.tom(900, 0.05, 'square', 0.06, 500, 0.04)
+    s.ruido(0.03, 0.12, 0, 6000)
+  },
+  dardo: (s) => {
+    s.ruido(0.12, 0.14, 0, 7000)
+    s.tom(1800, 0.1, 'triangle', 0.04, 700)
+  },
+  espinhos: (s) => {
+    s.ruido(0.05, 0.25, 0, 9000)
+    s.tom(2600, 0.25, 'triangle', 0.05, 2500)
+    s.tom(3900, 0.18, 'sine', 0.03, 3800, 0.01)
+    s.tom(180, 0.12, 'square', 0.08, 90)
+  },
+  // AREIA MOVEDIÇA: o chiado da areia (poça surgindo / coração afundando)
+  areia: (s) => {
+    s.ruido(0.5, 0.12, 0, 1800)
+    s.ruido(0.3, 0.06, 0.15, 900)
+    s.tom(140, 0.3, 'sine', 0.06, 90, 0.05)
+  },
+  // RELÓGIO DO TEMPO: tique e taque, e as viradas para lento / rápido
+  tique: (s) => {
+    s.tom(2400, 0.025, 'square', 0.05, 2000)
+    s.ruido(0.02, 0.08, 0, 8000)
+  },
+  taque: (s) => {
+    s.tom(1600, 0.03, 'square', 0.05, 1300)
+    s.ruido(0.02, 0.07, 0, 5000)
+  },
+  tempoLento: (s) => {
+    s.tom(880, 0.9, 'triangle', 0.08, 220)
+    s.tom(1320, 0.9, 'sine', 0.04, 330, 0.05)
+    s.nota(110, 1.0, 'sine', 0.12, 80, 0, 0.2)
+    ;[1568, 1318, 1046].forEach((f, i) => s.tom(f, 0.4, 'sine', 0.04, f, 0.1 + i * 0.18))
+  },
+  tempoRapido: (s) => {
+    s.tom(220, 0.5, 'sawtooth', 0.06, 1320)
+    s.tom(330, 0.5, 'square', 0.03, 1760, 0.03)
+    for (let i = 0; i < 6; i++) s.tom(2400, 0.02, 'square', 0.05, 2000, 0.3 + i * 0.05)
+  },
 }

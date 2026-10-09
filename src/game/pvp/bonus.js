@@ -60,6 +60,10 @@ export const EVENTOS = [
   { id: 'ritmo', nome: 'NO RITMO', descricao: 'o coração só anda na batida!', cartas: 'normal', cor: 0xff4fa8 },
   { id: 'karaoke', nome: 'KARAOKÊ', descricao: 'a letra da música atravessa a caixa: passe entre as palavras!', cartas: 'normal', cor: 0xff5ab0 },
   { id: 'mosh', nome: 'MOSH', descricao: 'ondas de gente empurram o coração de um lado pro outro!', cartas: 'normal', cor: 0xb06aff },
+  { id: 'pedra', nome: 'PEDRA ROLANTE', descricao: 'uma pedra gigante vem rolando: saia da faixa vermelha!', cartas: 'normal', cor: 0xc09468 },
+  { id: 'armadilhas', nome: 'ARMADILHAS', descricao: 'placas disparam dardos e espinhos sobem do chão!', cartas: 'normal', cor: 0xff6a3a },
+  { id: 'areia', nome: 'AREIA MOVEDIÇA', descricao: 'poças de areia prendem e puxam o coração!', cartas: 'normal', cor: 0xe8c070 },
+  { id: 'relogio', nome: 'RELÓGIO DO TEMPO', descricao: 'o ataque alterna entre câmera lenta e acelerado!', cartas: 'normal', cor: 0x7fc8ff },
 ]
 
 export const EVENTO = Object.fromEntries(EVENTOS.map((ev) => [ev.id, ev]))

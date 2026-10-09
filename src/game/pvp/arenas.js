@@ -83,7 +83,7 @@ export const ARENAS = [
     tituloMusica: null,
     cor: 0xf0c050,
     moldura: { cor: 0x6a5020, alpha: 0.35 },
-    bonus: [...GERAIS, 'terremoto', 'gravidade', 'pontaCabeca', { id: 'apagao', nome: 'TOCHAS', descricao: 'as tochas apagaram: só dá pra ver em volta do coração!' }],
+    bonus: [...GERAIS, 'terremoto', 'gravidade', 'pontaCabeca', { id: 'apagao', nome: 'TOCHAS', descricao: 'as tochas apagaram: só dá pra ver em volta do coração!' }, 'pedra', 'armadilhas', 'areia', 'relogio'],
   },
   {
     id: 'coliseu',

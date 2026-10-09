@@ -42,4 +42,9 @@ import ritmo from './ritmo.js'
 import karaoke from './karaoke.js'
 import mosh from './mosh.js'
 
-export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, clone, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira, encolhendo, leoes, lancas, bigas, brasas, polegar, rede, plateia, geloSeco, ritmo, karaoke, mosh }
+import pedra from './pedra.js'
+import armadilhas from './armadilhas.js'
+import areia from './areia.js'
+import relogio from './relogio.js'
+
+export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, clone, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira, encolhendo, leoes, lancas, bigas, brasas, polegar, rede, plateia, geloSeco, ritmo, karaoke, mosh, pedra, armadilhas, areia, relogio }

@@ -14,6 +14,7 @@ pvp/bonus/
                                  encolhendo, leoes, lancas, bigas, brasas, polegar, rede }
   eventos/arteColiseu.js  arte (texturas de canvas) e utilidades dos eventos do COLISEU
                                  plateia, geloSeco, ritmo, karaoke, mosh }
+                                 pedra, armadilhas, areia, relogio }
   eventos/<id>.js     um evento que bagunça a ESQUIVA normal (cartas 'normal')
   Duelo.js            o evento 'duelo' (substitui arremesso + esquiva)
   botDuelo.js         a CPU do duelo
@@ -130,6 +131,8 @@ DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto
 `chiado` e `queimou` (BRASAS), `polegarCima` e `polegarBaixo` (POLEGAR), `rede`, `redePegou` e `redeSoltou` (REDE).
 DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO), `arremesso` e `splat` (PLATEIA ARREMESSA), `fumaca` (GELO SECO),
 `batida` ({ forte }) (NO RITMO), `karaoke` ({ freq }) e `karaokeVerso` (KARAOKÊ), `avisoOnda` e `onda` (MOSH).
+`pedraRolando` (PEDRA ROLANTE), `cliquePlaca`, `dardo` e `espinhos` (ARMADILHAS), `areia` (AREIA MOVEDIÇA),
+`tique`, `taque`, `tempoLento` e `tempoRapido` (RELÓGIO DO TEMPO).
 
 Outros recursos de audio.js usados pelos eventos:
 
@@ -190,3 +193,7 @@ Outros recursos de audio.js usados pelos eventos:
 | `ritmo` | NO RITMO: o coração só anda na janela da batida (joy zerado fora dela, CPU também); `fatorCoracao` ×2 e `passo` ×0,85 compensam. Anel, halo da caixa, compasso e som `batida` | `joy` + `passo` + `fatorCoracao` |
 | `karaoke` | KARAOKÊ: versos (textos) correm pela caixa; cada palavra é bala retangular invisível com o texto seguindo; acende (`setCrop`) ao cruzar o meio e toca a nota `karaoke` | `balas.criar` (retângulo) |
 | `mosh` | MOSH: onda de gente numa faixa da caixa, com aviso na borda de entrada; empurra o coração dentro dela | `joy` |
+| `pedra` | PEDRA ROLANTE: aviso de ~1 s (ronco, faixa vermelha com setas, poeira na entrada) e uma pedra gigante atravessa a caixa (às vezes duas, em terços diferentes); mesmo plano nas duas caixas | `balas.criar` (textura `bonus-templo-pedra`, `jaAvisada`) |
+| `armadilhas` | placas de pressão (pisou: clique, a linha pisca, dardos das duas paredes) e espinhos em padrões avisados (colunas, faixas, xadrez, borda, miolo) | `balas.criar` (dardos com aviso; espinhos = retângulos invisíveis avisando) |
+| `areia` | poças de areia movediça (surgem avisando, prendem, secam): coração lento e puxado para o meio da poça, sem dano | `joy` |
+| `relogio` | RELÓGIO DO TEMPO: o ataque alterna câmera lenta (×0,5) / acelerado (×1,5) com 1 s de aviso; o coração anda normal (`fatorCoracao` = base / fator, devolvido no fim); a música acompanha (`velocidadeMusica`) | `passo` + `fatorCoracao` |
