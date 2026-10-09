@@ -172,7 +172,7 @@ Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria 
 | Castelo | Rude Buster (`pvp.mid`) | os clássicos: explosões, apagão, gravidade, ponta-cabeça, coração trocado, aquário, gelo, terremoto |
 | Jardim | Seven Suns (`arena_jardim.mid`) | cogumelo, lago (aquário) + os do jardim |
 | Sala de Informática | `arena_informatica.mid` | PC da escola, queda de energia (apagão) + os da sala |
-| Palco | `arena_palco.mid` | festa, dança da estátua, pirotecnia (explosões) + os do palco |
+| Palco | `arena_palco.mid` | festa, dança da estátua, pirotecnia (explosões), plateia arremessa, gelo seco, no ritmo, karaokê, mosh |
 | Templo | `arena_templo.mid` | terremoto, gravidade, ponta-cabeça, tochas (apagão) + os do templo |
 | Coliseu | `arena_coliseu.mid` | coração trocado + os do coliseu |
 
@@ -198,6 +198,11 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Terremoto | normais | a terra treme (ronco de aviso antes): a tela sacode, o coração é empurrado e pedras caem do teto das caixas |
 | Cartas malucas | viram outras | na revelação cada carta vira uma carta sorteada de qualquer personagem (mesmo custo); o SUPER não vira (é imparável). Depois da rodada o baralho volta ao normal |
 | Duelo | viram armas | a carta escolhida vira a arma, sem gastar energia. Uma caixa só para os dois: ♥ tiro, ♠ espada, ♦ bumerangue, ♣ explosão (3 bombas em leque com estilhaços). Mira automática: é só se mexer e apertar A; o valor da carta aumenta o dano. Passar dá uma arma sorteada, fraca |
+| Plateia arremessa | normais | (Palco) a plateia joga tomates, flores, ursinhos e baldes de pipoca no palco: uma sombra no chão da caixa avisa onde cai (~1 s antes), o objeto cai em cima dela e sai quicando pela caixa até sumir |
+| Gelo seco | normais | (Palco) uma fumaça densa sobe do chão e cobre a metade de baixo das caixas, ondulando (com jatos de CO2 de vez em quando); lá dentro as balas viram silhuetas escuras. Só visual, sem dano novo |
+| No ritmo | normais | (Palco) o coração só anda na batida (~140 BPM, metade de cada batida); entre as batidas fica parado. Para compensar ele anda mais rápido na janela e as caixas ficam 15% mais lentas. Anel que encolhe até o coração, borda pulsando, compasso e bumbo marcam a batida |
+| Karaokê | normais | (Palco) versos da música atravessam as caixas da direita para a esquerda; cada palavra é uma bala (com o "!" de aviso) e acende em rosa ao passar pelo meio da caixa, cantando uma nota. Dá para passar entre as palavras e entre as faixas dos versos |
+| Mosh | normais | (Palco) ondas de gente atravessam a caixa numa faixa (metade de cima, de baixo ou o meio) e empurram o coração; antes, a borda de entrada pisca na altura da faixa com setas. Não machuca: o perigo é ser jogado nas balas (dá para resistir ou sair da faixa) |
 
 ## Ases (cartas especiais, um por naipe em todo baralho, custo 3)
 

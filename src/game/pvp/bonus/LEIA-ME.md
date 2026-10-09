@@ -8,7 +8,8 @@ pvp/bonus/
   anuncio.js          roleta "BONUS ROUND!" que sorteia o evento na frente de todo mundo
                       (depois da escolha das cartas; música abaixa e rola o som de cassino)
   eventos/index.js    EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado,
-                                 pcEscola, aquario, cogumelo, estatua, gelo, terremoto }
+                                 pcEscola, aquario, cogumelo, estatua, gelo, terremoto,
+                                 plateia, geloSeco, ritmo, karaoke, mosh }
   eventos/<id>.js     um evento que bagunça a ESQUIVA normal (cartas 'normal')
   Duelo.js            o evento 'duelo' (substitui arremesso + esquiva)
   botDuelo.js         a CPU do duelo
@@ -108,7 +109,8 @@ Na roleta o anúncio chama `abaixarMusica()` / `restaurarMusica()` (audio.js).
 `pavio`, `duelo`, `trovao` (estalo + ronco ~2,5 s), `aplausos` (palmas + "uhuu", ~1,6 s:
 DESVIO PERFEITO), `superAtivar` e `superCorte` (carta SUPER), `pcLigando` e `travou` (PC DA
 ESCOLA), `tchibum` e `bolha` (AQUÁRIO), `crescer` e `encolher` (COGUMELO), `pego` (alarme da
-DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO).
+DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO), `arremesso` e `splat` (PLATEIA ARREMESSA), `fumaca` (GELO SECO),
+`batida` ({ forte }) (NO RITMO), `karaoke` ({ freq }) e `karaokeVerso` (KARAOKÊ), `avisoOnda` e `onda` (MOSH).
 
 Outros recursos de audio.js usados pelos eventos:
 
@@ -145,3 +147,8 @@ Outros recursos de audio.js usados pelos eventos:
 | `estatua` | DANÇA DA ESTÁTUA: a música para do nada (`cortarMusica`), as pistas congelam (`pista.congelada`) e um holofote de vigia PERSEGUE o coração em cada caixa (mais lento que ele); quem se mexer sob a luz é PEGO (30% do HP máximo, uma vez por parada; `arena.acertou`). A CPU obedece em ~80% das paradas. `efeitoBonus.estadoDebug()` mostra a parada e as luzes | `cortarMusica` + `congelada` + `joy` (CPU) |
 | `gelo` | o coração desliza (inércia no joystick), flocos e reflexos | `joy` |
 | `terremoto` | ronco de aviso, tremor, empurrão no coração e pedras caindo (balas) | `joy` + `balas.criar` |
+| `plateia` | PLATEIA ARREMESSA: sombra no chão da caixa avisa, o objeto (tomate, flor, ursinho, pipoca; texturas `bonus-plateia-*` geradas no canvas) voa da plateia e cai quicando. A bala nasce no começo do voo, invisível e avisando (`aviso` = voo), então a CPU vê onde vai cair | `balas.criar` (textura, `quicar`, `atualizar`) |
+| `geloSeco` | GELO SECO: fumaça cobre a metade de baixo das caixas; bala dentro dela vira silhueta (`setTint` + `TintModes.FILL`, devolvida ao sair e no `terminar()`) | Graphics + tint das balas |
+| `ritmo` | NO RITMO: o coração só anda na janela da batida (joy zerado fora dela, CPU também); `fatorCoracao` ×2 e `passo` ×0,85 compensam. Anel, halo da caixa, compasso e som `batida` | `joy` + `passo` + `fatorCoracao` |
+| `karaoke` | KARAOKÊ: versos (textos) correm pela caixa; cada palavra é bala retangular invisível com o texto seguindo; acende (`setCrop`) ao cruzar o meio e toca a nota `karaoke` | `balas.criar` (retângulo) |
+| `mosh` | MOSH: onda de gente numa faixa da caixa, com aviso na borda de entrada; empurra o coração dentro dela | `joy` |

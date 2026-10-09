@@ -72,7 +72,7 @@ export const ARENAS = [
     tituloMusica: null,
     cor: 0xff4fa8,
     moldura: { cor: 0x6a1d4a, alpha: 0.35 },
-    bonus: [...GERAIS, 'festa', 'estatua', { id: 'explosoes', nome: 'PIROTECNIA', descricao: 'os fogos do show caem nas duas caixas!' }],
+    bonus: [...GERAIS, 'festa', 'estatua', { id: 'explosoes', nome: 'PIROTECNIA', descricao: 'os fogos do show caem nas duas caixas!' }, 'plateia', 'geloSeco', 'ritmo', 'karaoke', 'mosh'],
   },
   {
     id: 'templo',
