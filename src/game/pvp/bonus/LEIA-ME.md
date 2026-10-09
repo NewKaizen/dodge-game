@@ -8,7 +8,9 @@ pvp/bonus/
   anuncio.js          roleta "BONUS ROUND!" que sorteia o evento na frente de todo mundo
                       (depois da escolha das cartas; música abaixa e rola o som de cassino)
   eventos/index.js    EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado,
-                                 pcEscola, aquario, cogumelo, estatua, gelo, terremoto }
+                                 pcEscola, aquario, cogumelo, estatua, gelo, terremoto,
+                                 encolhendo, leoes, lancas, bigas, brasas, polegar, rede }
+  eventos/arteColiseu.js  arte (texturas de canvas) e utilidades dos eventos do COLISEU
   eventos/<id>.js     um evento que bagunça a ESQUIVA normal (cartas 'normal')
   Duelo.js            o evento 'duelo' (substitui arremesso + esquiva)
   botDuelo.js         a CPU do duelo
@@ -108,7 +110,9 @@ Na roleta o anúncio chama `abaixarMusica()` / `restaurarMusica()` (audio.js).
 `pavio`, `duelo`, `trovao` (estalo + ronco ~2,5 s), `aplausos` (palmas + "uhuu", ~1,6 s:
 DESVIO PERFEITO), `superAtivar` e `superCorte` (carta SUPER), `pcLigando` e `travou` (PC DA
 ESCOLA), `tchibum` e `bolha` (AQUÁRIO), `crescer` e `encolher` (COGUMELO), `pego` (alarme da
-DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO).
+DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO), `muralha` (ARENA ENCOLHENDO), `rugido` (LEÕES), `assobio` e `cravar`
+(CHUVA DE LANÇAS; `cravar` também é o baque das paredes e da rede no chão), `galope` e `relincho` (BIGAS),
+`chiado` e `queimou` (BRASAS), `polegarCima` e `polegarBaixo` (POLEGAR), `rede`, `redePegou` e `redeSoltou` (REDE).
 
 Outros recursos de audio.js usados pelos eventos:
 
@@ -145,3 +149,10 @@ Outros recursos de audio.js usados pelos eventos:
 | `estatua` | DANÇA DA ESTÁTUA: a música para do nada (`cortarMusica`), as pistas congelam (`pista.congelada`) e um holofote de vigia PERSEGUE o coração em cada caixa (mais lento que ele); quem se mexer sob a luz é PEGO (30% do HP máximo, uma vez por parada; `arena.acertou`). A CPU obedece em ~80% das paradas. `efeitoBonus.estadoDebug()` mostra a parada e as luzes | `cortarMusica` + `congelada` + `joy` (CPU) |
 | `gelo` | o coração desliza (inércia no joystick), flocos e reflexos | `joy` |
 | `terremoto` | ronco de aviso, tremor, empurrão no coração e pedras caindo (balas) | `joy` + `balas.criar` |
+| `encolhendo` | ARENA ENCOLHENDO: paliçadas entram pelas bordas (aviso vermelho com setas), seguram e abrem; só empurram, sempre sobra um miolo livre. O coração usa um retângulo interno como limite (`coracao.caixa` vira `{ limites: interno }` durante o evento; volta no `terminar()`). A CPU é afastada das paredes no `joy` | `coracao.caixa` + `joy` (CPU) |
+| `leoes` | LEÕES!: rugido + faixa piscando, o leão atravessa (bala retangular com `aviso`, sprite próprio); no trecho do SALTO a bala fica `inofensiva` (buraco na faixa) | `balas.criar` |
+| `lancas` | CHUVA DE LANÇAS: sombra crescendo avisa, a lança crava (ponta = bala redonda curta) e a haste fica como obstáculo um tempo | `balas.criar` |
+| `bigas` | CORRIDA DE BIGAS: 3 faixas de sentidos alternados, bigas (balas retangulares) avisadas por poeira; nunca todas as faixas | `balas.criar` |
+| `brasas` | CHÃO EM BRASAS: parado esquenta a barra de CALOR, cheia queima (dano pequeno, `arena.acertou`); a CPU dá voltinhas | `joy` (CPU) |
+| `polegar` | POLEGAR DO IMPERADOR: roleta de regras com o busto e o polegar; invertido (`joy`), rápido/lento (`pista.fatorCoracao`), mini/gigante (`setTamanho`), caixa escura (véu recortado seguindo o coração). `efeitoBonus.forcarRegra(id)` nos testes | `joy` + `fatorCoracao` + `setTamanho` |
+| `rede` | REDE DO RECIÁRIO: gladiador entre as caixas joga a rede (círculo avisado); preso = joystick ×0,16 até sacudir as setas 5× (ou 1,8 s); sem dano. A CPU sacode sozinha | `joy` |

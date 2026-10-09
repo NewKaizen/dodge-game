@@ -759,4 +759,70 @@ const SINTESE = {
     s.tom(3000, 0.07, 'sine', 0.05, 2600, 0.05)
     s.tom(120, 0.12, 'square', 0.1, 50, 0.04)
   },
+  // COLISEU: paredes de pedra arrastando (ARENA ENCOLHENDO)
+  muralha: (s) => {
+    s.ruido(0.9, 0.22, 0, 320)
+    s.nota(62, 0.9, 'sawtooth', 0.09, 48, 0, 0.1)
+    for (let i = 0; i < 5; i++) s.ruido(0.03, 0.08, 0.1 + i * 0.16 + Math.random() * 0.05, 1600)
+  },
+  // LEÕES: rugido (grave rasgado que sobe e cai)
+  rugido: (s) => {
+    s.ruido(0.8, 0.22, 0, 650)
+    s.nota(95, 0.85, 'sawtooth', 0.16, 62, 0, 0.12)
+    s.nota(190, 0.7, 'square', 0.05, 120, 0.05, 0.12)
+    s.tom(140, 0.35, 'sawtooth', 0.08, 180, 0)
+  },
+  // CHUVA DE LANÇAS: assobio caindo e a lança cravando na areia
+  assobio: (s) => s.tom(2200, 0.32, 'sine', 0.035, 700),
+  cravar: (s) => {
+    s.tom(170, 0.12, 'square', 0.1, 60)
+    s.ruido(0.08, 0.22, 0, 2200)
+    s.tom(1100, 0.09, 'triangle', 0.04, 760, 0.01)
+  },
+  // CORRIDA DE BIGAS: galope de cascos e o relincho
+  galope: (s) => {
+    for (let i = 0; i < 8; i++) {
+      const t = i * 0.085 + (i % 2) * 0.03
+      s.ruido(0.035, 0.16, t, 1400)
+      s.tom(95, 0.05, 'sine', 0.14, 60, t)
+    }
+  },
+  relincho: (s) => {
+    for (let i = 0; i < 6; i++) s.tom(820 + (i % 2) * 260, 0.08, 'sawtooth', 0.04, 960 + (i % 2) * 200, i * 0.07)
+    s.tom(700, 0.3, 'sawtooth', 0.04, 380, 0.42)
+  },
+  // CHÃO EM BRASAS: chiado de brasa e o "fuuu" da queimadura
+  chiado: (s) => {
+    s.ruido(0.35, 0.06, 0, 9000)
+    for (let i = 0; i < 4; i++) s.ruido(0.015, 0.1, 0.04 + i * 0.07 + Math.random() * 0.03, 7000)
+  },
+  queimou: (s) => {
+    s.ruido(0.55, 0.3, 0, 2600)
+    s.tom(320, 0.35, 'sawtooth', 0.1, 70)
+    s.tom(900, 0.12, 'square', 0.05, 300)
+  },
+  // POLEGAR DO IMPERADOR: a plateia vibra (pra cima) ou vaia (pra baixo)
+  polegarCima: (s) => {
+    s.ruido(1.1, 0.12, 0.05, 2800)
+    ;[523, 659, 784, 1046].forEach((f, i) => s.tom(f, 0.16, 'square', 0.06, f, i * 0.08))
+  },
+  polegarBaixo: (s) => {
+    s.nota(150, 1.0, 'sawtooth', 0.08, 105, 0, 0.25)
+    s.nota(158, 1.0, 'sawtooth', 0.06, 112, 0.03, 0.25)
+    s.ruido(1.0, 0.1, 0, 700)
+  },
+  // REDE DO RECIÁRIO: arremesso, a rede pegando e rasgando ao soltar
+  rede: (s) => {
+    s.ruido(0.4, 0.14, 0, 2400)
+    s.tom(280, 0.35, 'triangle', 0.05, 720)
+  },
+  redePegou: (s) => {
+    s.ruido(0.12, 0.22, 0, 1400)
+    s.tom(150, 0.22, 'square', 0.09, 90)
+    s.tom(620, 0.16, 'sawtooth', 0.03, 480, 0.08)
+  },
+  redeSoltou: (s) => {
+    s.ruido(0.18, 0.2, 0, 5200)
+    s.tom(420, 0.15, 'square', 0.05, 1400)
+  },
 }
