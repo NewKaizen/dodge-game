@@ -15,5 +15,9 @@ import cogumelo from './cogumelo.js'
 import estatua from './estatua.js'
 import gelo from './gelo.js'
 import terremoto from './terremoto.js'
+import pedra from './pedra.js'
+import armadilhas from './armadilhas.js'
+import areia from './areia.js'
+import relogio from './relogio.js'
 
-export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto }
+export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, pedra, armadilhas, areia, relogio }

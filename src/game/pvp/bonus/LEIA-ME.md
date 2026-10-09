@@ -8,7 +8,8 @@ pvp/bonus/
   anuncio.js          roleta "BONUS ROUND!" que sorteia o evento na frente de todo mundo
                       (depois da escolha das cartas; música abaixa e rola o som de cassino)
   eventos/index.js    EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado,
-                                 pcEscola, aquario, cogumelo, estatua, gelo, terremoto }
+                                 pcEscola, aquario, cogumelo, estatua, gelo, terremoto,
+                                 pedra, armadilhas, areia, relogio }
   eventos/<id>.js     um evento que bagunça a ESQUIVA normal (cartas 'normal')
   Duelo.js            o evento 'duelo' (substitui arremesso + esquiva)
   botDuelo.js         a CPU do duelo
@@ -108,7 +109,9 @@ Na roleta o anúncio chama `abaixarMusica()` / `restaurarMusica()` (audio.js).
 `pavio`, `duelo`, `trovao` (estalo + ronco ~2,5 s), `aplausos` (palmas + "uhuu", ~1,6 s:
 DESVIO PERFEITO), `superAtivar` e `superCorte` (carta SUPER), `pcLigando` e `travou` (PC DA
 ESCOLA), `tchibum` e `bolha` (AQUÁRIO), `crescer` e `encolher` (COGUMELO), `pego` (alarme da
-DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO).
+DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO),
+`pedraRolando` (PEDRA ROLANTE), `clique`, `dardo` e `espinhos` (ARMADILHAS), `areia` (AREIA MOVEDIÇA),
+`tique`, `taque`, `tempoLento` e `tempoRapido` (RELÓGIO DO TEMPO).
 
 Outros recursos de audio.js usados pelos eventos:
 
@@ -145,3 +148,7 @@ Outros recursos de audio.js usados pelos eventos:
 | `estatua` | DANÇA DA ESTÁTUA: a música para do nada (`cortarMusica`), as pistas congelam (`pista.congelada`) e um holofote de vigia PERSEGUE o coração em cada caixa (mais lento que ele); quem se mexer sob a luz é PEGO (30% do HP máximo, uma vez por parada; `arena.acertou`). A CPU obedece em ~80% das paradas. `efeitoBonus.estadoDebug()` mostra a parada e as luzes | `cortarMusica` + `congelada` + `joy` (CPU) |
 | `gelo` | o coração desliza (inércia no joystick), flocos e reflexos | `joy` |
 | `terremoto` | ronco de aviso, tremor, empurrão no coração e pedras caindo (balas) | `joy` + `balas.criar` |
+| `pedra` | PEDRA ROLANTE: aviso de ~1 s (ronco, faixa vermelha com setas, poeira na entrada) e uma pedra gigante atravessa a caixa (às vezes duas, em terços diferentes); mesmo plano nas duas caixas | `balas.criar` (textura `bonus-templo-pedra`, `jaAvisada`) |
+| `armadilhas` | placas de pressão (pisou: clique, a linha pisca, dardos das duas paredes) e espinhos em padrões avisados (colunas, faixas, xadrez, borda, miolo) | `balas.criar` (dardos com aviso; espinhos = retângulos invisíveis avisando) |
+| `areia` | poças de areia movediça (surgem avisando, prendem, secam): coração lento e puxado para o meio da poça, sem dano | `joy` |
+| `relogio` | RELÓGIO DO TEMPO: o ataque alterna câmera lenta (×0,5) / acelerado (×1,5) com 1 s de aviso; o coração anda normal (`fatorCoracao` = base / fator, devolvido no fim); a música acompanha (`velocidadeMusica`) | `passo` + `fatorCoracao` |

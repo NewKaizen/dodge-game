@@ -23,6 +23,15 @@ test('arenas: o nome próprio da arena vale só nela', () => {
   assert.equal(eventosDaArena('castelo').find((e) => e.id === 'apagao').nome, EVENTO.apagao.nome)
 })
 
+test('arenas: o templo tem os bônus próprios dele (pedra, armadilhas, areia, relógio)', () => {
+  const ids = eventosDaArena('templo').map((e) => e.id)
+  for (const id of ['pedra', 'armadilhas', 'areia', 'relogio']) {
+    assert.ok(ids.includes(id), id)
+    assert.equal(EVENTO[id].cartas, 'normal')
+  }
+  assert.ok(ids.length >= 10)
+})
+
 test('arenas: a mais votada ganha', () => {
   const r = apurarVotos(['templo', 'templo'], criarRng('a'))
   assert.equal(r.arena, 'templo')

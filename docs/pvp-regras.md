@@ -173,7 +173,7 @@ Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria 
 | Jardim | Seven Suns (`arena_jardim.mid`) | cogumelo, lago (aquário) + os do jardim |
 | Sala de Informática | `arena_informatica.mid` | PC da escola, queda de energia (apagão) + os da sala |
 | Palco | `arena_palco.mid` | festa, dança da estátua, pirotecnia (explosões) + os do palco |
-| Templo | `arena_templo.mid` | terremoto, gravidade, ponta-cabeça, tochas (apagão) + os do templo |
+| Templo | `arena_templo.mid` | terremoto, gravidade, ponta-cabeça, tochas (apagão), pedra rolante, armadilhas, areia movediça, relógio do tempo |
 | Coliseu | `arena_coliseu.mid` | coração trocado + os do coliseu |
 
 Testes: `scene.start('PvpVoto', { p1, p2 })` ou direto `scene.start('PvpArena', { p1, p2, arena: 'templo' })`.
@@ -196,6 +196,10 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Dança da estátua | normais | a música PARA de repente, sem aviso: balas e ataque congelam, o coração não. Um holofote de vigia PERSEGUE o coração de cada um (é mais lento: dá para fugir); quem se mexer com a luz em cima do coração é PEGO (30% do HP máximo, uma vez por parada). Mexer fora da luz pode. A música volta e tudo descongela |
 | Pista de gelo | normais | o coração escorrega: demora para acelerar, demora para frear e desliza quando você solta |
 | Terremoto | normais | a terra treme (ronco de aviso antes): a tela sacode, o coração é empurrado e pedras caem do teto das caixas |
+| Pedra rolante (Templo) | normais | ronco, tremor e a faixa por onde a pedra vai passar fica vermelha com setas no sentido dela (~1 s de aviso); aí uma pedra gigante atravessa a caixa rolando (bala, 5 de dano). Às vezes vem uma segunda em outra faixa: sempre sobra um terço da caixa livre |
+| Armadilhas (Templo) | normais | placas de pressão no chão (com setas ↔/↕): pisou, clique, a linha dela pisca e ~0,55 s depois dardos saem das duas paredes por ela. De tempos em tempos um padrão de lajes (colunas, faixas, xadrez, borda ou miolo) estala com as pontas brilhando nas frestas (~1 s) e os espinhos sobem por 0,6 s; sempre sobram lajes livres |
+| Areia movediça (Templo) | normais | poças de areia surgem (aviso, sem efeito ainda), prendem por uns segundos e secam. Dentro: o coração fica lento (42% no meio, 80% na borda) e é puxado para o centro; sair sempre dá. Não machuca |
+| Relógio do tempo (Templo) | normais | um relógio entre as caixas alterna o tempo do ATAQUE entre câmera lenta (×0,5) e acelerado (×1,5), com 1 s de aviso (tique-taque dispara, nome do próximo modo pisca). O coração anda sempre no ritmo normal; a música acompanha um pouco |
 | Cartas malucas | viram outras | na revelação cada carta vira uma carta sorteada de qualquer personagem (mesmo custo); o SUPER não vira (é imparável). Depois da rodada o baralho volta ao normal |
 | Duelo | viram armas | a carta escolhida vira a arma, sem gastar energia. Uma caixa só para os dois: ♥ tiro, ♠ espada, ♦ bumerangue, ♣ explosão (3 bombas em leque com estilhaços). Mira automática: é só se mexer e apertar A; o valor da carta aumenta o dano. Passar dá uma arma sorteada, fraca |
 
