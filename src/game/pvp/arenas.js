@@ -61,7 +61,7 @@ export const ARENAS = [
     tituloMusica: null,
     cor: 0x4fc8ff,
     moldura: { cor: 0x1d4a66, alpha: 0.35 },
-    bonus: [...GERAIS, 'pcEscola', { id: 'apagao', nome: 'QUEDA DE ENERGIA', descricao: 'caiu a energia da sala: só dá pra ver em volta do coração!' }],
+    bonus: [...GERAIS, 'pcEscola', { id: 'apagao', nome: 'QUEDA DE ENERGIA', descricao: 'caiu a energia da sala: só dá pra ver em volta do coração!' }, 'popups', 'lag', 'teclado', 'clone', 'telaAzul', 'cursor'],
   },
   {
     id: 'palco',

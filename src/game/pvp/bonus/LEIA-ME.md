@@ -8,7 +8,8 @@ pvp/bonus/
   anuncio.js          roleta "BONUS ROUND!" que sorteia o evento na frente de todo mundo
                       (depois da escolha das cartas; música abaixa e rola o som de cassino)
   eventos/index.js    EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado,
-                                 pcEscola, aquario, cogumelo, estatua, gelo, terremoto }
+                                 pcEscola, aquario, cogumelo, estatua, gelo, terremoto,
+                                 popups, lag, teclado, clone, telaAzul, cursor }
   eventos/<id>.js     um evento que bagunça a ESQUIVA normal (cartas 'normal')
   Duelo.js            o evento 'duelo' (substitui arremesso + esquiva)
   botDuelo.js         a CPU do duelo
@@ -108,7 +109,9 @@ Na roleta o anúncio chama `abaixarMusica()` / `restaurarMusica()` (audio.js).
 `pavio`, `duelo`, `trovao` (estalo + ronco ~2,5 s), `aplausos` (palmas + "uhuu", ~1,6 s:
 DESVIO PERFEITO), `superAtivar` e `superCorte` (carta SUPER), `pcLigando` e `travou` (PC DA
 ESCOLA), `tchibum` e `bolha` (AQUÁRIO), `crescer` e `encolher` (COGUMELO), `pego` (alarme da
-DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO).
+DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO),
+`popup` e `fecharJanela` (POP-UPS), `lag` (LAG), `teclas` e `embaralhar` (TECLADO EMBARALHADO),
+`clonar` (CTRL+C CTRL+V), `telaAzul` e `reiniciar` (TELA AZUL), `ampulheta` e `clique` (CURSOR GIGANTE).
 
 Outros recursos de audio.js usados pelos eventos:
 
@@ -145,3 +148,9 @@ Outros recursos de audio.js usados pelos eventos:
 | `estatua` | DANÇA DA ESTÁTUA: a música para do nada (`cortarMusica`), as pistas congelam (`pista.congelada`) e um holofote de vigia PERSEGUE o coração em cada caixa (mais lento que ele); quem se mexer sob a luz é PEGO (30% do HP máximo, uma vez por parada; `arena.acertou`). A CPU obedece em ~80% das paradas. `efeitoBonus.estadoDebug()` mostra a parada e as luzes | `cortarMusica` + `congelada` + `joy` (CPU) |
 | `gelo` | o coração desliza (inércia no joystick), flocos e reflexos | `joy` |
 | `terremoto` | ronco de aviso, tremor, empurrão no coração e pedras caindo (balas) | `joy` + `balas.criar` |
+| `popups` | janelas de propaganda (depth 8: por cima das balas, por baixo do coração) tapam a caixa; coração no [X] fecha; posição relativa à caixa | containers recortados |
+| `lag` | o direcional chega 250–400 ms atrasado (fila de comandos, `lerAtrasado` de `pvp/bonusInformatica.js`); fantasma do coração simula os comandos "na rede"; wi-fi + PING em cima da caixa | `joy` |
+| `teclado` | as setas trocam (7 giros/espelhos de `MAPAS_TECLADO`), aviso de 1,1 s, tecladinho no meio mostrando o mapa; a CPU aprende o mapa depois de 0,6–1,2 s | `joy` |
+| `clone` | clone espelhado (`espelhar`) que as balas acertam: `balas.colidir([alvo])` + `pista.acertou(coracaoReal)` (i-frames e dano do dono); o espelho muda com aviso e carência | `balas.colidir` |
+| `telaAzul` | chuvisco de aviso, TELA AZUL congela a pista toda (`passo` = 0), reinicia, revela parado e volta com 480 ms de i-frames | `passo` |
+| `cursor` | cursor gigante persegue o coração, mira (ampulheta, anel fechando) e clica: bala redonda invisível com `aviso` = tempo da mira (a CPU enxerga); às vezes clique duplo | `balas.criar` |

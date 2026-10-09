@@ -171,7 +171,7 @@ Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria 
 |---|---|---|
 | Castelo | Rude Buster (`pvp.mid`) | os clássicos: explosões, apagão, gravidade, ponta-cabeça, coração trocado, aquário, gelo, terremoto |
 | Jardim | Seven Suns (`arena_jardim.mid`) | cogumelo, lago (aquário) + os do jardim |
-| Sala de Informática | `arena_informatica.mid` | PC da escola, queda de energia (apagão) + os da sala |
+| Sala de Informática | `arena_informatica.mid` | PC da escola, queda de energia (apagão), pop-ups, lag, teclado embaralhado, Ctrl+C Ctrl+V, tela azul, cursor gigante |
 | Palco | `arena_palco.mid` | festa, dança da estátua, pirotecnia (explosões) + os do palco |
 | Templo | `arena_templo.mid` | terremoto, gravidade, ponta-cabeça, tochas (apagão) + os do templo |
 | Coliseu | `arena_coliseu.mid` | coração trocado + os do coliseu |
@@ -196,6 +196,12 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Dança da estátua | normais | a música PARA de repente, sem aviso: balas e ataque congelam, o coração não. Um holofote de vigia PERSEGUE o coração de cada um (é mais lento: dá para fugir); quem se mexer com a luz em cima do coração é PEGO (30% do HP máximo, uma vez por parada). Mexer fora da luz pode. A música volta e tudo descongela |
 | Pista de gelo | normais | o coração escorrega: demora para acelerar, demora para frear e desliza quando você solta |
 | Terremoto | normais | a terra treme (ronco de aviso antes): a tela sacode, o coração é empurrado e pedras caem do teto das caixas |
+| Pop-ups | normais | janelas de propaganda ("VOCÊ GANHOU!", "BAIXE MAIS RAM") abrem por cima das balas (por baixo do coração) e tapam a visão; passar o coração no [X] fecha. Nunca nascem em cima do coração, no máximo 2–3 por caixa, somem sozinhas em 7 s |
+| Lag | normais | o direcional chega atrasado 250–400 ms (o ping aparece em cima da caixa); um fantasma do coração mostra para onde ele vai. A CPU também sofre |
+| Teclado embaralhado | normais | as setas trocam de lugar (giros e espelhos: seta sempre vira seta) e o mapa muda a cada ~4 s, com 1,1 s de aviso; o tecladinho entre as caixas mostra sempre o mapa atual. A CPU demora um pouco para aprender cada mapa |
+| Ctrl+C Ctrl+V | normais | um clone espelhado do coração (lados, cima/baixo ou centro, com o eixo tracejado) anda junto; bala no clone conta como acerto no dono. O espelho muda de tempos em tempos, com aviso e um instante sem machucar |
+| Tela azul | normais | de vez em quando uma caixa chuvisca e dá TELA AZUL: a pista inteira congela (ninguém leva dano), reinicia, mostra tudo parado por um instante e volta com i-frames curtos |
+| Cursor gigante | normais | um cursor de mouse enorme persegue o coração (mais devagar que ele), para, mira (anel vermelho fechando, ampulheta) e clica: dano em área. Às vezes clique duplo |
 | Cartas malucas | viram outras | na revelação cada carta vira uma carta sorteada de qualquer personagem (mesmo custo); o SUPER não vira (é imparável). Depois da rodada o baralho volta ao normal |
 | Duelo | viram armas | a carta escolhida vira a arma, sem gastar energia. Uma caixa só para os dois: ♥ tiro, ♠ espada, ♦ bumerangue, ♣ explosão (3 bombas em leque com estilhaços). Mira automática: é só se mexer e apertar A; o valor da carta aumenta o dano. Passar dá uma arma sorteada, fraca |
 
