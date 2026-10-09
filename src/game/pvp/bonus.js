@@ -36,6 +36,12 @@ export const EVENTOS = [
   { id: 'estatua', nome: 'DANÇA DA ESTÁTUA', descricao: 'a música parou? ESTÁTUA! Quem a luz pegar se mexendo leva dano', cartas: 'normal', cor: 0x7fd8ff },
   { id: 'gelo', nome: 'PISTA DE GELO', descricao: 'o coração escorrega: difícil de frear!', cartas: 'normal', cor: 0xbfefff },
   { id: 'terremoto', nome: 'TERREMOTO', descricao: 'a terra treme, joga o coração e derruba pedras!', cartas: 'normal', cor: 0xc8a070 },
+  { id: 'chuva', nome: 'CHUVA DE VERÃO', descricao: 'a chuva empurra o coração pra baixo e as poças escorregam!', cartas: 'normal', cor: 0x6ab8ff },
+  { id: 'ventania', nome: 'VENTANIA', descricao: 'rajadas de vento empurram o coração (olhe as folhas!)', cartas: 'normal', cor: 0x9ae07a },
+  { id: 'abelhas', nome: 'ENXAME', descricao: 'ficou parado? as abelhas vêm atrás! (se mexer despista)', cartas: 'normal', cor: 0xffd23a },
+  { id: 'vagalumes', nome: 'VAGA-LUMES', descricao: 'anoiteceu: só os vaga-lumes iluminam a caixa!', cartas: 'normal', cor: 0xd8ff6a },
+  { id: 'polen', nome: 'ESPIRRO DE PÓLEN', descricao: 'a... a... ATCHIM! o espirro joga o coração longe', cartas: 'normal', cor: 0xffe680 },
+  { id: 'trepadeira', nome: 'TREPADEIRA', descricao: 'vinhas crescem das bordas e fecham a caixa: não encoste!', cartas: 'normal', cor: 0x3fbf5a },
 ]
 
 export const EVENTO = Object.fromEntries(EVENTOS.map((ev) => [ev.id, ev]))
