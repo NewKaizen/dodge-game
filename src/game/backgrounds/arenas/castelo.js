@@ -23,6 +23,10 @@ export default function castelo(scene, objetos) {
   for (let y = 84; y < ALTURA - 14; y += 28) {
     for (let x = 24 + ((y / 28) % 2) * 14; x < LARGURA - 16; x += 28) losangos.push({ x, y })
   }
+  const losango = (gr, x, y) => gr.fillPoints([{ x, y: y - 4 }, { x: x + 3, y }, { x, y: y + 4 }, { x: x - 3, y }], true)
+  // os losangos apagados ficam desenhados de vez; por frame só os da onda de brilho
+  g.fillStyle(0x221a3c, 1)
+  for (const { x, y } of losangos) losango(g, x, y)
   const brilho = add(scene.add.graphics())
   const NAIPES = ['espadas', 'copas', 'ouros', 'paus']
   const CORES_NAIPES = [0x9a8bff, 0xff5f8a, 0xffd24c, 0x7fe0c0]
@@ -45,9 +49,10 @@ export default function castelo(scene, objetos) {
       const frente = ((estado.tempo / 6000) % 1) * (LARGURA + ALTURA + 400) - 200
       brilho.clear()
       for (const { x, y } of losangos) {
-        const perto = Math.max(0, 1 - Math.abs(x + y - frente) / 90)
+        const perto = 1 - Math.abs(x + y - frente) / 90
+        if (perto <= 0) continue
         brilho.fillStyle(misturar(0x221a3c, 0x5a46a8, perto), 1)
-        brilho.fillPoints([{ x, y: y - 4 }, { x: x + 3, y }, { x, y: y + 4 }, { x: x - 3, y }], true)
+        losango(brilho, x, y)
       }
     },
   }
