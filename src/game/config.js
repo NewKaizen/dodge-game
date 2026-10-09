@@ -5,6 +5,7 @@ import Menu from './scenes/Menu.js'
 import EscolhaParty from './scenes/EscolhaParty.js'
 import PvpEscolha from './scenes/PvpEscolha.js'
 import PvpArena from './scenes/PvpArena.js'
+import PvpVoto from './scenes/PvpVoto.js'
 import CoopArena from './scenes/CoopArena.js'
 import PvpResultado from './scenes/PvpResultado.js'
 import Selecao from './scenes/Selecao.js'
@@ -27,6 +28,6 @@ export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCs
     pixelArt: true,
     roundPixels: true,
     scale: { mode: Phaser.Scale.NONE, zoom: zoomCss },
-    scene: [Boot, Menu, EscolhaParty, PvpEscolha, PvpArena, PvpResultado, Selecao, Dificuldade, CoopArena, Vitoria, GameOver, Entrada, Pausa, Config, Grimorio],
+    scene: [Boot, Menu, EscolhaParty, PvpEscolha, PvpVoto, PvpArena, PvpResultado, Selecao, Dificuldade, CoopArena, Vitoria, GameOver, Entrada, Pausa, Config, Grimorio],
   }
 }

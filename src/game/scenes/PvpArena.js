@@ -16,6 +16,8 @@ import { EsquivaBot } from '../pvp/botEsquiva.js'
 import { criarRng, aleatorio, inteiro } from '../pvp/baralho.js'
 import { EVENTOS, EVENTO, ehRodadaBonus, adiarBonus, sortearEvento, transformarMalucas, desfazerMalucas, podeJogarDuelo, resolverDuelo } from '../pvp/bonus.js'
 import { EFEITOS } from '../pvp/bonus/eventos/index.js'
+import { ARENA, ARENA_PADRAO, eventosDaArena } from '../pvp/arenas.js'
+import { criarFundo } from '../backgrounds/index.js'
 import { anunciarBonus } from '../pvp/bonus/anuncio.js'
 import Duelo from '../pvp/bonus/Duelo.js'
 import { shake } from '../effects/shake.js'
@@ -28,8 +30,10 @@ import { anunciarSuper } from '../pvp/super/anuncio.js'
 // Partida PvP de cartas. Junta as peças de pvp/ (regras, baralho, cartas,
 // Pista) com o visual das cartas (Carta, Mao). Regras em docs/pvp-regras.md.
 //
-//   scene.start('PvpArena', { p1: 'susie', p2: 'noelle', semente?, tempo? })
+//   scene.start('PvpArena', { p1: 'susie', p2: 'noelle', arena?, semente?, tempo? })
 //     p1, p2   personagens (padrão: registry 'pvp' = { p1, p2 }; depois kris x susie)
+//     arena    id de pvp/arenas.js (padrão: registry 'pvp'.arena; depois o castelo):
+//              fundo animado (backgrounds/arenas/), música e a lista de bônus
 //     tempo    ms para escolher a carta (padrão TEMPO.escolha; 0 = sem limite)
 //
 // Máquina de estados (this.fase), uma volta por rodada:
@@ -89,7 +93,7 @@ import { anunciarSuper } from '../pvp/super/anuncio.js'
 // Com 1 jogador no painel, o P2 é a CPU (pvp/bot.js escolhe a carta,
 // pvp/botEsquiva.js desvia). Nível: registry 'pvpNivelBot' (tela PvpEscolha, ↑/↓).
 //
-// Música: public/assets/musicas/pvp.mid.
+// Música: a da arena (public/assets/musicas/<arena.musica>.mid; sem o arquivo, pvp.mid).
 //
 // No dev: debugJogo.jogo.scene.start('PvpArena', { p1: 'susie', p2: 'noelle' })
 // e window.pvpArena (estadoDebug, forcarMao, setHp) para os testes.
@@ -151,6 +155,8 @@ export default class PvpArena extends Phaser.Scene {
     this.semente = dados?.semente ?? `pvp:${Date.now()}`
     this.tempoBase = dados?.tempo ?? TEMPO.escolha
     this.bonusForcado = EVENTO[dados?.bonus] ? dados.bonus : null
+    this.arena = ARENA[dados?.arena] ?? ARENA[salvo.arena] ?? ARENA[ARENA_PADRAO]
+    this.eventosArena = eventosDaArena(this.arena.id)
   }
 
   create() {
@@ -228,33 +234,34 @@ export default class PvpArena extends Phaser.Scene {
       if (window.pvpArena === this) delete window.pvpArena
     })
 
-    musica('pvp')
+    musica(this.arena.musica, 'pvp')
     this.cameras.main.fadeIn(300)
     this.partida()
   }
 
   // ---------- montagem da mesa ----------
 
+  // Fundo animado da arena (backgrounds/arenas/) e, por cima, a moldura do
+  // tabuleiro: véu escuro (moldura.alpha) para as caixas e cartas continuarem
+  // legíveis, borda na cor da arena, o brilho fraco de cada metade e a
+  // costura tracejada do meio
   desenharFundo() {
-    const g = this.add.graphics().setDepth(-10)
-    g.fillStyle(0x0d0a16, 1)
-    g.fillRect(0, 0, LARGURA, ALTURA)
-    g.fillStyle(0x17122b, 1)
-    g.fillRoundedRect(6, 66, LARGURA - 12, ALTURA - 72, 16)
-    g.lineStyle(2, 0x3a2d5a, 1)
-    g.strokeRoundedRect(6, 66, LARGURA - 12, ALTURA - 72, 16)
-    g.fillStyle(0x221a3c, 1)
-    for (let y = 84; y < ALTURA - 14; y += 28) {
-      for (let x = 24 + ((y / 28) % 2) * 14; x < LARGURA - 16; x += 28) {
-        g.fillPoints([{ x, y: y - 4 }, { x: x + 3, y }, { x, y: y + 4 }, { x: x - 3, y }], true)
-      }
+    this.fundoArena = criarFundo(this, `arena-${this.arena.id}`)
+    this.events.once('shutdown', () => this.fundoArena?.destruir())
+    const { cor, alpha } = this.arena.moldura
+    const g = this.add.graphics().setDepth(-4)
+    if (alpha > 0) {
+      g.fillStyle(0x000000, alpha)
+      g.fillRoundedRect(6, 66, LARGURA - 12, ALTURA - 72, 16)
     }
+    g.lineStyle(2, cor, 1)
+    g.strokeRoundedRect(6, 66, LARGURA - 12, ALTURA - 72, 16)
     // metade de cada jogador: um brilho bem fraco na cor do coração
     for (const j of [0, 1]) {
       g.fillStyle(CORES.almas[j], 0.05)
       g.fillRect(j ? LARGURA / 2 + 2 : 8, 68, LARGURA / 2 - 10, ALTURA - 76)
     }
-    g.lineStyle(1, 0x3a2d5a, 0.9)
+    g.lineStyle(1, cor, 0.9)
     for (let y = 76; y < 340; y += 12) g.lineBetween(LARGURA / 2, y, LARGURA / 2, y + 6)
   }
 
@@ -568,11 +575,14 @@ export default class PvpArena extends Phaser.Scene {
       return
     }
     this.fase = 'bonus'
-    const evento = EVENTO[forcado] ?? EVENTO[this.bonusForcado] ?? sortearEvento(this.rngBonus, { anterior: this.bonusAnterior })
+    // a versão da arena (nome/descrição próprios), se o evento for dela
+    const daArena = (ev) => ev && (this.eventosArena.find((e) => e.id === ev.id) ?? ev)
+    const disponiveis = this.eventosArena.map((e) => e.id)
+    const evento = daArena(EVENTO[forcado] ?? EVENTO[this.bonusForcado] ?? sortearEvento(this.rngBonus, { anterior: this.bonusAnterior, disponiveis }))
     this.bonus = evento
     this.bonusAnterior = evento.id
     this.esconderBanner() // o "RODADA N" não fica por cima da roleta
-    await anunciarBonus(this, evento, { eventos: EVENTOS, rng: () => aleatorio(this.rngBonus) })
+    await anunciarBonus(this, evento, { eventos: this.eventosArena.length > 1 ? this.eventosArena : EVENTOS, rng: () => aleatorio(this.rngBonus) })
     if (this.saindo) return
     this.textoBonus.setText(`★ BONUS: ${evento.nome} ★`).setColor(corTexto(evento.cor)).setAlpha(1)
     this.tweens.add({ targets: this.textoBonus, scale: { from: 1.6, to: 1 }, duration: 260, ease: 'Back.easeOut' })
@@ -1531,6 +1541,7 @@ export default class PvpArena extends Phaser.Scene {
       vencedor: v,
       p1: this.ids[0],
       p2: this.ids[1],
+      arena: this.arena.id,
       rodadas: this.estado.rodada,
       cpu: this.cpu !== null,
       estatisticas: { p1: { ...this.estatisticas[0] }, p2: { ...this.estatisticas[1] } },
@@ -1550,7 +1561,7 @@ export default class PvpArena extends Phaser.Scene {
     pausarMusica()
     this.scene.pause()
     const nomes = this.ids.map((id) => PERSONAGENS[id]?.nome ?? id)
-    this.scene.launch('Pausa', { cena: 'PvpArena', recomecar: { p1: this.ids[0], p2: this.ids[1] }, sair: 'Menu', subtitulo: `${nomes[0]} x ${nomes[1]}` })
+    this.scene.launch('Pausa', { cena: 'PvpArena', recomecar: { p1: this.ids[0], p2: this.ids[1], arena: this.arena.id }, sair: 'Menu', subtitulo: `${nomes[0]} x ${nomes[1]}` })
     this.scene.bringToTop('Pausa') // a Pausa vem antes da arena na lista de cenas: sem isso, ela ficaria por baixo
   }
 
@@ -1572,6 +1583,7 @@ export default class PvpArena extends Phaser.Scene {
     this.tweens.timeScale = animacao
     this.time.timeScale = animacao
     this.controles.atualizar()
+    this.fundoArena?.atualizar(delta)
 
     if (this.fase === 'escolha') {
       for (let j = 0; j < this.numJogadores; j++) {

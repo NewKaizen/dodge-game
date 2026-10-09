@@ -67,6 +67,7 @@ export default class PvpResultado extends Phaser.Scene {
     const salvo = this.registry.get('pvp') ?? {}
     this.p1 = PERSONAGENS[dados.p1] ? dados.p1 : salvo.p1 ?? 'kris'
     this.p2 = PERSONAGENS[dados.p2] ? dados.p2 : salvo.p2 ?? 'susie'
+    this.arena = dados.arena ?? salvo.arena ?? null // revanche: mesma arena
     this.vencedor = [1, 2].includes(dados.vencedor) ? dados.vencedor : 0
     this.empate = this.vencedor === 0
     this.rodadas = dados.rodadas ?? 0
@@ -130,8 +131,8 @@ export default class PvpResultado extends Phaser.Scene {
     this.saindo = true
     tocar(this, botao === 'A' ? 'confirmar' : 'cancelar')
     this.cameras.main.fadeOut(250, 0, 0, 0)
-    const { p1, p2 } = this
-    this.time.delayedCall(260, () => (botao === 'A' ? this.scene.start('PvpArena', { p1, p2 }) : this.scene.start('PvpEscolha')))
+    const { p1, p2, arena } = this
+    this.time.delayedCall(260, () => (botao === 'A' ? this.scene.start('PvpArena', { p1, p2, arena }) : this.scene.start('PvpEscolha')))
   }
 
   // ---------- etapas ----------

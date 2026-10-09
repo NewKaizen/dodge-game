@@ -161,9 +161,26 @@ Ficar parado não é mais uma estratégia: quase todo padrão tem uma parte mira
 
 A cada 5 rodadas (rodadas 5, 10, 15, 20, 25) tudo fica 30% mais rápido, até ×2,5 na rodada 25 (`ACELERACAO` em `constants.js`): balas (velocidade e densidade), relógio da escolha (15 s → até 8 s), animações e música. O coração ganha metade do bônus para continuar dando para desviar. Aparece um aviso "VELOCIDADE ×1,3!" e o selo fica no HUD. No co-op a regra fica desligada (`ACELERACAO.coop = false`; com `true` ela vale por turno do chefe, por cima do `RITMO`).
 
+## Arenas (votação antes da partida)
+
+Depois da escolha dos lutadores (e do "VS"), os jogadores **votam na arena** (cena `PvpVoto`, dados em `pvp/arenas.js`). Cada um move o próprio coração entre os cartões e vota com A (B desfaz). Ganha a mais votada; **empate = roleta** entre as empatadas; o cartão **"?" (ALEATÓRIA)** vale como voto numa arena sorteada na hora da apuração; acabou o tempo (12 s), quem não votou fica de fora (ninguém votou = roleta entre todas). Contra a CPU só o P1 vota: a CPU segue o voto. A revanche (tela de resultado) e o "recomeçar" do pause mantêm a arena.
+
+Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria (`public/assets/musicas/<arena.musica>.mid`; sem o arquivo, toca o `pvp.mid`) e a **sua lista de rodadas bônus** (no mínimo 10; Duelo e Cartas Malucas estão em todas). Um evento pode ter nome próprio numa arena (o Apagão vira TOCHAS no Templo e QUEDA DE ENERGIA na Informática).
+
+| Arena | Música | Bônus |
+|---|---|---|
+| Castelo | Rude Buster (`pvp.mid`) | os clássicos: explosões, apagão, gravidade, ponta-cabeça, coração trocado, aquário, gelo, terremoto |
+| Jardim | Seven Suns (`arena_jardim.mid`) | cogumelo, lago (aquário) + os do jardim |
+| Sala de Informática | `arena_informatica.mid` | PC da escola, queda de energia (apagão) + os da sala |
+| Palco | `arena_palco.mid` | festa, dança da estátua, pirotecnia (explosões) + os do palco |
+| Templo | `arena_templo.mid` | terremoto, gravidade, ponta-cabeça, tochas (apagão) + os do templo |
+| Coliseu | `arena_coliseu.mid` | coração trocado + os do coliseu |
+
+Testes: `scene.start('PvpVoto', { p1, p2 })` ou direto `scene.start('PvpArena', { p1, p2, arena: 'templo' })`.
+
 ## Bonus rounds (a cada 3 rodadas)
 
-Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento caótico **depois** que os dois escolhem as cartas (no Duelo, a carta escolhida vira a arma, sem gastar energia), que nunca repete o da rodada bônus anterior. Só caos, sem prêmio: ninguém ganha nada a mais, e o dano continua valendo. Nos eventos de esquiva, as duas caixas abrem mesmo que ninguém tenha atacado.
+Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento caótico **depois** que os dois escolhem as cartas (no Duelo, a carta escolhida vira a arma, sem gastar energia), que nunca repete o da rodada bônus anterior. A roleta só tem os eventos da arena da partida (veja Arenas). Só caos, sem prêmio: ninguém ganha nada a mais, e o dano continua valendo. Nos eventos de esquiva, as duas caixas abrem mesmo que ninguém tenha atacado.
 
 | Evento | Cartas | O que acontece |
 |---|---|---|
