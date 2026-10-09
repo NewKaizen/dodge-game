@@ -10,8 +10,8 @@ import { shake } from '../../../effects/shake.js'
 // faixa aparecem na caixa (mais o "ê-ê!" da galera). Empurrar não machuca: o
 // perigo é ser jogado nas balas. A CPU passa pelo mesmo empurrão.
 
-const PERIODO = { min: 2500, max: 3300 } // ms entre ondas em cada caixa
-const PRIMEIRA = { min: 700, max: 1300 }
+const PERIODO = { min: 1900, max: 2700 } // ms entre uma onda e a próxima em cada caixa
+const PRIMEIRA = { min: 600, max: 1000 }
 const AVISO_MS = 950
 const VELOCIDADE = 260 // px/s da onda
 const LARGURA = 58 // px da "multidão" (largura da onda)
@@ -42,7 +42,7 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
     const [f0, f1] = FAIXAS[Math.floor(sorte() * FAIXAS.length)]
     const lado = sorte() < 0.5 ? 1 : -1 // 1: entra pela esquerda e vai para a direita
     // a multidão: cabeças com braços para cima, espalhadas na faixa
-    const pessoas = Array.from({ length: 9 }, (_, k) => ({ dx: entre(0, LARGURA - 10), fy: (k + 0.5) / 9 + entre(-0.04, 0.04), fase: entre(0, 6), r: entre(4.5, 6.5) }))
+    const pessoas = Array.from({ length: 14 }, (_, k) => ({ dx: entre(4, LARGURA - 6), fy: (k + 0.5) / 14 + entre(-0.03, 0.03), fase: entre(0, 6), r: entre(4.5, 6.5) }))
     v.onda = { lado, f0, f1, inicio: t, frente: null, pessoas }
     tocar(arena, 'avisoOnda')
   }
@@ -92,9 +92,9 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
     // a onda: faixa rosada e a multidão (por baixo das balas)
     const tras = fx - LARGURA * o.lado
     const xa = Math.min(fx, tras)
-    g.fillStyle(COR, 0.12)
+    g.fillStyle(COR, 0.2)
     g.fillRect(xa, y0, LARGURA, y1 - y0)
-    g.lineStyle(2, COR, 0.7)
+    g.lineStyle(3, COR, 0.85)
     g.lineBetween(fx, y0, fx, y1)
     for (const p of o.pessoas) {
       const x = tras + p.dx * o.lado
