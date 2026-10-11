@@ -36,5 +36,5 @@ export const ASSETS = {
   },
 
   // nome que aparece no canto de cima do menu inicial (troque junto com menu.mid)
-  tituloMusicaMenu: 'THE WORLD REVOLVING',
+  tituloMusicaMenu: 'CATSWING',
 }

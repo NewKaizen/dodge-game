@@ -16,9 +16,11 @@ const SOUNDFONT = 'assets/audio/soundfont.sf3'
 const PROCESSADOR = 'assets/audio/spessasynth_processor.min.js'
 const FADE_S = 0.35
 const GRAVE_HZ = 180 // realce de graves (setGraveMidi): lowshelf abaixo daqui
+const GRAVE_BASE_DB = 3 // peso extra permanente; o Modo Festa soma seu próprio realce
+const MARGEM_SAIDA_DB = -1 // margem depois do compressor, sem alterar o slider
 
 let preparo = null // Promise do sintetizador pronto (uma vez só)
-let motor = null // { ctx, synth, seq, ganho, grave }
+let motor = null // { ctx, synth, seq, ganho, grave, compressor, saida }
 let atual = null // url da música tocando
 let pedido = 0 // descarta pedidos antigos quando a música muda no meio do carregamento
 const arquivos = new Map() // url -> Promise<ArrayBuffer | null>
@@ -71,7 +73,7 @@ export function setVelocidadeMidi(fator, ms = 600) {
   }, 30)
 }
 
-// Realce de graves (dB no lowshelf de ~180 Hz; 0 = normal), ex.: o MODO FESTA
+// Realce EXTRA de graves (dB no lowshelf de ~180 Hz; 0 = grave base), ex.: o MODO FESTA
 // "batendo" mais forte. Rampa suave; fica valendo para as próximas músicas
 // até alguém pedir 0.
 export function setGraveMidi(db = 0, ms = 400) {
@@ -81,7 +83,7 @@ export function setGraveMidi(db = 0, ms = 400) {
   const t = motor.ctx.currentTime
   g.cancelScheduledValues(t)
   g.setValueAtTime(g.value, t)
-  g.linearRampToValueAtTime(graveDb, t + Math.max(0.01, ms / 1000))
+  g.linearRampToValueAtTime(GRAVE_BASE_DB + graveDb, t + Math.max(0.01, ms / 1000))
 }
 
 // Tom da música em semitons (0 = normal; -7 = bem mais grave), sem mudar o
@@ -112,20 +114,32 @@ function preparar(ctx) {
     const synth = new WorkletSynthesizer(ctx)
     const ganho = ctx.createGain()
     ganho.gain.value = 0
-    // synth -> grave (lowshelf) -> ganho -> saída
+    // O ganho continua controlando fades, pause, corte e abafo.
+    // O compressor recebe o volume que realmente sairá, inclusive o grave extra.
+    // synth -> grave -> ganho -> compressor -> margem de saída -> destino
     const grave = ctx.createBiquadFilter()
     grave.type = 'lowshelf'
     grave.frequency.value = GRAVE_HZ
-    grave.gain.value = graveDb
+    grave.gain.value = GRAVE_BASE_DB + graveDb
+    const compressor = ctx.createDynamicsCompressor()
+    compressor.threshold.value = -3
+    compressor.knee.value = 3
+    compressor.ratio.value = 20
+    compressor.attack.value = 0.001
+    compressor.release.value = 0.12
+    const saida = ctx.createGain()
+    saida.gain.value = 10 ** (MARGEM_SAIDA_DB / 20)
     synth.connect(grave)
     grave.connect(ganho)
-    ganho.connect(ctx.destination)
+    ganho.connect(compressor)
+    compressor.connect(saida)
+    saida.connect(ctx.destination)
     const banco = await (await fetch(SOUNDFONT)).arrayBuffer()
     await synth.soundBankManager.addSoundBank(banco, 'principal')
     await synth.isReady
     if (tom) synth.setSystemParameter('keyShift', tom)
     const seq = new Sequencer(synth)
-    motor = { ctx, synth, seq, ganho, grave }
+    motor = { ctx, synth, seq, ganho, grave, compressor, saida }
     return motor
   })().catch((erro) => {
     console.warn('[música] não deu para iniciar o MIDI:', erro)
