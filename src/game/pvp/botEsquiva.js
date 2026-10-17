@@ -8,13 +8,15 @@
 // em linha reta (com aceleração) por `horizonteMs` e dá nota a cada caminho
 // pelo quanto ele passa perto delas (perigo agora pesa mais que perigo
 // depois), mais um empurrão leve para longe das paredes e para o centro.
-// Balas ainda telegrafando ficam paradas e só contam depois do aviso.
+// Balas ainda telegrafando ficam paradas e só contam depois do aviso. Balas
+// com `arranque` (espiam devagar na borda e depois disparam) são previstas
+// já com o disparo, como quem vê a ponta da lança esperando na borda.
 // Os níveis erram de propósito: reagem mais devagar, enxergam menos à frente
 // e às vezes escolhem uma direção qualquer.
 //
 // coracao: { x, y, hitbox }   limites: { left, right, top, bottom }
 // balas: lista de Bullets.js (usa tipo, x, y, vx, vy, ax, ay, raio, largura,
-//        altura, comprimento, espessura, angulo, girar, idade, aviso, inofensiva, morta)
+//        altura, comprimento, espessura, angulo, girar, idade, aviso, arranque, inofensiva, morta)
 
 // decidirMs   de quanto em quanto tempo reavalia (tempo de reação)
 // horizonteMs quanto à frente simula
@@ -58,6 +60,16 @@ function preverBala(b, ms, fator, vmax) {
   const espera = Math.max(0, (b.aviso ?? 0) - (b.idade ?? 0))
   if (ms < espera) return null // ainda telegrafando: inofensiva
   const s = (ms - Math.max(0, espera)) / 1000
+  if (b.arranque) {
+    // anda devagar até o arranque e dali na velocidade nova (aceleração ignorada)
+    const ate = Math.max(0, Math.min(s, (b.arranque.ms - Math.max(0, (b.idade ?? 0) - (b.aviso ?? 0))) / 1000))
+    const depois = s - ate
+    const vd = Math.hypot(b.arranque.vx, b.arranque.vy) * fator
+    const teto = vd > vmax ? vmax / vd : 1 // teto de velocidade no disparo
+    const x = b.x + ((b.vx ?? 0) * ate + b.arranque.vx * depois * teto) * fator
+    const y = b.y + ((b.vy ?? 0) * ate + b.arranque.vy * depois * teto) * fator
+    return { x, y, angulo: b.angulo ?? 0 }
+  }
   const vx0 = (b.vx ?? 0) * fator
   const vy0 = (b.vy ?? 0) * fator
   const ax = (b.ax ?? 0) * fator

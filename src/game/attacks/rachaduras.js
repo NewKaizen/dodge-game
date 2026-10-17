@@ -14,7 +14,8 @@ import { particulas } from '../effects/particulas.js'
 // leque para fora (para longe do centro da rachadura).
 //
 // Justiça:
-//   - todo trecho pisca pelo menos ATAQUE.telegrafoMs antes de machucar;
+//   - todo trecho racha (uma trinca fina pisca no chão) pelo menos
+//     ATAQUE.telegrafoMs antes de machucar;
 //   - os ramos saem bem espalhados (jitter pequeno no ângulo) e, antes de
 //     rachar, procura um espaço livre de LACUNA_MINIMA ao alcance do coração
 //     durante o aviso; se não achar, sorteia de novo e depois tira um ramo;
@@ -86,7 +87,8 @@ export default definirAtaque({
           trechos.forEach((s, j) => {
             const ultimo = j === trechos.length - 1
             a.depois(j * cfg.crescer, () => {
-              a.aviso({ tipo: 'linha', x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, espessura: cfg.espessura, ms: aviso }, () => {
+              // a trinca fina no chão é o aviso (sem faixa larga piscando: não é projétil)
+              a.aviso({ tipo: 'linha', x1: s.x1, y1: s.y1, x2: s.x2, y2: s.y2, espessura: cfg.espessura, ms: aviso, estilo: 'fino' }, () => {
                 if (primeira) {
                   primeira = false
                   // uma rachadura por vez: o que sobrou da anterior some sem dano

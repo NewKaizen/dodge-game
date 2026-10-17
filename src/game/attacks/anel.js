@@ -1,7 +1,10 @@
 import { definirAtaque } from './definir.js'
 
 // Anel (elipse do tamanho da caixa) que fecha em direção ao centro, com uma
-// abertura. O anel pisca parado antes de fechar.
+// abertura. O anel nasce FORA da caixa (uma elipse maior, que contém a caixa
+// inteira) e vem fechando: as balas entram pelas bordas, e essa entrada é o
+// aviso (nada pisca parado). Ao passar pelo tamanho da caixa ele já anda na
+// velocidade de antes; o tempo extra de fora substitui o pisca-pisca.
 //
 //   mirar   quanto o centro do anel se desloca do meio da caixa em direção ao
 //           coração (0 = sempre no meio, 1 = centrado no coração). Com o anel
@@ -9,6 +12,7 @@ import { definirAtaque } from './definir.js'
 //           parado. O vão é sorteado dentro da caixa (alcançável) e de lado em
 //           relação ao coração: nem em cima dele (aí bastaria ficar parado)
 //           nem do outro lado do anel (longe demais para chegar a tempo).
+//   aviso   ms mínimos entre o anel nascer e chegar ao tamanho da caixa
 export default definirAtaque({
   nome: 'anel',
   padrao: { duracao: 6000, intervalo: 2000, quantidade: 24, abertura: 1.0, tempoFechar: 1400, aviso: 600, raio: 7, forma: null, mirar: 0.35 },
@@ -39,22 +43,39 @@ export default definirAtaque({
       let vao = sortear()
       for (let tentativa = 0; tentativa < 16 && !(dentro(vao, 1) && dentro(vao, 0.5)); tentativa++) vao = sortear()
 
+      // k0: escala em que a elipse contém a caixa inteira (todas as balas nascem
+      // fora); limitada para nenhuma nascer longe demais (balas a 160 px somem)
+      const cantos = [
+        [l.left, l.top],
+        [l.right, l.top],
+        [l.left, l.bottom],
+        [l.right, l.bottom],
+      ]
+      const k0 = Math.min(1.75, Math.max(1.08, 1.04 * Math.max(...cantos.map(([x, y]) => Math.hypot((x - cx) / rx, (y - cy) / ry)))))
+      // tempo total: mais rápido que antes por dentro da caixa, mas com o
+      // trecho de fora no lugar do pisca-pisca (e pelo menos `aviso` até a caixa)
+      const total = Math.max(cfg.tempoFechar * (1 + 0.6 * (k0 - 1)), (cfg.aviso * k0) / (k0 - 1))
+      const s = total / 1000
+
       const passo = (Math.PI * 2 - cfg.abertura) / (cfg.quantidade - 1)
       for (let k = 0; k < cfg.quantidade; k++) {
         const ang = vao + cfg.abertura / 2 + k * passo
-        const x = cx + Math.cos(ang) * rx
-        const y = cy + Math.sin(ang) * ry
-        const s = cfg.tempoFechar / 1000
+        const x = cx + Math.cos(ang) * rx * k0
+        const y = cy + Math.sin(ang) * ry * k0
+        // se o limite de k0 deixou alguma bala dentro da caixa (centro muito
+        // puxado para um canto), ela fica de fora: só abre mais espaço, longe do coração
+        if (x > l.left && x < l.right && y > l.top && y < l.bottom) continue
         a.bala({
           x,
           y,
           vx: (cx - x) / s,
           vy: (cy - y) / s,
-          vida: cfg.tempoFechar * 0.88,
+          // some quando o anel chega a 12% do tamanho da caixa (como antes)
+          vida: total * ((k0 - 0.12) / k0),
           raio: cfg.raio,
           forma: cfg.forma ?? a.forma(i),
-          aviso: cfg.aviso,
           girar: 3,
+          entrando: true,
         })
       }
     })

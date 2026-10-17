@@ -1,7 +1,9 @@
 import { definirAtaque } from './definir.js'
 
-// Projéteis que vão em direção a um coração e, depois de piscar (aviso da
-// divisão), se dividem em `filhos` menores abertos em leque.
+// Projéteis que entram pelo topo (nascem logo acima da caixa: a entrada é o
+// aviso) em direção a um coração e, depois de piscar (aviso da divisão), se
+// dividem em `filhos` menores abertos em leque. O ponto de entrada e o giro do
+// leque são sorteados (com semente).
 export default definirAtaque({
   nome: 'divisores',
   padrao: { duracao: 6000, intervalo: 1100, velocidade: 110, divideEm: 900, filhos: 3, abertura: 0.55, velocidadeFilhos: 150, raio: 9, forma: null },
@@ -10,8 +12,8 @@ export default definirAtaque({
     const avisoDivisao = Math.min(400, cfg.divideEm)
 
     a.aCada(cfg.intervalo, (i) => {
-      const x = l.left + l.width * (i % 2 ? 0.25 : 0.75) + a.aleatorio(-20, 20)
-      const y = l.top + cfg.raio + 2
+      const x = l.left + l.width * a.aleatorio(0.15, 0.85)
+      const y = l.top - cfg.raio - 2
       const alvo = a.alvo()
       const dir = Math.atan2(alvo.y - y, alvo.x - x)
       const forma = cfg.forma ?? a.forma(i)
@@ -26,14 +28,16 @@ export default definirAtaque({
         raio: cfg.raio,
         forma,
         girar: 3,
+        entrando: true,
         atualizar: (mae) => {
           const t = mae.idade - mae.aviso
           if (t >= cfg.divideEm - avisoDivisao) mae.piscar = true
           if (t < cfg.divideEm || dividida || mae.morta || mae.inofensiva) return
           dividida = true
           mae.morta = true
+          const torto = a.aleatorio(-0.2, 0.2) * cfg.abertura // o leque não abre sempre igual
           for (let k = 0; k < cfg.filhos; k++) {
-            const ang = dir + (k - (cfg.filhos - 1) / 2) * cfg.abertura
+            const ang = dir + torto + (k - (cfg.filhos - 1) / 2) * cfg.abertura
             a.bala({
               x: mae.x,
               y: mae.y,

@@ -20,6 +20,15 @@ const ESCALA_BARRA = 32 / 24 // textura bala-barra: miolo de 24px numa tela de 3
 //   cor, dano
 //   aviso              ms parada, piscando e inofensiva antes de valer (padrão ATAQUE.telegrafoMs)
 //   jaAvisada          o ataque já telegrafou com a.aviso(): começa valendo
+//   entrando           a bala nasce FORA da caixa e entra voando: a entrada pela
+//                      borda é o aviso, então começa valendo (sem piscar e sem "!").
+//                      Sem `aviso`/`jaAvisada`/`entrando`, uma bala que nasce fora da
+//                      caixa com velocidade apontando para dentro já conta como
+//                      entrando (entrando: false volta ao antigo: parada fora com "!")
+//   arranque           { ms, vx, vy }: aos `ms` de idade a velocidade passa a ser (vx, vy).
+//                      Para a bala que espia na borda devagar e depois dispara (lança,
+//                      lâmina, forcado): os bots (pvp/botEsquiva.js) leem o arranque e
+//                      desviam antes, como quem vê a ponta parada na borda
 //   vida               ms até sumir depois de ativa
 //   quicar             quantas vezes rebate nas paredes da caixa
 //   atravessa          não some ao acertar um coração
@@ -47,9 +56,10 @@ export default class Balas {
     const sprite = this.scene.add.image(o.x, o.y, textura, propria ? o.quadro : undefined).setDepth(5)
     if (!propria) sprite.setTint(o.cor ?? CORES.bala)
     else if (o.cor !== undefined) sprite.setTint(o.cor)
-    const aviso = o.jaAvisada ? 0 : (o.aviso ?? ATAQUE.telegrafoMs)
+    const entrando = this.entrando(o)
+    const aviso = o.jaAvisada || entrando ? 0 : (o.aviso ?? ATAQUE.telegrafoMs)
 
-    if (!o.jaAvisada && aviso < ATAQUE.telegrafoMs) {
+    if (!o.jaAvisada && !entrando && aviso < ATAQUE.telegrafoMs) {
       avisar(`telegrafo:${o.origem}`, `[telegrafo] ${o.origem}: bala com aviso de ${aviso}ms (mínimo ${ATAQUE.telegrafoMs}ms)`)
     }
 
@@ -76,6 +86,7 @@ export default class Balas {
       atravessa: !!o.atravessa,
       quicar: o.quicar ?? 0,
       atualizar: o.atualizar,
+      arranque: o.arranque ?? null,
       aviso,
       idade: 0,
       grazeados: new Set(),
@@ -106,6 +117,28 @@ export default class Balas {
     this.lista.push(b)
     this.criadas++
     return b
+  }
+
+  // A bala é avisada pelo próprio trajeto? (nasce fora da caixa e entra voando)
+  //   entrando: true    o ataque garante (vale mesmo com velocidade só no atualizar)
+  //   entrando: false   nunca (bala de fora com `aviso` e "!" como antes)
+  //   sem a opção       automático, só se o ataque não pediu `aviso` nem `jaAvisada`:
+  //                     nasce fora e a reta da velocidade (ou da aceleração) entra na caixa
+  entrando(o) {
+    if (o.entrando === false || o.jaAvisada) return false
+    const l = this.limites
+    const fora = !Phaser.Geom.Rectangle.Contains(l, o.x, o.y)
+    if (o.entrando) {
+      if (!fora) avisar(`entrada:${o.origem}`, `[telegrafo] ${o.origem}: bala "entrando" nasceu dentro da caixa (vale na hora, sem aviso)`)
+      else if (distanciaFora(l, o.x, o.y) > MARGEM) avisar(`entrada-longe:${o.origem}`, `[telegrafo] ${o.origem}: bala "entrando" nasceu a mais de ${MARGEM}px da caixa (some na hora)`)
+      return true
+    }
+    if (o.aviso !== undefined || !fora) return false
+    const vx = o.vx || o.ax || 0
+    const vy = o.vy || o.ay || 0
+    if (!vx && !vy) return false
+    const ponto = entrada(l, o.x, o.y, vx, vy)
+    return ponto.x !== o.x || ponto.y !== o.y
   }
 
   // Se a bala nasce fora da caixa, um "!" pisca na borda por onde ela vai entrar
@@ -141,6 +174,11 @@ export default class Balas {
         if (!b.inofensiva && !b.piscar) b.sprite.setAlpha(1) // piscando: animar() cuida do alpha
       }
 
+      if (b.arranque && b.idade - b.aviso >= b.arranque.ms) {
+        b.vx = b.arranque.vx
+        b.vy = b.arranque.vy
+        b.arranque = null
+      }
       b.vx += b.ax * s
       b.vy += b.ay * s
       let vx = b.vx * this.fatorVelocidade
@@ -266,6 +304,11 @@ export default class Balas {
     }
     this.lista = []
   }
+}
+
+// Quanto (px) o ponto está fora do retângulo (0 = dentro ou na borda)
+function distanciaFora(l, x, y) {
+  return Math.max(l.left - x, x - l.right, l.top - y, y - l.bottom, 0)
 }
 
 // Ponto em que a reta (x, y) + t·(vx, vy) entra no retângulo

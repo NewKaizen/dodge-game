@@ -2,25 +2,27 @@ import { definirAtaque } from './definir.js'
 import { ATAQUE } from '../constants.js'
 import { tocar } from '../audio.js'
 
-// Forcado. Identidade: o forcado de três dentes ESTOCA de cima (e de baixo,
-// alternando) na coluna do coração, CRAVA, e a palha espirra para os lados.
+// Forcado. Identidade: o forcado de três dentes ESTOCA de cima ou de baixo
+// (sorteado) na coluna do coração, CRAVA, e a palha espirra para os lados.
 // O desvio tem dois tempos:
-//   1. os dentes piscam (até onde as pontas chegam): saia da coluna, ou fique
-//      NO VÃO entre dois dentes (o vão é seguro);
+//   1. as pontas dos dentes aparecem na borda, entrando bem de mansinho
+//      (é o aviso: nenhuma linha risca a caixa): saia da coluna, ou fique NO
+//      VÃO entre dois dentes (o vão é seguro);
 //   2. quando o forcado crava, a palha (ou terra) espirra da ponta do dente do
-//      meio para os dois lados: pule por cima/por baixo dela.
+//      meio para os dois lados, saindo devagar e ganhando força: pule por
+//      cima/por baixo dela.
 //
 //   profundidade  o dente do meio entra mais fundo (atravessa a caixa toda):
 //                 do outro lado da coluna dele não existe canto seguro.
-//   pinca         a cada `pinca` estocadas, uma pinça: um forcado de cima e um
+//   pinca         em média a cada `pinca` estocadas (sorteado; nunca a 1ª), uma pinça: um forcado de cima e um
 //                 de baixo, cada um até a metade da caixa, o segundo deslocado
 //                 meio vão (o vão de um é o dente do outro) e um pouco depois.
 //   palha         quantos fiapos de palha saem para CADA lado na cravada (0 desliga)
 //
-// Justiça: um forcado (ou uma pinça) por vez: quando o próximo chega, o que
-// sobrou do anterior vira inofensivo. Todo dente pisca `aviso` ms antes; o vão
-// entre dentes é > LACUNA_MINIMA; a palha nasce parada piscando (o aviso
-// normal das balas) antes de se espalhar.
+// Justiça: um forcado (ou uma pinça) por vez: quando o próximo estoca, o que
+// sobrou do anterior vira inofensivo. Todo dente espia na borda `aviso` ms
+// antes de estocar; o vão entre dentes é > LACUNA_MINIMA; a palha sai a 10% da
+// velocidade e só chega nela em ~0,45 s (a cravada, com tremida e som, avisa).
 //
 // Config:
 //   dentes, vao, espessura    o garfo (o vão livre é vao - espessura)
@@ -54,24 +56,36 @@ export default definirAtaque({
     const aviso = Math.max(ATAQUE.telegrafoMs, cfg.aviso)
     const turno = { vivos: [], chegou: 0 }
     a.lacuna(cfg.vao - cfg.espessura, 'vão entre os dentes do forcado')
+    // pinças: acumulador com fase sorteada (a 1ª estocada nunca é pinça)
+    const taxaPinca = cfg.pinca > 0 ? 1 / cfg.pinca : 0
+    let pincas = a.aleatorio(0, Math.max(0, 1 - taxaPinca) * 0.999)
+    let deCima = a.aleatorio(0, 1) < 0.5
+    let repetidas = 0 // o mesmo lado no máximo duas vezes seguidas
 
     a.aCada(
       cfg.intervalo,
       (i) => {
         const geracao = i + 1
-        const deCima = i % 2 === 0
-        const pinca = cfg.pinca > 0 && (i + 1) % cfg.pinca === 0
+        const troca = repetidas >= 1 || a.aleatorio(0, 1) < 0.5
+        repetidas = troca ? 0 : repetidas + 1
+        if (troca) deCima = !deCima
+        pincas += taxaPinca
+        const pinca = pincas >= 1
+        if (pinca) pincas -= 1
         const comum = { a, cfg, aviso, turno, geracao }
         if (!pinca) {
           estocar({ ...comum, deCima, centro: a.alvo().x, alcance: cfg.alcance, fundo: cfg.alcance + cfg.profundidade })
           return
         }
         // pinça: cada lado só até a metade (os dois nunca ocupam o mesmo y)
-        const xc = estocar({ ...comum, deCima: true, centro: a.alvo().x, alcance: 0.5, fundo: 0.5 })
+        const xc = estocar({ ...comum, deCima, centro: a.alvo().x, alcance: 0.5, fundo: 0.5 })
         a.depois(cfg.atrasoPinca, () => {
           const meioVao = cfg.vao / 2
-          const cabe = xc + meioVao <= centroMax(a.caixa, cfg)
-          estocar({ ...comum, deCima: false, centro: xc + (cabe ? meioVao : -meioVao), alcance: 0.5, fundo: 0.5, mesmaGeracao: true })
+          const l = a.caixa
+          // o segundo desloca meio vão para um lado sorteado (se couber)
+          let sinal = a.aleatorio(0, 1) < 0.5 ? 1 : -1
+          if (sinal > 0 ? xc + meioVao > centroMax(l, cfg) : xc - meioVao < centroMin(l, cfg)) sinal = -sinal
+          estocar({ ...comum, deCima: !deCima, centro: xc + sinal * meioVao, alcance: 0.5, fundo: 0.5, mesmaGeracao: true })
         })
       },
       Infinity,
@@ -87,6 +101,8 @@ const limitar = (v, min, max) => Math.min(Math.max(v, min), max)
 
 // Um forcado estocando na coluna `centro`. Devolve o x usado.
 //   alcance  ponta dos dentes de fora; fundo  ponta do(s) dente(s) do meio
+// O dente nasce fora da caixa com a ponta na borda, espia (entrando bem
+// devagar) por `aviso` ms, estoca, crava e volta.
 function estocar({ a, cfg, aviso, turno, geracao, deCima, centro, alcance, fundo, mesmaGeracao = false }) {
   const l = a.caixa
   const dir = deCima ? 1 : -1
@@ -103,44 +119,49 @@ function estocar({ a, cfg, aviso, turno, geracao, deCima, centro, alcance, fundo
     const comprimento = l.height * r
     const ponta = borda + dir * comprimento
     const paradaY = borda + (dir * comprimento) / 2
-    const inicioY = borda - (dir * comprimento) / 2
 
-    a.aviso({ tipo: 'linha', x1: x, y1: borda, x2: x, y2: ponta, espessura: cfg.espessura, ms: aviso }, () => {
-      if (turno.chegou > geracao) return
-      if (!mesmaGeracao || turno.chegou < geracao) {
-        // chegou: o que sobrou dos forcados anteriores não machuca mais
-        for (const v of turno.vivos) if (v.geracao < geracao && !v.bala.morta && !v.bala.inofensiva) desarmar(a, v.bala)
-      }
-      turno.chegou = geracao
-
-      let estado = 'entrando'
-      let parado = 0
-      const bala = a.bala({
-        x,
-        y: inicioY,
-        vy: dir * cfg.velocidade,
-        largura: cfg.espessura,
-        altura: comprimento,
-        forma: cfg.forma,
-        jaAvisada: true,
-        atualizar: (b, dt) => {
-          if (estado === 'entrando' && (b.y - paradaY) * dir >= 0) {
-            b.y = paradaY
-            b.vy = 0
-            estado = 'cravado'
-            if (doMeio) cravar(a, cfg, x, ponta, dir)
-          } else if (estado === 'cravado' && (parado += dt) >= cfg.parada) {
-            estado = 'voltando'
-            b.vy = -dir * cfg.velocidade * cfg.retorno
-          } else if (estado === 'voltando' && (b.y + (dir * comprimento) / 2 - borda) * dir <= 0) {
-            b.morta = true // a ponta saiu da caixa
+    const espia = 6 // px da ponta que aparecem na borda
+    let estado = 'espiando'
+    let parado = 0
+    const bala = a.bala({
+      x,
+      y: borda - (dir * comprimento) / 2 + dir * espia,
+      vy: dir * 12, // entra de mansinho enquanto espia
+      largura: cfg.espessura,
+      altura: comprimento,
+      forma: cfg.forma,
+      entrando: true,
+      arranque: { ms: aviso, vx: 0, vy: dir * cfg.velocidade }, // a estocada (os bots já leem)
+      atualizar: (b, dt) => {
+        if (estado === 'espiando') {
+          if (b.idade < aviso) return
+          // um forcado mais novo já estocou: este nem entra
+          if (turno.chegou > geracao) {
+            b.morta = true
+            return
           }
-        },
-      })
-      const { vivos } = turno
-      for (let j = vivos.length - 1; j >= 0; j--) if (vivos[j].bala.morta) vivos.splice(j, 1)
-      vivos.push({ bala, geracao })
+          if (!mesmaGeracao || turno.chegou < geracao) {
+            // estocou: o que sobrou dos forcados anteriores não machuca mais
+            for (const v of turno.vivos) if (v.geracao < geracao && !v.bala.morta && !v.bala.inofensiva) desarmar(a, v.bala)
+          }
+          turno.chegou = geracao
+          estado = 'entrando' // a velocidade da estocada vem do arranque
+        } else if (estado === 'entrando' && (b.y - paradaY) * dir >= 0) {
+          b.y = paradaY
+          b.vy = 0
+          estado = 'cravado'
+          if (doMeio) cravar(a, cfg, x, ponta, dir)
+        } else if (estado === 'cravado' && (parado += dt) >= cfg.parada) {
+          estado = 'voltando'
+          b.vy = -dir * cfg.velocidade * cfg.retorno
+        } else if (estado === 'voltando' && (b.y + (dir * comprimento) / 2 - borda) * dir <= 0) {
+          b.morta = true // a ponta saiu da caixa
+        }
+      },
     })
+    const { vivos } = turno
+    for (let j = vivos.length - 1; j >= 0; j--) if (vivos[j].bala.morta) vivos.splice(j, 1)
+    vivos.push({ bala, geracao })
   })
   return xc
 }
@@ -157,16 +178,26 @@ function cravar(a, cfg, x, ponta, dir) {
       // leque: um reto, os outros um pouco para cima e para baixo
       const abre = (k - (cfg.palha - 1) / 2) * 0.32
       const v = cfg.velocidadePalha * (1 - Math.abs(abre) * 0.4)
+      const vx0 = lado * v * Math.cos(abre)
+      const vy0 = v * Math.sin(abre)
       a.bala({
         x: x + lado * 10,
         y,
-        vx: lado * v * Math.cos(abre),
-        vy: v * Math.sin(abre),
-        ax: -lado * v * 0.25, // a palha perde força no ar
+        vx: vx0 * 0.1,
+        vy: vy0 * 0.1,
         raio: 4,
         forma: 'bola',
         cor: 0xe8c860,
         vida: 2600,
+        // sai devagar e ganha força em 0,45 s (no lugar do pisca-pisca parado);
+        // depois perde força no ar (25% por segundo)
+        jaAvisada: true,
+        atualizar: (b) => {
+          const s = b.idade / 1000
+          const g = s < 0.45 ? 0.1 + 0.9 * (s / 0.45) : Math.max(0.2, 1 - 0.25 * (s - 0.45))
+          b.vx = vx0 * g
+          b.vy = vy0 * g
+        },
       })
     }
   }

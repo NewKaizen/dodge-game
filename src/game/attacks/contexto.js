@@ -10,6 +10,13 @@ import { LACUNA_MINIMA, avisar, validarParede, validarLacuna } from './validacao
 //                                    { tipo: 'area', x, y, largura, altura }
 //                                    { tipo: 'circulo', x, y, raio }
 //                                    + ms (padrão ATAQUE.telegrafoMs)
+//                                    + estilo: 'fino'   (linha) só um traço fino, sem a faixa larga
+//                                              'pontas' (linha) só as duas pontas, na borda: o
+//                                                       "emissor" (lasers), sem riscar a caixa
+//                             Prefira não usar: projéteis que nascem fora e entram já são o aviso
+//   a.deFora(lado, fracao?, recuo?)   ponto `recuo` px FORA da borda `lado` ('top' | 'bottom' |
+//                             'left' | 'right'), a `fracao` (0..1, padrão sorteada) ao longo dela,
+//                             mais a direção para dentro: { x, y, dx, dy }. Para balas que entram.
 //   a.parede({ eixo, lacunas | ocupados })   valida a rota de fuga de uma parede
 //   a.lacuna(px, descricao)   valida uma abertura isolada
 //   a.aCada(ms, fn, vezes?, atraso?)   repete fn(i) a cada ms (i = 0, 1, 2...); atraso = ms até o 1º
@@ -68,7 +75,22 @@ export default class ContextoAtaque {
     const cor = forma.cor ?? CORES.aviso
     g.fillStyle(cor, 0.22)
     g.lineStyle(2, cor, 0.9)
-    if (forma.tipo === 'linha') {
+    if (forma.tipo === 'linha' && forma.estilo === 'pontas') {
+      // só os "emissores" nas duas pontas: um toco curto na direção da linha
+      const e = Math.max(4, forma.espessura ?? 2)
+      const dx = forma.x2 - forma.x1
+      const dy = forma.y2 - forma.y1
+      const d = Math.hypot(dx, dy) || 1
+      const toco = Math.min(10, d / 4)
+      const ux = (dx / d) * toco
+      const uy = (dy / d) * toco
+      g.lineStyle(e, cor, 0.85)
+      g.lineBetween(forma.x1, forma.y1, forma.x1 + ux, forma.y1 + uy)
+      g.lineBetween(forma.x2, forma.y2, forma.x2 - ux, forma.y2 - uy)
+    } else if (forma.tipo === 'linha' && forma.estilo === 'fino') {
+      g.lineStyle(2, cor, 0.7)
+      g.lineBetween(forma.x1, forma.y1, forma.x2, forma.y2)
+    } else if (forma.tipo === 'linha') {
       const e = forma.espessura ?? 2
       g.lineStyle(Math.max(2, e * 0.35), cor, 0.9)
       g.lineBetween(forma.x1, forma.y1, forma.x2, forma.y2)
@@ -91,6 +113,17 @@ export default class ContextoAtaque {
       depois?.()
     })
     return g
+  }
+
+  // Ponto logo fora da borda `lado` (para uma bala nascer fora e entrar)
+  deFora(lado, fracao = this.aleatorio(0.1, 0.9), recuo = 12) {
+    const l = this.caixa
+    const x = l.left + fracao * l.width
+    const y = l.top + fracao * l.height
+    if (lado === 'top') return { x, y: l.top - recuo, dx: 0, dy: 1 }
+    if (lado === 'bottom') return { x, y: l.bottom + recuo, dx: 0, dy: -1 }
+    if (lado === 'left') return { x: l.left - recuo, y, dx: 1, dy: 0 }
+    return { x: l.right + recuo, y, dx: -1, dy: 0 }
   }
 
   parede({ eixo, lacunas, ocupados }) {
