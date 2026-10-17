@@ -7,7 +7,7 @@ export default {
   principal: { espadas: 'anel', ouros: 'carrossel', paus: 'emprestimo' },
   leve: (A) => A.anel({ duracao: 4000, intervalo: 2800, quantidade: 16, abertura: 1.4, tempoFechar: 1700 }),
   receitas: {
-    estrela: r('Estrelas cadentes miradas no coração que deixam um rastro de brilhos parado no ar', (A, t) =>
+    estrela: r('Estrelas cadentes entram por cima miradas no coração e deixam um rastro de brilhos parado no ar', (A, t) =>
       A.ralseiEstrelaGentil({ duracao: duracaoDe(t), intervalo: lerp(1250, 800, t), velocidade: lerp(150, 200, t), rastro: lerp(450, 650, t), porVez: t >= 0.7 ? 2 : 1 }),
     ),
     coro: r('Um coro de estrelinhas canta em onda, vai e volta, cada uma soltando estrelas miradas; no fim da volta, o coro inteiro canta junto', (A, t) =>
@@ -17,16 +17,16 @@ export default {
       apertar(A, t, A.ralseiCancaoNinar({ duracao: duracaoDe(t), velocidade: lerp(95, 125, t), espaco: lerp(72, 64, t), vozes: t >= 0.4 ? 2 : 1 })),
     ),
     sono: r('Numa caixa apertada, trios de "Z" brotam do chão e sobem em zigue-zague, crescendo', (A, t) =>
-      apertar(A, t, A.ralseiFeiticoSono({ duracao: duracaoDe(t), intervalo: lerp(1000, 720, t), velocidade: lerp(55, 80, t) })),
+      apertar(A, t, A.ralseiFeiticoSono({ duracao: duracaoDe(t), intervalo: lerp(1080, 800, t), velocidade: lerp(55, 80, t) })),
     ),
-    bolinho: r('Cupcakes no chão: a vela queima e eles estouram num chafariz de granulado, com a cereja voando no coração', (A, t) =>
+    bolinho: r('Cupcakes deslizam para as paredes da caixa (chão, teto ou lados): a vela queima e eles estouram num chafariz de granulado, com a cereja voando no coração', (A, t) =>
       A.ralseiBolinho({ duracao: duracaoDe(t), intervalo: lerp(1800, 1200, t), granulos: t >= 0.6 ? 10 : 8, velocidade: lerp(170, 210, t) }),
     ),
     fios: r('Novelos de lã rolam quicando e desenrolam um fio preso na parede', (A, t) =>
       A.ralseiFiosLa({ duracao: duracaoDe(t), intervalo: lerp(2100, 1500, t), velocidade: lerp(115, 150, t), quiques: t >= 0.6 ? 3 : 2, comprimento: lerp(80, 120, t) }),
     ),
-    laco: r('Uma fita dá um laço em volta do coração e se aperta: fuja pelo vão antes que feche; o lacinho fica no chão', (A, t) =>
-      A.ralseiLacoFita({ duracao: duracaoDe(t), intervalo: lerp(2600, 2000, t), raio: lerp(54, 62, t), tempoApertar: lerp(1500, 1200, t) }),
+    laco: r('O lacinho voa até você e a fita se enrola em volta do coração e se aperta: fuja pelo vão antes que feche; o lacinho estoura em faíscas e fica no chão', (A, t) =>
+      A.ralseiLacoFita({ duracao: duracaoDe(t), intervalo: lerp(2100, 1600, t), raio: lerp(52, 58, t), vao: lerp(64, 58, t), aviso: lerp(480, 420, t), tempoApertar: lerp(1200, 950, t), aperto: 0.92, faiscas: t >= 0.5 ? 5 : 4, velocidadeFaisca: lerp(110, 140, t) }),
     ),
     emprestimo: r('Estrelas presas numa fitinha, como ioiô, vão até onde você estava, fazem uma reverência (soltando faíscas de juros) e voltam pelo mesmo caminho', (A, t) =>
       A.ralseiEmprestimo({ duracao: duracaoDe(t), intervalo: lerp(1500, 1100, t), porVez: t >= 0.45 ? 2 : 1, velocidade: lerp(170, 220, t), parada: lerp(420, 320, t), juros: t >= 0.4 ? 4 : 0 }),
