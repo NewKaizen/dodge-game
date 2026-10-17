@@ -22,8 +22,12 @@ import { particulas } from '../../effects/particulas.js'
 //   asrielChuvaMeteoros   meteoros caem nos pontos marcados: cratera em brasa + lascas
 //   asrielSupernova       estrelas incham, colapsam e explodem numa área, soltando nebulosas
 //
-// Justiça: tudo que fere pisca >= ATAQUE.telegrafoMs (a.bala) ou vem depois de
-// um a.aviso; paredes declaram a rota de fuga (a.parede / a.lacuna).
+// Justiça: projéteis nascem FORA da caixa e entram (jaAvisada: a entrada é o
+// aviso, sem ficar parado piscando) ou saem de algo já à vista (a espada, o
+// raio, a estrela que estoura); golpes de área (corte, colunas, crateras,
+// supernova) e linhas de tiro ainda vêm depois de um a.aviso. Paredes declaram
+// a rota de fuga (a.parede / a.lacuna). Lados, ordens, tempos e quais golpes
+// miram são sorteados com a semente: nada de padrão para decorar.
 
 const TAU = Math.PI * 2
 const S = (nome) => `hab-asriel-${nome}`
@@ -59,32 +63,47 @@ function recortarReta(l, p, d) {
   return [t0, t1]
 }
 
-// acumulador: `mirar` (0..1) vira um ritmo fixo de golpes mirados no coração
-function mirador(mirar) {
-  let acc = 0.5
+// acumulador: `mirar` (0..1) vira a fração de golpes mirados no coração. Os
+// passos são sorteados (com a semente), então o ritmo dos mirados muda a cada
+// partida, mas a fração média e a falta de sequências longas sem mira ficam.
+function mirador(a, mirar) {
+  let acc = a.aleatorio(0, 1)
   return () => {
-    acc += Number(mirar) || 0
+    acc += (Number(mirar) || 0) * a.aleatorio(0.5, 1.5)
     if (acc < 1) return false
     acc -= 1
     return true
   }
 }
 
+// a.depois repetido com o intervalo variando um pouco (±variacao): como
+// a.aCada, mas sem ritmo fixo
+function aCadaSorteado(a, ms, fn, atraso = null, variacao = 0.15) {
+  let i = 0
+  const proximo = () => (ms / a.ritmo.densidade) * a.aleatorio(1 - variacao, 1 + variacao)
+  const disparar = () => {
+    fn(i++)
+    a.depois(proximo(), disparar)
+  }
+  a.depois(atraso ?? proximo(), disparar)
+}
+
 // ---------------------------------------------------------------------------
-// ♠ Star Blazing: estrelas grandes caem na diagonal (o sentido muda a cada 4)
-// e, na altura marcada, piscam e estouram em 5 estrelinhas, uma por ponta.
-// As miradas estouram logo acima do coração.
+// ♠ Star Blazing: estrelas grandes entram de fora pelo alto, na diagonal (o
+// sentido e a inclinação são sorteados), e, na altura marcada, piscam e
+// estouram em 5 estrelinhas, uma por ponta. As miradas estouram logo acima
+// do coração.
 const asrielStarBlazing = definirAtaque({
   nome: 'asrielStarBlazing',
   padrao: { duracao: 5000, intervalo: 700, velocidade: 110, velocidadeFilhos: 110, mirar: 0.5, raio: 9 },
   iniciar(a, cfg) {
-    const mirada = mirador(cfg.mirar)
+    const mirada = mirador(a, cfg.mirar)
     // no estouro, as estrelinhas saem a 72° uma da outra: a 55 px do centro já ficam a > 60 px
     a.lacuna(2 * 55 * Math.sin(Math.PI / 5) - 9, 'vão entre as estrelinhas do estouro')
-    a.aCada(cfg.intervalo, (i) => {
+    aCadaSorteado(a, cfg.intervalo, (i) => {
       const l = a.caixa
-      const lado = Math.floor(i / 4) % 2 ? -1 : 1
-      const ang = Math.PI / 2 - lado * 0.45
+      const lado = a.escolher([1, -1])
+      const ang = Math.PI / 2 - lado * a.aleatorio(0.3, 0.6)
       let bx
       let by
       if (mirada()) {
@@ -109,6 +128,7 @@ const asrielStarBlazing = definirAtaque({
         tamanho: 25,
         girar: 1.4 * lado,
         pulso: 0.05,
+        jaAvisada: true, // nasce fora, acima da caixa: a entrada é o aviso
         vida: 6000,
         atualizar: (m) => {
           if (estourou || m.morta || m.inofensiva) return
@@ -146,10 +166,11 @@ const asrielStarBlazing = definirAtaque({
 // ---------------------------------------------------------------------------
 // ♠ Chaos Saber: a espada do caos aparece encostada numa borda, a metade da
 // caixa onde o coração está pisca, e a espada corta essa metade num arco de
-// 90° (o cabo fica fixo no meio da borda). Os cortes alternam entre dividir
-// a caixa na vertical (esquerda/direita) e na horizontal (cima/baixo). Com
-// `duplo`, a cada 3 cortes vem um segundo na outra metade, colado (um X).
-// A espada solta `faiscas` na linha do meio, que andam para a metade segura.
+// 90° (o cabo fica fixo no meio da borda). Cada corte sorteia se divide a
+// caixa na vertical (esquerda/direita) ou na horizontal (cima/baixo), sem
+// repetir mais de duas vezes seguidas. Com `duplo`, ~1 corte em 3 (sorteado)
+// ganha um segundo na outra metade, colado (um X). A espada solta `faiscas`
+// na linha do meio, que saem dela devagar e aceleram para a metade segura.
 const OPOSTA = { esquerda: 'direita', direita: 'esquerda', cima: 'baixo', baixo: 'cima' }
 
 const asrielChaosSaber = definirAtaque({
@@ -157,19 +178,20 @@ const asrielChaosSaber = definirAtaque({
   padrao: { duracao: 6000, aviso: 600, golpe: 400, pausa: 400, duplo: false, faiscas: 2, velocidadeFaisca: 95, espessura: 14 },
   iniciar(a, cfg) {
     const aviso = Math.max(ATAQUE.telegrafoMs, cfg.aviso)
-    let k = 0
+    let ultimos = []
 
     const proximo = () => {
       if (!cabe(a, aviso + cfg.golpe)) return
       const l = a.caixa
       const alvo = a.alvo()
-      const vertical = k % 2 === 0
+      const repetiu = ultimos.length === 2 && ultimos[0] === ultimos[1]
+      const vertical = repetiu ? !ultimos[1] : a.escolher([true, false])
+      ultimos = [...ultimos, vertical].slice(-2)
       const metade = vertical ? (alvo.x < l.centerX ? 'esquerda' : 'direita') : alvo.y < l.centerY ? 'cima' : 'baixo'
-      const duplo = cfg.duplo && k % 3 === 2
-      k++
+      const duplo = cfg.duplo && a.aleatorio(0, 1) < 1 / 3
       golpear(metade, () => {
         if (duplo && cabe(a, aviso + cfg.golpe)) golpear(OPOSTA[metade], () => a.depois(cfg.pausa, proximo))
-        else a.depois(cfg.pausa, proximo)
+        else a.depois(cfg.pausa * a.aleatorio(0.8, 1.25), proximo)
       })
     }
 
@@ -286,26 +308,37 @@ function faiscas(a, cfg, g, l, vertical) {
     const desvio = a.aleatorio(-0.4, 0.4)
     const vx = nrm.x * Math.cos(desvio) - nrm.y * Math.sin(desvio)
     const vy = nrm.x * Math.sin(desvio) + nrm.y * Math.cos(desvio)
-    a.bala({
+    // saem da espada (à vista) devagar e aceleram até velocidadeFaisca, sem piscar paradas
+    const v0 = cfg.velocidadeFaisca * 0.3
+    const b = a.bala({
       x: g.p.x + d.x * s,
       y: g.p.y + d.y * s,
-      vx: vx * cfg.velocidadeFaisca,
-      vy: vy * cfg.velocidadeFaisca,
+      vx: vx * v0,
+      vy: vy * v0,
+      ax: vx * cfg.velocidadeFaisca * 1.4,
+      ay: vy * cfg.velocidadeFaisca * 1.4,
       raio: 4.5,
       textura: S('estrelinhas'),
-      quadro: k % 6,
+      quadro: a.inteiro(0, 5),
       tamanho: 11,
       girar: 6,
+      jaAvisada: true,
       vida: 3200,
+      atualizar: (f) => {
+        if (Math.hypot(f.vx, f.vy) < cfg.velocidadeFaisca) return
+        f.ax = f.ay = 0
+      },
     })
+    b.sprite.setAlpha(1)
   }
 }
 
 // ---------------------------------------------------------------------------
 // ♠ Chaos Buster: dois canhões (um em cada metade da caixa) mudam de lugar
-// pela borda, seguem o coração com o cano, TRAVAM a mira (a linha pisca) e
-// disparam uma rajada de plasma nessa linha. A cada `carregado` rajadas de um
-// canhão, ele carrega e solta um feixe grosso na linha travada.
+// pela borda (topo ou lado, sorteado), seguem o coração com o cano, TRAVAM a
+// mira (a linha pisca) e disparam uma rajada de plasma nessa linha. Mais ou
+// menos 1 vez em `carregado` (sorteado, nunca duas seguidas), o canhão
+// carrega e solta um feixe grosso na linha travada.
 const asrielChaosBuster = definirAtaque({
   nome: 'asrielChaosBuster',
   padrao: { duracao: 6000, ciclo: 1700, rajada: 3, velocidade: 190, aviso: 480, mira: 420, carregado: 3, feixe: 420 },
@@ -314,7 +347,7 @@ const asrielChaosBuster = definirAtaque({
     const canhoes = [0, 1].map((lado) => {
       const l = a.caixa
       const img = a.decoracao(a.cena.add.image(lado ? l.right - 20 : l.left + 20, l.top + 9, S('canhao')).setDepth(6).setAlpha(0))
-      return { lado, img, ang: Math.PI / 2, rastrear: true, volta: 0 }
+      return { lado, img, ang: Math.PI / 2, rastrear: true, volta: 0, carregou: false }
     })
     a.aoAtualizar((dt) => {
       for (const c of canhoes) {
@@ -330,7 +363,7 @@ const asrielChaosBuster = definirAtaque({
 
     const posicao = (c) => {
       const l = a.caixa
-      const noTopo = c.volta % 2 === 0
+      const noTopo = a.escolher([true, false])
       if (noTopo) return { x: c.lado ? a.aleatorio(l.centerX + 18, l.right - 20) : a.aleatorio(l.left + 20, l.centerX - 18), y: l.top + 9 }
       return { x: c.lado ? l.right - 9 : l.left + 9, y: a.aleatorio(l.top + 22, l.centerY + 15) }
     }
@@ -340,7 +373,8 @@ const asrielChaosBuster = definirAtaque({
       const p = posicao(c)
       c.rastrear = true
       a.cena.tweens.add({ targets: c.img, x: p.x, y: p.y, alpha: 1, duration: 280, ease: 'Sine.easeInOut' })
-      const carregado = cfg.carregado > 0 && c.volta % cfg.carregado === cfg.carregado - 1
+      const carregado = cfg.carregado > 0 && !c.carregou && c.volta > 0 && a.aleatorio(0, 1) < 1 / cfg.carregado
+      c.carregou = carregado
       c.volta++
       a.depois(280 + cfg.mira, () => {
         c.rastrear = false
@@ -365,7 +399,7 @@ const asrielChaosBuster = definirAtaque({
     }
 
     a.depois(0, () => volta(canhoes[0]))
-    a.depois(cfg.ciclo / 2, () => volta(canhoes[1]))
+    a.depois(cfg.ciclo * a.aleatorio(0.35, 0.65), () => volta(canhoes[1]))
   },
 })
 
@@ -407,14 +441,17 @@ function feixe(a, cfg, boca, ang, l) {
 
 // ---------------------------------------------------------------------------
 // ♠ Hyper Goner: a caveira de bode abre a boca no alto da caixa e SUGA:
-// losangos arco-íris piscam nas bordas e vão em linha reta para a boca,
-// acelerando (a sucção). Uma fração nasce na borda certa para a linha até a
-// boca passar pelo coração. Encostar na boca (o vórtice) também fere.
+// losangos arco-íris entram de fora da caixa, por todas as bordas, e vão em
+// linha reta para a boca, acelerando (a sucção). Uma fração nasce no ponto da
+// borda em que a linha até a boca passa pelo coração. Encostar na boca (o
+// vórtice) também fere. `fatorDano` deixa cada losango (e a boca) mais fraco
+// que o dano da carta: são muitos.
 const asrielHyperGoner = definirAtaque({
   nome: 'asrielHyperGoner',
-  padrao: { duracao: 6000, intervalo: 420, porVez: 2, velocidade: 65, aceleracao: 110, mirar: 0.5 },
+  padrao: { duracao: 6000, intervalo: 420, porVez: 2, velocidade: 65, aceleracao: 110, mirar: 0.5, fatorDano: 1, fora: 10 },
   iniciar(a, cfg) {
     const l = a.caixa
+    const dano = Math.max(1, Math.round(a.dano * cfg.fatorDano))
     const cx = l.centerX
     const caveira = a.decoracao(a.cena.add.image(cx, l.top + 24, S('caveira'), 0).setDepth(3).setAlpha(0))
     a.cena.tweens.add({ targets: caveira, alpha: 1, duration: 300 })
@@ -433,7 +470,7 @@ const asrielHyperGoner = definirAtaque({
     })
     a.depois(0, () => caveira.setFrame(1))
     a.aviso({ tipo: 'circulo', x: boca.x, y: boca.y, raio: 14, ms: 500 }, () => {
-      const b = a.bala({ x: boca.x, y: boca.y, raio: 11, jaAvisada: true, atravessa: true, vida: cfg.duracao + 3000 })
+      const b = a.bala({ x: boca.x, y: boca.y, raio: 11, dano, jaAvisada: true, atravessa: true, vida: cfg.duracao + 3000 })
       b.sprite.setVisible(false)
     })
     // a caveira "ruge": fecha e abre a boca de tempos em tempos (só visual)
@@ -443,7 +480,7 @@ const asrielHyperGoner = definirAtaque({
       a.depois(160, () => caveira.setFrame(1))
     })
 
-    const m = 6
+    const m = -cfg.fora // negativo: o ponto fica fora da caixa
     const pontoBorda = () => {
       const lados = [
         ['esq', l.height - 12],
@@ -471,11 +508,13 @@ const asrielHyperGoner = definirAtaque({
       const [, t1] = recortarReta({ left: l.left + m, right: l.right - m, top: l.top + m, bottom: l.bottom - m }, boca, d)
       const p = { x: boca.x + d.x * t1, y: boca.y + d.y * t1 }
       if (Math.abs(p.x - cx) < 40 && p.y < l.top + 12) return null // atrás da caveira
-      return { ...p, perto: Math.hypot(p.x - alvo.x, p.y - alvo.y) < 30 }
+      // coração colado na borda de onde viria: sem tempo de reagir à entrada, sorteia outra borda
+      if (Math.hypot(p.x - alvo.x, p.y - alvo.y) < 36) return null
+      return p
     }
 
-    const mirada = mirador(cfg.mirar)
-    a.aCada(cfg.intervalo, (i) => {
+    const mirada = mirador(a, cfg.mirar)
+    aCadaSorteado(a, cfg.intervalo, () => {
       for (let k = 0; k < cfg.porVez; k++) {
         const p = (k === 0 && mirada() && pontoMirado()) || pontoBorda()
         const dx = boca.x - p.x
@@ -490,12 +529,12 @@ const asrielHyperGoner = definirAtaque({
           ax: d.x * cfg.aceleracao,
           ay: d.y * cfg.aceleracao,
           raio: 4.5,
+          dano,
           textura: S('diamantes'),
-          quadro: (i * cfg.porVez + k) % 6,
+          quadro: a.inteiro(0, 5),
           tamanho: 14,
           pulso: 0.1,
-          // nasceu colado no coração: pisca mais um pouco
-          aviso: p.perto ? ATAQUE.telegrafoMs + 250 : ATAQUE.telegrafoMs,
+          jaAvisada: true, // vem de fora: a entrada é o aviso
           vida: 5000,
           atualizar: (bala) => {
             if (Math.hypot(bala.x - boca.x, bala.y - boca.y) < 10 || (bala.x - boca.x) * d.x + (bala.y - boca.y) * d.y > 0) bala.morta = true
@@ -509,9 +548,10 @@ const asrielHyperGoner = definirAtaque({
 
 // ---------------------------------------------------------------------------
 // ♦ Shocker Breaker: relâmpagos caem em colunas que piscam antes (a primeira
-// no coração). A cada `cadeia` golpes, uma corrente: 3 colunas seguidas,
-// uma depois da outra, varrendo a caixa a partir do coração. Cada raio solta
-// faíscas que correm pelo chão para os dois lados.
+// no coração). Mais ou menos 1 golpe em `cadeia` (sorteado, nunca dois
+// seguidos) é uma corrente: 3 colunas seguidas, uma depois da outra, varrendo
+// a caixa a partir do coração. Cada raio solta faíscas que correm pelo chão
+// para os dois lados.
 const asrielShockerBreaker = definirAtaque({
   nome: 'asrielShockerBreaker',
   padrao: { duracao: 5000, intervalo: 1200, quantidade: 1, largura: 22, aviso: 600, raio: 260, faiscas: true, velocidadeFaisca: 100, cadeia: 3 },
@@ -572,15 +612,19 @@ const asrielShockerBreaker = definirAtaque({
       return Math.max(maior, l.right - cursor)
     }
 
-    a.aCada(cfg.intervalo, (i) => {
+    let correnteAntes = true // a primeira nunca é corrente
+    a.aCada(cfg.intervalo, () => {
       if (!cabe(a, aviso)) return
       const l = a.caixa
       const alvo = a.alvo()
       const presa = (x) => limitar(x, l.left + meia, l.right - meia)
-      if (cfg.cadeia && i % cfg.cadeia === cfg.cadeia - 1) {
+      const corrente = cfg.cadeia > 0 && !correnteAntes && a.aleatorio(0, 1) < 1 / cfg.cadeia
+      correnteAntes = corrente
+      if (corrente) {
         // corrente: começa no coração e vai para o lado com mais espaço; numa
         // caixa apertada a 3ª coluna sai se ela não deixar uma rota de fuga
-        const sentido = alvo.x < l.centerX ? 1 : -1
+        // vai para o lado com mais espaço (com folga no meio: aí é sorteado)
+        const sentido = Math.abs(alvo.x - l.centerX) < 20 ? a.escolher([1, -1]) : alvo.x < l.centerX ? 1 : -1
         const xs = [0, 1, 2].map((k) => presa(alvo.x + sentido * k * 48))
         while (xs.length > 1 && maiorLacuna(xs) < a.lacunaMinima) xs.pop()
         a.parede({ eixo: 'x', ocupados: xs.map(faixa) })
@@ -599,8 +643,9 @@ const asrielShockerBreaker = definirAtaque({
 })
 
 // ---------------------------------------------------------------------------
-// ♦ Tempo Parado: estrelas entram pelas bordas mirando o coração. A cada
-// `fluxo` ms o tempo PARA: o relógio aparece, a caixa fica azulada, toda
+// ♦ Tempo Parado: estrelas entram de fora da caixa, pelas bordas, mirando o
+// coração. A cada ~`fluxo` ms (varia um pouco) o tempo PARA: o relógio
+// aparece, a caixa fica azulada, toda
 // estrela congela no ar (cinza) e ponteiros de relógio aparecem em volta do
 // coração (piscando, apontados para onde ele estava, com uma brecha de 90°).
 // O coração ainda anda: é a hora de sair do cerco. Nos últimos
@@ -626,10 +671,10 @@ const asrielTempoParado = definirAtaque({
       pequeno.rotation += (dt / 1000) * 0.5 * fator(a)
     })
 
-    a.aCada(cfg.intervalo, (i) => {
+    aCadaSorteado(a, cfg.intervalo, () => {
       if (estado.parado) return
       const borda = a.inteiro(0, 3)
-      const m = 7
+      const m = -10 // negativo: nasce fora da caixa e entra
       const x = borda === 1 ? l.right - m : borda === 3 ? l.left + m : a.aleatorio(l.left + m, l.right - m)
       const y = borda === 0 ? l.top + m : borda === 2 ? l.bottom - m : a.aleatorio(l.top + m, l.bottom - m)
       const alvo = a.alvo()
@@ -642,9 +687,10 @@ const asrielTempoParado = definirAtaque({
           vy: Math.sin(ang) * cfg.velocidade,
           raio: 5,
           textura: S('estrelinhas'),
-          quadro: i % 6,
+          quadro: a.inteiro(0, 5),
           tamanho: 13,
           girar: 4,
+          jaAvisada: true,
           vida: 4500,
         }),
       )
@@ -717,10 +763,10 @@ const asrielTempoParado = definirAtaque({
         b.sprite.clearTint()
         if (!b.inofensiva) b.sprite.setAlpha(1)
       }
-      a.depois(cfg.fluxo, parar)
+      a.depois(cfg.fluxo * a.aleatorio(0.8, 1.2), parar)
     }
 
-    a.depois(cfg.fluxo, parar)
+    a.depois(cfg.fluxo * a.aleatorio(0.8, 1.2), parar)
   },
 })
 
@@ -734,9 +780,9 @@ const asrielEstrelaCadente = definirAtaque({
   padrao: { duracao: 5000, intervalo: 1100, aviso: 600, velocidade: 250, espaco: 58, raioPoeira: 3.5, vidaPoeira: 2000, mirar: 0.6 },
   iniciar(a, cfg) {
     const aviso = Math.max(ATAQUE.telegrafoMs, cfg.aviso)
-    const mirada = mirador(cfg.mirar)
+    const mirada = mirador(a, cfg.mirar)
     a.lacuna(cfg.espaco - 2 * cfg.raioPoeira, 'vão entre a poeira do rastro')
-    a.aCada(cfg.intervalo, () => {
+    aCadaSorteado(a, cfg.intervalo, () => {
       if (!cabe(a, aviso)) return
       const l = a.caixa
       const q = mirada() ? a.alvo() : { x: a.aleatorio(l.left + 25, l.right - 25), y: a.aleatorio(l.top + 25, l.bottom - 25) }
@@ -809,7 +855,7 @@ const asrielChuvaMeteoros = definirAtaque({
   padrao: { duracao: 5500, intervalo: 900, queda: 850, raioImpacto: 20, lascas: 3, velocidadeLasca: 120, gravidade: 280, cratera: 1600, mirar: 0.5 },
   iniciar(a, cfg) {
     const queda = Math.max(ATAQUE.telegrafoMs, cfg.queda)
-    const mirada = mirador(cfg.mirar)
+    const mirada = mirador(a, cfg.mirar)
     const caindo = []
     a.aoAtualizar((dt) => {
       for (const m of caindo) {
@@ -821,7 +867,7 @@ const asrielChuvaMeteoros = definirAtaque({
       }
     })
 
-    a.aCada(cfg.intervalo, (i) => {
+    aCadaSorteado(a, cfg.intervalo, (i) => {
       if (!cabe(a, queda)) return
       const l = a.caixa
       const margem = 18
@@ -832,8 +878,8 @@ const asrielChuvaMeteoros = definirAtaque({
       } else {
         p = a.pontoLonge(45, margem)
       }
-      const sentido = Math.floor(i / 5) % 2 ? -1 : 1
-      const ang = Math.PI / 2 - sentido * 0.6
+      const sentido = a.escolher([1, -1])
+      const ang = Math.PI / 2 - sentido * a.aleatorio(0.45, 0.75)
       const de = { x: p.x - Math.cos(ang) * 130, y: p.y - Math.sin(ang) * 130 }
       const img = a.decoracao(a.cena.add.image(de.x, de.y, S('meteoro'), 0).setDepth(6).setRotation(ang).setScale(0.7))
       const m = { img, de, p, relogio: 0, feito: false }
@@ -899,12 +945,12 @@ const asrielSupernova = definirAtaque({
   padrao: { duracao: 6000, intervalo: 1900, crescer: 1450, raioEstrela: 16, raioExplosao: 50, nebulosas: 5, velocidadeNebulosa: 36, vidaNebulosa: 2200, mirar: 0.6 },
   iniciar(a, cfg) {
     const crescer = Math.max(ATAQUE.telegrafoMs + 400, cfg.crescer)
-    const mirada = mirador(cfg.mirar)
+    const mirada = mirador(a, cfg.mirar)
     const estrelas = []
     // relógio próprio de cada estrela (para junto com os timers no respiro)
     a.aoAtualizar((dt) => estrelas.forEach((e) => (e.relogio += dt)))
 
-    a.aCada(cfg.intervalo, (i) => {
+    aCadaSorteado(a, cfg.intervalo, (i) => {
       if (!cabe(a, crescer)) return
       const l = a.caixa
       const R = cfg.raioExplosao

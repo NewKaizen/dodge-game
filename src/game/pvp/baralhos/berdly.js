@@ -7,13 +7,13 @@ export default {
   principal: { espadas: 'mira', ouros: 'estocadas', paus: 'ondas' },
   leve: (A) => A.aimed({ duracao: 4000, intervalo: 1600, velocidade: 110, rajada: 2 }),
   receitas: {
-    bicada: r('Um bico entra pela borda e bica o coração três vezes seguidas, mirando de novo a cada bicada', (A, t) =>
+    bicada: r('Um bico entra de fora da caixa, por uma borda sorteada, e bica o coração três vezes seguidas, mirando de novo a cada bicada', (A, t) =>
       A.berdlyBicada({ duracao: duracaoDe(t), intervalo: lerp(1900, 1400, t), cadencia: lerp(520, 420, t), velocidade: lerp(260, 360, t) })),
-    penas: r('Um bater de asas solta um leque de penas que vêm flutuando até o coração', (A, t) =>
+    penas: r('Um bater de asas fora da caixa solta um leque de penas que entram flutuando até o coração', (A, t) =>
       A.berdlyPenas({ duracao: duracaoDe(t), intervalo: lerp(1250, 850, t), quantidade: t >= 0.6 ? 5 : 4, abertura: t >= 0.6 ? 0.3 : 0.34, velocidade: lerp(110, 150, t) })),
-    mergulho: r('Mergulhos em diagonal do alto que passam pelo coração e arremetem no chão, num V', (A, t) =>
+    mergulho: r('Mergulhos em diagonal que entram pelo alto, de um lado sorteado, passam pelo coração e arremetem no chão, num V', (A, t) =>
       A.berdlyMergulho({ duracao: duracaoDe(t), intervalo: lerp(1450, 1000, t), velocidade: lerp(300, 400, t) })),
-    correcao: r('A caneta vermelha marca um X em cima do coração, numa caixa apertada; a tinta demora a secar', (A, t) =>
+    correcao: r('A caneta vermelha entra pela borda e risca um X em cima do coração, numa caixa apertada; a tinta demora a secar', (A, t) =>
       apertar(A, t, A.berdlyCorrecao({ duracao: duracaoDe(t), intervalo: lerp(1500, 1050, t), tamanho: lerp(30, 40, t), tinta: lerp(900, 1300, t) }))),
     rajadaVento: r('Lufadas de vento atravessam a faixa do coração, numa caixa apertada', (A, t) =>
       apertar(A, t, A.berdlyRajada({ duracao: duracaoDe(t), intervalo: lerp(1250, 850, t), riscos: t >= 0.6 ? 6 : 5, velocidade: lerp(260, 340, t), eco: t >= 0.6 }))),
@@ -21,11 +21,11 @@ export default {
       apertar(A, t, A.berdlyCalculo({ duracao: duracaoDe(t), intervalo: lerp(1450, 1000, t), tiros: t >= 0.6 ? 3 : 2, velocidade: lerp(150, 200, t) }))),
     tornado: r('Um funil de vento atravessa a caixa apertada atrás do coração, cuspindo papel e lápis', (A, t) =>
       apertar(A, t, A.berdlyTornado({ duracao: duracaoDe(t), intervalo: lerp(2300, 1700, t), velocidade: lerp(70, 100, t), deriva: lerp(22, 38, t), detritos: lerp(520, 380, t) }))),
-    qi: r('O gráfico do QI sobe em colunas, do chão e depois do teto, numa caixa apertada', (A, t) =>
+    qi: r('O gráfico do QI sobe em colunas, do chão ou do teto, numa caixa apertada', (A, t) =>
       apertar(A, t, A.berdlyQI({ duracao: duracaoDe(t), intervalo: lerp(1900, 1500, t) }))),
-    vendaval: r('A ventania carrega livros, folhas, lápis e óculos pela caixa apertada e vira de lado no meio', (A, t) =>
+    vendaval: r('A ventania carrega livros, folhas, lápis e óculos pela caixa apertada e vira de lado perto do meio', (A, t) =>
       A.comCaixa(caixaApertada(t * 0.5), A.berdlyVendaval({ duracao: duracaoDe(t), intervalo: lerp(380, 260, t), velocidade: lerp(150, 185, t) }))),
-    penaArmada: r('Penas-dardo cravadas em volta do coração, apontando para ele, disparam depois de armadas', (A, t) =>
+    penaArmada: r('Penas-dardo voam de fora e se cravam em volta do coração; armadas, giram atrás dele, recuam e disparam', (A, t) =>
       A.berdlyPenaArmada({ duracao: duracaoDe(t), intervalo: lerp(1500, 1050, t), quantidade: t >= 0.6 ? 3 : 2, armar: lerp(1200, 950, t), velocidade: lerp(240, 320, t) })),
     corrente: r('Paredes de vento vindo da esquerda', (A, t) => P.ondas(A, t, { direcao: 'direita' })),
     ciclone: r('O olho de um ciclone se arma perto do coração e suga uma roda de folhas até o centro, que cospe tudo de volta', (A, t) =>
