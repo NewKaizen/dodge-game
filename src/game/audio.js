@@ -1022,4 +1022,20 @@ const SINTESE = {
     s.tom(330, 0.5, 'square', 0.03, 1760, 0.03)
     for (let i = 0; i < 6; i++) s.tom(2400, 0.02, 'square', 0.05, 2000, 0.3 + i * 0.05)
   },
+  // CTRL+C CTRL+V (minigame de apertar A): o clique de cada aperto (um tom por
+  // lado, para dar para ouvir quem está apertando), o "copiado!" e o erro do empate
+  copiarTecla: (s, { lado = 0 } = {}) => {
+    s.ruido(0.012, 0.07, 0, 6500)
+    const f = (lado ? 620 : 820) * (0.97 + Math.random() * 0.06)
+    s.tom(f, 0.025, 'square', 0.025, f * 1.15)
+  },
+  copiado: (s) => {
+    ;[659, 880, 1046, 1318, 1760].forEach((f, i) => s.tom(f, 0.12, 'triangle', 0.07, f * 1.01, i * 0.06))
+    s.tom(440, 0.4, 'sine', 0.06, 1760, 0.02)
+  },
+  copiarErro: (s) => {
+    s.tom(311, 0.32, 'square', 0.07, 311)
+    s.tom(233, 0.45, 'square', 0.07, 230, 0.16)
+    s.ruido(0.05, 0.1, 0, 2500)
+  },
 }
