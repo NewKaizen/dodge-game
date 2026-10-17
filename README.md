@@ -10,21 +10,30 @@ Controle: joystick pela porta serial ([docs/protocolo-serial.md](docs/protocolo-
 ```sh
 npm install
 npm run dev     # http://localhost:5173
-npm test        # regras do PvP, do CO-OP e fichas do Grimório (node --test)
+npm test        # regras do PvP, do CO-OP e fichas do Guia (node --test)
 npm run build
 ```
 
 - Ataques e músicas: [docs/ataques.md](docs/ataques.md).
 - Arte e sons gerados por script: `scripts/` (Python + Pillow).
 
-## Grimório (CARTAS no menu)
+## Guia (GUIA no menu)
 
-Tela para estudar as cartas: **Menu → CARTAS** (`src/game/scenes/Grimorio.js`).
+Tela para estudar o jogo: **Menu → GUIA** (`src/game/scenes/Grimorio.js`; a cena ainda se chama `Grimorio`). Duas seções, que o **↑/↓** percorre em sequência (o nome da seção acende ao lado do título): **CARTAS** e **ARENAS**.
 
-- Em cima, as páginas: os 7 personagens (o baralho vale no PvP e no CO-OP) e os 4 chefes do CO-OP. **↑/↓** troca de página.
+### Cartas
+
+- Em cima, as páginas: os 7 personagens (o baralho vale no PvP e no CO-OP) e os 4 chefes do CO-OP. **↑/↓** troca de página (depois do último chefe vêm as arenas).
 - Embaixo, todas as cartas da página num leque, por naipe (no chefe, por fase), com o SUPER no fim. **←/→** escolhe a carta (segure para correr).
 - A carta em foco aparece grande, com custo, dano por bala, balas mais rápidas (♦) e se inverte os controles, mais o texto do **PvP** e o do **CO-OP** (no chefe: o ataque por extenso e como responder a ele).
 - À direita, a **prévia**: a mesma caixa da arena roda o ataque da carta em loop, com a CPU desviando e o placar de acertos e grazes. **A** passa o coração para você (A ou B devolve para a CPU). O Ás de copas não manda ataque, então só tem a descrição.
-- **B** volta ao menu. A tela lembra a página e a carta de onde você saiu.
+- **B** volta ao menu. A tela lembra a página e a carta (ou o evento) de onde você saiu.
 
-Textos e prévias saem de `src/game/grimorio/fichas.js` (lógica pura, testada em `src/game/grimorio/__tests__/`).
+### Arenas (as rodadas bônus de cada mapa)
+
+- Uma página por arena do PvP (abas com o nome). O fundo da tela vira o fundo animado da arena, e a janela da direita mostra a arena (nome, descrição, música).
+- Embaixo, uma ficha por rodada bônus da arena, na cor do evento: primeiro as que caem em **todas as arenas** (Duelo, Cartas Malucas), depois as **desta arena**. **←/→** escolhe.
+- O evento em foco aparece à esquerda: nome (o da arena: no Jardim o Aquário vira LAGO), o que acontece com as cartas, em que outras arenas ele cai, **o que acontece** e **como se virar**.
+- **A** abre a **prévia ao vivo** (`src/game/scenes/GuiaBonus.js`): a tela da arena com as duas caixas, um ataque sorteado em cada e o efeito do evento rodando em loop, com a CPU desviando. Lá **←/→** troca de evento, **A** passa a caixa da esquerda para você (A ou B devolve) e **B** volta ao Guia. Duelo e Cartas Malucas não mexem na esquiva, então só têm a descrição.
+
+Textos e prévias saem de `src/game/grimorio/fichas.js` (cartas) e `src/game/grimorio/arenas.js` (arenas: lidas de `pvp/arenas.js` e `pvp/bonus.js`, então evento novo aparece sozinho; as dicas de "como se virar" ficam lá, uma por evento). Lógica pura, testada em `src/game/grimorio/__tests__/`.
