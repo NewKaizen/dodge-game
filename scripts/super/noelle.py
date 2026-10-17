@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
-"""Gera os sprites do SUPER de Noelle ("Zero Absoluto") em
+"""Gera os sprites do SUPER de Noelle (SNOWGRAVE) em
 public/assets/sprites/super/noelle/ e os sons em public/assets/audio/super/noelle/.
 
 Uso (na raiz do projeto):  python3 scripts/super/noelle.py
 Precisa do Pillow e do numpy. Saída determinística (sementes fixas).
 
 Sprites (chaves em src/game/pvp/super/sprites/noelle.js):
-  carta.png      132x141  arte da carta: grade de gelo rachando sob um pingente gigante
-  placa.png      2 quadros 28x28: placa de gelo inteira (clara/escura, tabuleiro)
-  rachadura.png  28x28    trinca luminosa por cima da placa (aviso de que vai quebrar)
-  buraco.png     28x28    placa já quebrada (abismo com lascas de gelo nas bordas)
-  pingente.png   16x46    o pingente/estalactite gigante que cai do teto
-  impacto.png    32x32    estouro de gelo (pingente atingindo o chão / lasca final)
-  feixe.png      160x20   lança de gelo do estilhaçamento final (raios saindo do centro)
+  carta.png      132x141  arte da carta: o pilar de nevasca girando sobre o chão congelado, com o floco gigante no alto
+  pilar.png      24x120   pilar de gelo (ponta para cima): brota do chão/teto/paredes no ato III
+  flocao.png     34x34    floco de neve gigante (atravessa a caixa e estoura em estilhaços)
+  estilhaco.png  18x8     estilhaço de gelo deitado (ponta para a direita): rajadas, estouros e o túmulo final
+  pingente.png   16x46    pingente de gelo (cinemática e efeito no chefe do CO-OP)
+  impacto.png    32x32    estouro de gelo (efeito no chefe do CO-OP)
+
+Sons (super-noelle-<nome>):
+  tique, quebra, vento, estilhaco   estalo fino, vidro quebrando, vento, explosão de gelo
+  nevasca      uivo longo da nevasca (ato II)
+  redemoinho   o vento começa a girar (ato III)
+  pilar        pilar de gelo brotando (estalo + baque + cristal subindo)
+  cristal      floco gigante estourando
+  implosao     o frio sendo sugado para um ponto (antes do golpe final)
 """
 
 import math
@@ -31,8 +38,6 @@ VAZIO = (0, 0, 0, 0)
 
 # paleta: azul-gelo/branco (cor da Noelle: 0xa8eaff)
 CONTORNO = (8, 18, 38)
-ABISMO = (5, 11, 24)
-ABISMO_CLARO = (13, 26, 50)
 NOITE = (12, 30, 64)
 NOITE_CLARA = (20, 46, 92)
 AZUL_ESCURO = (26, 72, 142)
@@ -40,10 +45,7 @@ AZUL = (68, 150, 224)
 CIANO = (150, 222, 255)
 GELO = (214, 246, 255)
 BRANCO = (255, 255, 255)
-NOELLE = (168, 234, 255)  # 0xa8eaff
-SOMBRA = (32, 86, 146)
 FROST = (226, 250, 255)
-MAGENTA_GELO = (210, 235, 255)
 
 
 # ---------- utilitários ----------
@@ -166,101 +168,6 @@ def gerar_pingente():
     return pingente_vertical(16, 46, topo=13)
 
 
-# ---------- placas de gelo (tabuleiro que racha) ----------
-
-
-def placa(clara):
-    rng = random.Random(17 if clara else 19)
-    img = nova(28, 28)
-    base = (58, 130, 196) if clara else (28, 68, 118)
-    luz = (120, 190, 240) if clara else (48, 96, 150)
-    sombra = (38, 96, 156) if clara else (16, 40, 76)
-    for y in range(28):
-        for x in range(28):
-            cor = base
-            if x <= 1 or y <= 1:
-                cor = luz
-            elif x >= 26 or y >= 26:
-                cor = sombra
-            por(img, x, y, cor)
-    # veios de gelo (linhas finas e claras, textura de superfície congelada)
-    for _ in range(5 if clara else 4):
-        x0, y0 = rng.randint(3, 24), rng.randint(3, 10)
-        x1, y1 = x0 + rng.randint(-6, 6), y0 + rng.randint(8, 16)
-        linha(img, x0, y0, x1, y1, luz, 90)
-    # fagulhas de brilho
-    for _ in range(3):
-        por(img, rng.randint(3, 24), rng.randint(3, 24), FROST, 140)
-    if clara:
-        por(img, 3, 3, GELO)
-        por(img, 4, 3, CIANO)
-        por(img, 3, 4, CIANO)
-    return img
-
-
-def gerar_placas():
-    folha = nova(56, 28)
-    folha.alpha_composite(placa(True), (0, 0))
-    folha.alpha_composite(placa(False), (28, 0))
-    return folha
-
-
-def gerar_rachadura():
-    """Trincas luminosas crescendo a partir do centro (aviso: a placa vai quebrar)."""
-    rng = random.Random(29)
-    img = nova(28, 28)
-    cx, cy = 14, 14
-    for k in range(6):
-        ang = k * (2 * math.pi / 6) + rng.uniform(-0.25, 0.25)
-        x, y = float(cx), float(cy)
-        for _ in range(9):
-            ang += rng.uniform(-0.4, 0.4)
-            nx, ny = x + math.cos(ang) * 2.1, y + math.sin(ang) * 2.1
-            if not (1 <= nx < 27 and 1 <= ny < 27):
-                break
-            linha(img, x, y, nx, ny, CIANO, 235)
-            por(img, nx, ny, BRANCO, 180)
-            x, y = nx, ny
-    for dx in range(-1, 2):
-        for dy in range(-1, 2):
-            por(img, cx + dx, cy + dy, BRANCO if abs(dx) + abs(dy) < 2 else GELO)
-    return img
-
-
-def gerar_buraco():
-    """Placa já quebrada: abismo escuro com lascas de gelo espetadas nas bordas."""
-    rng = random.Random(31)
-    a = np.zeros((28, 28, 4), np.uint8)
-    raios = [rng.uniform(9.0, 12.2) for _ in range(14)]
-    for y in range(28):
-        for x in range(28):
-            dx, dy = x - 13.5, y - 13.5
-            ang = (math.atan2(dy, dx) + math.pi) / (2 * math.pi) * 14
-            i = int(ang) % 14
-            f = ang - int(ang)
-            r = raios[i] * (1 - f) + raios[(i + 1) % 14] * f
-            dist = max(abs(dx), abs(dy)) * 0.7 + math.hypot(dx, dy) * 0.3
-            if dist < r - 3.2:
-                prof = dist / (r - 3.2)
-                a[y, x] = rgba(ABISMO if prof < 0.6 else ABISMO_CLARO if prof < 0.88 else AZUL_ESCURO)
-                if prof >= 0.88 and dy < 1:
-                    a[y, x] = rgba(CIANO, 160)  # brilho gélido na borda de cima do abismo
-            elif dist < r - 1.2:
-                a[y, x] = rgba((70, 140, 196))
-            elif dist < r:
-                a[y, x] = rgba(GELO if dy < 0 else SOMBRA)
-    img = Image.fromarray(a)
-    # lascas de gelo espetadas ao redor da borda (perigo visível)
-    for k in range(6):
-        ang = k * (2 * math.pi / 6) + rng.uniform(-0.2, 0.2)
-        bx, by = 13.5 + math.cos(ang) * 10.5, 13.5 + math.sin(ang) * 10.5
-        for s in range(4):
-            px = bx - math.cos(ang) * s * 0.9
-            py = by - math.sin(ang) * s * 0.9 - s * 0.6
-            por(img, px, py, BRANCO if s == 0 else CIANO)
-    return img
-
-
 def gerar_impacto():
     """Estouro de gelo: núcleo branco com pontas de cristal saindo em todas as direções."""
     rng = random.Random(37)
@@ -277,21 +184,113 @@ def gerar_impacto():
     return img
 
 
-def gerar_feixe():
-    """Lança de gelo do estilhaçamento final (igual formato do corte do Kris, paleta de gelo)."""
-    img = nova(160, 20)
-    for x in range(160):
-        t = x / 159
-        meia = 8 * math.sin(math.pi * t) ** 0.8
-        curva = 2 * math.sin(math.pi * t)
-        for y in range(20):
-            d = abs(y - 10 + curva - 1.5)
-            if d > meia:
+
+
+# ---------- pilar de gelo ----------
+
+
+def gerar_pilar():
+    """Coluna de cristal com a ponta para cima (o jogo gira/inverte para os outros lados).
+
+    Faces: esquerda escura, miolo branco com veios, direita ciano; a ponta tem
+    duas lascas menores saindo dos lados (cristal lascado, não um retângulo).
+    """
+    L, A = 24, 120
+    img = nova(L, A)
+    cx = L / 2 - 0.5
+    rng = random.Random(53)
+    ponta = 30  # altura da ponta
+    for y in range(A):
+        if y < ponta:
+            meia = 1 + (L / 2 - 2) * (y / ponta) ** 0.9
+        else:
+            meia = L / 2 - 2 + (1 if (y // 9) % 2 == 0 else 0)  # facetas irregulares nas bordas
+        for x in range(L):
+            dx = x - cx
+            if abs(dx) > meia:
                 continue
-            k = d / max(0.5, meia)
-            cor = BRANCO if k < 0.35 else (GELO if k < 0.6 else (CIANO if k < 0.85 else AZUL))
-            alfa = 255 if k < 0.85 else 200
-            por(img, x, y, cor, alfa)
+            k = dx / max(1, meia)
+            if k < -0.55:
+                cor = AZUL_ESCURO
+            elif k < -0.1:
+                cor = AZUL
+            elif k < 0.25:
+                cor = BRANCO if y < ponta + 4 or (y // 3) % 4 else GELO
+            elif k < 0.7:
+                cor = CIANO
+            else:
+                cor = AZUL
+            por(img, x, y, cor)
+    # lascas laterais perto da ponta
+    for lado in (-1, 1):
+        base_y = ponta + 6 + (4 if lado > 0 else 0)
+        for i in range(8):
+            x = cx + lado * (L / 2 - 2 + i * 0.5)
+            y = base_y - i * 1.6
+            por(img, x, y, GELO if lado > 0 else CIANO)
+            por(img, x, y + 1, AZUL if lado > 0 else AZUL_ESCURO)
+    # veios diagonais (trincas internas)
+    for _ in range(7):
+        y0 = rng.randint(ponta, A - 12)
+        x0 = rng.randint(4, L - 6)
+        linha(img, x0, y0, x0 + rng.choice([-3, 3]), y0 + rng.randint(5, 10), FROST, 170)
+    # brilho vertical no miolo
+    for y in range(4, A, 2):
+        por(img, cx + 1, y, BRANCO, 230)
+    contornar(img)
+    return img
+
+
+# ---------- floco gigante ----------
+
+
+def gerar_flocao():
+    """Floco de neve de 6 braços com galhos (contorno escuro, miolo hexagonal)."""
+    img = nova(34, 34)
+    cx = cy = 16.5
+    for b in range(6):
+        ang = b * math.pi / 3 - math.pi / 2
+        ux, uy = math.cos(ang), math.sin(ang)
+        # braço grosso (2 px)
+        for s in np.arange(0, 14.5, 0.5):
+            x, y = cx + ux * s, cy + uy * s
+            por(img, x, y, BRANCO)
+            por(img, x - uy * 0.8, y + ux * 0.8, GELO)
+        # dois pares de galhos
+        for base, comp in [(6, 5), (10, 3.5)]:
+            bx, by = cx + ux * base, cy + uy * base
+            for lado in (-1, 1):
+                ga = ang + lado * 0.85
+                for s in np.arange(0, comp, 0.5):
+                    por(img, bx + math.cos(ga) * s, by + math.sin(ga) * s, CIANO if s > comp * 0.6 else GELO)
+        # ponta em losango
+        px, py = cx + ux * 15, cy + uy * 15
+        por(img, px, py, BRANCO)
+    # miolo hexagonal
+    for y in range(34):
+        for x in range(34):
+            if math.hypot(x - cx, y - cy) < 3.2:
+                por(img, x, y, CIANO if math.hypot(x - cx, y - cy) > 1.8 else BRANCO)
+    contornar(img, (10, 34, 74))
+    return img
+
+
+# ---------- estilhaço ----------
+
+
+def gerar_estilhaco():
+    """Lasca de gelo deitada, ponta para a direita (o jogo gira para a direção do voo)."""
+    img = nova(18, 8)
+    for x in range(18):
+        t = x / 17
+        meia = 3.4 * (1 - t) ** 1.1 if t > 0.3 else 2.0 + 1.4 * (t / 0.3) - (0.8 if x % 3 == 0 else 0)  # traseira lascada
+        for y in range(8):
+            d = y - 3.5
+            if abs(d) > meia:
+                continue
+            cor = BRANCO if abs(d) < meia * 0.35 else (CIANO if d < 0 else AZUL)
+            por(img, x, y, cor)
+    contornar(img, (10, 34, 74))
     return img
 
 
@@ -301,87 +300,108 @@ def gerar_feixe():
 def gerar_carta():
     """66x71 em pixels lógicos, ampliado 2x e cortado para 132x141.
 
-    Grade de placas de gelo vista de cima/perspectiva; uma placa rachou e um
-    pingente gigante acabou de atingi-la; trincas se espalham pelo chão e a
-    nevasca começa a tomar o topo da tela. Sem a Noelle: só o golpe.
+    O SNOWGRAVE visto de longe: um pilar de nevasca (luz branca no miolo e
+    faixas de neve girando em volta) sobe do chão congelado até o céu; no alto,
+    o floco gigante; na base, cristais de gelo brotando e trincas no chão.
     """
-    rng = random.Random(41)
+    rng = random.Random(61)
     L, A = 66, 71
     img = nova(L, A)
     cx = 33
-    impacto_x, impacto_y = 35, 50  # onde o pingente crava
+    hz = 48  # horizonte
 
-    # fundo: noite gelada com brilho frio ao redor do impacto
+    # céu: noite gelada, mais claro perto do pilar
     for y in range(A):
         for x in range(L):
-            d = math.hypot(x - impacto_x, y - impacto_y)
-            base = 0.16 + max(0, 0.5 - d / 60)
-            cor = (int(10 + 60 * base), int(26 + 110 * base), int(50 + 170 * base))
+            d = abs(x - cx) / 33
+            base = 0.12 + 0.35 * max(0, 1 - d * 1.6) + 0.08 * (y / A)
+            cor = (int(8 + 70 * base), int(22 + 120 * base), int(48 + 180 * base))
             por(img, x, y, cor)
 
-    # grade de placas de gelo em perspectiva (horizonte em y=hz)
-    hz = 30
+    # chão congelado em perspectiva (placas de gelo)
     for y in range(hz + 1, A):
         dy = y - hz
-        z = 60 / dy
-        p = dy / (A - hz)
+        z = 48 / dy
         for x in range(L):
-            wx = (x - cx) * z / 12
-            clara = (math.floor(wx + 0.5) + math.floor(z)) % 2 == 0
-            cor = (62, 138, 206) if clara else (24, 58, 104)
-            nevoa = max(0, 1 - p * 2.2)
-            cor = tuple(int(cor[i] * (1 - nevoa) + (150, 205, 245)[i] * nevoa) for i in range(3))
+            wx = (x - cx) * z / 10
+            clara = (math.floor(wx + 0.5) + math.floor(z * 1.5)) % 2 == 0
+            cor = (70, 146, 210) if clara else (30, 70, 124)
+            brilho = max(0, 1 - abs(x - cx) / 26) * max(0, 1 - dy / 18)
+            cor = tuple(min(255, int(cor[i] + (220 - cor[i]) * brilho)) for i in range(3))
             por(img, x, y, cor)
     for x in range(L):
-        por(img, x, hz, CIANO if abs(x - cx) < 20 else AZUL)
+        por(img, x, hz, GELO if abs(x - cx) < 14 else CIANO)
 
-    # trincas radiais saindo do ponto de impacto, cortando a grade
-    for k in range(9):
-        ang = k * (2 * math.pi / 9) + rng.uniform(-0.12, 0.12)
-        x, y = float(impacto_x), float(impacto_y)
-        comp = rng.randint(14, 24)
-        for _ in range(comp):
-            ang += rng.uniform(-0.3, 0.3)
-            nx = x + math.cos(ang) * 1.6
-            ny = y + math.sin(ang) * 1.1
+    # o pilar: miolo de luz (largura cresce um pouco para cima)
+    for y in range(4, hz + 4):
+        meia = 4.5 + (hz - y) * 0.06
+        for x in range(L):
+            d = abs(x - cx) / meia
+            if d < 1:
+                misturar(img, x, y, BRANCO if d < 0.45 else FROST, 0.95 if d < 0.45 else 0.7)
+            elif d < 2.2:
+                misturar(img, x, y, CIANO, 0.45 * (2.2 - d) / 1.2)
+
+    # faixas de neve girando em volta do pilar: traços contínuos (as da frente
+    # claras e por cima, as de trás escuras e por baixo)
+    for frente_vez in (False, True):
+        for faixa in range(3):
+            fase = faixa * (2 * math.pi / 3)
+            ant = None
+            for y in np.arange(hz + 1, 22, -0.25):
+                meia = 8 + (hz - y) * 0.22
+                ang = y * 0.21 + fase
+                x = cx + math.sin(ang) * meia
+                frente = math.cos(ang) > 0
+                if frente == frente_vez and ant and ant[2] == frente:
+                    linha(img, ant[0], ant[1], x, y, BRANCO if frente else (70, 128, 196))
+                    if frente:
+                        por(img, x, y + 1, GELO, 200)
+                ant = (x, y, frente)
+
+    # cristais de gelo brotando na base, em leque
+    for i, (dx, alt, larg) in enumerate([(-15, 10, 3), (-9, 16, 4), (-4, 12, 3), (5, 13, 3), (10, 17, 4), (16, 9, 3)]):
+        bx = cx + dx
+        for k in range(alt):
+            meia = larg * (1 - k / alt)
+            for x in range(int(bx - meia), int(bx + meia) + 1):
+                cor = GELO if x >= bx else AZUL
+                if abs(x - bx) < 0.8:
+                    cor = BRANCO
+                por(img, x, hz + 6 - k, cor)
+
+    # trincas no chão saindo da base
+    for k in range(8):
+        ang = math.pi * (0.05 + 0.9 * k / 7)
+        x, y = float(cx), float(hz + 5)
+        for _ in range(rng.randint(8, 16)):
+            ang += rng.uniform(-0.25, 0.25)
+            nx, ny = x + math.cos(ang) * 1.8, y + abs(math.sin(ang)) * 1.0
             if not (0 <= nx < L and hz < ny < A):
                 break
-            misturar(img, nx, ny, FROST, 0.85)
-            misturar(img, nx + 1, ny, CIANO, 0.4)
+            misturar(img, nx, ny, FROST, 0.8)
             x, y = nx, ny
 
-    # a placa do impacto: buraco escuro com lascas (reaproveita o gerador pequeno)
-    buraco_img = gerar_buraco().resize((22, 22), Image.NEAREST)
-    img.alpha_composite(buraco_img, (impacto_x - 11, impacto_y - 10))
+    # o floco gigante no alto do pilar
+    for y in range(0, 34):
+        for x in range(cx - 18, cx + 18):
+            d = math.hypot(x - cx, y - 17)
+            if d < 17:
+                misturar(img, x, y, (150, 222, 255), 0.35 * (1 - d / 17))
+    floco = gerar_flocao().resize((30, 30), Image.NEAREST)
+    img.alpha_composite(floco, (cx - 15, 2))
 
-    # o pingente gigante, ainda cravado, vindo de cima
-    ping = pingente_vertical(20, 58, topo=16)
-    img.alpha_composite(ping, (impacto_x - 10, impacto_y - 52))
-
-    # estouro de gelo no ponto de impacto
-    est = gerar_impacto().resize((30, 30), Image.NEAREST)
-    img.alpha_composite(est, (impacto_x - 15, impacto_y - 15))
-
-    # lascas de gelo espalhadas pelo ar
-    for x, y, tam in [(14, 20, 3), (52, 16, 2), (10, 46, 2), (56, 44, 3), (44, 12, 2), (20, 8, 2)]:
-        for i in range(tam):
-            por(img, x + i, y - i, GELO)
-            por(img, x + i + 1, y - i, CIANO)
-
-    # névoa da nevasca tomando o topo da tela
-    for y in range(0, 16):
-        f = max(0, 1 - y / 16) * 0.55
-        for x in range(L):
-            misturar(img, x, y, FROST, f * rng.uniform(0.7, 1.0))
-
-    # faíscas de gelo soltas
-    for _ in range(14):
-        x = rng.randint(2, L - 3)
-        y = rng.randint(2, A - 3)
-        if math.hypot(x - impacto_x, y - impacto_y) < 9:
-            continue
+    # flocos e faíscas voando em volta (puxados pelo redemoinho)
+    for _ in range(26):
+        ang = rng.uniform(0, 2 * math.pi)
+        r = rng.uniform(14, 30)
+        x = cx + math.cos(ang) * r
+        y = rng.uniform(4, hz)
         cor = rng.choice([BRANCO, GELO, CIANO])
         por(img, x, y, cor)
+        if rng.random() < 0.35:
+            por(img, x + 1, y, cor, 160)
+            por(img, x, y + 1, cor, 160)
 
     # base um pouco mais escura embaixo (a palavra SUPER entra por cima)
     a = np.array(img).astype(np.float32)
@@ -420,7 +440,12 @@ def sons():
     def tempo(seg):
         return np.arange(int(taxa * seg)) / taxa
 
-    # tique: estalo de gelo fino (telegrafo do pingente)
+    def varrer(f0, f1, t):
+        """Seno com a frequência indo de f0 a f1 (fase integrada, sem estalos)."""
+        f = f0 + (f1 - f0) * (t / t[-1])
+        return np.sin(2 * np.pi * np.cumsum(f) / taxa)
+
+    # tique: estalo de gelo fino
     t = tempo(0.08)
     s = (np.sin(2 * np.pi * 2300 * t) + 0.5 * np.sin(2 * np.pi * 3200 * t)) * np.exp(-t * 70)
     salvar_som('tique.wav', s)
@@ -441,22 +466,58 @@ def sons():
     assovio = np.sin(2 * np.pi * (500 + 180 * np.sin(2 * np.pi * 0.6 * t)) * t) * 0.12
     salvar_som('vento.wav', base * lfo * subida + assovio * subida)
 
-    # estilhaco: a explosão final de gelo (grave + cristais + ruído)
+    # estilhaco: a explosão de gelo (grave + cristais + ruído)
     t = tempo(0.8)
     grave = np.sin(2 * np.pi * (80 * np.exp(-t * 6) + 40) * t) * np.exp(-t * 7)
     cristais = sum(np.sin(2 * np.pi * f * t) * np.exp(-t * d) for f, d in [(2000, 7), (2700, 9), (3600, 11), (1500, 6)]) * 0.28
     ruido = rng.standard_normal(len(t)) * np.exp(-t * 16) * 0.5
     salvar_som('estilhaco.wav', grave * 1.1 + cristais + ruido)
 
+    # nevasca: uivo longo (ruído grave com rajadas) e dois assovios que sobem e descem
+    t = tempo(2.4)
+    base = passa_baixa(rng.standard_normal(len(t)), 24) * 5
+    rajadas = 0.45 + 0.55 * np.abs(np.sin(2 * np.pi * 0.7 * t + np.sin(2 * np.pi * 0.23 * t) * 2))
+    uivo = varrer(420, 620, t) * 0.10 + np.sin(2 * np.pi * (700 + 160 * np.sin(2 * np.pi * 0.45 * t)) * t) * 0.06
+    env = np.clip(t / 0.5, 0, 1) * np.clip((2.4 - t) / 0.6, 0, 1)
+    salvar_som('nevasca.wav', (base * rajadas + uivo * rajadas) * env)
+
+    # redemoinho: o vento começa a girar (tremolo cada vez mais rápido e assovio subindo)
+    t = tempo(1.7)
+    giro = np.sin(2 * np.pi * np.cumsum(2 + 9 * (t / t[-1]) ** 1.5) / taxa)
+    ruido = passa_baixa(rng.standard_normal(len(t)), 12) * 4
+    assovio = varrer(260, 980, t) * 0.14
+    env = np.clip(t / 0.4, 0, 1) * np.clip((1.7 - t) / 0.35, 0, 1)
+    salvar_som('redemoinho.wav', (ruido * (0.55 + 0.45 * giro) + assovio * (0.6 + 0.4 * giro)) * env)
+
+    # pilar: estalo seco, baque grave e um cristal subindo rápido
+    t = tempo(0.65)
+    estalo = (passa_baixa(rng.standard_normal(len(t)), 2) - passa_baixa(rng.standard_normal(len(t)), 8)) * np.exp(-t * 40) * 1.4
+    baque = np.sin(2 * np.pi * (110 * np.exp(-t * 9) + 45) * t) * np.exp(-t * 9) * 1.1
+    cristal = varrer(900, 3200, t) * np.exp(-t * 6) * 0.25
+    salvar_som('pilar.wav', estalo + baque + cristal)
+
+    # cristal: floco gigante estourando (sinos agudos + vidro)
+    t = tempo(0.6)
+    sinos = sum(np.sin(2 * np.pi * f * t) * np.exp(-t * d) for f, d in [(1976, 6), (2637, 7), (3136, 8), (3951, 10)]) * 0.3
+    vidro = (passa_baixa(rng.standard_normal(len(t)), 2) - passa_baixa(rng.standard_normal(len(t)), 6)) * np.exp(-t * 14)
+    salvar_som('cristal.wav', sinos + vidro)
+
+    # implosao: tudo sendo sugado (ruído e tom crescendo ao contrário, corte seco no fim)
+    t = tempo(1.15)
+    sobe = (t / t[-1]) ** 2.5
+    ruido = passa_baixa(rng.standard_normal(len(t)), 6) * 3 * sobe
+    tom = varrer(120, 900, t) * 0.35 * sobe + varrer(60, 240, t) * 0.4 * sobe
+    corte = np.clip((t[-1] - t) / 0.03, 0, 1)
+    salvar_som('implosao.wav', (ruido + tom) * corte)
+
 
 def main():
     salvar(gerar_carta(), 'carta.png')
-    salvar(gerar_placas(), 'placa.png')
-    salvar(gerar_rachadura(), 'rachadura.png')
-    salvar(gerar_buraco(), 'buraco.png')
+    salvar(gerar_pilar(), 'pilar.png')
+    salvar(gerar_flocao(), 'flocao.png')
+    salvar(gerar_estilhaco(), 'estilhaco.png')
     salvar(gerar_pingente(), 'pingente.png')
     salvar(gerar_impacto(), 'impacto.png')
-    salvar(gerar_feixe(), 'feixe.png')
     sons()
 
 

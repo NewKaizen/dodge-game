@@ -38,7 +38,7 @@ test('bonus: eventos têm o formato que a arena espera', () => {
   const ids = new Set()
   for (const ev of EVENTOS) {
     assert.ok(ev.id && ev.nome && ev.descricao, ev.id)
-    assert.ok(['normal', 'malucas', 'duelo'].includes(ev.cartas), ev.id)
+    assert.ok(['normal', 'malucas', 'duelo', 'copia'].includes(ev.cartas), ev.id)
     assert.equal(typeof ev.cor, 'number')
     assert.ok(!ids.has(ev.id), `id repetido ${ev.id}`)
     ids.add(ev.id)

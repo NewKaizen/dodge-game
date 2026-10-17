@@ -90,7 +90,7 @@ Todo baralho tem **uma** carta SUPER (`valor: 14`, `naipe: 'espadas'`, id `'<per
 | Kris | Alma Determinada | estocadas + colunas de espada → lasers alternados numa caixa apertada → forcado + rajadas miradas |
 | Susie | Machado Colossal | pisões → machado gigante com faíscas → dinamite (bombas + chão rachado) |
 | Ralsei | Valsa Real | carrossel de anéis → anel + divisores → espiral de copas |
-| Noelle | Inverno Absoluto | neve em cascata → raios de gelo verticais → pingentes + anel de gelo |
+| Noelle | SNOWGRAVE | neve + flocos gigantes que estouram → nevasca (rajadas de estilhaços) → redemoinho que persegue + pilares de gelo → túmulo de estilhaços que se fecha e explode |
 | Berdly | Furacão Genial | vento da esquerda → estocadas numa caixa apertada → lasers em cruz + mira |
 | Dess | Turnê Final | ondas sonoras → bolas quicando → palco explosivo |
 | Asriel | Supernova Arco-Íris | chuva de estrelas → espiral + chuva → Caos Final (com tempo para o colapso explodir) |
@@ -131,7 +131,7 @@ Na arena: "PERFEITO!" (x1), "PERFEITO x2!", "PERFEITO x3!!", "PERFEITO x4!!!": o
 | Naipe | Tipo | Ataque na caixa do adversário | Dano por bala |
 |---|---|---|---|
 | ♠ espadas | ataque direto | padrões do personagem escalados pelo valor | 2 + 0,6 × valor (3 a 10) |
-| ♦ ouros | controle | balas até 20% mais rápidas, caixa menor (210×170 → 160×135), Q/K invertem os controles durante o ataque todo | 2 + 0,45 × valor (3 a 8) |
+| ♦ ouros | controle | balas até 20% mais rápidas, caixa menor (210×170 → 160×135), Q/K invertem os controles durante o ataque todo (menos o Q♦ Tempo Parado e o K♦ Caos Final do Asriel) | 2 + 0,45 × valor (3 a 8) |
 | ♣ paus | armadilha | bombas, lasers, colunas, ondas, forcado, chão rachado | 2 + 0,55 × valor (3 a 9) |
 | ♥ copas | suporte em quem joga | só um ataque fraquinho (4 s, dano 2) | 2 |
 
@@ -161,6 +161,16 @@ Ficar parado não é mais uma estratégia: quase todo padrão tem uma parte mira
 
 A cada 5 rodadas (rodadas 5, 10, 15, 20, 25) tudo fica 30% mais rápido, até ×2,5 na rodada 25 (`ACELERACAO` em `constants.js`): balas (velocidade e densidade), relógio da escolha (15 s → até 8 s), animações e música. O coração ganha metade do bônus para continuar dando para desviar. Aparece um aviso "VELOCIDADE ×1,3!" e o selo fica no HUD. No co-op a regra fica desligada (`ACELERACAO.coop = false`; com `true` ela vale por turno do chefe, por cima do `RITMO`).
 
+## Fim da partida: câmera lenta, replay e tela de vitória
+
+Código em `src/game/pvp/fimDePartida/` (o `index.js` explica as peças).
+
+- **Câmera lenta**: no K.O. o jogo congela um instante e passa a andar a 20% por ~2,3 s: as balas se arrastam, a bala do golpe segue atravessando o coração e ele trinca em duas metades e estilhaça devagar (como no Undertale). A tela escurece em volta, as balas perdem a cor e a música fica lenta e abafada. Se o outro também cair nesse meio tempo, é empate (vale de verdade).
+- **Replay em fita VHS**: depois, a tela vira uma TV velha: estática, "◀◀ REW" (a fita volta de trás para frente), "▶ PLAY" com os últimos ~3 s antes do golpe, "SLOW" no finalzinho e "❚❚ PAUSE" no quadro do golpe com o K.O. marcado no coração. Tem scanlines, ruído, aberração de cor, tremida/tracking, curvatura da tela, contador da fita e data; a música passa com passa-baixa, wow/flutter (o tom oscilando) e chiado de fita. Empate: as duas pistas lado a lado. O replay usa fotos das caixas tiradas durante a esquiva (`gravador.js`, DynamicTextures em baixa resolução a 30 quadros/s; nada é re-simulado).
+- **Duelo** (rodada bônus): o K.O. dele ganha a câmera lenta, mas não tem replay.
+- **A ou B pula** a câmera lenta e o replay (depois de uma carência curta; no duelo, mais longa, porque todo mundo está apertando A para atacar).
+- **Tela de vitória** (`PvpResultado`): antes das estatísticas, a entrada do vencedor: faixa diagonal na cor dele, o sprite grande entrando com rastro, o nome enorme batendo com clarão, tremor, confete, fogos e a música da vitória. No empate não tem entrada. A pula, como antes.
+
 ## Arenas (votação antes da partida)
 
 Depois da escolha dos lutadores (e do "VS"), os jogadores **votam na arena** (cena `PvpVoto`, dados em `pvp/arenas.js`). Cada um move o próprio coração entre os cartões e vota com A (B desfaz). Ganha a mais votada; **empate = roleta** entre as empatadas; o cartão **"?" (ALEATÓRIA)** vale como voto numa arena sorteada na hora da apuração; acabou o tempo (12 s), quem não votou fica de fora (ninguém votou = roleta entre todas). Contra a CPU só o P1 vota: a CPU segue o voto. A revanche (tela de resultado) e o "recomeçar" do pause mantêm a arena.
@@ -180,7 +190,7 @@ Testes: `scene.start('PvpVoto', { p1, p2 })` ou direto `scene.start('PvpArena', 
 
 ## Bonus rounds (a cada 3 rodadas)
 
-Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento caótico **depois** que os dois escolhem as cartas (no Duelo, a carta escolhida vira a arma, sem gastar energia), que nunca repete o da rodada bônus anterior. A roleta só tem os eventos da arena da partida (veja Arenas). Só caos, sem prêmio: ninguém ganha nada a mais, e o dano continua valendo. Nos eventos de esquiva, as duas caixas abrem mesmo que ninguém tenha atacado.
+Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento caótico **depois** que os dois escolhem as cartas (no Duelo, a carta escolhida vira a arma, sem gastar energia; no Ctrl+C Ctrl+V ela só vai para o descarte, também sem gastar energia), que nunca repete o da rodada bônus anterior. A roleta só tem os eventos da arena da partida (veja Arenas). Quase só caos, sem prêmio: ninguém ganha nada a mais e o dano continua valendo. A exceção é o Ctrl+C Ctrl+V, que passa energia de um para o outro. Nos eventos de esquiva, as duas caixas abrem mesmo que ninguém tenha atacado.
 
 | Evento | Cartas | O que acontece |
 |---|---|---|
@@ -191,7 +201,7 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Gravidade maluca | normais | uma gravidade puxa o coração e muda de lado a cada ~2 s, com aviso |
 | Coração trocado | normais | os corações trocam de caixa: cada um desvia do próprio ataque |
 | PC da escola | normais | as caixas ficam pixeladas (baixa resolução) e rodam a 6–14 FPS, aos trancos; de vez em quando o PC trava ("Não está respondendo") |
-| Aquário | normais | as caixas enchem de água: tudo em câmera lenta, o coração boia (segure ↓ para afundar) e tem inércia de água |
+| Aquário | normais | as caixas enchem de água: tudo em câmera lenta leve (×0,82), o coração boia (segure ↓ para afundar) e tem inércia de água |
 | Cogumelo maluco | normais | o coração alterna entre GIGANTE (hitbox enorme, música grave) e MINI (hitbox mínima, música aguda), com pisca-pisca de aviso |
 | Dança da estátua | normais | a música PARA de repente, sem aviso: balas e ataque congelam, o coração não. Um holofote de vigia PERSEGUE o coração de cada um (é mais lento: dá para fugir); quem se mexer com a luz em cima do coração é PEGO (30% do HP máximo, uma vez por parada). Mexer fora da luz pode. A música volta e tudo descongela |
 | Pista de gelo | normais | o coração escorrega: demora para acelerar, demora para frear e desliza quando você solta |
@@ -199,7 +209,7 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Pop-ups | normais | janelas de propaganda ("VOCÊ GANHOU!", "BAIXE MAIS RAM") abrem por cima das balas (por baixo do coração) e tapam a visão; passar o coração no [X] fecha. Nunca nascem em cima do coração, no máximo 2–3 por caixa, somem sozinhas em 7 s |
 | Lag | normais | o direcional chega atrasado 250–400 ms (o ping aparece em cima da caixa); um fantasma do coração mostra para onde ele vai. A CPU também sofre |
 | Teclado embaralhado | normais | as setas trocam de lugar (giros e espelhos: seta sempre vira seta) e o mapa muda a cada ~4 s, com 1,1 s de aviso; o tecladinho entre as caixas mostra sempre o mapa atual. A CPU demora um pouco para aprender cada mapa |
-| Ctrl+C Ctrl+V | normais | um clone espelhado do coração (lados, cima/baixo ou centro, com o eixo tracejado) anda junto; bala no clone conta como acerto no dono. O espelho muda de tempos em tempos, com aviso e um instante sem machucar |
+| Ctrl+C Ctrl+V | sem custo (descarte) | (Informática) minigame no lugar de arremesso + esquiva: abre uma janela "Copiando energia..." com a barra de progresso disputada em cabo de guerra. 3-2-1-COPIAR! e por 5 s cada aperto de A (Z/espaço do P1, Enter do P2, botão A do joystick) puxa a barra para o seu lado. Quem estiver na frente no fim COPIA (rouba) energia do outro: até 35% da barra = 1, até 70% = 2, mais = 3; 14 apertos de vantagem enchem a barra (100%) e acabam na hora. Empate: ninguém copia. Quem perde não fica negativo e quem copia não passa de 10 (o que não cabe se perde). A CPU aperta como gente (~4/s no fácil, ~5,5/s no normal, ~7/s no difícil) |
 | Tela azul | normais | de vez em quando uma caixa chuvisca e dá TELA AZUL: a pista inteira congela (ninguém leva dano), reinicia, mostra tudo parado por um instante e volta com i-frames curtos |
 | Cursor gigante | normais | um cursor de mouse enorme persegue o coração (mais devagar que ele), para, mira (anel vermelho fechando, ampulheta) e clica: dano em área. Às vezes clique duplo |
 | Pedra rolante (Templo) | normais | ronco, tremor e a faixa por onde a pedra vai passar fica vermelha com setas no sentido dela (~1 s de aviso); aí uma pedra gigante atravessa a caixa rolando (bala, 5 de dano). Às vezes vem uma segunda em outra faixa: sempre sobra um terço da caixa livre |
@@ -245,7 +255,7 @@ HP de `data/personagens.js` quando o personagem existe lá (Kris 90, Susie 110);
 | Kris | equilibrado, puxado para controle | 90 | 19 + ★ | 5 | 4 | 6 | 4 | K♠ Lâmina Determinada, J♦ Formação, Q♦ Controle da Alma · ★ Alma Determinada |
 | Susie | força bruta | 110 | 19 + ★ | 8 | 3 | 4 | 4 | Q♠ Rude Buster, K♠ Machado Maluco, J♦ Pressão, J♣ Dinamite · ★ Machado Colossal |
 | Ralsei | suporte | 80 | 19 + ★ | 3 | 8 | 4 | 4 | J♦ Feitiço de Sono, Q♥ Pacify, K♥ Oração Maior · ★ Valsa Real |
-| Noelle | suporte gélido | 85 | 19 + ★ | 4 | 7 | 4 | 4 | Q♠ Nevasca, K♦ Inverno Eterno, J♣ Avalanche, J♥ Anjo da Neve · ★ Inverno Absoluto |
+| Noelle | suporte gélido | 85 | 19 + ★ | 4 | 7 | 4 | 4 | Q♠ Nevasca, K♦ Inverno Eterno, J♣ Avalanche, J♥ Anjo da Neve · ★ SNOWGRAVE |
 | Berdly | controle | 90 | 19 + ★ | 4 | 4 | 7 | 4 | Q♦ QI Elevado, K♦ Vendaval Supremo, J♣ Ciclone · ★ Furacão Genial |
 | Dess | ataque | 100 | 19 + ★ | 7 | 3 | 4 | 5 | J♠ Solo de Guitarra, K♠ Show de Rock, Q♦ Feedback, Q♣ Palco Explosivo · ★ Turnê Final |
 | Asriel | equilibrado, com mais figuras | 90 | 20 + ★ | 5 | 5 | 5 | 5 | J♠ Chaos Buster, K♠ Hyper Goner, Q♦ Tempo Parado, K♦ Caos Final, K♣ Supernova, Q♥ Sonho (6 figuras) · ★ Supernova Arco-Íris |
@@ -317,6 +327,25 @@ no aviso fica seguro. Medido com 24 sementes: perfeito 2,7, médio **34,1**
 Cinemática nova em `pvp/super/anuncios/noelle.js` e efeito novo no chefe do
 CO-OP (`coop/superNoChefe.js`).
 
+**2026-10-17: SNOWGRAVE recriado** ("muito fácil e previsível"). Agora são
+quatro atos que escalam, com o mundo congelando (véu cada vez mais escuro,
+geada subindo pelas bordas, neve de fundo seguindo o vento): **I. O frio**
+(neve entrando pelo lado do vento, parte mirada, engrossando; flocos gigantes
+que atravessam a caixa, param, racham e estouram em estilhaços), **II.
+Nevasca** (rajadas de estilhaços espalhadas, com a brecha longe do coração; o
+vento inverte uma vez), **III. Redemoinho** (anéis de flocos entram por todas
+as bordas e espiralam para um olho de gelo que persegue o coração devagar;
+pilares de gelo brotam do chão, teto ou paredes na linha do coração, só a
+ponta aparece antes) e **IV. SNOWGRAVE** (o nome cai letra a letra e um túmulo
+de estilhaços entra por todas as bordas e se fecha onde o coração estava,
+com uma lasca a menos de brecha; ao fechar, o pilar de luz explode e os
+estilhaços voltam para todo lado). Nenhum projétil nasce dentro da caixa e
+tudo é sorteado com a semente (vento, lados, brechas, olho e giro, pilares,
+túmulo). Sprites (pilar, floco gigante, estilhaço, carta nova) e 5 sons novos
+em `scripts/super/noelle.py`. Medido com 24 sementes: perfeito 2,7 → **9,8**,
+médio 34,1 → **39,5** (os outros 6 SUPERs, na mesma medição: perfeito 3,3 a
+21,1, média 14,5; médio 33,6 a 39,5, média 37,1), nenhum aviso do validador.
+
 SUPER da Dess mais justo:
 
 - os avisos dos acordes se sobrepõem (o próximo pisca antes do anterior bater); agora a conta de "sobra um traste livre" soma todos os trastes acesos ao mesmo tempo (antes cada acorde deixava um livre, mas a soma podia acender o braço inteiro);
@@ -351,6 +380,8 @@ O Asriel ainda dá um pouco mais de dano por carta porque tem mais figuras (o da
 | 10♣ Raio Caótico | 1,5 → 1,2 | lasers em cruz a cada ~1,5 s (era ~1,3) |
 | 3♦ Shocker Breaker | 1,1 → 0,75 | raios mais espaçados; na caixa apertada a corrente perde a 3ª coluna se ela fechar a rota de fuga |
 
+**2026-10-17: Berdly e Asriel de reação, sem guias.** Os projéteis dos dois nascem fora da caixa e entram (a entrada é o aviso; nada de bala parada piscando), e lados, ordens, tempos e quais golpes miram saem dos sorteios com semente (nada para decorar). Berdly: Bicada, Mergulho Aéreo, Correção (a caneta entra pela borda riscando o X) e Pena Armada (as penas voam de fora, cravam, giram atrás do coração e recuam antes de disparar) ficaram sem linhas de aviso. Asriel: Q♦ Tempo Parado e K♦ Caos Final não invertem mais os controles; o Caos Final perdeu a linha e o círculo das estrelas, a linha dos tiros do núcleo (ele incha antes) e o círculo do colapso (o anel entra de fora); Hyper Goner com menos losangos (no K, 2 a cada ~620 ms; eram 3 a cada 390) e cada um fere 60% do dano da carta. Medido (12 sementes, bot médio, acertos/carta antes → depois): Bicada 1,42 → 1,58, Mergulho 0,33 → 0,75, Correção 1,83 → 1,58, Pena Armada 0,25 → 0,92, Hyper Goner 1,0 → 1,08 (dano real ~13 → ~8,7), Tempo Parado 1,42 → 1,5, Caos Final 2,08 → 2,25; média por carta Berdly 1,20 → 1,16, Asriel 1,12 → 1,15.
+
 A carta mais difícil do jogo agora é o K♠ Show de Rock da Dess (3 acertos no bot médio, ~40 de dano), fora deste ajuste.
 
 **2026-10-08: K♠ Show de Rock refeito** (`dessShow` em `attacks/habilidades/dess.js`). Saíram as
@@ -360,3 +391,73 @@ casa por batida), colcheias no contratempo fora do caminho livre e pirotecnia no
 corda longe da livre. Medido (24 sementes): bot médio **~40 → 11,4** (0,88 acerto), perfeito 2,2;
 nenhum aviso do validador. Fica na faixa das cartas fortes da Dess (Solo 11, Amplificador 11,
 Palco Explosivo 16,5, Feedback 20).
+
+**2026-10-17: Susie e Ralsei revistos** (`attacks/habilidades/susie.js`, `ralsei.js`). Projéteis nascem fora
+da caixa e entram (sem piscar parados), e lados, ordens e posições são sorteados com a semente. Medido (12 sementes,
+acertos do bot médio, antes → depois):
+
+| Carta | Antes → depois | Mudança |
+|---|---|---|
+| 6♠ Pisão (Susie) | 1,25 → 1,33 | pisa numa parede sorteada (chão, teto ou lados), altura da onda sorteada; sem faixa de aviso, só a pegada piscando; cascalho entra pela parede oposta (o 1º na linha do coração) |
+| 3♦ Encarar | 0,25 → 1,08 | 2–3 olhos, olhadelas miradas enquanto encaram, a rajada travada fecha com um leque de 3 |
+| 7♦ Rugido | 0,58 → 0,75 | sem guia do vão; a onda vem de qualquer parede (o vão fica longe da linha do coração quando dá) |
+| 5♣ Bomba de Giz | 0,50 → 1,50 | o maço é arremessado de fora (machuca em voo e no chão), pavio menor, 7–8 pedaços (um no coração), 2 por vez na força alta; sem círculo de aviso |
+| 3♣ Bolinho Explosivo | 0,50 → 0,42 | cupcakes deslizam para qualquer parede; o chafariz sai da parede; sem círculo de contagem |
+| 10♣ Laço de Fita | 1,08 → 1,75 | o nó voa de fora, a fita se enrola e aperta mais rápido, vão menor e sorteado; estoura em faíscas (uma no coração) |
+| J♦ Feitiço de Sono | 2,42 → 2,58 | os Z entram por baixo do chão (um pouco mais espaçados para compensar) |
+| A♣ Empréstimo Educado | 1,00 → 1,25 | sem linha de caminho: a estrela espia na borda 560 ms e sai |
+
+Médias por carta (bot médio): Susie 1,13 → 1,28, Ralsei 1,26 → 1,35. Nenhum aviso `[telegrafo]`/`[rota de fuga]`.
+No Pisão o bot perfeito subiu (0,33 → 1,08 acerto) porque ele não enxerga a pegada (é decoração), só os pilares.
+
+**2026-10-17: cartas da Dess revistas** (`attacks/habilidades/dess.js`, `attacks/super/dess.js`).
+Todos os projéteis dela nascem fora da caixa e entram (sem piscar), com lados, ordem e posições
+sorteados; quem avisa é o próprio objeto (o taco no home plate, o microfone na parede, a guitarra
+na corda, o amplificador na borda). Testado com o coração PARADO (sem bot, 6 posições × 3
+sementes): todas as cartas e o SUPER acertam o coração parado.
+
+- 9♠ Home Run: o taco se prepara no home plate e a bola sai de fora mirando onde o coração está na
+  hora da tacada (antes, com 2 bolas, as duas abriam em volta do coração e parado ninguém apanhava).
+- K♠ Show de Rock: os acordes são gemas que ocupam a corda (ficar na divisa entre duas cordas não
+  salva mais); no refrão os acordes param e a labareda (um quarto da caixa) nasce sob o coração e o
+  segue pelo palco, mais devagar que ele, trava e sobe.
+- 8♦ Palheta: palhetas que perseguem o coração (Asgore/Toriel): fileira lateral que vira para ele,
+  cerco que se fecha onde ele estava e chuva que escorrega atrás dele.
+- Q♦ Feedback: mais fácil (2 passagens, mais lento, cresce menos, mais espaço entre as ondas).
+- 3♣ Bomba de Fumaça: latas arremessadas que estouram num anel de brasas; a nuvem corre com o vento.
+- 6♣ Amplificador: sem o cone de guia; o amplificador entra pela borda e vira atrás do coração.
+- Q♣ Palco Explosivo: bombas e ondas mais espaçadas (menos dano).
+- ★ Último Bis: as notas despencam nos trastes e EXPLODEM no chão (quadros `bonus-explosao-*` +
+  som `explosaoGrande`), com estilhaços; sai a faixa inteira do traste que machucava.
+
+Medido (bot médio, acertos por carta, 12 sementes; antes → depois): Home Run 0,33 → 1,17;
+Show de Rock 0,92 → 1,33; Palheta 1,25 → 1,67; Feedback 2,00 → 1,42; Fumaça 0,33 → 0,33;
+Amplificador 1,58 → 1,75; Palco Explosivo 1,50 → 1,00. SUPER (24 sementes): perfeito 11,4 → 2,7,
+médio 38,5 → 32,5. Nenhum aviso do validador.
+
+**Noelle: cartas normais sem guia e com projéteis entrando de fora** (`attacks/habilidades/noelle.js`).
+As balas nascem fora da caixa e entram (a entrada é o aviso: nada de bala piscando parada nem "!"),
+e lado, posição, instante e mirada são sorteados com a semente (nada de ritmo fixo).
+
+- **8♠ Granizo:** a coluna e o círculo do chão que piscavam saíram. As pedras caem de cima da caixa em instantes sorteados (algumas de viés). Agora são 3 ou 4 por leva, com mais lascas e mais mirada.
+- **3♣ Pingentes:** soltam do teto ou de uma parede lateral (sorteado a cada leva). A ponta sai da parede tremendo, e então o pingente dispara até cravar na parede oposta. Agora são 3 ou 4 por leva, com ritmo maior.
+- **7♣ Estalactites:** crescem do teto, do chão ou das laterais. No lugar da área piscando, a ponta aparece na parede. O crescimento começa devagar. Duas estalactites nunca se cruzam, e uma só nasce se o coração tiver por onde sair a tempo (busca numa grade de 6 px).
+- **J♣ Avalanche (refeita):** bolas de neve entram rolando por bordas sorteadas e fazem curva pesada atrás do coração; o passo para o lado na hora certa faz a bola passar reto. Elas crescem enquanto rolam e se espatifam na parede em torrões que voltam para dentro.
+- **Floco Afiado, Vento Gélido, Raio de Gelo, Inverno Eterno:**
+  - flocos, estilhaços, orbe e cristais vêm de fora;
+  - o lado da rajada é sorteado (não alterna mais);
+  - a mira do raio virou um fio fino;
+  - os sopros do inverno variam ±15%.
+
+Medido com 12 sementes (acertos por carta; bot médio, antes → depois):
+
+| Carta | Antes | Depois |
+|---|---|---|
+| Granizo | 0,67 | 1,17 |
+| Pingentes | 0,33 | 1,00 |
+| Estalactites | 0,50 | 1,25 |
+| Avalanche | 1,42 | 1,58 |
+| Vento Gélido | 0,08 | 0,42 |
+| Raio de Gelo | 1,17 | 1,00 |
+
+Média da Noelle: 0,85 → 1,08. Nenhum aviso do validador. O bot não enxerga a ponta da estalactite saindo da parede (é só decoração), então nessa carta ele leva um pouco mais do que quem joga.

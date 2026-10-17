@@ -5,29 +5,33 @@ import { particulas } from '../effects/particulas.js'
 
 // Caos Final: finalização em três fases, cada uma pedindo movimento o tempo todo.
 //
-//   1. Chuva de estrelas: estrelas saem do topo miradas no coração (linha de
-//      aviso + estrela piscando) e, ao bater na borda, estouram em
-//      fragmentos (o ponto de impacto pisca desde o disparo)
+//   1. Chuva de estrelas: estrelas entram de fora, pelo topo, miradas no
+//      coração (sem linha de aviso nem estrela parada piscando: a entrada é o
+//      aviso) e, ao bater na borda, estouram em fragmentos
 //   2. Cruz do caos: duas lâminas cruzadas giram em volta do centro da caixa
-//      (aviso das duas linhas antes). O giro inverte de tempos em tempos (as
-//      lâminas piscam antes) e o núcleo dispara tiros mirados. Numa caixa
-//      com lado < 150 px fica uma lâmina só
-//   3. Colapso: um anel do tamanho da caixa, com um vão do lado do coração,
-//      fecha no ponto onde o coração estava e explode em fragmentos. Até
-//      `aneis` seguidos (um só numa caixa com lado < 150 px)
+//      (o único aviso grande que sobrou: as duas linhas, curto, antes de elas
+//      aparecerem). O giro inverte em tempos sorteados (as lâminas piscam
+//      antes) e o núcleo dispara tiros mirados (ele incha um instante antes de
+//      cada tiro, sem linha). Numa caixa com lado < 150 px fica uma lâmina só
+//   3. Colapso: um anel um pouco maior que a caixa, com um vão do lado do
+//      coração, entra de fora e fecha no ponto onde o coração estava e explode
+//      em fragmentos (sem círculo piscando: o anel fechando mostra o ponto).
+//      Até `aneis` seguidos (um só numa caixa com lado < 150 px)
 //
 // Feito para caixas de pelo menos ~160x135 (caixaApertada de cartas.js cabe).
 //
 // Config (objetos parciais completam com o padrão):
 //   duracao   tempo ativo total
 //   fases     fração da duração de cada fase [estrelas, cruz, colapso]
-//   estrelas  { intervalo, velocidade, raio, aviso, espalhar, fragmentos, velocidadeFragmento }
-//   cruz      { bracos (2 = cruz, 1 = uma lâmina; null = 1 só em caixa pequena), giro, espessura, aviso, inverte, avisoInverte, viradaMs, tiro, velocidadeTiro, avisoTiro }
-//   colapso   { aneis, intervalo, quantidade, abertura, tempoFechar, aviso, fragmentos, velocidade, raio }
+//   estrelas  { intervalo, velocidade, raio, fora, espalhar, fragmentos, velocidadeFragmento }
+//   cruz      { bracos (2 = cruz, 1 = uma lâmina; null = 1 só em caixa pequena), giro, espessura, aviso, inverte, avisoInverte, viradaMs, tiro, velocidadeTiro, carga }
+//   colapso   { aneis, intervalo, quantidade, abertura, tempoFechar, fora, fragmentos, velocidade, raio }
+//
+// Nada de padrão fixo: intervalos, a variação do giro e a ordem saem dos sorteios com semente.
 const PADRAO = {
-  estrelas: { intervalo: 320, velocidade: 150, raio: 7, aviso: 450, espalhar: 70, fragmentos: 3, velocidadeFragmento: 95 },
-  cruz: { bracos: null, giro: 1.0, espessura: 10, aviso: 650, inverte: 1400, avisoInverte: 450, viradaMs: 300, tiro: 950, velocidadeTiro: 130, avisoTiro: 450 },
-  colapso: { aneis: 2, intervalo: 700, quantidade: 22, abertura: 1.15, tempoFechar: 1200, aviso: 550, fragmentos: 10, velocidade: 120, raio: 6 },
+  estrelas: { intervalo: 320, velocidade: 150, raio: 7, fora: 12, espalhar: 70, fragmentos: 3, velocidadeFragmento: 95 },
+  cruz: { bracos: null, giro: 1.0, espessura: 10, aviso: 500, inverte: 1400, avisoInverte: 450, viradaMs: 300, tiro: 950, velocidadeTiro: 130, carga: 260 },
+  colapso: { aneis: 2, intervalo: 700, quantidade: 22, abertura: 1.15, tempoFechar: 1200, fora: 14, fragmentos: 10, velocidade: 120, raio: 6 },
 }
 
 export default definirAtaque({
@@ -54,35 +58,39 @@ export default definirAtaque({
   },
 })
 
+// a.depois repetido com o intervalo variando um pouco (±variacao): como a.aCada, sem ritmo fixo
+function aCadaSorteado(a, ms, fn, atraso, variacao = 0.15) {
+  let i = 0
+  const disparar = () => {
+    fn(i++)
+    a.depois((ms / a.ritmo.densidade) * a.aleatorio(1 - variacao, 1 + variacao), disparar)
+  }
+  a.depois(atraso, disparar)
+}
+
 // ---------- fase 1: chuva de estrelas ----------
 
 function faseEstrelas(a, cfg, ate) {
   let parar = false
   a.depois(ate, () => (parar = true))
-  a.aCada(
+  aCadaSorteado(
+    a,
     cfg.intervalo,
     (i) => {
       if (parar) return
       const l = a.caixa
       const c = a.alvo()
       const x0 = limitar(c.x + a.aleatorio(-cfg.espalhar, cfg.espalhar), l.left + 12, l.right - 12)
-      const y0 = l.top + 8
+      // nasce fora da caixa, acima da borda de cima
+      const y0 = l.top - cfg.fora
       // sempre descendo: entre 25° e 155° (nada quase na horizontal)
       let dir = Math.atan2(Math.max(c.y - y0, 1), c.x - x0)
       dir = limitar(dir, 0.44, Math.PI - 0.44)
       const cos = Math.cos(dir)
       const sin = Math.sin(dir)
-
-      // ponto onde a estrela bate na borda da caixa
       const m = cfg.raio
-      const tx = cos > 0 ? (l.right - m - x0) / cos : cos < 0 ? (l.left + m - x0) / cos : Infinity
-      const ty = (l.bottom - m - y0) / sin
-      const dist = Math.max(0, Math.min(tx, ty))
-      const impacto = { x: x0 + cos * dist, y: y0 + sin * dist }
-      const veloc = Math.min(cfg.velocidade * a.balas.fatorVelocidade, a.balas.velocidadeMax)
-      const viagem = (dist / veloc) * 1000
+      let estourou = false
 
-      a.aviso({ tipo: 'linha', x1: x0, y1: y0, x2: x0 + cos * 46, y2: y0 + sin * 46, espessura: 2, ms: cfg.aviso })
       a.bala({
         x: x0,
         y: y0,
@@ -90,34 +98,35 @@ function faseEstrelas(a, cfg, ate) {
         vy: sin * cfg.velocidade,
         raio: cfg.raio,
         forma: a.forma(i),
-        aviso: cfg.aviso,
-        vida: viagem,
+        jaAvisada: true,
+        vida: 4000,
         girar: 6,
-      })
-
-      if (cfg.fragmentos <= 0) return
-      // o ponto de impacto pisca desde o disparo (aviso + viagem >= 450 ms)
-      a.aviso({ tipo: 'circulo', x: impacto.x, y: impacto.y, raio: 16, ms: cfg.aviso + viagem }, () => {
-        particulas(a.cena, impacto.x, impacto.y, { cor: a.cor(a.forma(i)), quantidade: 6, velocidade: 90 })
-        // fragmentos voltam para dentro da caixa, em leque
-        const base = Math.atan2(a.caixa.centerY - impacto.y, a.caixa.centerX - impacto.x)
-        for (let k = 0; k < cfg.fragmentos; k++) {
-          const ang = base + (k - (cfg.fragmentos - 1) / 2) * 0.6
-          a.bala({
-            x: impacto.x,
-            y: impacto.y,
-            vx: Math.cos(ang) * cfg.velocidadeFragmento,
-            vy: Math.sin(ang) * cfg.velocidadeFragmento,
-            raio: 5,
-            forma: a.forma(i + k + 1),
-            girar: 6,
-            vida: 1400, // somem antes de atravessar a caixa toda (não sujam a fase seguinte)
-            jaAvisada: true,
-          })
-        }
+        atualizar: (b) => {
+          // bateu na borda (lados ou chão): estoura em fragmentos que voltam para dentro, em leque
+          const lim = a.caixa
+          if (estourou || (b.x > lim.left + m && b.x < lim.right - m && b.y < lim.bottom - m)) return
+          estourou = true
+          b.morta = true
+          if (cfg.fragmentos <= 0 || b.inofensiva || a.tempo > a.fim) return
+          particulas(a.cena, b.x, b.y, { cor: a.cor(a.forma(i)), quantidade: 6, velocidade: 90 })
+          const base = Math.atan2(lim.centerY - b.y, lim.centerX - b.x) + a.aleatorio(-0.2, 0.2)
+          for (let k = 0; k < cfg.fragmentos; k++) {
+            const ang = base + (k - (cfg.fragmentos - 1) / 2) * 0.6
+            a.bala({
+              x: b.x,
+              y: b.y,
+              vx: Math.cos(ang) * cfg.velocidadeFragmento,
+              vy: Math.sin(ang) * cfg.velocidadeFragmento,
+              raio: 5,
+              forma: a.forma(i + k + 1),
+              girar: 6,
+              vida: 1400, // somem antes de atravessar a caixa toda (não sujam a fase seguinte)
+              jaAvisada: true,
+            })
+          }
+        },
       })
     },
-    Infinity,
     200,
   )
 }
@@ -192,8 +201,9 @@ function faseCruz(a, cfg, duracao) {
     }
   })
 
-  // inversões do giro: as lâminas piscam e então viram
-  a.aCada(
+  // inversões do giro (em tempos sorteados): as lâminas piscam e então viram
+  aCadaSorteado(
+    a,
     cfg.inverte,
     () => {
       if (!estado.ativa || estado.fim) return
@@ -203,31 +213,36 @@ function faseCruz(a, cfg, duracao) {
         estado.sentido = -estado.sentido
       })
     },
-    Infinity,
-    cfg.aviso + Math.max(0, cfg.inverte - cfg.avisoInverte),
+    cfg.aviso + Math.max(0, cfg.inverte - cfg.avisoInverte) * a.aleatorio(0.8, 1.2),
+    0.25,
   )
 
-  // o núcleo atira no coração
-  a.aCada(
+  // o núcleo atira no coração: incha um instante (a carga) e dispara, sem linha de aviso
+  aCadaSorteado(
+    a,
     cfg.tiro,
     (i) => {
       if (!estado.ativa || estado.fim) return
-      const c = a.alvo()
-      const dir = Math.atan2(c.y - cy, c.x - cx)
-      a.aviso({ tipo: 'linha', x1: cx, y1: cy, x2: cx + Math.cos(dir) * 50, y2: cy + Math.sin(dir) * 50, espessura: 2, ms: cfg.avisoTiro })
-      a.bala({
-        x: cx,
-        y: cy,
-        vx: Math.cos(dir) * cfg.velocidadeTiro,
-        vy: Math.sin(dir) * cfg.velocidadeTiro,
-        raio: 6,
-        forma: a.forma(i + 2),
-        aviso: cfg.avisoTiro,
-        girar: 5,
+      a.cena.tweens.add({ targets: nucleo, alpha: 0.4, duration: cfg.carga / 2, yoyo: true })
+      a.depois(cfg.carga, () => {
+        if (!estado.ativa || estado.fim) return
+        const c = a.alvo()
+        const dir = Math.atan2(c.y - cy, c.x - cx)
+        tocar(a.cena, 'estalo')
+        a.bala({
+          x: cx + Math.cos(dir) * 10,
+          y: cy + Math.sin(dir) * 10,
+          vx: Math.cos(dir) * cfg.velocidadeTiro,
+          vy: Math.sin(dir) * cfg.velocidadeTiro,
+          raio: 6,
+          forma: a.forma(i + 2),
+          jaAvisada: true, // sai do núcleo, que está à vista e acabou de inchar
+          girar: 5,
+        })
       })
     },
-    Infinity,
-    cfg.aviso + cfg.tiro * 0.5,
+    cfg.aviso + cfg.tiro * a.aleatorio(0.35, 0.65),
+    0.2,
   )
 
   // fim da fase: as lâminas se desfazem (inofensivas) antes do colapso
@@ -246,14 +261,15 @@ function faseCruz(a, cfg, duracao) {
 
 function faseColapso(a, cfg, duracao) {
   const l = a.caixa
-  const rx = l.width / 2 - 8
-  const ry = l.height / 2 - 8
+  // o anel nasce um pouco FORA da caixa e entra fechando
+  const rx = l.width / 2 + cfg.fora
+  const ry = l.height / 2 + cfg.fora
   // abertura medida no menor raio da elipse (no começo do fechamento); numa caixa pequena ela cresce
   const abertura = Math.max(cfg.abertura, (a.lacunaMinima + 2 * cfg.raio + 4) / Math.min(rx, ry))
   a.lacuna(abertura * Math.min(rx, ry) - 2 * cfg.raio, 'vão do colapso')
 
   // cabe quantos anéis na fase (o último ainda explode antes do fim, com 300 ms de folga)
-  const ciclo = cfg.aviso + cfg.tempoFechar
+  const ciclo = cfg.tempoFechar
   const cabem = Math.max(1, Math.floor((duracao - ciclo - 300) / cfg.intervalo) + 1)
   // numa caixa pequena (lado < 150) dois anéis juntos não deixam espaço: fica um só
   const aneis = Math.min(cfg.aneis, cabem, Math.min(l.width, l.height) < 150 ? 1 : Infinity)
@@ -266,8 +282,9 @@ function faseColapso(a, cfg, duracao) {
       const alvo = { x: limitar(c.x, l.left + 30, l.right - 30), y: limitar(c.y, l.top + 30, l.bottom - 30) }
       // o vão fica do lado do coração (com uma variação), para dar tempo de chegar nele
       const vao = Math.atan2(c.y - cy, c.x - cx) + a.aleatorio(-1.1, 1.1)
+      const fechar = cfg.tempoFechar * a.aleatorio(0.92, 1.08)
       const passo = (Math.PI * 2 - abertura) / (cfg.quantidade - 1)
-      const s = cfg.tempoFechar / 1000
+      const s = fechar / 1000
       tocar(a.cena, 'aviso')
 
       for (let k = 0; k < cfg.quantidade; k++) {
@@ -279,16 +296,16 @@ function faseColapso(a, cfg, duracao) {
           y,
           vx: (alvo.x - x) / s,
           vy: (alvo.y - y) / s,
-          vida: cfg.tempoFechar * 0.9,
+          vida: fechar * 0.9,
           raio: cfg.raio,
           forma: a.forma(k + n),
-          aviso: cfg.aviso,
+          jaAvisada: true, // entra de fora: o anel fechando é o aviso
           girar: 3,
         })
       }
 
-      // o ponto de colapso pisca o tempo todo e explode quando o anel chega
-      a.aviso({ tipo: 'circulo', x: alvo.x, y: alvo.y, raio: 24, ms: cfg.aviso + cfg.tempoFechar }, () => {
+      // explode quando o anel chega no ponto de colapso
+      a.depois(fechar, () => {
         tocar(a.cena, 'explosao')
         particulas(a.cena, alvo.x, alvo.y, { cor: 0xffc040, quantidade: 18, velocidade: 170 })
         const giro = a.aleatorio(0, Math.PI * 2)

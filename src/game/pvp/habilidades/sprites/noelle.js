@@ -24,6 +24,7 @@ export default {
     imagem('estalactite'), // Estalactites
     imagem('bola'), // Avalanche
     imagem('monte'),
+    imagem('torrao'),
   ],
-  sons: ['floco', 'granizo', 'vento', 'raio', 'congelar', 'estalactite', 'avalanche'].map(som),
+  sons: ['floco', 'granizo', 'vento', 'raio', 'congelar', 'estalactite', 'avalanche', 'espatifar'].map(som),
 }

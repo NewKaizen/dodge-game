@@ -1,7 +1,7 @@
 // node --test src/game/pvp/__tests__/
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { lerAtrasado, MAPAS_TECLADO, MAPA_NORMAL, aplicarMapa, inverterMapa, sortearMapa, setaResultante, SETAS, MODOS_CLONE, espelhar } from '../bonusInformatica.js'
+import { lerAtrasado, MAPAS_TECLADO, MAPA_NORMAL, aplicarMapa, inverterMapa, sortearMapa, setaResultante, SETAS } from '../bonusInformatica.js'
 import { eventosDaArena } from '../arenas.js'
 import { criarRng, aleatorio } from '../baralho.js'
 
@@ -52,22 +52,8 @@ test('teclado: o sorteio nunca repete o mapa atual', () => {
   }
 })
 
-test('clone: o espelho fica dentro da caixa e espelhar duas vezes volta ao lugar', () => {
-  const l = { left: 50, right: 270, top: 113, bottom: 283 }
-  for (const modo of MODOS_CLONE) {
-    for (const [x, y] of [[60, 120], [160, 198], [265, 280]]) {
-      const p = espelhar(modo, l, x, y)
-      assert.ok(p.x >= l.left && p.x <= l.right && p.y >= l.top && p.y <= l.bottom, modo)
-      assert.deepEqual(espelhar(modo, l, p.x, p.y), { x, y }, modo)
-    }
-  }
-  assert.deepEqual(espelhar('lados', l, 60, 120), { x: 260, y: 120 })
-  assert.deepEqual(espelhar('cimaBaixo', l, 60, 120), { x: 60, y: 276 })
-  assert.deepEqual(espelhar('centro', l, 60, 120), { x: 260, y: 276 })
-})
-
 test('sala de informática: pelo menos 10 bônus, com os 6 da sala', () => {
   const ids = eventosDaArena('informatica').map((e) => e.id)
   assert.ok(ids.length >= 10, `só ${ids.length}`)
-  for (const id of ['popups', 'lag', 'teclado', 'clone', 'telaAzul', 'cursor']) assert.ok(ids.includes(id), id)
+  for (const id of ['popups', 'lag', 'teclado', 'copia', 'telaAzul', 'cursor']) assert.ok(ids.includes(id), id)
 })

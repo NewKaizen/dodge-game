@@ -14,11 +14,15 @@ Sprites (chaves em src/game/pvp/habilidades/sprites/kris.js, prefixo hab-kris-):
   pegada.png    11x18   pegada de bota, bico para cima (Passo Calculado)
   pisada.png    24x24   impacto da pisada no chão
   peao.png      12x14   peão de xadrez (Plano Tático: as tropas que marcham)
-  seta.png      14x14   ponta de seta do plano, para a direita
   alma.png      2 quadros 24x22: a alma vermelha (normal e pulsando) (Controle da Alma)
   caco.png      10x10   caco da alma (os anéis que ela solta)
   placa.png     3 quadros 24x24: placa armada, clique (furos vermelhos), espinhos para cima
                 (Armadilha de Espinhos)
+  lamina.png    28x8    lâmina silenciosa: punhal pálido de fio ciano, ponta para a direita
+                (Silêncio, o ataque leve do Ás de ouros)
+
+Sons: corte, estoque, passo, olhar, pulso, clique, espinhos e silencio (o "shhh"
+abafado que apaga a caixa no Silêncio).
 """
 
 import math
@@ -396,19 +400,6 @@ def gerar_peao():
     return img
 
 
-def gerar_seta():
-    n = 14
-    img = nova(n, n)
-    for y in range(n):
-        for x in range(n):
-            # triângulo apontando para a direita
-            fx = x - 1
-            lim = (12 - fx) * 0.5
-            if 0 <= fx <= 12 and abs(y - 6.5) <= lim:
-                por(img, x, y, GELO if y < 6.5 else CIANO)
-    contornar(img, AZUL_ESCURO)
-    return img
-
 
 # ---------- Controle da Alma ----------
 
@@ -509,6 +500,36 @@ def gerar_placa():
     return folha([placa(0), placa(1), placa(2)])
 
 
+# ---------- Silêncio: lâmina silenciosa ----------
+
+
+def gerar_lamina():
+    w, h = 28, 8
+    img = nova(w, h)
+    cy = 3
+    # cabo curto, enrolado em couro escuro
+    for x in range(1, 6):
+        por(img, x, cy, CABO_CLARO if x % 2 else CABO)
+        por(img, x, cy + 1, CABO)
+    # guarda fina
+    for y in range(cy - 2, cy + 4):
+        por(img, 6, y, GUARDA_CLARA if y < cy + 1 else GUARDA)
+    # lâmina pálida, quase fantasma (sem reflexo vermelho, sem brilho de metal):
+    # clara para ser vista no escuro da caixa, com o fio ciano embaixo
+    ini, ponta = 7, w - 2
+    for x in range(ini, ponta + 1):
+        k = (x - ini) / (ponta - ini)
+        por(img, x, cy - 1, BRANCO if k < 0.9 else GELO)
+        if k < 0.97:
+            por(img, x, cy, GELO if x % 5 else BRANCO)
+        if k < 0.82:
+            por(img, x, cy + 1, CIANO)
+        if k < 0.55:
+            por(img, x, cy + 2, AZUL)
+    contornar(img, AZUL_ESCURO)
+    return img
+
+
 # ---------- sons ----------
 
 
@@ -582,6 +603,13 @@ def sons():
     sobe = np.sin(2 * np.pi * (700 + 2600 * t) * t) * np.exp(-t * 12) * 0.5
     salvar_som('espinhos.wav', ruido + sobe)
 
+    # silencio: "shhh" abafado que some (a caixa fica muda)
+    t = tempo(0.7)
+    chiado = media(rng.normal(0, 1, len(t)), 3) - media(rng.normal(0, 1, len(t)), 40)
+    env = np.clip(t / 0.08, 0, 1) * np.exp(-t * 4.5)
+    grave = np.sin(2 * np.pi * (70 - 25 * t) * t) * np.exp(-t * 6) * 0.35
+    salvar_som('silencio.wav', chiado * env * 0.8 + grave)
+
 
 def main():
     salvar(gerar_espada(), 'espada.png')
@@ -592,10 +620,10 @@ def main():
     salvar(gerar_pegada(), 'pegada.png')
     salvar(gerar_pisada(), 'pisada.png')
     salvar(gerar_peao(), 'peao.png')
-    salvar(gerar_seta(), 'seta.png')
     salvar(gerar_alma(), 'alma.png')
     salvar(gerar_caco(), 'caco.png')
     salvar(gerar_placa(), 'placa.png')
+    salvar(gerar_lamina(), 'lamina.png')
     sons()
 
 
