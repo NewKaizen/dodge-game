@@ -3,6 +3,7 @@ import { LARGURA } from '../../../constants.js'
 import { tocar } from '../../../audio.js'
 import { shake } from '../../../effects/shake.js'
 import { etiqueta, poeirinha, texturaRede, texturaReciario, chaoDeAreia } from './arteColiseu.js'
+import { registrarZona } from '../../../attacks/zonas.js'
 
 // REDE DO RECIÁRIO: um gladiador de rede e tridente fica entre as caixas e
 // joga a rede, uma caixa de cada vez (alternando). O aviso: um círculo
@@ -71,6 +72,7 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
     const sombra = guardar(arena.add.ellipse(x, y, RAIO * 2, RAIO * 2, 0x1a0a04, 0).setDepth(3))
     pista.caixa.recortar(alvo, sombra)
     redes.push({ j, pista, x, y, t0: t, alvo, sombra, voando: null })
+    registrarZona(pista.balas, { tipo: 'circulo', x, y, raio: RAIO }, { ms: AVISO_MS / aceleracao, dura: 150 }) // a CPU lê o alvo e foge da rede
     gladiador.setFlipX(j === 0).setFrame('r0')
     return true
   }

@@ -1,6 +1,7 @@
 import { tocar } from '../../../audio.js'
 import { shake } from '../../../effects/shake.js'
 import { poeirinha, texturaBiga, chaoDeAreia } from './arteColiseu.js'
+import { registrarZona } from '../../../attacks/zonas.js'
 
 // CORRIDA DE BIGAS: a caixa vira uma pista de corrida com FAIXAS horizontais
 // (linhas de cal no chão) e cada faixa tem o seu sentido, alternado: a de cima
@@ -75,6 +76,8 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
       },
     })
     bala.sprite.setVisible(false)
+    // a CPU lê a faixa inteira (a bala piscando só mostra a ela o começo do caminho)
+    registrarZona(pista.balas, { tipo: 'area', x: l.left, y: y - bala.altura / 2, largura: l.width, altura: bala.altura }, { ms: AVISO_MS / aceleracao, dura: ((l.width + CORPO.largura + 16) / VELOCIDADE) * 1000 })
     const sombra = guardar(arena.add.ellipse(x0, y + 13, 60, 8, 0x000000, 0.3).setDepth(4))
     const sprite = guardar(arena.add.sprite(x0, y, texturaBiga(arena), 'b0').setDepth(7).setFlipX(dir < 0))
     // nuvem de poeira na entrada (o aviso)

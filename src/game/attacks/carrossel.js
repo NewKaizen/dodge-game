@@ -255,6 +255,9 @@ export default definirAtaque({
           // a bala do anel pisca carregando (é o aviso) e então atira de onde
           // estiver, mirando onde o coração estava quando ela começou a carregar
           origem.carga = cfg.avisoTiro
+          // a CPU lê a bala carregando como uma linha curta na direção do alvo (sem desenho)
+          const d0 = Math.atan2(c.y - origem.b.y, c.x - origem.b.x)
+          a.zonaPerigo({ tipo: 'linha', x1: origem.b.x, y1: origem.b.y, x2: origem.b.x + Math.cos(d0) * 50, y2: origem.b.y + Math.sin(d0) * 50, espessura: 2 }, { ms: cfg.avisoTiro })
           a.depois(cfg.avisoTiro, () => {
             const { b } = origem
             if (estado.desfeito || b.morta || b.inofensiva || !dentro(l, b.x, b.y, 6)) return

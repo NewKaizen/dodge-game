@@ -1675,6 +1675,7 @@ export default class PvpArena extends Phaser.Scene {
       coracao,
       limites: pista.caixa.limites,
       balas: pista.balas.lista,
+      zonas: pista.balas.zonas, // avisos de área (attacks/zonas.js): a CPU lê o vermelho
       velocidade: pista.velocidadeCoracao,
       fatorVelocidade: pista.balas.fatorVelocidade,
       velocidadeMax: pista.balas.velocidadeMax,

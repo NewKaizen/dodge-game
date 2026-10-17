@@ -41,6 +41,8 @@ export default definirAtaque({
     const lanca = (daEsquerda, y, aviso) => {
       const dir = daEsquerda ? 1 : -1
       const carga = Math.max(ATAQUE.telegrafoMs, (cfg.carga + aviso * 0.5) * a.aleatorio(0.9, 1.15))
+      // quem joga vê a ponta na borda e sabe a fileira: a CPU também (zona, sem desenho)
+      a.zonaPerigo({ tipo: 'linha', x1: l.left, y1: y, x2: l.right, y2: y, espessura: cfg.espessura }, { ms: carga })
       a.bala({
         // nasce fora, com a ponta encostando na borda: o que aparece é a ponta entrando
         x: daEsquerda ? l.left - cfg.comprimento / 2 + 2 : l.right + cfg.comprimento / 2 - 2,
@@ -50,7 +52,7 @@ export default definirAtaque({
         altura: cfg.espessura,
         forma: 'barra',
         entrando: true,
-        arranque: { ms: carga, vx: dir * cfg.velocidade, vy: 0, rastro: true }, // dispara (os bots já leem)
+        arranque: { ms: carga, vx: dir * cfg.velocidade, vy: 0 }, // dispara (os bots já leem)
       })
     }
 

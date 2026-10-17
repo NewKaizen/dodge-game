@@ -10,8 +10,8 @@
 //     filtro: personagens ("asriel,dess") ou ids de carta ("asriel-ouros-13")
 //     URL_JOGO (padrão http://localhost:5175/) e CHROMIUM (executável) no ambiente
 //
-// Para o bot se parecer com quem joga (o EsquivaBot da CPU só enxerga balas):
-//   - os avisos de área (a.aviso) viram balas "fantasmas" que valem quando o aviso acaba;
+// Para o bot se parecer com quem joga (o EsquivaBot da CPU já lê os avisos de
+// área sozinho, pelas zonas de perigo da pista: attacks/zonas.js), aqui ainda:
 //   - balas que andam sozinhas (atualizar / aoAtualizar mexendo em x, y, angulo)
 //     entram com a velocidade observada no último quadro;
 //   - lâminas girando rápido em volta de uma ponta viram o disco que elas varrem.
@@ -37,32 +37,10 @@ const resultado = await page.evaluate(
     const { EsquivaBot } = await import('/src/game/pvp/botEsquiva.js')
     const { CARTAS, TEMAS, resumoDoAtaque, ehSuper } = await import('/src/game/pvp/cartas.js')
     const { ataqueDaCartaNoJogo } = await import('/src/game/pvp/ataquesDasCartas.js')
-    const { default: Ctx } = await import('/src/game/attacks/contexto.js')
-    // o bot enxerga os avisos de área (a.aviso) como balas que ainda vão valer
-    const fantasmas = []
-    const VE_AVISOS = true
+    // os avisos de área (a.aviso / a.zonaPerigo) o bot já enxerga sozinho, pelas
+    // zonas de perigo da pista (pista.balas.zonas), como a CPU do jogo
     const VE_MOVIMENTO = true
     const anteriores = new WeakMap()
-    const avisoOriginal = Ctx.prototype.aviso
-    Ctx.prototype.aviso = function (forma, depois) {
-      const ms = forma.ms ?? 400
-      let f = null
-      if (forma.tipo === 'area') f = { tipo: 'retangulo', x: forma.x + forma.largura / 2, y: forma.y + forma.altura / 2, largura: forma.largura, altura: forma.altura }
-      else if (forma.tipo === 'circulo') f = { tipo: 'circulo', x: forma.x, y: forma.y, raio: forma.raio }
-      else if (forma.tipo === 'linha') {
-        const dx = forma.x2 - forma.x1
-        const dy = forma.y2 - forma.y1
-        f = { tipo: 'segmento', x: (forma.x1 + forma.x2) / 2, y: (forma.y1 + forma.y2) / 2, comprimento: Math.hypot(dx, dy), espessura: Math.max(4, forma.espessura ?? 2), angulo: Math.atan2(dy, dx) }
-      }
-      if (f && VE_AVISOS) {
-        Object.assign(f, { vx: 0, vy: 0, aviso: ms, idade: 0, fantasma: true })
-        fantasmas.push(f)
-      }
-      return avisoOriginal.call(this, forma, () => {
-        if (f) f.morta = true
-        depois?.()
-      })
-    }
     const jogo = window.debugJogo.jogo
     const cena = jogo.scene.getScenes(true)[0]
     const pista = new Pista(cena, {
@@ -123,7 +101,6 @@ const resultado = await page.evaluate(
       c.x = l.centerX
       c.y = l.bottom - 30
       c.invencivelMs = 0
-      fantasmas.length = 0
       let pronto = false
       pista.rodar(ataque, { dano, ritmo, semente: `medida:${semente}` }).then(() => (pronto = true))
       for (let i = 0; i < 5; i++) await Promise.resolve()
@@ -131,11 +108,6 @@ const resultado = await page.evaluate(
       let frames = 0
       while (pista.rodando && frames < 60 * 40) {
         const inv = inverterMs > 0 && pista.atacando
-        for (let i = fantasmas.length - 1; i >= 0; i--) {
-          const f = fantasmas[i]
-          if (f.morta || !pista.rodando) fantasmas.splice(i, 1)
-          else f.idade = Math.min(f.aviso - 1, f.idade + DT)
-        }
         // balas com movimento próprio (atualizar mexe em x/y/angulo): o bot usa
         // a velocidade observada no último frame, como um jogador que vê a bala andar
         const fator = pista.balas.fatorVelocidade || 1
@@ -171,7 +143,8 @@ const resultado = await page.evaluate(
         let joy = bot.joy(DT, {
           coracao: c,
           limites: pista.caixa.limites,
-          balas: fantasmas.length || discos.length ? [...vistas, ...fantasmas, ...discos] : vistas,
+          balas: discos.length ? [...vistas, ...discos] : vistas,
+          zonas: pista.balas.zonas,
           velocidade: pista.velocidadeCoracao,
           fatorVelocidade: pista.balas.fatorVelocidade,
           velocidadeMax: pista.balas.velocidadeMax,

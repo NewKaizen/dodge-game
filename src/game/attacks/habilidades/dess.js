@@ -778,6 +778,8 @@ const dessAmplificador = definirAtaque({
       const amp = a.decoracao(a.cena.add.image(fora.x, fora.y, T('amp')).setDepth(6).setRotation(dir + Math.PI / 2).setScale(0.85))
       a.cena.tweens.add({ targets: amp, x: p.x, y: p.y, duration: 200, ease: 'Back.easeOut' })
       a.cena.tweens.add({ targets: amp, scaleX: 0.92, duration: 50, yoyo: true, repeat: Math.floor(cfg.aquece / 100) - 2, delay: 200 })
+      // a CPU lê para onde o amplificador aponta (o cone que ele vai varrer, com a virada atrás do coração)
+      a.zonaPerigo({ tipo: 'leque', x: p.x, y: p.y, raio: 320, angulo: dir, abertura: Math.atan(cfg.abertura) + cfg.vira }, { ms: cfg.aquece, dura: cfg.pulsos * cfg.batida + 400 })
 
       a.aCada(
         cfg.batida,

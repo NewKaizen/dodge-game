@@ -417,6 +417,8 @@ const ralseiBolinho = definirAtaque({
       const fora = p.ponto(u, -14)
       const lugar = p.ponto(u, 12)
 
+      // a CPU lê a contagem do bolinho (o estouro sai da parede para dentro)
+      a.zonaPerigo({ tipo: 'circulo', x: lugar.x + p.n.x * 12, y: lugar.y + p.n.y * 12, raio: 34 }, { ms: cfg.entrada + contagem, dura: 300 })
       let estourou = false
       const bolinho = a.bala({
         ...fora,

@@ -25,9 +25,8 @@ const ESCALA_BARRA = 32 / 24 // textura bala-barra: miolo de 24px numa tela de 3
 //                      Sem `aviso`/`jaAvisada`/`entrando`, uma bala que nasce fora da
 //                      caixa com velocidade apontando para dentro já conta como
 //                      entrando (entrando: false volta ao antigo: parada fora com "!")
-//   arranque           { ms, vx, vy, ax?, ay?, rastro? }: aos `ms` de idade a velocidade passa
-//                      a ser (vx, vy) (e a aceleração (ax, ay), se vier). rastro: true faz os
-//                      bots tratarem a reta do disparo como perigo já durante a espera
+//   arranque           { ms, vx, vy, ax?, ay? }: aos `ms` de idade a velocidade passa a ser
+//                      (vx, vy) (e a aceleração (ax, ay), se vier).
 //                      Para a bala que espia na borda devagar e depois dispara (lança,
 //                      lâmina, forcado): os bots (pvp/botEsquiva.js) leem o arranque e
 //                      desviam antes, como quem vê a ponta parada na borda

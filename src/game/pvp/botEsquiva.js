@@ -2,7 +2,7 @@
 // move o coração do bot na pista dele. Lógica pura (sem Phaser).
 //
 //   const esquiva = new EsquivaBot({ nivel: 'normal' })
-//   todo frame:  joy = esquiva.joy(dt, { coracao, limites, balas, velocidade, fatorVelocidade, velocidadeMax, invertido })
+//   todo frame:  joy = esquiva.joy(dt, { coracao, limites, balas, zonas, velocidade, fatorVelocidade, velocidadeMax, invertido })
 //
 // A cada `decidirMs` o bot testa 16 direções e ficar parado: simula as balas
 // em linha reta (com aceleração) por `horizonteMs` e dá nota a cada caminho
@@ -10,14 +10,24 @@
 // depois), mais um empurrão leve para longe das paredes e para o centro.
 // Balas ainda telegrafando ficam paradas e só contam depois do aviso. Balas
 // com `arranque` (espiam devagar na borda e depois disparam) são previstas
-// já com o disparo, como quem vê a ponta da lança esperando na borda (com
-// arranque.rastro, a reta inteira do disparo já conta como perigo).
+// já com o disparo.
+//
+// O bot também LÊ OS AVISOS (o vermelho na tela), como quem joga: as zonas de
+// perigo (attacks/zonas.js: a.aviso, a.zonaPerigo, eventos do bônus) e o
+// caminho das balas que ainda estão piscando. Terminar o caminho dentro de
+// uma zona que vai valer custa mais quanto menos tempo sobra para sair dela
+// (e quanto mais fundo se está); zona já valendo pesa como bala. Assim ele
+// sai com antecedência pela borda mais perto. Se tudo é perigo, fica com o
+// caminho menos ruim (a nota é contínua, nunca trava).
 // Os níveis erram de propósito: reagem mais devagar, enxergam menos à frente
-// e às vezes escolhem uma direção qualquer.
+// e às vezes escolhem uma direção qualquer; os avisos, o fácil nota tarde e
+// só os que estão para estourar, o difícil vê cedo.
 //
 // coracao: { x, y, hitbox }   limites: { left, right, top, bottom }
 // balas: lista de Bullets.js (usa tipo, x, y, vx, vy, ax, ay, raio, largura,
 //        altura, comprimento, espessura, angulo, girar, idade, aviso, arranque, inofensiva, morta)
+// zonas: lista de zonas de perigo (pista.balas.zonas; ver attacks/zonas.js), opcional
+import { folgaZona } from '../attacks/zonas.js'
 
 // decidirMs   de quanto em quanto tempo reavalia (tempo de reação)
 // horizonteMs quanto à frente simula
@@ -28,18 +38,21 @@
 //             até CONFUSAO_RESIDUAL dela (o bot "se acostuma", como gente)
 // lapso       chance, a cada decisão, de "se distrair" e seguir na mesma direção
 // lapsoMs     por quanto tempo (é o que faz a CPU tomar dano como gente)
+// avisos (zonas de perigo e balas piscando):
+//   reacaoMs   quanto tempo um aviso precisa estar na tela para o bot notar
+//   visaoMs    só liga para avisos que valem em até tanto tempo (o resto ainda "não é com ele")
+//   peso       quanto o bot respeita o aviso (o fácil arrisca ficar na beirada)
 const NIVEIS_ESQUIVA = {
-  facil: { decidirMs: 200, horizonteMs: 240, margem: 2, erro: 0.25, confusao: 0.4, adaptaMs: 4000, lapso: 0.1, lapsoMs: 650 },
-  normal: { decidirMs: 130, horizonteMs: 330, margem: 5, erro: 0.1, confusao: 0.25, adaptaMs: 2500, lapso: 0.05, lapsoMs: 500 },
-  dificil: { decidirMs: 70, horizonteMs: 520, margem: 9, erro: 0.02, confusao: 0.08, adaptaMs: 1500, lapso: 0.008, lapsoMs: 300 },
+  facil: { decidirMs: 200, horizonteMs: 240, margem: 2, erro: 0.25, confusao: 0.4, adaptaMs: 4000, lapso: 0.1, lapsoMs: 650, avisos: { reacaoMs: 320, visaoMs: 500, peso: 0.5 } },
+  normal: { decidirMs: 130, horizonteMs: 330, margem: 5, erro: 0.1, confusao: 0.25, adaptaMs: 2500, lapso: 0.05, lapsoMs: 500, avisos: { reacaoMs: 200, visaoMs: 800, peso: 0.8 } },
+  dificil: { decidirMs: 70, horizonteMs: 520, margem: 9, erro: 0.02, confusao: 0.08, adaptaMs: 1500, lapso: 0.008, lapsoMs: 300, avisos: { reacaoMs: 90, visaoMs: 1300, peso: 1 } },
 }
 const CONFUSAO_RESIDUAL = 0.35
 
 const PASSO_MS = 35 // passo da simulação
-const RASTRO_MS = 900 // arranque: até quanto depois do disparo o bot "lê" a reta da bala
-const RASTRO_PX = 10 // distância entre as amostras do rastro
-const RASTRO_MAX = 40
 const MEIO = 8 // metade do coração (CORACAO.tamanho / 2): o centro não passa daqui na parede
+const CAMINHO_PISCANDO_MS = 350 // quanto do caminho de uma bala piscando o bot evita (ms depois de sair)
+const FOLGA_URGENCIA_MS = 160 // folga (ms além do necessário para sair) em que a urgência cai à metade
 const DIRECOES = [{ x: 0, y: 0 }, ...Array.from({ length: 16 }, (_, k) => ({ x: Math.cos((k * Math.PI) / 8), y: Math.sin((k * Math.PI) / 8) }))]
 
 // Distância entre um ponto e a borda da bala (negativa = dentro). Igual a Balas.folga.
@@ -101,6 +114,39 @@ function preverBala(b, ms, fator, vmax) {
   return { x: b.x + dx, y: b.y + dy, angulo: (b.angulo ?? 0) + (b.tipo === 'segmento' ? (b.girar ?? 0) * s : 0) }
 }
 
+// Zona de perigo do caminho de uma bala que ainda pisca: ela vai passar por
+// ali logo depois do aviso (parada: a própria bala). Mesma forma das zonas.
+export function zonaDaBalaPiscando(b, fator = 1) {
+  const espera = (b.aviso ?? 0) - (b.idade ?? 0)
+  if (b.morta || b.inofensiva || espera <= 0) return null
+  const tempo = { falta: espera, idade: b.idade ?? 0, dura: CAMINHO_PISCANDO_MS }
+  const s = CAMINHO_PISCANDO_MS / 1000
+  const dx = (b.vx ?? 0) * fator * s + 0.5 * (b.ax ?? 0) * fator * s * s
+  const dy = (b.vy ?? 0) * fator * s + 0.5 * (b.ay ?? 0) * fator * s * s
+  if (b.tipo === 'segmento') {
+    const cx = Math.cos(b.angulo ?? 0) * (b.comprimento / 2)
+    const cy = Math.sin(b.angulo ?? 0) * (b.comprimento / 2)
+    // lâmina parada: a própria lâmina; andando: o meio dela arrastado (largura = a lâmina)
+    if (Math.hypot(dx, dy) < 4) return { tipo: 'segmento', x1: b.x - cx, y1: b.y - cy, x2: b.x + cx, y2: b.y + cy, meia: (b.espessura ?? 8) / 2, ...tempo }
+    return { tipo: 'segmento', x1: b.x, y1: b.y, x2: b.x + dx, y2: b.y + dy, meia: b.comprimento / 2, ...tempo }
+  }
+  const meia = b.tipo === 'circulo' ? (b.raio ?? 6) : Math.max(b.largura ?? 0, b.altura ?? 0) / 2
+  return { tipo: 'segmento', x1: b.x, y1: b.y, x2: b.x + dx, y2: b.y + dy, meia, ...tempo }
+}
+
+// Custo de terminar o caminho em (x, y) daqui a `ms`, com zonas que ainda
+// vão valer: quanto mais fundo e menos tempo para sair, pior. velocidade em px/s.
+export function custoZonaPendente(z, x, y, { ms, seguro, velocidade, reacaoMs = 0 }) {
+  const fundo = seguro - folgaZona(z, x, y)
+  if (fundo <= 0) return 0
+  const sobra = z.falta - ms // ms até valer, contados do fim do caminho
+  if (sobra <= 0) return 0 // já vale no fim do caminho: conta como bala (custoZonaAtiva)
+  const sair = (fundo / Math.max(1, velocidade)) * 1000 + reacaoMs
+  const folga = sobra - sair
+  const urgencia = folga <= 0 ? 1.5 : 1 / (1 + (folga / FOLGA_URGENCIA_MS) ** 2)
+  return fundo * fundo * urgencia
+}
+
 export class EsquivaBot {
   constructor({ nivel = 'normal', sorte = Math.random } = {}) {
     this.cfg = NIVEIS_ESQUIVA[nivel] ?? NIVEIS_ESQUIVA.normal
@@ -142,30 +188,33 @@ export class EsquivaBot {
     return { x: Math.round(x * 100), y: Math.round(y * 100) }
   }
 
-  decidir({ coracao, limites, balas, velocidade = 180, fatorVelocidade = 1, velocidadeMax = Infinity, invertido = false }) {
+  // Avisos que o bot enxerga agora: zonas registradas e caminhos de balas
+  // piscando que só valem depois do horizonte (antes disso a simulação das
+  // balas já cuida delas). Filtrados pela reação e pela visão do nível.
+  avisosVisiveis(zonas, balas, fatorVelocidade) {
+    const av = this.cfg.avisos
+    if (!av) return []
+    const vistas = []
+    const ve = (z) => z && z.idade >= av.reacaoMs && z.falta <= av.visaoMs && z.falta > -z.dura
+    for (const z of zonas ?? []) if (!z.cancelada && ve(z)) vistas.push(z)
+    for (const b of balas) {
+      if ((b.aviso ?? 0) - (b.idade ?? 0) <= this.cfg.horizonteMs) continue
+      const z = zonaDaBalaPiscando(b, fatorVelocidade)
+      if (ve(z)) vistas.push(z)
+    }
+    return vistas
+  }
+
+  decidir({ coracao, limites, balas, zonas, velocidade = 180, fatorVelocidade = 1, velocidadeMax = Infinity, invertido = false }) {
     const chanceErro = this.cfg.erro + (invertido ? this.confusaoAgora() : 0)
     if (this.sorte() < chanceErro) return DIRECOES[1 + Math.floor(this.sorte() * 16)]
     const ativas = balas.filter((b) => !b.morta && !b.inofensiva)
-    // quem joga vê a ponta esperando na borda e sai da reta dela antes do
-    // disparo: o rastro do arranque (onde a bala vai passar logo depois de
-    // disparar) conta como perigo parado, mesmo além do horizonte. Só para
-    // quem pede (arranque.rastro: lança, lâmina, forcado: uma reta só); para
-    // paredes em fila o rastro da próxima tamparia a abertura da atual
-    for (const b of ativas.slice()) {
-      if (!b.arranque?.rastro) continue
-      const falta = b.arranque.ms - Math.max(0, (b.idade ?? 0) - (b.aviso ?? 0))
-      if (falta <= 0 || falta > RASTRO_MS) continue
-      // amostras a cada ~RASTRO_PX ao longo da reta (sem buracos entre elas)
-      const fim = preverBala(b, falta + RASTRO_MS, fatorVelocidade, velocidadeMax)
-      if (!fim) continue
-      const n = Math.min(RASTRO_MAX, Math.max(1, Math.ceil(Math.hypot(fim.x - b.x, fim.y - b.y) / RASTRO_PX)))
-      for (let j = 1; j <= n; j++) {
-        const p = preverBala(b, falta + (j * RASTRO_MS) / n, fatorVelocidade, velocidadeMax)
-        if (p) ativas.push({ ...b, x: p.x, y: p.y, angulo: p.angulo, vx: 0, vy: 0, ax: 0, ay: 0, girar: 0, arranque: null, aviso: 0, idade: 0 })
-      }
-    }
-    const seguro = (coracao.hitbox ?? 5) + this.cfg.margem
+    const hitbox = coracao.hitbox ?? 5
+    const seguro = hitbox + this.cfg.margem
     const passos = Math.max(1, Math.round(this.cfg.horizonteMs / PASSO_MS))
+    const avisos = this.avisosVisiveis(zonas, ativas, fatorVelocidade)
+    const pesoAviso = this.cfg.avisos?.peso ?? 0
+    const fimMs = passos * PASSO_MS
     const cx = (limites.left + limites.right) / 2
     const cy = (limites.top + limites.bottom) / 2
     const meiaLargura = Math.max(1, (limites.right - limites.left) / 2 - MEIO)
@@ -190,9 +239,18 @@ export class EsquivaBot {
         const peso = 1 / (1 + k * 0.35) // perigo próximo pesa mais
         for (const [b, p] of previsoes[k]) {
           const folga = folgaBala(b, x, y, p.x, p.y, p.angulo)
-          if (folga < seguro) custo += (seguro - folga) ** 2 * peso * (folga <= (coracao.hitbox ?? 5) ? 6 : 1)
+          if (folga < seguro) custo += (seguro - folga) ** 2 * peso * (folga <= hitbox ? 6 : 1)
+        }
+        // zona que já vale neste passo: igual a uma bala (só que pode ser bem mais funda)
+        const ms = (k + 1) * PASSO_MS
+        for (const z of avisos) {
+          if (z.falta > ms || z.falta <= ms - z.dura) continue
+          const folga = folgaZona(z, x, y)
+          if (folga < seguro) custo += (seguro - folga) ** 2 * peso * (folga <= hitbox ? 6 : 1) * pesoAviso
         }
       }
+      // zonas que ainda vão valer: quanto custa estar aqui no fim do caminho
+      for (const z of avisos) custo += custoZonaPendente(z, x, y, { ms: fimMs, seguro, velocidade, reacaoMs: this.cfg.decidirMs }) * 2 * pesoAviso
       // fim do caminho: longe das paredes e perto do centro (mais espaço para fugir depois)
       const nx = (x - cx) / meiaLargura
       const ny = (y - cy) / meiaAltura

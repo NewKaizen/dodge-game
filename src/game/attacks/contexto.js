@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { ATAQUE, CORES } from '../constants.js'
 import { LACUNA_MINIMA, avisar, validarParede, validarLacuna } from './validacao.js'
+import { registrarZona, envelhecerZonas, limparZonas } from './zonas.js'
 
 // O que um ataque pode usar (o parâmetro `a` em iniciar(a, cfg)):
 //
@@ -13,10 +14,13 @@ import { LACUNA_MINIMA, avisar, validarParede, validarLacuna } from './validacao
 //                                    + estilo: 'fino'   (linha) só um traço fino, sem a faixa larga
 //                                              'pontas' (linha) só as duas pontas, na borda: o
 //                                                       "emissor" (lasers), sem riscar a caixa
+//                             Registra a área como zona de perigo (a CPU desvia dela; ver attacks/zonas.js)
 //                             Prefira não usar: projéteis que nascem fora e entram já são o aviso
 //   a.deFora(lado, fracao?, recuo?)   ponto `recuo` px FORA da borda `lado` ('top' | 'bottom' |
 //                             'left' | 'right'), a `fracao` (0..1, padrão sorteada) ao longo dela,
 //                             mais a direção para dentro: { x, y, dx, dy }. Para balas que entram.
+//   a.zonaPerigo(forma, { ms, dura })   só registra a zona, sem desenhar (aviso desenhado à mão);
+//                             forma como a do aviso (ou { tipo: 'leque', x, y, raio, angulo, abertura })
 //   a.parede({ eixo, lacunas | ocupados })   valida a rota de fuga de uma parede
 //   a.lacuna(px, descricao)   valida uma abertura isolada
 //   a.aCada(ms, fn, vezes?, atraso?)   repete fn(i) a cada ms (i = 0, 1, 2...); atraso = ms até o 1º
@@ -71,6 +75,7 @@ export default class ContextoAtaque {
     if (ms < ATAQUE.telegrafoMs) {
       avisar(`telegrafo:${this.nome}`, `[telegrafo] ${this.nome}: aviso de ${ms}ms (mínimo ${ATAQUE.telegrafoMs}ms)`)
     }
+    this.zonaPerigo(forma, { ms })
     const g = this.cena.add.graphics().setDepth(4)
     const cor = forma.cor ?? CORES.aviso
     g.fillStyle(cor, 0.22)
@@ -124,6 +129,14 @@ export default class ContextoAtaque {
     if (lado === 'bottom') return { x, y: l.bottom + recuo, dx: 0, dy: -1 }
     if (lado === 'left') return { x: l.left - recuo, y, dx: 1, dy: 0 }
     return { x: l.right + recuo, y, dx: -1, dy: 0 }
+  }
+
+  // Área que vai machucar daqui a `ms` (por `dura` ms): só para a CPU enxergar.
+  // O relógio dela para nos respiros desta onda, como os timers
+  zonaPerigo(forma, { ms = forma.ms ?? ATAQUE.telegrafoMs, dura } = {}) {
+    const z = registrarZona(this.balas, forma, { ms, dura })
+    if (z) Object.assign(z, { respiro: this.respiro, fim: this.fim })
+    return z
   }
 
   parede({ eixo, lacunas, ocupados }) {
@@ -187,6 +200,7 @@ export default class ContextoAtaque {
       }
     }
     this.timers = this.timers.filter((t) => this.tempo <= t.fim && (t.cadaFrame || t.vezes > 0))
+    envelhecerZonas(this.balas, dt, { tempo: this.tempo, parada: (z) => z.respiro && this.emRespiro(z.respiro) })
   }
 
   // A onda que criou o timer está numa pausa (respiro de início ou do meio)?
@@ -197,6 +211,7 @@ export default class ContextoAtaque {
 
   limpar() {
     this.timers = []
+    limparZonas(this.balas)
     this.objetos.forEach((o) => {
       this.cena.tweens.killTweensOf(o)
       o.destroy()

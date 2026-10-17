@@ -75,6 +75,8 @@ export default definirAtaque({
         })
       }
 
+      // a bomba contando é o aviso: a CPU lê a área em volta como zona (sem desenho)
+      a.zonaPerigo({ tipo: 'circulo', x: p.x, y: p.y, raio: 26 }, { ms: Math.max(400, cfg.contagem) })
       a.depois(Math.max(400, cfg.contagem), () => {
         bomba.setVisible(false)
         texto.setVisible(false)

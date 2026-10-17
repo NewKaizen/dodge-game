@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { tocar } from '../../../audio.js'
 import { shake } from '../../../effects/shake.js'
 import { etiqueta, poeirinha, texturaLeao, chaoDeAreia } from './arteColiseu.js'
+import { registrarZona } from '../../../attacks/zonas.js'
 
 // LEÕES!: soltaram as feras. De tempos em tempos um leão atravessa a caixa
 // correndo numa linha reta horizontal. O aviso vem antes (AVISO_MS): rugido,
@@ -76,6 +77,8 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
       },
     })
     bala.sprite.setVisible(false)
+    // a CPU lê a faixa inteira (a bala piscando só mostra a ela o começo do caminho)
+    registrarZona(pista.balas, { tipo: 'area', x: l.left, y: y - CORPO.altura / 2, largura: l.width, altura: CORPO.altura }, { ms: AVISO_MS / aceleracao, dura: ((l.width + 52) / VELOCIDADE) * 1000 })
     const sombra = guardar(arena.add.ellipse(x0, y + 9, 30, 7, 0x000000, 0.35).setDepth(4))
     const sprite = guardar(arena.add.sprite(x0, y, texturaLeao(arena), 'l0').setScale(1.2).setDepth(7).setFlipX(dir < 0))
     const faixa = guardar(arena.add.graphics().setDepth(3))

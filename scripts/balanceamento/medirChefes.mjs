@@ -10,8 +10,8 @@
 //     chefes: "king,jevil" (padrão: todos); niveis: "facil,medio,dificil"
 //     URL_JOGO (padrão http://localhost:5175/) e CHROMIUM (executável) no ambiente
 //
-// A visão do bot é a mesma do medir.mjs (avisos de área, balas que andam
-// sozinhas, lâminas girando).
+// A visão do bot é a mesma do medir.mjs (avisos de área pelas zonas de perigo,
+// balas que andam sozinhas, lâminas girando).
 import { chromium } from 'playwright'
 import fs from 'node:fs'
 
@@ -36,32 +36,10 @@ const resultado = await page.evaluate(
     const { CARTAS_CHEFES, ataqueDaCartaChefe, danoDaCartaChefe, ritmoDaCartaChefe, inverteControles } = await import('/src/game/coop/cartasChefe.js')
     const { DESAFIO, DIFICULDADES } = await import('/src/game/constants.js')
     const { ataques } = await import('/src/game/attacks/index.js')
-    const { default: Ctx } = await import('/src/game/attacks/contexto.js')
-    // o bot enxerga os avisos de área (a.aviso) como balas que ainda vão valer
-    const fantasmas = []
-    const VE_AVISOS = true
+    // os avisos de área (a.aviso / a.zonaPerigo) o bot já enxerga sozinho, pelas
+    // zonas de perigo da pista (pista.balas.zonas), como a CPU do jogo
     const VE_MOVIMENTO = true
     const anteriores = new WeakMap()
-    const avisoOriginal = Ctx.prototype.aviso
-    Ctx.prototype.aviso = function (forma, depois) {
-      const ms = forma.ms ?? 400
-      let f = null
-      if (forma.tipo === 'area') f = { tipo: 'retangulo', x: forma.x + forma.largura / 2, y: forma.y + forma.altura / 2, largura: forma.largura, altura: forma.altura }
-      else if (forma.tipo === 'circulo') f = { tipo: 'circulo', x: forma.x, y: forma.y, raio: forma.raio }
-      else if (forma.tipo === 'linha') {
-        const dx = forma.x2 - forma.x1
-        const dy = forma.y2 - forma.y1
-        f = { tipo: 'segmento', x: (forma.x1 + forma.x2) / 2, y: (forma.y1 + forma.y2) / 2, comprimento: Math.hypot(dx, dy), espessura: Math.max(4, forma.espessura ?? 2), angulo: Math.atan2(dy, dx) }
-      }
-      if (f && VE_AVISOS) {
-        Object.assign(f, { vx: 0, vy: 0, aviso: ms, idade: 0, fantasma: true })
-        fantasmas.push(f)
-      }
-      return avisoOriginal.call(this, forma, () => {
-        if (f) f.morta = true
-        depois?.()
-      })
-    }
     const jogo = window.debugJogo.jogo
     const cena = jogo.scene.getScenes(true)[0]
     const pista = new Pista(cena, {
@@ -133,7 +111,6 @@ const resultado = await page.evaluate(
       c.x = l.centerX
       c.y = l.bottom - 30
       c.invencivelMs = 0
-      fantasmas.length = 0
       let pronto = false
       pista.rodar(ataque, { dano, ritmo, semente: `medida:${semente}` }).then(() => (pronto = true))
       for (let i = 0; i < 5; i++) await Promise.resolve()
@@ -141,11 +118,6 @@ const resultado = await page.evaluate(
       let frames = 0
       while (pista.rodando && frames < 60 * 40) {
         const inv = inverterMs > 0 && pista.atacando
-        for (let i = fantasmas.length - 1; i >= 0; i--) {
-          const f = fantasmas[i]
-          if (f.morta || !pista.rodando) fantasmas.splice(i, 1)
-          else f.idade = Math.min(f.aviso - 1, f.idade + DT)
-        }
         // balas com movimento próprio (atualizar mexe em x/y/angulo): o bot usa
         // a velocidade observada no último frame, como um jogador que vê a bala andar
         const fator = pista.balas.fatorVelocidade || 1
@@ -181,7 +153,8 @@ const resultado = await page.evaluate(
         let joy = bot.joy(DT, {
           coracao: c,
           limites: pista.caixa.limites,
-          balas: fantasmas.length || discos.length ? [...vistas, ...fantasmas, ...discos] : vistas,
+          balas: discos.length ? [...vistas, ...discos] : vistas,
+          zonas: pista.balas.zonas,
           velocidade: pista.velocidadeCoracao,
           fatorVelocidade: pista.balas.fatorVelocidade,
           velocidadeMax: pista.balas.velocidadeMax,

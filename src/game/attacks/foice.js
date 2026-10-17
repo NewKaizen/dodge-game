@@ -133,6 +133,13 @@ export default definirAtaque({
       const profundo = alcance + cfg.espessura / 2
       const faixa = lado === 0 ? [inicioFaixa, inicioFaixa + profundo] : [fimFaixa - profundo, fimFaixa]
       a.parede({ eixo: h ? 'y' : 'x', ocupados: [faixa] })
+      // a lâmina em pé na borda mostra a faixa: a CPU lê como zona (sem desenho)
+      a.zonaPerigo(
+        h
+          ? { tipo: 'area', x: l.left, y: faixa[0], largura: l.width, altura: faixa[1] - faixa[0] }
+          : { tipo: 'area', x: faixa[0], y: l.top, largura: faixa[1] - faixa[0], altura: l.height },
+        { ms },
+      )
 
       {
         // a lâmina da ida termina de sumir fora da caixa: a volta "é" ela
@@ -164,7 +171,7 @@ export default definirAtaque({
           entrando: true,
           pulso: 0,
           // espiando: em pé na borda, quase parada (o aviso); depois atravessa balançando
-          arranque: { ms, vx: h ? v * 0.3 : 0, vy: h ? 0 : v * 0.3, ax: h ? acel : 0, ay: h ? 0 : acel, rastro: true },
+          arranque: { ms, vx: h ? v * 0.3 : 0, vy: h ? 0 : v * 0.3, ax: h ? acel : 0, ay: h ? 0 : acel },
           atualizar: (b) => {
             if (b.idade < ms) return
             if ((h ? b.ax : b.ay) !== 0 && Math.abs(h ? b.vx : b.vy) >= Math.abs(v)) {

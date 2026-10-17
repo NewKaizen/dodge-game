@@ -121,6 +121,8 @@ function estocar({ a, cfg, aviso, turno, geracao, deCima, centro, alcance, fundo
     const paradaY = borda + (dir * comprimento) / 2
 
     const espia = 6 // px da ponta que aparecem na borda
+    // a ponta espiando mostra a coluna: a CPU lê como zona (sem desenho)
+    a.zonaPerigo({ tipo: 'linha', x1: x, y1: borda, x2: x, y2: ponta, espessura: cfg.espessura }, { ms: aviso })
     let estado = 'espiando'
     let parado = 0
     const bala = a.bala({
@@ -131,7 +133,7 @@ function estocar({ a, cfg, aviso, turno, geracao, deCima, centro, alcance, fundo
       altura: comprimento,
       forma: cfg.forma,
       entrando: true,
-      arranque: { ms: aviso, vx: 0, vy: dir * cfg.velocidade, rastro: true }, // a estocada (os bots já leem)
+      arranque: { ms: aviso, vx: 0, vy: dir * cfg.velocidade }, // a estocada (os bots já leem)
       atualizar: (b, dt) => {
         if (estado === 'espiando') {
           if (b.idade < aviso) return
