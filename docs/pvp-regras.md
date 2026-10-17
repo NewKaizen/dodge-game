@@ -381,3 +381,21 @@ casa por batida), colcheias no contratempo fora do caminho livre e pirotecnia no
 corda longe da livre. Medido (24 sementes): bot médio **~40 → 11,4** (0,88 acerto), perfeito 2,2;
 nenhum aviso do validador. Fica na faixa das cartas fortes da Dess (Solo 11, Amplificador 11,
 Palco Explosivo 16,5, Feedback 20).
+
+**2026-10-17: Susie e Ralsei revistos** (`attacks/habilidades/susie.js`, `ralsei.js`). Projéteis nascem fora
+da caixa e entram (sem piscar parados), e lados, ordens e posições são sorteados com a semente. Medido (12 sementes,
+acertos do bot médio, antes → depois):
+
+| Carta | Antes → depois | Mudança |
+|---|---|---|
+| 6♠ Pisão (Susie) | 1,25 → 1,33 | pisa numa parede sorteada (chão, teto ou lados), altura da onda sorteada; sem faixa de aviso, só a pegada piscando; cascalho entra pela parede oposta (o 1º na linha do coração) |
+| 3♦ Encarar | 0,25 → 1,08 | 2–3 olhos, olhadelas miradas enquanto encaram, a rajada travada fecha com um leque de 3 |
+| 7♦ Rugido | 0,58 → 0,75 | sem guia do vão; a onda vem de qualquer parede (o vão fica longe da linha do coração quando dá) |
+| 5♣ Bomba de Giz | 0,50 → 1,50 | o maço é arremessado de fora (machuca em voo e no chão), pavio menor, 7–8 pedaços (um no coração), 2 por vez na força alta; sem círculo de aviso |
+| 3♣ Bolinho Explosivo | 0,50 → 0,42 | cupcakes deslizam para qualquer parede; o chafariz sai da parede; sem círculo de contagem |
+| 10♣ Laço de Fita | 1,08 → 1,75 | o nó voa de fora, a fita se enrola e aperta mais rápido, vão menor e sorteado; estoura em faíscas (uma no coração) |
+| J♦ Feitiço de Sono | 2,42 → 2,58 | os Z entram por baixo do chão (um pouco mais espaçados para compensar) |
+| A♣ Empréstimo Educado | 1,00 → 1,25 | sem linha de caminho: a estrela espia na borda 560 ms e sai |
+
+Médias por carta (bot médio): Susie 1,13 → 1,28, Ralsei 1,26 → 1,35. Nenhum aviso `[telegrafo]`/`[rota de fuga]`.
+No Pisão o bot perfeito subiu (0,33 → 1,08 acerto) porque ele não enxerga a pegada (é decoração), só os pilares.
