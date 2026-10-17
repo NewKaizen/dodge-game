@@ -4,7 +4,8 @@ import { P, r, apertar, duracaoDe, lerp } from '../padroes.js'
 
 export default {
   tema: { formas: ['espadas', 'losango'], cores: { espadas: 0x4aa8ff, losango: 0x9fd0ff, barra: 0xbfe0ff, bola: 0x4aa8ff }, cor: 0x4aa8ff },
-  principal: { espadas: 'estocadas', ouros: 'mira', paus: 'forcado' },
+  // ouros: o Ás Silêncio (Anular) manda o ataque próprio de Kris (receita `silencio`)
+  principal: { espadas: 'estocadas', ouros: 'silencio', paus: 'forcado' },
   leve: (A) => A.sides({ duracao: 4000, intervalo: 1500, velocidade: 140, eco: 0 }),
   receitas: {
     corte: r('Uma espada larga presa na parede gira meia volta e corta a meia-lua do lado do coração', (A, t) =>
@@ -15,15 +16,17 @@ export default {
       A.juntos(P.estocadas(A, t, { esparso: 1.5, caixa: null }), P.colunas(A, t, { esparso: 1.6, quantidade: 2, forma: 'espadas' }))),
     olhar: r('Um olho vazio segue o coração devagar, fixa o olhar e pisca num clarão que solta faíscas', (A, t) =>
       apertar(A, t, A.krisOlharVazio({ duracao: duracaoDe(t), intervalo: lerp(1600, 1050, t), velocidade: lerp(55, 85, t), aviso: lerp(650, 480, t), cilios: t >= 0.6 ? 6 : 4, velocidadeCilio: lerp(80, 115, t) }))),
-    passo: r('Pegadas andam até onde o coração vai estar e pisam com força: mude de direção', (A, t) =>
-      apertar(A, t, A.krisPassoCalculado({ duracao: duracaoDe(t), intervalo: lerp(1500, 1000, t), passos: t >= 0.6 ? 5 : 4, cadencia: lerp(220, 170, t), aviso: lerp(520, 430, t) }))),
-    plano: r('Setas de um plano de batalha riscam a caixa e uma tropa de peões marcha por elas', (A, t) =>
-      apertar(A, t, A.krisPlanoTatico({ duracao: duracaoDe(t), intervalo: lerp(2100, 1500, t), setas: t >= 0.8 ? 3 : 2, tropas: t >= 0.6 ? 4 : 3, velocidade: lerp(140, 190, t), aviso: lerp(800, 620, t) }))),
+    passo: r('Pegadas entram pela borda e andam atrás de onde o coração vai estar, refazendo a conta a cada passo; o último pisa forte e espirra pedrinhas. Às vezes vêm dois caminhantes: mude de direção', (A, t) =>
+      apertar(A, t, A.krisPassoCalculado({ duracao: duracaoDe(t), intervalo: lerp(1300, 850, t), maxPassos: t >= 0.6 ? 8 : 7, cadencia: lerp(200, 160, t), aviso: lerp(480, 420, t), dupla: lerp(0.3, 0.65, t), estilhacos: t >= 0.6 ? 5 : 4, velocidadeEstilhaco: lerp(85, 115, t) }))),
+    plano: r('Tropas de peões entram marchando por fora da caixa e seguem um plano que só Kris conhece: reto ou dobrando a esquina, a primeira pela fileira do coração', (A, t) =>
+      apertar(A, t, A.krisPlanoTatico({ duracao: duracaoDe(t), intervalo: lerp(2000, 1400, t), setas: t >= 0.8 ? 3 : 2, tropas: t >= 0.6 ? 4 : 3, velocidade: lerp(140, 190, t) }))),
     formacao: r('Lasers alternados numa caixa apertada', (A, t) => apertar(A, t, P.lasers(A, t, { orientacao: 'alternar', quantidade: 1 }))),
     alma: r('A alma vermelha prende o coração por um fio e bate, soltando anéis de cacos com um só vão', (A, t) =>
       apertar(A, t, A.krisControleDaAlma({ duracao: duracaoDe(t), intervalo: lerp(1400, 1000, t), velocidade: lerp(70, 92, t), cacos: t >= 0.7 ? 18 : 16 }))),
-    espinhos: r('Placas de espinhos no chão: pisou (ou demorou), clique, e os espinhos sobem', (A, t) =>
-      A.krisArmadilhaEspinhos({ duracao: duracaoDe(t), intervalo: lerp(750, 480, t), maximo: lerp(5, 8, t), vidaPlaca: lerp(2600, 1900, t), aviso: lerp(520, 430, t), corrente: t >= 0.55 })),
+    espinhos: r('Placas de espinhos caem debaixo, na frente ou longe do coração, às vezes em fila (dominó) ou dos dois lados dele; com o coração perto elas tremem e o pavio corre: pisou (ou demorou), clique, e os espinhos sobem', (A, t) =>
+      A.krisArmadilhaEspinhos({ duracao: duracaoDe(t), intervalo: lerp(750, 480, t), maximo: lerp(5, 8, t), vidaPlaca: lerp(2600, 1900, t), aviso: lerp(520, 430, t), combinacoes: lerp(0.3, 0.55, t), corrente: t >= 0.55 })),
+    silencio: r('A caixa fica muda e escura e lâminas silenciosas entram pelas bordas: em fileira, cruzadas no coração ou espreitando rente à parede antes de investir', (A, t) =>
+      A.krisSilencio({ duracao: duracaoDe(t), intervalo: lerp(1150, 780, t), velocidade: lerp(150, 200, t), investida: lerp(260, 330, t), espreita: lerp(480, 380, t), fileira: t >= 0.45 ? 3 : 2 })),
     emboscada: r('Forcado e chão rachado', (A, t) => A.juntos(P.forcado(A, t, { esparso: 1.4 }), P.rachaduras(A, t, { esparso: 1.9, ramos: 3 }))),
   },
   super: {

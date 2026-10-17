@@ -1,4 +1,4 @@
-// Fichas do Grimório (scenes/Grimorio.js): as páginas (personagens do PvP e
+// Fichas das CARTAS no Guia (scenes/Grimorio.js): as páginas (personagens do PvP e
 // chefes do CO-OP), as cartas de cada página na ordem da tela e tudo que a
 // tela mostra de uma carta (números, textos do PvP e do CO-OP e como montar a
 // prévia do ataque). Lógica pura (sem Phaser), testável em Node: a biblioteca

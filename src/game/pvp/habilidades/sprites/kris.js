@@ -15,10 +15,10 @@ export default {
     { chave: 'hab-kris-pegada', arquivo: `${PASTA}/pegada.png` },
     { chave: 'hab-kris-pisada', arquivo: `${PASTA}/pisada.png` },
     { chave: 'hab-kris-peao', arquivo: `${PASTA}/peao.png` },
-    { chave: 'hab-kris-seta', arquivo: `${PASTA}/seta.png` },
     { chave: 'hab-kris-alma', arquivo: `${PASTA}/alma.png`, quadro: { largura: 24, altura: 22 } },
     { chave: 'hab-kris-caco', arquivo: `${PASTA}/caco.png` },
     { chave: 'hab-kris-placa', arquivo: `${PASTA}/placa.png`, quadro: { largura: 24, altura: 24 } },
+    { chave: 'hab-kris-lamina', arquivo: `${PASTA}/lamina.png` },
   ],
   sons: [
     { nome: 'hab-kris-corte', arquivo: `${SONS}/corte.wav` },
@@ -28,5 +28,6 @@ export default {
     { nome: 'hab-kris-pulso', arquivo: `${SONS}/pulso.wav` },
     { nome: 'hab-kris-clique', arquivo: `${SONS}/clique.wav` },
     { nome: 'hab-kris-espinhos', arquivo: `${SONS}/espinhos.wav` },
+    { nome: 'hab-kris-silencio', arquivo: `${SONS}/silencio.wav` },
   ],
 }

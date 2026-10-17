@@ -5,7 +5,7 @@
 const PASTA = 'assets/sprites/habilidades/dess'
 const SONS = 'assets/audio/habilidades/dess'
 
-const IMAGENS = ['nota', 'notas', 'guitarra', 'taco', 'bola', 'impacto', 'microfone', 'chiado', 'palheta', 'caixasom', 'pulso', 'lata', 'fumaca', 'brasa', 'amp', 'arco', 'cabo', 'plugue']
+const IMAGENS = ['nota', 'notas', 'guitarra', 'taco', 'bola', 'impacto', 'microfone', 'chiado', 'palheta', 'caixasom', 'pulso', 'lata', 'fumaca', 'brasa', 'amp', 'arco', 'cabo', 'plugue', 'gema']
 const SONS_DESS = ['tacada', 'rebatida', 'microfonia', 'palheta', 'fumaca', 'grave']
 
 export default {

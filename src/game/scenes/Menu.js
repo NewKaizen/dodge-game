@@ -12,7 +12,8 @@ import { criarLogo } from '../menu/logo.js'
 // (uma luta de balas rolando) e a luz dele iluminando a sala e as silhuetas
 // dos lutadores. Logo no canto de cima à esquerda, opções alinhadas à
 // esquerda. CO-OP (-> EscolhaParty) e PVP (-> PvpEscolha): a luz do telão engole
-// a sala. CARTAS (-> Grimorio, todas as cartas com a prévia do ataque) e
+// a sala. GUIA (-> Grimorio: todas as cartas com a prévia do ataque e as
+// rodadas bônus de cada arena) e
 // CONFIGURAÇÕES (-> Config) só escurecem a tela. Embaixo da lista, uma linha diz o que a
 // opção escolhida faz; sem joystick conectado, as opções ficam apagadas e a
 // linha vira um aviso pedindo para conectar.
@@ -29,7 +30,7 @@ const CENA_PVP = 'PvpEscolha'
 const OPCOES = [
   { id: 'coop', rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty', dica: 'cartas juntos contra um chefe' },
   { id: 'pvp', rotulo: 'PVP', cor: '#ff3d6e', cena: CENA_PVP, dica: 'duelo de cartas: quem desvia, vence' },
-  { id: 'cartas', rotulo: 'CARTAS', cor: '#b48cff', cena: 'Grimorio', dica: 'todas as cartas, com a prévia do ataque' },
+  { id: 'cartas', rotulo: 'GUIA', cor: '#b48cff', cena: 'Grimorio', dica: 'todas as cartas e as rodadas bônus das arenas' },
   { id: 'config', rotulo: 'CONFIGURAÇÕES', cor: '#f2c14e', cena: 'Config', dica: 'som, velocidade e tela cheia' },
 ]
 
