@@ -360,3 +360,30 @@ casa por batida), colcheias no contratempo fora do caminho livre e pirotecnia no
 corda longe da livre. Medido (24 sementes): bot médio **~40 → 11,4** (0,88 acerto), perfeito 2,2;
 nenhum aviso do validador. Fica na faixa das cartas fortes da Dess (Solo 11, Amplificador 11,
 Palco Explosivo 16,5, Feedback 20).
+
+**Noelle: cartas normais sem guia e com projéteis entrando de fora** (`attacks/habilidades/noelle.js`).
+As balas nascem fora da caixa e entram (a entrada é o aviso: nada de bala piscando parada nem "!"),
+e lado, posição, instante e mirada são sorteados com a semente (nada de ritmo fixo).
+
+- **8♠ Granizo:** a coluna e o círculo do chão que piscavam saíram. As pedras caem de cima da caixa em instantes sorteados (algumas de viés). Agora são 3 ou 4 por leva, com mais lascas e mais mirada.
+- **3♣ Pingentes:** soltam do teto ou de uma parede lateral (sorteado a cada leva). A ponta sai da parede tremendo, e então o pingente dispara até cravar na parede oposta. Agora são 3 ou 4 por leva, com ritmo maior.
+- **7♣ Estalactites:** crescem do teto, do chão ou das laterais. No lugar da área piscando, a ponta aparece na parede. O crescimento começa devagar. Duas estalactites nunca se cruzam, e uma só nasce se o coração tiver por onde sair a tempo (busca numa grade de 6 px).
+- **J♣ Avalanche (refeita):** bolas de neve entram rolando por bordas sorteadas e fazem curva pesada atrás do coração; o passo para o lado na hora certa faz a bola passar reto. Elas crescem enquanto rolam e se espatifam na parede em torrões que voltam para dentro.
+- **Floco Afiado, Vento Gélido, Raio de Gelo, Inverno Eterno:**
+  - flocos, estilhaços, orbe e cristais vêm de fora;
+  - o lado da rajada é sorteado (não alterna mais);
+  - a mira do raio virou um fio fino;
+  - os sopros do inverno variam ±15%.
+
+Medido com 12 sementes (acertos por carta; bot médio, antes → depois):
+
+| Carta | Antes | Depois |
+|---|---|---|
+| Granizo | 0,67 | 1,17 |
+| Pingentes | 0,33 | 1,00 |
+| Estalactites | 0,50 | 1,25 |
+| Avalanche | 1,42 | 1,58 |
+| Vento Gélido | 0,08 | 0,42 |
+| Raio de Gelo | 1,17 | 1,00 |
+
+Média da Noelle: 0,85 → 1,08. Nenhum aviso do validador. O bot não enxerga a ponta da estalactite saindo da parede (é só decoração), então nessa carta ele leva um pouco mais do que quem joga.
