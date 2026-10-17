@@ -229,7 +229,7 @@ export default {
   // mergulho entrando pela borda (e o som do vento).
   berdlyMergulho: definirAtaque({
     nome: 'berdlyMergulho',
-    padrao: { duracao: 6000, intervalo: 1200, velocidade: 360, angulo: 0.95, comprimento: 34, espessura: 13, fora: 34 },
+    padrao: { duracao: 6000, intervalo: 1200, velocidade: 360, angulo: 0.95, comprimento: 34, espessura: 13, fora: 50 },
     iniciar(a, cfg) {
       aCadaSorteado(a, cfg.intervalo, () => {
         const l = a.caixa

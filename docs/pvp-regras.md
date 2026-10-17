@@ -131,7 +131,7 @@ Na arena: "PERFEITO!" (x1), "PERFEITO x2!", "PERFEITO x3!!", "PERFEITO x4!!!": o
 | Naipe | Tipo | Ataque na caixa do adversário | Dano por bala |
 |---|---|---|---|
 | ♠ espadas | ataque direto | padrões do personagem escalados pelo valor | 2 + 0,6 × valor (3 a 10) |
-| ♦ ouros | controle | balas até 20% mais rápidas, caixa menor (210×170 → 160×135), Q/K invertem os controles durante o ataque todo | 2 + 0,45 × valor (3 a 8) |
+| ♦ ouros | controle | balas até 20% mais rápidas, caixa menor (210×170 → 160×135), Q/K invertem os controles durante o ataque todo (menos o Q♦ Tempo Parado e o K♦ Caos Final do Asriel) | 2 + 0,45 × valor (3 a 8) |
 | ♣ paus | armadilha | bombas, lasers, colunas, ondas, forcado, chão rachado | 2 + 0,55 × valor (3 a 9) |
 | ♥ copas | suporte em quem joga | só um ataque fraquinho (4 s, dano 2) | 2 |
 
@@ -350,6 +350,8 @@ O Asriel ainda dá um pouco mais de dano por carta porque tem mais figuras (o da
 | 8♠ Chaos Saber | 1,7 → 1,3 | aviso do corte ~560 → ~670 ms (dá tempo de atravessar a caixa), corte duplo só a partir de t = 0,75 |
 | 10♣ Raio Caótico | 1,5 → 1,2 | lasers em cruz a cada ~1,5 s (era ~1,3) |
 | 3♦ Shocker Breaker | 1,1 → 0,75 | raios mais espaçados; na caixa apertada a corrente perde a 3ª coluna se ela fechar a rota de fuga |
+
+**2026-10-17: Berdly e Asriel de reação, sem guias.** Os projéteis dos dois nascem fora da caixa e entram (a entrada é o aviso; nada de bala parada piscando), e lados, ordens, tempos e quais golpes miram saem dos sorteios com semente (nada para decorar). Berdly: Bicada, Mergulho Aéreo, Correção (a caneta entra pela borda riscando o X) e Pena Armada (as penas voam de fora, cravam, giram atrás do coração e recuam antes de disparar) ficaram sem linhas de aviso. Asriel: Q♦ Tempo Parado e K♦ Caos Final não invertem mais os controles; o Caos Final perdeu a linha e o círculo das estrelas, a linha dos tiros do núcleo (ele incha antes) e o círculo do colapso (o anel entra de fora); Hyper Goner com menos losangos (no K, 2 a cada ~620 ms; eram 3 a cada 390) e cada um fere 60% do dano da carta. Medido (12 sementes, bot médio, acertos/carta antes → depois): Bicada 1,42 → 1,58, Mergulho 0,33 → 0,75, Correção 1,83 → 1,58, Pena Armada 0,25 → 0,92, Hyper Goner 1,0 → 1,08 (dano real ~13 → ~8,7), Tempo Parado 1,42 → 1,5, Caos Final 2,08 → 2,25; média por carta Berdly 1,20 → 1,16, Asriel 1,12 → 1,15.
 
 A carta mais difícil do jogo agora é o K♠ Show de Rock da Dess (3 acertos no bot médio, ~40 de dano), fora deste ajuste.
 

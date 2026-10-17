@@ -12,7 +12,7 @@ export default {
     penas: r('Um bater de asas fora da caixa solta um leque de penas que entram flutuando até o coração', (A, t) =>
       A.berdlyPenas({ duracao: duracaoDe(t), intervalo: lerp(1250, 850, t), quantidade: t >= 0.6 ? 5 : 4, abertura: t >= 0.6 ? 0.3 : 0.34, velocidade: lerp(110, 150, t) })),
     mergulho: r('Mergulhos em diagonal que entram pelo alto, de um lado sorteado, passam pelo coração e arremetem no chão, num V', (A, t) =>
-      A.berdlyMergulho({ duracao: duracaoDe(t), intervalo: lerp(1450, 1000, t), velocidade: lerp(300, 400, t) })),
+      A.berdlyMergulho({ duracao: duracaoDe(t), intervalo: lerp(1500, 1100, t), velocidade: lerp(250, 330, t) })),
     correcao: r('A caneta vermelha entra pela borda e risca um X em cima do coração, numa caixa apertada; a tinta demora a secar', (A, t) =>
       apertar(A, t, A.berdlyCorrecao({ duracao: duracaoDe(t), intervalo: lerp(1500, 1050, t), tamanho: lerp(30, 40, t), tinta: lerp(900, 1300, t) }))),
     rajadaVento: r('Lufadas de vento atravessam a faixa do coração, numa caixa apertada', (A, t) =>
@@ -20,7 +20,7 @@ export default {
     calculo: r('Símbolos de matemática com trajetória calculada: ricocheteiam na parede direto no coração, numa caixa apertada', (A, t) =>
       apertar(A, t, A.berdlyCalculo({ duracao: duracaoDe(t), intervalo: lerp(1450, 1000, t), tiros: t >= 0.6 ? 3 : 2, velocidade: lerp(150, 200, t) }))),
     tornado: r('Um funil de vento atravessa a caixa apertada atrás do coração, cuspindo papel e lápis', (A, t) =>
-      apertar(A, t, A.berdlyTornado({ duracao: duracaoDe(t), intervalo: lerp(2300, 1700, t), velocidade: lerp(70, 100, t), deriva: lerp(22, 38, t), detritos: lerp(520, 380, t) }))),
+      apertar(A, t, A.berdlyTornado({ duracao: duracaoDe(t), intervalo: lerp(2300, 1700, t), velocidade: lerp(70, 100, t), deriva: lerp(22, 38, t), detritos: lerp(600, 460, t) }))),
     qi: r('O gráfico do QI sobe em colunas, do chão ou do teto, numa caixa apertada', (A, t) =>
       apertar(A, t, A.berdlyQI({ duracao: duracaoDe(t), intervalo: lerp(1900, 1500, t) }))),
     vendaval: r('A ventania carrega livros, folhas, lápis e óculos pela caixa apertada e vira de lado perto do meio', (A, t) =>
