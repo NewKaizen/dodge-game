@@ -43,7 +43,7 @@ export default {
       A.dessCabos({ duracao: duracaoDe(t), intervalo: lerp(1500, 1050, t), aviso: lerp(650, 520, t), vida: lerp(2200, 2700, t), amplitude: lerp(9, 13, t), serpenteia: lerp(2, 3.2, t), maxCabos: t >= 0.6 ? 3 : 2 }),
     ),
     // mais espaçado que antes (era 1,4 e 1,6): dava dano demais para uma figura de paus
-    palco: r('Bombas e ondas sonoras', (A, t) => A.juntos(P.bombas(A, t, { esparso: 1.9 }), P.ondas(A, t, { esparso: 2.1 }))),
+    palco: r('Bombas e ondas sonoras', (A, t) => A.juntos(P.bombas(A, t, { esparso: 2.2 }), P.ondas(A, t, { esparso: 2.5 }))),
   },
   super: {
     nome: 'Último Bis',
