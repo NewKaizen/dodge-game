@@ -10,7 +10,9 @@ import { TEXTO_JOGADOR } from '../pvp/perfil.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 
 // Tela de fim da partida PvP, em etapas (como a Vitoria):
-//   luz crescendo -> ESTOURO + "JOGADOR 1 VENCE!" (ou 2, ou EMPATE) na cor do
+//   ENTRADA DO VENCEDOR (não tem no empate; ver entradaVencedor: faixa na cor
+//   dele, o sprite grande, o nome enorme com clarão, tremor, confete, fogos)
+//   -> luz crescendo -> ESTOURO + "JOGADOR 1 VENCE!" (ou 2, ou EMPATE) na cor do
 //   vencedor -> vencedor comemorando e perdedor caído -> estatísticas dos dois
 //   lado a lado, rolando com contador.
 // A ou B durante a animação pula para o fim. Depois:
@@ -31,6 +33,9 @@ const TEMPO = {
   rolar: 420, // quanto tempo cada número leva rolando
   opcoes: 500, // depois da última linha
 }
+
+// entrada do vencedor (antes da tela de sempre; não tem no empate)
+const ENTRADA = { golpe: 330, saida: 1750, duracao: 1950, y: 228, altura: 180, angulo: 0.16, escala: 9, tamanhoNome: 76, profundidade: 50 }
 
 const PAINEL = { x: 140, y: 118, largura: 360, altura: 290, linhaY: 176, espaco: 40 }
 const COLUNA = [PAINEL.x + 64, PAINEL.x + PAINEL.largura - 64] // centro dos valores do P1 e do P2
@@ -104,10 +109,18 @@ export default class PvpResultado extends Phaser.Scene {
 
   montarEtapas() {
     const e = []
-    const em = (t, f) => e.push({ t, f })
+    // com vencedor, a entrada dele vem antes de tudo (o resto anda junto)
+    const d = this.empate ? 0 : ENTRADA.duracao
+    const em = (t, f) => e.push({ t: t + d, f })
+    if (d) {
+      e.push({ t: 0, f: (r) => this.entradaVencedor(r) })
+      e.push({ t: ENTRADA.golpe, f: (r) => this.golpeEntrada(r) })
+      e.push({ t: ENTRADA.saida, f: (r) => this.sairEntrada(r) })
+    }
     em(TEMPO.subida, (r) => this.subida(r))
     em(TEMPO.estouro, (r) => this.estouro(r))
-    em(TEMPO.musica, () => musica('pvpResultado', 'vitoria'))
+    // a música da vitória entra no golpe da entrada (sem entrada, no tempo de sempre)
+    if (!d) em(TEMPO.musica, () => musica('pvpResultado', 'vitoria'))
     em(TEMPO.lutadores, (r) => this.entrarLutadores(r))
     em(TEMPO.painel, (r) => this.abrirPainel(r))
     LINHAS.forEach((linha, i) => em(TEMPO.painel + 300 + i * TEMPO.linha, (r) => this.mostrarLinha(linha, i, r)))
@@ -133,6 +146,131 @@ export default class PvpResultado extends Phaser.Scene {
     this.cameras.main.fadeOut(250, 0, 0, 0)
     const { p1, p2, arena } = this
     this.time.delayedCall(260, () => (botao === 'A' ? this.scene.start('PvpArena', { p1, p2, arena }) : this.scene.start('PvpEscolha')))
+  }
+
+  // ---------- entrada do vencedor ----------
+  // A tela escurece e uma faixa diagonal na cor do personagem rasga a tela
+  // vindo do lado dele (P1 da esquerda, P2 da direita), com linhas de
+  // velocidade; o sprite dele entra GRANDE deixando rastro. No golpe: clarão,
+  // tremor forte, o nome ENORME batendo, "VENCEU!", confete, fogos e a
+  // música da vitória. Depois tudo sai voando e começa a tela de sempre.
+  // Pulando (A/B), nada disso aparece (ou some na hora).
+
+  entradaVencedor(rapido) {
+    if (rapido) return
+    const id = this.vencedor === 1 ? this.p1 : this.p2
+    const def = PERSONAGENS[id]
+    const cor = def.cor ?? this.corNumero
+    const lado = this.vencedor === 1 ? -1 : 1 // de onde ele vem
+    const P = ENTRADA.profundidade
+    const objetos = (this.entrada = [])
+    const novo = (o) => (objetos.push(o), o)
+    this.ladoEntrada = lado
+
+    novo(this.add.rectangle(0, 0, LARGURA, ALTURA, 0x000000).setOrigin(0).setDepth(P))
+    // a faixa e as linhas de velocidade correndo dentro dela
+    const faixa = novo(this.add.container(LARGURA / 2 + lado * 900, ENTRADA.y).setDepth(P + 1).setRotation(ENTRADA.angulo * -lado))
+    const g = this.add.graphics()
+    g.fillStyle(cor, 1).fillRect(-560, -ENTRADA.altura / 2, 1120, ENTRADA.altura)
+    g.fillStyle(0xffffff, 0.9).fillRect(-560, -ENTRADA.altura / 2 - 6, 1120, 4).fillRect(-560, ENTRADA.altura / 2 + 2, 1120, 4)
+    g.fillStyle(0x000000, 0.25).fillRect(-560, -ENTRADA.altura / 2, 1120, ENTRADA.altura * 0.18)
+    faixa.add(g)
+    for (let i = 0; i < 16; i++) {
+      const y = Phaser.Math.Between(-ENTRADA.altura / 2 + 8, ENTRADA.altura / 2 - 8)
+      const linha = this.add.rectangle(0, y, Phaser.Math.Between(60, 220), Phaser.Math.Between(1, 3), 0xffffff, Phaser.Math.FloatBetween(0.25, 0.6))
+      faixa.add(linha)
+      this.tweens.add({ targets: linha, x: { from: lado * 640, to: -lado * 640 }, duration: Phaser.Math.Between(260, 520), delay: Phaser.Math.Between(0, 400), repeat: -1 })
+    }
+    this.faixaEntrada = faixa
+    tocar(this, 'superCorte')
+    this.tweens.add({ targets: faixa, x: LARGURA / 2, duration: 200, ease: 'Cubic.easeOut' })
+
+    // o vencedor GRANDE, do lado de onde veio, com rastro
+    const x = LARGURA / 2 + lado * 160
+    const chao = ENTRADA.y + ENTRADA.altura / 2 + 26
+    const brilho = novo(this.add.image(x, chao - 120, 'brilho').setTint(cor).setBlendMode(Phaser.BlendModes.ADD).setDepth(P + 2).setScale(0).setAlpha(0.9))
+    this.tweens.add({ targets: brilho, scale: 5, duration: 300, delay: 120, ease: 'Quad.easeOut' })
+    const rastros = [0.35, 0.22, 0.12].map((alpha, i) =>
+      novo(this.add.image(x + lado * 700, chao, id).setOrigin(0.5, 1).setScale(ENTRADA.escala).setDepth(P + 2).setFlipX(lado > 0).setTint(cor).setAlpha(alpha)),
+    )
+    const sprite = novo(this.add.image(x + lado * 700, chao, id).setOrigin(0.5, 1).setScale(ENTRADA.escala).setDepth(P + 3).setFlipX(lado > 0))
+    this.spriteEntrada = sprite
+    this.tweens.add({ targets: sprite, x, duration: 240, delay: 90, ease: 'Back.easeOut' })
+    rastros.forEach((r, i) =>
+      this.tweens.add({ targets: r, x: x + lado * (12 + i * 14), alpha: 0, duration: 340 + i * 90, delay: 90 + i * 40, ease: 'Cubic.easeOut' }),
+    )
+
+    // o nome (aparece no golpe)
+    const nx = LARGURA / 2 - lado * 120
+    this.nomeEntrada = novo(
+      this.add
+        .text(nx, ENTRADA.y - 18, def.nome.toUpperCase(), estilo(ENTRADA.tamanhoNome, '#ffffff', { strokeThickness: 10 }))
+        .setOrigin(0.5)
+        .setDepth(P + 4)
+        .setShadow(0, 0, corTexto(cor), 18, true, true)
+        .setAlpha(0),
+    )
+    const cpu = this.contraCpu && this.vencedor === 2
+    this.legendaEntrada = novo(
+      this.add
+        .text(nx, ENTRADA.y + 46, cpu ? 'A CPU VENCEU!' : `${this.rotulo(this.vencedor)} VENCEU!`, estilo(30, TEXTO.selecionado, { strokeThickness: 7 }))
+        .setOrigin(0.5)
+        .setDepth(P + 4)
+        .setAlpha(0),
+    )
+  }
+
+  golpeEntrada(rapido) {
+    if (rapido || !this.entrada) return
+    const cor = PERSONAGENS[this.vencedor === 1 ? this.p1 : this.p2].cor ?? this.corNumero
+    const P = ENTRADA.profundidade
+    musica('pvpResultado', 'vitoria')
+    tocar(this, 'vitoriaEntrada')
+    tocar(this, 'superAtivar')
+    this.cameras.main.flash(260, 255, 255, 255)
+    shake(this, 380, 0.022)
+    const nome = this.nomeEntrada
+    nome.setScale(3.4).setAlpha(0)
+    this.tweens.add({ targets: nome, scale: 1, alpha: 1, duration: 130, ease: 'Quad.easeIn' })
+    this.tweens.add({ targets: nome, scale: 1.06, delay: 300, duration: 380, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+    const leg = this.legendaEntrada
+    leg.setX(leg.x + this.ladoEntrada * 300)
+    this.tweens.add({ targets: leg, x: leg.x - this.ladoEntrada * 300, alpha: 1, delay: 120, duration: 220, ease: 'Back.easeOut' })
+    // o vencedor pula de alegria
+    const s = this.spriteEntrada
+    this.tweens.add({ targets: s, y: s.y - 26, scaleY: ENTRADA.escala * 1.05, duration: 210, yoyo: true, repeat: -1, repeatDelay: 80, ease: 'Quad.easeOut' })
+    canhoesConfete(this, 60, P + 5)
+    fogoArtificio(this, nome.x - 120, ENTRADA.y - 90, cor, { quantidade: 44, profundidade: P + 5 })
+    this.time.delayedCall(180, () => this.entrada && fogoArtificio(this, nome.x + 130, ENTRADA.y - 70, undefined, { quantidade: 40, profundidade: P + 5 }))
+    this.time.delayedCall(420, () => this.entrada && fogoArtificio(this, this.spriteEntrada.x, ENTRADA.y - 130, cor, { quantidade: 36, profundidade: P + 5 }))
+    // anel de luz saindo do golpe
+    const anel = this.add.circle(nome.x, nome.y, 20).setStrokeStyle(6, 0xffffff, 1).setDepth(P + 4)
+    this.entrada.push(anel)
+    this.tweens.add({ targets: anel, scale: 14, alpha: 0, duration: 600, ease: 'Quad.easeOut' })
+  }
+
+  // tudo sai voando (ou some na hora, pulando) e a tela de sempre começa
+  sairEntrada(rapido) {
+    const objetos = this.entrada
+    if (!objetos) return
+    this.entrada = null
+    const fim = () =>
+      objetos.forEach((o) => {
+        this.tweens.killTweensOf(o)
+        if (o.list) o.list.forEach((c) => this.tweens.killTweensOf(c))
+        o.destroy()
+      })
+    if (rapido) {
+      if (!this.relogio || this.relogio < ENTRADA.golpe) musica('pvpResultado', 'vitoria') // pulou antes do golpe: a música ainda não tinha entrado
+      return fim()
+    }
+    tocar(this, 'voo')
+    const lado = this.ladoEntrada
+    for (const o of objetos) {
+      this.tweens.killTweensOf(o)
+      this.tweens.add({ targets: o, x: o.x - lado * 700, alpha: 0, duration: 220, ease: 'Cubic.easeIn' })
+    }
+    this.time.delayedCall(240, fim)
   }
 
   // ---------- etapas ----------

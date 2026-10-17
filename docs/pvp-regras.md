@@ -161,6 +161,16 @@ Ficar parado não é mais uma estratégia: quase todo padrão tem uma parte mira
 
 A cada 5 rodadas (rodadas 5, 10, 15, 20, 25) tudo fica 30% mais rápido, até ×2,5 na rodada 25 (`ACELERACAO` em `constants.js`): balas (velocidade e densidade), relógio da escolha (15 s → até 8 s), animações e música. O coração ganha metade do bônus para continuar dando para desviar. Aparece um aviso "VELOCIDADE ×1,3!" e o selo fica no HUD. No co-op a regra fica desligada (`ACELERACAO.coop = false`; com `true` ela vale por turno do chefe, por cima do `RITMO`).
 
+## Fim da partida: câmera lenta, replay e tela de vitória
+
+Código em `src/game/pvp/fimDePartida/` (o `index.js` explica as peças).
+
+- **Câmera lenta**: no K.O. o jogo congela um instante e passa a andar a 20% por ~2,3 s: as balas se arrastam, a bala do golpe segue atravessando o coração e ele trinca em duas metades e estilhaça devagar (como no Undertale). A tela escurece em volta, as balas perdem a cor e a música fica lenta e abafada. Se o outro também cair nesse meio tempo, é empate (vale de verdade).
+- **Replay em fita VHS**: depois, a tela vira uma TV velha: estática, "◀◀ REW" (a fita volta de trás para frente), "▶ PLAY" com os últimos ~3 s antes do golpe, "SLOW" no finalzinho e "❚❚ PAUSE" no quadro do golpe com o K.O. marcado no coração. Tem scanlines, ruído, aberração de cor, tremida/tracking, curvatura da tela, contador da fita e data; a música passa com passa-baixa, wow/flutter (o tom oscilando) e chiado de fita. Empate: as duas pistas lado a lado. O replay usa fotos das caixas tiradas durante a esquiva (`gravador.js`, DynamicTextures em baixa resolução a 30 quadros/s; nada é re-simulado).
+- **Duelo** (rodada bônus): o K.O. dele ganha a câmera lenta, mas não tem replay.
+- **A ou B pula** a câmera lenta e o replay (depois de uma carência curta; no duelo, mais longa, porque todo mundo está apertando A para atacar).
+- **Tela de vitória** (`PvpResultado`): antes das estatísticas, a entrada do vencedor: faixa diagonal na cor dele, o sprite grande entrando com rastro, o nome enorme batendo com clarão, tremor, confete, fogos e a música da vitória. No empate não tem entrada. A pula, como antes.
+
 ## Arenas (votação antes da partida)
 
 Depois da escolha dos lutadores (e do "VS"), os jogadores **votam na arena** (cena `PvpVoto`, dados em `pvp/arenas.js`). Cada um move o próprio coração entre os cartões e vota com A (B desfaz). Ganha a mais votada; **empate = roleta** entre as empatadas; o cartão **"?" (ALEATÓRIA)** vale como voto numa arena sorteada na hora da apuração; acabou o tempo (12 s), quem não votou fica de fora (ninguém votou = roleta entre todas). Contra a CPU só o P1 vota: a CPU segue o voto. A revanche (tela de resultado) e o "recomeçar" do pause mantêm a arena.
