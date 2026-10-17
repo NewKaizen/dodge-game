@@ -90,7 +90,7 @@ Todo baralho tem **uma** carta SUPER (`valor: 14`, `naipe: 'espadas'`, id `'<per
 | Kris | Alma Determinada | estocadas + colunas de espada → lasers alternados numa caixa apertada → forcado + rajadas miradas |
 | Susie | Machado Colossal | pisões → machado gigante com faíscas → dinamite (bombas + chão rachado) |
 | Ralsei | Valsa Real | carrossel de anéis → anel + divisores → espiral de copas |
-| Noelle | Inverno Absoluto | neve em cascata → raios de gelo verticais → pingentes + anel de gelo |
+| Noelle | SNOWGRAVE | neve + flocos gigantes que estouram → nevasca (rajadas de estilhaços) → redemoinho que persegue + pilares de gelo → túmulo de estilhaços que se fecha e explode |
 | Berdly | Furacão Genial | vento da esquerda → estocadas numa caixa apertada → lasers em cruz + mira |
 | Dess | Turnê Final | ondas sonoras → bolas quicando → palco explosivo |
 | Asriel | Supernova Arco-Íris | chuva de estrelas → espiral + chuva → Caos Final (com tempo para o colapso explodir) |
@@ -245,7 +245,7 @@ HP de `data/personagens.js` quando o personagem existe lá (Kris 90, Susie 110);
 | Kris | equilibrado, puxado para controle | 90 | 19 + ★ | 5 | 4 | 6 | 4 | K♠ Lâmina Determinada, J♦ Formação, Q♦ Controle da Alma · ★ Alma Determinada |
 | Susie | força bruta | 110 | 19 + ★ | 8 | 3 | 4 | 4 | Q♠ Rude Buster, K♠ Machado Maluco, J♦ Pressão, J♣ Dinamite · ★ Machado Colossal |
 | Ralsei | suporte | 80 | 19 + ★ | 3 | 8 | 4 | 4 | J♦ Feitiço de Sono, Q♥ Pacify, K♥ Oração Maior · ★ Valsa Real |
-| Noelle | suporte gélido | 85 | 19 + ★ | 4 | 7 | 4 | 4 | Q♠ Nevasca, K♦ Inverno Eterno, J♣ Avalanche, J♥ Anjo da Neve · ★ Inverno Absoluto |
+| Noelle | suporte gélido | 85 | 19 + ★ | 4 | 7 | 4 | 4 | Q♠ Nevasca, K♦ Inverno Eterno, J♣ Avalanche, J♥ Anjo da Neve · ★ SNOWGRAVE |
 | Berdly | controle | 90 | 19 + ★ | 4 | 4 | 7 | 4 | Q♦ QI Elevado, K♦ Vendaval Supremo, J♣ Ciclone · ★ Furacão Genial |
 | Dess | ataque | 100 | 19 + ★ | 7 | 3 | 4 | 5 | J♠ Solo de Guitarra, K♠ Show de Rock, Q♦ Feedback, Q♣ Palco Explosivo · ★ Turnê Final |
 | Asriel | equilibrado, com mais figuras | 90 | 20 + ★ | 5 | 5 | 5 | 5 | J♠ Chaos Buster, K♠ Hyper Goner, Q♦ Tempo Parado, K♦ Caos Final, K♣ Supernova, Q♥ Sonho (6 figuras) · ★ Supernova Arco-Íris |
@@ -316,6 +316,25 @@ no aviso fica seguro. Medido com 24 sementes: perfeito 2,7, médio **34,1**
 (dentro da faixa 34–40 dos outros SUPERs), nenhum aviso do validador.
 Cinemática nova em `pvp/super/anuncios/noelle.js` e efeito novo no chefe do
 CO-OP (`coop/superNoChefe.js`).
+
+**2026-10-17: SNOWGRAVE recriado** ("muito fácil e previsível"). Agora são
+quatro atos que escalam, com o mundo congelando (véu cada vez mais escuro,
+geada subindo pelas bordas, neve de fundo seguindo o vento): **I. O frio**
+(neve entrando pelo lado do vento, parte mirada, engrossando; flocos gigantes
+que atravessam a caixa, param, racham e estouram em estilhaços), **II.
+Nevasca** (rajadas de estilhaços espalhadas, com a brecha longe do coração; o
+vento inverte uma vez), **III. Redemoinho** (anéis de flocos entram por todas
+as bordas e espiralam para um olho de gelo que persegue o coração devagar;
+pilares de gelo brotam do chão, teto ou paredes na linha do coração, só a
+ponta aparece antes) e **IV. SNOWGRAVE** (o nome cai letra a letra e um túmulo
+de estilhaços entra por todas as bordas e se fecha onde o coração estava,
+com uma lasca a menos de brecha; ao fechar, o pilar de luz explode e os
+estilhaços voltam para todo lado). Nenhum projétil nasce dentro da caixa e
+tudo é sorteado com a semente (vento, lados, brechas, olho e giro, pilares,
+túmulo). Sprites (pilar, floco gigante, estilhaço, carta nova) e 5 sons novos
+em `scripts/super/noelle.py`. Medido com 24 sementes: perfeito 2,7 → **9,8**,
+médio 34,1 → **39,5** (os outros 6 SUPERs, na mesma medição: perfeito 3,3 a
+21,1, média 14,5; médio 33,6 a 39,5, média 37,1), nenhum aviso do validador.
 
 SUPER da Dess mais justo:
 

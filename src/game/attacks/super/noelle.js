@@ -4,87 +4,136 @@ import { tocar } from '../../audio.js'
 import { shake } from '../../effects/shake.js'
 import { particulas } from '../../effects/particulas.js'
 
-// SUPER de Noelle: SNOWGRAVE. A caixa esfria até virar um túmulo de gelo, em
-// três atos:
+// SUPER de Noelle: SNOWGRAVE. O frio cresce até o mundo inteiro congelar, em
+// quatro atos que escalam (a caixa escurece, a geada sobe pelas bordas e a
+// neve de fundo segue o vento de cada ato):
 //
-//   I. O frio. Um SELO de floco de neve gigante aparece no meio da caixa,
-//      girando, e solta flocos pelos braços (um "regador" de 3 braços que
-//      desenha espirais). O giro inverte no meio do ato.
-//   II. Nevasca. A caixa embranquece, o vento uiva e PAREDES de estilhaços
-//      de gelo atravessam a caixa de um lado para o outro. Cada parede tem
-//      UMA brecha, que serpenteia devagar de uma parede para a próxima.
-//      No meio da nevasca o vento muda de lado (com uma pausa antes).
-//   III. SNOWGRAVE. O nome aparece, o selo cresce e brilha, e COLUNAS de gelo
-//      explodem do chão: metade delas de uma vez (as ímpares), depois a outra
-//      metade (as pares). No fim, um quadrado de luz marca o ÚNICO lugar
-//      seguro: o resto da caixa vira espinhos de gelo.
+//   I. O frio. Começa a nevar: flocos entram pela borda de onde vem o vento
+//      (direção sorteada, muda no meio do ato), balançando, e parte deles cai
+//      em cima do coração. A neve engrossa com o tempo. FLOCOS GIGANTES
+//      atravessam a caixa na direção do coração, param, racham e estouram em
+//      estilhaços.
+//   II. Nevasca. O vento vira de lado (lado sorteado) e uiva: RAJADAS de
+//      estilhaços entram por aquele lado, espalhadas (altura, atraso e
+//      velocidade sorteados), com uma brecha que nunca é onde o coração está.
+//      Uma vez no meio o vento inverte. Um floco gigante volta.
+//   III. Redemoinho. (depois da calmaria do meio) O vento começa a girar em
+//      volta de um OLHO de gelo (o selo) que persegue o coração devagar. Anéis
+//      de flocos entram por todas as bordas e espiralam para o olho, cada vez
+//      mais rápido perto dele; flocos mirados continuam vindo de fora. PILARES
+//      de gelo brotam do chão, do teto ou das paredes na linha do coração.
+//   IV. SNOWGRAVE. O nome cai letra a letra, o redemoinho para e todo o frio é
+//      sugado para onde o coração está: um TÚMULO de estilhaços entra por
+//      todas as bordas e se fecha naquele ponto. Quando se fecha, o pilar de
+//      luz explode e os estilhaços voam de volta para todo lado.
 //
-// Justiça:
-//   - os braços do regador saem do selo, que gira à vista (o selo é o aviso);
-//     entre dois braços sobra mais que LACUNA_MINIMA a partir do raio do selo;
-//     o NÚCLEO do selo machuca (avisa antes, como toda bala): ninguém se esconde
-//     no meio enquanto o regador gira;
-//   - toda parede da nevasca tem uma brecha >= LACUNA_MINIMA, e a brecha da
-//     parede seguinte anda no máximo `serpenteia` px (dá tempo de acompanhar);
-//     o vento só muda de lado depois que a última parede saiu da caixa;
-//   - cada coluna de gelo tem aviso (a.aviso) de `avisoColuna` ms; as ímpares
-//     e as pares nunca valem ao mesmo tempo, e entre o fim de uma leva e o
-//     começo da outra dá tempo de atravessar uma coluna;
-//   - o lugar seguro do final é um BURACO no aviso (quatro faixas avisando em
-//     volta dele), com lado >= LACUNA_MINIMA, aparece `avisoFinal` ms antes e
-//     fica perto o bastante do coração para chegar com folga.
+// Nada decorável: direção do vento e quando ele muda, lados das rajadas e
+// brechas, de onde vêm os flocos gigantes, onde nasce o olho e para que lado
+// ele gira, ângulo dos anéis, lado e hora dos pilares, quantas lascas tem o
+// túmulo e onde fica a brecha dele: tudo sorteado com a semente do ataque.
+//
+// Justiça (nenhum projétil nasce dentro da caixa: todos entram pela borda):
+//   - flocos e estilhaços são pequenos e espaçados; a rajada sempre deixa uma
+//     brecha >= `folgaRajada` (validada como parede) longe do coração;
+//   - o floco gigante PARA e racha `avisoEstouro` ms antes de estourar, e só
+//     estoura a >= `estouroFlocao` px do coração (estilhaços a mais que a
+//     lacuna mínima um do outro nessa distância);
+//   - entre dois flocos de um anel do redemoinho sobra mais que a lacuna a
+//     partir de `raioLivre` px do olho; o olho (que machuca) anda devagar;
+//   - o pilar mostra a PONTA na borda por `avisoPilar` ms antes de subir
+//     (aviso >= telegrafoMs) e ocupa só uma faixa de `larguraPilar` px;
+//   - o túmulo leva `convergir` ms para se fechar, tem uma lasca a menos (a
+//     brecha) e a explosão nasce no ponto onde ele se fechou.
 //
 // Config:
-//   bracos, giro, intervaloFloco, velocidadeFloco   o regador do ato I
-//   fimRegador                                      quando o regador para
-//   nevasca, fimNevasca                             janela das paredes
-//   intervaloParede, velocidadeParede, brecha       as paredes de estilhaços
-//   serpenteia                                      quanto a brecha anda entre paredes
-//   troca                                           quando o vento muda de lado
-//   snowgrave                                       quando o ato III começa
-//   avisoColuna, levas                              as colunas (ms de cada leva, a partir do ato III)
-//   avisoFinal, raioSeguro, distanciaSeguro         o golpe final (raioSeguro = meio lado do buraco)
+//   neve, velocidadeNeve, mirarNeve       a neve (intervalo e velocidade: [começo, fim] do ato I)
+//   flocoes                               janelas [de, até] (ms) em que entra um floco gigante
+//   velocidadeFlocao, estouroFlocao, avisoEstouro, estilhacosFlocao, velocidadeEstilhaco
+//   nevasca                               quando começa o ato II
+//   rajada, estilhacosRajada, velocidadeRajada, folgaRajada   as rajadas ([começo, fim] do ato II)
+//   redemoinho                            quando começa o ato III
+//   anel, flocosAnel, queda, giro, raioLivre, perseguir, mirados   o redemoinho
+//                                         (giro = "momento angular": giro / r² rad/s)
+//   pilares, avisoPilar, larguraPilar, manterPilar   os pilares (ms aproximados de cada um)
+//   snowgrave, convergir, lascasTumulo, explosao, velocidadeExplosao   o ato IV
+const TAU = Math.PI * 2
+
 export default definirAtaque({
   nome: 'superNoelle',
   padrao: {
     duracao: 9000,
-    bracos: 3,
-    giro: 0.9,
-    intervaloFloco: 170,
-    velocidadeFloco: 78,
-    fimRegador: 3200,
-    nevasca: 3300,
-    fimNevasca: 6000,
-    troca: 4700,
-    intervaloParede: 600,
-    velocidadeParede: 140,
-    brecha: 54,
-    serpenteia: 46,
-    snowgrave: 6100,
-    avisoColuna: 480,
-    levas: [250, 820],
-    avisoFinal: 780,
-    raioSeguro: 30,
-    distanciaSeguro: 85,
+    neve: [280, 140],
+    velocidadeNeve: [70, 105],
+    mirarNeve: 0.45,
+    flocoes: [
+      [450, 900],
+      [1500, 2000],
+      [3200, 3700],
+    ],
+    velocidadeFlocao: 64,
+    estouroFlocao: 66,
+    avisoEstouro: 300,
+    estilhacosFlocao: 6,
+    velocidadeEstilhaco: 150,
+    nevasca: 2600,
+    rajada: [530, 400],
+    estilhacosRajada: [4, 6],
+    velocidadeRajada: [165, 215],
+    folgaRajada: 58,
+    redemoinho: 4500,
+    anel: [800, 600],
+    flocosAnel: 6,
+    queda: 62,
+    giro: 5400,
+    raioLivre: 56,
+    perseguir: 24,
+    mirados: 560,
+    pilares: [5500, 6150, 6700],
+    avisoPilar: 460,
+    larguraPilar: 30,
+    manterPilar: 360,
+    snowgrave: 7150,
+    convergir: 1150,
+    lascasTumulo: [8, 9],
+    explosao: 8,
+    velocidadeExplosao: 175,
   },
   iniciar(a, cfg) {
     garantirTexturas(a.cena)
-    const estado = { angulo: 0, sentido: 1, selo: criarSelo(a), veu: criarVeu(a) }
+    const estado = {
+      ativo: 0, // tempo ativo (para nas pausas de respiro, como os timers)
+      fase: 'frio',
+      vento: a.aleatorio(Math.PI / 2 - 0.55, Math.PI / 2 + 0.55), // direção em que a neve voa
+      lado: 1,
+      olho: null,
+      tumulo: null,
+    }
+    estado.cenario = montarCenario(a, cfg, estado)
     tocar(a.cena, 'snowgraveFrio')
-
-    // o selo gira o ataque todo (mais rápido no ato III)
     a.aoAtualizar((dt) => {
-      estado.angulo += estado.sentido * cfg.giro * (dt / 1000) * (estado.furia ? 2.2 : 1)
-      estado.selo.setRotation(estado.angulo)
+      estado.ativo += dt
+      andarCenario(a, cfg, estado, dt)
     })
 
-    regador(a, cfg, estado)
+    // ---------- I. o frio ----------
+    nevar(a, cfg, estado)
+    // o vento vira no meio do ato
+    a.depois(a.aleatorio(1100, 1600), () => (estado.vento = a.aleatorio(Math.PI / 2 - 0.6, Math.PI / 2 + 0.6)))
+    for (const [de, ate] of cfg.flocoes) a.depois(a.aleatorio(de, ate), () => flocao(a, cfg, estado))
+
+    // ---------- II. nevasca ----------
     a.depois(cfg.nevasca, () => nevasca(a, cfg, estado))
+
+    // ---------- III. redemoinho ----------
+    a.depois(cfg.redemoinho, () => redemoinho(a, cfg, estado))
+    for (const ms of cfg.pilares) a.depois(ms + a.aleatorio(-90, 90), () => estado.fase === 'redemoinho' && pilar(a, cfg))
+
+    // ---------- IV. SNOWGRAVE ----------
     a.depois(cfg.snowgrave, () => snowgrave(a, cfg, estado))
   },
 })
 
-// ---------- texturas (geradas uma vez) ----------
+// ---------- texturas (geradas uma vez; o selo e o floco também servem à cinemática e ao CO-OP) ----------
 
 export function garantirTexturas(cena) {
   if (cena.textures.exists('super-noelle-floco')) return
@@ -108,335 +157,633 @@ export function garantirTexturas(cena) {
   g.clear()
   desenharFloco(64, 64, 60, 3)
   g.generateTexture('super-noelle-selo', 128, 128)
-  // lasca de gelo deitada (ponta para a direita): os estilhaços da nevasca
-  g.clear()
-  g.fillStyle(0x9fd8ff, 1).fillTriangle(0, 4, 8, 0, 8, 8)
-  g.fillStyle(0xeaf7ff, 1).fillTriangle(8, 0, 22, 4, 8, 8)
-  g.fillStyle(0xffffff, 1).fillTriangle(9, 3, 20, 4, 9, 5)
-  g.generateTexture('super-noelle-lasca', 22, 8)
   g.destroy()
 }
 
-// ---------- visual de fundo ----------
+// ---------- utilitários ----------
 
-function criarSelo(a) {
-  const l = a.caixa
-  const selo = a.decoracao(a.cena.add.image(l.centerX, l.centerY, 'super-noelle-selo').setDepth(2).setTint(0xbfe8ff).setAlpha(0).setScale(0.2))
-  a.cena.tweens.add({ targets: selo, alpha: 0.55, scale: 0.55, duration: 600, ease: 'Back.easeOut' })
-  return selo
+const limitar = (v, min, max) => Math.max(min, Math.min(max, v))
+const lerp = (a, b, t) => a + (b - a) * limitar(t, 0, 1)
+
+// Ponto FORA da caixa de onde uma bala que anda na direção (dx, dy) passa por
+// (x, y): volta pela direção até sair da caixa e anda mais `margem` px.
+function deFora(l, x, y, dx, dy, margem) {
+  const n = Math.hypot(dx, dy) || 1
+  const ux = dx / n
+  const uy = dy / n
+  const tx = ux > 0 ? (x - l.left) / ux : ux < 0 ? (x - l.right) / ux : Infinity
+  const ty = uy > 0 ? (y - l.top) / uy : uy < 0 ? (y - l.bottom) / uy : Infinity
+  const t = Math.max(0, Math.min(tx, ty)) + margem
+  return { x: x - ux * t, y: y - uy * t }
 }
 
-function criarVeu(a) {
-  const l = a.caixa
-  // frio: azul-escuro por baixo de tudo (as balas brancas saltam aos olhos)
-  const frio = a.decoracao(a.cena.add.rectangle(l.centerX, l.centerY, l.width, l.height, 0x0b2a55).setDepth(1).setAlpha(0))
-  a.cena.tweens.add({ targets: frio, alpha: 0.55, duration: 700 })
-  // geada nas bordas
-  const geada = a.decoracao(a.cena.add.graphics().setDepth(3))
-  for (let k = 0; k < 3; k++) {
-    geada.lineStyle(6 - k * 2, 0xdff6ff, 0.25 + k * 0.15)
-    geada.strokeRect(l.left + 2 + k * 3, l.top + 2 + k * 3, l.width - 4 - k * 6, l.height - 4 - k * 6)
+// coração ativo mais perto de (x, y)
+function maisPerto(a, x, y) {
+  let melhor = null
+  let d = Infinity
+  for (const c of a.coracoes) {
+    if (!c.ativo) continue
+    const dc = Math.hypot(c.x - x, c.y - y)
+    if (dc < d) {
+      d = dc
+      melhor = c
+    }
   }
-  geada.setAlpha(0)
-  a.cena.tweens.add({ targets: geada, alpha: 1, duration: 900 })
-  // neve calma (enfeite, sem colisão)
-  const neve = a.decoracao(
-    a.cena.add.particles(l.centerX, l.top - 6, 'faisca', {
-      x: { min: l.left - l.centerX, max: l.right - l.centerX },
-      quantity: 1,
-      frequency: 90,
-      lifespan: 2600,
-      speedY: { min: 30, max: 55 },
-      speedX: { min: -12, max: 12 },
-      scale: { start: 0.6, end: 0.25 },
-      alpha: { start: 0.55, end: 0 },
-      tint: 0xdff6ff,
-    }),
-  )
-  neve.setDepth(3)
-  return { frio, geada, neve }
+  return { c: melhor, d }
 }
 
-// ---------- ato I: o regador do selo ----------
+// bala que some aos poucos nos últimos `ms` de vida (já sem machucar)
+function sumirNoFim(ms) {
+  return (bala) => {
+    if (bala.vida < ms) {
+      bala.inofensiva = true
+      bala.sprite.setAlpha(Math.max(0, bala.vida / ms))
+    }
+  }
+}
 
-function regador(a, cfg, estado) {
-  const passo = (Math.PI * 2) / cfg.bracos
-  const raioSaida = 24
-  // o núcleo do selo: machuca enquanto o regador gira (aviso padrão de bala)
-  const l0 = a.caixa
-  const nucleo = a.bala({ x: l0.centerX, y: l0.centerY, raio: 16, textura: 'super-noelle-floco', tamanho: 40, cor: 0xbfe8ff, girar: -2, atravessa: true, pulso: 0.12 })
-  a.depois(cfg.fimRegador, () => {
-    nucleo.inofensiva = true
-    a.cena.tweens.add({ targets: nucleo.sprite, alpha: 0, scale: 0.2, duration: 300, onComplete: () => (nucleo.morta = true) })
+// intervalo respeitando a densidade do ritmo (como a.aCada)
+const ritmo = (a, ms) => ms / (a.ritmo?.densidade ?? 1)
+
+// ---------- cenário: o mundo congelando ----------
+
+function montarCenario(a, cfg, estado) {
+  const l = a.caixa
+  const cena = a.cena
+  // frio: azul de noite por baixo de tudo, cada vez mais fundo
+  const frio = a.decoracao(cena.add.rectangle(l.centerX, l.centerY, l.width, l.height, 0x081f45).setDepth(1).setAlpha(0))
+  // branco da nevasca (ato II)
+  const branco = a.decoracao(cena.add.rectangle(l.centerX, l.centerY, l.width, l.height, 0xeaf7ff).setDepth(3).setAlpha(0))
+  // geada: espinhos de gelo crescendo das bordas para dentro (sorteados uma vez)
+  const geada = a.decoracao(cena.add.graphics().setDepth(3))
+  const espinhos = []
+  for (const lado of ['cima', 'baixo', 'esquerda', 'direita']) {
+    const comprimento = lado === 'cima' || lado === 'baixo' ? l.width : l.height
+    for (let p = a.aleatorio(0, 6); p < comprimento; p += a.aleatorio(7, 13)) espinhos.push({ lado, p, base: a.aleatorio(5, 10), alto: a.aleatorio(0.35, 1) })
+  }
+  // neve de fundo (sem colisão): segue o vento, o redemoinho e, no fim, o túmulo
+  const flocos = []
+  for (let i = 0; i < 46; i++) {
+    const f = a.decoracao(
+      cena.add
+        .image(a.aleatorio(l.left, l.right), a.aleatorio(l.top, l.bottom), i % 5 ? 'faisca' : 'super-noelle-floco')
+        .setDepth(2)
+        .setTint(0xdff6ff)
+        .setAlpha(0)
+        .setScale(i % 5 ? a.aleatorio(0.25, 0.6) : a.aleatorio(0.35, 0.6)),
+    )
+    flocos.push({ f, rapidez: a.aleatorio(0.55, 1.35), fase: a.aleatorio(0, TAU), alfa: a.aleatorio(0.25, 0.6) })
+  }
+  // o olho do redemoinho: o selo de gelo (aparece no ato III)
+  const selo = a.decoracao(cena.add.image(l.centerX, l.centerY, 'super-noelle-selo').setDepth(2).setTint(0xbfe8ff).setAlpha(0).setScale(0.1))
+  return { frio, branco, geada, espinhos, flocos, selo, giroSelo: 0, redesenho: 0 }
+}
+
+function andarCenario(a, cfg, estado, dt) {
+  const l = a.caixa
+  const c = estado.cenario
+  const s = dt / 1000
+  // o frio cresce o ataque todo: veu mais escuro e geada mais alta
+  const frio = Math.min(1, estado.ativo / cfg.duracao)
+  c.frio.setAlpha(0.18 + 0.55 * frio)
+  for (const r of [c.frio, c.branco]) r.setPosition(l.centerX, l.centerY).setSize(l.width, l.height) // a caixa pode mexer
+  c.redesenho -= dt
+  if (c.redesenho <= 0) {
+    c.redesenho = 70
+    const alto = 4 + 18 * frio ** 0.8
+    c.geada.clear().fillStyle(0xdff6ff, 0.3 + 0.25 * frio)
+    for (const e of c.espinhos) {
+      const h = alto * e.alto
+      if (e.lado === 'cima') c.geada.fillTriangle(l.left + e.p - e.base / 2, l.top, l.left + e.p + e.base / 2, l.top, l.left + e.p, l.top + h)
+      else if (e.lado === 'baixo') c.geada.fillTriangle(l.left + e.p - e.base / 2, l.bottom, l.left + e.p + e.base / 2, l.bottom, l.left + e.p, l.bottom - h)
+      else if (e.lado === 'esquerda') c.geada.fillTriangle(l.left, l.top + e.p - e.base / 2, l.left, l.top + e.p + e.base / 2, l.left + h, l.top + e.p)
+      else c.geada.fillTriangle(l.right, l.top + e.p - e.base / 2, l.right, l.top + e.p + e.base / 2, l.right - h, l.top + e.p)
+    }
+    c.geada.lineStyle(2 + 3 * frio, 0xeaf7ff, 0.35 + 0.4 * frio).strokeRect(l.left + 1, l.top + 1, l.width - 2, l.height - 2)
+  }
+  // o selo gira (mais rápido no SNOWGRAVE)
+  c.giroSelo += (estado.olho?.sentido ?? 1) * s * (estado.fase === 'snowgrave' ? 4 : 1.4)
+  c.selo.setRotation(c.giroSelo)
+  if (estado.olho) c.selo.setPosition(estado.olho.x, estado.olho.y)
+
+  // neve de fundo
+  const forca = estado.fase === 'frio' ? 40 + 40 * frio : estado.fase === 'nevasca' ? 150 : 90
+  for (const n of c.flocos) {
+    const f = n.f
+    f.setAlpha(Math.min(n.alfa, f.alpha + s))
+    let vx
+    let vy
+    const alvo = estado.tumulo ?? estado.olho
+    if (alvo && estado.fase !== 'frio' && estado.fase !== 'nevasca') {
+      // girando em volta do olho / sugada pelo túmulo
+      const dx = f.x - alvo.x
+      const dy = f.y - alvo.y
+      const r = Math.max(8, Math.hypot(dx, dy))
+      const sugar = estado.tumulo ? 220 : 45
+      const girar = estado.tumulo ? 60 : Math.min(260, 6000 / r)
+      const sentido = estado.olho?.sentido ?? 1
+      vx = (-dy / r) * girar * sentido - (dx / r) * sugar
+      vy = (dx / r) * girar * sentido - (dy / r) * sugar
+      if (r < 10) recolocar(a, f)
+    } else {
+      vx = Math.cos(estado.vento) * forca + Math.cos(estado.ativo / 300 + n.fase) * 14
+      vy = Math.sin(estado.vento) * forca + Math.sin(estado.ativo / 420 + n.fase) * 6
+    }
+    f.x += vx * n.rapidez * s
+    f.y += vy * n.rapidez * s
+    f.rotation += s * n.rapidez
+    // saiu da caixa: volta pelo lado de onde vem o vento
+    if (f.x < l.left - 6) f.x = l.right + 4
+    else if (f.x > l.right + 6) f.x = l.left - 4
+    if (f.y < l.top - 6) f.y = l.bottom + 4
+    else if (f.y > l.bottom + 6) f.y = l.top - 4
+  }
+}
+
+function recolocar(a, f) {
+  const l = a.caixa
+  const lado = Math.floor(Math.random() * 4) // só visual: não gasta a semente
+  const p = Math.random()
+  f.x = lado < 2 ? l.left + p * l.width : lado === 2 ? l.left : l.right
+  f.y = lado < 2 ? (lado === 0 ? l.top : l.bottom) : l.top + p * l.height
+}
+
+// ---------- I. o frio: a neve ----------
+
+function nevar(a, cfg, estado) {
+  const fimFrio = cfg.redemoinho // a neve linear acompanha os atos I e II
+  const proximo = () => {
+    if (estado.ativo >= fimFrio || estado.fase === 'redemoinho') return
+    const t = estado.ativo / cfg.nevasca
+    const mirado = a.aleatorio(0, 1) < cfg.mirarNeve
+    floco(a, estado, mirado, lerp(cfg.velocidadeNeve[0], cfg.velocidadeNeve[1], t))
+    const intervalo = estado.fase === 'nevasca' ? cfg.neve[0] : lerp(cfg.neve[0], cfg.neve[1], t)
+    a.depois(ritmo(a, intervalo * a.aleatorio(0.75, 1.25)), proximo)
+  }
+  a.depois(250, proximo)
+}
+
+// Um floco de neve que entra pela borda de onde vem o vento, balançando.
+function floco(a, estado, mirado, velocidade) {
+  const l = a.caixa
+  const ang = estado.vento + a.aleatorio(-0.22, 0.22)
+  const dx = Math.cos(ang)
+  const dy = Math.sin(ang)
+  const alvo = mirado ? a.alvo() : { x: a.aleatorio(l.left + 6, l.right - 6), y: a.aleatorio(l.top + 6, l.bottom - 6) }
+  const p = deFora(l, alvo.x, alvo.y, dx, dy, a.aleatorio(10, 34))
+  const v = velocidade * a.aleatorio(0.88, 1.15)
+  const fase = a.aleatorio(0, TAU)
+  const balanco = a.aleatorio(14, 28)
+  a.bala({
+    x: p.x,
+    y: p.y,
+    vx: dx * v,
+    vy: dy * v,
+    raio: 5,
+    textura: 'super-noelle-floco',
+    tamanho: 14,
+    cor: mirado ? 0xffffff : 0xdff6ff,
+    girar: a.aleatorio(-3, 3),
+    jaAvisada: true,
+    // balança de leve na perpendicular do vento
+    atualizar: (b, dt) => {
+      const o = Math.cos((b.idade / 1000) * 3.2 + fase) * balanco * (dt / 1000)
+      b.x -= dy * o
+      b.y += dx * o
+    },
   })
-  // a partir do raio do selo, dois braços vizinhos ficam a mais que a lacuna
-  a.lacuna(raioSaida * passo * 1.6, 'entre os braços do selo')
-  a.depois(cfg.fimRegador / 2, () => {
-    estado.sentido *= -1 // o giro inverte no meio do ato
-    tocar(a.cena, 'super-noelle-tique')
-  })
-  a.aCada(
-    cfg.intervaloFloco,
-    () => {
-      if (a.tempo >= cfg.fimRegador) return
-      const l = a.caixa
-      for (let k = 0; k < cfg.bracos; k++) {
-        const ang = estado.angulo + k * passo
-        a.bala({
-          x: l.centerX + Math.cos(ang) * raioSaida,
-          y: l.centerY + Math.sin(ang) * raioSaida,
-          vx: Math.cos(ang) * cfg.velocidadeFloco,
-          vy: Math.sin(ang) * cfg.velocidadeFloco,
-          raio: 5,
-          textura: 'super-noelle-floco',
-          tamanho: 14,
-          cor: 0xeaf7ff,
-          girar: 3,
-          jaAvisada: true,
-        })
+}
+
+// ---------- floco gigante ----------
+
+function flocao(a, cfg, estado) {
+  if (estado.fase === 'redemoinho' || estado.fase === 'snowgrave') return
+  const l = a.caixa
+  const alvo = a.alvo()
+  // entra por um lado sorteado e atravessa a caixa passando pelo coração
+  const ang = a.aleatorio(0, TAU)
+  const dx = Math.cos(ang)
+  const dy = Math.sin(ang)
+  const p = deFora(l, alvo.x, alvo.y, dx, dy, 24)
+  const v = cfg.velocidadeFlocao * a.aleatorio(0.9, 1.15)
+  const giro = a.escolher([-1.5, 1.5])
+  const base = a.aleatorio(0, TAU) // rotação do estouro
+  const n = cfg.estilhacosFlocao
+  // a `estouroFlocao` px do centro, dois estilhaços vizinhos ficam a mais que a lacuna
+  a.lacuna((TAU * cfg.estouroFlocao) / n - 6, 'entre os estilhaços do floco gigante')
+  let dentro = 0
+  let rachando = -1
+  tocar(a.cena, 'super-noelle-tique')
+  a.bala({
+    x: p.x,
+    y: p.y,
+    vx: dx * v,
+    vy: dy * v,
+    raio: 12,
+    textura: 'super-noelle-flocao',
+    tamanho: 38,
+    girar: giro,
+    pulso: 0.04,
+    jaAvisada: true,
+    atravessa: true,
+    atualizar: (b, dt) => {
+      const lc = a.caixa
+      const m = 16
+      const estaDentro = b.x > lc.left + m && b.x < lc.right - m && b.y > lc.top + m && b.y < lc.bottom - m
+      if (rachando < 0) {
+        if (!estaDentro && dentro === 0) return
+        dentro += dt
+        const { d } = maisPerto(a, b.x, b.y)
+        // para perto do coração (mas não em cima), quando vai sair ou depois de um tempo
+        if (d < cfg.estouroFlocao + 14 || !estaDentro || dentro > 1500) {
+          rachando = 0
+          b.vx = 0
+          b.vy = 0
+          b.girar = giro * 5
+          b.sprite.setTint(0xffffff)
+          tocar(a.cena, 'super-noelle-quebra')
+        }
+        return
+      }
+      // rachando: treme e pisca (o aviso), depois estoura
+      rachando += dt
+      b.x += Math.sin(rachando * 0.9) * 0.6
+      b.sprite.setTint(Math.floor(rachando / 60) % 2 ? 0xffffff : 0x7fc8ff)
+      if (rachando >= Math.max(ATAQUE.telegrafoMs * 0.5, cfg.avisoEstouro)) {
+        b.morta = true
+        estourar(a, b.x, b.y, n, base, cfg.velocidadeEstilhaco, 'super-noelle-estilhaco')
+        tocar(a.cena, 'super-noelle-cristal')
+        shake(a.cena, 140, 0.006)
+        particulas(a.cena, b.x, b.y, { cor: 0xeaf7ff, quantidade: 14, velocidade: 160, vida: 420 })
       }
     },
-    Infinity,
-    300,
-  )
-}
-
-// ---------- ato II: a nevasca ----------
-
-function nevasca(a, cfg, estado) {
-  const l = a.caixa
-  tocar(a.cena, 'super-noelle-vento')
-  shake(a.cena, 200, 0.005)
-  const branco = a.decoracao(a.cena.add.rectangle(l.centerX, l.centerY, l.width, l.height, 0xeaf7ff).setDepth(3).setAlpha(0))
-  a.cena.tweens.add({ targets: branco, alpha: 0.22, duration: 600 })
-  estado.branco = branco
-  // vento: riscos brancos atravessando a caixa no sentido da nevasca
-  const vento = a.decoracao(a.cena.add.graphics().setDepth(3))
-  let fase = 0
-  a.aoAtualizar((dt) => {
-    if (a.tempo >= cfg.fimNevasca) return vento.clear()
-    fase += dt
-    const lado = a.tempo < cfg.troca ? 1 : -1
-    vento.clear().lineStyle(1, 0xffffff, 0.35)
-    for (let k = 0; k < 9; k++) {
-      const y = l.top + ((k * 37 + fase * 0.013) % l.height)
-      const x = l.left + ((k * 71 + lado * fase * 0.42) % (l.width + 60) + l.width + 60) % (l.width + 60) - 30
-      vento.lineBetween(x, y, x - lado * 24, y)
-    }
   })
-
-  a.lacuna(cfg.brecha, 'brecha da parede de gelo')
-  let centro = l.centerY
-  let lado = 1
-  let ultimaSaida = 0
-  const paredes = []
-  for (let t = 0; cfg.nevasca + t < cfg.fimNevasca - 600; t += cfg.intervaloParede) {
-    const quando = cfg.nevasca + t
-    // o vento muda de lado: a última parede do lado antigo já saiu da caixa
-    const depoisDaTroca = quando >= cfg.troca
-    if (depoisDaTroca && lado === 1) {
-      if (quando < ultimaSaida) continue
-      lado = -1
-    }
-    paredes.push({ quando, lado })
-    ultimaSaida = quando + ((l.width + 40) / cfg.velocidadeParede) * 1000
-  }
-  paredes.forEach((p, i) =>
-    a.depois(p.quando - cfg.nevasca, () => {
-      // a brecha serpenteia: anda no máximo `serpenteia` px de uma parede para a outra
-      const margem = cfg.brecha / 2 + 6
-      const desejo = a.caixa.centerY + Math.sin(i * 1.3) * (a.caixa.height / 2 - margem)
-      centro = Math.max(a.caixa.top + margem, Math.min(a.caixa.bottom - margem, centro + Math.max(-cfg.serpenteia, Math.min(cfg.serpenteia, desejo - centro))))
-      parede(a, cfg, centro, p.lado)
-    }),
-  )
-  a.depois(cfg.troca - cfg.nevasca, () => tocar(a.cena, 'super-noelle-vento'))
-  a.depois(cfg.fimNevasca - cfg.nevasca, () => a.cena.tweens.add({ targets: branco, alpha: 0.08, duration: 500 }))
 }
 
-// Uma parede de estilhaços atravessando a caixa, com uma brecha em `centro`
-function parede(a, cfg, centro, lado) {
-  const l = a.caixa
-  const x = lado > 0 ? l.left - 10 : l.right + 10
-  const passo = 13
-  const ocupados = []
-  for (let y = l.top + passo / 2; y < l.bottom; y += passo) {
-    if (Math.abs(y - centro) < cfg.brecha / 2) continue
-    ocupados.push([y - passo / 2, y + passo / 2])
+// estilhaços em todas as direções a partir de (x, y)
+function estourar(a, x, y, n, base, velocidade, textura, vida = Infinity) {
+  for (let k = 0; k < n; k++) {
+    const ang = base + (k * TAU) / n
     a.bala({
-      x,
-      y,
-      vx: lado * cfg.velocidadeParede,
-      comprimento: 16,
-      espessura: 6,
-      angulo: lado > 0 ? 0 : Math.PI, // a ponta da lasca vai na frente
-      textura: 'super-noelle-lasca',
+      x: x + Math.cos(ang) * 10,
+      y: y + Math.sin(ang) * 10,
+      vx: Math.cos(ang) * velocidade,
+      vy: Math.sin(ang) * velocidade,
+      comprimento: 15,
+      espessura: 5,
+      angulo: ang,
+      textura,
       tamanho: 20,
       jaAvisada: true,
+      vida,
+      pulso: 0,
+      atualizar: vida < Infinity ? sumirNoFim(160) : undefined,
     })
   }
-  a.parede({ eixo: 'y', ocupados })
+}
+
+// ---------- II. nevasca ----------
+
+function nevasca(a, cfg, estado) {
+  estado.fase = 'nevasca'
+  estado.lado = a.escolher([-1, 1])
+  ventoDoLado(a, estado)
+  tocar(a.cena, 'super-noelle-nevasca')
+  shake(a.cena, 220, 0.006)
+  a.cena.tweens.add({ targets: estado.cenario.branco, alpha: 0.2, duration: 500 })
+  a.lacuna(cfg.folgaRajada, 'brecha da rajada de estilhaços')
+
+  const fim = cfg.redemoinho - 250
+  const inverteEm = a.aleatorio(cfg.nevasca + 600, fim - 700)
+  let invertido = false
+  const proxima = () => {
+    if (estado.ativo >= fim) {
+      a.cena.tweens.add({ targets: estado.cenario.branco, alpha: 0.06, duration: 400 })
+      return
+    }
+    // o vento inverte uma vez (com um respiro curto antes da 1ª rajada do outro lado)
+    if (!invertido && estado.ativo >= inverteEm) {
+      invertido = true
+      estado.lado *= -1
+      ventoDoLado(a, estado)
+      tocar(a.cena, 'super-noelle-vento')
+      a.depois(320, proxima)
+      return
+    }
+    rajada(a, cfg, estado)
+    const t = (estado.ativo - cfg.nevasca) / (fim - cfg.nevasca)
+    a.depois(ritmo(a, lerp(cfg.rajada[0], cfg.rajada[1], t) * a.aleatorio(0.85, 1.15)), proxima)
+  }
+  a.depois(200, proxima)
+}
+
+function ventoDoLado(a, estado) {
+  // quase horizontal, um pouco para baixo
+  estado.vento = estado.lado > 0 ? a.aleatorio(0.05, 0.4) : Math.PI - a.aleatorio(0.05, 0.4)
+}
+
+// Uma rajada de estilhaços entrando pelo lado do vento, com uma brecha longe do coração
+function rajada(a, cfg, estado) {
+  const l = a.caixa
+  const lado = estado.lado
+  const alvo = a.alvo()
+  const meia = cfg.folgaRajada / 2
+  // a brecha: sorteada, mas nunca em cima do coração
+  let brecha = a.aleatorio(l.top + meia, l.bottom - meia)
+  for (let t = 0; t < 8 && Math.abs(brecha - alvo.y) < meia + 10; t++) brecha = a.aleatorio(l.top + meia, l.bottom - meia)
+  const n = a.inteiro(cfg.estilhacosRajada[0], cfg.estilhacosRajada[1])
+  const ys = []
+  // um vem na altura do coração (se não cair na brecha)
+  if (Math.abs(alvo.y - brecha) >= meia + 6) ys.push(limitar(alvo.y + a.aleatorio(-6, 6), l.top + 5, l.bottom - 5))
+  for (let t = 0; ys.length < n && t < 40; t++) {
+    const y = a.aleatorio(l.top + 5, l.bottom - 5)
+    if (Math.abs(y - brecha) < meia + 6) continue
+    if (ys.some((o) => Math.abs(o - y) < 15)) continue
+    ys.push(y)
+  }
+  a.parede({ eixo: 'y', ocupados: ys.map((y) => [y - 6, y + 6]) })
+  for (const y of ys) {
+    const v = a.aleatorio(cfg.velocidadeRajada[0], cfg.velocidadeRajada[1])
+    const atraso = a.aleatorio(8, 52) // espalhados: rajada, não parede
+    a.bala({
+      x: lado > 0 ? l.left - atraso : l.right + atraso,
+      y,
+      vx: lado * v,
+      vy: a.aleatorio(-8, 14),
+      comprimento: 16,
+      espessura: 5,
+      angulo: lado > 0 ? 0 : Math.PI,
+      textura: 'super-noelle-estilhaco',
+      tamanho: 20,
+      jaAvisada: true,
+      pulso: 0,
+    })
+  }
   tocar(a.cena, 'super-noelle-tique')
 }
 
-// ---------- ato III: SNOWGRAVE ----------
+// ---------- III. redemoinho ----------
+
+function redemoinho(a, cfg, estado) {
+  const l = a.caixa
+  estado.fase = 'redemoinho'
+  estado.olho = { x: l.centerX + a.aleatorio(-34, 34), y: l.centerY + a.aleatorio(-22, 22), sentido: a.escolher([-1, 1]) }
+  tocar(a.cena, 'super-noelle-redemoinho')
+  shake(a.cena, 200, 0.005)
+  const olho = estado.olho
+  const selo = estado.cenario.selo.setPosition(olho.x, olho.y)
+  a.cena.tweens.add({ targets: selo, alpha: 0.6, scale: 0.5, duration: 700, ease: 'Back.easeOut' })
+  // a partir de `raioLivre` px do olho, dois flocos vizinhos do anel ficam a mais que a lacuna
+  a.lacuna((TAU * cfg.raioLivre) / cfg.flocosAnel - 10, 'entre os flocos do redemoinho')
+
+  // o núcleo do olho machuca (pisca antes, como toda bala)
+  const nucleo = a.bala({ x: olho.x, y: olho.y, raio: 11, textura: 'super-noelle-flocao', tamanho: 30, cor: 0xbfe8ff, girar: olho.sentido * 3, atravessa: true, pulso: 0.1, aviso: 500 })
+
+  // o olho persegue o coração devagar (nunca colado nas bordas)
+  a.aoAtualizar((dt) => {
+    if (estado.fase !== 'redemoinho') return
+    const lc = a.caixa
+    const { c } = maisPerto(a, olho.x, olho.y)
+    if (c) {
+      const dx = c.x - olho.x
+      const dy = c.y - olho.y
+      const d = Math.hypot(dx, dy)
+      if (d > 1) {
+        const passo = Math.min(d, cfg.perseguir * (dt / 1000))
+        olho.x += (dx / d) * passo
+        olho.y += (dy / d) * passo
+      }
+    }
+    const m = 46
+    olho.x = limitar(olho.x, lc.left + m, lc.right - m)
+    olho.y = limitar(olho.y, lc.top + m, lc.bottom - m)
+    nucleo.x = olho.x
+    nucleo.y = olho.y
+    if (nucleo.idade < nucleo.aviso) nucleo.sprite.setPosition(olho.x, olho.y)
+  })
+  estado.nucleo = nucleo
+
+  // anéis de flocos entrando por todas as bordas
+  const inicio = estado.ativo
+  const fim = cfg.snowgrave
+  const proximo = () => {
+    if (estado.fase !== 'redemoinho') return
+    anel(a, cfg, estado)
+    const t = (estado.ativo - inicio) / (fim - inicio)
+    a.depois(ritmo(a, lerp(cfg.anel[0], cfg.anel[1], t) * a.aleatorio(0.9, 1.1)), proximo)
+  }
+  a.depois(250, proximo)
+  // flocos mirados de fora: ninguém fica parado longe do olho
+  const mirar = () => {
+    if (estado.fase !== 'redemoinho') return
+    const alvo = a.alvo()
+    const ang = a.aleatorio(0, TAU)
+    const p = deFora(a.caixa, alvo.x, alvo.y, Math.cos(ang), Math.sin(ang), a.aleatorio(10, 30))
+    const v = a.aleatorio(110, 135)
+    a.bala({ x: p.x, y: p.y, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v, raio: 5, textura: 'super-noelle-floco', tamanho: 14, cor: 0xffffff, girar: 4, jaAvisada: true })
+    a.depois(ritmo(a, cfg.mirados * a.aleatorio(0.8, 1.2)), mirar)
+  }
+  a.depois(600, mirar)
+}
+
+// Um anel de flocos: cada um entra pela borda (na direção dele a partir do olho)
+// e espirala para o olho, girando mais rápido quanto mais perto
+function anel(a, cfg, estado) {
+  const l = a.caixa
+  const olho = estado.olho
+  const base = a.aleatorio(0, TAU)
+  const n = cfg.flocosAnel
+  for (let k = 0; k < n; k++) {
+    const th0 = base + (k * TAU) / n
+    const p = deFora(l, olho.x, olho.y, -Math.cos(th0), -Math.sin(th0), 12)
+    const b = a.bala({
+      x: p.x,
+      y: p.y,
+      raio: 5,
+      textura: 'super-noelle-floco',
+      tamanho: 15,
+      cor: 0xdff6ff,
+      girar: olho.sentido * 5,
+      jaAvisada: true,
+      atualizar: (bala, dt) => {
+        const s = dt / 1000
+        bala.r -= cfg.queda * s
+        bala.th += olho.sentido * Math.min(3.4, cfg.giro / (bala.r * bala.r)) * s
+        bala.x = olho.x + Math.cos(bala.th) * bala.r
+        bala.y = olho.y + Math.sin(bala.th) * bala.r
+        if (bala.r < 16) bala.morta = true // engolido pelo olho
+      },
+    })
+    b.r = Math.hypot(p.x - olho.x, p.y - olho.y)
+    b.th = th0
+  }
+}
+
+// Um pilar de gelo na linha do coração: a ponta aparece na borda, depois sobe de uma vez
+function pilar(a, cfg) {
+  const l = a.caixa
+  const alvo = a.alvo()
+  const lado = a.escolher(['baixo', 'baixo', 'cima', 'esquerda', 'direita'])
+  const vertical = lado === 'baixo' || lado === 'cima'
+  const W = cfg.larguraPilar
+  const H = (vertical ? l.height : l.width) + 16
+  const [min, max] = vertical ? [l.left, l.right] : [l.top, l.bottom]
+  const pos = limitar((vertical ? alvo.x : alvo.y) + a.aleatorio(-14, 14), min + W / 2 + 2, max - W / 2 - 2)
+  a.lacuna(Math.max(pos - W / 2 - min, max - pos - W / 2), 'ao lado do pilar de gelo')
+  const aviso = Math.max(ATAQUE.telegrafoMs, cfg.avisoPilar)
+  const PONTA = 12
+  const SUBIR = 110
+  let subiu = false
+  let quebrou = false
+  const b = a.bala({
+    x: vertical ? pos : l.centerX,
+    y: vertical ? l.centerY : pos,
+    largura: vertical ? W : H,
+    altura: vertical ? H : W,
+    textura: 'super-noelle-pilar',
+    aviso,
+    atravessa: true,
+    pulso: 0,
+    vida: SUBIR + cfg.manterPilar + 180,
+    atualizar: (bala) => {
+      const lc = a.caixa
+      const t = bala.idade - bala.aviso
+      const p = Math.min(1, t / SUBIR)
+      const h = PONTA + (H - PONTA) * (1 - (1 - p) ** 3)
+      if (lado === 'baixo') bala.y = lc.bottom - h + H / 2
+      else if (lado === 'cima') bala.y = lc.top + h - H / 2
+      else if (lado === 'esquerda') bala.x = lc.left + h - H / 2
+      else bala.x = lc.right - h + H / 2
+      if (!subiu) {
+        subiu = true
+        tocar(a.cena, 'super-noelle-pilar')
+        shake(a.cena, 160, 0.008)
+        const bx = vertical ? pos : lado === 'esquerda' ? lc.left : lc.right
+        const by = vertical ? (lado === 'baixo' ? lc.bottom : lc.top) : pos
+        particulas(a.cena, bx, by, { cor: 0xeaf7ff, quantidade: 10, velocidade: 150, vida: 360 })
+      }
+      if (bala.vida < 180) {
+        bala.inofensiva = true
+        bala.sprite.setAlpha(Math.max(0, bala.vida / 180))
+        if (!quebrou) {
+          quebrou = true
+          tocar(a.cena, 'super-noelle-quebra')
+          particulas(a.cena, bala.x, bala.y, { cor: 0xbfe8ff, quantidade: 12, velocidade: 120, vida: 380 })
+        }
+      }
+    },
+  })
+  // o sprite: a coluna fina (não a escala uniforme da textura), girada para o lado de onde brota
+  b.sprite.setDisplaySize(W * 1.3, H).setRotation({ baixo: 0, cima: Math.PI, esquerda: Math.PI / 2, direita: -Math.PI / 2 }[lado])
+  b.escalaX = b.sprite.scaleX
+  b.escalaY = b.sprite.scaleY
+  // durante o aviso só a ponta aparece na borda (o resto ainda está "no gelo")
+  if (lado === 'baixo') b.sprite.y = l.bottom + H / 2 - PONTA
+  else if (lado === 'cima') b.sprite.y = l.top - H / 2 + PONTA
+  else if (lado === 'esquerda') b.sprite.x = l.left - H / 2 + PONTA
+  else b.sprite.x = l.right + H / 2 - PONTA
+  tocar(a.cena, 'super-noelle-tique')
+}
+
+// ---------- IV. SNOWGRAVE ----------
 
 function snowgrave(a, cfg, estado) {
   const l = a.caixa
-  estado.furia = true
+  estado.fase = 'snowgrave'
   tocar(a.cena, 'snowgrave')
-  shake(a.cena, 400, 0.01)
-  estado.veu.neve.stop?.()
-  a.cena.tweens.add({ targets: estado.selo, scale: 1.25, alpha: 0.85, duration: 700, ease: 'Cubic.easeOut' })
-  a.cena.tweens.add({ targets: estado.veu.frio, alpha: 0.8, duration: 700 })
-
-  // o nome, em letras de gelo
-  const nome = a.decoracao(
-    a.cena.add
-      .text(l.centerX, l.top + 18, 'SNOWGRAVE', { fontFamily: FONTE, fontSize: '22px', color: '#dff6ff', stroke: '#0b2a55', strokeThickness: 5 })
-      .setOrigin(0.5)
-      .setDepth(8)
-      .setAlpha(0)
-      .setScale(1.8),
-  )
-  a.cena.tweens.add({ targets: nome, alpha: 1, scale: 1, duration: 420, ease: 'Back.easeOut' })
-  a.cena.tweens.add({ targets: nome, alpha: 0.55, duration: 300, delay: 500, yoyo: true, repeat: -1 })
-
-  // colunas de gelo: as ímpares numa leva, as pares na outra
-  // colunas largas: a coluna livre entre duas levas tem sempre mais que a lacuna
-  const colunas = Math.max(3, Math.floor(l.width / (a.lacunaMinima + 4)))
-  const largura = l.width / colunas
-  const aviso = Math.max(ATAQUE.telegrafoMs, cfg.avisoColuna)
-  a.lacuna(largura, 'coluna livre entre as levas de gelo')
-  cfg.levas.forEach((ms, paridade) =>
-    a.depois(ms, () => {
-      tocar(a.cena, 'super-noelle-tique')
-      for (let k = paridade; k < colunas; k += 2) {
-        const x = a.caixa.left + (k + 0.5) * largura
-        a.aviso({ tipo: 'area', x: x - largura / 2 + 2, y: a.caixa.top, largura: largura - 4, altura: a.caixa.height, ms: aviso, cor: 0x9fd8ff }, () => coluna(a, x, largura, k === paridade))
-      }
-    }),
-  )
-
-  // o golpe final: o único lugar seguro, e o resto vira espinhos
-  const finalEm = cfg.duracao - cfg.snowgrave - cfg.avisoFinal - 420
-  a.depois(finalEm, () => golpeFinal(a, cfg))
+  shake(a.cena, 380, 0.01)
+  a.cena.tweens.add({ targets: estado.cenario.frio, alpha: 0.85, duration: 600 })
+  // o olho se apaga e o núcleo deixa de machucar
+  if (estado.nucleo) {
+    estado.nucleo.inofensiva = true
+    a.cena.tweens.add({ targets: estado.nucleo.sprite, alpha: 0, scale: 0.1, duration: 300, onComplete: () => (estado.nucleo.morta = true) })
+  }
+  nome(a, l)
+  a.depois(260, () => tumulo(a, cfg, estado))
 }
 
-function coluna(a, x, largura, primeira) {
-  const l = a.caixa
-  if (primeira) {
-    tocar(a.cena, 'super-noelle-estilhaco')
-    shake(a.cena, 220, 0.01)
-  }
-  a.bala({
-    x,
-    y: l.centerY,
-    largura: largura - 6,
-    altura: l.height,
-    textura: 'super-noelle-feixe',
-    jaAvisada: true,
-    vida: 360,
-    atravessa: true,
-    pulso: 0,
-    atualizar: (bala) => {
-      if (bala.vida < 170) {
-        bala.inofensiva = true
-        bala.sprite.setAlpha(Math.max(0, bala.vida / 170))
-      }
-    },
-  }).sprite.setRotation(Math.PI / 2)
-  // cristais subindo pela coluna
-  for (let i = 0; i < 4; i++) {
-    const cristal = a.decoracao(a.cena.add.image(x + (i - 1.5) * 5, l.bottom, 'super-noelle-pingente').setDepth(6).setScale(0.8).setAlpha(0.95))
-    a.cena.tweens.add({ targets: cristal, y: l.top + 20 + i * 18, alpha: 0, duration: 330, ease: 'Cubic.easeOut', onComplete: () => cristal.destroy() })
-  }
-  particulas(a.cena, x, l.bottom - 8, { cor: 0xeaf7ff, quantidade: 8, velocidade: 130, vida: 300 })
+// SNOWGRAVE caindo letra a letra, em gelo, no alto da caixa
+function nome(a, l) {
+  const letras = 'SNOWGRAVE'
+  const passo = 17
+  const x0 = l.centerX - ((letras.length - 1) * passo) / 2
+  ;[...letras].forEach((ch, i) => {
+    const t = a.decoracao(
+      a.cena.add
+        .text(x0 + i * passo, l.top - 20, ch, { fontFamily: FONTE, fontSize: '22px', color: '#e6f8ff', stroke: '#0b2a55', strokeThickness: 5 })
+        .setOrigin(0.5)
+        .setDepth(8)
+        .setAlpha(0),
+    )
+    a.cena.tweens.add({ targets: t, y: l.top + 18, alpha: 1, delay: i * 55, duration: 260, ease: 'Bounce.easeOut' })
+    a.cena.tweens.add({ targets: t, alpha: 0.5, delay: 900 + i * 40, duration: 260, yoyo: true, repeat: -1 })
+  })
 }
 
-function golpeFinal(a, cfg) {
+// O túmulo: estilhaços entram por todas as bordas e se fecham onde o coração estava
+function tumulo(a, cfg, estado) {
   const l = a.caixa
   const alvo = a.alvo()
-  // o lugar seguro: a `distanciaSeguro` do coração (tem que se mexer), dentro da caixa
-  const margem = cfg.raioSeguro + 8
-  let melhor = null
-  for (let k = 0; k < 12; k++) {
-    const ang = (k / 12) * Math.PI * 2 + a.aleatorio(0, 0.4)
-    const p = {
-      x: Math.max(l.left + margem, Math.min(l.right - margem, alvo.x + Math.cos(ang) * cfg.distanciaSeguro)),
-      y: Math.max(l.top + margem, Math.min(l.bottom - margem, alvo.y + Math.sin(ang) * cfg.distanciaSeguro)),
-    }
-    p.d = Math.abs(Math.hypot(p.x - alvo.x, p.y - alvo.y) - cfg.distanciaSeguro)
-    if (!melhor || p.d < melhor.d) melhor = p
+  const P = { x: limitar(alvo.x, l.left + 10, l.right - 10), y: limitar(alvo.y, l.top + 10, l.bottom - 10) }
+  estado.tumulo = P
+  tocar(a.cena, 'super-noelle-implosao')
+  const n = a.inteiro(cfg.lascasTumulo[0], cfg.lascasTumulo[1])
+  const passo = TAU / n
+  const base = a.aleatorio(0, TAU)
+  const falta = a.inteiro(0, n - 1) // a brecha do túmulo
+  const T = cfg.convergir
+  a.lacuna(passo * 80 - 6, 'entre as lascas do túmulo (a 80 px do centro)')
+  a.lacuna(2 * passo * 60 - 6, 'brecha do túmulo')
+  for (let k = 0; k < n; k++) {
+    if (k === falta) continue
+    const th = base + k * passo + a.aleatorio(-0.05, 0.05)
+    const fora = deFora(l, P.x, P.y, -Math.cos(th), -Math.sin(th), a.aleatorio(14, 22))
+    a.bala({
+      x: fora.x,
+      y: fora.y,
+      comprimento: 18,
+      espessura: 6,
+      angulo: th + Math.PI, // ponta para o centro
+      textura: 'super-noelle-estilhaco',
+      tamanho: 24,
+      jaAvisada: true,
+      pulso: 0,
+      vida: T,
+      // anda pelo relógio do próprio estilhaço: todos chegam juntos (sem depender do ritmo)
+      atualizar: (b) => {
+        const p = Math.min(1, b.idade / T) ** 1.15
+        b.x = fora.x + (P.x - fora.x) * p
+        b.y = fora.y + (P.y - fora.y) * p
+      },
+    })
   }
-  const seguro = melhor
-  a.lacuna(cfg.raioSeguro * 2, 'lugar seguro do SNOWGRAVE')
-  const aviso = Math.max(ATAQUE.telegrafoMs, cfg.avisoFinal)
-  tocar(a.cena, 'super-noelle-vento')
-
-  // quatro faixas avisam em volta do buraco seguro (o buraco não pisca: é ali)
-  const r = cfg.raioSeguro
-  const faixas = [
-    { x: l.left, y: l.top, largura: l.width, altura: seguro.y - r - l.top },
-    { x: l.left, y: seguro.y + r, largura: l.width, altura: l.bottom - seguro.y - r },
-    { x: l.left, y: seguro.y - r, largura: seguro.x - r - l.left, altura: r * 2 },
-    { x: seguro.x + r, y: seguro.y - r, largura: l.right - seguro.x - r, altura: r * 2 },
-  ]
-  let primeira = true
-  for (const f of faixas) {
-    if (f.largura < 2 || f.altura < 2) continue
-    const disparar = primeira ? () => espinhos(a, cfg, seguro) : null
-    primeira = false
-    a.aviso({ tipo: 'area', ...f, ms: aviso, cor: 0x9fd8ff }, disparar)
-  }
-  const anel = a.decoracao(a.cena.add.graphics().setDepth(9).setPosition(seguro.x, seguro.y))
-  anel.fillStyle(0xffffff, 0.22).fillRoundedRect(-r, -r, r * 2, r * 2, 8)
-  anel.lineStyle(3, 0xffffff, 1).strokeRoundedRect(-r, -r, r * 2, r * 2, 8)
-  anel.setScale(2.2).setAlpha(0)
-  a.cena.tweens.add({ targets: anel, scale: 1, alpha: 1, duration: 260, ease: 'Back.easeOut' })
-  a.cena.tweens.add({ targets: anel, alpha: 0.6, duration: 140, delay: 300, yoyo: true, repeat: -1 })
-  a.depois(aviso, () => anel.destroy())
+  // o frio se junta no ponto (brilho pequeno, sem desenhar trajetória)
+  const brilho = a.decoracao(a.cena.add.image(P.x, P.y, 'super-noelle-floco').setDepth(6).setTint(0xffffff).setAlpha(0).setScale(0.6))
+  a.cena.tweens.add({ targets: brilho, alpha: 0.9, scale: 1.6, angle: 360, duration: T, ease: 'Quad.easeIn' })
+  a.depois(T, () => {
+    brilho.destroy()
+    explosao(a, cfg, estado, P, base + passo / 2)
+  })
 }
 
-function espinhos(a, cfg, seguro) {
+function explosao(a, cfg, estado, P, base) {
   const l = a.caixa
   tocar(a.cena, 'snowgraveFim')
-  shake(a.cena, 420, 0.02)
-  // clarão branco na caixa inteira
+  tocar(a.cena, 'super-noelle-estilhaco')
+  shake(a.cena, 480, 0.022)
+  estado.tumulo = null
+  // clarão na caixa inteira e o pilar de luz no ponto
   const clarao = a.decoracao(a.cena.add.rectangle(l.centerX, l.centerY, l.width, l.height, 0xffffff).setDepth(7).setAlpha(0.85))
-  a.cena.tweens.add({ targets: clarao, alpha: 0, duration: 520, ease: 'Quad.easeOut' })
-  const lado = 20
-  for (let y = l.top + lado / 2; y < l.bottom; y += lado) {
-    for (let x = l.left + lado / 2; x < l.right; x += lado) {
-      // nada nasce dentro do buraco seguro (o quadrado do aviso)
-      if (Math.abs(x - seguro.x) < cfg.raioSeguro + lado * 0.5 && Math.abs(y - seguro.y) < cfg.raioSeguro + lado * 0.5) continue
-      const b = a.bala({
-        x,
-        y,
-        largura: lado - 6,
-        altura: lado - 4,
-        textura: 'super-noelle-pingente',
-        tamanho: lado + 14,
-        jaAvisada: true,
-        vida: 420,
-        atravessa: true,
-        pulso: 0,
-        atualizar: (bala) => {
-          if (bala.vida < 160) {
-            bala.inofensiva = true
-            bala.sprite.setAlpha(Math.max(0, bala.vida / 160))
-          }
-        },
-      })
-      // os espinhos brotam do chão numa onda que sai do buraco seguro
-      const final = b.sprite.scale
-      const atraso = Math.min(120, Math.hypot(x - seguro.x, y - seguro.y) * 0.5)
-      b.sprite.setScale(final * 0.1, final * 0.1)
-      a.cena.tweens.add({ targets: b.sprite, scaleX: final, scaleY: final * 1.15, duration: 110, delay: atraso, ease: 'Back.easeOut' })
-    }
-  }
-  // estilhaços voando para todo lado
-  for (let i = 0; i < 4; i++) {
-    particulas(a.cena, l.left + ((i + 0.5) * l.width) / 4, l.centerY, { cor: i % 2 ? 0xffffff : 0xbfe8ff, quantidade: 18, velocidade: 300, vida: 600, escala: 1.4 })
-  }
+  a.cena.tweens.add({ targets: clarao, alpha: 0, duration: 560, ease: 'Quad.easeOut' })
+  const luz = a.decoracao(a.cena.add.rectangle(P.x, l.centerY, 46, l.height + 20, 0xeaf7ff).setDepth(7).setAlpha(0.95))
+  a.cena.tweens.add({ targets: luz, scaleX: 0.05, alpha: 0, duration: 650, ease: 'Cubic.easeIn' })
+  const flor = a.decoracao(a.cena.add.image(P.x, P.y, 'super-noelle-flocao').setDepth(7).setScale(1).setAlpha(1))
+  a.cena.tweens.add({ targets: flor, scale: 5, alpha: 0, angle: 120, duration: 600, ease: 'Cubic.easeOut' })
+  a.cena.tweens.add({ targets: estado.cenario.selo, alpha: 0, scale: 1.6, duration: 500 })
+  // o estouro no ponto (quem ficou lá é pego)
+  a.bala({ x: P.x, y: P.y, raio: 26, textura: 'super-noelle-impacto', tamanho: 64, jaAvisada: true, atravessa: true, pulso: 0, vida: 300, atualizar: sumirNoFim(140) })
+  // os estilhaços voltam para todo lado (entre as direções por onde vieram)
+  estourar(a, P.x, P.y, cfg.explosao, base + a.aleatorio(-0.15, 0.15), cfg.velocidadeExplosao, 'super-noelle-estilhaco', 900)
+  particulas(a.cena, P.x, P.y, { cor: 0xffffff, quantidade: 26, velocidade: 300, vida: 600, escala: 1.4 })
+  particulas(a.cena, P.x, P.y, { cor: 0xbfe8ff, quantidade: 20, velocidade: 200, vida: 700 })
 }
