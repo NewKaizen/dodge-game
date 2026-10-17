@@ -22,7 +22,7 @@ export default {
       A.dessSolo({ duracao: duracaoDe(t), batida: lerp(300, 230, t), cadencia: lerp(75, 58, t), velocidade: lerp(150, 195, t), frase: t >= 0.6 ? 8 : 6 }),
     ),
     show: r('A estrada de notas do show: gemas caem pelas 4 cordas no ritmo, sempre com uma corda livre; no refrão, uma labareda sobe do palco seguindo o coração', (A, t) =>
-      A.dessShow({ duracao: duracaoDe(t), batida: lerp(540, 440, t), velocidade: lerp(140, 170, t), livres: t >= 0.6 ? 1 : 2, pirotecnia: t >= 0.5 ? 6 : 0, troca: lerp(50, 62, t) / 100, colcheias: t >= 0.6, persegue: lerp(460, 400, t), seguir: lerp(90, 110, t) }),
+      A.dessShow({ duracao: duracaoDe(t), batida: lerp(560, 460, t), velocidade: lerp(140, 170, t), livres: t >= 0.6 ? 1 : 2, pirotecnia: t >= 0.5 ? 6 : 0, troca: lerp(50, 62, t) / 100, colcheias: t >= 0.6, persegue: lerp(460, 400, t), seguir: lerp(90, 110, t) }),
     ),
     microfonia: r('Um microfone encosta na parede e solta um agudo serrilhado pela faixa do coração, numa caixa apertada', (A, t) =>
       apertar(A, t, A.dessMicrofonia({ duracao: duracaoDe(t), intervalo: lerp(1300, 900, t), aviso: lerp(620, 500, t), velocidade: lerp(260, 340, t), faiscas: t >= 0.6 ? 12 : 10, quantidade: t >= 0.75 ? 2 : 1 })),
@@ -37,7 +37,7 @@ export default {
       A.dessFumaca({ duracao: duracaoDe(t), intervalo: lerp(1900, 1400, t), brasas: lerp(4, 6, t), anel: lerp(6, 9, t), velocidade: lerp(65, 95, t), velocidadeAnel: lerp(90, 120, t) }),
     ),
     amplificador: r('Amplificadores entram pelas bordas, viram para o coração e batem o grave: ondas saem pelo cone e se abrem', (A, t) =>
-      A.dessAmplificador({ duracao: duracaoDe(t), intervalo: lerp(1700, 1200, t), batida: lerp(440, 350, t), velocidade: lerp(110, 150, t), pulsos: t >= 0.6 ? 4 : 3 }),
+      A.dessAmplificador({ duracao: duracaoDe(t), intervalo: lerp(1700, 1200, t), batida: lerp(440, 350, t), velocidade: lerp(105, 140, t), maximo: 84, pulsos: t >= 0.6 ? 4 : 3 }),
     ),
     cabos: r('Cabos de guitarra se esticam de parede a parede e ficam serpenteando no chão', (A, t) =>
       A.dessCabos({ duracao: duracaoDe(t), intervalo: lerp(1500, 1050, t), aviso: lerp(650, 520, t), vida: lerp(2200, 2700, t), amplitude: lerp(9, 13, t), serpenteia: lerp(2, 3.2, t), maxCabos: t >= 0.6 ? 3 : 2 }),
