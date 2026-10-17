@@ -51,7 +51,8 @@ function disparar(a, cfg, orientacao, quantidade) {
       posicoes.push(Math.min(Math.max(p, ini + meia), fim - meia))
     }
     const livres = lacunasLivres(ini, fim, posicoes.map(faixa))
-    if (Math.max(0, ...livres.map(([p, q]) => q - p)) >= a.lacunaMinima) break
+    // folga de 6 px além do mínimo: a sobra garante o círculo livre do validador
+    if (Math.max(0, ...livres.map(([p, q]) => q - p)) >= a.lacunaMinima + 6) break
   }
   a.parede({ eixo: vertical ? 'x' : 'y', ocupados: posicoes.map(faixa) })
 

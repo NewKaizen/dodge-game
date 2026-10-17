@@ -137,6 +137,11 @@ function estocar({ a, cfg, aviso, turno, geracao, deCima, centro, alcance, fundo
       atualizar: (b, dt) => {
         if (estado === 'espiando') {
           if (b.idade < aviso) return
+          if (a.tempo > a.fim) {
+            b.morta = true // o ataque acabou enquanto espiava: não estoca
+            return
+          }
+          b.inofensiva = false
           // um forcado mais novo já estocou: este nem entra
           if (turno.chegou > geracao) {
             b.morta = true
@@ -161,6 +166,8 @@ function estocar({ a, cfg, aviso, turno, geracao, deCima, centro, alcance, fundo
         }
       },
     })
+    // espiando, a pontinha na borda é só o aviso: não machuca (nem tampa a rota de fuga)
+    bala.inofensiva = true
     const { vivos } = turno
     for (let j = vivos.length - 1; j >= 0; j--) if (vivos[j].bala.morta) vivos.splice(j, 1)
     vivos.push({ bala, geracao })

@@ -44,6 +44,8 @@ export default definirAtaque({
     const v0 = cfg.velocidade * cfg.partida
     const aceleracao = (cfg.velocidade ** 2 - v0 ** 2) / (2 * alcance)
 
+    // o núcleo acendendo é o aviso (desenhado à mão): a CPU lê como zona
+    a.zonaPerigo({ tipo: 'circulo', x, y, raio: 20 }, { ms: Math.max(400, cfg.nucleo), dura: cfg.nucleo })
     a.depois(Math.max(400, cfg.nucleo), () => {
       // conta em disparos (não em relógio), porque o relógio inclui os respiros da onda
       const passo = cfg.intervalo / a.ritmo.densidade

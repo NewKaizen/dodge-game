@@ -52,9 +52,9 @@ export default definirAtaque({
         [l.right, l.bottom],
       ]
       const k0 = Math.min(1.75, Math.max(1.08, 1.04 * Math.max(...cantos.map(([x, y]) => Math.hypot((x - cx) / rx, (y - cy) / ry)))))
-      // tempo total: mais rápido que antes por dentro da caixa, mas com o
+      // tempo total: quase a velocidade de antes por dentro da caixa, com o
       // trecho de fora no lugar do pisca-pisca (e pelo menos `aviso` até a caixa)
-      const total = Math.max(cfg.tempoFechar * (1 + 0.6 * (k0 - 1)), (cfg.aviso * k0) / (k0 - 1))
+      const total = Math.max(cfg.tempoFechar * (1 + 0.8 * (k0 - 1)), (cfg.aviso * k0) / (k0 - 1))
       const s = total / 1000
 
       const passo = (Math.PI * 2 - cfg.abertura) / (cfg.quantidade - 1)

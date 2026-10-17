@@ -32,6 +32,15 @@ export default definirAtaque({
     const v0 = cfg.velocidade * cfg.partida
     const queda = (cfg.velocidade ** 2 - v0 ** 2) / (2 * Math.max(40, l.height + cfg.largura / 2))
 
+    // colunas que ainda estão caindo dentro da caixa: { x, balas }. Como elas
+    // entram devagar, a leva anterior pode ainda estar na caixa quando a nova
+    // chega; a rota de fuga conta as duas
+    let caindo = []
+    const ocupadas = () => {
+      caindo = caindo.filter((c) => c.balas.some((b) => !b.morta && b.y - b.raio < a.caixa.bottom))
+      return caindo.map((c) => c.x)
+    }
+
     a.aCada(cfg.intervalo, (i) => {
       mira += taxa
       let fixo = null
@@ -41,12 +50,15 @@ export default definirAtaque({
         const folga = (l.width - slots * cfg.largura) / 2
         fixo = Math.min(slots - 1, Math.max(0, Math.floor((alvo.x - l.left - folga) / cfg.largura)))
       }
-      const xs = escolherColunas(a, slots, cfg, fixo)
-      a.parede({ eixo: 'x', ocupados: xs.map((x) => [x - cfg.largura / 2, x + cfg.largura / 2]) })
+      const antigas = ocupadas()
+      const xs = escolherColunas(a, slots, cfg, fixo, antigas)
+      a.parede({ eixo: 'x', ocupados: [...xs, ...antigas].map((x) => [x - cfg.largura / 2, x + cfg.largura / 2]) })
 
       for (const x of xs) {
+        const coluna = { x, balas: [] }
+        caindo.push(coluna)
         for (let k = 0; k < porColuna; k++) {
-          a.bala({
+          coluna.balas.push(a.bala({
             x,
             y: l.top - cfg.largura / 2 - k * passo,
             vy: v0,
@@ -56,7 +68,7 @@ export default definirAtaque({
             girar: 2,
             pulso: 0.04,
             entrando: true,
-          })
+          }))
         }
       }
     })
@@ -64,19 +76,25 @@ export default definirAtaque({
 })
 
 // Sorteia as colunas (com semente) até sobrar uma lacuna grande o bastante.
-// `fixo`: índice de uma coluna que sempre entra (a mirada no coração)
-function escolherColunas(a, slots, cfg, fixo = null) {
+// `fixo`: índice de uma coluna que sempre entra (a mirada no coração);
+// `antigas`: x das colunas da leva anterior que ainda estão caindo. Se não
+// achar saída, vai tirando colunas da leva nova (no mínimo uma) e, por fim,
+// solta até a coluna mirada
+function escolherColunas(a, slots, cfg, fixo = null, antigas = []) {
   const l = a.caixa
   let xs = []
-  for (let tentativa = 0; tentativa < 10; tentativa++) {
-    const indices = new Set(fixo === null ? [] : [fixo])
-    while (indices.size < Math.min(cfg.quantidade, slots)) indices.add(a.inteiro(0, slots - 1))
+  for (let tentativa = 0; tentativa < 15; tentativa++) {
+    const quantas = Math.max(1, Math.min(cfg.quantidade, slots) - Math.floor(tentativa / 5))
+    // nas últimas tentativas até a coluna mirada pode trocar de lugar
+    const indices = new Set(fixo === null || tentativa >= 10 ? [] : [fixo])
+    while (indices.size < quantas) indices.add(a.inteiro(0, slots - 1))
     // as faixas ficam centradas na caixa: a sobra se divide entre os dois lados
     // (antes ficava toda à direita, e o canto direito nunca levava coluna)
     const folga = (l.width - slots * cfg.largura) / 2
     xs = [...indices].map((s) => l.left + folga + cfg.largura / 2 + s * cfg.largura)
-    const livres = lacunasLivres(l.left, l.right, xs.map((x) => [x - cfg.largura / 2, x + cfg.largura / 2]))
-    if (Math.max(0, ...livres.map(([p, q]) => q - p)) >= a.lacunaMinima) break
+    const livres = lacunasLivres(l.left, l.right, [...xs, ...antigas].map((x) => [x - cfg.largura / 2, x + cfg.largura / 2]))
+    // folga de 6 px além do mínimo: a sobra garante o círculo livre do validador
+    if (Math.max(0, ...livres.map(([p, q]) => q - p)) >= a.lacunaMinima + 6) break
   }
   return xs
 }
