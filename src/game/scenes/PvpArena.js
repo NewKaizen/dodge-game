@@ -14,12 +14,13 @@ import { criarPartida, iniciarRodada, podeJogar, resolverRodada, aplicarDano, re
 import { escolherJogada, NIVEIS_BOT, NIVEL_BOT_PADRAO } from '../pvp/bot.js'
 import { EsquivaBot } from '../pvp/botEsquiva.js'
 import { criarRng, aleatorio, inteiro } from '../pvp/baralho.js'
-import { EVENTOS, EVENTO, ehRodadaBonus, adiarBonus, sortearEvento, transformarMalucas, desfazerMalucas, podeJogarDuelo, resolverDuelo } from '../pvp/bonus.js'
+import { EVENTOS, EVENTO, ehRodadaBonus, adiarBonus, sortearEvento, transformarMalucas, desfazerMalucas, podeJogarDuelo, resolverDuelo, resolverCopia } from '../pvp/bonus.js'
 import { EFEITOS } from '../pvp/bonus/eventos/index.js'
 import { ARENA, ARENA_PADRAO, eventosDaArena } from '../pvp/arenas.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { anunciarBonus } from '../pvp/bonus/anuncio.js'
 import Duelo from '../pvp/bonus/Duelo.js'
+import Copia from '../pvp/bonus/Copia.js'
 import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
@@ -82,6 +83,8 @@ import { anunciarSuper } from '../pvp/super/anuncio.js'
 //   'malucas'  na revelação cada carta vira outra sorteada (transformarMalucas)
 //   'duelo'    a carta escolhida (sem gastar energia) vira a arma do duelo:
 //              arremesso + esquiva dão lugar a 'duelo' (pvp/bonus/Duelo.js)
+//   'copia'    CTRL+C CTRL+V: igual ao duelo nas cartas, mas a fase 'duelo' roda o
+//              minigame de apertar A (pvp/bonus/Copia.js): quem ganha copia energia
 //   CORAÇÃO TROCADO liga coracoesTrocados: cada coração desvia na pista do
 //   outro (donoDaPista/pistaDe), ou seja, do ataque que o próprio dono jogou
 // Testes: scene.start('PvpArena', { bonus: 'festa' }) força esse evento em
@@ -469,8 +472,8 @@ export default class PvpArena extends Phaser.Scene {
       // bonus round: o evento só é revelado agora, com as cartas já escolhidas
       await this.sortearBonus(jogadas)
       if (this.saindo) return
-      if (this.bonus?.cartas === 'duelo') {
-        const duelo = resolverDuelo(this.estado, jogadas[0], jogadas[1], this.rngBonus)
+      if (this.bonus?.cartas === 'duelo' || this.bonus?.cartas === 'copia') {
+        const duelo = this.bonus.cartas === 'copia' ? resolverCopia(this.estado, jogadas[0], jogadas[1]) : resolverDuelo(this.estado, jogadas[0], jogadas[1], this.rngBonus)
         this.contarJogadas(duelo)
         await this.revelacaoDuelo(duelo)
         if (this.saindo) return
@@ -631,14 +634,17 @@ export default class PvpArena extends Phaser.Scene {
     this.maos.forEach((m) => m.setTravada(false))
     tocar(this, 'cartaDeslizar')
     await Promise.all(cartas.map((c, j) => this.tween({ targets: c, x: MESA[j].x, y: MESA[j].y, rotation: 0, scaleX: ESCALA_MESA, scaleY: ESCALA_MESA, duration: 320, ease: 'Cubic.easeOut' })))
-    this.mostrarBanner('DUELO!', corTexto(this.bonus.cor))
+    this.mostrarBanner(r.copia ? this.bonus.nome : 'DUELO!', corTexto(this.bonus.cor))
     await this.esperar(240)
     await Promise.all(cartas.map((c) => (c instanceof Carta ? c.revelar() : this.tween({ targets: c, scale: ESCALA_MESA * 1.15, duration: 110, yoyo: true }))))
     const NOMES = { tiro: 'TIRO', espada: 'ESPADA', bumerangue: 'BUMERANGUE', explosao: 'EXPLOSÃO' }
-    const etiquetas = r.armas.flatMap((arma, j) => [
-      this.etiquetaEm(MESA[j].x, MESA[j].y + 86, NOMES[arma.arma] ?? arma.arma, '#ffe9a0', { atraso: 120, tamanho: 14, ms: 1700 }),
-      this.etiquetaEm(MESA[j].x, MESA[j].y + 104, r.jogadas[j].passou ? 'sorteada (passou)' : `${arma.dano} por acerto`, TEXTO.normal, { atraso: 280, tamanho: 11, ms: 1540 }),
-    ])
+    // CTRL+C CTRL+V: a carta só vai para o descarte (sem gastar energia)
+    const etiquetas = r.copia
+      ? [0, 1].filter((j) => !r.jogadas[j].passou).map((j) => this.etiquetaEm(MESA[j].x, MESA[j].y + 86, 'sem custo', TEXTO.normal, { atraso: 120, tamanho: 12, ms: 1700 }))
+      : r.armas.flatMap((arma, j) => [
+          this.etiquetaEm(MESA[j].x, MESA[j].y + 86, NOMES[arma.arma] ?? arma.arma, '#ffe9a0', { atraso: 120, tamanho: 14, ms: 1700 }),
+          this.etiquetaEm(MESA[j].x, MESA[j].y + 104, r.jogadas[j].passou ? 'sorteada (passou)' : `${arma.dano} por acerto`, TEXTO.normal, { atraso: 280, tamanho: 11, ms: 1540 }),
+        ])
     tocar(this, 'brilhoRank')
     await this.esperar(1700)
     etiquetas.forEach((t) => t.scene && t.destroy())
@@ -656,8 +662,15 @@ export default class PvpArena extends Phaser.Scene {
     if (this.saindo) return
     this.fase = 'duelo'
     this.ko = [false, false]
-    this.dica.setText(this.cpu === null ? 'mira automática   A: atacar' : 'mira automática   A: atacar   (a CPU também luta!)')
-    this.duelo = new Duelo(this, { armas: r.armas, cpu: this.cpu, nivelBot: this.nivelBot, semente: `${this.semente}:duelo:${this.estado.rodada}`, aceleracao: this.aceleracao })
+    const semente = `${this.semente}:duelo:${this.estado.rodada}`
+    if (r.copia) {
+      // CTRL+C CTRL+V: o minigame ocupa o lugar do duelo (mesma interface)
+      this.dica.setText('aperte A sem parar!')
+      this.duelo = new Copia(this, { cpu: this.cpu, nivelBot: this.nivelBot, semente })
+    } else {
+      this.dica.setText(this.cpu === null ? 'mira automática   A: atacar' : 'mira automática   A: atacar   (a CPU também luta!)')
+      this.duelo = new Duelo(this, { armas: r.armas, cpu: this.cpu, nivelBot: this.nivelBot, semente, aceleracao: this.aceleracao })
+    }
     await this.duelo.rodar()
     this.duelo = null
     this.dica.setText('')

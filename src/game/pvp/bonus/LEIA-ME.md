@@ -9,7 +9,7 @@ pvp/bonus/
                       (depois da escolha das cartas; música abaixa e rola o som de cassino)
   eventos/index.js    EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado,
                                  pcEscola, aquario, cogumelo, estatua, gelo, terremoto,
-                                 popups, lag, teclado, clone, telaAzul, cursor }
+                                 popups, lag, teclado, telaAzul, cursor }
                                  chuva, ventania, abelhas, vagalumes, polen, trepadeira }
                                  encolhendo, leoes, lancas, bigas, brasas, polegar, rede }
   eventos/arteColiseu.js  arte (texturas de canvas) e utilidades dos eventos do COLISEU
@@ -18,6 +18,10 @@ pvp/bonus/
   eventos/<id>.js     um evento que bagunça a ESQUIVA normal (cartas 'normal')
   Duelo.js            o evento 'duelo' (substitui arremesso + esquiva)
   botDuelo.js         a CPU do duelo
+  Copia.js            o evento 'copia' (CTRL+C CTRL+V): minigame de apertar A, também no
+                      lugar de arremesso + esquiva (mesma interface do Duelo: a arena roda
+                      os dois na fase 'duelo')
+  botCopia.js         a CPU do CTRL+C CTRL+V (apertos com ritmo de gente por nível)
 ```
 
 `malucas` não tem arquivo de efeito: a arena faz a animação de transformar a
@@ -50,7 +54,7 @@ os corações já andaram neste frame (dá para medir quanto cada um se mexeu).
 Dois jeitos, para coisas diferentes:
 
 - **`passo(j, delta, joy)`**: quanto tempo a pista j anda neste frame, TUDO junto (coração,
-  caixa, ataque e balas). `delta` = normal; `delta * 0.72` = câmera lenta (AQUÁRIO);
+  caixa, ataque e balas). `delta` = normal; `delta * 0.82` = câmera lenta (AQUÁRIO);
   `0` = a pista inteira congela, coração junto; devolver o tempo acumulado de uma vez = anda
   aos trancos (PC DA ESCOLA). `Pista.atualizar` divide passos grandes em pedaços de ~20 ms,
   então nenhuma bala atravessa o coração.
@@ -116,7 +120,7 @@ DESVIO PERFEITO), `superAtivar` e `superCorte` (carta SUPER), `pcLigando` e `tra
 ESCOLA), `tchibum` e `bolha` (AQUÁRIO), `crescer` e `encolher` (COGUMELO), `pego` (alarme da
 DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO),
 `popup` e `fecharJanela` (POP-UPS), `lag` (LAG), `teclas` e `embaralhar` (TECLADO EMBARALHADO),
-`clonar` (CTRL+C CTRL+V), `telaAzul` e `reiniciar` (TELA AZUL), `ampulheta` e `clique` (CURSOR GIGANTE).
+`clonar`, `copiarTecla` ({ lado }), `copiado` e `copiarErro` (CTRL+C CTRL+V), `telaAzul` e `reiniciar` (TELA AZUL), `ampulheta` e `clique` (CURSOR GIGANTE).
 DANÇA DA ESTÁTUA), `congelar` e `patins` (PISTA DE GELO), `ronco` e `terremoto` (TERREMOTO).
 Arena JARDIM: `pancada` e `poca` (CHUVA DE VERÃO), `ventoAviso` e `rajada` (VENTANIA), `zumbido` e
 `zumbidoBravo` (ENXAME), `anoitecer`, `grilo` e `vagalume` (VAGA-LUMES), `inspirar` (opção `{ altura }`)
@@ -164,7 +168,7 @@ Outros recursos de audio.js usados pelos eventos:
 | `gravidade` | uma força puxa o coração e troca de lado | `joy` |
 | `trocado` | os corações trocam de caixa | `arena.coracoesTrocados` |
 | `pcEscola` | caixas pixeladas (filtro Blocky na câmera da caixa), 6–14 FPS aos trancos, travadas com "Não está respondendo" | `passo` + filtro |
-| `aquario` | câmera lenta, o coração boia (segure ↓ para afundar), inércia, peixes e bolhas | `passo` (×0,72) + `joy` |
+| `aquario` | câmera lenta, o coração boia (segure ↓ para afundar), inércia, peixes e bolhas | `passo` (×0,82) + `joy` |
 | `cogumelo` | coração GIGANTE (2,3×) / MINI (0,5×) alternando, a música desce/sobe de tom junto | `setTamanho` + `tomMusica` |
 | `estatua` | DANÇA DA ESTÁTUA: a música para do nada (`cortarMusica`), as pistas congelam (`pista.congelada`) e um holofote de vigia PERSEGUE o coração em cada caixa (mais lento que ele); quem se mexer sob a luz é PEGO (30% do HP máximo, uma vez por parada; `arena.acertou`). A CPU obedece em ~80% das paradas. `efeitoBonus.estadoDebug()` mostra a parada e as luzes | `cortarMusica` + `congelada` + `joy` (CPU) |
 | `gelo` | o coração desliza (inércia no joystick), flocos e reflexos | `joy` |
@@ -172,7 +176,6 @@ Outros recursos de audio.js usados pelos eventos:
 | `popups` | janelas de propaganda (depth 8: por cima das balas, por baixo do coração) tapam a caixa; coração no [X] fecha; posição relativa à caixa | containers recortados |
 | `lag` | o direcional chega 250–400 ms atrasado (fila de comandos, `lerAtrasado` de `pvp/bonusInformatica.js`); fantasma do coração simula os comandos "na rede"; wi-fi + PING em cima da caixa | `joy` |
 | `teclado` | as setas trocam (7 giros/espelhos de `MAPAS_TECLADO`), aviso de 1,1 s, tecladinho no meio mostrando o mapa; a CPU aprende o mapa depois de 0,6–1,2 s | `joy` |
-| `clone` | clone espelhado (`espelhar`) que as balas acertam: `balas.colidir([alvo])` + `pista.acertou(coracaoReal)` (i-frames e dano do dono); o espelho muda com aviso e carência | `balas.colidir` |
 | `telaAzul` | chuvisco de aviso, TELA AZUL congela a pista toda (`passo` = 0), reinicia, revela parado e volta com 480 ms de i-frames | `passo` |
 | `cursor` | cursor gigante persegue o coração, mira (ampulheta, anel fechando) e clica: bala redonda invisível com `aviso` = tempo da mira (a CPU enxerga); às vezes clique duplo | `balas.criar` |
 | `chuva` | (Jardim) CHUVA DE VERÃO: a chuva empurra o coração para baixo (PANCADAS avisadas com setas), poças com aviso onde o coração escorrega (inércia só dentro da poça) | `joy` + `somContinuo('chuva')` |
@@ -197,3 +200,18 @@ Outros recursos de audio.js usados pelos eventos:
 | `armadilhas` | placas de pressão (pisou: clique, a linha pisca, dardos das duas paredes) e espinhos em padrões avisados (colunas, faixas, xadrez, borda, miolo) | `balas.criar` (dardos com aviso; espinhos = retângulos invisíveis avisando) |
 | `areia` | poças de areia movediça (surgem avisando, prendem, secam): coração lento e puxado para o meio da poça, sem dano | `joy` |
 | `relogio` | RELÓGIO DO TEMPO: o ataque alterna câmera lenta (×0,5) / acelerado (×1,5) com 1 s de aviso; o coração anda normal (`fatorCoracao` = base / fator, devolvido no fim); a música acompanha (`velocidadeMusica`) | `passo` + `fatorCoracao` |
+
+## Minigame CTRL+C CTRL+V (`copia`, Copia.js)
+
+Não é evento de esquiva (`cartas: 'copia'`): como o duelo, as cartas vão para o descarte sem
+gastar energia (`resolverCopia`) e a arena roda `new Copia(arena, { cpu, nivelBot, semente })`
+no lugar do Duelo (fase `'duelo'`: `atacar(j)` = o humano apertou A, `atualizar(delta)`,
+`parar()`). Uma janela "Copiando energia..." estilo Windows 98 abre no meio da mesa com uma
+barra de progresso em cabo de guerra: cada A puxa o marcador 1 aperto para o seu lado (apertos
+a menos de `COPIA.intervaloMinMs` não contam: ruído do botão). Em `COPIA.duracaoMs` (5 s) quem
+estiver na frente copia `quantiaCopiada(fração da barra)` de energia (1, 2 ou 3; as faixas
+aparecem embaixo da barra); `COPIA.cheio` apertos de vantagem = 100%, acaba na hora. Empate:
+caixinha "Erro ao copiar", ninguém leva nada. A energia passa por `copiarEnergia` (nunca abaixo
+de 0 nem acima de `ENERGIA.maxima`) e voa gema a gema de um HUD para o outro.
+A CPU usa `BotCopia` (`NIVEIS_COPIA`: ~4, 5,5 e 7 apertos/s com variação, cansaço e tropeços).
+`pvpArena.duelo.estadoDebug()` mostra apertos, cabo e o resultado.

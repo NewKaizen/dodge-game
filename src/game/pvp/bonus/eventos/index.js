@@ -1,7 +1,7 @@
 // Efeitos visuais dos eventos de bônus que bagunçam a esquiva (cartas 'normal').
 // Cada um: export default function criar(arena, { rng, rodada, aceleracao })
 // -> { comecar(), atualizar(delta), joy?(j, joy), passo?(j, delta, joy), terminar() } (ver ../LEIA-ME.md).
-// 'malucas' e 'duelo' não estão aqui (a arena e o Duelo.js cuidam deles).
+// 'malucas', 'duelo' e 'copia' não estão aqui (a arena, o Duelo.js e o Copia.js cuidam deles).
 
 import explosoes from './explosoes.js'
 import festa from './festa.js'
@@ -18,7 +18,6 @@ import terremoto from './terremoto.js'
 import popups from './popups.js'
 import lag from './lag.js'
 import teclado from './teclado.js'
-import clone from './clone.js'
 import telaAzul from './telaAzul.js'
 import cursor from './cursor.js'
 import chuva from './chuva.js'
@@ -47,4 +46,4 @@ import armadilhas from './armadilhas.js'
 import areia from './areia.js'
 import relogio from './relogio.js'
 
-export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, clone, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira, encolhendo, leoes, lancas, bigas, brasas, polegar, rede, plateia, geloSeco, ritmo, karaoke, mosh, pedra, armadilhas, areia, relogio }
+export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira, encolhendo, leoes, lancas, bigas, brasas, polegar, rede, plateia, geloSeco, ritmo, karaoke, mosh, pedra, armadilhas, areia, relogio }

@@ -180,7 +180,7 @@ Testes: `scene.start('PvpVoto', { p1, p2 })` ou direto `scene.start('PvpArena', 
 
 ## Bonus rounds (a cada 3 rodadas)
 
-Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento caótico **depois** que os dois escolhem as cartas (no Duelo, a carta escolhida vira a arma, sem gastar energia), que nunca repete o da rodada bônus anterior. A roleta só tem os eventos da arena da partida (veja Arenas). Só caos, sem prêmio: ninguém ganha nada a mais, e o dano continua valendo. Nos eventos de esquiva, as duas caixas abrem mesmo que ninguém tenha atacado.
+Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento caótico **depois** que os dois escolhem as cartas (no Duelo, a carta escolhida vira a arma, sem gastar energia; no Ctrl+C Ctrl+V ela só vai para o descarte, também sem gastar energia), que nunca repete o da rodada bônus anterior. A roleta só tem os eventos da arena da partida (veja Arenas). Quase só caos, sem prêmio: ninguém ganha nada a mais e o dano continua valendo. A exceção é o Ctrl+C Ctrl+V, que passa energia de um para o outro. Nos eventos de esquiva, as duas caixas abrem mesmo que ninguém tenha atacado.
 
 | Evento | Cartas | O que acontece |
 |---|---|---|
@@ -191,7 +191,7 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Gravidade maluca | normais | uma gravidade puxa o coração e muda de lado a cada ~2 s, com aviso |
 | Coração trocado | normais | os corações trocam de caixa: cada um desvia do próprio ataque |
 | PC da escola | normais | as caixas ficam pixeladas (baixa resolução) e rodam a 6–14 FPS, aos trancos; de vez em quando o PC trava ("Não está respondendo") |
-| Aquário | normais | as caixas enchem de água: tudo em câmera lenta, o coração boia (segure ↓ para afundar) e tem inércia de água |
+| Aquário | normais | as caixas enchem de água: tudo em câmera lenta leve (×0,82), o coração boia (segure ↓ para afundar) e tem inércia de água |
 | Cogumelo maluco | normais | o coração alterna entre GIGANTE (hitbox enorme, música grave) e MINI (hitbox mínima, música aguda), com pisca-pisca de aviso |
 | Dança da estátua | normais | a música PARA de repente, sem aviso: balas e ataque congelam, o coração não. Um holofote de vigia PERSEGUE o coração de cada um (é mais lento: dá para fugir); quem se mexer com a luz em cima do coração é PEGO (30% do HP máximo, uma vez por parada). Mexer fora da luz pode. A música volta e tudo descongela |
 | Pista de gelo | normais | o coração escorrega: demora para acelerar, demora para frear e desliza quando você solta |
@@ -199,7 +199,7 @@ Nas rodadas 3, 6, 9... (`BONUS` em `pvp/bonus.js`) uma roleta sorteia um evento 
 | Pop-ups | normais | janelas de propaganda ("VOCÊ GANHOU!", "BAIXE MAIS RAM") abrem por cima das balas (por baixo do coração) e tapam a visão; passar o coração no [X] fecha. Nunca nascem em cima do coração, no máximo 2–3 por caixa, somem sozinhas em 7 s |
 | Lag | normais | o direcional chega atrasado 250–400 ms (o ping aparece em cima da caixa); um fantasma do coração mostra para onde ele vai. A CPU também sofre |
 | Teclado embaralhado | normais | as setas trocam de lugar (giros e espelhos: seta sempre vira seta) e o mapa muda a cada ~4 s, com 1,1 s de aviso; o tecladinho entre as caixas mostra sempre o mapa atual. A CPU demora um pouco para aprender cada mapa |
-| Ctrl+C Ctrl+V | normais | um clone espelhado do coração (lados, cima/baixo ou centro, com o eixo tracejado) anda junto; bala no clone conta como acerto no dono. O espelho muda de tempos em tempos, com aviso e um instante sem machucar |
+| Ctrl+C Ctrl+V | sem custo (descarte) | (Informática) minigame no lugar de arremesso + esquiva: abre uma janela "Copiando energia..." com a barra de progresso disputada em cabo de guerra. 3-2-1-COPIAR! e por 5 s cada aperto de A (Z/espaço do P1, Enter do P2, botão A do joystick) puxa a barra para o seu lado. Quem estiver na frente no fim COPIA (rouba) energia do outro: até 35% da barra = 1, até 70% = 2, mais = 3; 14 apertos de vantagem enchem a barra (100%) e acabam na hora. Empate: ninguém copia. Quem perde não fica negativo e quem copia não passa de 10 (o que não cabe se perde). A CPU aperta como gente (~4/s no fácil, ~5,5/s no normal, ~7/s no difícil) |
 | Tela azul | normais | de vez em quando uma caixa chuvisca e dá TELA AZUL: a pista inteira congela (ninguém leva dano), reinicia, mostra tudo parado por um instante e volta com i-frames curtos |
 | Cursor gigante | normais | um cursor de mouse enorme persegue o coração (mais devagar que ele), para, mira (anel vermelho fechando, ampulheta) e clica: dano em área. Às vezes clique duplo |
 | Pedra rolante (Templo) | normais | ronco, tremor e a faixa por onde a pedra vai passar fica vermelha com setas no sentido dela (~1 s de aviso); aí uma pedra gigante atravessa a caixa rolando (bala, 5 de dano). Às vezes vem uma segunda em outra faixa: sempre sobra um terço da caixa livre |
