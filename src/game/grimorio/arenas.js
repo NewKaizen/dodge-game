@@ -48,7 +48,7 @@ const DICAS = {
   popups: { nome: 'POP-UPS', dica: 'O coração fica sempre por cima das janelas, e o vidro deixa adivinhar as balas atrás. Para fechar, é só passar o coração pelo [X] vermelho.' },
   lag: { nome: 'LAG', dica: 'O direcional chega atrasado. O fantasma do coração mostra para onde ele VAI: guie pelo fantasma e antecipe.' },
   teclado: { nome: 'TECLADO EMBARALHADO', dica: 'As setas trocam de lugar (giros e espelhos). O tecladinho entre as caixas mostra o mapa da vez: olhe antes de mexer.' },
-  clone: { nome: 'CTRL+C CTRL+V', dica: 'O clone anda espelhado na mesma caixa: bala que pegar nele acerta você. O eixo tracejado mostra o espelho, e ele muda com aviso.' },
+  copia: { nome: 'CTRL+C CTRL+V', dica: 'Aperte A sem parar por 5 s: quem estiver na frente na barra copia 1 a 3 de energia do outro. 14 apertos de vantagem enchem a barra e acabam a disputa.' },
   telaAzul: { nome: 'TELA AZUL', dica: 'O chuvisco avisa. Na tela azul a caixa congela e ninguém leva dano; ela volta do mesmo ponto, então já pense na saída.' },
   cursor: { nome: 'CURSOR GIGANTE', dica: 'O cursor persegue o coração; quando aparecem a ampulheta e o anel fechando, ele vai clicar ali. Saia de baixo (às vezes é clique duplo).' },
   chuva: { nome: 'CHUVA DE VERÃO', dica: 'Fique mais para cima: a chuva puxa para baixo, e as pancadas fortes vêm avisadas com setas. Nas poças o coração escorrega (só dentro delas).' },
@@ -90,6 +90,7 @@ const CARTAS_DO_EVENTO = {
   normal: 'as de sempre',
   malucas: 'viram outras',
   duelo: 'viram arma',
+  copia: 'vão para o descarte sem custo',
 }
 
 const maiuscula = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t)

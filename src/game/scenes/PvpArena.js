@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { LARGURA, ALTURA, FONTE, CORES, TEXTO, corTexto, ACELERACAO, fatorAceleracao, nivelAceleracao, parteDoFator } from '../constants.js'
 import Controles from '../controles.js'
-import { tocar, musica, pausarMusica, retomarMusica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal } from '../audio.js'
+import { tocar, musica, pausarMusica, retomarMusica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal, tomMusica, cortarMusica, reforcarGrave } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import Carta, { CORES_CARTA, TIPOS } from '../entities/Carta.js'
@@ -234,7 +234,16 @@ export default class PvpArena extends Phaser.Scene {
     this.events.once('shutdown', () => {
       this.saindo = true
       this.events.off('postupdate', this.filtrarCaixas, this)
-      this.encerrarEfeitoBonus()
+      // na saída os objetos do efeito já podem ter sido destruídos: um terminar()
+      // que falhe no meio não pode deixar a música desafinada/cortada (COGUMELO etc.)
+      try {
+        this.encerrarEfeitoBonus()
+      } catch (erro) {
+        console.warn('[pvp] efeito bônus falhou ao terminar na saída', erro)
+      }
+      tomMusica(0)
+      cortarMusica(false)
+      reforcarGrave(0)
       this.duelo?.parar()
       this.duelo = null
       this.pistas.forEach((p) => p.destruir())
