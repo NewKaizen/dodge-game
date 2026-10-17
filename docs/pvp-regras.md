@@ -399,3 +399,28 @@ acertos do bot médio, antes → depois):
 
 Médias por carta (bot médio): Susie 1,13 → 1,28, Ralsei 1,26 → 1,35. Nenhum aviso `[telegrafo]`/`[rota de fuga]`.
 No Pisão o bot perfeito subiu (0,33 → 1,08 acerto) porque ele não enxerga a pegada (é decoração), só os pilares.
+
+**2026-10-17: cartas da Dess revistas** (`attacks/habilidades/dess.js`, `attacks/super/dess.js`).
+Todos os projéteis dela nascem fora da caixa e entram (sem piscar), com lados, ordem e posições
+sorteados; quem avisa é o próprio objeto (o taco no home plate, o microfone na parede, a guitarra
+na corda, o amplificador na borda). Testado com o coração PARADO (sem bot, 6 posições × 3
+sementes): todas as cartas e o SUPER acertam o coração parado.
+
+- 9♠ Home Run: o taco se prepara no home plate e a bola sai de fora mirando onde o coração está na
+  hora da tacada (antes, com 2 bolas, as duas abriam em volta do coração e parado ninguém apanhava).
+- K♠ Show de Rock: os acordes são gemas que ocupam a corda (ficar na divisa entre duas cordas não
+  salva mais); no refrão os acordes param e a labareda (um quarto da caixa) nasce sob o coração e o
+  segue pelo palco, mais devagar que ele, trava e sobe.
+- 8♦ Palheta: palhetas que perseguem o coração (Asgore/Toriel): fileira lateral que vira para ele,
+  cerco que se fecha onde ele estava e chuva que escorrega atrás dele.
+- Q♦ Feedback: mais fácil (2 passagens, mais lento, cresce menos, mais espaço entre as ondas).
+- 3♣ Bomba de Fumaça: latas arremessadas que estouram num anel de brasas; a nuvem corre com o vento.
+- 6♣ Amplificador: sem o cone de guia; o amplificador entra pela borda e vira atrás do coração.
+- Q♣ Palco Explosivo: bombas e ondas mais espaçadas (menos dano).
+- ★ Último Bis: as notas despencam nos trastes e EXPLODEM no chão (quadros `bonus-explosao-*` +
+  som `explosaoGrande`), com estilhaços; sai a faixa inteira do traste que machucava.
+
+Medido (bot médio, acertos por carta, 12 sementes; antes → depois): Home Run 0,33 → 1,17;
+Show de Rock 0,92 → 1,33; Palheta 1,25 → 1,67; Feedback 2,00 → 1,42; Fumaça 0,33 → 0,33;
+Amplificador 1,58 → 1,75; Palco Explosivo 1,50 → 1,00. SUPER (24 sementes): perfeito 11,4 → 2,7,
+médio 38,5 → 32,5. Nenhum aviso do validador.

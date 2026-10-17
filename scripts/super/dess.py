@@ -11,7 +11,8 @@ Imagens em public/assets/sprites/super/dess/:
   guitarra.png  30x96    a guitarra-arma, cabeça no topo e ponta afiada embaixo (o golpe mergulha com ela)
   traste.png    2x 16x32 faixa do braço da guitarra (2 tons, trastes acesos)
   nota.png      14x16    a "palheta" que cai em cada traste (tingida por cor a cada acorde)
-  impacto.png   32x32    estouro de um acorde batido (usado nos trastes e na onda de choque final)
+  impacto.png   32x32    estouro (estilhaços das notas que explodem no palco e a pancada final)
+A explosão das notas no chão usa os quadros bonus-explosao-0..7 de public/assets/sprites/bonus/.
 Sons em public/assets/audio/super/dess/: tique, acorde, mergulho, estouro (.wav)
 """
 

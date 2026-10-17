@@ -9,24 +9,25 @@ import { particulas } from '../../effects/particulas.js'
 // fixo: tudo acontece em cima de uma batida (a.aCada no tempo da música), com
 // as luzes do palco piscando junto. Quatro partes, cada vez mais rápidas:
 //
-//   I.   Levada  - um acorde por tempo, num traste só.
-//   II.  Refrão  - dois trastes por tempo (power chord), sempre sobrando um.
+//   I.   Levada  - uma nota por tempo, num traste só.
+//   II.  Refrão  - duas notas por tempo (power chord), sempre sobrando um traste.
 //   III. Solo    - meio tempo cada nota: uma escala correndo pelo braço, com
 //        "bends" (duas notas) de vez em quando.
 //   IV.  Mergulho do whammy - a guitarra cai do alto e crava no palco; duas
 //        ondas de choque circulares varrem a caixa a partir do impacto.
 //
+// Cada nota é uma bala que entra pelo alto do traste e despenca acelerando;
+// quando bate no chão do palco, EXPLODE (sprite de explosão + som
+// explosaoGrande): a explosão machuca um círculo no chão e solta estilhaços
+// para cima. A nota do traste em que o coração está cai na coluna dele
+// (parado, apanha).
+//
 // Justiça:
-//   - todo acorde pisca a faixa do traste por `aviso` ms (a nota cai visível
-//     por cima, decorativa) antes de valer;
-//   - os avisos se sobrepõem (o próximo acorde começa a piscar antes do
-//     anterior bater), então a conta é feita com TODOS os trastes acesos ao
-//     mesmo tempo (os que ainda piscam + os que estão batendo): um traste
-//     só acende se, somado aos outros, ainda sobrar pelo menos um traste
-//     inteiro apagado (a.parede com eixo x valida essa soma). Antes, cada
-//     acorde deixava um traste livre, mas a soma dos avisos podia acender o
-//     braço inteiro;
-//   - o acorde em si dura pouco (sai suave: vira inofensivo e desaparece);
+//   - a nota entra visível pelo alto e leva ~`queda` ms até o chão (é o aviso);
+//     o traste dela acende de leve enquanto ela cai;
+//   - um traste fica "aceso" da entrada da nota até a explosão acabar; um
+//     traste só recebe nota se, somado aos acesos, ainda sobrar pelo menos um
+//     traste inteiro apagado (a.parede com eixo x valida essa soma);
 //   - a onda de choque final nasce no centro, parada e piscando por
 //     `avisoClimax` ms (pode ficar em cima dela à vontade) antes de abrir um
 //     vão angular (sorteado perto do coração, nunca embaixo dele) e sair
@@ -37,11 +38,14 @@ import { particulas } from '../../effects/particulas.js'
 //
 // Config:
 //   bpm            andamento do show (define o tempo de cada batida)
-//   aviso          aviso de cada nota da Levada (ms)
-//   avisoAcorde    aviso dos acordes (2 trastes) do Refrão
-//   avisoSolo      aviso de cada nota do Solo (mais rápido, mas nunca < telegrafoMs)
+//   queda          ms que a nota da Levada leva do alto ao chão
+//   quedaAcorde    idem, as do Refrão
+//   quedaSolo      idem, as do Solo
 //   notaSolo       fração do tempo entre duas notas do Solo (0.5 = meio tempo)
-//   bendSolo       a cada quantas notas do Solo vem um bend (2 trastes)
+//   bendSolo       chance de uma nota do Solo vir em bend (2 trastes)
+//   raioNota       raio da nota que cai
+//   raioExplosao   fração da largura do traste que a explosão machuca (raio)
+//   estilhacos     estilhaços que cada explosão solta para cima
 //   avisoClimax    aviso das ondas de choque do Mergulho
 //   intervaloOndas ms entre as duas ondas de choque
 //   desvioVao      quanto o vão da 2ª onda pode se afastar do da 1ª (rad)
@@ -53,11 +57,14 @@ export default definirAtaque({
   padrao: {
     duracao: 9000,
     bpm: 128,
-    aviso: 650,
-    avisoAcorde: 720,
-    avisoSolo: 600,
+    queda: 660,
+    quedaAcorde: 720,
+    quedaSolo: 600,
     notaSolo: 0.62,
-    bendSolo: 5,
+    bendSolo: 0.2,
+    raioNota: 9,
+    raioExplosao: 0.55,
+    estilhacos: 3,
     avisoClimax: 700,
     intervaloOndas: 480,
     desvioVao: 0.55,
@@ -79,7 +86,7 @@ export default definirAtaque({
       beat,
       () => {
         const lanes = escolherTrastes(a, palco, 1, 0.5)
-        acorde(a, cfg, palco, lanes, Math.max(ATAQUE.telegrafoMs, cfg.aviso), corDoGolpe())
+        acorde(a, cfg, palco, lanes, cfg.queda, corDoGolpe())
         ondaAmp(a, a.escolher([-1, 1]))
       },
       Math.max(1, Math.round(cfg.fases.verso / beat)),
@@ -87,14 +94,12 @@ export default definirAtaque({
 
     // ---------- II. Refrão: power chord (2 trastes) ----------
     a.depois(cfg.fases.verso, () => {
-      let lado = -1
       a.aCada(
         beat,
         () => {
           const trastes = escolherTrastes(a, palco, 2, 0.7)
-          acorde(a, cfg, palco, trastes, Math.max(ATAQUE.telegrafoMs, cfg.avisoAcorde), corDoGolpe())
-          ondaAmp(a, lado)
-          lado *= -1
+          acorde(a, cfg, palco, trastes, cfg.quedaAcorde, corDoGolpe())
+          ondaAmp(a, a.escolher([-1, 1]))
         },
         Math.max(1, Math.round(cfg.fases.refrao / beat)),
       )
@@ -103,16 +108,17 @@ export default definirAtaque({
     // ---------- III. Solo: escala correndo pelo braço ----------
     a.depois(cfg.fases.verso + cfg.fases.refrao, () => {
       const passoNota = beat * cfg.notaSolo
-      let atual = Math.floor(palco.lanes / 2)
-      let dir = 1
+      // a escala começa num traste e sentido sorteados
+      let atual = a.inteiro(1, palco.lanes - 2)
+      let dir = a.escolher([-1, 1])
       a.aCada(
         passoNota,
-        (i) => {
+        () => {
           atual += dir
           if (atual <= 0 || atual >= palco.lanes - 1) dir *= -1
-          const bend = palco.lanes > 3 && i % cfg.bendSolo === cfg.bendSolo - 1
+          const bend = palco.lanes > 3 && a.aleatorio(0, 1) < cfg.bendSolo
           const trastes = bend ? [...new Set([atual, limitar(atual + dir, 0, palco.lanes - 1)])] : [atual]
-          acorde(a, cfg, palco, livres(palco, trastes), Math.max(ATAQUE.telegrafoMs, cfg.avisoSolo), corDoGolpe())
+          acorde(a, cfg, palco, livres(palco, trastes), cfg.quedaSolo, corDoGolpe())
         },
         Math.max(1, Math.round(cfg.fases.solo / passoNota) - 1),
       )
@@ -181,60 +187,84 @@ function escolherTrastes(a, palco, qtd, mirar) {
   return indices
 }
 
-// ---------- o acorde: a nota cai, o traste acende, o golpe bate ----------
+// ---------- o acorde: a nota despenca no traste e explode no chão ----------
 
-function acorde(a, cfg, palco, lanes, aviso, cor) {
+function acorde(a, cfg, palco, lanes, queda, cor) {
   const l = a.caixa
   if (!lanes.length) return
   for (const i of lanes) palco.acesos[i]++
-  // a parede é a soma de tudo que está aceso agora (este acorde + os anteriores ainda piscando/batendo)
+  // a parede é a soma de tudo que está aceso agora (este acorde + as notas anteriores ainda no ar ou explodindo)
   const ocupados = []
   palco.acesos.forEach((n, i) => n > 0 && ocupados.push([palco.left + i * palco.larguraReal, palco.left + (i + 1) * palco.larguraReal]))
   a.parede({ eixo: 'x', ocupados })
+  const alvo = a.alvo()
+  const doAlvo = trasteDoAlvo(palco, alvo)
 
   for (const i of lanes) {
-    const x = palco.trastes[i].x
     const traste = palco.trastes[i].img
-    const nota = a.decoracao(a.cena.add.image(x, l.top - 12, 'super-dess-nota').setDepth(6).setTint(cor).setScale(0).setAlpha(0.95))
-    a.cena.tweens.add({ targets: nota, scale: 1.4, y: l.bottom - 10, duration: aviso, ease: 'Cubic.easeIn' })
-    a.cena.tweens.add({ targets: nota, angle: 360, duration: aviso, ease: 'Linear' })
-    a.cena.tweens.add({ targets: traste, alpha: 0.4, duration: aviso * 0.85, ease: 'Sine.easeIn' })
-
-    a.aviso(
-      { tipo: 'area', x: x - palco.larguraReal / 2 + 3, y: l.top, largura: palco.larguraReal - 6, altura: l.height, ms: aviso },
-      () => {
-        tocar(a.cena, 'super-dess-acorde')
-        shake(a.cena, 70, 0.004)
-        a.cena.tweens.killTweensOf(nota)
-        nota.destroy()
+    const r = cfg.raioNota
+    const esq = palco.left + i * palco.larguraReal
+    // no traste do coração, a nota cai na coluna dele (dentro do traste)
+    const x = i === doAlvo ? limitar(alvo.x, esq + r, esq + palco.larguraReal - r) : palco.trastes[i].x
+    a.cena.tweens.add({ targets: traste, alpha: 0.4, duration: queda * 0.85, ease: 'Sine.easeIn' })
+    // entra de fora e despenca acelerando: ~`queda` ms até o chão
+    const y0 = l.top - 14
+    const H = l.bottom - 8 - y0
+    const T = queda / 1000
+    a.bala({
+      x,
+      y: y0,
+      vy: (0.5 * H) / T,
+      ay: H / (T * T),
+      raio: r,
+      textura: 'super-dess-nota',
+      tamanho: r * 2.6,
+      cor,
+      girar: 6,
+      pulso: 0.05,
+      jaAvisada: true,
+      atualizar: (b) => {
+        if (b.y < a.caixa.bottom - 8) return
+        b.morta = true
         a.cena.tweens.add({ targets: traste, alpha: 0.14, duration: 220 })
-        const golpe = a.bala({
-          x,
-          y: l.centerY,
-          largura: palco.larguraReal - 6,
-          altura: l.height - 4,
-          textura: 'super-dess-impacto',
-          cor,
-          jaAvisada: true,
-          vida: 220,
-          atravessa: true,
-          pulso: 0,
-          // meio transparente: o coração continua visível através do golpe
-          atualizar: (b) => {
-            if (b.vida < 110 && !b.inofensiva) {
-              b.inofensiva = true
-              palco.acesos[i]-- // o traste apaga: já pode acender de novo
-            }
-            b.sprite.setAlpha(0.72 * Math.min(1, b.vida / 110))
-          },
-        })
-        // o desenho do golpe tem exatamente o tamanho da faixa que machuca (a textura é quadrada)
-        golpe.sprite.setDisplaySize(palco.larguraReal - 6, l.height - 4)
-        golpe.escalaX = golpe.sprite.scaleX
-        golpe.escalaY = golpe.sprite.scaleY
-        particulas(a.cena, x, l.centerY, { cor, quantidade: 7, velocidade: 150, vida: 300 })
+        explodir(a, cfg, palco, b.x, a.caixa.bottom - 6, cor, () => palco.acesos[i]--) // o traste apaga: já pode receber nota de novo
       },
-    )
+    })
+  }
+}
+
+// A nota bateu no chão: explosão (quadros bonus-explosao-0..7, som, tremor),
+// um círculo que machuca no chão e estilhaços que sobem
+const ANIM_EXPLOSAO = 'super-dess-explosao'
+let ultimoEstrondo = -Infinity
+// só o desenho: os 8 quadros da explosão (sprites do bônus), recortados na caixa
+function explosaoVisual(a, x, y, tamanho) {
+  if (!a.cena.anims.exists(ANIM_EXPLOSAO)) {
+    a.cena.anims.create({ key: ANIM_EXPLOSAO, frames: Array.from({ length: 8 }, (_, k) => ({ key: `bonus-explosao-${k}` })), frameRate: 24, repeat: 0 })
+  }
+  const fogo = a.decoracao(a.cena.add.sprite(x, y, 'bonus-explosao-0').setDepth(7))
+  fogo.setScale(tamanho / Math.max(1, fogo.width)).setRotation(a.aleatorio(-0.4, 0.4))
+  fogo.play(ANIM_EXPLOSAO)
+  fogo.once('animationcomplete', () => fogo.destroy())
+}
+
+function explodir(a, cfg, palco, x, y, cor, aoApagar) {
+  const raio = palco.larguraReal * cfg.raioExplosao
+  explosaoVisual(a, x, y - raio * 0.3, raio * 2.6)
+  // um estrondo por acorde (as notas do mesmo acorde explodem juntas)
+  if (a.tempo - ultimoEstrondo > 90 || a.tempo < ultimoEstrondo) {
+    ultimoEstrondo = a.tempo
+    tocar(a.cena, 'explosaoGrande')
+    shake(a.cena, 90, 0.005)
+  }
+  particulas(a.cena, x, y, { cor, quantidade: 7, velocidade: 150, vida: 300 })
+  const area = a.bala({ x, y, raio, jaAvisada: true, atravessa: true, vida: 220, pulso: 0, cor })
+  area.sprite.setVisible(false) // quem aparece é a explosão
+  a.depois(240, aoApagar)
+  for (let k = 0; k < cfg.estilhacos; k++) {
+    const ang = a.aleatorio(-Math.PI + 0.45, -0.45)
+    const v = a.aleatorio(120, 170)
+    a.bala({ x, y: y - 6, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v, ay: 120, raio: 4, textura: 'super-dess-impacto', tamanho: 11, cor, girar: 8, jaAvisada: true, vida: 1400 })
   }
 }
 
@@ -284,7 +314,9 @@ function climax(a, cfg, palco) {
   // onde a guitarra crava pisca enquanto ela cai (a pancada do centro também é avisada)
   a.aviso({ tipo: 'circulo', x: cx, y: cy, raio: 18, ms: Math.max(ATAQUE.telegrafoMs, 420), cor: 0xffe14a }, () => {
     tocar(a.cena, 'super-dess-estouro')
+    tocar(a.cena, 'explosaoGrande')
     shake(a.cena, 220, 0.014)
+    explosaoVisual(a, cx, cy, 90)
     particulas(a.cena, cx, cy, { cor: 0xffe14a, quantidade: 22, velocidade: 210, vida: 420 })
     a.cena.tweens.add({ targets: guitarra, angle: 6, duration: 50, yoyo: true, repeat: 6 })
     a.bala({ x: cx, y: cy, raio: 15, textura: 'super-dess-impacto', tamanho: 50, cor: 0xffe14a, jaAvisada: true, atravessa: true, vida: 180, pulso: 0 })

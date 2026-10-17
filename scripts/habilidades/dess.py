@@ -23,6 +23,7 @@ Imagens em public/assets/sprites/habilidades/dess/:
   arco.png       40x10  frente de onda curva do amplificador
   cabo.png       8x8    elo do cabo de guitarra
   plugue.png     16x8   plugue P10 (ponta para a direita)
+  gema.png       28x12  gema da estrada de notas (Show de Rock), clara para ser tingida pela corda
 Sons em public/assets/audio/habilidades/dess/: tacada, rebatida, microfonia, palheta, fumaca, grave (.wav)
 """
 
@@ -452,6 +453,28 @@ def plugue():
     return contornar(img)
 
 
+# ---------- gema do Show de Rock ----------
+
+
+def gema():
+    # cápsula clara (a corda tinge): brilho em cima, sombra embaixo, aro mais escuro
+    img = nova(28, 12)
+    for y in range(12):
+        for x in range(28):
+            # cápsula: retângulo com as pontas redondas (raio 5,5)
+            cx = min(max(x, 5.5), 21.5)
+            if math.hypot(x - cx, (y - 5.5)) <= 5.6:
+                cor = BRANCO if y < 4 else (CINZA_CLARO if y < 8 else CINZA)
+                if math.hypot(x - cx, (y - 5.5)) > 4.4:
+                    cor = CINZA
+                por(img, x, y, cor)
+    # reflexo
+    for x in range(7, 13):
+        por(img, x, 2, BRANCO)
+    por(img, 6, 3, BRANCO)
+    return contornar(img)
+
+
 # ---------- sons ----------
 
 TAXA = 22050
@@ -549,6 +572,7 @@ def main():
     salvar(arco(), 'arco.png')
     salvar(cabo(), 'cabo.png')
     salvar(plugue(), 'plugue.png')
+    salvar(gema(), 'gema.png')
     sons()
 
 
