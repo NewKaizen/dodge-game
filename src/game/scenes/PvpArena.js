@@ -27,6 +27,7 @@ import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
 import { fogoArtificio, canhoesConfete, chuvaConfete } from '../effects/festa.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
+import FimDePartida from '../pvp/fimDePartida/index.js'
 
 // Partida PvP de cartas. Junta as peças de pvp/ (regras, baralho, cartas,
 // Pista) com o visual das cartas (Carta, Mao). Regras em docs/pvp-regras.md.
@@ -67,6 +68,8 @@ import { anunciarSuper } from '../pvp/super/anuncio.js'
 //                nem quebra. O combo atual fica no HUD ("PERFEITO x3")
 //   'duelo'      só no bonus round de duelo, no lugar de 'arremesso' e 'esquiva'
 //   'fim'        fimDaRodada: vencedor? -> 'resultado' (PvpResultado); senão volta ao 'inicio'
+//                O K.O. que acaba a partida vira câmera lenta (nocaute) e o
+//                começo de 'resultado' passa o replay em fita VHS: pvp/fimDePartida/
 //
 // Morte súbita (ACELERACAO em constants.js): a cada 5 rodadas (começo da 5ª,
 // 10ª...) tudo acelera: balas (velocidade, densidade e teto), o coração (metade
@@ -212,9 +215,12 @@ export default class PvpArena extends Phaser.Scene {
     )
     this.botoesPassar = [0, 1].map((j) => this.criarBotaoPassar(j))
     this.criarTextos()
+    // K.O. final: câmera lenta + replay em fita (pvp/fimDePartida/)
+    this.fimDePartida = new FimDePartida(this, { campos: CAMPOS })
 
     this.controles.onBotao((j, botao) => {
       if (this.pausado || this.saindo) return
+      if (this.fimDePartida?.botao(botao)) return // pula a câmera lenta / o replay
       if (this.fase === 'duelo') return botao === 'A' && this.duelo?.atacar(this.ladoDoControle(j))
       if (botao === 'A') this.apertarA(j)
       else this.apertarB(j)
@@ -1475,8 +1481,13 @@ export default class PvpArena extends Phaser.Scene {
   nocaute(j) {
     this.ko[j] = true
     // o duelo quebra o coração (com efeitos próprios) e termina a luta
-    if (this.fase === 'duelo') return this.duelo?.nocaute(j)
+    if (this.fase === 'duelo') {
+      this.fimDePartida?.nocauteDuelo(j)
+      return this.duelo?.nocaute(j)
+    }
     const k = this.pistaDe(j) // CORAÇÃO TROCADO: o coração dele está na outra pista
+    // fim da partida: a quebra em câmera lenta e o replay cuidam do resto
+    if (this.fimDePartida?.nocaute(j, k)) return
     const coracao = this.pistas[k].coracoes[0]
     tocar(this, 'quebrar')
     flashTela(this, CORES.almas[j], 0.3, 220)
@@ -1535,6 +1546,9 @@ export default class PvpArena extends Phaser.Scene {
 
   async resultado(vencedor) {
     this.fase = 'resultado'
+    // replay do golpe final em fita VHS (pvp/fimDePartida/)
+    await this.fimDePartida?.replay()
+    if (this.saindo) return
     const v = VENCEDOR[vencedor]
     if (v) {
       const cor = corTexto(PERSONAGENS[this.ids[v - 1]]?.cor ?? 0xffffff)
@@ -1592,10 +1606,12 @@ export default class PvpArena extends Phaser.Scene {
   // ---------- frame ----------
 
   update(_, deltaReal) {
-    const delta = deltaReal * debug.acelerar
+    // câmera lenta do K.O. final (pvp/fimDePartida/): tudo da arena anda devagar
+    const lento = this.fimDePartida?.fator ?? 1
+    const delta = deltaReal * debug.acelerar * lento
     // morte súbita: animações de carta, esperas e transições também aceleram
     // (as pistas usam o delta: o bônus delas já vem no ritmo das balas)
-    const animacao = debug.acelerar * parteDoFator(this.aceleracao, ACELERACAO.animacao)
+    const animacao = debug.acelerar * parteDoFator(this.aceleracao, ACELERACAO.animacao) * lento
     this.tweens.timeScale = animacao
     this.time.timeScale = animacao
     this.controles.atualizar()
