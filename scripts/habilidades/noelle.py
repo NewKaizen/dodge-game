@@ -12,8 +12,9 @@ Sprites (chaves em src/game/pvp/habilidades/sprites/noelle.js):
   lasca.png         8x8    lasquinha de gelo do granizo que estoura no chão          -> Granizo
   pingente.png     12x30   pingente pendurado (ponta para baixo, gelo + neve no topo) -> Pingentes
   estalactite.png 132x22   estalactite comprida (base à esquerda, ponta à direita)   -> Estalactites
-  bola.png         24x24   bola de neve rolando (com pedrinhas e gelo)               -> Avalanche
-  monte.png        22x9    montinho de neve que a bola deixa no chão                 -> Avalanche
+  bola.png         40x40   bola de neve rolando (com pedrinhas e gelo; cresce no jogo) -> Avalanche
+  monte.png        22x9    montinho de neve onde a bola se espatifa                  -> Avalanche
+  torrao.png       10x10   torrão de neve que sobra da bola espatifada               -> Avalanche
   rajada.png       18x8    estilhaço de geada levado pelo vento (horizontal)         -> Vento Gélido
   vento.png        40x9    risco de vento (decoração, aviso da rajada)               -> Vento Gélido
   cristal.png      12x12   orbe de cristal que dispara o raio                        -> Raio de Gelo
@@ -287,16 +288,20 @@ def gerar_estalactite():
 
 
 def gerar_bola():
+    """Bola de neve grande (desenhada no tamanho máximo que ela chega no jogo)."""
     rng = random.Random(13)
-    img = nova(24, 24)
-    c = 11.5
-    for y in range(24):
-        for x in range(24):
+    n = 40
+    img = nova(n, n)
+    c = (n - 1) / 2
+    raio = n / 2 - 1.6
+    for y in range(n):
+        for x in range(n):
             dx, dy = x - c, y - c
             d = math.hypot(dx, dy)
-            if d > 10.6 + 0.5 * math.sin(math.atan2(dy, dx) * 7):
+            # borda irregular de neve grudada
+            if d > raio + 0.8 * math.sin(math.atan2(dy, dx) * 9) - 0.4:
                 continue
-            luz = (-dx - dy * 1.2) / 14
+            luz = (-dx - dy * 1.2) / (raio * 1.3)
             if luz > 0.35:
                 cor = BRANCO
             elif luz > -0.1:
@@ -307,21 +312,36 @@ def gerar_bola():
                 cor = (140, 170, 204)
             por(img, x, y, cor)
     # torrões de neve e pedrinhas presas (dão a sensação de rolar quando gira)
-    for _ in range(7):
+    for _ in range(14):
         ang = rng.uniform(0, 2 * math.pi)
-        r = rng.uniform(2, 8)
+        r = rng.uniform(3, raio - 3)
         x, y = c + math.cos(ang) * r, c + math.sin(ang) * r
-        if rng.random() < 0.45:
+        if rng.random() < 0.4:
             por(img, x, y, PEDRA)
             por(img, x + 1, y, PEDRA_ESCURA)
+            por(img, x, y + 1, PEDRA_ESCURA)
         else:
             por(img, x, y, CINZA_NEVE)
+            por(img, x + 1, y, CINZA_NEVE)
             por(img, x, y + 1, (140, 170, 204))
     # espiral de neve (rolando)
-    for i in range(20):
-        a = i * 0.45
-        r = 1 + i * 0.38
+    for i in range(34):
+        a = i * 0.42
+        r = 1.5 + i * 0.45
         por(img, c + math.cos(a) * r, c + math.sin(a) * r, (160, 190, 220))
+    contornar(img)
+    return img
+
+
+def gerar_torrao():
+    """Torrão de neve irregular (sobra da bola espatifada)."""
+    img = nova(10, 10)
+    d = ImageDraw.Draw(img)
+    d.polygon([(1, 5), (3, 1), (6, 1), (8, 4), (7, 8), (3, 8)], fill=rgba(GELO))
+    d.polygon([(4, 6), (7, 5), (7, 8), (3, 8)], fill=rgba(CINZA_NEVE))
+    por(img, 3, 3, BRANCO)
+    por(img, 4, 2, BRANCO)
+    por(img, 4, 3, BRANCO)
     contornar(img)
     return img
 
@@ -572,6 +592,12 @@ def sons():
     lfo = 0.6 + 0.4 * np.sin(2 * np.pi * 7 * t)
     salvar_som('avalanche.wav', estrondo * lfo * np.clip(t / 0.15, 0, 1) * np.exp(-t * 2.2))
 
+    # espatifar: a bola de neve bate na parede (baque abafado + chiado de neve)
+    t = tempo(0.35)
+    baque = np.sin(2 * np.pi * (90 * np.exp(-t * 12) + 45) * t) * np.exp(-t * 14)
+    neve = passa_baixa(rng.standard_normal(len(t)), 3) * np.exp(-t * 9) * 0.7
+    salvar_som('espatifar.wav', baque * 1.3 + neve)
+
 
 def main():
     salvar(gerar_floco(), 'floco.png')
@@ -581,6 +607,7 @@ def main():
     salvar(gerar_estalactite(), 'estalactite.png')
     salvar(gerar_bola(), 'bola.png')
     salvar(gerar_monte(), 'monte.png')
+    salvar(gerar_torrao(), 'torrao.png')
     salvar(gerar_rajada(), 'rajada.png')
     salvar(gerar_vento(), 'vento.png')
     salvar(gerar_cristal(), 'cristal.png')
