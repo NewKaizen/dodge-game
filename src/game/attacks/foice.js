@@ -29,7 +29,7 @@ import { ATAQUE } from '../constants.js'
 //   espessura        espessura da lâmina
 //   giro             ritmo do balanço da lâmina (rad/s da fase; a ponta respeita a velocidade máxima)
 //   balanco          quanto a lâmina balança para os lados (rad, máx. 0.5)
-//   aviso            ms (+ 250) que a lâmina se arrasta na borda antes de cada arremesso
+//   aviso            ms (+ 150) que a lâmina se arrasta na borda antes de cada arremesso
 //   avisoVolta       idem, antes da volta do bumerangue (mínimo ATAQUE.telegrafoMs)
 //   mirar, volta, vertical   ver acima (true por padrão)
 //   faiscas          faíscas por passagem (0 desliga)
@@ -121,9 +121,10 @@ export default definirAtaque({
       // sentido: +1 = da esquerda/de cima (sorteado); a volta faz o caminho contrário
       const sentido = ehVolta ? -anterior.sentido : a.aleatorio(0, 1) < 0.5 ? 1 : -1
 
-      // a lâmina espia na borda pelo aviso + 250 ms: antes ela vinha de mais
-      // longe (fora da caixa), e esse trecho a mais também era tempo de reagir
-      const ms = (ehVolta ? avisoVolta : cfg.aviso) + 250
+      // a lâmina espia na borda pelo aviso + 150 ms e sai arrancando: entra a
+      // 30% da velocidade e acelera (antes ela vinha de mais longe, de fora da
+      // caixa, e esse trecho também era tempo de reagir)
+      const ms = (ehVolta ? avisoVolta : cfg.aviso) + 150
       if (!cabe(ms)) return
 
       const inicioFaixa = h ? l.top : l.left
@@ -142,6 +143,7 @@ export default definirAtaque({
         // nasce fora, com o fio encostando na borda de entrada: só ele aparece
         const partida = sentido > 0 ? iniAndar - cfg.espessura / 2 + 2 : fimAndar + cfg.espessura / 2 - 2
         const v = sentido * velocidade
+        const acel = (v * 0.7) / 0.6 // de 30% até a velocidade cheia em 0,6 s
         const arrasto = sentido * Math.min(velocidade * 0.08, 14) // px/s enquanto espia na borda
         const pontos = Array.from({ length: Math.max(0, cfg.faiscas) }, (_, i) => {
           const f = (i + 0.5 + a.aleatorio(-0.2, 0.2)) / cfg.faiscas
@@ -162,9 +164,16 @@ export default definirAtaque({
           entrando: true,
           pulso: 0,
           // espiando: em pé na borda, quase parada (o aviso); depois atravessa balançando
-          arranque: { ms, vx: h ? v : 0, vy: h ? 0 : v },
+          arranque: { ms, vx: h ? v * 0.3 : 0, vy: h ? 0 : v * 0.3, ax: h ? acel : 0, ay: h ? 0 : acel, rastro: true },
           atualizar: (b) => {
             if (b.idade < ms) return
+            if ((h ? b.ax : b.ay) !== 0 && Math.abs(h ? b.vx : b.vy) >= Math.abs(v)) {
+              // chegou na velocidade cheia: para de acelerar
+              if (h) b.vx = v
+              else b.vy = v
+              b.ax = 0
+              b.ay = 0
+            }
             b.angulo = (h ? Math.PI / 2 : 0) + balanco * Math.sin(((b.idade - ms) / 1000) * ritmoBalanco) * sentido
             if (proxima >= pontos.length) return
             const pos = h ? b.x : b.y

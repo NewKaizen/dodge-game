@@ -10,7 +10,8 @@
 // depois), mais um empurrão leve para longe das paredes e para o centro.
 // Balas ainda telegrafando ficam paradas e só contam depois do aviso. Balas
 // com `arranque` (espiam devagar na borda e depois disparam) são previstas
-// já com o disparo, como quem vê a ponta da lança esperando na borda.
+// já com o disparo, como quem vê a ponta da lança esperando na borda (com
+// arranque.rastro, a reta inteira do disparo já conta como perigo).
 // Os níveis erram de propósito: reagem mais devagar, enxergam menos à frente
 // e às vezes escolhem uma direção qualquer.
 //
@@ -35,6 +36,9 @@ const NIVEIS_ESQUIVA = {
 const CONFUSAO_RESIDUAL = 0.35
 
 const PASSO_MS = 35 // passo da simulação
+const RASTRO_MS = 900 // arranque: até quanto depois do disparo o bot "lê" a reta da bala
+const RASTRO_PX = 10 // distância entre as amostras do rastro
+const RASTRO_MAX = 40
 const MEIO = 8 // metade do coração (CORACAO.tamanho / 2): o centro não passa daqui na parede
 const DIRECOES = [{ x: 0, y: 0 }, ...Array.from({ length: 16 }, (_, k) => ({ x: Math.cos((k * Math.PI) / 8), y: Math.sin((k * Math.PI) / 8) }))]
 
@@ -61,13 +65,20 @@ function preverBala(b, ms, fator, vmax) {
   if (ms < espera) return null // ainda telegrafando: inofensiva
   const s = (ms - Math.max(0, espera)) / 1000
   if (b.arranque) {
-    // anda devagar até o arranque e dali na velocidade nova (aceleração ignorada)
+    // anda devagar até o arranque e dali na velocidade (e aceleração) nova
     const ate = Math.max(0, Math.min(s, (b.arranque.ms - Math.max(0, (b.idade ?? 0) - (b.aviso ?? 0))) / 1000))
     const depois = s - ate
-    const vd = Math.hypot(b.arranque.vx, b.arranque.vy) * fator
-    const teto = vd > vmax ? vmax / vd : 1 // teto de velocidade no disparo
-    const x = b.x + ((b.vx ?? 0) * ate + b.arranque.vx * depois * teto) * fator
-    const y = b.y + ((b.vy ?? 0) * ate + b.arranque.vy * depois * teto) * fator
+    const { vx: avx, vy: avy, ax: aax = 0, ay: aay = 0 } = b.arranque
+    let dx = avx * depois + 0.5 * aax * depois * depois
+    let dy = avy * depois + 0.5 * aay * depois * depois
+    const media = depois > 0 ? (Math.hypot(dx, dy) / depois) * fator : 0
+    if (media > vmax) {
+      // teto de velocidade no disparo
+      dx *= vmax / media
+      dy *= vmax / media
+    }
+    const x = b.x + ((b.vx ?? 0) * ate + dx) * fator
+    const y = b.y + ((b.vy ?? 0) * ate + dy) * fator
     return { x, y, angulo: b.angulo ?? 0 }
   }
   const vx0 = (b.vx ?? 0) * fator
@@ -135,6 +146,24 @@ export class EsquivaBot {
     const chanceErro = this.cfg.erro + (invertido ? this.confusaoAgora() : 0)
     if (this.sorte() < chanceErro) return DIRECOES[1 + Math.floor(this.sorte() * 16)]
     const ativas = balas.filter((b) => !b.morta && !b.inofensiva)
+    // quem joga vê a ponta esperando na borda e sai da reta dela antes do
+    // disparo: o rastro do arranque (onde a bala vai passar logo depois de
+    // disparar) conta como perigo parado, mesmo além do horizonte. Só para
+    // quem pede (arranque.rastro: lança, lâmina, forcado: uma reta só); para
+    // paredes em fila o rastro da próxima tamparia a abertura da atual
+    for (const b of ativas.slice()) {
+      if (!b.arranque?.rastro) continue
+      const falta = b.arranque.ms - Math.max(0, (b.idade ?? 0) - (b.aviso ?? 0))
+      if (falta <= 0 || falta > RASTRO_MS) continue
+      // amostras a cada ~RASTRO_PX ao longo da reta (sem buracos entre elas)
+      const fim = preverBala(b, falta + RASTRO_MS, fatorVelocidade, velocidadeMax)
+      if (!fim) continue
+      const n = Math.min(RASTRO_MAX, Math.max(1, Math.ceil(Math.hypot(fim.x - b.x, fim.y - b.y) / RASTRO_PX)))
+      for (let j = 1; j <= n; j++) {
+        const p = preverBala(b, falta + (j * RASTRO_MS) / n, fatorVelocidade, velocidadeMax)
+        if (p) ativas.push({ ...b, x: p.x, y: p.y, angulo: p.angulo, vx: 0, vy: 0, ax: 0, ay: 0, girar: 0, arranque: null, aviso: 0, idade: 0 })
+      }
+    }
     const seguro = (coracao.hitbox ?? 5) + this.cfg.margem
     const passos = Math.max(1, Math.round(this.cfg.horizonteMs / PASSO_MS))
     const cx = (limites.left + limites.right) / 2

@@ -3,8 +3,8 @@ import { CORACAO } from '../constants.js'
 
 // Paredes neon que atravessam a caixa, uma a cada `intervalo` (ritmo fixo),
 // com uma abertura que ondula suavemente (seno) para dar tempo de seguir. A
-// parede nasce fora da caixa e entra deslizando: nada pisca, a própria entrada
-// é o aviso. O seno começa numa fase sorteada e o passo de uma parede para a
+// parede nasce fora da caixa e entra deslizando devagar até disparar: nada
+// pisca, a própria entrada é o aviso. O seno começa numa fase sorteada e o passo de uma parede para a
 // outra varia um pouco (com semente): o caminho da abertura não se repete.
 // direcao: 'esquerda' | 'direita' (paredes verticais) ou 'baixo' (horizontais)
 //
@@ -78,9 +78,12 @@ export default definirAtaque({
   },
 })
 
+// A parede entra devagar (40% da velocidade) por ENTRADA_MS e então segue
+// na velocidade cheia: o deslizar na borda é o aviso (os bots leem o arranque)
+const ENTRADA_MS = 400
 function barra(a, x, y, largura, altura, vx, vy) {
   if (largura < 1 || altura < 1) return
-  a.bala({ x, y, largura, altura, vx, vy, forma: 'barra', entrando: true })
+  a.bala({ x, y, largura, altura, vx: vx * 0.4, vy: vy * 0.4, forma: 'barra', entrando: true, arranque: { ms: ENTRADA_MS, vx, vy } })
 }
 
 function limitar(v, min, max) {

@@ -21,8 +21,8 @@ import { tocar } from '../audio.js'
 //
 // Justiça: um forcado (ou uma pinça) por vez: quando o próximo estoca, o que
 // sobrou do anterior vira inofensivo. Todo dente espia na borda `aviso` ms
-// antes de estocar; o vão entre dentes é > LACUNA_MINIMA; a palha sai a 10% da
-// velocidade e só chega nela em ~0,45 s (a cravada, com tremida e som, avisa).
+// antes de estocar; o vão entre dentes é > LACUNA_MINIMA; a palha sai a 8% da
+// velocidade e só chega nela em ~0,55 s (a cravada, com tremida e som, avisa).
 //
 // Config:
 //   dentes, vao, espessura    o garfo (o vão livre é vao - espessura)
@@ -131,7 +131,7 @@ function estocar({ a, cfg, aviso, turno, geracao, deCima, centro, alcance, fundo
       altura: comprimento,
       forma: cfg.forma,
       entrando: true,
-      arranque: { ms: aviso, vx: 0, vy: dir * cfg.velocidade }, // a estocada (os bots já leem)
+      arranque: { ms: aviso, vx: 0, vy: dir * cfg.velocidade, rastro: true }, // a estocada (os bots já leem)
       atualizar: (b, dt) => {
         if (estado === 'espiando') {
           if (b.idade < aviso) return
@@ -183,18 +183,18 @@ function cravar(a, cfg, x, ponta, dir) {
       a.bala({
         x: x + lado * 10,
         y,
-        vx: vx0 * 0.1,
-        vy: vy0 * 0.1,
+        vx: vx0 * 0.08,
+        vy: vy0 * 0.08,
         raio: 4,
         forma: 'bola',
         cor: 0xe8c860,
         vida: 2600,
-        // sai devagar e ganha força em 0,45 s (no lugar do pisca-pisca parado);
+        // sai devagar e ganha força em 0,55 s (no lugar do pisca-pisca parado);
         // depois perde força no ar (25% por segundo)
         jaAvisada: true,
         atualizar: (b) => {
           const s = b.idade / 1000
-          const g = s < 0.45 ? 0.1 + 0.9 * (s / 0.45) : Math.max(0.2, 1 - 0.25 * (s - 0.45))
+          const g = s < 0.55 ? 0.08 + 0.92 * (s / 0.55) : Math.max(0.2, 1 - 0.25 * (s - 0.55))
           b.vx = vx0 * g
           b.vy = vy0 * g
         },

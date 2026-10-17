@@ -50,7 +50,7 @@ export default definirAtaque({
         altura: cfg.espessura,
         forma: 'barra',
         entrando: true,
-        arranque: { ms: carga, vx: dir * cfg.velocidade, vy: 0 }, // dispara (os bots já leem)
+        arranque: { ms: carga, vx: dir * cfg.velocidade, vy: 0, rastro: true }, // dispara (os bots já leem)
       })
     }
 
