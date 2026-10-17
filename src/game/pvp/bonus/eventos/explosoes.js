@@ -4,6 +4,7 @@ import { tocar } from '../../../audio.js'
 import { shake } from '../../../effects/shake.js'
 import { particulas } from '../../../effects/particulas.js'
 import { ignorarNasCaixas } from '../../../recorte.js'
+import { registrarZona } from '../../../attacks/zonas.js'
 
 // CHUVA DE EXPLOSÕES: durante a esquiva caem bombas nas DUAS caixas. Cada
 // uma é avisada: uma mira vermelha pulsa no ponto (recortada na caixa) e a
@@ -112,6 +113,7 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
     guardar(bomba).setDepth(94)
     ignorarNasCaixas(arena, bomba)
     bombas.push({ j, x, y, t: 0, mira, area, bomba, giro: entre(-9, 9) })
+    registrarZona(pista.balas, { tipo: 'circulo', x, y, raio: RAIO }, { ms: QUEDA_MS, dura: VIDA_AREA }) // a CPU lê a mira
   }
 
   const explodir = (b) => {

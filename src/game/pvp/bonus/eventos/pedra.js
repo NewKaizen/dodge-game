@@ -1,6 +1,7 @@
 import { tocar } from '../../../audio.js'
 import { shake } from '../../../effects/shake.js'
 import { particulas } from '../../../effects/particulas.js'
+import { registrarZona } from '../../../attacks/zonas.js'
 
 // PEDRA ROLANTE (TEMPLO): de tempos em tempos uma pedra gigante atravessa as
 // caixas rolando, estilo filme de aventura. Antes, o AVISO: o chão ronca, a
@@ -78,6 +79,13 @@ export default function criar(arena, { rng } = {}) {
     const r = raioDe(l)
     return eixo === 'h' ? l.top + r + faixa * (l.height - 2 * r) : l.left + r + faixa * (l.width - 2 * r)
   }
+  // a faixa por onde a pedra passa (a mesma do aviso desenhado) e quanto ela leva para atravessar
+  const faixaDaPedra = (l, a) => {
+    const r = raioDe(l)
+    const c = centroDe(l, a.eixo, a.faixa)
+    return a.eixo === 'h' ? { tipo: 'area', x: l.left, y: c - r, largura: l.width, altura: 2 * r } : { tipo: 'area', x: c - r, y: l.top, largura: 2 * r, altura: l.height }
+  }
+  const travessiaMs = (l, a) => (((a.eixo === 'h' ? l.width : l.height) + 4 * raioDe(l)) / VELOCIDADE) * 1000
   const viva = (j) => {
     const p = arena.pistas?.[j]
     return p && p.atacando && !arena.ko?.[j] ? p : null
@@ -96,6 +104,8 @@ export default function criar(arena, { rng } = {}) {
       return g
     })
     avisos.push({ ...plano, graficos, poeiraEm: 0 })
+    // a CPU lê a faixa vermelha (vale da entrada da pedra até ela sair do outro lado)
+    arena.pistas.forEach((pista, j) => viva(j) && registrarZona(pista.balas, faixaDaPedra(pista.caixa.limites, plano), { ms: plano.em - t, dura: travessiaMs(pista.caixa.limites, plano) }))
   }
 
   const planejar = () => {

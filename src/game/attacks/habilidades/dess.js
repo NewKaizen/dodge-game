@@ -536,6 +536,7 @@ const dessAmplificador = definirAtaque({
       const amp = a.decoracao(a.cena.add.image(p.x, p.y, T('amp')).setDepth(6).setRotation(dir + Math.PI / 2).setScale(0))
       a.cena.tweens.add({ targets: amp, scale: 0.85, duration: 180, ease: 'Back.easeOut' })
       const cone = desenharCone(a, p, dir, cfg)
+      a.zonaPerigo({ tipo: 'leque', x: p.x, y: p.y, raio: 320, angulo: dir, abertura: Math.atan(cfg.abertura) }, { ms: cfg.aquece, dura: cfg.pulsos * cfg.batida + 400 }) // a CPU lê o cone
       a.cena.tweens.add({ targets: cone, alpha: 0.3, duration: 90, yoyo: true, repeat: -1 })
       a.depois(cfg.aquece, () => {
         a.cena.tweens.killTweensOf(cone)

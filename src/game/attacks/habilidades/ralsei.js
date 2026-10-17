@@ -75,6 +75,7 @@ const ralseiEstrelaGentil = definirAtaque({
       linha.lineStyle(2, 0xffe48a, 0.6)
       linha.lineBetween(x, y, x + Math.cos(ang) * alcance, y + Math.sin(ang) * alcance)
       a.cena.tweens.add({ targets: linha, alpha: 0.25, duration: 90, yoyo: true, repeat: -1 })
+      a.zonaPerigo({ tipo: 'linha', x1: x, y1: y, x2: x + Math.cos(ang) * alcance, y2: y + Math.sin(ang) * alcance, espessura: cfg.raio * 2 }, { ms: aviso, dura: (alcance / (cfg.velocidade * fv(a))) * 1000 }) // a CPU lê o caminho
       let partiu = false
       let andado = 0
       let ultimo = { x, y }
@@ -377,6 +378,7 @@ const ralseiBolinho = definirAtaque({
       anel.lineStyle(2, 0xffbad6, 0.8)
       anel.strokeCircle(x, y, 22)
       a.cena.tweens.add({ targets: anel, alpha: 0.3, duration: 120, yoyo: true, repeat: -1 })
+      a.zonaPerigo({ tipo: 'circulo', x, y: y - 10, raio: 34 }, { ms: contagem, dura: 300 }) // a CPU lê a contagem (o estouro)
       let estourou = false
       a.bala({
         x,
