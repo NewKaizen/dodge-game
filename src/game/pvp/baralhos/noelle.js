@@ -36,7 +36,7 @@ export default {
   },
   super: {
     nome: 'SNOWGRAVE',
-    texto: 'O frio chega: um selo de gelo gira soltando flocos, a nevasca atravessa a caixa em paredes de estilhaços e, no fim, colunas de gelo explodem do chão até só sobrar um lugar seguro',
+    texto: 'O frio cresce até tudo congelar: flocos gigantes estouram, a nevasca sopra estilhaços, um redemoinho persegue o coração entre pilares de gelo e um túmulo de estilhaços se fecha onde você está',
     criar: (A) => A.superNoelle()
   },
   cartas: [
