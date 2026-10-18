@@ -14,4 +14,4 @@ Uma mensagem por linha (terminada em `\n`), 9600 baud. O número do jogador (`1`
 - `JOY` pode ser enviado continuamente ou só quando mudar.
 - No modo 1 jogador, os comandos de qualquer jogador controlam o jogador 1.
 
-O simulador de teclado ([src/lib/simulador.js](../src/lib/simulador.js)) gera exatamente essas linhas.
+O simulador de teclado ([src/lib/simulador.js](../src/lib/simulador.js)) gera exatamente essas linhas. As teclas dele (as de fábrica estão acima) podem ser trocadas em CONFIGURAÇÕES → CONTROLES, por jogador; ficam salvas no navegador (preferência `teclas`, ver [src/game/teclas.js](../src/game/teclas.js)). O joystick serial não é remapeável.
