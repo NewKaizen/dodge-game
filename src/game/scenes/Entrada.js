@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { LARGURA, ALTURA, NIVEIS } from '../constants.js'
 import { corNumero } from '../effects/entrada.js'
+import { alphaClarao } from '../effects/flash.js'
 
 const CORTE = { segmentos: 9, pontaMax: 22 } // zigue-zague da linha onde a tela "abre"
 
@@ -58,7 +59,7 @@ export default class Entrada extends Phaser.Scene {
     this.tweens.add({ targets: esquerda, x: -dist, y: -dist * 0.3, delay: espera, duration: duracao, ease: 'Quad.easeIn' })
     this.tweens.add({ targets: direita, x: dist, y: dist * 0.3, delay: espera, duration: duracao, ease: 'Quad.easeIn' })
 
-    this.tweens.add({ targets: clarao, alpha: { from: 0.75, to: 0 }, delay: espera + duracao * 0.5, duration: 260 })
+    this.tweens.add({ targets: clarao, alpha: { from: alphaClarao(0.75), to: 0 }, delay: espera + duracao * 0.5, duration: 260 })
     this.time.delayedCall(espera + duracao + 280, () => this.scene.stop())
   }
 }

@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { ALTURA, LARGURA } from '../../constants.js'
+import { tremerCamera } from '../../effects/shake.js'
 
 // O "motivo" de cada personagem no anúncio do SUPER (pvp/super/anuncio.js):
 // a parte da animação que muda de um para outro. Tudo desenhado com formas
@@ -76,7 +77,7 @@ function susie(arena, m) {
   machado.setScale(0.2).setAlpha(0.95)
   arena.tweens.add({ targets: machado, scale: 1.25, rotation: m.lado * -TAU * 1.5, duration: 700, ease: 'Cubic.easeIn' })
   m.depois(700, () => {
-    arena.cameras.main.shake(260, 0.02)
+    tremerCamera(arena.cameras.main, 260, 0.02)
     // rachaduras em ziguezague saindo do ponto do golpe
     for (let k = 0; k < 7; k++) {
       const g = m.novo(arena.add.graphics().setDepth(FUNDO))
@@ -208,7 +209,7 @@ function dess(arena, m) {
     m.depois(i * 330, () => {
       const anel = m.novo(arena.add.circle(LARGURA / 2, m.cy, 30).setStrokeStyle(5, 0xff8a4a).setDepth(FUNDO))
       arena.tweens.add({ targets: anel, scale: 9, alpha: 0, duration: 700, ease: 'Quad.easeOut' })
-      arena.cameras.main.shake(90, 0.006)
+      tremerCamera(arena.cameras.main, 90, 0.006)
     })
   }
   for (let i = 0; i < 16; i++) {

@@ -9,6 +9,8 @@ import { criarFundo } from '../backgrounds/index.js'
 import { tocar, musica, pararMusica } from '../audio.js'
 import { estilhacos, faixasDiagonais } from '../effects/entrada.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
+import { tremerCamera } from '../effects/shake.js'
+import { claraoCamera } from '../effects/flash.js'
 
 // Área da grade de personagens e dos painéis de cada jogador (px)
 const GRADE = { topo: 62, base: 190, esquerda: 20, direita: 620, espaco: 8, larguraMax: 96, alturaMax: 128 }
@@ -437,7 +439,7 @@ export default class PvpEscolha extends Phaser.Scene {
     const camera = this.cameras.main
     pararMusica()
     tocar(this, 'tensao')
-    camera.flash(80, 255, 255, 255)
+    claraoCamera(camera, 80, 255, 255, 255)
     this.cursores.forEach((c) => c.coracao.setVisible(false))
 
     const veu = this.add.rectangle(LARGURA / 2, ALTURA / 2, LARGURA + 200, ALTURA + 200, 0x000000, 1).setDepth(topo).setAlpha(0)
@@ -508,8 +510,8 @@ export default class PvpEscolha extends Phaser.Scene {
         ease: 'Quad.easeIn',
         onComplete: () => {
           tocar(this, 'impacto')
-          camera.flash(140, 255, 255, 255)
-          camera.shake(280, 0.018)
+          claraoCamera(camera, 140, 255, 255, 255)
+          tremerCamera(camera, 280, 0.018)
           costura.setAlpha(1)
           this.tweens.add({ targets: costura, alpha: 0.5, duration: 400 })
           brilho.setScale(4).setAlpha(1)

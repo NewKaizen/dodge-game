@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { LARGURA } from '../constants.js'
 import { BATIDA, PES } from './layout.js'
+import { fatores } from '../acessibilidade.js'
 
 // O quarto escuro do menu: parede, chão, a luz que o telão joga no chão e as
 // silhuetas dos sete lutadores assistindo a tela (contornadas pela luz dela).
@@ -20,6 +21,10 @@ import { BATIDA, PES } from './layout.js'
 // a luz. As silhuetas são as texturas dos personagens escurecidas, cortadas em
 // cabeça e corpo para a cabeça balançar sozinha, com uma cópia chapada na cor
 // da luz um pouco deslocada para cima/para o telão por trás (o contorno de luz).
+//
+// Preferências (acessibilidade.js), lidas a cada quadro: no gráfico mínimo a
+// poeira some e as silhuetas param de dançar (só a luz muda de cor); com
+// "reduzir animações" a luz quase não pulsa nem tremula.
 
 const ESCALA = 3 // a mesma dos personagens na luta
 const SILHUETA = 0x11141e // multiplica a textura: quase preto, só um fio do volume
@@ -108,16 +113,19 @@ export function criarSala(cena, { tela } = {}) {
     pulso *= Math.exp(-dt / 170)
     if (Math.random() < dt / 90) tremorAlvo = Phaser.Math.FloatBetween(-1, 1)
     tremor += (tremorAlvo - tremor) * (1 - Math.exp(-dt / 60))
-    const forca = 0.86 + 0.22 * pulso + 0.035 * tremor
+    const { nivel, piscar } = fatores()
+    const forca = piscar ? 0.86 + 0.22 * pulso + 0.035 * tremor : 0.9 + 0.05 * pulso
 
     luzParede.setTint(cor).setAlpha(Math.min(1, forca + 0.06 * pulso))
     luzChao.setTint(cor).setAlpha(Math.min(1, forca * 0.95))
 
-    const t = desde / BATIDA
+    const t = nivel === 0 ? Infinity : desde / BATIDA // mínimo: ninguém dança (pose de descanso)
     const corSilhueta = misturar(SILHUETA, cor, 0.07)
     for (const f of figuras) posar(f, t, n, cor, corSilhueta, forca)
 
     for (const g of poeira) {
+      g.img.setVisible(nivel > 0)
+      if (nivel === 0) continue
       g.x += (g.vx * dt) / 1000
       g.y += (g.vy * dt) / 1000
       if (g.y < AREA_POEIRA.y0 || g.x < AREA_POEIRA.x0 || g.x > AREA_POEIRA.x1) soltar(g, false)

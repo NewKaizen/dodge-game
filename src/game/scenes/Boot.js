@@ -4,6 +4,7 @@ import { gerarTexturas } from '../arte/texturas.js'
 import { IMAGENS_SUPER, SONS_SUPER } from '../pvp/super/sprites/index.js'
 import { IMAGENS_HABILIDADES, SONS_HABILIDADES } from '../pvp/habilidades/sprites/index.js'
 import { IMAGENS_MENU, SONS_MENU } from '../menu/sprites/index.js'
+import { instalarGraficos } from '../graficos.js'
 
 // Carrega os arquivos dos manifestos, desenha por código o resto e espera a
 // fonte pixelada antes de começar
@@ -24,6 +25,7 @@ export default class Boot extends Phaser.Scene {
   }
 
   async create() {
+    instalarGraficos(this.game) // preferências de gráficos e modo daltônico (graficos.js)
     gerarTexturas(this)
     await carregarFonte()
     this.scene.start('Menu')

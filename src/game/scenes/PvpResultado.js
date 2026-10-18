@@ -8,6 +8,7 @@ import { fogoArtificio, canhoesConfete, chuvaConfete, raiosDeLuz, CORES_FESTA } 
 import { shake } from '../effects/shake.js'
 import { TEXTO_JOGADOR } from '../pvp/perfil.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
+import { claraoCamera } from '../effects/flash.js'
 
 // Tela de fim da partida PvP, em etapas (como a Vitoria):
 //   ENTRADA DO VENCEDOR (não tem no empate; ver entradaVencedor: faixa na cor
@@ -227,7 +228,7 @@ export default class PvpResultado extends Phaser.Scene {
     musica('pvpResultado', 'vitoria')
     tocar(this, 'vitoriaEntrada')
     tocar(this, 'superAtivar')
-    this.cameras.main.flash(260, 255, 255, 255)
+    claraoCamera(this.cameras.main, 260, 255, 255, 255)
     shake(this, 380, 0.022)
     const nome = this.nomeEntrada
     nome.setScale(3.4).setAlpha(0)
@@ -284,7 +285,7 @@ export default class PvpResultado extends Phaser.Scene {
   estouro(rapido) {
     if (!rapido) {
       tocar(this, this.empate ? 'impacto' : 'estouroFesta')
-      this.cameras.main.flash(240, 255, 255, 240)
+      claraoCamera(this.cameras.main, 240, 255, 255, 240)
       shake(this, 220, 0.012)
     }
     this.tweens.add({ targets: this.veu, alpha: 0.55, duration: rapido ? 1 : 500 })
