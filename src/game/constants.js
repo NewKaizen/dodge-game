@@ -16,7 +16,10 @@ export const CORES = {
   hpChefe: 0x3cff6a,
   aviso: 0xff3048,
   selecionado: 0xffe040,
+  acerto: 0xff3048, // borda da caixa piscando no golpe
 }
+// aviso, acerto e almas mudam com o modo daltônico (daltonismo.js escreve
+// aqui): leia CORES.* na hora de desenhar, não guarde em constante de módulo.
 
 // Cores de texto (Phaser usa string CSS em textos)
 export const TEXTO = {

@@ -6,6 +6,8 @@ import { ESCALA } from '../arte/texturas.js'
 import { tocar, musica, pararMusica } from '../audio.js'
 import { rachadura, estilhacos, faixasDiagonais, corNumero } from '../effects/entrada.js'
 import { CORES, DIFICULDADES, NIVEIS, ORDEM_NIVEIS, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
+import { tremerCamera } from '../effects/shake.js'
+import { claraoCamera, alphaClarao } from '../effects/flash.js'
 
 const OPCAO = { x: 440, largura: 330, altura: 100, y: 128, passo: 112 }
 const CHEFE = { x: 138, y: 200 }
@@ -131,7 +133,7 @@ export default class Dificuldade extends Phaser.Scene {
     tocar(this, 'tensao')
     this.fundo.estado.agito = 0
     this.congelado = true
-    camera.flash(90, 255, 255, 255)
+    claraoCamera(camera, 90, 255, 255, 255)
     this.cursor.setVisible(false)
 
     // escurece a interface; o chefe e o nível escolhido ficam por cima
@@ -168,7 +170,7 @@ export default class Dificuldade extends Phaser.Scene {
       .setAngle(-6)
     this.time.delayedCall(climax * 0.35, () => {
       this.tweens.add({ targets: rotulo, alpha: 1, scale: 1, duration: 110, ease: 'Back.easeOut' })
-      camera.shake(120, 0.004 + k * 0.002)
+      tremerCamera(camera, 120, 0.004 + k * 0.002)
     })
 
     // o vidro da tela trinca em batidas: mais trincas no nível mais alto
@@ -180,8 +182,8 @@ export default class Dificuldade extends Phaser.Scene {
         const y = Phaser.Math.Between(60, ALTURA - 60)
         rachadura(this, x, y, { tamanho: 120 + i * 30 + k * 30, galhos: 1 + k, profundidade: topo + 3.5 })
         tocar(this, 'rachar')
-        camera.shake(90, 0.003 + k * 0.002)
-        const lampejo = this.add.rectangle(0, 0, LARGURA, ALTURA, cor, 0.25).setOrigin(0).setDepth(topo + 2)
+        tremerCamera(camera, 90, 0.003 + k * 0.002)
+        const lampejo = this.add.rectangle(0, 0, LARGURA, ALTURA, cor, alphaClarao(0.25)).setOrigin(0).setDepth(topo + 2)
         this.tweens.add({ targets: lampejo, alpha: 0, duration: 120, onComplete: () => lampejo.destroy() })
       })
     }
@@ -189,8 +191,8 @@ export default class Dificuldade extends Phaser.Scene {
     // clímax: estouro, tela estilhaça e apaga
     this.time.delayedCall(climax, () => {
       tocar(this, 'impacto')
-      camera.flash(160 + k * 60, 255, 255, 255)
-      camera.shake(300 + k * 80, 0.012 + k * 0.008)
+      claraoCamera(camera, 160 + k * 60, 255, 255, 255)
+      tremerCamera(camera, 300 + k * 80, 0.012 + k * 0.008)
       // com folga nas bordas: o tremor da câmera não mostra o que está por trás
       const negro = this.add.rectangle(LARGURA / 2, ALTURA / 2, LARGURA + 200, ALTURA + 200, 0x000000, 1).setDepth(topo + 5)
       const onda = this.add.circle(LARGURA / 2, ALTURA / 2, 20).setStrokeStyle(10, cor).setDepth(topo + 7)

@@ -5,6 +5,7 @@ import { ESCALA } from '../arte/texturas.js'
 import { tocar, musica, pararMusica } from '../audio.js'
 import { formatarTempo } from '../coop/nota.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, NIVEIS } from '../constants.js'
+import { tremerCamera } from '../effects/shake.js'
 
 // Tela de game over (os dois caíram na CoopArena).
 // Em etapas: ronco grave no escuro -> letras de GAME OVER despencando uma a
@@ -229,7 +230,7 @@ export default class GameOver extends Phaser.Scene {
       ease: 'Quad.easeIn',
       onComplete: () => {
         tocar(this, 'letraPesada')
-        this.cameras.main.shake(ultima ? 260 : 110, ultima ? 0.012 : 0.005)
+        tremerCamera(this.cameras.main, ultima ? 260 : 110, ultima ? 0.012 : 0.005)
         texto.setScale(1.25, 0.7)
         this.tweens.add({ targets: texto, scaleX: 1, scaleY: 1, duration: 260, ease: 'Back.easeOut' })
         this.poeira(x, TITULO.y + 8, ultima ? 14 : 7)

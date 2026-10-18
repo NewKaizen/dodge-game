@@ -5,6 +5,7 @@ import { PERSONAGENS } from '../data/personagens.js'
 import { tocar } from '../audio.js'
 import { particulas } from '../effects/particulas.js'
 import { shake } from '../effects/shake.js'
+import { fatores } from '../acessibilidade.js'
 
 // Carta de baralho desenhada por código (frente, verso e animações).
 // Só o VISUAL: as regras (baralho, naipes, valores, efeitos) ficam em outro módulo.
@@ -957,8 +958,9 @@ export default class Carta extends Phaser.GameObjects.Container {
     })
   }
 
-  // fantasma da carta que fica para trás no voo
+  // fantasma da carta que fica para trás no voo (só enfeite: some no gráfico mínimo)
   deixarRastro(cor) {
+    if (!fatores().rastros) return
     const { largura: w, altura: h, u } = this
     const g = this.scene.add.graphics()
     g.fillStyle(cor, 0.4)

@@ -6,6 +6,7 @@ import { shake } from '../../effects/shake.js'
 import { particulas } from '../../effects/particulas.js'
 import { COPIA, quantiaCopiada, copiarEnergia } from '../bonus.js'
 import { BotCopia } from './botCopia.js'
+import { claraoCamera } from '../../effects/flash.js'
 
 // CTRL+C CTRL+V (bonus round da SALA DE INFORMÁTICA): no lugar de arremesso +
 // esquiva abre uma janela de "Copiando energia..." estilo Windows velho, com
@@ -396,7 +397,7 @@ export default class Copia {
       const cor = corTexto(CORES.almas[vencedor])
       tocar(a, 'copiado')
       shake(a, fracao >= 1 ? 260 : 160, fracao >= 1 ? 0.012 : 0.007)
-      if (fracao >= 1) a.cameras?.main?.flash(180, 255, 255, 255)
+      if (fracao >= 1) claraoCamera(a.cameras?.main, 180, 255, 255, 255)
       if (a.mostrarBanner) a.mostrarBanner(`${this.rotulo(vencedor)} COPIOU!`, cor, { y: JANELA.y - H - 22, tamanho: 26 })
       this.porcento.setText(`${Math.round(fracao * 100)}%`).setColor(cor)
       a.tweens.add({ targets: this.porcento, scale: { from: 1.6, to: 1 }, duration: 300, ease: 'Back.easeOut' })

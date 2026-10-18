@@ -4,6 +4,7 @@ import { debug } from '../../debug.js'
 import { caixasDe } from '../../recorte.js'
 import { flashTela } from '../../effects/flash.js'
 import { shake } from '../../effects/shake.js'
+import { fatores } from '../../acessibilidade.js'
 import { ESCALA } from '../../arte/texturas.js'
 import Gravador from './gravador.js'
 import Transmissao from './transmissao.js'
@@ -125,7 +126,8 @@ export default class FimDePartida {
     this.estado = 'lenta'
     this.relogio = 0
     this.fatorAtual = 0
-    this.duracaoLenta = duelo ? LENTA.duracaoDueloMs : LENTA.duracaoMs
+    // "reduzir animações" encurta a câmera lenta (acessibilidade.js)
+    this.duracaoLenta = (duelo ? LENTA.duracaoDueloMs : LENTA.duracaoMs) * fatores().lenta
     // no duelo todo mundo está martelando A (atacar): demora mais para o A pular
     this.carencia = duelo ? LENTA.carenciaDueloMs : LENTA.carenciaMs
     this.gravador.parar()
@@ -145,8 +147,9 @@ export default class FimDePartida {
     this.objetos.push(veu, vinheta)
     a.tweens.add({ targets: veu, alpha: 0.5, duration: 120 })
     a.tweens.add({ targets: vinheta, alpha: 0.9, duration: 120 })
-    // dentro das caixas, as balas perdem a cor (o coração salta aos olhos)
-    for (const caixa of caixasDe(a)) {
+    // dentro das caixas, as balas perdem a cor (o coração salta aos olhos).
+    // Filtro de câmera só de enfeite: só nos gráficos no máximo
+    for (const caixa of fatores().filtros ? caixasDe(a) : []) {
       const lista = caixa.camera.filters?.internal
       if (!lista) continue
       try {

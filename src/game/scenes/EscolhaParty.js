@@ -6,6 +6,7 @@ import { tocar, musica } from '../audio.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 import { perfilPvp, rotuloCarta } from '../pvp/perfil.js'
 import { SIMBOLOS } from '../pvp/cartas.js'
+import { claraoCamera } from '../effects/flash.js'
 
 // Área da grade de personagens e dos painéis de detalhes (px)
 const GRADE = { topo: 72, base: 282, esquerda: 20, direita: 620, espaco: 8, larguraMax: 180, alturaMax: 200 }
@@ -223,7 +224,7 @@ export default class EscolhaParty extends Phaser.Scene {
       // sem armazenamento (aba anônima etc.): fica só no registry
     }
     this.status.setText('PARTY PRONTA!')
-    this.cameras.main.flash(200, 255, 255, 255)
+    claraoCamera(this.cameras.main, 200, 255, 255, 255)
     this.time.delayedCall(420, () => this.cameras.main.fadeOut(300, 0, 0, 0))
     this.time.delayedCall(740, () => this.scene.start('Selecao'))
   }

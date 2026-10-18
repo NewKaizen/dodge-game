@@ -5,6 +5,7 @@ import { criarFundo } from '../backgrounds/index.js'
 import { ESCALA } from '../arte/texturas.js'
 import { tocar, musica } from '../audio.js'
 import { CORES, DIFICULDADES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
+import { claraoCamera } from '../effects/flash.js'
 
 const CARTA = { largura: 142, altura: 270, y: 245, passo: 152 }
 
@@ -72,7 +73,7 @@ export default class Selecao extends Phaser.Scene {
     if (this.escolhido) return
     this.escolhido = true
     tocar(this, 'confirmar')
-    this.cameras.main.flash(200, 255, 255, 255)
+    claraoCamera(this.cameras.main, 200, 255, 255, 255)
     this.cameras.main.fadeOut(300, 0, 0, 0)
     this.time.delayedCall(320, () => this.scene.start('Dificuldade', { chefe: ORDEM_CHEFES[this.indice] }))
   }

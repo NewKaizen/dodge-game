@@ -4,6 +4,7 @@ import { PERSONAGENS } from '../data/personagens.js'
 import { CORES_CARTA } from '../entities/Carta.js'
 import { ENERGIA, COMBO_PERFEITO, multiplicadorPerfeito } from './regras.js'
 import { ignorarNasCaixas } from '../recorte.js'
+import { fatores } from '../acessibilidade.js'
 
 
 // Placar de um jogador na arena PvP (canto de cima): P1/P2, nome do
@@ -209,7 +210,8 @@ export default class HudPvp {
     const c = this.container
     this.cena.tweens.killTweensOf(c)
     c.setPosition(0, 0)
-    this.cena.tweens.add({ targets: c, x: { from: this.s * 4, to: 0 }, duration: 50, repeat: 2, yoyo: true, onComplete: () => c.setPosition(0, 0) })
+    const px = this.s * 4 * fatores().tremor // preferência de tremor (acessibilidade.js)
+    if (px > 0.2) this.cena.tweens.add({ targets: c, x: { from: px, to: 0 }, duration: 50, repeat: 2, yoyo: true, onComplete: () => c.setPosition(0, 0) })
     this.barra.setFillStyle(0xffffff)
     this.cena.time.delayedCall(90, () => this.barra.setFillStyle(this.corBarra))
   }
