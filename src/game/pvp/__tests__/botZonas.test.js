@@ -110,19 +110,21 @@ test('a CPU sai de uma área vermelha antes de ela valer', () => {
   assert.deepEqual(velha, { x: 0, y: 0 })
 })
 
-test('reação humana: o difícil vê o aviso cedo, o fácil só depois; avisos distantes não assustam', () => {
+test('reação humana: o perfeito vê o aviso cedo, o fácil só depois; avisos distantes não assustam', () => {
   const foge = (nivel, o) => {
     const joy = new EsquivaBot({ nivel, sorte: semSorte }).joy(16, { coracao: NO_CENTRO, limites: LIMITES, balas: [], zonas: [zona(FAIXA, o)], velocidade: 180 })
     return Math.hypot(joy.x, joy.y) > 50
   }
   // acabou de aparecer (150 ms na tela)
-  assert.ok(foge('dificil', { ms: 450, idade: 150 }))
+  assert.ok(foge('perfeito', { ms: 450, idade: 150 }))
   assert.ok(!foge('facil', { ms: 450, idade: 150 }))
-  // vale só daqui a 1,1 s: o difícil já sai, o fácil ainda não liga
-  assert.ok(foge('dificil', { ms: 1100 }))
+  // vale só daqui a 1,1 s: o perfeito já sai, o fácil ainda não liga
+  assert.ok(foge('perfeito', { ms: 1100 }))
   assert.ok(!foge('facil', { ms: 1100 }))
+  // a CPU do DIFÍCIL nota um aviso já assentado (300 ms na tela) que vale logo
+  assert.ok(foge('dificil', { ms: 450, idade: 300 }))
   // daqui a 3 s: ninguém liga
-  for (const nivel of ['facil', 'normal', 'dificil']) assert.ok(!foge(nivel, { ms: 3000 }), nivel)
+  for (const nivel of ['facil', 'normal', 'dificil', 'perfeito']) assert.ok(!foge(nivel, { ms: 3000 }), nivel)
 })
 
 test('tudo vermelho: a CPU não trava (escolhe o caminho menos ruim)', () => {
@@ -142,7 +144,7 @@ test('bala piscando: o bot enxerga o caminho dela e sai da frente antes de ela p
   // lâmina parada: a própria lâmina
   const lam = zonaDaBalaPiscando({ tipo: 'segmento', x: 0, y: 0, comprimento: 40, espessura: 8, angulo: 0, vx: 0, vy: 0, idade: 0, aviso: 600 })
   assert.ok(perto(folgaZona(lam, 10, 0), -4) && perto(folgaZona(lam, 30, 0), 6))
-  const bot = new EsquivaBot({ nivel: 'dificil', sorte: semSorte })
+  const bot = new EsquivaBot({ nivel: 'perfeito', sorte: semSorte })
   const joy = bot.joy(16, { coracao: { x: 210, y: 160, hitbox: 5 }, limites: LIMITES, balas: [b], velocidade: 180 })
   assert.ok(Math.abs(joy.x) > 30, JSON.stringify(joy))
 })

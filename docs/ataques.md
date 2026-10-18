@@ -59,6 +59,8 @@ node scripts/balanceamento/resumo.mjs depois.json antes.json     # tabelas (DETA
 
 Os números da última rodada estão em `docs/pvp-regras.md` ("Balanceamento medido com o bot").
 
+Os scripts medem o bot `perfeito` (o "jogador perfeito", que no JSON fica na chave `dificil`) e o `normal`. A CPU do DIFÍCIL do jogo é outro nível, entre os dois (`NIVEIS_ESQUIVA` em `pvp/botEsquiva.js`); para medi-la: `NIVEIS_BOT=perfeito,dificil,normal` (sai na chave `cpuDificil`).
+
 Para os chefes do CO-OP (cada carta em cada nível, e partidas inteiras sorteando os acertos medidos):
 
 ```sh
