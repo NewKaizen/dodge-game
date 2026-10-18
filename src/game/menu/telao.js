@@ -2,6 +2,8 @@ import Phaser from 'phaser'
 import { CORES, LARGURA, ALTURA } from '../constants.js'
 import { tocar } from '../audio.js'
 import { RAIO_BALA } from '../arte/texturas.js'
+import { tremerCamera } from '../effects/shake.js'
+import { fatores } from '../acessibilidade.js'
 
 // O telão na parede do menu: é ONDE o caos mora. Dentro dele roda uma luta de
 // balas (os dois corações desviando), e a cor dele ilumina a sala.
@@ -20,6 +22,11 @@ import { RAIO_BALA } from '../arte/texturas.js'
 // chuva, espiral, anéis, lasers, paredes e um final caótico. As balas saem de
 // um conjunto fixo de MAX_BALAS imagens (reaproveitadas) e morrem ao sair da
 // tela; o que passa um pouco da borda fica escondido debaixo da moldura.
+//
+// Preferências (acessibilidade.js): nos gráficos menores a mini-luta tem
+// menos balas vivas (fatores().balasTelao) e a grade para; com "reduzir
+// animações" somem o chiado/glitch, os clarões das balas e o aviso piscando
+// dos lasers (fica aceso). Vale na hora (lido a cada quadro).
 
 const MAX_BALAS = 80
 const ONDA_BATIDAS = 8
@@ -270,14 +277,18 @@ export function criarTelao(cena, tela) {
 
   // ---------- balas (conjunto fixo, reaproveitado) ----------
   const balas = Array.from({ length: MAX_BALAS }, () => ({ img: cena.add.image(0, 0, 'bala-bola').setDepth(P.bala).setVisible(false), vivo: false }))
+  let vivas = 0
   const soltar = ({ x, y, vx = 0, vy = 0, r = 3.6, textura = 'bala-bola', cor = 0xffffff, giro = 0, onda = null }) => {
+    if (vivas >= fatores().balasTelao) return null
     const b = balas.find((b) => !b.vivo)
     if (!b) return null
+    vivas++
     Object.assign(b, { vivo: true, x, y, vx, vy, r, giro, onda, t: 0, escala: r / RAIO_BALA })
     b.img.setTexture(textura).setTint(cor).setRotation(0).setPosition(x, y).setScale(0).setAlpha(1).setVisible(true)
     return b
   }
   const matar = (b) => {
+    if (b.vivo) vivas--
     b.vivo = false
     b.img.setVisible(false)
   }
@@ -330,7 +341,7 @@ export function criarTelao(cena, tela) {
 
   // clarão curto num ponto (de onde sai um anel)
   const claroes = []
-  const clarao = (x, y, cor) => claroes.length < 4 && claroes.push({ x, y, cor, t: 0 })
+  const clarao = (x, y, cor) => fatores().piscar && claroes.length < 4 && claroes.push({ x, y, cor, t: 0 })
 
   // ---------- ondas ----------
   let ondaIdx = 0
@@ -454,8 +465,8 @@ export function criarTelao(cena, tela) {
         else gLaser.fillRect(Math.round(l.pos - esp / 2), T.y, Math.max(1, Math.round(esp)), T.altura)
       }
       if (l.t < AVISO_LASER) {
-        // aviso: linha fina piscando
-        if (Math.floor(l.t * 18) % 2 === 0) faixa(1, CORES.aviso, 0.9)
+        // aviso: linha fina piscando (acesa direto com "reduzir animações")
+        if (!fatores().piscar || Math.floor(l.t * 18) % 2 === 0) faixa(1, CORES.aviso, 0.9)
         continue
       }
       const tf = l.t - AVISO_LASER
@@ -552,14 +563,16 @@ export function criarTelao(cena, tela) {
     estado.pulso = Math.max(0, estado.pulso - dt * 2.6)
     const viva = misturar(estado.corOnda, 0xffffff, Math.min(1, estado.pulso * 0.35 + estado.brancura))
     estado.corAtual = misturar(0x000000, viva, estado.luzLigada)
-    grade.tilePositionX += dt * 9
-    grade.tilePositionY += dt * 6
+    if (fatores().fundo === 'animado') {
+      grade.tilePositionX += dt * 9
+      grade.tilePositionY += dt * 6
+    }
     grade.setTint(estado.corOnda).setAlpha((0.08 + estado.pulso * 0.06) * estado.luzLigada)
     halo.setTint(estado.corAtual).setAlpha((0.14 + estado.pulso * 0.06) * estado.luzLigada + estado.brancura * 0.25)
     reflexo.setTint(estado.corAtual).setAlpha((0.5 + estado.pulso * 0.25) * estado.luzLigada + estado.brancura * 0.4)
 
     // chiado / glitch de vez em quando
-    if (estado.ligado && !estado.explodindo) {
+    if (estado.ligado && !estado.explodindo && fatores().piscar && fatores().nivel > 0) {
       estado.proxGlitch -= dt
       if (estado.proxGlitch <= 0) {
         estado.glitch = sorte(0.07, 0.16)
@@ -574,7 +587,7 @@ export function criarTelao(cena, tela) {
     if (!estado.ligado || estado.explodindo) return
     if (n > 1 && (n - 1) % ONDA_BATIDAS === 0) {
       comecarOnda(ondaIdx + 1)
-      estado.glitch = 0.12
+      if (fatores().piscar) estado.glitch = 0.12
     }
     estado.pulso = Math.max(estado.pulso, 0.7)
     onda.batida(o, c, batidaOnda++)
@@ -593,7 +606,7 @@ export function criarTelao(cena, tela) {
         acender()
         estado.luzLigada = 1
         estado.corOnda = onda.cor
-        estado.glitch = 0.15
+        if (fatores().piscar) estado.glitch = 0.15
         resolver()
         return
       }
@@ -661,6 +674,12 @@ export function criarTelao(cena, tela) {
       estado.explodindo = true
       estado.glitch = 0
       lasers.length = 0
+      // sem clarões (preferência): a tela só escurece, sem a luz branca engolindo tudo
+      if (fatores().clarao <= 0) {
+        cena.cameras.main.fadeOut(420, 0, 0, 0)
+        cena.time.delayedCall(700, resolver)
+        return
+      }
       const luz = cena.add.image(cx, cy, 'menu-telao-brilho').setDepth(P.luz).setBlendMode(Phaser.BlendModes.ADD)
       luz.setDisplaySize(T.largura * 1.2, T.altura * 1.4).setAlpha(0.9)
       const p = { tela: 0, sala: 0 }
@@ -682,7 +701,7 @@ export function criarTelao(cena, tela) {
       cena.tweens.add({ targets: p, tela: 1, duration: 130, ease: 'Quad.easeOut', onUpdate: desenhar })
       cena.tweens.add({ targets: p, sala: 1, delay: 110, duration: 480, ease: 'Cubic.easeIn', onUpdate: desenhar })
       cena.tweens.add({ targets: luz, scaleX: luz.scaleX * 6, scaleY: luz.scaleY * 6, alpha: 1, duration: 560, ease: 'Cubic.easeIn' })
-      cena.cameras.main.shake(260, 0.004)
+      tremerCamera(cena.cameras.main, 260, 0.004)
       cena.time.delayedCall(480, () => cena.cameras.main.fadeOut(200, 255, 255, 255))
       cena.time.delayedCall(700, resolver)
     })

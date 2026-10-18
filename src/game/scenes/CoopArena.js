@@ -777,7 +777,7 @@ export default class CoopArena extends PvpArena {
     this.pistas[j].caixa.tremer(110, 2) // só a caixa de quem levou (a tela toda tremendo enjoa)
     this.personagemDoi(j)
     const borda = this.pistas[j].caixa.retangulo
-    borda.setStrokeStyle(4, 0xff3048)
+    borda.setStrokeStyle(4, CORES.acerto)
     this.time.delayedCall(140, () => borda.scene && borda.setStrokeStyle(4, CORES.almas[j]))
     if (jog.protegido && jog.hp === 1 && dano > 0) this.etiquetaEm(CENTROS[j], PISTA.y - PISTA.altura / 2 - 18, 'SEGUNDA CHANCE: AGUENTA!', '#ffe9a0', { tamanho: 11, ms: 700 })
     if (jog.hp > 0 && jog.hp <= jog.hpMax * HP_BAIXO && !this.hpAvisado[j]) {

@@ -6,6 +6,8 @@ import { criarFundo } from '../backgrounds/index.js'
 import { tocar, musica } from '../audio.js'
 import { estilhacos } from '../effects/entrada.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
+import { tremerCamera } from '../effects/shake.js'
+import { claraoCamera } from '../effects/flash.js'
 
 // Votação da arena do PvP (PvpEscolha -> PvpVoto -> PvpArena).
 //   Um cartão por arena (pvp/arenas.js) e o "?" (ALEATÓRIA: vale como voto numa
@@ -268,8 +270,8 @@ export default class PvpVoto extends Phaser.Scene {
     this.tweens.add({ targets: cartao.c, x: LARGURA / 2, y: 190, scale: 1.7, duration: 480, ease: 'Cubic.easeOut' })
     await esperar(500)
     tocar(this, 'impacto')
-    this.cameras.main.flash(160, 255, 255, 255)
-    this.cameras.main.shake(260, 0.014)
+    claraoCamera(this.cameras.main, 160, 255, 255, 255)
+    tremerCamera(this.cameras.main, 260, 0.014)
     estilhacos(this, LARGURA / 2, 190, { quantidade: 30, cores: [arena.cor, 0xffffff, CORES.almas[0], CORES.almas[1]], profundidade: 11, duracao: 700 })
     const nome = this.texto(LARGURA / 2, 345, arena.nome, arena.nome.length > 12 ? 30 : 44, corTexto(arena.cor), { strokeThickness: 7 }).setDepth(12).setScale(3).setAlpha(0)
     const sub = this.texto(LARGURA / 2, 382, arena.tituloMusica ? `♪ ${arena.tituloMusica}` : arena.descricao, 13, '#d8d8e8').setDepth(12).setAlpha(0)

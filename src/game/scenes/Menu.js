@@ -31,7 +31,7 @@ const OPCOES = [
   { id: 'coop', rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty', dica: 'cartas juntos contra um chefe' },
   { id: 'pvp', rotulo: 'PVP', cor: '#ff3d6e', cena: CENA_PVP, dica: 'duelo de cartas: quem desvia, vence' },
   { id: 'cartas', rotulo: 'GUIA', cor: '#b48cff', cena: 'Grimorio', dica: 'todas as cartas e as rodadas bônus das arenas' },
-  { id: 'config', rotulo: 'CONFIGURAÇÕES', cor: '#f2c14e', cena: 'Config', dica: 'som, velocidade e tela cheia' },
+  { id: 'config', rotulo: 'CONFIGURAÇÕES', cor: '#f2c14e', cena: 'Config', dica: 'som, controles, acessibilidade e gráficos' },
 ]
 
 export default class Menu extends Phaser.Scene {

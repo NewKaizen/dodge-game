@@ -21,6 +21,7 @@ function lerConfig() {
   }
 }
 const salvo = lerConfig()
+export const CONFIG_PADRAO = PADRAO // "restaurar padrão" da tela Config
 
 // Estado compartilhado entre a UI (Svelte) e o jogo (Phaser, via bridge.js)
 export const jogo = writable({

@@ -5,6 +5,7 @@ import { CORES_FESTA, chuvaConfete, canhoesConfete } from '../../../effects/fest
 import { particulas } from '../../../effects/particulas.js'
 import { ignorarNasCaixas } from '../../../recorte.js'
 import { transformarTela, restaurarTela } from './pontaCabeca.js'
+import { fatores } from '../../../acessibilidade.js'
 
 // MODO FESTA: a arena vira uma balada. Uma bola de discoteca desce no alto,
 // girando e soltando raios; holofotes coloridos varrem a tela; chove confete
@@ -143,9 +144,10 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
 
   // ---------- frame ----------
 
-  // pulso da tela no postupdate (depois das caixas refazerem as câmeras delas)
+  // pulso da tela no postupdate (depois das caixas refazerem as câmeras delas);
+  // "reduzir animações" quase tira o pulso (acessibilidade.js)
   function aoPosUpdate() {
-    const k = Math.exp(-batida / 110)
+    const k = Math.exp(-batida / 110) * fatores().zoom
     transformarTela(arena, 0, 1 + PULSO_ZOOM * k)
   }
 
@@ -220,7 +222,7 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
       // bordas arco-íris (o vermelho do dano da arena tem prioridade)
       ;(arena.pistas ?? []).forEach((p, j) => {
         const r = p.caixa.retangulo
-        if (!r?.scene || r.strokeColor === 0xff3048) return
+        if (!r?.scene || r.strokeColor === CORES.acerto) return
         r.setStrokeStyle(4, arcoIris(t / 1600 + j * 0.5))
       })
 

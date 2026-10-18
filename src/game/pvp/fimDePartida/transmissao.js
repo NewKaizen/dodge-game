@@ -5,6 +5,8 @@ import { ESCALA } from '../../arte/texturas.js'
 import { GRAVACAO } from './gravador.js'
 import { RES, ajustarCamera } from '../../resolucao.js'
 import { quebrarCoracao, QUEBRA } from './coracaoPartido.js'
+import { tremerCamera } from '../../effects/shake.js'
+import { fatores, quantas } from '../../acessibilidade.js'
 
 // O REPLAY do golpe final como TRANSMISSÃO ESPORTIVA ao vivo na TV.
 // Toca as fotos do Gravador (nada é re-simulado), com o coração de verdade
@@ -526,7 +528,7 @@ export default class Transmissao {
 
   claraoRapido(alpha, ms) {
     this.cena.tweens.killTweensOf(this.clarao)
-    this.clarao.setAlpha(alpha)
+    this.clarao.setAlpha(alpha * fatores().clarao) // preferência de clarões (acessibilidade.js)
     this.cena.tweens.add({ targets: this.clarao, alpha: 0, duration: ms, ease: 'Quad.easeOut' })
   }
 
@@ -534,6 +536,11 @@ export default class Transmissao {
   flashes(n, espalharMs = 500, som = true) {
     const cena = this.cena
     if (som) tocar(cena, 'tvFlash', { n: Math.min(5, n) })
+    // sem clarões: só o som; com "reduzir animações": metade, bem mais fracos
+    const { clarao } = fatores()
+    if (clarao <= 0) return
+    if (clarao < 1) n = Math.max(1, quantas(n, 0.5))
+    const pico = Math.min(1, clarao * 1.6)
     for (let i = 0; i < n; i++) {
       const atraso = i ? Math.random() * espalharMs : 0
       const x = Phaser.Math.Between(20, LARGURA - 20)
@@ -543,7 +550,7 @@ export default class Transmissao {
       cena.tweens.add({
         targets: f,
         delay: atraso,
-        alpha: { from: 1, to: 0 },
+        alpha: { from: pico, to: 0 },
         scale: { from: Phaser.Math.FloatBetween(0.5, 1.1), to: 1.4 },
         duration: Phaser.Math.Between(160, 260),
         ease: 'Quad.easeOut',
@@ -571,7 +578,7 @@ export default class Transmissao {
     for (const m of this.mortos) {
       const hp = this.hps[m.j]
       hp?.setText('0').setColor(hex(TV.vermelho))
-      if (hp) cena.tweens.add({ targets: hp, alpha: 0.25, duration: 160, yoyo: true, repeat: 7 })
+      if (hp && fatores().piscar) cena.tweens.add({ targets: hp, alpha: 0.25, duration: 160, yoyo: true, repeat: 7 })
     }
     // o coração despedaça por cima da foto do golpe
     for (const t of this.telas) {
@@ -588,10 +595,10 @@ export default class Transmissao {
           escala: c.escala || ESCALA.coracao,
           profundidade: 10,
           vagar: TV.vagar,
-          tremer: () => t.cam.shake(260, 0.012),
+          tremer: () => tremerCamera(t.cam, 260, 0.012),
         }),
       )
-      t.cam.shake(200, 0.01)
+      tremerCamera(t.cam, 200, 0.01)
     }
     // estilhaçou: a torcida explode e a música volta com tudo
     this.agendar(TV.estilhacaMs, () => {
@@ -623,6 +630,7 @@ export default class Transmissao {
       duration: 900,
     })
     this.confete.setDepth(1001) // acima das artes (raiz 1000), na região da câmera de cima
+    this.confete.festa = true // comemoração: corta mais nos gráficos menores (graficos.js)
     this.objetos.push(this.confete)
   }
 
@@ -712,18 +720,22 @@ export default class Transmissao {
       if (this.fase === 'close') {
         const u = suave((this.pos - this.iClose) / Math.max(1, this.iFim - this.iClose))
         zoom = Phaser.Math.Linear(z0, z1, u)
-        // câmera na mão: balança de leve
-        alvo = foco && { x: foco.x + Math.sin(this.tempo * 0.0021) * 2.5, y: foco.y + Math.cos(this.tempo * 0.0017) * 2 }
+        // câmera na mão: balança de leve (nada com "reduzir animações")
+        const mao = fatores().zoom
+        alvo = foco && { x: foco.x + Math.sin(this.tempo * 0.0021) * 2.5 * mao, y: foco.y + Math.cos(this.tempo * 0.0017) * 2 * mao }
         this.desenharCirculo(t, hx, hy, u)
       } else {
         // golpe: tranco no zoom e depois abre devagar para ver os cacos caindo
         const ms = this.faseMs
         const tranco = ms < 90 ? ms / 90 : Math.max(0, 1 - (ms - 90) / 260)
         const abre = suave((ms - 500) / 1900)
-        zoom = Phaser.Math.Linear(z1, z1 * 0.72, abre) * (1 + 0.14 * tranco)
+        zoom = Phaser.Math.Linear(z1, z1 * 0.72, abre) * (1 + 0.14 * tranco * fatores().zoom)
         alvo = foco
       }
     }
+    // "reduzir animações": o zoom só anda uma parte do caminho (sem fechar tanto no close)
+    const suavizar = fatores().zoom
+    if (suavizar < 1) zoom = t.zoomAberto + (zoom - t.zoomAberto) * Math.max(0.45, suavizar)
     if (alvo) t.centro = alvo
     if (t.centro) {
       cam.setZoom(zoom * RES.escala)

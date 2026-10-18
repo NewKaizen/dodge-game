@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { ALTURA, LARGURA } from '../../../constants.js'
 import { tocar } from '../../../audio.js'
 import { shake } from '../../../effects/shake.js'
+import { alphaClarao } from '../../../effects/flash.js'
 
 // Cinemática do SUPER de Susie: DEMOLIÇÃO TOTAL (~3,2 s)
 //   1. a tela escurece e um MURO de tijolos roxos se ergue na frente de tudo,
@@ -61,7 +62,7 @@ export default async function (arena, kit) {
   tocar(arena, 'super-susie-pancada')
   tocar(arena, 'super-susie-muro')
   shake(arena, 380, 0.02)
-  const clarao = novo(arena.add.rectangle(0, 0, LARGURA, ALTURA, 0xffffff).setOrigin(0).setAlpha(0.85).setDepth(99))
+  const clarao = novo(arena.add.rectangle(0, 0, LARGURA, ALTURA, 0xffffff).setOrigin(0).setAlpha(alphaClarao(0.85)).setDepth(99))
   arena.tweens.add({ targets: clarao, alpha: 0, duration: 260, ease: 'Quad.easeOut' })
   const impacto = novo(arena.add.image(cx, cy, 'super-susie-impacto').setScale(1).setDepth(98))
   arena.tweens.add({ targets: impacto, scale: 6, alpha: 0, angle: 60, duration: 420, ease: 'Quad.easeOut' })

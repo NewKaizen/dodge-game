@@ -8,7 +8,7 @@ import { calcularRank, formatarTempo } from '../coop/nota.js'
 import { partyDe } from '../data/batalha.js'
 import { fogoArtificio, canhoesConfete, chuvaConfete, raiosDeLuz, CORES_FESTA } from '../effects/festa.js'
 import { shake } from '../effects/shake.js'
-import { flashTela } from '../effects/flash.js'
+import { flashTela, claraoCamera } from '../effects/flash.js'
 import { FONTE, LARGURA, ALTURA, TEXTO, NIVEIS } from '../constants.js'
 
 // Tela de vitória, em etapas com ritmo:
@@ -150,7 +150,7 @@ export default class Vitoria extends Phaser.Scene {
   estouro(rapido) {
     if (!rapido) {
       tocar(this, 'estouroFesta')
-      this.cameras.main.flash(260, 255, 255, 240)
+      claraoCamera(this.cameras.main, 260, 255, 255, 240)
       shake(this, 220, 0.012)
       for (let i = 0; i < 3; i++) this.time.delayedCall(i * 140, () => fogoArtificio(this, 120 + i * 200 + Phaser.Math.Between(-30, 30), Phaser.Math.Between(60, 150)))
     }

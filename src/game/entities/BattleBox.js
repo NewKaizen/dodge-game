@@ -3,6 +3,7 @@ import { CAIXA, CAIXA_DINAMICA, CORES } from '../constants.js'
 import { tocar } from '../audio.js'
 import { ajustarCamera } from '../resolucao.js'
 import { caixasDe, registrarCaixa, removerCaixa, ignorarNasCaixas } from '../recorte.js'
+import { fatores } from '../acessibilidade.js'
 
 // Faixa de aproximação em volta da caixa (ver aproximar()):
 //   px      quanto a faixa passa da caixa para cada lado (mundo 640x480)
@@ -138,7 +139,10 @@ export default class BattleBox {
   // rápidas. `px` é o deslocamento máximo (mundo 640x480). As câmeras da caixa
   // tremem pelo efeito do Phaser (sem mexer no scroll) e a borda junto, pela
   // origem de desenho (sem mexer em x/y, que as animações da caixa usam).
+  // A preferência de tremor (acessibilidade.js) reduz ou desliga.
   tremer(duracao = 120, px = 2) {
+    px *= fatores().tremor
+    if (px <= 0.05) return
     const l = this.limites
     for (const cam of [this.camera, this.cameraFaixa]) cam.shake(duracao, px / Math.max(1, l.width), true)
     const r = this.retangulo

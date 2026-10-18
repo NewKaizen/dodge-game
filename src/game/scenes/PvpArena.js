@@ -22,7 +22,7 @@ import { anunciarBonus } from '../pvp/bonus/anuncio.js'
 import Duelo from '../pvp/bonus/Duelo.js'
 import Copia from '../pvp/bonus/Copia.js'
 import { shake } from '../effects/shake.js'
-import { flashTela } from '../effects/flash.js'
+import { flashTela, claraoCamera } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
 import { fogoArtificio, canhoesConfete, chuvaConfete } from '../effects/festa.js'
@@ -1471,7 +1471,7 @@ export default class PvpArena extends Phaser.Scene {
     this.pistas[k].caixa.tremer(110, 2) // só a caixa de quem levou (a tela toda tremendo enjoa)
     if (this.fase === 'esquiva') {
       const borda = this.pistas[k].caixa.retangulo
-      borda.setStrokeStyle(4, 0xff3048)
+      borda.setStrokeStyle(4, CORES.acerto)
       this.time.delayedCall(140, () => borda.scene && borda.setStrokeStyle(4, CORES.almas[k]))
     }
     if (jog.protegido && jog.hp === 1 && dano > 0) {
@@ -1569,7 +1569,7 @@ export default class PvpArena extends Phaser.Scene {
       tocar(this, 'sino')
     }
     shake(this, 300, 0.012)
-    this.cameras.main.flash(250, 255, 255, 255)
+    claraoCamera(this.cameras.main, 250, 255, 255, 255)
     await this.esperar(1800)
     if (this.saindo) return
     this.cameras.main.fadeOut(400, 0, 0, 0)

@@ -1,28 +1,24 @@
 import { jogo } from './estado.js'
 import { processarLinha } from './protocolo.js'
+import { pref, aoMudarPref } from '../game/preferencias.js'
+import { normalizarTeclas, JOGADORES } from '../game/teclas.js'
 
-// Teclas de cada jogador (e.code, independe do layout do teclado).
-// Em modo 1 jogador, os dois conjuntos controlam o jogador 1.
-const TECLADO = [
-  {
-    cima: ['KeyW'],
-    baixo: ['KeyS'],
-    esquerda: ['KeyA'],
-    direita: ['KeyD'],
-    A: ['Space', 'KeyZ', 'KeyE'],
-    B: ['KeyQ', 'KeyX', 'ShiftLeft'],
-    C: ['KeyC', 'Escape'], // pause
-  },
-  {
-    cima: ['ArrowUp'],
-    baixo: ['ArrowDown'],
-    esquerda: ['ArrowLeft'],
-    direita: ['ArrowRight'],
-    A: ['Enter', 'NumpadEnter'],
-    B: ['ShiftRight', 'Backspace'],
-    C: ['KeyP'], // pause
-  },
-]
+// Teclas de cada jogador (e.code, independe do layout do teclado): as
+// remapeadas na tela Config (preferência 'teclas'), ou as de fábrica
+// (TECLAS_PADRAO em game/teclas.js). Em modo 1 jogador, os dois conjuntos
+// controlam o jogador 1.
+const lerTeclado = () => {
+  const mapa = normalizarTeclas(pref('teclas'))
+  return JOGADORES.map((j) => mapa[j])
+}
+let TECLADO = lerTeclado()
+aoMudarPref((chave) => {
+  if (chave !== 'teclas') return
+  if (ativo) soltarTudo() // nada fica "preso" com o mapa antigo
+  TECLADO = lerTeclado()
+})
+
+let ativo = false // simulador ligado (o joystick serial não pode levar JOY 0 0 daqui)
 
 const DIRECOES = ['cima', 'baixo', 'esquerda', 'direita']
 const pressionadas = new Set()
@@ -77,6 +73,7 @@ function soltarTudo() {
 // Emite linhas do protocolo a partir do teclado, para jogar sem o hardware
 export function iniciarSimulador() {
   pararSimulador()
+  ativo = true
   jogo.update((s) => ({ ...s, conectado: true, fonte: 'simulador' }))
 
   window.addEventListener('keydown', aoPressionar)
@@ -88,7 +85,33 @@ export function pararSimulador() {
   window.removeEventListener('keydown', aoPressionar)
   window.removeEventListener('keyup', aoSoltar)
   window.removeEventListener('blur', soltarTudo)
-  soltarTudo()
+  if (ativo) soltarTudo()
+  ativo = false
   ultimoJoy.length = 0
   jogo.update((s) => ({ ...s, conectado: false, fonte: null }))
+}
+
+// Espera a próxima tecla (tela Config, remapear): fn(code) com o e.code dela.
+// Enquanto espera, NENHUM outro atalho de teclado dispara (simulador, F da tela
+// cheia, Esc/C da pausa, Phaser): o ouvinte fica na fase de captura da janela e
+// engole o evento. Devolve a função que cancela a espera.
+let esperando = null
+function aoCapturar(e) {
+  e.preventDefault()
+  e.stopImmediatePropagation()
+  if (e.repeat || !esperando) return
+  const fn = esperando
+  pararCaptura()
+  fn(e.code)
+}
+function pararCaptura() {
+  esperando = null
+  window.removeEventListener('keydown', aoCapturar, true)
+}
+export function capturarTecla(fn) {
+  pararCaptura()
+  if (ativo) soltarTudo() // uma direção segurada não fica andando sozinha
+  esperando = fn
+  window.addEventListener('keydown', aoCapturar, true)
+  return () => esperando === fn && pararCaptura()
 }

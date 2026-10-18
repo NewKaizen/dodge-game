@@ -243,7 +243,7 @@ export default class GuiaBonus extends Phaser.Scene {
     placar.acertos++
     placar.dano += dano
     const borda = this.pistas[this.pistaDe(j)].caixa.retangulo
-    borda.setStrokeStyle(4, 0xff3048)
+    borda.setStrokeStyle(4, CORES.acerto)
     const k = this.pistaDe(j)
     this.time.delayedCall(140, () => borda.scene && borda.setStrokeStyle(4, CORES.almas[k]))
     return true
