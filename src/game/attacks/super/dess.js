@@ -1,7 +1,6 @@
 import { definirAtaque } from '../definir.js'
 import { ATAQUE } from '../../constants.js'
 import { tocar } from '../../audio.js'
-import { shake } from '../../effects/shake.js'
 import { particulas } from '../../effects/particulas.js'
 
 // SUPER de Dess: ÚLTIMO BIS. A caixa vira um braço de guitarra com TRASTES
@@ -255,7 +254,7 @@ function explodir(a, cfg, palco, x, y, cor, aoApagar) {
   if (a.tempo - ultimoEstrondo > 90 || a.tempo < ultimoEstrondo) {
     ultimoEstrondo = a.tempo
     tocar(a.cena, 'explosaoGrande')
-    shake(a.cena, 90, 0.005)
+    a.tremer(90, 0.005)
   }
   particulas(a.cena, x, y, { cor, quantidade: 7, velocidade: 150, vida: 300 })
   const area = a.bala({ x, y, raio, jaAvisada: true, atravessa: true, vida: 220, pulso: 0, cor })
@@ -315,7 +314,7 @@ function climax(a, cfg, palco) {
   a.aviso({ tipo: 'circulo', x: cx, y: cy, raio: 18, ms: Math.max(ATAQUE.telegrafoMs, 420), cor: 0xffe14a }, () => {
     tocar(a.cena, 'super-dess-estouro')
     tocar(a.cena, 'explosaoGrande')
-    shake(a.cena, 220, 0.014)
+    a.tremer(220, 0.014)
     explosaoVisual(a, cx, cy, 90)
     particulas(a.cena, cx, cy, { cor: 0xffe14a, quantidade: 22, velocidade: 210, vida: 420 })
     a.cena.tweens.add({ targets: guitarra, angle: 6, duration: 50, yoyo: true, repeat: 6 })

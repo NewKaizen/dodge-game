@@ -10,7 +10,6 @@ import { definirAtaque } from '../definir.js'
 import { ATAQUE, CORACAO } from '../../constants.js'
 import { lacunasLivres } from '../validacao.js'
 import { tocar } from '../../audio.js'
-import { shake } from '../../effects/shake.js'
 import { particulas } from '../../effects/particulas.js'
 
 const T = (nome) => `hab-noelle-${nome}` // textura
@@ -149,7 +148,7 @@ export default {
           riscosDeVento(a, sentido, aviso, 0.35)
           a.depois(aviso, () => {
             estado.soprando = true
-            shake(a.cena, 120, 0.003)
+            a.tremer(120, 0.003)
             riscosDeVento(a, sentido, rajada, 0.9)
             const tiros = Math.max(2, Math.floor(rajada / cfg.tiros))
             for (let k = 0; k < tiros; k++) {
@@ -205,7 +204,7 @@ export default {
           a.cena.tweens.add({ targets: orbe, angle: 360, duration: aviso, ease: 'Cubic.easeIn' })
           a.aviso({ tipo: 'linha', x1: p.x, y1: p.y, x2: fim.x, y2: fim.y, espessura: 2, ms: aviso }, () => {
             tocar(a.cena, S('raio'))
-            shake(a.cena, 90, 0.003)
+            a.tremer(90, 0.003)
             const feixe = a.bala({
               x: (p.x + fim.x) / 2,
               y: (p.y + fim.y) / 2,
@@ -409,7 +408,7 @@ export default {
     },
     iniciar(a, cfg) {
       tocar(a.cena, S('avalanche'))
-      shake(a.cena, 220, 0.004)
+      a.tremer(220, 0.004)
       a.lacuna(Math.min(a.caixa.width, a.caixa.height) - cfg.raioFinal * 2, 'espaço ao lado da bola de neve')
       let lado = a.inteiro(0, 3)
       a.aCada(
@@ -570,7 +569,7 @@ function pedraDeGranizo(a, cfg, x, mirada) {
 
 function estourarGranizo(a, cfg, x, y) {
   tocar(a.cena, S('granizo'))
-  shake(a.cena, 70, 0.003)
+  a.tremer(70, 0.003)
   particulas(a.cena, x, y, { cor: 0xe0f8ff, quantidade: 6, velocidade: 90, vida: 220 })
   // lascas para os dois lados, com força e ângulo sorteados (metade de cada lado)
   const primeiro = a.aleatorio(0, 1) < 0.5 ? 1 : -1
@@ -667,7 +666,7 @@ function congelarTudo(a, estado) {
   estado.congelado = true
   estado.geada = (estado.geada ?? 0) + 1
   tocar(a.cena, S('congelar'))
-  shake(a.cena, 110, 0.003)
+  a.tremer(110, 0.003)
   const l = a.caixa
   const veu = a.decoracao(a.cena.add.rectangle(l.centerX, l.centerY, l.width, l.height, 0xeaf7ff).setAlpha(0.45).setDepth(3))
   a.cena.tweens.add({ targets: veu, alpha: 0.12, duration: 380 })
@@ -753,7 +752,7 @@ function pingente(a, cfg, lado, pos) {
       if (vertical) b.y = c.bottom - 9
       else b.x = lado === 3 ? c.right - 9 : c.left + 9
       b.vida = cfg.cravado
-      shake(a.cena, 60, 0.002)
+      a.tremer(60, 0.002)
       const px = vertical ? b.x : lado === 3 ? c.right - 2 : c.left + 2
       const py = vertical ? c.bottom - 2 : b.y
       particulas(a.cena, px, py, { cor: 0xd6f6ff, quantidade: 6, velocidade: 80, vida: 240 })
@@ -937,7 +936,7 @@ function bolaDeNeve(a, cfg, lado) {
   // entra mirando o coração com um desvio sorteado (a curva corrige... ou não)
   const ang0 = Math.atan2(alvo.y - p.y, alvo.x - p.x) + a.aleatorio(-0.35, 0.35)
   const curva = cfg.curva * a.aleatorio(0.85, 1.15)
-  shake(a.cena, 90, 0.002)
+  a.tremer(90, 0.002)
   a.bala({
     x: p.x,
     y: p.y,
@@ -996,7 +995,7 @@ function bolaDeNeve(a, cfg, lado) {
 function espatifar(a, cfg, x, y, raio, [nx, ny]) {
   const l = a.caixa
   tocar(a.cena, S('espatifar'))
-  shake(a.cena, 120, 0.004)
+  a.tremer(120, 0.004)
   // o ponto do impacto, colado na parede
   const px = Math.min(l.right - 4, Math.max(l.left + 4, x - nx * (raio - 4)))
   const py = Math.min(l.bottom - 4, Math.max(l.top + 4, y - ny * (raio - 4)))

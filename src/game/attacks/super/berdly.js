@@ -1,7 +1,6 @@
 import { definirAtaque } from '../definir.js'
 import { ATAQUE, FONTE } from '../../constants.js'
 import { tocar } from '../../audio.js'
-import { shake } from '../../effects/shake.js'
 import { particulas } from '../../effects/particulas.js'
 
 // SUPER de Berdly: PROVA IRREFUTÁVEL. A passiva dele ("Ego Inflado": cada
@@ -346,7 +345,7 @@ function corteFinal(a, cfg, cx, cy) {
   tocar(a.cena, 'super-berdly-vento')
   a.aviso({ tipo: 'linha', x1: cx - dx, y1: cy - dy, x2: cx + dx, y2: cy + dy, espessura: 18, ms: aviso }, () => {
     tocar(a.cena, 'super-berdly-estalo')
-    shake(a.cena, 200, 0.012)
+    a.tremer(200, 0.012)
     const feixe = a.bala({
       x: cx,
       y: cy,

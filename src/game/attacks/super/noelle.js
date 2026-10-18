@@ -1,7 +1,6 @@
 import { definirAtaque } from '../definir.js'
 import { ATAQUE, FONTE } from '../../constants.js'
 import { tocar } from '../../audio.js'
-import { shake } from '../../effects/shake.js'
 import { particulas } from '../../effects/particulas.js'
 
 // SUPER de Noelle: SNOWGRAVE. O frio cresce até o mundo inteiro congelar, em
@@ -413,7 +412,7 @@ function flocao(a, cfg, estado) {
         b.morta = true
         estourar(a, b.x, b.y, n, base, cfg.velocidadeEstilhaco, 'super-noelle-estilhaco')
         tocar(a.cena, 'super-noelle-cristal')
-        shake(a.cena, 140, 0.006)
+        a.tremer(140, 0.006)
         particulas(a.cena, b.x, b.y, { cor: 0xeaf7ff, quantidade: 14, velocidade: 160, vida: 420 })
       }
     },
@@ -449,7 +448,7 @@ function nevasca(a, cfg, estado) {
   estado.lado = a.escolher([-1, 1])
   ventoDoLado(a, estado)
   tocar(a.cena, 'super-noelle-nevasca')
-  shake(a.cena, 220, 0.006)
+  a.tremer(220, 0.006)
   a.cena.tweens.add({ targets: estado.cenario.branco, alpha: 0.2, duration: 500 })
   a.lacuna(cfg.folgaRajada, 'brecha da rajada de estilhaços')
 
@@ -529,7 +528,7 @@ function redemoinho(a, cfg, estado) {
   estado.fase = 'redemoinho'
   estado.olho = { x: l.centerX + a.aleatorio(-34, 34), y: l.centerY + a.aleatorio(-22, 22), sentido: a.escolher([-1, 1]) }
   tocar(a.cena, 'super-noelle-redemoinho')
-  shake(a.cena, 200, 0.005)
+  a.tremer(200, 0.005)
   const olho = estado.olho
   const selo = estado.cenario.selo.setPosition(olho.x, olho.y)
   a.cena.tweens.add({ targets: selo, alpha: 0.6, scale: 0.5, duration: 700, ease: 'Back.easeOut' })
@@ -657,7 +656,7 @@ function pilar(a, cfg) {
       if (!subiu) {
         subiu = true
         tocar(a.cena, 'super-noelle-pilar')
-        shake(a.cena, 160, 0.008)
+        a.tremer(160, 0.008)
         const bx = vertical ? pos : lado === 'esquerda' ? lc.left : lc.right
         const by = vertical ? (lado === 'baixo' ? lc.bottom : lc.top) : pos
         particulas(a.cena, bx, by, { cor: 0xeaf7ff, quantidade: 10, velocidade: 150, vida: 360 })
@@ -691,7 +690,7 @@ function snowgrave(a, cfg, estado) {
   const l = a.caixa
   estado.fase = 'snowgrave'
   tocar(a.cena, 'snowgrave')
-  shake(a.cena, 380, 0.01)
+  a.tremer(380, 0.01)
   a.cena.tweens.add({ targets: estado.cenario.frio, alpha: 0.85, duration: 600 })
   // o olho se apaga e o núcleo deixa de machucar
   if (estado.nucleo) {
@@ -770,7 +769,7 @@ function explosao(a, cfg, estado, P, base) {
   const l = a.caixa
   tocar(a.cena, 'snowgraveFim')
   tocar(a.cena, 'super-noelle-estilhaco')
-  shake(a.cena, 480, 0.022)
+  a.tremer(480, 0.022)
   estado.tumulo = null
   // clarão na caixa inteira e o pilar de luz no ponto
   const clarao = a.decoracao(a.cena.add.rectangle(l.centerX, l.centerY, l.width, l.height, 0xffffff).setDepth(7).setAlpha(0.85))

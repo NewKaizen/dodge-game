@@ -1467,8 +1467,8 @@ export default class PvpArena extends Phaser.Scene {
     hud.setHp(jog.hp)
     hud.tremer()
     numero(this, hud.pontoHp.x, hud.pontoHp.y + 4, efetivo ? `-${efetivo}` : '0', TEXTO.caido, { tamanho: 16, desvio: 12 })
-    shake(this, 90, 0.004)
     const k = this.pistaDe(j) // a pista onde o coração dele está (CORAÇÃO TROCADO)
+    this.pistas[k].caixa.tremer(110, 2) // só a caixa de quem levou (a tela toda tremendo enjoa)
     if (this.fase === 'esquiva') {
       const borda = this.pistas[k].caixa.retangulo
       borda.setStrokeStyle(4, 0xff3048)
@@ -1500,7 +1500,7 @@ export default class PvpArena extends Phaser.Scene {
     const coracao = this.pistas[k].coracoes[0]
     tocar(this, 'quebrar')
     flashTela(this, CORES.almas[j], 0.3, 220)
-    shake(this, 260, 0.014)
+    this.pistas[k].caixa.tremer(260, 4)
     particulas(this, coracao.x, coracao.y, { cor: CORES.almas[j], quantidade: 30, velocidade: 220, vida: 700 })
     coracao.esconder()
     this.avisoPista[k].setText('K.O.!').setColor(TEXTO.caido).setFontSize(20)
