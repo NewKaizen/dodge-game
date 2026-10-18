@@ -23,7 +23,6 @@
 import { definirAtaque } from '../definir.js'
 import { ATAQUE } from '../../constants.js'
 import { tocar } from '../../audio.js'
-import { shake } from '../../effects/shake.js'
 import { particulas } from '../../effects/particulas.js'
 
 const T = (nome) => `hab-susie-${nome}`
@@ -112,7 +111,7 @@ const susieCabecada = definirAtaque({
 
       a.aviso({ tipo: 'area', ...ret, ms: cfg.aviso }, () => {
         tocar(a.cena, 'hab-susie-bonk')
-        shake(a.cena, 120, 0.008)
+        a.tremer(120, 0.008)
         const cx = lateral ? centro : p
         const cy = lateral ? p : centro
         const b = a.bala({
@@ -214,7 +213,7 @@ const susiePisao = definirAtaque({
         marca.setAlpha(1)
         a.cena.tweens.add({ targets: marca, alpha: 0, delay: 600, duration: 300 })
         tocar(a.cena, 'hab-susie-pisao')
-        shake(a.cena, 160, 0.01)
+        a.tremer(160, 0.01)
         particulas(a.cena, pe.x, pe.y, { cor: LILAS, quantidade: 12, velocidade: 110, vida: 360 })
         // a onda: um pilar a cada `passo` px, saindo da pegada para os dois lados
         const v = cfg.velocidade * a.balas.fatorVelocidade
@@ -578,7 +577,7 @@ const susieRugido = definirAtaque({
         a.cena.tweens.killTweensOf(boca)
         a.cena.tweens.add({ targets: boca, scale: 1.6, alpha: 0, duration: 260 })
         tocar(a.cena, 'hab-susie-rugido')
-        shake(a.cena, 220, 0.006)
+        a.tremer(220, 0.006)
         const v = cfg.velocidade
         const metade = (p.fim - p.ini) / 2
         const travessia = ((p.fundo + cfg.curva + 30) / (v * a.balas.fatorVelocidade)) * 1000

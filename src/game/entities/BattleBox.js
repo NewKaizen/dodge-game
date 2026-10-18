@@ -133,6 +133,28 @@ export default class BattleBox {
     ]
   }
 
+  // Tremor só DESTA caixa (golpe no coração, explosão dentro dela): o resto da
+  // tela fica parado — tremer o jogo inteiro a cada dano enjoa em partidas
+  // rápidas. `px` é o deslocamento máximo (mundo 640x480). As câmeras da caixa
+  // tremem pelo efeito do Phaser (sem mexer no scroll) e a borda junto, pela
+  // origem de desenho (sem mexer em x/y, que as animações da caixa usam).
+  tremer(duracao = 120, px = 2) {
+    const l = this.limites
+    for (const cam of [this.camera, this.cameraFaixa]) cam.shake(duracao, px / Math.max(1, l.width), true)
+    const r = this.retangulo
+    this.tremorBorda?.remove()
+    const voltar = () => r.scene && r.setOrigin(0.5, 0.5)
+    this.tremorBorda = this.scene.time.addEvent({
+      delay: 16,
+      repeat: Math.max(1, Math.round(duracao / 16)),
+      callback: () => {
+        if (!r.scene) return
+        if (this.tremorBorda.getRepeatCount() === 0) return voltar()
+        r.setDisplayOrigin(r.width / 2 + Phaser.Math.FloatBetween(-px, px), r.height / 2 + Phaser.Math.FloatBetween(-px, px))
+      },
+    })
+  }
+
   // Remove a caixa da cena (a do co-op vive a cena toda e não precisa disso)
   destruir() {
     this.cancelarMudanca()

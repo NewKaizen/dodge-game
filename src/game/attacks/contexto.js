@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { ATAQUE, CORES, CORACAO, tetoDeFuga } from '../constants.js'
+import { ATAQUE, CORES, CORACAO, LARGURA, tetoDeFuga } from '../constants.js'
 import { LACUNA_MINIMA, avisar, validarParede, validarLacuna } from './validacao.js'
 import { registrarZona, envelhecerZonas, limparZonas } from './zonas.js'
 
@@ -30,6 +30,7 @@ import { registrarZona, envelhecerZonas, limparZonas } from './zonas.js'
 //                             que nasce FORA da caixa (lança, lata, meteoro vindo de fora) aparece
 //                             também na faixa de aproximação em volta dela (BattleBox.aproximar);
 //                             o resto (véus, fundos, gráficos) fica só dentro da caixa
+//   a.tremer(ms, intensidade) treme só esta caixa (nunca chame o shake da tela toda num ataque)
 //   a.caixa                   retângulo da caixa (left, right, top, bottom, centerX, centerY, width, height);
 //                             é o mesmo objeto o turno todo, então leia a.caixa na hora de usar (ela pode ter mudado)
 //   a.caixaPara(forma)        muda a caixa ({ largura, altura, x?, y? }; null = padrão), com aviso antes.
@@ -158,6 +159,13 @@ export default class ContextoAtaque {
 
   lacuna(tamanho, descricao) {
     return validarLacuna(this.nome, tamanho, descricao)
+  }
+
+  // Tremor só desta caixa (mesma assinatura do shake de effects/shake.js, que
+  // treme a tela toda): explosões e pancadas de um ataque não sacodem o jogo
+  // inteiro nem a caixa do outro jogador. Teto de 5 px para não enjoar.
+  tremer(duracao = 150, intensidade = 0.01) {
+    this.caixaDeBatalha.tremer?.(duracao, Math.min(5, intensidade * LARGURA * 0.6))
   }
 
   decoracao(objeto) {

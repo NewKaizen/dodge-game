@@ -178,7 +178,7 @@ function estocar({ a, cfg, aviso, turno, geracao, deCima, centro, alcance, fundo
 // O forcado cravou: tremidinha e a palha espirra da ponta para os dois lados
 function cravar(a, cfg, x, ponta, dir) {
   tocar(a.cena, 'impacto')
-  a.cena.cameras.main.shake(90, 0.004)
+  a.tremer(90, 0.004)
   if (!(cfg.palha > 0)) return
   const l = a.caixa
   const y = limitar(ponta - dir * 10, l.top + 8, l.bottom - 8)

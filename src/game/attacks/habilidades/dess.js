@@ -668,7 +668,7 @@ const dessFumaca = definirAtaque({
         a.cena.tweens.killTweensOf(lata)
         lata.destroy()
         tocar(a.cena, T('fumaca'))
-        a.cena.cameras.main.shake(90, 0.003)
+        a.tremer(90, 0.003)
         // o estouro: anel de brasas (girado ao acaso), o próprio estouro é o aviso
         const giro0 = a.aleatorio(0, Math.PI * 2)
         for (let k = 0; k < cfg.anel; k++) {
@@ -1094,7 +1094,7 @@ function labareda(a, cfg, geo) {
       queimador.destroy()
       b.sprite.setVisible(true).setPosition(b.x, b.y)
       tocar(a.cena, T('grave'))
-      a.cena.cameras.main.shake(140, 0.005)
+      a.tremer(140, 0.005)
       for (let n = 0; n < 4; n++) particulas(a.cena, b.x, g.bottom - n * (g.height / 4), { cor: n % 2 ? 0xffe14a : 0xff8a3a, quantidade: 6, velocidade: 120, vida: 380 })
     }
   })

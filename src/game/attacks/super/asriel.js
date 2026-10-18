@@ -1,7 +1,6 @@
 import Phaser from 'phaser'
 import { definirAtaque } from '../definir.js'
 import { tocar } from '../../audio.js'
-import { shake } from '../../effects/shake.js'
 import { particulas } from '../../effects/particulas.js'
 
 // SUPER de Asriel: SINGULARIDADE RADIANTE. A única carta do jogo que mexe no
@@ -143,7 +142,7 @@ function crescerVazio(a, cfg, cx, cy, raio, forca, estado, buraco, g) {
   a.aviso({ tipo: 'circulo', x: cx, y: cy, raio, ms: cfg.aviso }, () => {
     if (!g.ativo) return
     tocar(a.cena, 'super-asriel-pulso')
-    shake(a.cena, 110, 0.005)
+    a.tremer(110, 0.005)
     if (estado.bala) {
       estado.bala.inofensiva = true
       estado.bala.vida = 1
@@ -232,7 +231,7 @@ function colapsar(a, estado, buraco, disco, cx, cy, g) {
   for (const p of disco.pontos) a.cena.tweens.add({ targets: p.img, x: cx, y: cy, alpha: 0, duration: 220, ease: 'Cubic.easeIn' })
   disco.pontos = []
   tocar(a.cena, 'super-asriel-colapso')
-  shake(a.cena, 260, 0.015)
+  a.tremer(260, 0.015)
   a.cena.tweens.killTweensOf(buraco)
   a.cena.tweens.add({ targets: buraco, scale: 0, angle: 280, duration: 260, ease: 'Cubic.easeIn', onComplete: () => buraco.setVisible(false) })
   const nova = a.decoracao(a.cena.add.image(cx, cy, 'super-asriel-nova').setDepth(3).setScale(0).setAlpha(0.95).setBlendMode(Phaser.BlendModes.ADD))

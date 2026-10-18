@@ -1,7 +1,6 @@
 import { definirAtaque } from '../definir.js'
 import { ATAQUE } from '../../constants.js'
 import { tocar } from '../../audio.js'
-import { shake } from '../../effects/shake.js'
 import { particulas } from '../../effects/particulas.js'
 
 // SUPER de Kris: ALMA SEM RETORNO. Três regras novas, uma depois da outra,
@@ -279,7 +278,7 @@ function golpe(a, cfg, t, peca) {
   }
   a.depois(aviso, () => {
     tocar(a.cena, 'super-kris-crava')
-    shake(a.cena, 110, 0.005)
+    a.tremer(110, 0.005)
   })
 }
 
@@ -385,7 +384,7 @@ function cortar(a, cfg, ecos, i) {
   tocar(a.cena, 'super-kris-pulso')
   a.aviso({ tipo: 'linha', x1: alvo.x - dx, y1: alvo.y - dy, x2: alvo.x + dx, y2: alvo.y + dy, espessura: 12, ms: aviso }, () => {
     tocar(a.cena, 'super-kris-corte')
-    shake(a.cena, 160, 0.008)
+    a.tremer(160, 0.008)
     const b = a.bala({
       x: alvo.x,
       y: alvo.y,

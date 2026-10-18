@@ -1,7 +1,6 @@
 import { definirAtaque } from '../definir.js'
 import { lacunasLivres } from '../validacao.js'
 import { tocar } from '../../audio.js'
-import { shake } from '../../effects/shake.js'
 import { particulas } from '../../effects/particulas.js'
 
 // SUPER de Susie: DEMOLIÇÃO TOTAL. O chão da caixa vira um piso de lajotas e
@@ -122,7 +121,7 @@ function machadada(a, M, chao, estado) {
 
   a.depois(M.aviso, () => {
     tocar(a.cena, 'super-susie-pancada')
-    shake(a.cena, 200, 0.012)
+    a.tremer(200, 0.012)
     a.cena.tweens.add({ targets: sombra, alpha: 0, duration: 120 })
     const est = a.decoracao(a.cena.add.image(cx, py(MACHADO.cabeca.y), T('impacto')).setDepth(8).setScale(0.6))
     a.cena.tweens.add({ targets: est, scale: 2.2, alpha: 0, angle: 40, duration: 320, ease: 'Quad.easeOut' })
@@ -270,7 +269,7 @@ function rudeBuster(a, B, i, final, estado) {
     }
     tocar(a.cena, 'super-susie-buster')
     if (final) tocar(a.cena, 'super-susie-pancada')
-    shake(a.cena, final ? 260 : 140, final ? 0.012 : 0.006)
+    a.tremer(final ? 260 : 140, final ? 0.012 : 0.006)
     for (const [p, q] of faixas) disparar(a, B, estado, p, q, vertical, sentido, final)
   })
 }

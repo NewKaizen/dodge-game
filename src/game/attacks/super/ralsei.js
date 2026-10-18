@@ -1,7 +1,6 @@
 import { definirAtaque } from '../definir.js'
 import { ATAQUE } from '../../constants.js'
 import { tocar } from '../../audio.js'
-import { shake } from '../../effects/shake.js'
 import { particulas } from '../../effects/particulas.js'
 
 // SUPER de Ralsei: ÚLTIMO CAPÍTULO. A caixa vira o livro de histórias que ele
@@ -175,7 +174,7 @@ function sopro(a, cfg, nomeCanto) {
     leque.destroy()
     a.cena.tweens.add({ targets: asa, alpha: 0, duration: 260 })
     tocar(a.cena, 'super-ralsei-sopro')
-    shake(a.cena, 90, 0.004)
+    a.tremer(90, 0.004)
     particulas(a.cena, info.x, info.y, { cor: 0x6be08a, quantidade: 14, velocidade: 160, vida: 380 })
     for (let r = 0; r < cfg.rajadasPorSopro; r++) a.depois(r * cfg.intervaloRajada, () => rajada(a, cfg, info, diag))
   })
@@ -275,11 +274,11 @@ function montarMoldura(a, cfg, M) {
 
   for (const [ini, avisoPulso, dur] of M.pulsos) {
     const ap = Math.max(ATAQUE.telegrafoMs, avisoPulso)
-    a.depois(avisoM + ini, () => shake(a.cena, 60, 0.003))
+    a.depois(avisoM + ini, () => a.tremer(60, 0.003))
     a.depois(avisoM + ini + ap, () => {
       m.pulsando = true
       tocar(a.cena, 'super-ralsei-espinho')
-      shake(a.cena, 130, 0.007)
+      a.tremer(130, 0.007)
     })
     a.depois(avisoM + ini + ap + dur, () => (m.pulsando = false))
   }
@@ -346,7 +345,7 @@ function montarDragao(a, cfg, D) {
   const amplitude = D.amplitude ?? l.width * 0.3
 
   tocar(a.cena, 'super-ralsei-dragao')
-  shake(a.cena, 260, 0.01)
+  a.tremer(260, 0.01)
 
   const sombra = a.decoracao(
     a.cena.add.image(l.centerX, l.top - 4, 'super-ralsei-sombra-dragao').setOrigin(0.5, 0.76).setDepth(1).setAlpha(0).setScale(0.45),
