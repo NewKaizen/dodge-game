@@ -3,6 +3,7 @@ import { LARGURA, ALTURA, FONTE } from '../../constants.js'
 import { tocar, velocidadeMusica, fitaMusica, cortarMusica, abaixarMusica, restaurarMusica, calarTransmissao } from '../../audio.js'
 import { ESCALA } from '../../arte/texturas.js'
 import { GRAVACAO } from './gravador.js'
+import { RES, ajustarCamera } from '../../resolucao.js'
 import { quebrarCoracao, QUEBRA } from './coracaoPartido.js'
 
 // O REPLAY do golpe final como TRANSMISSÃO ESPORTIVA ao vivo na TV.
@@ -167,7 +168,9 @@ export default class Transmissao {
       const base = { x: TV.longe.x + i * 5000, y: TV.longe.y }
       const campo = this.campos[k]
       const vw = duas ? LARGURA / 2 : LARGURA
-      const cam = cena.cameras.add(duas ? i * vw : 0, 0, vw, ALTURA).setBackgroundColor(0x07070c).setVisible(false)
+      // viewport em pixels reais da tela (o canvas tem 640x480 x RES.escala); o zoom também leva a escala (ver posicionar)
+      const e = RES.escala
+      const cam = cena.cameras.add(Math.round((duas ? i * vw : 0) * e), 0, Math.round(vw * e), Math.round(ALTURA * e)).setBackgroundColor(0x07070c).setVisible(false)
       this.cameras.push(cam)
       // as fotos: a aberta (duas camadas: o quadro e o próximo por cima, misturando na câmera lenta) e a do close
       const foto = () => this.novo(cena.add.image(base.x + campo.esquerda, base.y + campo.topo, '__DEFAULT').setOrigin(0).setScale(1 / GRAVACAO.escala).setVisible(false))
@@ -211,7 +214,7 @@ export default class Transmissao {
     const A = this.artes
     const P = 1000 // profundidade das artes (só a câmera de cima vê esta região)
     // a câmera das artes: por cima de tudo (a última adicionada desenha por último)
-    this.camArtes = cena.cameras.add(0, 0, LARGURA, ALTURA).setScroll(A.x, A.y)
+    this.camArtes = ajustarCamera(cena.cameras.add()).setScroll(A.x, A.y)
     this.cameras.push(this.camArtes)
     const raiz = this.novo(cena.add.container(A.x, A.y).setDepth(P))
     this.raiz = raiz
@@ -723,7 +726,7 @@ export default class Transmissao {
     }
     if (alvo) t.centro = alvo
     if (t.centro) {
-      cam.setZoom(zoom)
+      cam.setZoom(zoom * RES.escala)
       cam.centerOn(t.centro.x, t.centro.y)
     }
   }

@@ -25,7 +25,7 @@ import { shake } from '../../../effects/shake.js'
 const MUSICA = { min: 2200, max: 4200 } // ms tocando entre uma parada e outra
 const PRIMEIRA = { min: 1500, max: 2600 } // ms até a primeira parada
 const PARADA = { min: 2600, max: 3600 } // ms de música parada
-const ACENDE_MS = 380 // a luz acende devagar: só vigia depois de acesa (tempo de reação)
+const ACENDE_MS = 600 // tolerância: a luz acende devagar e só vigia depois de acesa (tempo para perceber e parar)
 const RAIO = 38 // raio (px) da área vigiada
 const VELOCIDADE = 115 // px/s da luz perseguindo o coração (o coração anda ~180)
 const MEXEU_PX = 4 // px andados sob a luz até contar como "se mexeu" (tremidinha passa)
