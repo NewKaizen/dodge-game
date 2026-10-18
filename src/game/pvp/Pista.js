@@ -14,7 +14,7 @@ import { tocar } from '../audio.js'
 // câmera de recorte (a da BattleBox) e as câmeras não desenham os objetos
 // umas das outras (recorte.js).
 //
-//   const pista = new Pista(cena, { x, y, largura, altura, jogador, cor, tema, velocidadeMax, velocidade, dinamica })
+//   const pista = new Pista(cena, { x, y, largura, altura, jogador, cor, tema, velocidadeMax, velocidade, dinamica, faixa })
 //     x, y              centro da caixa padrão (mundo 640x480)
 //     largura, altura   tamanho padrão; as formas dos ataques escalam com ele
 //     jogador           dono do coração (número) ou lista de jogadores
@@ -26,6 +26,9 @@ import { tocar } from '../audio.js'
 //                       caixa pode crescer até 40px para cada lado da padrão.
 //                       Pistas vizinhas: passe dinamica.campo (região onde a
 //                       caixa pode ficar) sem cruzar o campo da outra
+//     faixa             região onde a faixa de aproximação (as balas chegando de
+//                       fora, ver BattleBox.aproximar) pode aparecer; padrão: o
+//                       campo da caixa dinâmica
 //
 //   pista.mostrar()                      abre a caixa e põe o coração nela (Promise)
 //   pista.esconder()                     fecha a caixa (Promise)
@@ -53,7 +56,7 @@ import { tocar } from '../audio.js'
 //
 //   pista.caixa (BattleBox), pista.balas (Balas), pista.coracoes (Heart[]), pista.rodando
 export default class Pista {
-  constructor(cena, { x, y, largura, altura, jogador = 0, cor, tema = {}, velocidadeMax = Infinity, velocidade, dinamica } = {}) {
+  constructor(cena, { x, y, largura, altura, jogador = 0, cor, tema = {}, velocidadeMax = Infinity, velocidade, dinamica, faixa } = {}) {
     this.cena = cena
     this.jogadores = [jogador].flat()
     this.tema = tema
@@ -68,6 +71,7 @@ export default class Pista {
       largura,
       altura,
       cor: cor ?? CORES.caixa,
+      campoFaixa: faixa ?? campo,
       dinamica: {
         larguraMax: Math.min(largura + folga * 2, campo.direita - campo.esquerda),
         alturaMax: Math.min(altura + folga * 2, campo.base - campo.topo),

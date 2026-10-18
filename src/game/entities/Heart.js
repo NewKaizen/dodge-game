@@ -10,7 +10,7 @@ export default class Heart {
     this.caixa = caixa
     this.cor = cor
     this.jogador = jogador
-    this.hitbox = CORACAO.hitbox
+    this.hitbox = CORACAO.hitbox // raio do miolo que leva dano (bem menor que o sprite)
     this.graze = CORACAO.graze
     this.tamanho = 1 // setTamanho(): coração gigante/mini (sprite, hitbox e graze juntos)
     this.x = 0

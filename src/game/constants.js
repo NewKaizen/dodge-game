@@ -49,8 +49,11 @@ export const CAIXA_DINAMICA = {
   deslocMax: 40,
 }
 
-// hitbox e graze são raios em px; velocidade em px/s
-export const CORACAO = { tamanho: 16, hitbox: 5, graze: 22, velocidadePadrao: 180 }
+// hitbox e graze são raios em px; velocidade em px/s.
+// Como em Undertale/Deltarune, só o MIOLO do coração leva dano: o sprite tem
+// ~15x14 px (CORACAO_MAPA x ESCALA.coracao) e a hitbox é um círculo de 8,4 px
+// de diâmetro no meio dele (~55-60% do tamanho visível). O graze continua largo.
+export const CORACAO = { tamanho: 16, hitbox: 4.2, graze: 22, velocidadePadrao: 180 }
 
 export const TEMPOS = {
   invencivelMs: 850,

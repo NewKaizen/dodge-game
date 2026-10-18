@@ -71,6 +71,12 @@ const CAMPOS = [
   { esquerda: 8, direita: 268, topo: 74, base: 334 },
   { esquerda: 372, direita: LARGURA - 8, topo: 74, base: 334 },
 ]
+// faixa de aproximação (balas chegando de fora, ver BattleBox.aproximar): pode
+// passar um pouco do campo para o lado do chefe, sem cruzar o meio da mesa
+const FAIXAS = [
+  { ...CAMPOS[0], direita: 296 },
+  { ...CAMPOS[1], esquerda: LARGURA - 296 },
+]
 const CHEFE = { x: 320, y: 196 }
 const INTENCAO = [
   { x: 258, y: 300 },
@@ -247,6 +253,7 @@ export default class CoopArena extends PvpArena {
         tema: def.tema,
         velocidadeMax,
         dinamica: { campo: CAMPOS[j] },
+        faixa: FAIXAS[j],
       })
       pista.aoAcertar = (dano) => this.acertou(j, dano)
       pista.aoGraze = () => this.grazeou(j)

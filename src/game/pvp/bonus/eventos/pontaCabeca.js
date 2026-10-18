@@ -50,8 +50,8 @@ export function transformarTela(arena, angulo = 0, zoom = 1) {
   main.setViewport(0, 0, Math.round(LARGURA * e), Math.round(ALTURA * e))
   main.setScroll(...scrollDe(0, 0))
 
-  for (const caixa of arena.caixasDeRecorte ?? []) {
-    const l = caixa.limites
+  // cada caixa tem duas câmeras de recorte (a da faixa de aproximação e a da caixa)
+  for (const { camera: cam, limites: l } of (arena.caixasDeRecorte ?? []).flatMap((caixa) => caixa.recortes)) {
     const cantos = [naTela(l.left, l.top), naTela(l.right, l.top), naTela(l.left, l.bottom), naTela(l.right, l.bottom)]
     const x0 = Math.max(0, Math.min(...cantos.map((p) => p[0])))
     const x1 = Math.min(LARGURA, Math.max(...cantos.map((p) => p[0])))
@@ -59,7 +59,6 @@ export function transformarTela(arena, angulo = 0, zoom = 1) {
     const y1 = Math.min(ALTURA, Math.max(...cantos.map((p) => p[1])))
     const vx = Math.round(x0 * e)
     const vy = Math.round(y0 * e)
-    const cam = caixa.camera
     cam.setOrigin(0, 0).setZoom(e * zoom).setRotation(angulo)
     cam.setViewport(vx, vy, Math.max(1, Math.round(x1 * e) - vx), Math.max(1, Math.round(y1 * e) - vy))
     cam.setScroll(...scrollDe(vx / e, vy / e))
@@ -73,7 +72,7 @@ export function restaurarTela(arena) {
   ajustarCamera(main).setScroll(0, 0).setRotation(0)
   for (const caixa of arena.caixasDeRecorte ?? []) {
     caixa.reaplicar()
-    caixa.camera.setRotation(0)
+    for (const { camera } of caixa.recortes) camera.setRotation(0)
   }
 }
 

@@ -26,7 +26,10 @@ import { registrarZona, envelhecerZonas, limparZonas } from './zonas.js'
 //   a.aCada(ms, fn, vezes?, atraso?)   repete fn(i) a cada ms (i = 0, 1, 2...); atraso = ms até o 1º
 //   a.depois(ms, fn)          roda fn uma vez depois de ms
 //   a.aoAtualizar(fn)         roda fn(dt, tempo) todo frame
-//   a.decoracao(objeto)       objeto visual que só aparece na caixa e some no fim
+//   a.decoracao(objeto)       objeto visual que só aparece na caixa e some no fim. Uma imagem/sprite
+//                             que nasce FORA da caixa (lança, lata, meteoro vindo de fora) aparece
+//                             também na faixa de aproximação em volta dela (BattleBox.aproximar);
+//                             o resto (véus, fundos, gráficos) fica só dentro da caixa
 //   a.caixa                   retângulo da caixa (left, right, top, bottom, centerX, centerY, width, height);
 //                             é o mesmo objeto o turno todo, então leia a.caixa na hora de usar (ela pode ter mudado)
 //   a.caixaPara(forma)        muda a caixa ({ largura, altura, x?, y? }; null = padrão), com aviso antes.
@@ -158,7 +161,10 @@ export default class ContextoAtaque {
   }
 
   decoracao(objeto) {
-    this.caixaDeBatalha.recortar(objeto)
+    const imagem = objeto instanceof Phaser.GameObjects.Image || objeto instanceof Phaser.GameObjects.Sprite
+    const vemDeFora = imagem && !Phaser.Geom.Rectangle.Contains(this.caixa, objeto.x, objeto.y)
+    if (vemDeFora) this.caixaDeBatalha.aproximar(objeto)
+    else this.caixaDeBatalha.recortar(objeto)
     this.objetos.push(objeto)
     return objeto
   }

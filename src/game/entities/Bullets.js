@@ -7,6 +7,9 @@ const MARGEM = 160 // distância fora da caixa em que a bala é removida
 const ESCALA_BARRA = 32 / 24 // textura bala-barra: miolo de 24px numa tela de 32px
 
 // Balas de uma Pista: aviso (telegrafo), movimento, colisão e graze.
+// As balas aparecem também na faixa de aproximação em volta da caixa
+// (BattleBox.aproximar): dá para ver a bala chegando de fora. Enquanto está
+// TODA fora da caixa ela não acerta nem dá graze (o coração nunca sai da caixa).
 //
 // Opções de a.bala({...}):
 //   x, y               posição inicial
@@ -114,7 +117,7 @@ export default class Balas {
       sprite.setAlpha(0.4)
       b.marcador = this.criarMarcador(b)
     }
-    this.caixa.recortar(sprite)
+    this.caixa.aproximar(sprite) // visível também na faixa em volta da caixa
     this.lista.push(b)
     this.criadas++
     return b
@@ -221,6 +224,7 @@ export default class Balas {
   }
 
   tocar(b, coracoes, aoAcertar, aoGrazear) {
+    if (this.foraDaCaixa(b)) return // ainda chegando (na faixa de fora): nem acerta nem grazeia
     for (const c of coracoes) {
       if (!c.ativo) continue
       const folga = this.folga(b, c.x, c.y)
@@ -231,6 +235,22 @@ export default class Balas {
         aoGrazear(c, b)
       }
     }
+  }
+
+  // A bala inteira ainda está fora da caixa? (pela caixa que envolve a forma dela)
+  foraDaCaixa(b) {
+    const l = this.limites
+    let mx
+    let my
+    if (b.tipo === 'circulo') mx = my = b.raio
+    else if (b.tipo === 'retangulo') {
+      mx = b.largura / 2
+      my = b.altura / 2
+    } else {
+      mx = (Math.abs(Math.cos(b.angulo)) * b.comprimento) / 2 + b.espessura / 2
+      my = (Math.abs(Math.sin(b.angulo)) * b.comprimento) / 2 + b.espessura / 2
+    }
+    return b.x + mx < l.left || b.x - mx > l.right || b.y + my < l.top || b.y - my > l.bottom
   }
 
   // tira da lista (e da tela) as balas mortas

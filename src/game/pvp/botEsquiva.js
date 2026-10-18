@@ -51,6 +51,7 @@ const CONFUSAO_RESIDUAL = 0.35
 
 const PASSO_MS = 35 // passo da simulação
 const MEIO = 8 // metade do coração (CORACAO.tamanho / 2): o centro não passa daqui na parede
+const HITBOX = 4.2 // raio da hitbox do coração (CORACAO.hitbox), se a situação não disser
 const CAMINHO_PISCANDO_MS = 350 // quanto do caminho de uma bala piscando o bot evita (ms depois de sair)
 const FOLGA_URGENCIA_MS = 160 // folga (ms além do necessário para sair) em que a urgência cai à metade
 const DIRECOES = [{ x: 0, y: 0 }, ...Array.from({ length: 16 }, (_, k) => ({ x: Math.cos((k * Math.PI) / 8), y: Math.sin((k * Math.PI) / 8) }))]
@@ -209,7 +210,7 @@ export class EsquivaBot {
     const chanceErro = this.cfg.erro + (invertido ? this.confusaoAgora() : 0)
     if (this.sorte() < chanceErro) return DIRECOES[1 + Math.floor(this.sorte() * 16)]
     const ativas = balas.filter((b) => !b.morta && !b.inofensiva)
-    const hitbox = coracao.hitbox ?? 5
+    const hitbox = coracao.hitbox ?? HITBOX
     const seguro = hitbox + this.cfg.margem
     const passos = Math.max(1, Math.round(this.cfg.horizonteMs / PASSO_MS))
     const avisos = this.avisosVisiveis(zonas, ativas, fatorVelocidade)

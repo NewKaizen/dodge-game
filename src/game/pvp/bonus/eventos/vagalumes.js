@@ -158,6 +158,7 @@ export default function criar(arena, { rng }) {
       veu = arena.add.rectangle(0, 0, LARGURA, ALTURA, 0x050a14).setOrigin(0).setDepth(15).setAlpha(0)
       ignorarNasCaixas(arena, veu)
       caixas = arena.pistas.map(criarCaixa)
+      arena.pistas.forEach((p) => (p.caixa.faixaLigada = false)) // no escuro, nada de ver as balas chegando por fora
       // vaga-lumes soltos pela tela também
       telaVagalumes = Array.from({ length: 14 }, () => {
         const halo = arena.add.image(0, 0, 'jardim-brilho').setTint(VERDE).setBlendMode(Phaser.BlendModes.ADD).setDepth(16)
@@ -208,6 +209,7 @@ export default function criar(arena, { rng }) {
         }
       }
       caixas = []
+      arena.pistas.forEach((p) => (p.caixa.faixaLigada = true))
       telaVagalumes.forEach((v) => v.halo.destroy())
       telaVagalumes = []
     },
