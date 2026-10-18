@@ -7,7 +7,7 @@ import { caixasDe, registrarCaixa, removerCaixa, ignorarNasCaixas } from '../rec
 // Faixa de aproximação em volta da caixa (ver aproximar()):
 //   px      quanto a faixa passa da caixa para cada lado (mundo 640x480)
 //   alpha   transparência do que aparece nela (ainda está fora: não machuca)
-export const FAIXA = { px: 44, alpha: 0.6 }
+export const FAIXA = { px: 52, alpha: 0.85 }
 
 // A caixa branca onde os corações desviam (abre para o ataque e fecha no
 // fim). Pode mudar de forma no meio do turno (mudarPara), sempre
