@@ -4,6 +4,11 @@ import { tocar } from '../audio.js'
 import { ajustarCamera } from '../resolucao.js'
 import { caixasDe, registrarCaixa, removerCaixa, ignorarNasCaixas } from '../recorte.js'
 
+// Faixa de aproximação em volta da caixa (ver aproximar()):
+//   px      quanto a faixa passa da caixa para cada lado (mundo 640x480)
+//   alpha   transparência do que aparece nela (ainda está fora: não machuca)
+export const FAIXA = { px: 52, alpha: 0.85 }
+
 // A caixa branca onde os corações desviam (abre para o ataque e fecha no
 // fim). Pode mudar de forma no meio do turno (mudarPara), sempre
 // com uma pré-visualização antes, e volta ao padrão quando fecha.
@@ -14,11 +19,14 @@ import { caixasDe, registrarCaixa, removerCaixa, ignorarNasCaixas } from '../rec
 //   dinamica          limites da caixa dinâmica, mesclados em CAIXA_DINAMICA
 //                     (larguraMin/Max, alturaMin/Max, deslocMax, campo)
 //   cor               cor da borda
+//   campoFaixa        região da tela onde a faixa de aproximação pode aparecer
+//                     ({ esquerda, direita, topo, base }; padrão: dinamica.campo).
+//                     Caixas vizinhas: campos que não se cruzam e não pegam o HUD
 // As formas pedidas pelos ataques ({ largura, altura, x, y }) são pensadas
 // para a caixa padrão CAIXA; numa caixa de outro tamanho elas são escaladas
 // na mesma proporção (ver destinoDe).
 export default class BattleBox {
-  constructor(scene, { x, y, largura, altura, dinamica, cor }) {
+  constructor(scene, { x, y, largura, altura, dinamica, cor, campoFaixa }) {
     this.scene = scene
     this.base = { x, y, largura, altura } // centro e tamanho padrão
     this.dinamica = { ...CAIXA_DINAMICA, ...dinamica }
@@ -30,6 +38,25 @@ export default class BattleBox {
       .setStrokeStyle(CAIXA.borda, cor)
       .setDepth(1)
       .setVisible(false)
+
+    // Faixa de aproximação: uma câmera um pouco MAIOR que a caixa que só
+    // desenha o que foi passado para aproximar() (as balas e o que vem
+    // entrando). Ela é criada antes da câmera da caixa, então desenha POR
+    // BAIXO dela: dentro da caixa a câmera da caixa cobre tudo e nada muda; em
+    // volta, o jogador vê o projétil chegando (meio transparente, FAIXA.alpha).
+    // Não passa de campoFaixa (não invade a outra caixa nem o HUD). Todo o
+    // resto da cena é ignorado por ela (filtrarFaixa, a cada quadro).
+    this.campoFaixa = campoFaixa ?? this.dinamica.campo ?? null
+    this.limitesFaixa = new Phaser.Geom.Rectangle()
+    this.cameraFaixa = scene.cameras.add().setAlpha(FAIXA.alpha).setVisible(false)
+    this.naFaixa = new Set() // objetos que a faixa desenha
+    this.faixaLigada = true // eventos que escurecem a caixa (apagão) desligam a faixa
+    this.ajustarFaixa()
+    this.filtrarFaixa = this.filtrarFaixa.bind(this)
+    scene.events.on('prerender', this.filtrarFaixa)
+    // os eventos da cena sobrevivem ao restart: a caixa do co-op vive a cena toda
+    this.aoDesligarCena = () => scene.events.off('prerender', this.filtrarFaixa)
+    scene.events.once('shutdown', this.aoDesligarCena)
 
     // Câmera com viewport do tamanho da caixa: o que for passado para
     // recortar() só é desenhado por ela, então some fora da caixa. Ela só
@@ -67,14 +94,57 @@ export default class BattleBox {
     }
   }
 
+  // Como recortar(), e o objeto também aparece na faixa de aproximação em
+  // volta da caixa (meio transparente): balas e o que vem entrando de fora
+  // (lanças, latas...). Véus, fundos e escuros da caixa ficam só em recortar():
+  // na faixa eles vazariam para fora da caixa.
+  aproximar(...objetos) {
+    const lista = objetos.flat()
+    this.recortar(lista)
+    const id = this.cameraFaixa.id
+    for (const o of lista) {
+      o.cameraFilter &= ~id
+      if (this.naFaixa.has(o)) continue
+      this.naFaixa.add(o)
+      o.once?.('destroy', () => this.naFaixa.delete(o))
+    }
+  }
+
+  // Antes de desenhar (todo quadro): a faixa só aparece com a caixa aberta (e
+  // some junto quando alguém esconde a câmera da caixa, como a fita do replay),
+  // e ignora tudo da cena que não foi aproximado — inclusive o que foi criado
+  // neste quadro (HUD, efeitos, outros recortes)
+  filtrarFaixa() {
+    const cam = this.cameraFaixa
+    cam.setVisible(this.faixaLigada && this.camera.visible)
+    if (!cam.visible) return
+    const id = cam.id
+    for (const o of this.scene.children.list) {
+      if (!(o.cameraFilter & id) && !this.naFaixa.has(o)) o.cameraFilter |= id
+    }
+  }
+
+  // Câmeras de recorte desta caixa e o retângulo (mundo) que cada uma mostra,
+  // na ordem em que desenham (bonus/eventos/pontaCabeca.js gira as duas)
+  get recortes() {
+    return [
+      { camera: this.cameraFaixa, limites: this.limitesFaixa },
+      { camera: this.camera, limites: this.limites },
+    ]
+  }
+
   // Remove a caixa da cena (a do co-op vive a cena toda e não precisa disso)
   destruir() {
     this.cancelarMudanca()
     this.scene.tweens.killTweensOf(this.retangulo)
     removerCaixa(this.scene, this)
+    this.aoDesligarCena()
+    this.scene.events.off('shutdown', this.aoDesligarCena)
     this.scene.cameras.remove(this.camera)
+    this.scene.cameras.remove(this.cameraFaixa)
     this.retangulo.destroy()
     this.recortados.clear()
+    this.naFaixa.clear()
   }
 
   mostrar(aoAbrir) {
@@ -187,13 +257,29 @@ export default class BattleBox {
     l.setTo(Math.round(cx - w / 2), Math.round(cy - h / 2), w, h)
     this.retangulo.setPosition(l.centerX, l.centerY).setSize(w, h)
     ajustarCamera(this.camera, l.x, l.y, l.width, l.height).setScroll(l.x, l.y)
+    this.ajustarFaixa()
     this.aoMudar?.()
   }
 
-  // A resolução da tela mudou (resolucao.js): refaz a câmera de recorte
+  // A resolução da tela mudou (resolucao.js): refaz as câmeras de recorte
   reaplicar() {
     const l = this.limites
     ajustarCamera(this.camera, l.x, l.y, l.width, l.height).setScroll(l.x, l.y)
+    this.ajustarFaixa()
+  }
+
+  // Faixa de aproximação: a caixa mais FAIXA.px para cada lado, sem passar do
+  // campoFaixa (mas nunca menor que a própria caixa)
+  ajustarFaixa() {
+    const l = this.limites
+    const c = this.campoFaixa
+    const m = FAIXA.px
+    const x0 = Math.min(l.left, Math.max(l.left - m, c?.esquerda ?? -Infinity))
+    const x1 = Math.max(l.right, Math.min(l.right + m, c?.direita ?? Infinity))
+    const y0 = Math.min(l.top, Math.max(l.top - m, c?.topo ?? -Infinity))
+    const y1 = Math.max(l.bottom, Math.min(l.bottom + m, c?.base ?? Infinity))
+    this.limitesFaixa.setTo(x0, y0, x1 - x0, y1 - y0)
+    ajustarCamera(this.cameraFaixa, x0, y0, x1 - x0, y1 - y0).setScroll(x0, y0)
   }
 
   // Pré-visualização: contorno pulsante da caixa nova e, nas partes da caixa

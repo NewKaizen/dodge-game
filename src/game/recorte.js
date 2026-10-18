@@ -2,7 +2,9 @@
 //
 // Cada caixa (entities/BattleBox.js) tem uma câmera com viewport do tamanho
 // dela: o que a caixa recorta (balas, corações, avisos) só é desenhado por
-// essa câmera e some fora da caixa. Uma cena pode ter VÁRIAS caixas (o
+// essa câmera e some fora da caixa. As balas (e o que vem entrando de fora,
+// BattleBox.aproximar) também aparecem numa segunda câmera um pouco maior,
+// a faixa de aproximação (caixa.cameraFaixa), por baixo da da caixa. Uma cena pode ter VÁRIAS caixas (o
 // co-op tem uma; a arena PvP tem uma por jogador), então elas ficam
 // registradas aqui, por cena:
 //

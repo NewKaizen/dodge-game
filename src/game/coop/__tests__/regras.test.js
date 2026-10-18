@@ -251,8 +251,10 @@ test('SUPER no CO-OP: custo e dano do CO-OP; os dois juntos = SUPER COMBO', () =
   const r = resolverRodadaCoop(e, ...ids)
   assert.equal(comboDosGolpes(r.golpes), 'super')
   const lista = calcularGolpes(e, r.golpes)
-  assert.ok(lista.every((g) => g.dano === Math.round(COOP.superGolpe * COOP.superCombo)))
-  assert.ok(lista.every((g) => g.multiplicadores.some(([nome]) => nome === 'SUPER COMBO')))
+  // HP cheio: os dois juntos tiram o SUPER COMBO do nível (metade cada) e o chefe aguenta
+  const total = lista.reduce((t, g) => t + g.dano, 0)
+  assert.ok(Math.abs(total - e.chefe.hpMax * COOP.superCombo.facil) <= 1, `combo ${total}`)
+  assert.ok(total < e.chefe.hp)
   // só um SUPER: sem combo
   assert.equal(comboDosGolpes([r.golpes[0], null]), null)
 })
@@ -345,7 +347,7 @@ test('partida simulada inteira termina (bots dos dois lados)', () => {
 test('as cartas dos jogadores trazem o texto do CO-OP', () => {
   const e = nova()
   const todas = e.jogadores.flatMap((jog) => jog.baralho.monte)
-  assert.ok(todas.every((c) => c.descricao === descricaoCoop(c)))
+  assert.ok(todas.every((c) => c.descricao === descricaoCoop(c, { hpMax: e.chefe.hpMax, nivel: e.nivel })))
   assert.match(descricaoCoop(carta('kris-copas-10')), /VOCÊ E NO PARCEIRO.*levanta/)
   assert.match(descricaoCoop(carta('kris-copas-7')), /DOIS/)
   assert.match(descricaoCoop(carta('kris-copas-1')), /PARCEIRO/)

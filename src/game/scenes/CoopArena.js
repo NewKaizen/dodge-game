@@ -29,6 +29,7 @@ import {
   comboDosGolpes,
   aplicarGolpe,
   fimDaRodadaCoop,
+  fracaoDoCombo,
 } from '../coop/regras.js'
 import { escolherJogadaCoop } from '../coop/bot.js'
 import { superNoChefe } from '../coop/superNoChefe.js'
@@ -55,7 +56,8 @@ import { particulas } from '../effects/particulas.js'
 //                festa e HUD da PvpArena) + CRÍTICO no contra-ataque (fixo)
 //   'contra'     as cartas carregadas voam no chefe (crítico, combo, par, armadilha);
 //                o SUPER tem o efeito do personagem em cima do chefe (coop/superNoChefe.js)
-//                e os dois SUPER juntos viram o SUPER COMBO
+//                e os dois SUPER juntos viram o SUPER COMBO (forte, mas o chefe com mais
+//                da metade do HP aguenta: limiteDoSuper em coop/regras.js, "AGUENTOU!")
 //   'fim'        fase nova do chefe? vitória (Vitoria) ou os dois caídos (GameOver)
 //
 //   scene.start('CoopArena', { chefe: 'king', nivel: 'facil', semente? })
@@ -68,6 +70,12 @@ const { PISTA, CENTROS, MAOS, MAO_ESCONDIDA, PASSAR, ESCALA_MESA, HP_BAIXO } = L
 const CAMPOS = [
   { esquerda: 8, direita: 268, topo: 74, base: 334 },
   { esquerda: 372, direita: LARGURA - 8, topo: 74, base: 334 },
+]
+// faixa de aproximação (balas chegando de fora, ver BattleBox.aproximar): pode
+// passar um pouco do campo para o lado do chefe, sem cruzar o meio da mesa
+const FAIXAS = [
+  { ...CAMPOS[0], direita: 296 },
+  { ...CAMPOS[1], esquerda: LARGURA - 296 },
 ]
 const CHEFE = { x: 320, y: 196 }
 const INTENCAO = [
@@ -245,6 +253,7 @@ export default class CoopArena extends PvpArena {
         tema: def.tema,
         velocidadeMax,
         dinamica: { campo: CAMPOS[j] },
+        faixa: FAIXAS[j],
       })
       pista.aoAcertar = (dano) => this.acertou(j, dano)
       pista.aoGraze = () => this.grazeou(j)
@@ -846,6 +855,7 @@ export default class CoopArena extends PvpArena {
         if (g.golpe.tipo === 'super') {
           await carta.arremessar({ x: CHEFE.x, y: CHEFE.y }, { duracao: 300 })
           await superNoChefe(this, carta.dados.personagem, () => this.golpeNoChefe(g))
+          if (g.limitado) this.chefeAguentou()
         } else {
           await carta.arremessar({ x: CHEFE.x, y: CHEFE.y }, { duracao: 300, aoImpacto: () => this.golpeNoChefe(g) })
           await this.esperar(260)
@@ -876,7 +886,7 @@ export default class CoopArena extends PvpArena {
     tocar(this, 'superAtivar')
     flashTela(this, 0xffffff, 0.5, 260)
     shake(this, 300, 0.012)
-    this.mostrarBanner(`SUPER COMBO!!  x${COOP.superCombo}`, '#ffe9a0', { y: 236, tamanho: 34, ms: 1300 })
+    this.mostrarBanner(`SUPER COMBO!!  ${Math.round(fracaoDoCombo(this.estado.nivel) * 100)}% DO HP`, '#ffe9a0', { y: 236, tamanho: 34, ms: 1300 })
     const arco = [0xff4a5a, 0xffa23a, 0xffe14a, 0x5ae06a, 0x4ab8ff, 0xa66bff]
     arco.forEach((cor, k) => this.time.delayedCall(k * 110, () => this.banner.setColor(corTexto(cor))))
     lista.forEach((g) => {
@@ -907,7 +917,14 @@ export default class CoopArena extends PvpArena {
     arco.forEach((cor, k) => this.time.delayedCall(k * 60, () => particulas(this, CHEFE.x, CHEFE.y, { cor, quantidade: 22, velocidade: 360, vida: 800, escala: 1.8 })))
     numero(this, CHEFE.x, CHEFE.y - 90, `${total.dano}!!`, '#ffe9a0', { tamanho: 34 })
     this.inimigo.dano(1)
+    if (lista.some((g) => g.limitado)) this.chefeAguentou()
     await this.esperar(900)
+  }
+
+  // O SUPER bateu no limite (limiteDoSuper): o chefe aguentou de pé
+  chefeAguentou() {
+    if (this.estado.chefe.hp <= 0) return
+    this.etiquetaEm(CHEFE.x, CHEFE.y + 4, 'AGUENTOU!', TEXTO.guarda, { atraso: 200, tamanho: 16, ms: 1300 })
   }
 
   golpeNoChefe(g) {

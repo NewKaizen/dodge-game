@@ -18,10 +18,14 @@ import { tocar } from '../audio.js'
 //   - a ré só acontece se não houver outra caminhonete atrás dela na faixa
 //     (ela nunca esmaga o vão de trás), com luz de freio `avisoRe` ms antes;
 //   - as caminhonetes ocupam a faixa quase toda: entre uma faixa e outra sobra
-//     só uma fresta mais fina que o coração (não dá para morar nela).
+//     só uma fresta mais fina que o coração (não dá para morar nela);
+//   - nenhuma caminhonete anda mais rápido que o coração (a.limitarPerseguidor,
+//     já com o ritmo do nível/carta e a morte súbita): dá para correr na
+//     frente dela pela faixa até achar o vão na faixa vizinha.
 //
 //   faixas      quantas faixas (a caixa inteira é estrada)
-//   velocidade  px/s médios; cada faixa varia entre 75% e 125% disso
+//   velocidade  px/s médios; cada faixa varia entre 75% e 125% disso (se a
+//               faixa mais rápida passaria do teto de fuga, a média desce)
 //   intervalo   ms médios entre duas caminhonetes na mesma faixa
 //   vao         distância mínima (px) entre uma caminhonete e a próxima na faixa
 //   re          chance (0..1) de uma caminhonete dar ré no meio da caixa
@@ -67,10 +71,12 @@ export default definirAtaque({
 
     // cada faixa: sentido alternado, velocidade própria e a fila dela
     const primeira = a.aleatorio(0, 1) < 0.5 ? 1 : -1 // sentido da faixa de cima
+    // a faixa mais rápida (125%) fica no teto de fuga: as outras continuam variando abaixo dele
+    const media = Math.min(cfg.velocidade, a.limitarPerseguidor(cfg.velocidade * 1.25) / 1.25)
     const faixas = Array.from({ length: cfg.faixas }, (_, i) => ({
       i,
       dir: i % 2 === 0 ? primeira : -primeira,
-      velocidade: cfg.velocidade * a.aleatorio(0.75, 1.25),
+      velocidade: media * a.aleatorio(0.75, 1.25),
       fila: [], // caminhonetes vivas, da mais nova para a mais velha
       proxima: a.aleatorio(0, cfg.intervalo * 0.8),
     }))
@@ -86,6 +92,9 @@ export default definirAtaque({
       a.aviso({ tipo: 'circulo', x: xf, y: y(f.i) + altura * 0.3, raio: 4, ms: aviso, cor: COR_FAROL })
       a.aviso({ tipo: 'circulo', x: xf, y: y(f.i) - altura * 0.3, raio: 4, ms: aviso, cor: COR_FAROL }, () => {
         f.pendente = false
+        // teto relido na hora (o coração pode ter ficado lento num evento); a faixa
+        // nunca volta a acelerar, então quem vem atrás nunca alcança quem vai na frente
+        f.velocidade = a.limitarPerseguidor(f.velocidade)
         const vel = f.velocidade
         const b = a.bala({
           x: borda - dir * (cfg.largura / 2 + 4),

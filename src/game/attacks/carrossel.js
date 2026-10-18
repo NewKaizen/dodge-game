@@ -36,7 +36,9 @@ import { CORES } from '../constants.js'
 //   velocidadeTiro, avisoTiro, raioTiro
 //
 // O giro é limitado para a ponta do anel não passar de a.balas.velocidadeMax
-// (somando a respiração e a perseguição).
+// (somando a respiração e a perseguição). E a faixa segura (que anda com a
+// respiração e com o centro perseguindo) nunca anda mais rápido que
+// a.tetoPerseguidor(): com ritmo alto, os dois desaceleram juntos.
 export default definirAtaque({
   nome: 'carrossel',
   padrao: {
@@ -131,6 +133,7 @@ export default definirAtaque({
 
     // ---------- estado compartilhado (anda no relógio do ataque) ----------
     // fase: ângulo acumulado (rad por unidade de giro); mult vai de +1 a -1 nas viradas
+    // t: relógio da respiração (anda mais devagar que o resto se a faixa passaria do teto de fuga)
     const estado = { t: 0, fase: 0, mult: 1, sentido: 1, ativo: false, piscando: false, desfeito: false, montagem: 0 }
     const respiraVel = (cfg.respira * Math.PI * 2) / (cfg.periodo / 1000) // px/s radial máximo
 
@@ -169,7 +172,10 @@ export default definirAtaque({
       }
       const fator = a.balas.fatorVelocidade
       const s = (dt / 1000) * fator
-      estado.t += s
+      // a faixa segura anda (respiração + centro perseguindo) no máximo no teto de fuga
+      const faixa = (respiraVel + Math.max(0, cfg.persegue)) * fator
+      const calma = faixa > 0 ? Math.min(1, a.tetoPerseguidor() / faixa) : 1
+      estado.t += s * calma
 
       // virada suave do giro
       const passoVirada = (2 * s * 1000) / Math.max(1, cfg.viradaMs)
@@ -181,7 +187,7 @@ export default definirAtaque({
         const dx = alvo.x - centro.x
         const dy = alvo.y - centro.y
         const d = Math.hypot(dx, dy)
-        const passo = Math.min(d, cfg.persegue * s)
+        const passo = Math.min(d, cfg.persegue * s * calma)
         if (d > 0.5) {
           centro.x += (dx / d) * passo
           centro.y += (dy / d) * passo

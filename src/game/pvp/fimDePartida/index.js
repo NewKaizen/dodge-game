@@ -1,15 +1,16 @@
 import { LARGURA, ALTURA, CORES, TEXTO } from '../../constants.js'
-import { tocar, velocidadeMusica, fitaMusica, andamentoMusica } from '../../audio.js'
+import { tocar, velocidadeMusica, fitaMusica, andamentoMusica, calarTransmissao } from '../../audio.js'
 import { debug } from '../../debug.js'
 import { caixasDe } from '../../recorte.js'
 import { flashTela } from '../../effects/flash.js'
 import { shake } from '../../effects/shake.js'
 import { ESCALA } from '../../arte/texturas.js'
 import Gravador from './gravador.js'
-import Fita from './fita.js'
+import Transmissao from './transmissao.js'
+import { PERSONAGENS } from '../../data/personagens.js'
 import { quebrarCoracao, prepararTexturasCoracao } from './coracaoPartido.js'
 
-// Fim da partida PvP: CÂMERA LENTA no golpe final e o REPLAY em fita VHS.
+// Fim da partida PvP: CÂMERA LENTA no golpe final e o REPLAY como transmissão esportiva de TV.
 //
 //   1. K.O. (a arena chama nocaute(j, k) no lugar da quebra de sempre): o
 //      jogo congela por um instante (hitstop) e anda a LENTA.fator: as balas
@@ -20,9 +21,10 @@ import { quebrarCoracao, prepararTexturasCoracao } from './coracaoPartido.js'
 //      abafada (passa-baixa). Outro K.O. nesse meio tempo (empate) também quebra.
 //      No fim: clarão, as pistas param (pista.parar) e tudo volta ao normal.
 //   2. A arena segue (caixas fecham, fimDaRodada) e, no começo de
-//      resultado(), espera replay(): a fita (fita.js) com as fotos do
-//      Gravador (gravador.js: os últimos ~3 s das duas pistas). Mostra a
-//      pista de quem caiu (as duas no empate).
+//      resultado(), espera replay(): a transmissão (transmissao.js: tarja de
+//      INSTANT REPLAY, placar, câmera lenta, close no coração, o coração
+//      despedaçando, torcida, flashes) com as fotos do Gravador (gravador.js:
+//      os últimos ~3 s das duas pistas). Mostra a pista de quem caiu (as duas no empate).
 //   3. Depois o "P1 VENCEU!" de sempre e a PvpResultado.
 //
 // A ou B pula (botao(); o que sobrar da câmera lenta E o replay), com uma
@@ -55,7 +57,7 @@ export default class FimDePartida {
     this.fantasmas = []
     this.filtros = [] // [{ camera, filtro }]
     this.emissores = new Set()
-    this.fita = null
+    this.tv = null
     this.andamento = 1
     this.lentaPronta = Promise.resolve()
     this.gravador = new Gravador(arena, { pistas: arena.pistas, campos })
@@ -92,7 +94,7 @@ export default class FimDePartida {
   // delta REAL (a câmera lenta e o replay andam no relógio de verdade)
   aoAtualizar(_, delta) {
     if (this.estado === 'lenta') this.atualizarLenta(delta)
-    else if (this.estado === 'replay') this.fita?.atualizar(delta)
+    else if (this.estado === 'replay') this.tv?.atualizar(delta)
   }
 
   atualizarLenta(delta) {
@@ -250,11 +252,14 @@ export default class FimDePartida {
       return
     }
     const a = this.arena
-    const quem = this.mortos.length > 1 ? 'EMPATE' : `K.O. ${a.rotulo(this.mortos[0].j)}`
+    const jogadores = [0, 1].map((j) => {
+      const p = PERSONAGENS[a.ids?.[j]]
+      return { rotulo: a.rotulo(j), nome: p?.nome ?? `P${j + 1}`, cor: p?.cor ?? CORES.almas[j], hp: Math.max(0, Math.round(a.estado?.jogadores[j]?.hp ?? 0)) }
+    })
     this.estado = 'replay'
-    this.fita = new Fita(a, { quadros, pistas: ks, campos: this.campos, titulo: `REPLAY · ${quem}`, andamento: andamentoMusica() })
-    await this.fita.tocar()
-    this.fita = null
+    this.tv = new Transmissao(a, { quadros, pistas: ks, campos: this.campos, mortos: this.mortos, jogadores, arena: a.arena, andamento: andamentoMusica() })
+    await this.tv.tocar()
+    this.tv = null
     this.estado = 'fim'
   }
 
@@ -266,7 +271,7 @@ export default class FimDePartida {
       return true
     }
     if (this.estado === 'replay') {
-      if (this.fita && this.fita.tempo > 350) this.fita.encerrar()
+      if (this.tv && this.tv.tempo > 350) this.tv.encerrar()
       return true
     }
     // entre a câmera lenta e o replay: o botão pula o replay que vem
@@ -286,8 +291,9 @@ export default class FimDePartida {
     this.fatorAtual = 1
     this.arena.events.off('update', this.aoAtualizar, this)
     this.arena.events.off('postupdate', this.aoPosAtualizar, this)
-    this.fita?.encerrar()
-    this.fita = null
+    this.tv?.encerrar()
+    this.tv = null
+    calarTransmissao(600) // a torcida que ainda estava comemorando
     this.limparFiltros()
     this.quebras.forEach((q) => q.destruir())
     this.quebras = []

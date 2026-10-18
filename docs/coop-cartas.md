@@ -26,8 +26,10 @@ Fluxo: Menu → CO-OP → EscolhaParty → Selecao (chefe) → Dificuldade (nív
    - desvio perfeito (passou pelo ataque sem levar dano): **CRÍTICO ×1,5**
      (fixo: o combo de perfeitos multiplica só a energia, não o golpe)
    - os dois atacam com o mesmo naipe: **COMBO ×1,25**; mesmo valor: **PAR ×1,5**
-   - os dois jogam SUPER na mesma rodada: **SUPER COMBO ×1,5** em cada SUPER
-     (os dois efeitos acontecem juntos em cima do chefe e fecham numa explosão)
+   - os dois jogam SUPER na mesma rodada: **SUPER COMBO** — juntos tiram 40%
+     (FÁCIL), 45% (MÉDIO) ou 50% (DIFÍCIL) do HP máximo do chefe (os dois efeitos
+     acontecem juntos em cima do chefe e fecham numa explosão). Forte, mas não
+     acaba a luta: ver "SUPER no chefe" abaixo
    - quem caiu na esquiva perde o golpe
 7. **Fim**: chefe a 0 → vitória; os dois caídos → game over. Troca de fase do
    chefe (fala de entrada, fundo mais agitado, cartas novas no baralho dele).
@@ -63,13 +65,58 @@ e `jogadores[j].sequencia`.
 | ♦ ouros | golpe médio (5 + 2,2 × valor) e **atrasa** a carta do chefe na sua caixa (balas 15% mais lentas; Q/K atrasam as duas caixas) |
 | ♣ paus | golpe 6 + 2,5 × valor, **+6% por graze** na esquiva (até +60%) |
 | ♥ copas | suporte: **cura e escudo valem para os dois** (o texto da carta no CO-OP avisa: `descricaoCoop` em `coop/regras.js`); energia e compra para quem jogou. Cura **levanta** o parceiro caído |
-| ★ SUPER | custa **8** no CO-OP (10 no PvP); animação do personagem, golpe de **180** com o efeito dele em cima do chefe (espadas, machado, fogo, gelo, lâminas, ondas de choque, buraco negro) e **varre** a carta do chefe da sua caixa |
+| ★ SUPER | custa **8** no CO-OP (10 no PvP); animação do personagem, golpe de **33% do HP máximo do chefe** (mínimo 60) com o efeito dele em cima do chefe (espadas, machado, fogo, gelo, lâminas, ondas de choque, buraco negro) e **varre** a carta do chefe da sua caixa. O texto da carta na luta mostra o número de verdade |
 | A♠ Espelho | a carta do chefe na sua caixa volta e acerta o chefe |
 | A♦ Anular | cancela a carta do chefe na sua caixa e tira 2 da carga do SUPER dele |
 | A♣ Roubo | rouba a carta do chefe que ia no parceiro (a caixa dele fica livre) e +2 de energia |
 | A♥ Segunda chance | os dois curam 25% e ninguém cai nesta rodada (levanta quem caiu) |
 
 O SUPER do chefe não pode ser anulado, refletido, roubado nem varrido.
+
+## SUPER no chefe
+
+Pedido do dono: "2 SUPERs nos chefes não podem matar instantaneamente, mas
+também não podem dar pouco dano". Antes o SUPER era 180 fixo e o SUPER COMBO
+×1,5 em cada (540, 810 com CRÍTICO): matava qualquer chefe de HP cheio no FÁCIL
+e no MÉDIO (de 141% a 225% do HP) e quase todos no DIFÍCIL (Queen morria, King
+e Coronel sobravam com 7 HP); um SUPER sozinho tirava 56–75% do HP no FÁCIL.
+
+Agora tudo é fração do HP máximo do chefe (que já vem com o nível), em
+`COOP` (`coop/regras.js`: `danoDoSuper`, `fracaoDoCombo`, `limiteDoSuper`):
+
+| | FÁCIL | MÉDIO | DIFÍCIL |
+|---|---|---|---|
+| SUPER sozinho (`superGolpe`, piso `superPiso` 60) | 33% | 33% | 33% |
+| SUPER COMBO, os dois juntos (`superCombo`, metade em cada) | 40% | 45% | 50% |
+
+- **Teto**: o SUPER da rodada (um ou os dois, com CRÍTICO e GUARDA) nunca passa
+  do SUPER COMBO do nível. O CRÍTICO do SUPER só acontece na rodada do SUPER do
+  chefe (fora dela a caixa é varrida e não há esquiva).
+- **Não acaba a luta**: chefe com mais da metade do HP (`superFinaliza`) aguenta
+  qualquer SUPER com pelo menos 10% do HP (`superSobra`); a arena mostra
+  "AGUENTOU!". Do HP cheio, o combo deixa o chefe com 50–60%.
+- **Não pula fase**: o SUPER avança no máximo uma fase do chefe (o chefe fica
+  acima do limite da fase depois da próxima).
+- **Pode finalizar**: com o chefe já na metade ou menos, o combo acaba a luta
+  (é o golpe de fim de luta da dupla que guardou energia junto).
+- O combo escala com o nível porque as lutas do DIFÍCIL são duas vezes mais
+  longas (10–14 rodadas contra 4–9): metade da barra lá é menos decisiva do que
+  40% numa luta de 5 rodadas do FÁCIL.
+- Os limites só cortam o SUPER (`limitado: true` no golpe); a carta comum do
+  parceiro na mesma rodada bate inteira.
+- Troca honesta: dois SUPER em rodadas separadas somam 66%, mais que o combo
+  (40–50%); o combo entrega o dano de uma vez e varre as duas caixas na mesma
+  rodada. O SUPER sozinho continua bem acima da melhor carta (K♠: 50, ou 75 com
+  CRÍTICO; o SUPER vai de 79 no King FÁCIL a 214 no Jevil DIFÍCIL).
+
+Do HP cheio (antes → depois):
+
+| Chefe | HP F / M / D | combo antes | combo depois (sobra) |
+|---|---|---|---|
+| King | 240 / 288 / 547 | mata / mata / sobra 7 (crítico mata) | 96 (144) / 130 (158) / 274 (273) |
+| Queen | 270 / 324 / 436 | mata / mata / mata | 108 (162) / 146 (178) / 218 (218) |
+| Jevil | 310 / 372 / 648 | mata / mata / sobra 108 (crítico mata) | 124 (186) / 167 (205) / 323 (325) |
+| Coronel | 320 / 384 / 547 | mata / mata / sobra 7 (crítico mata) | 128 (192) / 172 (212) / 273 (274) |
 
 ## Chefe
 
@@ -124,6 +171,23 @@ garantidos, faróis avisando e ré com luz de freio) e o FORCADO novo (estoca
 de cima/de baixo, crava e espirra palha); "Atropela e Espeta" é o forcado
 estocando no meio do trânsito. Esses ataques já apertam sozinhos, então o
 Coronel não tem ritmo extra no DIFÍCIL.
+
+Depois do SUPER novo (seção "SUPER no chefe"; `simularCoop.mjs` com 600
+partidas por linha, medição nova de `medirChefes.mjs` com 6 sementes; antes →
+depois). FÁCIL e MÉDIO ficam em 96–100% para as duplas perfeita e mista; as
+mudanças maiores são nas linhas apertadas da dupla média:
+
+| Chefe | perfeita F / M / D | mista F / M / D | média F / M / D |
+|---|---|---|---|
+| King | 100 / 100 / 100 → igual | 100 / 100 / 95 → igual | 100 / 100 / 28 → igual |
+| Queen | 100 / 100 / 100 → igual | 100 / 100 / 98 → 100 / 100 / 97 | 100 / 96 / 22 → 100 / 96 / 15 |
+| Jevil | 100 / 100 / 94 → 100 / 100 / 93 | 100 / 100 / 64 → 100 / 100 / 68 | 100 / 99 / 2 → 100 / 99 / 3 |
+| Coronel | 100 / 100 / 96 → igual | 100 / 100 / 70 → igual | 96 / 56 / 1 → 96 / 43 / 1 |
+
+As lutas ficam de 0,2 a 1 rodada mais longas (o SUPER sozinho do FÁCIL/MÉDIO
+era 47–75% do HP). Na simulação o SUPER COMBO sai pouco (a CPU não combina com o
+parceiro: 0,01–0,06 por luta); nenhum SUPER matou chefe acima da metade do HP
+nem pulou fase (antes: até 4% das lutas acabavam num combo vindo de mais da metade do HP).
 
 Lutas de ~9 a 14 rodadas. A dupla "perfeita" (o bot difícil desviando) erra
 quase nada; "um de cada" é o mais parecido com uma dupla de gente.

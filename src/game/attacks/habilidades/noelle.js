@@ -925,8 +925,9 @@ function crescerEstalactite(a, cfg, lado, pos, prof, comprimento, total, espiada
 // ---------- Avalanche ----------
 
 // Bola de neve: nasce fora da borda `lado`, entra rolando rumo ao coração, faz
-// curva atrás dele por `perseguir` ms (giro limitado), cresce com o caminho e se
-// espatifa na primeira parede em que bater depois de entrar.
+// curva atrás dele por `perseguir` ms (giro limitado e, nesse tempo, mais devagar
+// que o coração: a.limitarPerseguidor), cresce com o caminho e se espatifa na
+// primeira parede em que bater depois de entrar.
 function bolaDeNeve(a, cfg, lado) {
   const l = a.caixa
   const alvo = a.alvo()
@@ -967,6 +968,9 @@ function bolaDeNeve(a, cfg, lado) {
         rumo += Math.max(-curva * s, Math.min(curva * s, d))
       }
       v = Math.min(cfg.maxima, v + (cfg.aceleracao * dt) / 1000)
+      // enquanto faz curva atrás do coração, rola mais devagar que ele (teto de fuga):
+      // correndo de lado ela não alcança; depois, já reta, pode embalar até `maxima`
+      if (b.t < cfg.perseguir) v = a.limitarPerseguidor(v)
       b.vx = Math.cos(rumo) * v
       b.vy = Math.sin(rumo) * v
       const cx = a.caixa

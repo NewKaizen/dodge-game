@@ -16,6 +16,12 @@ import { definirAtaque } from './definir.js'
 //              acender (0 = parado no centro). Sem isso, os cantos da caixa
 //              ficavam entre os braços e dava para esperar parado.
 //   distancia  o núcleo para de se aproximar a essa distância (px) do coração
+//
+// Fuga correndo: os braços varrem a caixa girando, e o jeito de não apanhar é
+// acompanhar o vão entre eles. Então o giro (rad por disparo) é limitado para
+// que, a `distancia` px do núcleo, o vão ande no máximo a.tetoPerseguidor()
+// (com a densidade do ritmo, que encurta o tempo entre os disparos): mais
+// ritmo deixa os braços mais cheios, não mais rápidos que o coração.
 export default definirAtaque({
   nome: 'spiral',
   padrao: {
@@ -103,7 +109,9 @@ export default definirAtaque({
             jaAvisada: true,
           })
         }
-        angulo += cfg.giro * sentido
+        // varredura do vão a `distancia` do núcleo <= teto de fuga (relido a cada disparo)
+        const giroMax = (a.tetoPerseguidor() * (passo / 1000)) / Math.max(40, cfg.distancia)
+        angulo += Math.min(cfg.giro, giroMax) * sentido
       })
     })
   },

@@ -40,9 +40,15 @@ import { CARTAS_CHEFES, faseDoChefe, suporteDoChefe, danoDaCartaChefe, ritmoDaCa
 //   combo / par      os dois atacam com o mesmo naipe / o mesmo valor
 //   grazeArmadilha   ♣: cada graze na esquiva soma esta fração ao golpe (até grazeArmadilhaMax)
 //   lentidao         ♦: fator da velocidade das balas do chefe na caixa de quem jogou (Q/K: nas duas)
-//   superGolpe       dano base do SUPER de um jogador
+//   superGolpe       dano base do SUPER de um jogador: esta fração do HP máximo do
+//                    chefe (o HP já vem com o nível), nunca menos que superPiso
 //   custoSuper       energia do SUPER no CO-OP (no PvP custa 10)
-//   superCombo       os dois jogam SUPER na mesma rodada: cada SUPER multiplica por isto
+//   superCombo       os dois jogam SUPER na mesma rodada (SUPER COMBO): juntos tiram esta
+//                    fração do HP máximo, por nível (metade em cada SUPER). É também o
+//                    TETO do SUPER da rodada (um ou os dois, com CRÍTICO e tudo)
+//   superFinaliza    o SUPER só mata o chefe que começou o golpe com até esta fração do
+//                    HP máximo; acima disso ele aguenta com pelo menos superSobra. E nunca
+//                    pula uma fase inteira do chefe (avança no máximo uma). Ver limiteDoSuper
 //   cargaSuper       o SUPER do chefe sai a cada tantas rodadas (a carga sobe 1 por rodada)
 //   rouboEnergia     energia que o A♣ dá
 //   anularCarga      quanto o A♦ tira da carga do SUPER do chefe
@@ -57,9 +63,12 @@ export const COOP = {
   grazeArmadilha: 0.06,
   grazeArmadilhaMax: 0.6,
   lentidao: 0.85,
-  superGolpe: 180,
+  superGolpe: 0.33,
+  superPiso: 60,
   custoSuper: 8,
-  superCombo: 1.5,
+  superCombo: { facil: 0.4, medio: 0.45, dificil: 0.5 },
+  superFinaliza: 0.5,
+  superSobra: 0.1,
   cargaSuper: 10,
   rouboEnergia: 2,
   anularCarga: 2,
@@ -76,9 +85,19 @@ const ECO = 7 // Espelho sem nada para refletir: golpe de um 7♠
 
 const pct = (f) => `${Math.round(f * 100)}%`
 
-// Texto da carta no CO-OP (a prévia ampliada mostra este no lugar do texto do PvP)
-export function descricaoCoop(carta) {
-  if (ehSuper(carta)) return `SUPER: golpe de ${COOP.superGolpe} no chefe e varre a carta dele da sua caixa (o SUPER do chefe não sai). Os dois com SUPER na mesma rodada: SUPER COMBO x${COOP.superCombo}!`
+// Texto da carta no CO-OP (a prévia ampliada mostra este no lugar do texto do PvP).
+// luta = { hpMax, nivel } do chefe: o SUPER mostra o dano de verdade nesta luta
+// (sem ela, como no Guia, mostra as frações do HP)
+export function descricaoCoop(carta, luta = null) {
+  if (ehSuper(carta)) {
+    const fim = `Com mais da metade do HP, o chefe aguenta.`
+    if (!luta) {
+      const combos = Object.values(COOP.superCombo)
+      return `SUPER: golpe de ${pct(COOP.superGolpe)} do HP do chefe e varre a carta dele da sua caixa (não o SUPER dele). Os dois na mesma rodada: SUPER COMBO de ${pct(Math.min(...combos))} a ${pct(Math.max(...combos))} (pelo nível)! ${fim}`
+    }
+    const combo = Math.round(luta.hpMax * fracaoDoCombo(luta.nivel))
+    return `SUPER: golpe de ${danoDoSuper(luta)} (${pct(COOP.superGolpe)} do HP do chefe) e varre a carta dele da sua caixa (não o SUPER dele). Os dois na mesma rodada: SUPER COMBO de ${combo} (${pct(fracaoDoCombo(luta.nivel))})! ${fim}`
+  }
   const especial = especialDaCarta(carta)
   if (especial === 'espelho') return `ESPECIAL: a carta do chefe na sua caixa volta e acerta ele. Sem nada para refletir (ou contra o SUPER dele), golpe de ${GOLPE.espadas(ECO)}.`
   if (especial === 'anular') return `ESPECIAL: cancela a carta do chefe na sua caixa e tira ${COOP.anularCarga} da carga do SUPER dele.`
@@ -125,18 +144,19 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
       baralho: criarBaralho(personagem, `${semente}:${ID_JOGADOR[j]}`),
     }
   }
+  const hpChefe = Math.round(def.hp * niv.hp)
+  const nivelDaLuta = NIVEIS[nivel] ? nivel : 'facil'
   const comTextoCoop = (jog) => {
     for (const carta of jog.baralho.monte) {
       if (ehSuper(carta)) carta.custo = COOP.custoSuper
-      carta.descricao = descricaoCoop(carta)
+      carta.descricao = descricaoCoop(carta, { hpMax: hpChefe, nivel: nivelDaLuta })
     }
     return jog
   }
-  const hpChefe = Math.round(def.hp * niv.hp)
   return {
     modo: 'coop',
     semente: String(semente),
-    nivel: NIVEIS[nivel] ? nivel : 'facil',
+    nivel: nivelDaLuta,
     fatorDano: niv.dano,
     rodada: 0,
     fase: 'inicio',
@@ -342,7 +362,7 @@ export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
   for (const j of [0, 1]) {
     if (!ehSuper(cartas[j])) continue
     if (livre(j)) destinos[j] = 'varrida'
-    golpes[j] = { carta: cartas[j], tipo: 'super', base: COOP.superGolpe }
+    golpes[j] = { carta: cartas[j], tipo: 'super', base: danoDoSuper(c) }
   }
   for (const j of [0, 1]) {
     if (especiais[j] !== 'espelho') continue
@@ -460,9 +480,56 @@ export function comboDosGolpes(golpes) {
   return null
 }
 
+// Dano base do SUPER de um jogador contra este chefe: COOP.superGolpe do HP
+// máximo (o HP já vem com o nível), nunca menos que COOP.superPiso
+export function danoDoSuper(chefe) {
+  return Math.max(COOP.superPiso, Math.round(chefe.hpMax * COOP.superGolpe))
+}
+
+// Fração do HP máximo que o SUPER COMBO tira neste nível (e o teto de qualquer SUPER)
+export const fracaoDoCombo = (nivel) => COOP.superCombo[nivel] ?? COOP.superCombo.facil
+
+// Dano base de CADA SUPER no SUPER COMBO: metade do combo
+export function danoNoCombo(estado) {
+  return Math.round((estado.chefe.hpMax * fracaoDoCombo(estado.nivel)) / 2)
+}
+
+// Quanto HP o SUPER desta rodada (um ou os dois do SUPER COMBO, somados) pode
+// tirar do chefe, a partir do HP de agora:
+//   - no máximo o SUPER COMBO do nível (fracaoDoCombo): nem com CRÍTICO ele acaba a luta
+//   - chefe acima de COOP.superFinaliza: ele aguenta com COOP.superSobra do HP máx
+//     (abaixo disso o SUPER pode finalizar)
+//   - no máximo uma fase: o chefe fica acima do limite da fase depois da próxima
+export function limiteDoSuper(estado) {
+  const c = estado.chefe
+  let piso = c.hp > c.hpMax * COOP.superFinaliza ? Math.ceil(c.hpMax * COOP.superSobra) : 0
+  const depois = CHEFES[c.id].fases[c.fase + 2]
+  if (depois) piso = Math.max(piso, Math.floor(c.hpMax * depois.hp) + 1)
+  return Math.max(0, Math.min(Math.round(c.hpMax * fracaoDoCombo(estado.nivel)), c.hp - piso))
+}
+
 // Dano final de cada golpe (não muda o estado). desempenho[j] = { perfeito, grazes }.
-// Quem está caído perde o golpe. Devolve [{ j, golpe, dano, falhou, multiplicadores: [[nome, fator]] }]
+// Quem está caído perde o golpe. O SUPER passa pelo limiteDoSuper: se a soma
+// dos SUPER da rodada passar dele, cada um é reduzido na mesma proporção e
+// vem com limitado: true (o chefe aguentou).
+// Devolve [{ j, golpe, dano, falhou, limitado?, multiplicadores: [[nome, fator]] }]
 export function calcularGolpes(estado, golpes, desempenho = []) {
+  const lista = golpesSemLimite(estado, golpes, desempenho)
+  const supers = lista.filter((g) => !g.falhou && g.golpe.tipo === 'super')
+  const total = supers.reduce((t, g) => t + g.dano, 0)
+  const limite = limiteDoSuper(estado)
+  if (total > limite) {
+    let resto = limite
+    supers.forEach((g, k) => {
+      g.dano = k === supers.length - 1 ? Math.max(1, resto) : Math.max(1, Math.floor((g.dano * limite) / total))
+      resto -= g.dano
+      g.limitado = true
+    })
+  }
+  return lista
+}
+
+function golpesSemLimite(estado, golpes, desempenho) {
   const combo = comboDosGolpes(golpes.map((g, j) => (estado.jogadores[j].caido ? null : g)))
   const guarda = estado.chefe.guarda
   return [0, 1]
@@ -476,10 +543,11 @@ export function calcularGolpes(estado, golpes, desempenho = []) {
       if (golpe.tipo === 'paus' && d.grazes) mult.push([`+${d.grazes} GRAZE`, 1 + Math.min(COOP.grazeArmadilhaMax, d.grazes * COOP.grazeArmadilha)])
       if (combo === 'par' && GOLPE[golpe.tipo]) mult.push(['PAR', COOP.par])
       if (combo === 'combo' && GOLPE[golpe.tipo]) mult.push(['COMBO', COOP.combo])
-      if (combo === 'super') mult.push(['SUPER COMBO', COOP.superCombo])
       if (guarda != null) mult.push(['GUARDA', guarda])
       const fator = mult.reduce((m, [, f]) => m * f, 1)
-      return { j, golpe, dano: Math.max(1, Math.round(golpe.base * fator)), falhou: false, multiplicadores: mult }
+      // SUPER COMBO: cada SUPER vira a metade do combo do nível (no lugar do golpe sozinho)
+      const base = combo === 'super' ? danoNoCombo(estado) : golpe.base
+      return { j, golpe, dano: Math.max(1, Math.round(base * fator)), falhou: false, multiplicadores: mult }
     })
 }
 

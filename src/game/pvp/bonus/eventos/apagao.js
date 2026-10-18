@@ -135,6 +135,7 @@ export default function criar(arena, { rng }) {
       veu = arena.add.rectangle(0, 0, LARGURA, ALTURA, 0x000000).setOrigin(0).setDepth(15).setAlpha(0)
       ignorarNasCaixas(arena, veu)
       escuros = arena.pistas.map((pista) => {
+        pista.caixa.faixaLigada = false // no escuro, nada de ver as balas chegando por fora
         // entre as balas (5) e o coração (10): o coração sempre aparece
         const luz = arena.add.image(0, 0, chave).setOrigin(0).setDepth(9.5)
         const bordas = [0, 1, 2, 3].map(() => arena.add.rectangle(0, 0, 1, 1, 0x000000).setOrigin(0).setDepth(9.5))
@@ -180,6 +181,7 @@ export default function criar(arena, { rng }) {
       veu?.destroy()
       veu = null
       for (const e of escuros) {
+        e.pista.caixa.faixaLigada = true
         e.luz.destroy()
         e.bordas.forEach((b) => b.destroy())
         e.avisos.destroy()

@@ -1042,15 +1042,16 @@ const SINTESE = {
 
 // ---------- fita (fim da partida PvP: câmera lenta e replay) ----------
 // fitaMusica({ corte, wow, chiado }, ms): música abafada (passa-baixa em Hz),
-// tom oscilando como fita gasta (wow 0..3) e chiado de fita (0..1). Sem
+// tom oscilando como fita gasta (wow 0..3) e chiado de fita (0..1; o replay
+// de hoje só usa o corte: transmissão de TV, sem chiado). Sem
 // argumentos volta tudo ao normal: sempre desfaça. andamentoMusica(): o
 // andamento pedido agora (para devolver depois de uma câmera lenta).
 import { setFitaMidi } from './midi.js'
 export const fitaMusica = (opcoes, ms) => setFitaMidi(opcoes, ms)
 export const andamentoMusica = () => estadoMidi().velocidade
 
-// Sons do fim da partida PvP (câmera lenta, coração quebrando, fita do
-// replay) e da entrada do vencedor na PvpResultado
+// Sons do fim da partida PvP (câmera lenta, coração quebrando) e da entrada
+// do vencedor na PvpResultado (os da transmissão do replay estão no fim do arquivo)
 Object.assign(SINTESE, {
   // o tempo freando: baque fundo e um sopro que desce
   cameraLenta: (s) => {
@@ -1076,22 +1077,6 @@ Object.assign(SINTESE, {
     s.tom(220, 0.35, 'square', 0.12, 50)
     ;[2400, 3100, 1900, 2800, 3600].forEach((f, i) => s.tom(f, 0.12, 'triangle', 0.05, f * 0.8, 0.03 + i * 0.06))
   },
-  // fita: chiado de estática, rebobinando, PLAY/PAUSE (clique da mecânica) e STOP
-  estatica: (s) => s.ruido(0.28, 0.16, 0, 9000),
-  fitaRebobinar: (s) => {
-    s.rolamento(0.75, 0.09)
-    s.tom(700, 0.75, 'sawtooth', 0.025, 2600)
-  },
-  fitaPlay: (s) => {
-    s.tom(95, 0.06, 'square', 0.18, 50)
-    s.ruido(0.04, 0.22, 0, 3000)
-    s.tom(1500, 0.02, 'square', 0.04, 900, 0.05)
-  },
-  fitaParar: (s) => {
-    s.tom(120, 0.08, 'square', 0.2, 40)
-    s.ruido(0.06, 0.25, 0, 2500)
-    s.tom(520, 0.3, 'sawtooth', 0.04, 60, 0.02)
-  },
   // entrada do vencedor: o golpe da faixa e o acorde que fica
   vitoriaEntrada: (s) => {
     s.ruido(0.08, 0.4, 0, 9000)
@@ -1101,3 +1086,490 @@ Object.assign(SINTESE, {
     s.tom(262, 1.0, 'triangle', 0.14, 262, 0.04)
   },
 })
+
+// ---------- transmissão (replay do fim da partida PvP) ----------
+// O replay virou TRANSMISSÃO ESPORTIVA: estádio lotado. Sons mais longos e
+// ricos que os do SINTESE comum, montados direto no WebAudio:
+//   multidão   vozes (dente-de-serra com vibrato, cada uma num ponto do
+//              estéreo) passando por um banco de FORMANTES (passa-faixas nas
+//              ressonâncias de uma vogal: "aaa", "ooo", "uuu"), mais ruído
+//              nos mesmos formantes (o sopro de milhares de gargantas)
+//   palmas     um buffer estéreo gerado aqui: centenas de estalos de ruído
+//              (ataque seco, decaimento de 3 a 9 ms, brilho e lado
+//              sorteados) com a densidade crescendo ou caindo no tempo
+//   "uhuu"     gritos com glide para cima e caindo, nos formantes de "u"
+//   assobios   fiu-fiu da galera; o apito do juiz é outro (pea whistle: dois
+//              senos batendo e o trinado da bolinha, ~30 Hz)
+// Tudo passa por um barramento próprio (compressor contra estouro + volume
+// dos efeitos): calarTransmissao(ms) faz o fade e solta (pular o replay,
+// sair da cena). SONS_TRANSMISSAO[nome](c, destino, opcoes) também serve para
+// gravar amostras num OfflineAudioContext (é o que o tocar() usa por baixo).
+//   tvVinheta      a tarja do REPLAY passando: whoosh + "tã-DÃÃ" de metais
+//   tvTorcida      { duracao } a torcida crescendo até o golpe (corta no fim)
+//   tvCorte        troca de câmera (whoosh curtinho + baque)
+//   tvOhhh         o "OHHHH!" coletivo do impacto
+//   tvImpacto      acorde orquestral + tímpano + prato
+//   tvExplosao     { duracao } a torcida explodindo: gritos, palmas, assobios
+//   tvApito        apito final do juiz (priii, priii, priiiiii)
+//   tvFlash        { n } cliques de câmeras fotográficas
+const TV = { reforco: 2.2 } // volume da transmissão sobre AUDIO.volume (o compressor segura os picos)
+let barramentoTV = null
+
+// a cadeia do barramento (exportada para gravar amostras com o mesmo volume do jogo)
+export function cadeiaTransmissao(c, destino = c.destination) {
+  const entrada = c.createGain()
+  const comp = c.createDynamicsCompressor()
+  comp.threshold.value = -8
+  comp.knee.value = 6
+  comp.ratio.value = 6
+  comp.attack.value = 0.003
+  comp.release.value = 0.2
+  const mestre = c.createGain()
+  mestre.gain.value = AUDIO.volume * volumes.efeitos * TV.reforco
+  entrada.connect(comp).connect(mestre).connect(destino)
+  return { contexto: c, entrada, mestre }
+}
+
+function barramentoTransmissao(c) {
+  if (barramentoTV?.contexto !== c) barramentoTV = cadeiaTransmissao(c)
+  return barramentoTV.entrada
+}
+
+export function calarTransmissao(ms = 300) {
+  const b = barramentoTV
+  if (!b) return
+  barramentoTV = null
+  const t = b.contexto.currentTime
+  const g = b.mestre.gain
+  g.cancelScheduledValues(t)
+  g.setValueAtTime(g.value, t)
+  g.linearRampToValueAtTime(0, t + Math.max(0.01, ms / 1000))
+  setTimeout(() => b.mestre.disconnect(), ms + 200)
+}
+
+const sorte = (a, b) => a + Math.random() * (b - a)
+// vogais: [frequência, Q, ganho] dos três primeiros formantes
+const VOGAIS = {
+  a: [[800, 5, 1], [1250, 6, 0.55], [2600, 8, 0.22]],
+  e: [[520, 5, 1], [1850, 7, 0.45], [2600, 8, 0.25]],
+  o: [[520, 5, 1], [880, 6, 0.5], [2500, 8, 0.12]],
+  u: [[360, 5, 1], [820, 6, 0.32], [2300, 8, 0.08]],
+}
+
+// banco de formantes: o que entra sai com a cor da vogal (filtros devolvidos para automatizar)
+function formantes(c, destino, vogal, ganho = 1) {
+  const entrada = c.createGain()
+  const saida = c.createGain()
+  saida.gain.value = ganho
+  const filtros = VOGAIS[vogal].map(([f, q, g]) => {
+    const b = c.createBiquadFilter()
+    b.type = 'bandpass'
+    b.frequency.value = f
+    b.Q.value = q
+    const gg = c.createGain()
+    gg.gain.value = g * q * 0.5 // passa-faixa estreito come energia: compensa
+    entrada.connect(b).connect(gg).connect(saida)
+    return b
+  })
+  // a multidão está longe: sem o chiado agudo das dente-de-serra
+  const abafa = c.createBiquadFilter()
+  abafa.type = 'lowpass'
+  abafa.frequency.value = 3400
+  saida.connect(abafa).connect(destino)
+  return { entrada, filtros, saida }
+}
+
+// uma voz: dente-de-serra com vibrato, num ponto do estéreo. Quem chama
+// automatiza f (frequência) e g (ganho, começa em 0)
+function voz(c, destino, t0, dur, f0, pan) {
+  const o = c.createOscillator()
+  o.type = 'sawtooth'
+  o.frequency.setValueAtTime(f0, t0)
+  o.detune.value = sorte(-15, 15)
+  const vib = c.createOscillator()
+  vib.frequency.value = sorte(4, 6.5)
+  const prof = c.createGain()
+  prof.gain.value = sorte(6, 22) // cents
+  vib.connect(prof).connect(o.detune)
+  const g = c.createGain()
+  g.gain.setValueAtTime(0, t0)
+  const p = c.createStereoPanner()
+  p.pan.value = pan
+  o.connect(g).connect(p).connect(destino)
+  o.start(t0)
+  vib.start(t0)
+  o.stop(t0 + dur + 0.3)
+  vib.stop(t0 + dur + 0.3)
+  return { f: o.frequency, g: g.gain }
+}
+
+// voz de homem ou de mulher (a torcida é mista)
+const alturaVoz = () => (Math.random() < 0.55 ? sorte(105, 175) : sorte(200, 320))
+
+// ruído estéreo (cada canal independente: a multidão "abre")
+function bufferRuido(c, dur) {
+  const n = Math.ceil(c.sampleRate * dur)
+  const buf = c.createBuffer(2, n, c.sampleRate)
+  for (let k = 0; k < 2; k++) {
+    const d = buf.getChannelData(k)
+    for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1
+  }
+  return buf
+}
+
+function tocarBuffer(c, buf, destino, t0) {
+  const f = c.createBufferSource()
+  f.buffer = buf
+  f.connect(destino)
+  f.start(t0)
+  return f
+}
+
+// envelope por pontos [[u, valor]...] (u de 0 a 1 da duração), em rampas lineares
+function envelope(param, t0, dur, pontos) {
+  param.setValueAtTime(pontos[0][1], t0)
+  for (const [u, v] of pontos.slice(1)) param.linearRampToValueAtTime(v, t0 + u * dur)
+}
+
+// palmas: densidade(u) palmas/s e forca(u) 0..1 ao longo da duração
+function palmas(c, destino, t0, dur, densidade, forca, vol = 1) {
+  const sr = c.sampleRate
+  const n = Math.ceil(sr * dur)
+  const buf = c.createBuffer(2, n, sr)
+  const L = buf.getChannelData(0)
+  const R = buf.getChannelData(1)
+  let t = 0
+  for (;;) {
+    t += -Math.log(1 - Math.random()) / Math.max(0.5, densidade(t / dur))
+    if (t >= dur) break
+    const i0 = Math.floor(t * sr)
+    const amp = forca(t / dur) * sorte(0.3, 1)
+    const lado = Math.random()
+    const gl = Math.sqrt(1 - lado) * amp
+    const gr = Math.sqrt(lado) * amp
+    const tau = sorte(0.003, 0.009) * sr
+    const k = sorte(0.3, 0.85) // brilho (passa-baixa de um polo)
+    const len = Math.min(n - i0, Math.floor(tau * 6))
+    let y = 0
+    for (let i = 0; i < len; i++) {
+      y += k * (Math.random() * 2 - 1 - y)
+      const e = Math.exp(-i / tau) * (i < 24 ? i / 24 : 1)
+      L[i0 + i] += y * e * gl
+      R[i0 + i] += y * e * gr
+    }
+  }
+  // corpo da palma (passa-altas) e o estalo (realce em ~1,8 kHz)
+  const pa = c.createBiquadFilter()
+  pa.type = 'highpass'
+  pa.frequency.value = 380
+  const pico = c.createBiquadFilter()
+  pico.type = 'peaking'
+  pico.frequency.value = 1800
+  pico.gain.value = 4
+  const g = c.createGain()
+  g.gain.value = vol
+  pa.connect(pico).connect(g).connect(destino)
+  tocarBuffer(c, buf, pa, t0)
+}
+
+// "uhuu!": sobe rápido, segura e cai
+function uhuu(c, destino, t, vol) {
+  const f0 = sorte(300, 560)
+  const dur = sorte(0.45, 0.8)
+  const banco = formantes(c, destino, 'u', 1)
+  const v = voz(c, banco.entrada, t, dur, f0 * 0.75, sorte(-0.9, 0.9))
+  v.f.exponentialRampToValueAtTime(f0 * 1.45, t + 0.13)
+  v.f.setValueAtTime(f0 * 1.45, t + dur * 0.45)
+  v.f.exponentialRampToValueAtTime(f0 * 0.95, t + dur)
+  envelope(v.g, t, dur, [[0, 0], [0.08, vol], [0.6, vol * 0.8], [1, 0]])
+}
+
+// assobio da galera: fiu (sobe) ou fiu-fiuuu (o de "lindo!")
+function assobio(c, destino, t, vol) {
+  const o = c.createOscillator()
+  o.type = 'sine'
+  const g = c.createGain()
+  const p = c.createStereoPanner()
+  p.pan.value = sorte(-0.8, 0.8)
+  const base = sorte(1500, 2100)
+  if (Math.random() < 0.5) {
+    o.frequency.setValueAtTime(base, t)
+    o.frequency.exponentialRampToValueAtTime(base * 1.6, t + 0.18)
+    o.frequency.exponentialRampToValueAtTime(base * 1.5, t + 0.55)
+    envelope(g.gain, t, 0.6, [[0, 0], [0.1, vol], [0.8, vol * 0.7], [1, 0]])
+  } else {
+    o.frequency.setValueAtTime(base, t)
+    o.frequency.exponentialRampToValueAtTime(base * 1.7, t + 0.12)
+    o.frequency.exponentialRampToValueAtTime(base * 1.05, t + 0.22)
+    o.frequency.setValueAtTime(base * 1.05, t + 0.3)
+    o.frequency.exponentialRampToValueAtTime(base * 1.75, t + 0.45)
+    o.frequency.exponentialRampToValueAtTime(base * 1.2, t + 0.7)
+    envelope(g.gain, t, 0.72, [[0, 0], [0.05, vol], [0.28, vol * 0.4], [0.33, 0], [0.42, 0], [0.48, vol], [0.9, vol * 0.6], [1, 0]])
+  }
+  o.connect(g).connect(p).connect(destino)
+  o.start(t)
+  o.stop(t + 0.8)
+}
+
+// a massa de vozes: n vozes da vogal, sílabas sorteadas (falatório) ou
+// contínuas, com a altura seguindo altura(u) (fator sobre a voz) e o volume vol(u)
+function coro(c, destino, t0, dur, { n, vogal, volume, vol = () => 1, altura = () => 1, silabas = false }) {
+  const banco = formantes(c, destino, vogal, volume)
+  for (let i = 0; i < n; i++) {
+    const f0 = alturaVoz()
+    const v = voz(c, banco.entrada, t0, dur, f0, sorte(-1, 1))
+    const passo = silabas ? () => sorte(0.1, 0.32) : () => sorte(0.25, 0.6)
+    let t = t0 + sorte(0, silabas ? 0.3 : 0.08)
+    while (t < t0 + dur) {
+      const u = (t - t0) / dur
+      const fala = silabas ? (Math.random() < 0.7 ? sorte(0.4, 1) : 0) : sorte(0.75, 1)
+      v.g.setTargetAtTime((fala * vol(u)) / Math.sqrt(n), t, silabas ? 0.03 : 0.08)
+      v.f.setTargetAtTime(f0 * altura(u) * sorte(0.94, 1.06), t, silabas ? 0.05 : 0.12)
+      t += passo()
+    }
+    v.g.setTargetAtTime(0, t0 + dur, 0.05)
+  }
+  return banco
+}
+
+// sopro da multidão: ruído estéreo (só os graves e médios: nada de chiado) nos formantes de uma vogal
+function sopro(c, destino, t0, dur, vogal, pontos) {
+  const banco = formantes(c, destino, vogal, 1)
+  const g = c.createGain()
+  envelope(g.gain, t0, dur, pontos)
+  const pb = c.createBiquadFilter()
+  pb.type = 'lowpass'
+  pb.frequency.value = 1600
+  pb.connect(g).connect(banco.entrada)
+  tocarBuffer(c, bufferRuido(c, dur + 0.05), pb, t0)
+  return banco
+}
+
+export const SONS_TRANSMISSAO = {
+  tvVinheta: (c, d) => {
+    const t = c.currentTime
+    // whoosh: ruído num passa-faixa varrendo para cima e voltando
+    const b = c.createBiquadFilter()
+    b.type = 'bandpass'
+    b.Q.value = 1.4
+    b.frequency.setValueAtTime(300, t)
+    b.frequency.exponentialRampToValueAtTime(5200, t + 0.32)
+    b.frequency.exponentialRampToValueAtTime(900, t + 0.7)
+    const g = c.createGain()
+    envelope(g.gain, t, 0.75, [[0, 0], [0.4, 0.9], [1, 0]])
+    b.connect(g).connect(d)
+    tocarBuffer(c, bufferRuido(c, 0.8), b, t)
+    // "tã-DÃÃ": metais (dente-de-serra no passa-baixa que fecha)
+    const metais = (notas, t1, dur, vol) => {
+      const lp = c.createBiquadFilter()
+      lp.type = 'lowpass'
+      lp.frequency.setValueAtTime(4200, t1)
+      lp.frequency.exponentialRampToValueAtTime(1100, t1 + dur)
+      const gg = c.createGain()
+      envelope(gg.gain, t1, dur, [[0, 0], [0.03, vol], [0.25, vol * 0.65], [1, 0]])
+      lp.connect(gg).connect(d)
+      for (const f of notas)
+        for (const det of [-7, 7]) {
+          const o = c.createOscillator()
+          o.type = 'sawtooth'
+          o.frequency.value = f
+          o.detune.value = det
+          o.connect(lp)
+          o.start(t1)
+          o.stop(t1 + dur + 0.05)
+        }
+    }
+    metais([440, 554, 659], t + 0.3, 0.14, 0.16)
+    metais([294, 587, 740, 880], t + 0.46, 0.9, 0.2)
+    // baque grave no "DÃÃ"
+    const o = c.createOscillator()
+    o.frequency.setValueAtTime(110, t + 0.46)
+    o.frequency.exponentialRampToValueAtTime(40, t + 0.9)
+    const gb = c.createGain()
+    envelope(gb.gain, t + 0.46, 0.5, [[0, 0.9], [1, 0]])
+    o.connect(gb).connect(d)
+    o.start(t + 0.46)
+    o.stop(t + 1)
+  },
+
+  tvTorcida: (c, d, { duracao = 5 } = {}) => {
+    const t = c.currentTime
+    const dur = Math.max(1.5, duracao)
+    const cresce = (u) => 0.12 + 0.88 * u ** 1.6
+    // falatório da arquibancada
+    coro(c, d, t, dur, { n: 12, vogal: 'e', volume: 0.32, silabas: true, vol: (u) => 0.9 - 0.3 * u })
+    coro(c, d, t, dur, { n: 10, vogal: 'a', volume: 0.3, silabas: true, vol: (u) => 0.8 - 0.2 * u })
+    // o "uuuuuOOOO" subindo de tom (a galera pressentindo o golpe)
+    const subida = coro(c, d, t, dur, { n: 18, vogal: 'u', volume: 1.3, vol: (u) => (u < 0.3 ? 0 : ((u - 0.3) / 0.7) ** 1.3), altura: (u) => 0.85 + 0.45 * u ** 2 })
+    subida.filtros.forEach((f, i) => f.frequency.linearRampToValueAtTime(VOGAIS.o[i][0], t + dur))
+    sopro(c, d, t, dur, 'a', [[0, 0.02], [0.6, 0.05], [0.97, 0.16], [1, 0]])
+    palmas(c, d, t, dur, (u) => 14 + 90 * u ** 1.4, cresce, 0.55)
+    // gritos e assobios espalhados (mais no fim)
+    for (let i = 0; i < 8; i++) {
+      const u = Math.sqrt(Math.random()) * 0.92
+      ;(Math.random() < 0.6 ? uhuu : assobio)(c, d, t + u * dur, 0.08 + 0.1 * u)
+    }
+  },
+
+  tvCorte: (c, d) => {
+    const t = c.currentTime
+    const b = c.createBiquadFilter()
+    b.type = 'highpass'
+    b.frequency.setValueAtTime(800, t)
+    b.frequency.exponentialRampToValueAtTime(6000, t + 0.18)
+    const g = c.createGain()
+    envelope(g.gain, t, 0.2, [[0, 0], [0.6, 0.5], [1, 0]])
+    b.connect(g).connect(d)
+    tocarBuffer(c, bufferRuido(c, 0.25), b, t)
+    const o = c.createOscillator()
+    o.frequency.setValueAtTime(90, t + 0.16)
+    o.frequency.exponentialRampToValueAtTime(45, t + 0.4)
+    const gb = c.createGain()
+    envelope(gb.gain, t + 0.16, 0.25, [[0, 0.7], [1, 0]])
+    o.connect(gb).connect(d)
+    o.start(t + 0.16)
+    o.stop(t + 0.45)
+  },
+
+  tvOhhh: (c, d) => {
+    const t = c.currentTime
+    const dur = 1.9
+    // todo mundo junto: "OOOHHHhhh" que cai de tom e vira "uuuh"
+    const banco = coro(c, d, t, dur, {
+      n: 26,
+      vogal: 'o',
+      volume: 1.5,
+      vol: (u) => (u < 0.06 ? u / 0.06 : 1 - 0.85 * ((u - 0.06) / 0.94) ** 0.8),
+      altura: (u) => 1.45 - 0.55 * Math.min(1, u * 1.3),
+    })
+    banco.filtros.forEach((f, i) => f.frequency.linearRampToValueAtTime(VOGAIS.u[i][0], t + dur))
+    sopro(c, d, t, dur, 'o', [[0, 0], [0.05, 0.14], [0.5, 0.06], [1, 0]])
+  },
+
+  tvImpacto: (c, d) => {
+    const t = c.currentTime
+    // acorde orquestral (ré menor em várias oitavas): ataque seco e cauda que escurece
+    const lp = c.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.setValueAtTime(6000, t)
+    lp.frequency.exponentialRampToValueAtTime(700, t + 1.6)
+    const g = c.createGain()
+    envelope(g.gain, t, 2.2, [[0, 0], [0.004, 0.32], [0.08, 0.17], [1, 0]])
+    lp.connect(g).connect(d)
+    for (const f of [73.4, 110, 146.8, 174.6, 220, 293.7, 349.2, 440, 587.3])
+      for (const det of [-9, 0, 9]) {
+        const o = c.createOscillator()
+        o.type = f < 120 ? 'square' : 'sawtooth'
+        o.frequency.value = f
+        o.detune.value = det
+        o.connect(lp)
+        o.start(t)
+        o.stop(t + 2.3)
+      }
+    // tímpano
+    const tim = c.createOscillator()
+    tim.frequency.setValueAtTime(98, t)
+    tim.frequency.exponentialRampToValueAtTime(52, t + 0.5)
+    const gt = c.createGain()
+    envelope(gt.gain, t, 1.6, [[0, 1], [0.15, 0.6], [1, 0]])
+    tim.connect(gt).connect(d)
+    tim.start(t)
+    tim.stop(t + 1.7)
+    // prato: ruído agudo que demora a morrer
+    const pa = c.createBiquadFilter()
+    pa.type = 'highpass'
+    pa.frequency.value = 4200
+    const gp = c.createGain()
+    gp.gain.setValueAtTime(0.5, t)
+    gp.gain.exponentialRampToValueAtTime(0.001, t + 2.4)
+    pa.connect(gp).connect(d)
+    tocarBuffer(c, bufferRuido(c, 2.5), pa, t)
+  },
+
+  tvExplosao: (c, d, { duracao = 5 } = {}) => {
+    const t = c.currentTime
+    const dur = Math.max(2, duracao)
+    const cai = (u) => (u < 0.02 ? u / 0.02 : 1 - 0.8 * ((u - 0.02) / 0.98) ** 1.2)
+    // o berro da galera ("AAAAAEEEE!") que vai virando festa
+    coro(c, d, t, dur, { n: 20, vogal: 'a', volume: 1.05, vol: cai, altura: (u) => 1.25 - 0.2 * u })
+    coro(c, d, t, dur, { n: 14, vogal: 'e', volume: 0.75, vol: cai, altura: (u) => 1.3 - 0.2 * u })
+    coro(c, d, t + 0.4, dur - 0.4, { n: 12, vogal: 'a', volume: 0.45, silabas: true, vol: (u) => 0.5 + 0.5 * u })
+    sopro(c, d, t, dur, 'a', [[0, 0], [0.04, 0.18], [0.4, 0.1], [1, 0]])
+    palmas(c, d, t, dur, (u) => 130 - 80 * u, (u) => (u < 0.05 ? u / 0.05 : 1 - 0.75 * u), 0.7)
+    for (let i = 0; i < 14; i++) uhuu(c, d, t + sorte(0.05, dur * 0.75), sorte(0.08, 0.16))
+    for (let i = 0; i < 8; i++) assobio(c, d, t + sorte(0.1, dur * 0.8), sorte(0.04, 0.08))
+  },
+
+  tvApito: (c, d) => {
+    const t = c.currentTime
+    for (const [ini, dur] of [[0, 0.22], [0.36, 0.22], [0.72, 0.85]]) {
+      const t1 = t + ini
+      const g = c.createGain()
+      envelope(g.gain, t1, dur, [[0, 0], [0.04, 0.22], [0.85, 0.2], [1, 0]])
+      // o trinado da bolinha: o volume treme a ~30 Hz
+      const trem = c.createGain()
+      trem.gain.value = 0.6
+      const lfo = c.createOscillator()
+      lfo.frequency.value = sorte(26, 32)
+      const prof = c.createGain()
+      prof.gain.value = 0.4
+      lfo.connect(prof).connect(trem.gain)
+      trem.connect(g).connect(d)
+      for (const f of [2950, 3080]) {
+        const o = c.createOscillator()
+        o.frequency.setValueAtTime(f, t1)
+        o.frequency.linearRampToValueAtTime(f * 0.97, t1 + dur)
+        o.connect(trem)
+        o.start(t1)
+        o.stop(t1 + dur + 0.02)
+      }
+      lfo.start(t1)
+      lfo.stop(t1 + dur + 0.02)
+      // o sopro
+      const bp = c.createBiquadFilter()
+      bp.type = 'bandpass'
+      bp.frequency.value = 3000
+      bp.Q.value = 2
+      const gs = c.createGain()
+      envelope(gs.gain, t1, dur, [[0, 0], [0.05, 0.12], [1, 0]])
+      bp.connect(gs).connect(d)
+      tocarBuffer(c, bufferRuido(c, dur + 0.05), bp, t1)
+    }
+  },
+
+  tvFlash: (c, d, { n = 3 } = {}) => {
+    const t = c.currentTime
+    const ruido = bufferRuido(c, 0.06)
+    for (let i = 0; i < n; i++) {
+      const t1 = t + (i ? sorte(0, 0.45) : 0)
+      const p = c.createStereoPanner()
+      p.pan.value = sorte(-0.9, 0.9)
+      p.connect(d)
+      // clique-claque do obturador
+      for (const [dt, corte, vol] of [[0, 3500, 0.35], [sorte(0.03, 0.05), 2200, 0.25]]) {
+        const pa = c.createBiquadFilter()
+        pa.type = 'highpass'
+        pa.frequency.value = corte
+        const g = c.createGain()
+        g.gain.setValueAtTime(vol, t1 + dt)
+        g.gain.exponentialRampToValueAtTime(0.001, t1 + dt + 0.025)
+        pa.connect(g).connect(p)
+        const f = tocarBuffer(c, ruido, pa, t1 + dt)
+        f.stop(t1 + dt + 0.04)
+      }
+    }
+  },
+}
+
+Object.assign(
+  SINTESE,
+  Object.fromEntries(
+    Object.entries(SONS_TRANSMISSAO).map(([nome, som]) => [
+      nome,
+      (_, opcoes) => {
+        const c = obterContexto()
+        if (c) som(c, barramentoTransmissao(c), opcoes)
+      },
+    ]),
+  ),
+)

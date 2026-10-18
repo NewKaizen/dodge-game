@@ -34,8 +34,8 @@ import { particulas } from '../../effects/particulas.js'
 //   - a lâmina cobre só uma fatia estreita do círculo a cada instante (3
 //     lâminas finas): entre duas lâminas sempre passa um coração, e o
 //     alcance máximo (raio x (1 + bonus x voltas)) é menor que a caixa: longe
-//     do pivô sempre sobra espaço; o pivô anda bem mais devagar que o coração
-//     e o caminho dele é mostrado antes;
+//     do pivô sempre sobra espaço; o pivô anda mais devagar que o coração
+//     (no máximo a.tetoPerseguidor()) e o caminho dele é mostrado antes;
 //   - cada página da rajada nasce no centro já com o aviso mínimo piscando
 //     antes de voar; são poucas e se espalham em leque, nunca uma parede;
 //   - a lâmina final é rápida demais para fugir depois que começa a girar:
@@ -137,7 +137,14 @@ export default definirAtaque({
 
       const s = dt / 1000
       anguloGiro += omega * s
-      faseOito += ((Math.PI * 2) / oito.periodo) * dt * velOito
+      // o pivô passeia no 8, mas nunca mais rápido que o teto de fuga (a.tetoPerseguidor):
+      // longe dele sempre dá para ficar correndo, mesmo com o ego inflado ou numa caixa grande
+      let dFase = ((Math.PI * 2) / oito.periodo) * dt * velOito
+      const prox = pontoDoOito(faseOito + dFase)
+      const anda = Math.hypot(prox.x - pivo.x, prox.y - pivo.y)
+      const teto = (a.tetoPerseguidor() * dt) / 1000
+      if (anda > teto) dFase *= teto / anda
+      faseOito += dFase
       Object.assign(pivo, pontoDoOito(faseOito))
       for (const lam of lams) posicionar(lam, pivo.x, pivo.y, lam.anguloBase + anguloGiro, raio)
       girarOrbita(orbita, pivo.x, pivo.y, anguloGiro * 0.55, raio * 1.15)

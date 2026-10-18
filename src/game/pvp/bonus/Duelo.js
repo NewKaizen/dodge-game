@@ -43,7 +43,7 @@ const DUELO = {
   borda: 4,
   invencivelMs: 700,
   fimMs: 900, // depois de um K.O. a luta ainda corre isso (dá para os dois caírem)
-  hitbox: 6, // raio do coração para os golpes do duelo
+  hitbox: 5, // raio do coração para os golpes do duelo (um pouco maior que CORACAO.hitbox: só o miolo leva dano)
   bufferMs: 160, // A apertado um pouco antes da recarga acabar ainda sai
   contagemMs: 520,
 }

@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { FONTE, LARGURA, TEMPOS } from '../../../constants.js'
+import { FONTE, LARGURA, TEMPOS, tetoDeFuga } from '../../../constants.js'
 import { tocar, cortarMusica } from '../../../audio.js'
 import { ignorarNasCaixas } from '../../../recorte.js'
 import { particulas } from '../../../effects/particulas.js'
@@ -115,7 +115,7 @@ export default function criar(arena, { rng }) {
     const dx = v.alvo.x - v.x
     const dy = v.alvo.y - v.y
     const d = Math.hypot(dx, dy)
-    const passo = (VELOCIDADE * delta) / 1000
+    const passo = (Math.min(VELOCIDADE, tetoDeFuga(v.pista.velocidadeCoracao)) * delta) / 1000 // nunca alcança quem corre
     if (d <= passo) {
       v.x = v.alvo.x
       v.y = v.alvo.y
