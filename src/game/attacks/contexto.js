@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { ATAQUE, CORES } from '../constants.js'
+import { ATAQUE, CORES, CORACAO, tetoDeFuga } from '../constants.js'
 import { LACUNA_MINIMA, avisar, validarParede, validarLacuna } from './validacao.js'
 import { registrarZona, envelhecerZonas, limparZonas } from './zonas.js'
 
@@ -39,10 +39,19 @@ import { registrarZona, envelhecerZonas, limparZonas } from './zonas.js'
 //   a.lacunaMinima            tamanho mínimo de uma rota de fuga (px)
 //   a.tempo                   ms desde o início do turno (relógio: inclui os respiros)
 //   a.respiro                 pausas da onda atual (ver attacks/definir.js); nelas os timers ficam parados
+//   a.velocidadeCoracao       px/s do coração desta caixa agora (o do painel, com a morte súbita e os eventos)
+//   a.tetoPerseguidor(fracao?)   px/s REAIS (já com o ritmo) que pode ter o que persegue o coração
+//                             ou varre a caixa inteira sem vão: `fracao` (padrão FUGA.perseguidor,
+//                             constants.js) da velocidade do coração. Para movimento feito à mão SEM
+//                             o fator do ritmo (ex.: um pivô que passeia a px/s fixos)
+//   a.limitarPerseguidor(v, fracao?)   v em px/s ANTES do ritmo (o vx de a.bala, ou o passo à mão que
+//                             depois é multiplicado por a.balas.fatorVelocidade), limitado para que,
+//                             com o ritmo, ande no máximo a.tetoPerseguidor(): só correndo dá para fugir
 //
 // Tudo que foi agendado para automaticamente quando o ataque acaba.
 export default class ContextoAtaque {
-  constructor({ cena, balas, caixa, coracoes, tema = {}, dano = 5, ritmo = {}, semente, nome = 'ataque' }) {
+  // velocidadeCoracao: px/s do coração (número ou função lida na hora; a Pista passa a dela)
+  constructor({ cena, balas, caixa, coracoes, tema = {}, dano = 5, ritmo = {}, semente, nome = 'ataque', velocidadeCoracao }) {
     this.cena = cena
     this.balas = balas
     this.caixaDeBatalha = caixa
@@ -59,6 +68,7 @@ export default class ContextoAtaque {
     this.tempo = 0
     this.fim = Infinity
     this.proximoAlvo = { i: 0 }
+    this.fonteVelocidadeCoracao = velocidadeCoracao
   }
 
   // ---------- balas e avisos ----------
@@ -243,6 +253,23 @@ export default class ContextoAtaque {
       }
     }
     return melhor
+  }
+
+  // ---------- fuga correndo (FUGA em constants.js) ----------
+
+  get velocidadeCoracao() {
+    const f = this.fonteVelocidadeCoracao
+    const v = typeof f === 'function' ? f() : f
+    return v ?? this.cena?.registry?.get?.('velocidade') ?? CORACAO.velocidadePadrao
+  }
+
+  tetoPerseguidor(fracao) {
+    return tetoDeFuga(this.velocidadeCoracao, fracao)
+  }
+
+  limitarPerseguidor(v, fracao) {
+    const teto = this.tetoPerseguidor(fracao) / (this.balas?.fatorVelocidade || 1)
+    return Math.sign(v) * Math.min(Math.abs(v), teto)
   }
 
   aleatorio(min, max) {

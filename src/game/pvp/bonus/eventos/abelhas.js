@@ -1,4 +1,4 @@
-import { FONTE } from '../../../constants.js'
+import { FONTE, tetoDeFuga } from '../../../constants.js'
 import { tocar } from '../../../audio.js'
 import { texturasJardim } from '../../../arte/jardim.js'
 
@@ -141,7 +141,8 @@ export default function criar(arena, { rng }) {
       if (vivo) voar(e, c.x, c.y, 30, delta)
       if (t - e.desde >= ALERTA_MS) mudar(e, vivo ? 'ataque' : 'confusa')
     } else if (e.estado === 'ataque') {
-      if (vivo) voar(e, c.x, c.y, ATAQUE.velocidade, delta)
+      // mais devagar que o coração de verdade (teto de fuga: painel lento, eventos)
+      if (vivo) voar(e, c.x, c.y, Math.min(ATAQUE.velocidade, tetoDeFuga(pista.velocidadeCoracao)), delta)
       e.andou += andouAgora
       if (t - ultimoBravo > 420) {
         ultimoBravo = t

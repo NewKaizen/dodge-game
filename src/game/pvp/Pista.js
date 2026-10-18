@@ -175,6 +175,7 @@ export default class Pista {
       ritmo: r,
       semente: semente ?? `${ATAQUE.semente}:${ataque.nome}`,
       nome: ataque.nome,
+      velocidadeCoracao: () => this.velocidadeCoracao, // limite dos perseguidores (FUGA em constants.js)
     })
 
     // se o ataque pede outra caixa, o aviso

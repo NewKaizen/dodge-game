@@ -22,7 +22,8 @@ import { particulas } from '../../effects/particulas.js'
 //
 // Justiça:
 //   - o puxão/empurrão nunca passa de `forcaMax` px/s (o coração anda
-//     CORACAO.velocidadePadrao = 180): sempre dá para fugir; só começa depois
+//     CORACAO.velocidadePadrao = 180) nem de PUXAO_MAX da velocidade de verdade
+//     do coração (painel mais lento, eventos): sempre dá para fugir; só começa depois
 //     do primeiro pulso piscar, e para nas pausas de respiro; o puxão para
 //     `FOLGA_PUXAO` px antes da borda do vazio (sozinho, nunca encosta o
 //     coração nele: quem machuca é o vazio crescer, e isso pisca antes);
@@ -39,6 +40,7 @@ import { particulas } from '../../effects/particulas.js'
 const ARCO = [0xff4a5a, 0xffa23a, 0xffe14a, 0x5ae06a, 0x4ab8ff, 0xa66bff]
 const TAU = Math.PI * 2
 const FOLGA_PUXAO = 6 // px entre o coração e a borda do vazio onde o puxão para
+const PUXAO_MAX = 0.45 // fração da velocidade do coração (a de agora) que o puxão/empurrão pode ter
 
 const PADRAO = {
   vazio: { fracoes: [0.32, 0.55, 0.78, 1], tempos: [0, 1150, 2300, 3400], aviso: 650, margem: 6, forcas: [28, 46, 62, 74] },
@@ -62,7 +64,11 @@ export default definirAtaque({
 
     // gravidade: > 0 puxa para o centro, < 0 empurra para fora (px/s)
     const g = { forca: 0, raioVazio: 0, ativo: true }
-    a.aoAtualizar((dt) => puxar(a, g, cx, cy, Phaser.Math.Clamp(g.forca, -forcaMax, forcaMax), dt))
+    // e nunca passa de PUXAO_MAX da velocidade do coração de verdade (painel lento, eventos)
+    a.aoAtualizar((dt) => {
+      const teto = Math.min(forcaMax, a.tetoPerseguidor(PUXAO_MAX))
+      puxar(a, g, cx, cy, Phaser.Math.Clamp(g.forca, -teto, teto), dt)
+    })
 
     // ---------- I. o vazio cresce e puxa ----------
     const folga = Math.min(l.width, l.height) / 2

@@ -148,3 +148,15 @@ export function fatorAceleracao(rodada, cfg = ACELERACAO) {
 
 // Só uma fração do bônus (ex.: o coração ganha metade do que as balas ganham)
 export const parteDoFator = (fator, fracao) => Math.round((1 + (fator - 1) * fracao) * 1000) / 1000
+
+// Fuga correndo: o que PERSEGUE o coração ou varre a caixa inteira sem vão
+// (caminhonete, redemoinho, enxame, cursor, labareda...) nunca anda mais
+// rápido que `perseguidor` da velocidade do coração (a de agora: o painel, a
+// morte súbita e os eventos), já com o ritmo da carta, do nível e da
+// aceleração. Assim, só correndo para o lado certo sempre dá para não
+// apanhar. Projéteis comuns, que se desviam com um passo para o lado, não
+// entram nessa conta. Nos ataques: a.tetoPerseguidor() / a.limitarPerseguidor(v).
+export const FUGA = { perseguidor: 0.85 }
+
+// px/s que um perseguidor pode ter com o coração andando `velocidadeCoracao` px/s
+export const tetoDeFuga = (velocidadeCoracao, fracao = FUGA.perseguidor) => fracao * (velocidadeCoracao ?? CORACAO.velocidadePadrao)

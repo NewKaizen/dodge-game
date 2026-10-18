@@ -1074,9 +1074,9 @@ function labareda(a, cfg, geo) {
     const t = b.idade
     const g = a.caixa
     if (t < cfg.persegue) {
-      // corre atrás do coração (mais devagar que ele)
+      // corre atrás do coração (mais devagar que ele, com qualquer ritmo: teto de fuga)
       const c = maisPerto(a, b.x, g.bottom)
-      const passo = cfg.seguir * fator(a) * (dt / 1000)
+      const passo = a.limitarPerseguidor(cfg.seguir) * fator(a) * (dt / 1000)
       b.x = limitar(b.x + limitar(c.x - b.x, -passo, passo), g.left + meia, g.right - meia)
     }
     const travado = t >= cfg.persegue

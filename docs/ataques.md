@@ -25,6 +25,7 @@ A validação confere estas regras no console, em modo dev (`[telegrafo]`, `[rot
 - **Nada decorável:** nada de alternância fixa (`i % 2`), posição fixa ou ritmo `k % n`. Sorteie lado, posição, ângulo e tempos (com limites que mantenham a rota de fuga). Os padrões com `mirar` usam um acumulador com fase sorteada: a fração média de balas miradas é a mesma, mas não dá para prever quais.
 - **Alvo:** use `a.alvo()`.
 - **Nada de ficar parado:** todo ataque deve ameaçar um coração parado, mirando parte das balas com `a.alvo()`. Vários padrões têm a opção `mirar`.
+- **Dá para fugir correndo:** o que persegue o coração ou varre a caixa sem vão (caminhonete, giro da espiral, faixa do carrossel, olho do Kris, labareda do Show, bola da Avalanche enquanto faz curva, pivô do SUPER do Berdly, enxame/cursor/holofote dos eventos) nunca anda mais rápido que `FUGA.perseguidor` (85%) da velocidade do coração de agora, já com o ritmo da carta, do nível e da morte súbita. Use `a.limitarPerseguidor(v)` (v antes do ritmo: o `vx` da bala ou o passo à mão que depois leva `a.balas.fatorVelocidade`) ou `a.tetoPerseguidor()` (px/s reais, para movimento à mão sem o fator); fora dos ataques, `tetoDeFuga(pista.velocidadeCoracao)` de `constants.js`. Projéteis comuns, que se desviam com um passo para o lado, não entram nessa conta.
 
 ## Ondas, respiros e caixa dinâmica
 

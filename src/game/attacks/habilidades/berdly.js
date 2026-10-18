@@ -567,7 +567,8 @@ export default {
               relogio += dt
               b.sprite.setFrame(Math.floor(relogio / 90) % 2)
               if (Math.floor(relogio / 300) !== Math.floor((relogio - dt) / 300)) alvoY = a.alvo().y
-              const passo = cfg.deriva * fator(a) * (dt / 1000)
+              // segue a altura do coração mais devagar que ele (teto de fuga): sair de baixo dele sempre dá
+              const passo = a.limitarPerseguidor(cfg.deriva) * fator(a) * (dt / 1000)
               b.y = limitar(b.y + limitar(alvoY - b.y, -passo, passo), lim.top + meiaAltura, lim.bottom - meiaAltura)
               acumulado += dt
               if (acumulado >= cfg.detritos) {

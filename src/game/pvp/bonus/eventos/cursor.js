@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { FONTE } from '../../../constants.js'
+import { FONTE, tetoDeFuga } from '../../../constants.js'
 import { tocar } from '../../../audio.js'
 import { shake } from '../../../effects/shake.js'
 
@@ -150,8 +150,9 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
     const vivo = pista.rodando && c?.ativo && !arena.ko?.[arena.donoDaPista?.(cu.j) ?? cu.j]
     if (cu.fase === 'segue' || cu.fase === 'descanso') {
       if (vivo) {
-        // persegue a ponta até o coração, mais devagar que ele
-        const vel = (VELOCIDADE.inicio + (VELOCIDADE.fim - VELOCIDADE.inicio) * rampa()) * aceleracao
+        // persegue a ponta até o coração, mais devagar que ele (teto de fuga: com a
+        // aceleração da morte súbita ou um coração lento ele nunca o alcança correndo)
+        const vel = Math.min((VELOCIDADE.inicio + (VELOCIDADE.fim - VELOCIDADE.inicio) * rampa()) * aceleracao, tetoDeFuga(pista.velocidadeCoracao))
         const dx = c.x - cu.x
         const dy = c.y - cu.y
         const d = Math.hypot(dx, dy)

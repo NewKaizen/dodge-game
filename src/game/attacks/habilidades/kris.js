@@ -373,7 +373,8 @@ export default {
             const c = coracaoPerto(a, b.x, b.y)
             if (c) {
               const d = Math.hypot(c.x - b.x, c.y - b.y)
-              const passo = Math.min(d, cfg.velocidade * a.balas.fatorVelocidade * (dt / 1000))
+              // sempre mais devagar que o coração, com qualquer ritmo (teto de fuga)
+              const passo = Math.min(d, a.limitarPerseguidor(cfg.velocidade) * a.balas.fatorVelocidade * (dt / 1000))
               if (d > 0.5) {
                 b.x += ((c.x - b.x) / d) * passo
                 b.y += ((c.y - b.y) / d) * passo
@@ -440,7 +441,8 @@ export default {
   // segundo mira onde o coração está agora (ficar parado é pisado). Correr em
   // linha reta também é pisado: mude de direção perto da pisada.
   //
-  //   distancia     px entre duas pegadas; cadencia: ms entre elas (± 12%)
+  //   distancia     px entre duas pegadas; cadencia: ms entre elas (± 12%); o passo
+  //                 encurta se distancia/cadencia passaria do teto de fuga (a.tetoPerseguidor)
   //   maxPassos     pegadas no máximo por caminhada (a última é a pisada forte)
   //   antecipa      fração do tempo até a pisada usada para prever o coração
   //   dupla         chance de vir um segundo caminhante junto
@@ -516,9 +518,11 @@ export default {
             giro = Math.atan2(Math.sin(giro), Math.cos(giro))
             ang += limitar(giro, -0.9, 0.9)
           }
-          const andar = chegou ? cfg.distancia : Math.min(cfg.distancia, d)
+          // o caminhante nunca anda mais rápido que o coração (teto de fuga): passo <= teto x cadência
+          const espera = cfg.cadencia * a.aleatorio(0.88, 1.12)
+          const andar = Math.min(chegou ? cfg.distancia : Math.min(cfg.distancia, d), (a.tetoPerseguidor() * espera) / 1000)
           pos = { x: limitar(pos.x + Math.cos(ang) * andar, l.left + m, l.right - m), y: limitar(pos.y + Math.sin(ang) * andar, l.top + m, l.bottom - m) }
-          a.depois(cfg.cadencia * a.aleatorio(0.88, 1.12), passo)
+          a.depois(espera, passo)
         }
         passo()
       }
