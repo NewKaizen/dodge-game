@@ -1,6 +1,6 @@
 // Mede a dificuldade das cartas do PvP: roda cada ataque numa Pista do
 // tamanho da do PvP, com o EsquivaBot (pvp/botEsquiva.js) desviando, e conta
-// quantos acertos e quanto dano ele leva. Dois níveis: 'dificil' (o "jogador
+// quantos acertos e quanto dano ele leva. Dois níveis: 'imbativel' (o "jogador
 // perfeito") e 'normal' (o "jogador médio"), cada um com N sementes.
 //
 // Precisa do jogo em modo dev (npm run dev) e do Playwright (Chromium):
@@ -32,7 +32,7 @@ await page.waitForFunction(() => window.debugJogo && window.debugJogo.cena().len
 await page.waitForTimeout(1500)
 
 const resultado = await page.evaluate(
-  async ({ modo, nSementes, filtro }) => {
+  async ({ modo, nSementes, filtro, niveisBot }) => {
     const { default: Pista } = await import('/src/game/pvp/Pista.js')
     const { EsquivaBot } = await import('/src/game/pvp/botEsquiva.js')
     const { CARTAS, TEMAS, resumoDoAtaque, ehSuper } = await import('/src/game/pvp/cartas.js')
@@ -175,7 +175,10 @@ const resultado = await page.evaluate(
         cartas.push(c)
       }
     }
-    const niveis = ['dificil', 'normal']
+    // no JSON o "jogador perfeito" continua na chave 'dificil' (resumo.mjs, simularCoop.mjs);
+    // a CPU do DIFÍCIL do jogo (NIVEIS_BOT=dificil) sai em 'cpuDificil'
+    const chaveDoNivel = (n) => (n === 'imbativel' ? 'dificil' : n === 'dificil' ? 'cpuDificil' : n)
+    const niveis = niveisBot
     const saida = []
     for (const carta of cartas) {
       const linha = { id: carta.id, nome: carta.nome, personagem: carta.personagem, naipe: carta.naipe, valor: carta.valor }
@@ -184,7 +187,7 @@ const resultado = await page.evaluate(
         porTextura = {}
         const runs = []
         for (let s = 1; s <= nSementes; s++) runs.push(await rodarUma(carta, nivel, s))
-        linha[nivel] = {
+        linha[chaveDoNivel(nivel)] = {
           acertos: runs.reduce((a, r) => a + r.acertos, 0) / runs.length,
           dano: runs.reduce((a, r) => a + r.dano, 0) / runs.length,
           max: Math.max(...runs.map((r) => r.dano)),
@@ -200,7 +203,7 @@ const resultado = await page.evaluate(
     }
     return saida
   },
-  { modo, nSementes: Number(nSementes), filtro },
+  { modo, nSementes: Number(nSementes), filtro, niveisBot: (process.env.NIVEIS_BOT || 'imbativel,normal').split(',') },
 )
 fs.writeFileSync(saida, JSON.stringify({ resultado, avisos: avisos.filter((a) => !/\[(telegrafo|rota de fuga)\]/.test(a)).slice(0, 30) }, null, 1))
 console.log('ok', resultado.length)

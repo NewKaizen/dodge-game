@@ -7,7 +7,8 @@
 // Gente apertando um botão o mais rápido que dá faz uns 5 a 9 apertos por
 // segundo, sem ritmo certinho: demora para começar, cada intervalo varia, o
 // braço cansa até o fim e de vez em quando perde o ritmo (tropeço). A CPU
-// imita isso; nem o difícil é imbatível (um jogador rápido passa dele).
+// imita isso; nem o difícil é imbatível (um jogador rápido passa dele). O IMBATÍVEL
+// aperta ~9 vezes por segundo quase sem cansar.
 //
 //   ritmo      apertos por segundo no começo
 //   variacao   ± fração sorteada em cada intervalo
@@ -18,6 +19,7 @@ export const NIVEIS_COPIA = {
   facil: { ritmo: 4.8, variacao: 0.3, cansaco: 0.22, reacaoMs: [260, 480], tropeco: 0.06, tropecoMs: [200, 420] },
   normal: { ritmo: 6.3, variacao: 0.25, cansaco: 0.16, reacaoMs: [190, 340], tropeco: 0.035, tropecoMs: [160, 320] },
   dificil: { ritmo: 7.7, variacao: 0.2, cansaco: 0.12, reacaoMs: [150, 270], tropeco: 0.02, tropecoMs: [130, 260] },
+  imbativel: { ritmo: 9.2, variacao: 0.12, cansaco: 0.06, reacaoMs: [110, 200], tropeco: 0.008, tropecoMs: [100, 200] },
 }
 
 export class BotCopia {
