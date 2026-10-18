@@ -461,3 +461,9 @@ Medido com 12 sementes (acertos por carta; bot médio, antes → depois):
 | Raio de Gelo | 1,17 | 1,00 |
 
 Média da Noelle: 0,85 → 1,08. Nenhum aviso do validador. O bot não enxerga a ponta da estalactite saindo da parede (é só decoração), então nessa carta ele leva um pouco mais do que quem joga.
+
+**2026-10-18: SNOWGRAVE mais fraco** (`attacks/super/noelle.js`). Menos projéteis em todos os atos (neve mais
+espaçada, 5 estilhaços por floco gigante, rajadas de 3–5, anéis de 5 flocos, túmulo de 7–8 lascas, explosão
+de 6) e cada golpe fere 75% do dano do SUPER (`fatorDano`). Medido (12 sementes, dano real por SUPER):
+imbatível 6,5 → 2,5, CPU difícil 20,6 → 11,7, bot normal 41,2 → 27,5 (era o SUPER mais forte; agora fica
+junto com o Último Bis, o mais fraco).

@@ -55,13 +55,14 @@ import { particulas } from '../../effects/particulas.js'
 //                                         (giro = "momento angular": giro / r² rad/s)
 //   pilares, avisoPilar, larguraPilar, manterPilar   os pilares (ms aproximados de cada um)
 //   snowgrave, convergir, lascasTumulo, explosao, velocidadeExplosao   o ato IV
+//   fatorDano                             fração do dano do SUPER em cada golpe
 const TAU = Math.PI * 2
 
 export default definirAtaque({
   nome: 'superNoelle',
   padrao: {
     duracao: 9000,
-    neve: [280, 140],
+    neve: [380, 220],
     velocidadeNeve: [70, 105],
     mirarNeve: 0.45,
     flocoes: [
@@ -72,32 +73,36 @@ export default definirAtaque({
     velocidadeFlocao: 64,
     estouroFlocao: 66,
     avisoEstouro: 300,
-    estilhacosFlocao: 6,
+    estilhacosFlocao: 5,
     velocidadeEstilhaco: 150,
     nevasca: 2600,
-    rajada: [530, 400],
-    estilhacosRajada: [4, 6],
+    rajada: [650, 520],
+    estilhacosRajada: [3, 5],
     velocidadeRajada: [165, 215],
     folgaRajada: 58,
     redemoinho: 4500,
-    anel: [800, 600],
-    flocosAnel: 6,
+    anel: [950, 760],
+    flocosAnel: 5,
     queda: 62,
     giro: 5400,
     raioLivre: 56,
     perseguir: 24,
-    mirados: 560,
+    mirados: 760,
     pilares: [5500, 6150, 6700],
     avisoPilar: 460,
     larguraPilar: 30,
     manterPilar: 360,
     snowgrave: 7150,
     convergir: 1150,
-    lascasTumulo: [8, 9],
-    explosao: 8,
+    lascasTumulo: [7, 8],
+    explosao: 6,
     velocidadeExplosao: 175,
+    fatorDano: 0.75,
   },
   iniciar(a, cfg) {
+    // cada golpe do SNOWGRAVE fere `fatorDano` do dano do SUPER (contexto filho: o resto é o mesmo `a`)
+    a = Object.create(a)
+    a.dano = Math.max(1, Math.round(a.dano * cfg.fatorDano))
     garantirTexturas(a.cena)
     const estado = {
       ativo: 0, // tempo ativo (para nas pausas de respiro, como os timers)
