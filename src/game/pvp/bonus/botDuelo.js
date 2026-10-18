@@ -38,6 +38,7 @@ export const NIVEIS_DUELO = {
   facil: { decidirMs: 230, horizonteMs: 260, margem: 3, medo: 0.55, erro: 0.18, gatilho: 0.4, lapso: 0.14, lapsoMs: 650 },
   normal: { decidirMs: 140, horizonteMs: 380, margem: 6, medo: 0.85, erro: 0.07, gatilho: 0.7, lapso: 0.07, lapsoMs: 480 },
   dificil: { decidirMs: 75, horizonteMs: 520, margem: 9, medo: 1, erro: 0.02, gatilho: 0.95, lapso: 0.015, lapsoMs: 300 },
+  imbativel: { decidirMs: 60, horizonteMs: 580, margem: 10, medo: 1, erro: 0.01, gatilho: 1, lapso: 0.005, lapsoMs: 250 },
 }
 
 const PASSO_MS = 40

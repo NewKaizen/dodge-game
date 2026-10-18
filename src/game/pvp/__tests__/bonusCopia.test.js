@@ -86,7 +86,9 @@ test('ctrl+c ctrl+v: a CPU aperta com ritmo de gente (5 a 8 por segundo) e repet
   const [facil, normal, dificil] = ['facil', 'normal', 'dificil'].map(media)
   assert.ok(facil < normal && normal < dificil, `${facil} ${normal} ${dificil}`)
   assert.ok(facil > 3 && dificil < 8, `ritmo de gente: ${facil.toFixed(2)} .. ${dificil.toFixed(2)} por segundo`)
-  assert.deepEqual(Object.keys(NIVEIS_COPIA), ['facil', 'normal', 'dificil'])
+  assert.deepEqual(Object.keys(NIVEIS_COPIA), ['facil', 'normal', 'dificil', 'imbativel'])
+  // o IMBATÍVEL passa do difícil (é a dificuldade extra, não um "ritmo de gente")
+  assert.ok(media('imbativel') > dificil)
 })
 
 test('ctrl+c ctrl+v: nem o difícil é imbatível (9 apertos/s ganham dele)', () => {

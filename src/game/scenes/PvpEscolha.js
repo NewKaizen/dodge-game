@@ -15,7 +15,7 @@ const GRADE = { topo: 62, base: 190, esquerda: 20, direita: 620, espaco: 8, larg
 const PAINEL = { y: 198, altura: 250, espaco: 8 }
 const CHAVE_SALVA = 'dodge-pvp' // última escolha (também fica no registry 'pvp')
 const CHAVE_NIVEL = 'dodge-pvp-cpu' // nível da CPU (também fica no registry 'pvpNivelBot')
-const NOMES_NIVEL = { facil: 'FÁCIL', normal: 'NORMAL', dificil: 'DIFÍCIL' }
+const NOMES_NIVEL = { facil: 'FÁCIL', normal: 'NORMAL', dificil: 'DIFÍCIL', imbativel: 'IMBATÍVEL' }
 
 // Transição "P1 VS P2" (ms desde a confirmação do segundo jogador)
 const VS = { entrada: 120, batida: 560, espelho: 760, saida: 1500, fim: 1760 }

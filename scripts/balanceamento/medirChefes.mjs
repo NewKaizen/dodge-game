@@ -1,7 +1,7 @@
 // Mede a dificuldade das cartas dos CHEFES do CO-OP em cada nível (FÁCIL,
 // MÉDIO, DIFÍCIL): cada carta roda numa Pista do tamanho da da arena, com o
 // ritmo, o teto de velocidade e o dano de verdade daquele nível, e o
-// EsquivaBot desvia em dois níveis: 'perfeito' (o "jogador perfeito") e
+// EsquivaBot desvia em dois níveis: 'imbativel' (o "jogador perfeito") e
 // 'normal' (o "jogador médio"). Guarda os acertos de cada rodada (amostras)
 // para a simulação de partidas (simularCoop.mjs).
 //
@@ -185,7 +185,7 @@ const resultado = await page.evaluate(
           linha[nivelJogo] = {}
           // no JSON o "jogador perfeito" continua na chave 'dificil' (resumo.mjs, simularCoop.mjs);
           // a CPU do DIFÍCIL do jogo (NIVEIS_BOT=dificil) sai em 'cpuDificil'
-          const chaveDoNivel = (n) => (n === 'perfeito' ? 'dificil' : n === 'dificil' ? 'cpuDificil' : n)
+          const chaveDoNivel = (n) => (n === 'imbativel' ? 'dificil' : n === 'dificil' ? 'cpuDificil' : n)
           for (const nivel of niveisBot) {
             const runs = []
             for (let s = 1; s <= nSementes; s++) runs.push(await rodarUma(carta, nivel, s, nivelJogo))
@@ -202,7 +202,7 @@ const resultado = await page.evaluate(
     }
     return saida
   },
-  { nSementes: Number(nSementes), filtroChefes, filtroNiveis, niveisBot: (process.env.NIVEIS_BOT || 'perfeito,normal').split(',') },
+  { nSementes: Number(nSementes), filtroChefes, filtroNiveis, niveisBot: (process.env.NIVEIS_BOT || 'imbativel,normal').split(',') },
 )
 fs.writeFileSync(saida, JSON.stringify({ resultado, avisos: avisos.filter((a) => !/\[(telegrafo|rota de fuga)\]/.test(a)).slice(0, 30) }, null, 1))
 console.log('ok', resultado.length)

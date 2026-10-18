@@ -1,6 +1,6 @@
 // Mede a dificuldade das cartas do PvP: roda cada ataque numa Pista do
 // tamanho da do PvP, com o EsquivaBot (pvp/botEsquiva.js) desviando, e conta
-// quantos acertos e quanto dano ele leva. Dois níveis: 'perfeito' (o "jogador
+// quantos acertos e quanto dano ele leva. Dois níveis: 'imbativel' (o "jogador
 // perfeito") e 'normal' (o "jogador médio"), cada um com N sementes.
 //
 // Precisa do jogo em modo dev (npm run dev) e do Playwright (Chromium):
@@ -177,7 +177,7 @@ const resultado = await page.evaluate(
     }
     // no JSON o "jogador perfeito" continua na chave 'dificil' (resumo.mjs, simularCoop.mjs);
     // a CPU do DIFÍCIL do jogo (NIVEIS_BOT=dificil) sai em 'cpuDificil'
-    const chaveDoNivel = (n) => (n === 'perfeito' ? 'dificil' : n === 'dificil' ? 'cpuDificil' : n)
+    const chaveDoNivel = (n) => (n === 'imbativel' ? 'dificil' : n === 'dificil' ? 'cpuDificil' : n)
     const niveis = niveisBot
     const saida = []
     for (const carta of cartas) {
@@ -203,7 +203,7 @@ const resultado = await page.evaluate(
     }
     return saida
   },
-  { modo, nSementes: Number(nSementes), filtro, niveisBot: (process.env.NIVEIS_BOT || 'perfeito,normal').split(',') },
+  { modo, nSementes: Number(nSementes), filtro, niveisBot: (process.env.NIVEIS_BOT || 'imbativel,normal').split(',') },
 )
 fs.writeFileSync(saida, JSON.stringify({ resultado, avisos: avisos.filter((a) => !/\[(telegrafo|rota de fuga)\]/.test(a)).slice(0, 30) }, null, 1))
 console.log('ok', resultado.length)

@@ -47,8 +47,8 @@ const NIVEIS_ESQUIVA = {
   normal: { decidirMs: 130, horizonteMs: 330, margem: 5, erro: 0.1, confusao: 0.25, adaptaMs: 2500, lapso: 0.05, lapsoMs: 500, avisos: { reacaoMs: 200, visaoMs: 800, peso: 0.8 } },
   // CPU do DIFÍCIL: difícil de vencer, mas leva dano (lapsos e erros de verdade, reage um pouco atrasada)
   dificil: { decidirMs: 100, horizonteMs: 420, margem: 6, erro: 0.06, confusao: 0.15, adaptaMs: 2000, lapso: 0.03, lapsoMs: 420, avisos: { reacaoMs: 150, visaoMs: 1000, peso: 0.9 } },
-  // o "jogador perfeito" das medições (scripts/balanceamento): não aparece no jogo
-  perfeito: { decidirMs: 70, horizonteMs: 520, margem: 9, erro: 0.02, confusao: 0.08, adaptaMs: 1500, lapso: 0.008, lapsoMs: 300, avisos: { reacaoMs: 90, visaoMs: 1300, peso: 1 } },
+  // IMBATÍVEL: o "jogador perfeito" (também é o das medições em scripts/balanceamento)
+  imbativel: { decidirMs: 70, horizonteMs: 520, margem: 9, erro: 0.02, confusao: 0.08, adaptaMs: 1500, lapso: 0.008, lapsoMs: 300, avisos: { reacaoMs: 90, visaoMs: 1300, peso: 1 } },
 }
 const CONFUSAO_RESIDUAL = 0.35
 

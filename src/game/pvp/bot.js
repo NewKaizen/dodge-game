@@ -28,6 +28,7 @@ export const NIVEIS_BOT = {
   facil: { ruido: 0.6, paciencia: 0.2 },
   normal: { ruido: 0.25, paciencia: 0.6 },
   dificil: { ruido: 0.08, paciencia: 1 },
+  imbativel: { ruido: 0.03, paciencia: 1 },
 }
 export const NIVEL_BOT_PADRAO = 'normal'
 
