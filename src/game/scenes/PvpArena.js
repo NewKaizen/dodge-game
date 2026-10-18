@@ -69,7 +69,7 @@ import FimDePartida from '../pvp/fimDePartida/index.js'
 //   'duelo'      só no bonus round de duelo, no lugar de 'arremesso' e 'esquiva'
 //   'fim'        fimDaRodada: vencedor? -> 'resultado' (PvpResultado); senão volta ao 'inicio'
 //                O K.O. que acaba a partida vira câmera lenta (nocaute) e o
-//                começo de 'resultado' passa o replay em fita VHS: pvp/fimDePartida/
+//                começo de 'resultado' passa o replay (transmissão de TV): pvp/fimDePartida/
 //
 // Morte súbita (ACELERACAO em constants.js): a cada 5 rodadas (começo da 5ª,
 // 10ª...) tudo acelera: balas (velocidade, densidade e teto), o coração (metade
@@ -215,7 +215,7 @@ export default class PvpArena extends Phaser.Scene {
     )
     this.botoesPassar = [0, 1].map((j) => this.criarBotaoPassar(j))
     this.criarTextos()
-    // K.O. final: câmera lenta + replay em fita (pvp/fimDePartida/)
+    // K.O. final: câmera lenta + replay na TV (pvp/fimDePartida/)
     this.fimDePartida = new FimDePartida(this, { campos: CAMPOS })
 
     this.controles.onBotao((j, botao) => {
@@ -1555,7 +1555,7 @@ export default class PvpArena extends Phaser.Scene {
 
   async resultado(vencedor) {
     this.fase = 'resultado'
-    // replay do golpe final em fita VHS (pvp/fimDePartida/)
+    // replay do golpe final, transmissão de TV (pvp/fimDePartida/)
     await this.fimDePartida?.replay()
     if (this.saindo) return
     const v = VENCEDOR[vencedor]

@@ -1,4 +1,3 @@
-import Phaser from 'phaser'
 import { tocar } from '../../audio.js'
 import { shake } from '../../effects/shake.js'
 
@@ -6,12 +5,15 @@ import { shake } from '../../effects/shake.js'
 // no Undertale: pisca branco, trinca em duas metades (corte em zigue-zague),
 // as metades se afastam um pouco e estilhaçam em cacos que caem.
 //
-//   const quebra = quebrarCoracao(cena, { x, y, cor, escala, profundidade })
+//   const quebra = quebrarCoracao(cena, { x, y, cor, escala, profundidade, vagar, tremer })
 //   quebra.destruir()
 //
 // Tudo no relógio da cena (tweens/time/partículas): com a câmera lenta
 // ligada (FimDePartida.fator) a quebra acontece devagar. Desenhado pela
-// câmera principal (os cacos podem voar para fora da caixa). Tempos em ms de jogo:
+// câmera principal (os cacos podem voar para fora da caixa). O replay
+// (transmissao.js) usa a mesma quebra por cima da foto do golpe, esticada no
+// tempo (vagar: 3 = três vezes mais devagar, cacos caindo em câmera lenta) e
+// tremendo só a câmera dele (tremer). Tempos em ms de jogo (vagar = 1):
 export const QUEBRA = { trincaMs: 30, estilhacaMs: 250, afastar: 2.4 }
 
 // Texturas (uma vez por jogo): as duas metades do 'coracao' e o caco
@@ -51,22 +53,23 @@ export function prepararTexturasCoracao(cena) {
   tex.addCanvas('fim-caco', c)
 }
 
-export function quebrarCoracao(cena, { x, y, cor, escala = 1.4, profundidade = 31 }) {
+export function quebrarCoracao(cena, { x, y, cor, escala = 1.4, profundidade = 31, vagar = 1, tremer = () => shake(cena, 160, 0.006) }) {
   prepararTexturasCoracao(cena)
   const objetos = []
   const novo = (o) => (objetos.push(o), o)
   const inteiro = novo(cena.add.image(x, y, 'coracao').setTint(cor).setScale(escala).setDepth(profundidade))
-  // o 'coracao' é branco: sem tint, por cima e somando, é o clarão do golpe
-  const branco = novo(cena.add.image(x, y, 'coracao').setScale(escala * 1.15).setDepth(profundidade + 1).setBlendMode(Phaser.BlendModes.ADD))
-  cena.tweens.add({ targets: branco, alpha: 0, scale: escala * 1.6, duration: 140 })
+  // o 'coracao' é branco: sem tint, por cima, é o clarão do golpe (mistura
+  // normal: o ADD saía escuro numa câmera com fundo próprio, a do replay)
+  const branco = novo(cena.add.image(x, y, 'coracao').setScale(escala * 1.15).setDepth(profundidade + 1))
+  cena.tweens.add({ targets: branco, alpha: 0, scale: escala * 1.6, duration: 140 * vagar })
   // tremidinha antes de trincar
-  cena.tweens.add({ targets: inteiro, x: x + 1.2, duration: 10, yoyo: true, repeat: 1 })
+  cena.tweens.add({ targets: inteiro, x: x + 1.2, duration: 10 * vagar, yoyo: true, repeat: Math.round(vagar) })
 
-  cena.time.delayedCall(QUEBRA.trincaMs, () => {
+  cena.time.delayedCall(QUEBRA.trincaMs * vagar, () => {
     if (!inteiro.scene) return
     inteiro.setVisible(false)
     tocar(cena, 'trincar')
-    shake(cena, 160, 0.006)
+    tremer()
     for (const [lado, chave] of [
       [-1, 'fim-coracao-esq'],
       [1, 'fim-coracao-dir'],
@@ -77,13 +80,13 @@ export function quebrarCoracao(cena, { x, y, cor, escala = 1.4, profundidade = 3
         x: x + lado * QUEBRA.afastar * escala,
         y: y + 0.6 * escala,
         angle: lado * 9,
-        duration: QUEBRA.estilhacaMs - QUEBRA.trincaMs,
+        duration: (QUEBRA.estilhacaMs - QUEBRA.trincaMs) * vagar,
         ease: 'Quad.easeOut',
       })
     }
   })
 
-  cena.time.delayedCall(QUEBRA.estilhacaMs, () => {
+  cena.time.delayedCall(QUEBRA.estilhacaMs * vagar, () => {
     if (!inteiro.scene) return
     objetos.forEach((o) => o.setVisible(false))
     tocar(cena, 'estilhacar')
@@ -98,6 +101,7 @@ export function quebrarCoracao(cena, { x, y, cor, escala = 1.4, profundidade = 3
       emitting: false,
     })
     cacos.setDepth(profundidade)
+    cacos.timeScale = 1 / vagar
     cacos.explode(9)
     objetos.push(cacos)
   })
