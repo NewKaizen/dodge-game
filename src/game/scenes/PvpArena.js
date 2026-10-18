@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { LARGURA, ALTURA, FONTE, CORES, TEXTO, corTexto, ACELERACAO, fatorAceleracao, nivelAceleracao, parteDoFator } from '../constants.js'
 import Controles from '../controles.js'
-import { tocar, musica, pausarMusica, retomarMusica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal } from '../audio.js'
+import { tocar, musica, pausarMusica, retomarMusica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal, tomMusica, cortarMusica, reforcarGrave } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import Carta, { CORES_CARTA, TIPOS } from '../entities/Carta.js'
@@ -14,18 +14,20 @@ import { criarPartida, iniciarRodada, podeJogar, resolverRodada, aplicarDano, re
 import { escolherJogada, NIVEIS_BOT, NIVEL_BOT_PADRAO } from '../pvp/bot.js'
 import { EsquivaBot } from '../pvp/botEsquiva.js'
 import { criarRng, aleatorio, inteiro } from '../pvp/baralho.js'
-import { EVENTOS, EVENTO, ehRodadaBonus, adiarBonus, sortearEvento, transformarMalucas, desfazerMalucas, podeJogarDuelo, resolverDuelo } from '../pvp/bonus.js'
+import { EVENTOS, EVENTO, ehRodadaBonus, adiarBonus, sortearEvento, transformarMalucas, desfazerMalucas, podeJogarDuelo, resolverDuelo, resolverCopia } from '../pvp/bonus.js'
 import { EFEITOS } from '../pvp/bonus/eventos/index.js'
 import { ARENA, ARENA_PADRAO, eventosDaArena } from '../pvp/arenas.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { anunciarBonus } from '../pvp/bonus/anuncio.js'
 import Duelo from '../pvp/bonus/Duelo.js'
+import Copia from '../pvp/bonus/Copia.js'
 import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
 import { fogoArtificio, canhoesConfete, chuvaConfete } from '../effects/festa.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
+import FimDePartida from '../pvp/fimDePartida/index.js'
 
 // Partida PvP de cartas. Junta as peças de pvp/ (regras, baralho, cartas,
 // Pista) com o visual das cartas (Carta, Mao). Regras em docs/pvp-regras.md.
@@ -66,6 +68,8 @@ import { anunciarSuper } from '../pvp/super/anuncio.js'
 //                nem quebra. O combo atual fica no HUD ("PERFEITO x3")
 //   'duelo'      só no bonus round de duelo, no lugar de 'arremesso' e 'esquiva'
 //   'fim'        fimDaRodada: vencedor? -> 'resultado' (PvpResultado); senão volta ao 'inicio'
+//                O K.O. que acaba a partida vira câmera lenta (nocaute) e o
+//                começo de 'resultado' passa o replay em fita VHS: pvp/fimDePartida/
 //
 // Morte súbita (ACELERACAO em constants.js): a cada 5 rodadas (começo da 5ª,
 // 10ª...) tudo acelera: balas (velocidade, densidade e teto), o coração (metade
@@ -82,6 +86,8 @@ import { anunciarSuper } from '../pvp/super/anuncio.js'
 //   'malucas'  na revelação cada carta vira outra sorteada (transformarMalucas)
 //   'duelo'    a carta escolhida (sem gastar energia) vira a arma do duelo:
 //              arremesso + esquiva dão lugar a 'duelo' (pvp/bonus/Duelo.js)
+//   'copia'    CTRL+C CTRL+V: igual ao duelo nas cartas, mas a fase 'duelo' roda o
+//              minigame de apertar A (pvp/bonus/Copia.js): quem ganha copia energia
 //   CORAÇÃO TROCADO liga coracoesTrocados: cada coração desvia na pista do
 //   outro (donoDaPista/pistaDe), ou seja, do ataque que o próprio dono jogou
 // Testes: scene.start('PvpArena', { bonus: 'festa' }) força esse evento em
@@ -209,9 +215,12 @@ export default class PvpArena extends Phaser.Scene {
     )
     this.botoesPassar = [0, 1].map((j) => this.criarBotaoPassar(j))
     this.criarTextos()
+    // K.O. final: câmera lenta + replay em fita (pvp/fimDePartida/)
+    this.fimDePartida = new FimDePartida(this, { campos: CAMPOS })
 
     this.controles.onBotao((j, botao) => {
       if (this.pausado || this.saindo) return
+      if (this.fimDePartida?.botao(botao)) return // pula a câmera lenta / o replay
       if (this.fase === 'duelo') return botao === 'A' && this.duelo?.atacar(this.ladoDoControle(j))
       if (botao === 'A') this.apertarA(j)
       else this.apertarB(j)
@@ -225,7 +234,16 @@ export default class PvpArena extends Phaser.Scene {
     this.events.once('shutdown', () => {
       this.saindo = true
       this.events.off('postupdate', this.filtrarCaixas, this)
-      this.encerrarEfeitoBonus()
+      // na saída os objetos do efeito já podem ter sido destruídos: um terminar()
+      // que falhe no meio não pode deixar a música desafinada/cortada (COGUMELO etc.)
+      try {
+        this.encerrarEfeitoBonus()
+      } catch (erro) {
+        console.warn('[pvp] efeito bônus falhou ao terminar na saída', erro)
+      }
+      tomMusica(0)
+      cortarMusica(false)
+      reforcarGrave(0)
       this.duelo?.parar()
       this.duelo = null
       this.pistas.forEach((p) => p.destruir())
@@ -469,8 +487,8 @@ export default class PvpArena extends Phaser.Scene {
       // bonus round: o evento só é revelado agora, com as cartas já escolhidas
       await this.sortearBonus(jogadas)
       if (this.saindo) return
-      if (this.bonus?.cartas === 'duelo') {
-        const duelo = resolverDuelo(this.estado, jogadas[0], jogadas[1], this.rngBonus)
+      if (this.bonus?.cartas === 'duelo' || this.bonus?.cartas === 'copia') {
+        const duelo = this.bonus.cartas === 'copia' ? resolverCopia(this.estado, jogadas[0], jogadas[1]) : resolverDuelo(this.estado, jogadas[0], jogadas[1], this.rngBonus)
         this.contarJogadas(duelo)
         await this.revelacaoDuelo(duelo)
         if (this.saindo) return
@@ -631,14 +649,17 @@ export default class PvpArena extends Phaser.Scene {
     this.maos.forEach((m) => m.setTravada(false))
     tocar(this, 'cartaDeslizar')
     await Promise.all(cartas.map((c, j) => this.tween({ targets: c, x: MESA[j].x, y: MESA[j].y, rotation: 0, scaleX: ESCALA_MESA, scaleY: ESCALA_MESA, duration: 320, ease: 'Cubic.easeOut' })))
-    this.mostrarBanner('DUELO!', corTexto(this.bonus.cor))
+    this.mostrarBanner(r.copia ? this.bonus.nome : 'DUELO!', corTexto(this.bonus.cor))
     await this.esperar(240)
     await Promise.all(cartas.map((c) => (c instanceof Carta ? c.revelar() : this.tween({ targets: c, scale: ESCALA_MESA * 1.15, duration: 110, yoyo: true }))))
     const NOMES = { tiro: 'TIRO', espada: 'ESPADA', bumerangue: 'BUMERANGUE', explosao: 'EXPLOSÃO' }
-    const etiquetas = r.armas.flatMap((arma, j) => [
-      this.etiquetaEm(MESA[j].x, MESA[j].y + 86, NOMES[arma.arma] ?? arma.arma, '#ffe9a0', { atraso: 120, tamanho: 14, ms: 1700 }),
-      this.etiquetaEm(MESA[j].x, MESA[j].y + 104, r.jogadas[j].passou ? 'sorteada (passou)' : `${arma.dano} por acerto`, TEXTO.normal, { atraso: 280, tamanho: 11, ms: 1540 }),
-    ])
+    // CTRL+C CTRL+V: a carta só vai para o descarte (sem gastar energia)
+    const etiquetas = r.copia
+      ? [0, 1].filter((j) => !r.jogadas[j].passou).map((j) => this.etiquetaEm(MESA[j].x, MESA[j].y + 86, 'sem custo', TEXTO.normal, { atraso: 120, tamanho: 12, ms: 1700 }))
+      : r.armas.flatMap((arma, j) => [
+          this.etiquetaEm(MESA[j].x, MESA[j].y + 86, NOMES[arma.arma] ?? arma.arma, '#ffe9a0', { atraso: 120, tamanho: 14, ms: 1700 }),
+          this.etiquetaEm(MESA[j].x, MESA[j].y + 104, r.jogadas[j].passou ? 'sorteada (passou)' : `${arma.dano} por acerto`, TEXTO.normal, { atraso: 280, tamanho: 11, ms: 1540 }),
+        ])
     tocar(this, 'brilhoRank')
     await this.esperar(1700)
     etiquetas.forEach((t) => t.scene && t.destroy())
@@ -656,8 +677,15 @@ export default class PvpArena extends Phaser.Scene {
     if (this.saindo) return
     this.fase = 'duelo'
     this.ko = [false, false]
-    this.dica.setText(this.cpu === null ? 'mira automática   A: atacar' : 'mira automática   A: atacar   (a CPU também luta!)')
-    this.duelo = new Duelo(this, { armas: r.armas, cpu: this.cpu, nivelBot: this.nivelBot, semente: `${this.semente}:duelo:${this.estado.rodada}`, aceleracao: this.aceleracao })
+    const semente = `${this.semente}:duelo:${this.estado.rodada}`
+    if (r.copia) {
+      // CTRL+C CTRL+V: o minigame ocupa o lugar do duelo (mesma interface)
+      this.dica.setText('aperte A sem parar!')
+      this.duelo = new Copia(this, { cpu: this.cpu, nivelBot: this.nivelBot, semente })
+    } else {
+      this.dica.setText(this.cpu === null ? 'mira automática   A: atacar' : 'mira automática   A: atacar   (a CPU também luta!)')
+      this.duelo = new Duelo(this, { armas: r.armas, cpu: this.cpu, nivelBot: this.nivelBot, semente, aceleracao: this.aceleracao })
+    }
     await this.duelo.rodar()
     this.duelo = null
     this.dica.setText('')
@@ -1462,8 +1490,13 @@ export default class PvpArena extends Phaser.Scene {
   nocaute(j) {
     this.ko[j] = true
     // o duelo quebra o coração (com efeitos próprios) e termina a luta
-    if (this.fase === 'duelo') return this.duelo?.nocaute(j)
+    if (this.fase === 'duelo') {
+      this.fimDePartida?.nocauteDuelo(j)
+      return this.duelo?.nocaute(j)
+    }
     const k = this.pistaDe(j) // CORAÇÃO TROCADO: o coração dele está na outra pista
+    // fim da partida: a quebra em câmera lenta e o replay cuidam do resto
+    if (this.fimDePartida?.nocaute(j, k)) return
     const coracao = this.pistas[k].coracoes[0]
     tocar(this, 'quebrar')
     flashTela(this, CORES.almas[j], 0.3, 220)
@@ -1522,6 +1555,9 @@ export default class PvpArena extends Phaser.Scene {
 
   async resultado(vencedor) {
     this.fase = 'resultado'
+    // replay do golpe final em fita VHS (pvp/fimDePartida/)
+    await this.fimDePartida?.replay()
+    if (this.saindo) return
     const v = VENCEDOR[vencedor]
     if (v) {
       const cor = corTexto(PERSONAGENS[this.ids[v - 1]]?.cor ?? 0xffffff)
@@ -1579,10 +1615,12 @@ export default class PvpArena extends Phaser.Scene {
   // ---------- frame ----------
 
   update(_, deltaReal) {
-    const delta = deltaReal * debug.acelerar
+    // câmera lenta do K.O. final (pvp/fimDePartida/): tudo da arena anda devagar
+    const lento = this.fimDePartida?.fator ?? 1
+    const delta = deltaReal * debug.acelerar * lento
     // morte súbita: animações de carta, esperas e transições também aceleram
     // (as pistas usam o delta: o bônus delas já vem no ritmo das balas)
-    const animacao = debug.acelerar * parteDoFator(this.aceleracao, ACELERACAO.animacao)
+    const animacao = debug.acelerar * parteDoFator(this.aceleracao, ACELERACAO.animacao) * lento
     this.tweens.timeScale = animacao
     this.time.timeScale = animacao
     this.controles.atualizar()
@@ -1637,6 +1675,7 @@ export default class PvpArena extends Phaser.Scene {
       coracao,
       limites: pista.caixa.limites,
       balas: pista.balas.lista,
+      zonas: pista.balas.zonas, // avisos de área (attacks/zonas.js): a CPU lê o vermelho
       velocidade: pista.velocidadeCoracao,
       fatorVelocidade: pista.balas.fatorVelocidade,
       velocidadeMax: pista.balas.velocidadeMax,

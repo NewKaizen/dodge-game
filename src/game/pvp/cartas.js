@@ -130,7 +130,7 @@ function montar(personagem) {
       descricao = `${texto}.`
       if (extras.inverter) descricao += ' Inverte os controles do adversário durante o ataque todo.'
     }
-    DETALHES[id] = { receita: especial ? null : naipe === 'copas' ? null : receita, efeitos, especial, inverter: extras.inverter ?? 0 }
+    DETALHES[id] = { receita: especial ? null : naipe === 'copas' ? null : receita, efeitos, especial, inverter: extras.inverter ?? 0, fatorDano: extras.dano ?? 1 }
     return { id, personagem, naipe, valor, nome, descricao, custo: custoDoValor(valor) }
   })
   // a carta SUPER entra no baralho como as outras
@@ -178,7 +178,9 @@ export function danoDaCarta(carta) {
   if (!valor) return 0
   if (naipe === 'copas') return Math.round(2 * DIFICULDADE_PVP.dano)
   const porValor = { espadas: 0.6, paus: 0.55, ouros: 0.45 }[naipe]
-  return Math.round((2 + valor * porValor) * DIFICULDADE_PVP.dano)
+  // extras.dano na lista de cartas do baralho: multiplica o dano por bala daquela carta
+  const fator = especial ? 1 : detalhesDaCarta(carta)?.fatorDano ?? 1
+  return Math.round((2 + valor * porValor) * DIFICULDADE_PVP.dano * fator)
 }
 
 // Multiplicadores de ritmo do ataque (ouros deixa as balas mais rápidas)

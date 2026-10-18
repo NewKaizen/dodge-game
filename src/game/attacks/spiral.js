@@ -4,10 +4,12 @@ import { definirAtaque } from './definir.js'
 // (ficam densos perto do centro e abrem em leque), e a rotação INVERTE de
 // sentido a cada `inverte` ms, com uma pausa curta na virada, desenhando um
 // "S" em vez de um redemoinho eterno. Um núcleo brilhante marca o centro
-// (aviso) e continua aceso enquanto a espiral dispara.
+// (é o aviso: acende `nucleo` ms antes do primeiro disparo, sem área piscando)
+// e continua aceso enquanto a espiral dispara. O ângulo inicial, o sentido do
+// primeiro giro e o tempo de cada giro até virar são sorteados (com semente).
 //
 //   partida    fração da velocidade final com que a bala sai do centro
-//   inverte    ms entre inversões do giro
+//   inverte    ms (médios) entre inversões do giro (cada giro sorteia de 80% a 120%)
 //   virada     ms sem disparar na inversão (a virada é o momento de respirar)
 //   caixa      a espiral ganha uma arena maior para abrir (aviso antes de mudar)
 //   deriva     px/s com que o núcleo desliza em direção ao coração depois de
@@ -42,14 +44,17 @@ export default definirAtaque({
     const v0 = cfg.velocidade * cfg.partida
     const aceleracao = (cfg.velocidade ** 2 - v0 ** 2) / (2 * alcance)
 
-    a.aviso({ tipo: 'circulo', x, y, raio: 20, ms: cfg.nucleo }, () => {
+    // o núcleo acendendo é o aviso (desenhado à mão): a CPU lê como zona
+    a.zonaPerigo({ tipo: 'circulo', x, y, raio: 20 }, { ms: Math.max(400, cfg.nucleo), dura: cfg.nucleo })
+    a.depois(Math.max(400, cfg.nucleo), () => {
       // conta em disparos (não em relógio), porque o relógio inclui os respiros da onda
       const passo = cfg.intervalo / a.ritmo.densidade
-      const disparosPorGiro = Math.max(1, Math.round(cfg.inverte / passo))
+      const porGiro = () => Math.max(1, Math.round((cfg.inverte * a.aleatorio(0.8, 1.2)) / passo))
       const disparosNaVirada = Math.ceil(cfg.virada / passo)
-      let angulo = 0
-      let sentido = 1
+      let angulo = a.aleatorio(0, Math.PI * 2)
+      let sentido = a.aleatorio(0, 1) < 0.5 ? 1 : -1
       let parados = 0
+      let proximaVirada = porGiro()
 
       // deriva: o núcleo (visível, brilhando) persegue devagar o coração, sem
       // chegar mais perto que `distancia`. O alvo é relido a cada 400 ms
@@ -71,9 +76,10 @@ export default definirAtaque({
       }
 
       a.aCada(cfg.intervalo, (i) => {
-        if (i > 0 && i % disparosPorGiro === 0) {
+        if (i > 0 && i >= proximaVirada) {
           sentido = -sentido
           parados = disparosNaVirada
+          proximaVirada = i + porGiro()
         }
         if (parados > 0) {
           parados--

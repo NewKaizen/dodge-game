@@ -282,3 +282,77 @@ export function pararMidi() {
 export function estadoMidi() {
   return { tocando: atual, velocidade, cortada, pausada, tom: motor ? motor.synth.systemParameters.keyShift : tom, tempo: motor ? Math.round(motor.seq.currentTime * 10) / 10 : null, contexto: motor?.ctx.state ?? null }
 }
+
+// ---------- fita (replay do fim da partida PvP) ----------
+// Efeito de FITA CASSETE / VHS na música: passa-baixa (som abafado), wow e
+// flutter (o tom oscilando, como fita esticada: um atraso modulado por dois
+// LFOs) e chiado de fita. Na primeira vez entra na cadeia
+//   synth -> grave -> [passa-baixa -> atraso modulado] -> ganho -> ...
+// e fica lá (neutro: filtro aberto, sem oscilação, 16 ms de atraso fixo).
+// O chiado vai direto ao compressor (independe do corte/pause da música).
+//   setFitaMidi({ corte, wow, chiado }, ms)
+//     corte    Hz do passa-baixa (null = aberto)
+//     wow      0 = nada, 1 = fita gasta (~20 cents indo e voltando), até 3
+//     chiado   0..1 volume do chiado
+// Fica valendo para as próximas músicas: sempre desfaça com setFitaMidi() (tudo neutro).
+const FITA = { atrasoS: 0.016, wowHz: 0.55, wowS: 0.0035, flutterHz: 6.8, flutterS: 0.00012, chiado: 0.05, aberto: 20000 }
+let fita = null // nós do efeito (montados na primeira vez que alguém pede)
+let pedidoFita = { corte: null, wow: 0, chiado: 0 }
+
+function montarFita() {
+  if (fita || !motor) return fita
+  const { ctx, grave, ganho, compressor } = motor
+  const passa = ctx.createBiquadFilter()
+  passa.type = 'lowpass'
+  passa.frequency.value = FITA.aberto
+  passa.Q.value = 0.9
+  const atraso = ctx.createDelay(0.1)
+  atraso.delayTime.value = FITA.atrasoS
+  const lfo = (hz) => {
+    const o = ctx.createOscillator()
+    o.frequency.value = hz
+    const g = ctx.createGain()
+    g.gain.value = 0
+    o.connect(g).connect(atraso.delayTime)
+    o.start()
+    return g
+  }
+  const wow = lfo(FITA.wowHz)
+  const flutter = lfo(FITA.flutterHz)
+  // chiado: ruído em loop passando por um passa-altas
+  const buffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate)
+  const dados = buffer.getChannelData(0)
+  for (let i = 0; i < dados.length; i++) dados[i] = Math.random() * 2 - 1
+  const ruido = ctx.createBufferSource()
+  ruido.buffer = buffer
+  ruido.loop = true
+  const agudo = ctx.createBiquadFilter()
+  agudo.type = 'highpass'
+  agudo.frequency.value = 3200
+  const chiado = ctx.createGain()
+  chiado.gain.value = 0
+  ruido.connect(agudo).connect(chiado).connect(compressor)
+  ruido.start()
+  grave.disconnect()
+  grave.connect(passa).connect(atraso).connect(ganho)
+  fita = { passa, wow, flutter, chiado }
+  return fita
+}
+
+export function setFitaMidi({ corte = null, wow = 0, chiado = 0 } = {}, ms = 300) {
+  pedidoFita = { corte, wow: Math.max(0, Math.min(3, Number(wow) || 0)), chiado: Math.max(0, Math.min(1, Number(chiado) || 0)) }
+  const neutro = pedidoFita.corte == null && !pedidoFita.wow && !pedidoFita.chiado
+  if (!motor || (!fita && neutro)) return // nada montado e nada pedido: não mexe na cadeia
+  const f = montarFita()
+  const t = motor.ctx.currentTime
+  const s = Math.max(0.01, ms / 1000)
+  const rampa = (param, valor) => {
+    param.cancelScheduledValues(t)
+    param.setValueAtTime(param.value, t)
+    param.linearRampToValueAtTime(valor, t + s)
+  }
+  rampa(f.passa.frequency, Math.max(60, Math.min(FITA.aberto, pedidoFita.corte ?? FITA.aberto)))
+  rampa(f.wow.gain, pedidoFita.wow * FITA.wowS)
+  rampa(f.flutter.gain, pedidoFita.wow * FITA.flutterS)
+  rampa(f.chiado.gain, pedidoFita.chiado * FITA.chiado * alvo())
+}

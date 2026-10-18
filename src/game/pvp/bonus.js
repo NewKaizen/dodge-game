@@ -1,6 +1,7 @@
 // Bonus rounds do PvP: a cada BONUS.aCadaRodadas rodadas (3ª, 6ª, 9ª...) a
-// rodada vira um evento caótico sorteado. Só caos, sem prêmio: ninguém ganha
-// nada a mais por causa do evento (o dano continua valendo normalmente).
+// rodada vira um evento caótico sorteado. Quase só caos, sem prêmio (o dano
+// continua valendo normalmente); a exceção é o CTRL+C CTRL+V, que passa
+// energia de um para o outro.
 // Lógica pura (sem Phaser), testável em Node. O visual de cada evento fica em
 // pvp/bonus/ (ver pvp/bonus/LEIA-ME.md).
 //
@@ -14,9 +15,14 @@
 //     'duelo'    a carta escolhida (o evento só é revelado DEPOIS da escolha)
 //                vira a arma do duelo numa caixa só para os dois, sem gastar
 //                energia (resolverDuelo)
+//     'copia'    CTRL+C CTRL+V: as cartas escolhidas vão para o descarte sem
+//                gastar energia (resolverCopia) e, no lugar de arremesso +
+//                esquiva, um minigame de apertar A rápido decide quem COPIA
+//                (rouba) energia do outro (quantiaCopiada, copiarEnergia)
 
 import { CARTAS, PERSONAGENS_PVP, forca, ehSuper } from './cartas.js'
 import { cartaNaMao, descartar, inteiro } from './baralho.js'
+import { ENERGIA } from './regras.js'
 
 export const BONUS = { aCadaRodadas: 3 }
 
@@ -39,7 +45,7 @@ export const EVENTOS = [
   { id: 'popups', nome: 'POP-UPS', descricao: 'propagandas tapam a caixa: passe o coração no [X] para fechar!', cartas: 'normal', cor: 0x5ad8ff },
   { id: 'lag', nome: 'LAG', descricao: 'internet lenta: o coração obedece atrasado!', cartas: 'normal', cor: 0xffb040 },
   { id: 'teclado', nome: 'TECLADO EMBARALHADO', descricao: 'as setas trocam de lugar: fique de olho no tecladinho!', cartas: 'normal', cor: 0xd8e0ff },
-  { id: 'clone', nome: 'CTRL+C CTRL+V', descricao: 'um clone espelhado do coração: se ele levar, você leva!', cartas: 'normal', cor: 0x7affc8 },
+  { id: 'copia', nome: 'CTRL+C CTRL+V', descricao: 'aperte A sem parar: quem copiar mais ROUBA energia do outro!', cartas: 'copia', cor: 0x7affc8 },
   { id: 'telaAzul', nome: 'TELA AZUL', descricao: 'a caixa trava na tela azul e reinicia (travada, ninguém leva dano)', cartas: 'normal', cor: 0x5a9aff },
   { id: 'cursor', nome: 'CURSOR GIGANTE', descricao: 'um cursor enorme persegue o coração e clica nele!', cartas: 'normal', cor: 0xffffff },
   { id: 'chuva', nome: 'CHUVA DE VERÃO', descricao: 'a chuva empurra o coração pra baixo e as poças escorregam!', cartas: 'normal', cor: 0x6ab8ff },
@@ -172,27 +178,87 @@ export function podeJogarDuelo(estado, j, jogada) {
   return { ok: true, motivo: null }
 }
 
+// Duelo e CTRL+C CTRL+V: a carta só precisa estar na mão (lança o erro)
+function validarSemCusto(estado, jogadas) {
+  jogadas.forEach((jogada, j) => {
+    const v = podeJogarDuelo(estado, j, jogada)
+    if (!v.ok) throw new Error(`jogada inválida do p${j + 1}: ${v.motivo}`)
+  })
+}
+
+// Tira as cartas jogadas da mão para o descarte (sem gastar energia) -> [carta | null]
+function descartarJogadas(estado, jogadas, eventos, para) {
+  return jogadas.map((jogada, j) => {
+    const id = jogada == null ? null : typeof jogada === 'string' ? jogada : jogada.carta ?? null
+    if (id === null) return null
+    const carta = descartar(estado.jogadores[j].baralho, id)
+    eventos.push(`p${j + 1} pegou ${carta.nome} ${para}`)
+    return carta
+  })
+}
+
 // Resolve a rodada de duelo (no lugar de resolverRodada): descarta as cartas
 // (sem gastar energia, sem efeitos de copas/Ases) e devolve as armas.
 //   { rodada, duelo: true, jogadas: [{ carta, passou }], armas: [arma0, arma1], eventos }
 export function resolverDuelo(estado, jogadaP1, jogadaP2, rng) {
   if (estado.vencedor) throw new Error('a partida já acabou')
   const jogadas = [jogadaP1, jogadaP2]
-  jogadas.forEach((jogada, j) => {
-    const v = podeJogarDuelo(estado, j, jogada)
-    if (!v.ok) throw new Error(`jogada inválida do p${j + 1}: ${v.motivo}`)
-  })
+  validarSemCusto(estado, jogadas)
   const eventos = []
-  const cartas = jogadas.map((jogada, j) => {
-    const id = jogada == null ? null : typeof jogada === 'string' ? jogada : jogada.carta ?? null
-    if (id === null) return null
-    const carta = descartar(estado.jogadores[j].baralho, id)
-    eventos.push(`p${j + 1} pegou ${carta.nome} para o duelo`)
-    return carta
-  })
+  const cartas = descartarJogadas(estado, jogadas, eventos, 'para o duelo')
   const armas = cartas.map((c) => armaDaCarta(c, rng))
   estado.fase = 'esquiva'
   estado.historico.push({ rodada: estado.rodada, duelo: true, cartas: cartas.map((c) => c?.id ?? null), armas: armas.map((a) => a.arma) })
   return { rodada: estado.rodada, duelo: true, jogadas: cartas.map((c) => ({ carta: c, passou: !c })), armas, eventos }
 }
 
+
+// ---------- CTRL+C CTRL+V ----------
+
+// Minigame de apertar A rápido (pvp/bonus/Copia.js): um cabo de guerra numa
+// barra de "copiando...". Cada aperto puxa o marcador `1` para o seu lado;
+// quem estiver na frente quando o tempo acaba COPIA energia do outro, tanto
+// mais quanto mais longe o marcador foi. Chegou na ponta (`cheio` apertos de
+// vantagem): 100%, acaba na hora.
+//   duracaoMs   tempo de apertar
+//   cheio       vantagem (em apertos) que enche a barra
+//   faixas      fração da barra a partir da qual copia 2, 3... (abaixo da 1ª: 1)
+//   intervaloMinMs  apertos mais juntos que isto não contam (ruído do botão do joystick)
+export const COPIA = { duracaoMs: 5000, cheio: 14, faixas: [0.35, 0.7], intervaloMinMs: 40 }
+
+// Quanto copia quem está na frente com o marcador em `fracao` (0..1) da barra
+export function quantiaCopiada(fracao, cfg = COPIA) {
+  if (!(fracao > 0)) return 0
+  return 1 + cfg.faixas.filter((f) => fracao >= f).length
+}
+
+// Valida e resolve a rodada do CTRL+C CTRL+V (no lugar de resolverRodada):
+// como no duelo, a carta só precisa estar na mão e vai para o descarte sem
+// gastar energia (sem efeitos de copas/Ases).
+//   { rodada, copia: true, jogadas: [{ carta, passou }], eventos }
+export function resolverCopia(estado, jogadaP1, jogadaP2) {
+  if (estado.vencedor) throw new Error('a partida já acabou')
+  const jogadas = [jogadaP1, jogadaP2]
+  validarSemCusto(estado, jogadas)
+  const eventos = []
+  const cartas = descartarJogadas(estado, jogadas, eventos, 'no CTRL+C CTRL+V')
+  estado.fase = 'esquiva'
+  estado.historico.push({ rodada: estado.rodada, copia: true, cartas: cartas.map((c) => c?.id ?? null) })
+  return { rodada: estado.rodada, copia: true, jogadas: cartas.map((c) => ({ carta: c, passou: !c })), eventos }
+}
+
+// Passa até `quantia` de energia do jogador `de` para o `para`, nos limites
+// das regras: ninguém fica com menos de 0 nem passa de ENERGIA.maxima (o que
+// não cabe em quem copiou se perde). Muda o estado.
+//   -> { perdeu, ganhou }
+export function copiarEnergia(estado, de, para, quantia) {
+  const origem = estado.jogadores[de]
+  const destino = estado.jogadores[para]
+  const perdeu = Math.max(0, Math.min(quantia, origem.energia))
+  const ganhou = Math.max(0, Math.min(perdeu, ENERGIA.maxima - destino.energia))
+  origem.energia -= perdeu
+  destino.energia += ganhou
+  const registro = estado.historico.at(-1)
+  if (registro?.copia) Object.assign(registro, { de, para, perdeu, ganhou })
+  return { perdeu, ganhou }
+}

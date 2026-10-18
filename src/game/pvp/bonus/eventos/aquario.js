@@ -6,10 +6,12 @@ import { tocar } from '../../../audio.js'
 // afundar, segure para BAIXO. Bolhas sobem, dois peixinhos passeiam e a
 // superfície ondula no alto da caixa.
 
-const RITMO = 0.72 // fator do relógio da pista (câmera lenta)
+// (o dono pediu o movimento um pouco mais rápido: era ritmo 0,72, força 0,85 e
+// inércia 220 ms; o coração andava a ~61% do normal, agora ~72%)
+const RITMO = 0.82 // fator do relógio da pista (câmera lenta)
 const EMPUXO = 48 // quanto a água empurra para cima (no joystick, -100..100)
-const FORCA = 0.85 // quanto do joystick vale dentro d'água
-const INERCIA_MS = 220 // quanto o coração demora para responder (arrasto da água)
+const FORCA = 0.88 // quanto do joystick vale dentro d'água
+const INERCIA_MS = 175 // quanto o coração demora para responder (arrasto da água)
 const AGUA = 0x2a7fff
 const SUPERFICIE = 10 // altura da faixa de espuma no alto (px)
 

@@ -1022,4 +1022,82 @@ const SINTESE = {
     s.tom(330, 0.5, 'square', 0.03, 1760, 0.03)
     for (let i = 0; i < 6; i++) s.tom(2400, 0.02, 'square', 0.05, 2000, 0.3 + i * 0.05)
   },
+  // CTRL+C CTRL+V (minigame de apertar A): o clique de cada aperto (um tom por
+  // lado, para dar para ouvir quem está apertando), o "copiado!" e o erro do empate
+  copiarTecla: (s, { lado = 0 } = {}) => {
+    s.ruido(0.012, 0.07, 0, 6500)
+    const f = (lado ? 620 : 820) * (0.97 + Math.random() * 0.06)
+    s.tom(f, 0.025, 'square', 0.025, f * 1.15)
+  },
+  copiado: (s) => {
+    ;[659, 880, 1046, 1318, 1760].forEach((f, i) => s.tom(f, 0.12, 'triangle', 0.07, f * 1.01, i * 0.06))
+    s.tom(440, 0.4, 'sine', 0.06, 1760, 0.02)
+  },
+  copiarErro: (s) => {
+    s.tom(311, 0.32, 'square', 0.07, 311)
+    s.tom(233, 0.45, 'square', 0.07, 230, 0.16)
+    s.ruido(0.05, 0.1, 0, 2500)
+  },
 }
+
+// ---------- fita (fim da partida PvP: câmera lenta e replay) ----------
+// fitaMusica({ corte, wow, chiado }, ms): música abafada (passa-baixa em Hz),
+// tom oscilando como fita gasta (wow 0..3) e chiado de fita (0..1). Sem
+// argumentos volta tudo ao normal: sempre desfaça. andamentoMusica(): o
+// andamento pedido agora (para devolver depois de uma câmera lenta).
+import { setFitaMidi } from './midi.js'
+export const fitaMusica = (opcoes, ms) => setFitaMidi(opcoes, ms)
+export const andamentoMusica = () => estadoMidi().velocidade
+
+// Sons do fim da partida PvP (câmera lenta, coração quebrando, fita do
+// replay) e da entrada do vencedor na PvpResultado
+Object.assign(SINTESE, {
+  // o tempo freando: baque fundo e um sopro que desce
+  cameraLenta: (s) => {
+    s.ruido(0.08, 0.35, 0, 8000)
+    s.nota(62, 1.8, 'sine', 0.45, 28, 0, 0.01)
+    s.tom(260, 1.3, 'sawtooth', 0.06, 45)
+    s.ruido(1.4, 0.12, 0.05, 500)
+  },
+  // batida de coração lenta (tum-tum)
+  batidaLenta: (s) => {
+    s.tom(72, 0.2, 'sine', 0.42, 40)
+    s.tom(64, 0.24, 'sine', 0.34, 36, 0.26)
+  },
+  // o coração trincando
+  trincar: (s) => {
+    s.ruido(0.07, 0.3, 0, 7000)
+    s.tom(1300, 0.06, 'square', 0.06, 420)
+    s.tom(150, 0.28, 'sawtooth', 0.12, 55, 0.02)
+  },
+  // o coração estilhaçando: chiado de vidro e lasquinhas tilintando
+  estilhacar: (s) => {
+    s.ruido(0.45, 0.3, 0, 7500)
+    s.tom(220, 0.35, 'square', 0.12, 50)
+    ;[2400, 3100, 1900, 2800, 3600].forEach((f, i) => s.tom(f, 0.12, 'triangle', 0.05, f * 0.8, 0.03 + i * 0.06))
+  },
+  // fita: chiado de estática, rebobinando, PLAY/PAUSE (clique da mecânica) e STOP
+  estatica: (s) => s.ruido(0.28, 0.16, 0, 9000),
+  fitaRebobinar: (s) => {
+    s.rolamento(0.75, 0.09)
+    s.tom(700, 0.75, 'sawtooth', 0.025, 2600)
+  },
+  fitaPlay: (s) => {
+    s.tom(95, 0.06, 'square', 0.18, 50)
+    s.ruido(0.04, 0.22, 0, 3000)
+    s.tom(1500, 0.02, 'square', 0.04, 900, 0.05)
+  },
+  fitaParar: (s) => {
+    s.tom(120, 0.08, 'square', 0.2, 40)
+    s.ruido(0.06, 0.25, 0, 2500)
+    s.tom(520, 0.3, 'sawtooth', 0.04, 60, 0.02)
+  },
+  // entrada do vencedor: o golpe da faixa e o acorde que fica
+  vitoriaEntrada: (s) => {
+    s.ruido(0.08, 0.4, 0, 9000)
+    s.tom(85, 0.7, 'sine', 0.5, 30)
+    s.ruido(0.5, 0.18, 0, 900)
+    for (const f of [523, 659, 784, 1046]) s.tom(f, 1.0, 'square', 0.05, f * 1.01, 0.04)
+    s.tom(262, 1.0, 'triangle', 0.14, 262, 0.04)
+  },
+})

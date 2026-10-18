@@ -30,9 +30,11 @@ import { ataquesHabilidades } from './habilidades/index.js'
 //   ataques.rain({ caixa: null })                     sem mudar a caixa (rain, sides, aimed, spiral e caminhonete mudam por padrão)
 //   ataques.comCaixa({ largura: 180, altura: 180 }, ataques.juntos(...))  outra caixa para um grupo
 //
-// Regras (ver constants.js ATAQUE e attacks/validacao.js): toda bala pisca
-// por ATAQUE.telegrafoMs antes de valer (ou vem depois de um a.aviso), toda
-// parede declara suas lacunas com a.parede(), e a velocidade é limitada pela
+// Regras (ver docs/ataques.md, constants.js ATAQUE e attacks/validacao.js):
+// projéteis nascem fora da caixa e entram (`entrando: true`; a entrada é o
+// aviso); senão a bala pisca por ATAQUE.telegrafoMs antes de valer (ou vem
+// depois de um a.aviso). Toda parede declara suas lacunas com a.parede(), os
+// sorteios usam a semente do contexto, e a velocidade é limitada pela
 // dificuldade do chefe.
 export const ataques = {
   rain,

@@ -4,15 +4,15 @@ import { tocar } from '../audio.js'
 
 // Caminhonete: TRÂNSITO. A caixa vira uma estrada com faixas e as
 // caminhonetes passam em FILA (estilo Frogger): cada faixa tem o seu sentido
-// (alternados) e a sua velocidade, e sempre sobra espaço entre uma caminhonete
+// (alternados, começando por um lado sorteado) e a sua velocidade, e sempre sobra espaço entre uma caminhonete
 // e a próxima. O jogo é costurar o trânsito: entrar no vão, andar junto com
 // ele, trocar de faixa quando o vão chega na borda.
 // Às vezes (`re`) uma caminhonete FREIA no meio do caminho (luz de freio e
 // "pi-pi-pi" de ré) e volta de ré por onde veio.
 //
 // Justiça:
-//   - toda caminhonete é anunciada pelos faróis piscando na entrada da faixa
-//     (`aviso` ms) antes de aparecer;
+//   - toda caminhonete é anunciada pelos faróis (dois pontos piscando na
+//     borda, na entrada da faixa: `aviso` ms) antes de aparecer;
 //   - numa faixa, a distância entre duas caminhonetes seguidas é sempre >=
 //     `vao` (+ comprimento): o vão tem mais que LACUNA_MINIMA;
 //   - a ré só acontece se não houver outra caminhonete atrás dela na faixa
@@ -66,9 +66,10 @@ export default definirAtaque({
     })
 
     // cada faixa: sentido alternado, velocidade própria e a fila dela
+    const primeira = a.aleatorio(0, 1) < 0.5 ? 1 : -1 // sentido da faixa de cima
     const faixas = Array.from({ length: cfg.faixas }, (_, i) => ({
       i,
-      dir: i % 2 === 0 ? 1 : -1,
+      dir: i % 2 === 0 ? primeira : -primeira,
       velocidade: cfg.velocidade * a.aleatorio(0.75, 1.25),
       fila: [], // caminhonetes vivas, da mais nova para a mais velha
       proxima: a.aleatorio(0, cfg.intervalo * 0.8),
@@ -79,9 +80,11 @@ export default definirAtaque({
       const { l, y, altura } = geometria()
       const dir = f.dir
       const borda = dir > 0 ? l.left : l.right
-      // faróis piscando na entrada da faixa
+      // faróis: dois pontinhos piscando na borda, na entrada da faixa
       f.pendente = true
-      a.aviso({ tipo: 'area', x: dir > 0 ? l.left : l.right - 34, y: y(f.i) - altura / 2, largura: 34, altura, ms: aviso, cor: COR_FAROL }, () => {
+      const xf = dir > 0 ? l.left + 3 : l.right - 3
+      a.aviso({ tipo: 'circulo', x: xf, y: y(f.i) + altura * 0.3, raio: 4, ms: aviso, cor: COR_FAROL })
+      a.aviso({ tipo: 'circulo', x: xf, y: y(f.i) - altura * 0.3, raio: 4, ms: aviso, cor: COR_FAROL }, () => {
         f.pendente = false
         const vel = f.velocidade
         const b = a.bala({

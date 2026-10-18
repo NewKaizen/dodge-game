@@ -12,11 +12,17 @@ Os ataques (as balas que caem nas caixas) ficam em `src/game/attacks/`. As carta
 
 A validação confere estas regras no console, em modo dev (`[telegrafo]`, `[rota de fuga]`):
 
-- **Aviso antes de causar dano:** toda bala perigosa precisa de pelo menos 400 ms de aviso.
-  - Por padrão, `a.bala()` já nasce parada e piscando por esse tempo.
-  - Se o ataque desenhar o próprio aviso com `a.aviso(forma, depois)`, crie as balas dentro de `depois` com `jaAvisada: true`.
+- **Projéteis nascem FORA da caixa e entram.** A entrada pela borda é o aviso: nada de bala surgindo dentro, parada e piscando, nem linha/área riscando a caixa antes ("guia"). O jogo é de reação.
+  - Crie a bala uns 8–40 px além da borda (`a.deFora(lado, fracao, recuo)` ajuda), com a velocidade apontando para dentro e `entrando: true` (ou `jaAvisada: true`). Ela vale na hora, sem piscar e sem o marcador "!". Balas a mais de 160 px da caixa somem na hora (o dev avisa).
+  - Sem `aviso`/`jaAvisada`/`entrando`, uma bala que nasce fora com a velocidade (ou aceleração) entrando na caixa já é tratada como `entrando`. `entrando: false` volta ao antigo (parada fora, com "!").
+  - Para ser justo sem guia: entrar devagar e acelerar (`partida` da chuva, das colunas, da mira, das brasas) ou espiar na borda e só então disparar (`arranque: { ms, vx, vy }` nas lanças, na foice e no forcado: a ponta aparece na borda e rasteja por `ms`). Os bots leem o `arranque`.
+  - Projétil que sai de uma fonte visível dentro da caixa (núcleo da espiral, bomba, ponta do forcado, bala do carrossel carregando) pode nascer dentro com `jaAvisada: true`: a fonte é o aviso (a bomba conta 3-2-1, a bala do carrossel pisca carregando).
+  - O que não é projétil (feixe de laser, espinhos do chão, faróis da caminhonete) pode manter um aviso curto e discreto com `a.aviso(forma, depois)`: prefira `estilo: 'pontas'` (só os emissores na borda) ou `estilo: 'fino'` (trinca fina), e crie as balas dentro de `depois` com `jaAvisada: true`.
+  - Aviso diegético desenhado à mão (lâmina espiando, bomba contando)? Registre a área com `a.zonaPerigo(forma, { ms })` para a CPU ler (o `a.aviso` já registra sozinho).
+  - Sem nada disso, `a.bala()` ainda nasce parada e piscando por 400 ms (`ATAQUE.telegrafoMs`), o mínimo de aviso; o validador reclama (`[telegrafo]`) de aviso menor.
 - **Paredes:** declare toda parede com `a.parede({ eixo, lacunas | ocupados })` e toda abertura com `a.lacuna(px)`. A lacuna mínima é 3x o coração (48 px).
 - **Sorteios:** use só `a.aleatorio`, `a.inteiro` e `a.escolher`, que têm semente fixa.
+- **Nada decorável:** nada de alternância fixa (`i % 2`), posição fixa ou ritmo `k % n`. Sorteie lado, posição, ângulo e tempos (com limites que mantenham a rota de fuga). Os padrões com `mirar` usam um acumulador com fase sorteada: a fração média de balas miradas é a mesma, mas não dá para prever quais.
 - **Alvo:** use `a.alvo()`.
 - **Nada de ficar parado:** todo ataque deve ameaçar um coração parado, mirando parte das balas com `a.alvo()`. Vários padrões têm a opção `mirar`.
 

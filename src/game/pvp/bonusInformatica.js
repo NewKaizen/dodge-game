@@ -1,13 +1,12 @@
 // Regras puras (sem Phaser, testáveis em Node) dos bônus da SALA DE
 // INFORMÁTICA que mexem no controle ou na posição do coração. O visual fica
-// em pvp/bonus/eventos/ (lag.js, teclado.js, clone.js).
+// em pvp/bonus/eventos/ (lag.js, teclado.js).
 //
 //   lerAtrasado(fila, limite)      LAG: o comando que "chegou" até `limite`
 //   MAPAS_TECLADO                  TECLADO EMBARALHADO: as 7 trocas de setas possíveis
 //   aplicarMapa(mapa, joy)         o joystick depois da troca
 //   inverterMapa(mapa)             a troca que desfaz (a CPU "aprende" o teclado novo)
 //   sortearMapa(rng, atual)        uma troca diferente da atual
-//   espelhar(modo, limites, x, y)  CTRL+C CTRL+V: onde fica o clone espelhado
 
 // ---------- LAG ----------
 
@@ -66,20 +65,4 @@ export const SETAS = {
 export function setaResultante(mapa, seta) {
   const v = aplicarMapa(mapa, SETAS[seta])
   return Object.keys(SETAS).find((s) => SETAS[s].x === Math.round(v.x) && SETAS[s].y === Math.round(v.y))
-}
-
-// ---------- CTRL+C CTRL+V ----------
-
-// modo: 'lados' (espelho na vertical do meio da caixa), 'cimaBaixo' (na
-// horizontal do meio) ou 'centro' (os dois: do outro lado do centro).
-// limites: { left, right, top, bottom }. Como é simétrico em volta do centro,
-// se o coração está dentro da caixa o clone também está.
-export const MODOS_CLONE = ['lados', 'cimaBaixo', 'centro']
-
-export function espelhar(modo, l, x, y) {
-  const ex = l.left + l.right - x
-  const ey = l.top + l.bottom - y
-  if (modo === 'cimaBaixo') return { x, y: ey }
-  if (modo === 'centro') return { x: ex, y: ey }
-  return { x: ex, y }
 }
