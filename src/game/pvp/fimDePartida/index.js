@@ -250,7 +250,11 @@ export default class FimDePartida {
     if (this.arena.saindo || this.estado !== 'pronto') return
     const ks = [...new Set(this.mortos.map((m) => m.k))].sort()
     const quadros = this.gravador.quadrosEmOrdem().filter((q) => ks.some((k) => q.pistas[k]))
-    if (this.pulou || this.semReplay || !ks.length || quadros.length < 12) {
+    // Qualquer gravação serve: a Transmissao encurta as fases quando há poucos
+    // quadros. Exigir um mínimo (eram 12) sumia com o replay quando o K.O. vinha
+    // logo no começo da esquiva ou o jogo rodava abaixo de 30 fps (o Gravador
+    // tira no máximo uma foto por frame: a 10 fps, 12 fotos são 1,2 s de esquiva)
+    if (this.pulou || this.semReplay || !ks.length || !quadros.length) {
       this.estado = 'fim'
       return
     }
