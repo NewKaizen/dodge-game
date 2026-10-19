@@ -35,8 +35,11 @@ import { BotDuelo, difAngulo } from './botDuelo.js'
 // para onde o outro está indo; a bomba cai em cima dele.
 // Tudo é desenhado na câmera principal (sem câmera de recorte): os objetos
 // ficam presos dentro da caixa à mão.
+// Replay do K.O. (pvp/fimDePartida/index.js, fonteDuelo): o gravador fotografa
+// `objetos` (menos a `borda` e os sprites de `coracoes`) dentro da `caixa`
+// aberta (`abertura`), enquanto o `estagio` é de luta.
 
-const DUELO = {
+export const DUELO = {
   duracaoMs: 15000, // tempo de luta (encurta com a morte súbita, até duracaoMinMs)
   duracaoMinMs: 9000,
   caixa: { x: 320, y: 200, largura: 430, altura: 228 }, // dentro de y 74..334
