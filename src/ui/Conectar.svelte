@@ -1,6 +1,7 @@
 <script>
   import { jogo, MAX_JOGADORES } from '../lib/estado.js'
-  import { conectarSerial } from '../lib/serial.js'
+  import { conectarSerial, desconectarSerial } from '../lib/serial.js'
+  import { despedir } from '../lib/saida.js'
   import { iniciarSimulador, pararSimulador } from '../lib/simulador.js'
   import { alternarTelaCheia } from '../lib/telaCheia.js'
 
@@ -13,6 +14,11 @@
     } catch (e) {
       erro = e.message
     }
+  }
+
+  async function desconectar() {
+    await despedir() // LED apagado e DISCONNECT antes de fechar a porta
+    await desconectarSerial()
   }
 </script>
 
@@ -29,6 +35,8 @@
     <span>Conectado ({$jogo.fonte})</span>
     {#if $jogo.fonte === 'simulador'}
       <button onclick={pararSimulador}>Parar simulador</button>
+    {:else if $jogo.fonte === 'serial'}
+      <button onclick={desconectar}>Desconectar joystick</button>
     {/if}
   {:else}
     <button onclick={conectar}>Conectar joystick</button>

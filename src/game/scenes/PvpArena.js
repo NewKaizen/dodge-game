@@ -28,6 +28,7 @@ import { particulas } from '../effects/particulas.js'
 import { fogoArtificio, canhoesConfete, chuvaConfete } from '../effects/festa.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
 import FimDePartida from '../pvp/fimDePartida/index.js'
+import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe } from '../../lib/saida.js'
 
 // Partida PvP de cartas. Junta as peças de pvp/ (regras, baralho, cartas,
 // Pista) com o visual das cartas (Carta, Mao). Regras em docs/pvp-regras.md.
@@ -231,8 +232,10 @@ export default class PvpArena extends Phaser.Scene {
     this.events.on('postupdate', this.filtrarCaixas, this)
 
     if (import.meta.env.DEV) window.pvpArena = this
+    entrarNoJogo() // joystick: GAME, LED e a barra de vida no OLED
     this.events.once('shutdown', () => {
       this.saindo = true
+      voltarAoMenu()
       this.events.off('postupdate', this.filtrarCaixas, this)
       // na saída os objetos do efeito já podem ter sido destruídos: um terminar()
       // que falhe no meio não pode deixar a música desafinada/cortada (COGUMELO etc.)
@@ -1466,6 +1469,7 @@ export default class PvpArena extends Phaser.Scene {
     const hud = this.huds[j]
     hud.setHp(jog.hp)
     hud.tremer()
+    if (j < this.numJogadores) levouGolpe(j) // buzzer no joystick de quem levou
     numero(this, hud.pontoHp.x, hud.pontoHp.y + 4, efetivo ? `-${efetivo}` : '0', TEXTO.caido, { tamanho: 16, desvio: 12 })
     const k = this.pistaDe(j) // a pista onde o coração dele está (CORAÇÃO TROCADO)
     this.pistas[k].caixa.tremer(110, 2) // só a caixa de quem levou (a tela toda tremendo enjoa)
@@ -1625,6 +1629,7 @@ export default class PvpArena extends Phaser.Scene {
     this.time.timeScale = animacao
     this.controles.atualizar()
     this.fundoArena?.atualizar(delta)
+    this.informarVidas()
 
     if (this.fase === 'escolha') {
       for (let j = 0; j < this.numJogadores; j++) {
@@ -1668,6 +1673,15 @@ export default class PvpArena extends Phaser.Scene {
   }
 
   // joystick da CPU na pista dela (pvp/botEsquiva.js)
+  // OLED de cada joystick: % da vida de quem joga de verdade (a CPU não tem
+  // joystick). saida.js só manda quando o número muda
+  informarVidas() {
+    for (let j = 0; j < this.numJogadores; j++) {
+      const jog = this.estado.jogadores[j]
+      informarVida(j, jog.hp, jog.hpMax)
+    }
+  }
+
   joyDaCpu(pista, delta, invertido) {
     const coracao = pista.coracoes[0]
     if (this.fase !== 'esquiva' || !pista.rodando || !coracao?.ativo || this.ko[this.cpu]) return { x: 0, y: 0 }
