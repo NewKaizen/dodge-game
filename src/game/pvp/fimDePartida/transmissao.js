@@ -30,6 +30,8 @@ import { fatores, quantas } from '../../acessibilidade.js'
 //            câmera abre devagar para ver os cacos caindo
 //   saida    a tarja varre de volta e a arena reaparece ("● AO VIVO")
 // Empate: as duas pistas lado a lado (cada uma com sua câmera e seu close).
+// Duelo: a mesma coisa com a caixa do duelo; cada tela destaca quem caiu e
+// mostra o outro coração junto (pista.outros).
 //
 // Como fica na tela sem mexer na arena: o replay e as artes de TV ficam numa
 // região do mundo bem longe da arena (TV.longe), vistas por câmeras próprias:
@@ -39,6 +41,7 @@ import { fatores, quantas } from '../../acessibilidade.js'
 // objetos, música, sons da torcida se pulou).
 //
 //   const tv = new Transmissao(cena, { quadros, pistas: [k...], campos, mortos, jogadores, arena, andamento })
+//     quadros    [{ tempo, pistas: [{ chave, caixa, borda, coracao, close, outros } | null] }] (k indexa pistas e campos)
 //     mortos     [{ j, k }]   jogadores  [{ rotulo, nome, cor, hp }]   arena { nome, cor }
 //   await tv.tocar()      resolve no fim (ou quando encerrar() for chamado)
 //   tv.atualizar(dtReal)  todo frame
@@ -190,6 +193,7 @@ export default class Transmissao {
         borda: this.novo(cena.add.graphics()),
         circulo: this.novo(cena.add.graphics()),
         coracao: this.novo(cena.add.image(0, 0, 'coracao').setVisible(false)),
+        outros: [], // os outros corações da mesma foto (duelo: quem ficou de pé), criados quando aparecem
         ultimaBorda: null,
         temClose: Boolean(ultimo?.pistas[k]?.close),
         morto: this.mortos.find((m) => m.k === k),
@@ -704,6 +708,7 @@ export default class Transmissao {
           .setVisible(Boolean(c0.ativo && c0.visivel))
       }
     } else t.coracao.setVisible(false)
+    this.desenharOutros(t, q0?.outros ?? [], q1?.outros ?? q0?.outros ?? [], frac)
 
     // ---- o cinegrafista: zoom e enquadramento ----
     const caixa = q0?.caixa
@@ -741,6 +746,23 @@ export default class Transmissao {
       cam.setZoom(zoom * RES.escala)
       cam.centerOn(t.centro.x, t.centro.y)
     }
+  }
+
+  // Os outros corações da foto (duelo), na posição interpolada. No golpe, o
+  // que também caiu (K.O. duplo) some: ele se despedaça na tela dele
+  desenharOutros(t, lista0, lista1, frac) {
+    lista0.forEach((c0, n) => {
+      const c1 = lista1[n] ?? c0
+      const img = (t.outros[n] ??= this.novo(this.cena.add.image(0, 0, 'coracao')))
+      const caiu = this.fase === 'golpe' && this.mortos.some((m) => m.j === c0.j)
+      img
+        .setPosition(t.base.x + Phaser.Math.Linear(c0.x, c1.x, frac), t.base.y + Phaser.Math.Linear(c0.y, c1.y, frac))
+        .setTint(c0.cor ?? 0xff2030)
+        .setScale(c0.escala || ESCALA.coracao)
+        .setAlpha(c0.alpha ?? 1)
+        .setVisible(Boolean(c0.ativo && c0.visivel) && !caiu)
+    })
+    for (let n = lista0.length; n < t.outros.length; n++) t.outros[n].setVisible(false)
   }
 
   // o círculo do comentarista sendo desenhado em volta do coração (u: 0..1 do close)
