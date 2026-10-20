@@ -37,6 +37,7 @@ import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
+import { entrarNoJogo, voltarAoMenu, levouGolpe } from '../../lib/saida.js'
 
 // CO-OP de cartas: os dois jogadores (ou 1 + CPU aliada) contra um chefe que
 // também joga cartas. Regras em coop/regras.js (docs/coop-cartas.md).
@@ -185,8 +186,10 @@ export default class CoopArena extends PvpArena {
     this.events.on('postupdate', this.filtrarCaixas, this)
 
     if (import.meta.env.DEV) window.coopArena = this
+    entrarNoJogo() // joystick: GAME, LED e a barra de vida no OLED
     this.events.once('shutdown', () => {
       this.saindo = true
+      voltarAoMenu()
       this.events.off('postupdate', this.filtrarCaixas, this)
       this.pistas.forEach((p) => p.destruir())
       this.voltarDaMusicaEspecial()
@@ -773,6 +776,7 @@ export default class CoopArena extends PvpArena {
     const hud = this.huds[j]
     hud.setHp(jog.hp)
     hud.tremer()
+    if (j < this.numJogadores) levouGolpe(j) // buzzer no joystick de quem levou
     numero(this, hud.pontoHp.x, hud.pontoHp.y + 4, efetivo ? `-${efetivo}` : '0', TEXTO.caido, { tamanho: 16, desvio: 12 })
     this.pistas[j].caixa.tremer(110, 2) // só a caixa de quem levou (a tela toda tremendo enjoa)
     this.personagemDoi(j)

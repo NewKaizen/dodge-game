@@ -1,10 +1,12 @@
 import { jogo, MAX_JOGADORES } from './estado.js'
+import { eixoDoAdc, INVERTER } from './conversao.js'
 
 let proximoIdBotao = 1
 
 // Converte uma linha recebida (serial ou simulador) em atualização do store.
-// Formato documentado em docs/protocolo-serial.md
-export function processarLinha(linha) {
+// Formato documentado em docs/protocolo-serial.md. analogico: os eixos do JOY
+// vêm crus do Arduino (0–1023, centro 512); sem ele (simulador), já em -100..100
+export function processarLinha(linha, { analogico = false } = {}) {
   const texto = linha.trim()
   if (!texto) return
 
@@ -18,7 +20,7 @@ export function processarLinha(linha) {
         const [p, x, y] = args.length >= 3 ? args : ['1', ...args]
         const i = indiceJogador(p)
         if (i === null) break
-        const joy = { x: eixo(x), y: eixo(y) }
+        const joy = analogico ? { x: eixoDoAdc(x, INVERTER.x), y: eixoDoAdc(y, INVERTER.y) } : { x: eixo(x), y: eixo(y) }
         novo.jogadores = s.jogadores.map((j, k) => (k === i ? { ...j, joy } : j))
         break
       }
