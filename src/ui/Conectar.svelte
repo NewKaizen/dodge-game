@@ -17,7 +17,7 @@
   }
 
   async function desconectar() {
-    await despedir() // LED apagado e DISCONNECT antes de fechar a porta
+    await despedir() // DISCONNECT antes de fechar a porta
     await desconectarSerial()
   }
 </script>

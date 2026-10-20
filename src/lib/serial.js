@@ -29,7 +29,7 @@ export async function conectarSerial(baudRate = 9600) {
       buffer += value
       const linhas = buffer.split('\n')
       buffer = linhas.pop()
-      linhas.forEach((linha) => processarLinha(linha, { analogico: true }))
+      linhas.forEach(processarLinha)
     }
   } finally {
     leitor.releaseLock()
