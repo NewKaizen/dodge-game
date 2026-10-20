@@ -186,7 +186,7 @@ export default class CoopArena extends PvpArena {
     this.events.on('postupdate', this.filtrarCaixas, this)
 
     if (import.meta.env.DEV) window.coopArena = this
-    entrarNoJogo() // joystick: GAME, LED e a barra de vida no OLED
+    entrarNoJogo() // joystick: GAME e o HP no OLED
     this.events.once('shutdown', () => {
       this.saindo = true
       voltarAoMenu()

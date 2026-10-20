@@ -232,7 +232,7 @@ export default class PvpArena extends Phaser.Scene {
     this.events.on('postupdate', this.filtrarCaixas, this)
 
     if (import.meta.env.DEV) window.pvpArena = this
-    entrarNoJogo() // joystick: GAME, LED e a barra de vida no OLED
+    entrarNoJogo() // joystick: GAME e o HP no OLED
     this.events.once('shutdown', () => {
       this.saindo = true
       voltarAoMenu()
@@ -1673,7 +1673,7 @@ export default class PvpArena extends Phaser.Scene {
   }
 
   // joystick da CPU na pista dela (pvp/botEsquiva.js)
-  // OLED de cada joystick: % da vida de quem joga de verdade (a CPU não tem
+  // OLED de cada joystick: HP de quem joga de verdade (a CPU não tem
   // joystick). saida.js só manda quando o número muda
   informarVidas() {
     for (let j = 0; j < this.numJogadores; j++) {
