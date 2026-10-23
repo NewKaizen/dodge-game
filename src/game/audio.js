@@ -180,14 +180,20 @@ export function somContinuo(scene, nome) {
   return controle
 }
 
-function obterContexto() {
+// O contexto de áudio do jogo inteiro (o Phaser usa o mesmo: config.js), para
+// a transmissão do modo LAN pegar todo o som num lugar só (lib/lan/audioTap.js)
+export function contextoAudio() {
   if (!contexto) {
     const AC = window.AudioContext || window.webkitAudioContext
-    if (!AC) return null
-    contexto = new AC()
+    if (AC) contexto = new AC()
   }
-  if (contexto.state === 'suspended') contexto.resume()
   return contexto
+}
+
+function obterContexto() {
+  const c = contextoAudio()
+  if (c?.state === 'suspended') c.resume()
+  return c
 }
 
 function sintetizador(c) {

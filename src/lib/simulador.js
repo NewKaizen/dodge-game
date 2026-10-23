@@ -19,6 +19,15 @@ aoMudarPref((chave) => {
 })
 
 let ativo = false // simulador ligado (o joystick serial não pode levar JOY 0 0 daqui)
+// Modo LAN (lib/lan/): as duas mãos do teclado comandam o jogador 1, porque o
+// jogador 2 está no outro PC
+let unico = false
+export function setTecladoUnico(valor) {
+  if (unico === Boolean(valor)) return
+  if (ativo) soltarTudo()
+  unico = Boolean(valor)
+}
+const dono = (jogador) => (unico ? 0 : jogador)
 
 const DIRECOES = ['cima', 'baixo', 'esquerda', 'direita']
 const pressionadas = new Set()
@@ -27,19 +36,20 @@ const ultimoJoy = []
 function mapear(code) {
   for (let jogador = 0; jogador < TECLADO.length; jogador++) {
     const teclas = TECLADO[jogador]
-    if (teclas.A.includes(code)) return { jogador, botao: 'A' }
-    if (teclas.B.includes(code)) return { jogador, botao: 'B' }
-    if (teclas.C.includes(code)) return { jogador, botao: 'C' }
-    if (DIRECOES.some((d) => teclas[d].includes(code))) return { jogador }
+    if (teclas.A.includes(code)) return { jogador: dono(jogador), botao: 'A' }
+    if (teclas.B.includes(code)) return { jogador: dono(jogador), botao: 'B' }
+    if (teclas.C.includes(code)) return { jogador: dono(jogador), botao: 'C' }
+    if (DIRECOES.some((d) => teclas[d].includes(code))) return { jogador: dono(jogador) }
   }
   return null
 }
 
 function enviarJoy(jogador) {
-  const teclas = TECLADO[jogador]
-  const algum = (codes) => codes.some((c) => pressionadas.has(c))
-  const x = (algum(teclas.direita) ? 100 : 0) - (algum(teclas.esquerda) ? 100 : 0)
-  const y = (algum(teclas.baixo) ? 100 : 0) - (algum(teclas.cima) ? 100 : 0)
+  // as teclas de todos os conjuntos que comandam este jogador
+  const conjuntos = TECLADO.filter((_, j) => dono(j) === jogador)
+  const algum = (d) => conjuntos.some((teclas) => teclas[d].some((c) => pressionadas.has(c)))
+  const x = (algum('direita') ? 100 : 0) - (algum('esquerda') ? 100 : 0)
+  const y = (algum('baixo') ? 100 : 0) - (algum('cima') ? 100 : 0)
   const linha = `JOY ${jogador + 1} ${x} ${y}`
   if (linha === ultimoJoy[jogador]) return
   ultimoJoy[jogador] = linha
@@ -67,7 +77,8 @@ function aoSoltar(e) {
 
 function soltarTudo() {
   pressionadas.clear()
-  TECLADO.forEach((_, jogador) => enviarJoy(jogador))
+  // só os jogadores deste teclado (no LAN, o jogador 2 vem do outro PC)
+  new Set(TECLADO.map((_, j) => dono(j))).forEach(enviarJoy)
 }
 
 // Emite linhas do protocolo a partir do teclado, para jogar sem o hardware
@@ -114,4 +125,36 @@ export function capturarTecla(fn) {
   esperando = fn
   window.addEventListener('keydown', aoCapturar, true)
   return () => esperando === fn && pararCaptura()
+}
+
+// Digitar um texto (lobby LAN: nome, IP, chat). Enquanto digita, nenhuma tecla
+// chega ao jogo (mesma captura da espera de tecla acima). opcoes:
+//   inicial, max, permitido (regex de UM caractere)
+//   aoMudar(texto)  a cada tecla       aoConfirmar(texto)  Enter
+//   aoCancelar()    Esc
+// Devolve a função que cancela.
+export function capturarTexto({ inicial = '', max = 24, permitido = /^[\p{L}\p{N} .,:!?'"@#()+\-_/*=<>%&]$/u, aoMudar, aoConfirmar, aoCancelar } = {}) {
+  pararCaptura()
+  if (ativo) soltarTudo()
+  let texto = String(inicial).slice(0, max)
+  const fim = () => window.removeEventListener('keydown', aoTeclar, true)
+  function aoTeclar(e) {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    if (e.key === 'Enter' || e.key === 'NumpadEnter') {
+      if (e.repeat) return
+      fim()
+      return aoConfirmar?.(texto)
+    }
+    if (e.key === 'Escape') {
+      fim()
+      return aoCancelar?.()
+    }
+    if (e.key === 'Backspace') texto = texto.slice(0, -1)
+    else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && permitido.test(e.key) && texto.length < max) texto += e.key
+    else return
+    aoMudar?.(texto)
+  }
+  window.addEventListener('keydown', aoTeclar, true)
+  return fim
 }
