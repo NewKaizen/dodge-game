@@ -20,6 +20,9 @@ Músicas em MIDI (.mid), com o nome da tela ou do chefe. O jogo procura
   arena_coliseu.mid      arena COLISEU
                    Sem o arquivo da arena, toca o pvp.mid. O nome que aparece na
                    votação fica em src/game/pvp/arenas.js (tituloMusica).
+  lobby.mid        lobby do modo LAN (o que está aí é provisório, gerado por
+                   scripts/lobby/gerar_lobby_mid.mjs: troque pelo seu). O nome
+                   no canto do lobby fica em src/game/assets.js, tituloMusicaLobby.
   pvpResultado.mid resultado do PvP (ainda não existe: enquanto isso toca vitoria.mid)
 
   Cartas SUPER (música especial de cada personagem; toca em loop enquanto o

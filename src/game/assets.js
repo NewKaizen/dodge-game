@@ -37,4 +37,6 @@ export const ASSETS = {
 
   // nome que aparece no canto de cima do menu inicial (troque junto com menu.mid)
   tituloMusicaMenu: 'CATSWING',
+  // nome no canto do lobby LAN (troque junto com lobby.mid)
+  tituloMusicaLobby: 'LOBBY',
 }

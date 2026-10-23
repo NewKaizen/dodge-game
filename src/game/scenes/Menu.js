@@ -7,14 +7,16 @@ import { BATIDA, TELA, LOGO, OPCOES as POS } from '../menu/layout.js'
 import { criarSala } from '../menu/sala.js'
 import { criarTelao } from '../menu/telao.js'
 import { criarLogo } from '../menu/logo.js'
+import { souHost } from '../../lib/lan/rede.js'
 
 // Tela inicial: um quarto escuro e calmo, com o caos preso no telão da parede
 // (uma luta de balas rolando) e a luz dele iluminando a sala e as silhuetas
 // dos lutadores. Logo no canto de cima à esquerda, opções alinhadas à
 // esquerda. CO-OP (-> EscolhaParty) e PVP (-> PvpEscolha): a luz do telão engole
-// a sala. GUIA (-> Grimorio: todas as cartas com a prévia do ataque e as
-// rodadas bônus de cada arena) e
-// CONFIGURAÇÕES (-> Config) só escurecem a tela. Embaixo da lista, uma linha diz o que a
+// a sala. LAN (-> Lan: lobby para jogar com outro PC da rede), GUIA (-> Grimorio:
+// todas as cartas com a prévia do ataque e as rodadas bônus de cada arena) e
+// CONFIGURAÇÕES (-> Config) só escurecem a tela. O host de uma sala LAN que
+// volta ao menu (fim da partida, SAIR da pausa) cai direto no lobby. Embaixo da lista, uma linha diz o que a
 // opção escolhida faz; sem joystick conectado, as opções ficam apagadas e a
 // linha vira um aviso pedindo para conectar.
 //
@@ -30,6 +32,7 @@ const CENA_PVP = 'PvpEscolha'
 const OPCOES = [
   { id: 'coop', rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty', dica: 'cartas juntos contra um chefe' },
   { id: 'pvp', rotulo: 'PVP', cor: '#ff3d6e', cena: CENA_PVP, dica: 'duelo de cartas: quem desvia, vence' },
+  { id: 'lan', rotulo: 'LAN', cor: '#3fd6c8', cena: 'Lan', dica: 'jogue com outro PC da mesma rede' },
   { id: 'cartas', rotulo: 'GUIA', cor: '#b48cff', cena: 'Grimorio', dica: 'todas as cartas e as rodadas bônus das arenas' },
   { id: 'config', rotulo: 'CONFIGURAÇÕES', cor: '#f2c14e', cena: 'Config', dica: 'som, controles, acessibilidade e gráficos' },
 ]
@@ -40,6 +43,11 @@ export default class Menu extends Phaser.Scene {
   }
 
   create() {
+    // host de uma sala LAN: o "menu" dele é o lobby
+    if (souHost()) {
+      this.scene.start('Lan')
+      return
+    }
     this.controles = new Controles(this)
     this.controles.onBotao((_, botao) => botao === 'A' && this.confirmar())
     this.saindo = false
@@ -151,7 +159,7 @@ export default class Menu extends Phaser.Scene {
     this.saindo = true
     const opcao = OPCOES[this.indice]
     this.registry.set('menuIndice', this.indice)
-    if (opcao.id === 'config' || opcao.id === 'cartas') {
+    if (opcao.id === 'config' || opcao.id === 'cartas' || opcao.id === 'lan') {
       tocar(this, 'confirmar')
       this.cameras.main.fadeOut(220, 0, 0, 0)
       this.time.delayedCall(240, () => this.scene.start(opcao.cena, { voltar: 'Menu' }))
@@ -166,6 +174,7 @@ export default class Menu extends Phaser.Scene {
   }
 
   update(time, delta) {
+    if (!this.controles) return // foi direto para o lobby LAN
     this.controles.atualizar()
     if (this.pronto && !this.saindo && this.conectado) {
       for (let j = 0; j < this.controles.numJogadores; j++) {

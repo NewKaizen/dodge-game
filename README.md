@@ -4,14 +4,16 @@ Jogo de esquiva estilo Deltarune/Undertale com cartas, feito com Svelte + Phaser
 
 - **CO-OP**: a dupla (ou 1 jogador + CPU aliada) contra um chefe que também joga cartas. Regras em [docs/coop-cartas.md](docs/coop-cartas.md).
 - **PVP**: um contra o outro (ou contra a CPU). Regras em [docs/pvp-regras.md](docs/pvp-regras.md).
+- **LAN**: os dois modos com o outro jogador em outro PC da mesma rede, com lobby (salas achadas sozinhas, chat, pronto). Como ligar em [docs/lan.md](docs/lan.md).
 
 Controle: joystick pela porta serial ([docs/protocolo-serial.md](docs/protocolo-serial.md)) ou o simulador de teclado da página.
 
 ```sh
 npm install
 npm run dev     # http://localhost:5173
-npm test        # regras do PvP, do CO-OP e fichas do Guia (node --test)
+npm test        # regras do PvP, do CO-OP, fichas do Guia e lobby LAN (node --test)
 npm run build
+npm run lan     # compila e serve o jogo para a rede (modo LAN): http://<ip>:5180
 ```
 
 - Ataques e músicas: [docs/ataques.md](docs/ataques.md).

@@ -1,3 +1,4 @@
+import './lib/lan/audioTap.js' // antes de qualquer som: copia o áudio para a transmissão LAN
 import { mount } from 'svelte'
 import App from './App.svelte'
 
