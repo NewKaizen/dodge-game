@@ -10,6 +10,7 @@ import { fogoArtificio, canhoesConfete, chuvaConfete, raiosDeLuz, CORES_FESTA } 
 import { shake } from '../effects/shake.js'
 import { flashTela, claraoCamera } from '../effects/flash.js'
 import { FONTE, LARGURA, ALTURA, TEXTO, NIVEIS } from '../constants.js'
+import { partidaOnline, sairDaPartidaOnline } from '../online.js'
 
 // Tela de vitória, em etapas com ritmo:
 //   silêncio + luz crescendo -> ESTOURO (flash, confete, fogos) -> "VITÓRIA!"
@@ -122,7 +123,8 @@ export default class Vitoria extends Phaser.Scene {
     this.saindo = true
     tocar(this, 'confirmar')
     this.cameras.main.fadeOut(250, 0, 0, 0)
-    this.time.delayedCall(260, () => this.scene.start(botao === 'A' ? 'CoopArena' : 'Selecao', { chefe: this.idChefe }))
+    const online = partidaOnline() // online: os dois voltam ao menu
+    this.time.delayedCall(260, () => (online ? sairDaPartidaOnline(this) : this.scene.start(botao === 'A' ? 'CoopArena' : 'Selecao', { chefe: this.idChefe })))
   }
 
   // ---------- etapas ----------
@@ -446,7 +448,7 @@ export default class Vitoria extends Phaser.Scene {
   liberar(rapido) {
     if (rapido) this.time.delayedCall(400, () => (this.liberado = true))
     else this.liberado = true
-    const opcoes = this.add.text(LARGURA / 2, ALTURA - 26, 'A: lutar de novo     B: escolher chefe', estilo(16)).setOrigin(0.5).setDepth(10).setAlpha(0)
+    const opcoes = this.add.text(LARGURA / 2, ALTURA - 26, partidaOnline() ? 'A: voltar ao menu' : 'A: lutar de novo     B: escolher chefe', estilo(16)).setOrigin(0.5).setDepth(10).setAlpha(0)
     this.tweens.add({
       targets: opcoes,
       alpha: 1,

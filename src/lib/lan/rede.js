@@ -61,6 +61,8 @@ export const souHost = () => estado().fase === 'sala' && estado().papel === 'hos
 export const souConvidado = () => estado().fase === 'sala' && estado().papel === 'convidado'
 export const emPartida = () => estado().fase === 'sala' && Boolean(estado().sala?.emPartida)
 export const souOnline = () => estado().online
+// partida ONLINE rolando (sem pausa, sem revanche: game/online.js)
+export const partidaOnline = () => estado().online && emPartida()
 export const parceiro = () => estado().sala?.membros.find((m) => m.id !== estado().eu.id) ?? null
 
 function enderecoCasa() {

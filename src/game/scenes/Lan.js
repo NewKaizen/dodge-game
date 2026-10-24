@@ -21,7 +21,7 @@ import {
   iniciarPartida,
   encerrarPartida,
 } from '../../lib/lan/rede.js'
-import { tela } from '../../lib/lan/transmissao.js'
+import { tela, pingPartida, ROTAS, corDoPing } from '../../lib/lan/transmissao.js'
 
 // Lobby do modo LAN e do ONLINE (Menu -> ONLINE; docs/lan.md, docs/online.md).
 // Quem decide é o servidor que serviu a página: `npm run lan` é LAN, o site na
@@ -62,6 +62,7 @@ export default class Lan extends Phaser.Scene {
     this.comecando = false
     this.musicaTocando = false
     this.pediuNome = false // online: já abriu o campo do nome sozinho
+    this.estavaAssistindo = false
     this.view = this.add.container(0, 0).setDepth(10)
     this.dinamicos = [] // objetos animados no update() (cursor, pontinhos)
 
@@ -73,12 +74,14 @@ export default class Lan extends Phaser.Scene {
     this.tela = null
     const pararLan = lan.subscribe((s) => (this.s = s))
     const pararTela = tela.subscribe((t) => (this.tela = t))
+    const pararPing = pingPartida.subscribe((p) => (this.pingPartida = p))
     // voltou de uma partida (o Menu mandou para cá): avisa que acabou
     if (this.s.papel === 'host' && this.s.sala?.emPartida) encerrarPartida()
 
     this.events.once('shutdown', () => {
       pararLan()
       pararTela()
+      pararPing()
       this.cancelarTexto?.()
     })
     this.cameras.main.fadeIn(300)
@@ -224,7 +227,7 @@ export default class Lan extends Phaser.Scene {
     const s = this.s
     const itens = this.itens()
     const i = this.indiceSelecionado(itens)
-    const assinatura = JSON.stringify([this.modoTela, s.fase, s.online, s.eu.nome, s.salas, s.sala, s.chat.length, s.erro, s.enderecos, this.selId, this.digitando, this.tela?.estado, this.tela?.modo])
+    const assinatura = JSON.stringify([this.modoTela, s.fase, s.online, s.eu.nome, s.salas, s.sala, s.chat.length, s.erro, s.enderecos, this.selId, this.digitando, this.tela?.estado, this.tela?.modo, s.ping, this.pingPartida])
     if (assinatura === this.assinatura) return
     this.assinatura = assinatura
     this.view.removeAll(true)
@@ -391,12 +394,18 @@ export default class Lan extends Phaser.Scene {
       }
       const voce = m.id === s.eu.id ? '  (você)' : ''
       t(x + 46, y + 44, `${m.nome}${voce}`, 16, TEXTO.normal).setOrigin(0, 0.5)
-      const ping = m.papel === 'host' && s.papel === 'host' ? 'neste PC' : m.ping != null ? `ping ${m.ping} ms` : 'ping …'
+      // ping de cada um até o servidor (o seu, medido aqui, é o mais fresco)
+      const ms = m.id === s.eu.id ? s.ping ?? m.ping : m.ping
       const pingAlto = s.online ? 150 : 60
-      t(x + 14, y + 84, ping, 11, m.ping != null && m.ping > pingAlto ? '#ffb040' : '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
+      t(x + 14, y + 84, ms != null ? `servidor ${ms} ms` : 'servidor …', 11, ms != null && ms > pingAlto ? '#ffb040' : '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
       const pronto = m.papel === 'host' || m.pronto
       t(x + largura - 14, y + 84, m.papel === 'host' ? 'ESCOLHE O MODO' : pronto ? 'PRONTO!' : 'ESPERANDO…', 12, pronto ? COR.ok : '#ffb040').setOrigin(1, 0.5)
     })
+
+    // a ligação entre os dois PCs (a que vale na partida)
+    const p = this.pingPartida
+    if (vagas[1] && p?.ms != null)
+      t(LARGURA / 2, 216, `ping entre vocês: ${p.ms} ms (${ROTAS[p.rota]})`, 12, corDoPing(p.ms), { strokeThickness: 0 }).setOrigin(0.5)
 
     // ações (esquerda)
     const xOp = 40
@@ -575,6 +584,11 @@ export default class Lan extends Phaser.Scene {
         if ((d === 'esquerda' || d === 'direita') && this.selId === 'modo') this.trocarModo(d === 'direita' ? 1 : -1)
       }
     }
+
+    // convidado online: a partida acabou (ou a sala caiu) -> menu inicial (game/online.js)
+    const assistindo = this.modoTela === 'assistindo'
+    if (this.estavaAssistindo && !assistindo && this.s.online && !this.saindo && this.s.fase !== 'sala') return this.voltarAoMenu()
+    this.estavaAssistindo = assistindo
 
     // online, na primeira vez: o jogo já pede o nome de usuário
     if (this.s.online && !this.s.eu.escolheuNome && !this.pediuNome && this.s.fase === 'navegando' && !this.digitando && !this.saindo) {

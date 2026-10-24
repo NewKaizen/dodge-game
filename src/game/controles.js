@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { partidaOnline } from './online.js'
 
 const LIMIAR = 50 // quanto o joystick precisa inclinar para contar como direção nos menus
 
@@ -14,8 +15,8 @@ export default class Controles {
     this.toques = []
 
     const aoBotao = ({ jogador, botao }) => {
-      // o botão de pause vale para qualquer jogador
-      if (botao === 'C') return this.ouvintesPausa.forEach((fn) => fn(jogador))
+      // o botão de pause vale para qualquer jogador (na partida online não tem pausa)
+      if (botao === 'C') return partidaOnline() ? undefined : this.ouvintesPausa.forEach((fn) => fn(jogador))
       const j = this.numJogadores === 1 ? 0 : jogador
       if (j >= this.numJogadores) return
       this.ouvintes.forEach((fn) => fn(j, botao))

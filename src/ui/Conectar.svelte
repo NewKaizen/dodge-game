@@ -5,7 +5,7 @@
   import { iniciarSimulador, pararSimulador } from '../lib/simulador.js'
   import { alternarTelaCheia } from '../lib/telaCheia.js'
   import { lan, sairSala } from '../lib/lan/rede.js'
-  import { tela } from '../lib/lan/transmissao.js'
+  import { tela, pingPartida, ROTAS, corDoPing } from '../lib/lan/transmissao.js'
 
   // modo LAN/ONLINE: na sala o número de jogadores é o da sala (sempre 2)
   let naSala = $derived($lan.fase === 'sala')
@@ -41,7 +41,9 @@
   <div class="conectar lan">
     <span>{$lan.online ? `ONLINE · sala ${$lan.sala.codigo}` : `LAN · ${$lan.sala.nome}`} · você é {$lan.papel === 'host' ? 'o HOST (P1)' : 'o CONVIDADO (P2)'}</span>
     {#if outro}
-      <span class="dica">com {outro.nome}{outro.ping != null ? ` · ${outro.ping} ms` : ''} · {ESTADOS[$tela.estado]}</span>
+      <span class="dica">com {outro.nome} · {ESTADOS[$tela.estado]}{$pingPartida.fps != null ? ` · ${$pingPartida.fps} fps` : ''}</span>
+      <span class="ping" style:color={corDoPing($pingPartida.ms)}>ping {$pingPartida.ms ?? '…'} ms{$pingPartida.rota ? ` (${ROTAS[$pingPartida.rota]})` : ''}</span>
+      <span class="dica">servidor: você {$lan.ping ?? '…'} ms · {outro.nome} {outro.ping ?? '…'} ms</span>
     {:else}
       <span class="dica">esperando alguém entrar</span>
     {/if}
@@ -88,5 +90,11 @@
   .lan {
     color: #6dffb0;
     font-size: 13px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .ping {
+    font-weight: bold;
   }
 </style>
