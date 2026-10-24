@@ -9,7 +9,7 @@ import { shake } from '../effects/shake.js'
 import { TEXTO_JOGADOR } from '../pvp/perfil.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 import { claraoCamera } from '../effects/flash.js'
-import { partidaOnline, sairDaPartidaOnline } from '../online.js'
+import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
 
 // Tela de fim da partida PvP, em etapas (como a Vitoria):
 //   ENTRADA DO VENCEDOR (não tem no empate; ver entradaVencedor: faixa na cor
@@ -144,12 +144,12 @@ export default class PvpResultado extends Phaser.Scene {
       return
     }
     this.saindo = true
-    const online = partidaOnline() // online não tem revanche: os dois voltam ao menu
+    const online = partidaOnline() // online não tem revanche: os dois voltam ao lobby da sala
     tocar(this, botao === 'A' || online ? 'confirmar' : 'cancelar')
     this.cameras.main.fadeOut(250, 0, 0, 0)
     const { p1, p2, arena } = this
     this.time.delayedCall(260, () => {
-      if (online) sairDaPartidaOnline(this)
+      if (online) voltarAoLobbyOnline(this)
       else if (botao === 'A') this.scene.start('PvpArena', { p1, p2, arena })
       else this.scene.start('PvpEscolha')
     })
@@ -585,7 +585,7 @@ export default class PvpResultado extends Phaser.Scene {
     if (rapido) this.time.delayedCall(400, () => (this.liberado = true))
     else this.liberado = true
     const opcoes = this.add
-      .text(LARGURA / 2, ALTURA - 26, partidaOnline() ? 'A: VOLTAR AO MENU' : 'A: REVANCHE     B: TROCAR PERSONAGENS', estilo(16))
+      .text(LARGURA / 2, ALTURA - 26, partidaOnline() ? 'A: VOLTAR AO LOBBY' : 'A: REVANCHE     B: TROCAR PERSONAGENS', estilo(16))
       .setOrigin(0.5)
       .setDepth(10)
       .setAlpha(0)

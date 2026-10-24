@@ -12,7 +12,7 @@ As salas online são privadas: não aparecem em lista nenhuma, só entra quem te
 ### Regras da partida online
 
 - **Sem pausa**: o C (e o Esc) não fazem nada durante a partida (pausar travaria o amigo).
-- **Sem revanche**: no fim, a única opção é **A: VOLTAR AO MENU**; a sala fecha e os dois voltam ao menu inicial. Para jogar de novo, cria outra sala.
+- **Sem revanche**: no fim, a única opção é **A: VOLTAR AO LOBBY**: os dois voltam para o lobby da sala (que continua aberta), com o chat, e o host começa outra partida quando quiser.
 - Se o convidado sai no meio, o host volta para o lobby da sala; para sair no meio, use **Sair da sala** na barra de cima.
 
 ### Ping
