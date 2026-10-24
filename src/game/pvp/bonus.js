@@ -232,6 +232,21 @@ export function quantiaCopiada(fracao, cfg = COPIA) {
   return 1 + cfg.faixas.filter((f) => fracao >= f).length
 }
 
+// O marcador do cabo de guerra a partir dos apertos dos dois: vantagem do P1 em
+// apertos (> 0 = P1 copiando, < 0 = P2), presa na ponta da barra (±cheio). Em
+// rede cada PC conta os próprios apertos; a tela e o host usam os dois números.
+export function caboDaCopia(apertos, cfg = COPIA) {
+  return Math.max(-cfg.cheio, Math.min(cfg.cheio, (apertos?.[0] ?? 0) - (apertos?.[1] ?? 0)))
+}
+
+// Quem copia e quanto com o marcador em `cabo`: { vencedor (0, 1 ou null no
+// empate), fracao (0..1 da barra), quantia }
+export function apurarCopia(cabo, cfg = COPIA) {
+  const fracao = Math.min(1, Math.abs(cabo) / cfg.cheio)
+  const vencedor = cabo > 0 ? 0 : cabo < 0 ? 1 : null
+  return { vencedor, fracao, quantia: vencedor === null ? 0 : quantiaCopiada(fracao, cfg) }
+}
+
 // Valida e resolve a rodada do CTRL+C CTRL+V (no lugar de resolverRodada):
 // como no duelo, a carta só precisa estar na mão e vai para o descarte sem
 // gastar energia (sem efeitos de copas/Ases).

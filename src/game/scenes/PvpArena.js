@@ -21,6 +21,7 @@ import { criarFundo } from '../backgrounds/index.js'
 import { anunciarBonus } from '../pvp/bonus/anuncio.js'
 import Duelo from '../pvp/bonus/Duelo.js'
 import Copia from '../pvp/bonus/Copia.js'
+import { canal, emRede, meuLado, souHostDaRede } from '../rede.js'
 import { shake } from '../effects/shake.js'
 import { flashTela, claraoCamera } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
@@ -681,13 +682,15 @@ export default class PvpArena extends Phaser.Scene {
     this.fase = 'duelo'
     this.ko = [false, false]
     const semente = `${this.semente}:duelo:${this.estado.rodada}`
+    // em rede o duelo/cópia simula só o lado daqui (pvp/bonus/redeDuelo.js, redeCopia.js)
+    const rede = emRede() ? { canal, meuLado: meuLado(), souHost: souHostDaRede(), rodada: this.estado.rodada } : null
     if (r.copia) {
       // CTRL+C CTRL+V: o minigame ocupa o lugar do duelo (mesma interface)
       this.dica.setText('aperte A sem parar!')
-      this.duelo = new Copia(this, { cpu: this.cpu, nivelBot: this.nivelBot, semente })
+      this.duelo = new Copia(this, { cpu: this.cpu, nivelBot: this.nivelBot, semente, rede })
     } else {
       this.dica.setText(this.cpu === null ? 'mira automática   A: atacar' : 'mira automática   A: atacar   (a CPU também luta!)')
-      this.duelo = new Duelo(this, { armas: r.armas, cpu: this.cpu, nivelBot: this.nivelBot, semente, aceleracao: this.aceleracao })
+      this.duelo = new Duelo(this, { armas: r.armas, cpu: this.cpu, nivelBot: this.nivelBot, semente, aceleracao: this.aceleracao, rede })
     }
     await this.duelo.rodar()
     this.duelo = null

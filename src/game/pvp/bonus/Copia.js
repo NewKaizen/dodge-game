@@ -4,8 +4,9 @@ import { CORES_CARTA } from '../../entities/Carta.js'
 import { criarRng, aleatorio } from '../baralho.js'
 import { shake } from '../../effects/shake.js'
 import { particulas } from '../../effects/particulas.js'
-import { COPIA, quantiaCopiada, copiarEnergia } from '../bonus.js'
+import { COPIA, copiarEnergia, caboDaCopia, apurarCopia } from '../bonus.js'
 import { BotCopia } from './botCopia.js'
+import { RedeCopia } from './redeCopia.js'
 import { claraoCamera } from '../../effects/flash.js'
 
 // CTRL+C CTRL+V (bonus round da SALA DE INFORMÁTICA): no lugar de arremesso +
@@ -21,6 +22,8 @@ import { claraoCamera } from '../../effects/flash.js'
 //   import Copia from '../pvp/bonus/Copia.js'
 //   const copia = new Copia(arena, { cpu: arena.cpu, nivelBot: arena.nivelBot, semente })
 //     cpu    lado da CPU (ou null); `cpus: [0, 1]` põe a CPU nos dois (testes)
+//     rede   partida EM REDE (docs/rede-pvp.md): { canal, meuLado, souHost, rodada }
+//            ou null (local / CPU, como sempre). Ver "Em rede" abaixo.
 //   await copia.rodar()     tudo (abre, explica, 3-2-1, disputa, resultado, fecha); resolve com
 //                           { motivo: 'tempo' | 'cheio' | 'parado', apertos, vencedor, quantia, perdeu, ganhou }
 //   copia.atualizar(delta)  todo frame (a arena chama enquanto fase === 'duelo')
@@ -32,6 +35,15 @@ import { claraoCamera } from '../../effects/flash.js'
 //
 // Tudo fica num container no meio da tela (câmera principal), por cima da
 // mesa vazia (as mãos já desceram, como no duelo).
+//
+// Em rede (redeCopia.js): cada PC conta só os PRÓPRIOS apertos e manda o total;
+// o do outro chega (apertosDoOutro) e o cabo é a diferença dos dois
+// (caboDaCopia). O 3-2-1 começa com o copiaPronto dos dois; o fim de um
+// (copiaFinal) acaba a disputa do outro. Quem copia e quanto é o HOST que
+// decide, com o total final dos dois; só ele aplica copiarEnergia e o
+// convidado mostra o resultado que chega (a energia dele só muda quando a
+// arena sincroniza o `estado` no fim da rodada; até lá a animação usa os
+// números do host).
 
 const JANELA = { x: 320, y: 200, largura: 430, altura: 228, titulo: 18 }
 const W = JANELA.largura / 2
@@ -54,10 +66,11 @@ const misturar = (a, b, t) => {
 }
 
 export default class Copia {
-  constructor(arena, { cpu = null, cpus = null, nivelBot = 'normal', semente = 'copia', cfg = COPIA } = {}) {
+  constructor(arena, { cpu = null, cpus = null, nivelBot = 'normal', semente = 'copia', cfg = COPIA, rede = null } = {}) {
     this.arena = arena
     this.cfg = cfg
-    const ladosCpu = cpus ?? (cpu === null || cpu === undefined ? [] : [cpu])
+    // em rede os dois lados são gente (cada um no seu PC)
+    const ladosCpu = rede ? [] : cpus ?? (cpu === null || cpu === undefined ? [] : [cpu])
     const rng = criarRng(`${semente}:copia`)
     const sorte = () => aleatorio(rng)
     this.bots = [0, 1].map((j) => (ladosCpu.includes(j) ? new BotCopia({ nivel: nivelBot, rng: sorte, duracaoMs: cfg.duracaoMs }) : null))
@@ -72,10 +85,12 @@ export default class Copia {
     this.exibido = 0 // o marcador desenhado (anda atrás do cabo, suave)
     this.lider = null
     this.final = null // { vencedor, quantia, perdeu, ganhou }
+    this.energiasFinais = null // a energia dos dois depois da cópia (o convidado não aplica: mostra estas)
     this.voando = 0
     this.objetos = new Set()
     this.pendentes = new Set()
     this.ultimoSegundo = null
+    this.rede = rede ? new RedeCopia(this, rede) : null
   }
 
   // ---------- utilidades ----------
@@ -128,12 +143,18 @@ export default class Copia {
   }
 
   energia(j) {
-    return this.arena.estado?.jogadores?.[j]?.energia ?? 0
+    return this.energiasFinais?.[j] ?? this.arena.estado?.jogadores?.[j]?.energia ?? 0
+  }
+
+  // em rede: o lado j aperta neste PC?
+  daqui(j) {
+    return !this.rede || j === this.rede.meuLado
   }
 
   // que teclas o lado j usa (teclado do simulador; no joystick é o botão A)
   teclas(j) {
     if (this.bots[j]) return 'CPU'
+    if (this.rede) return this.daqui(j) ? 'Z / ESPAÇO / ENTER' : 'no outro PC'
     if ((this.arena.numJogadores ?? 2) < 2) return 'Z / ESPAÇO / ENTER'
     return j ? 'ENTER' : 'Z / ESPAÇO'
   }
@@ -149,6 +170,9 @@ export default class Copia {
     try {
       if (this.arena.ko) this.arena.ko = [false, false]
       await this.abrir()
+      if (this.parado) return this.resultado()
+      // em rede: o 3-2-1 começa quando os dois abriram a janela
+      await this.rede?.sincronizarInicio()
       if (this.parado) return this.resultado()
       await this.apresentar()
       if (this.parado) return this.resultado()
@@ -381,9 +405,14 @@ export default class Copia {
     this.desenharBarra()
     if (a.textoRelogio) a.textoRelogio.setText('')
     this.textoTempo.setText('Tempo restante: 0 segundos')
-    const fracao = Math.abs(this.cabo) / this.cfg.cheio
-    const vencedor = this.cabo > 0 ? 0 : this.cabo < 0 ? 1 : null
-    const quantia = vencedor === null ? 0 : quantiaCopiada(fracao, this.cfg)
+    // quem copia e quanto: aqui mesmo ou, em rede, o host (o convidado espera o resultado dele)
+    const decisao = this.rede ? await this.rede.decidir(this) : this.decidir()
+    if (this.parado) return
+    // o host sumiu (a cena já vai ser trocada): "erro ao copiar"
+    const { apertos, cabo, vencedor, quantia, perdeu, ganhou, energias } = decisao ?? { apertos: this.apertos, cabo: 0, vencedor: null, quantia: 0, perdeu: 0, ganhou: 0, energias: null }
+    if (decisao?.motivo) this.motivo = decisao.motivo
+    this.mostrarApertos(apertos, cabo)
+    const fracao = apurarCopia(cabo, this.cfg).fracao
     this.final = { vencedor, quantia, perdeu: 0, ganhou: 0 }
 
     if (vencedor === null) {
@@ -404,16 +433,17 @@ export default class Copia {
       const pasta = this.pastas[vencedor]
       particulas(a, JANELA.x + pasta.x, JANELA.y + PASTA.y, { cor: CORES.almas[vencedor], quantidade: 16, velocidade: 140 })
 
-      const { perdeu, ganhou } = copiarEnergia(a.estado, perdedor, vencedor, quantia)
       this.final.perdeu = perdeu
       this.final.ganhou = ganhou
+      const antes = energias ?? [0, 1].map((j) => this.energia(j))
+      this.energiasFinais = antes.map((e, j) => (j === vencedor ? e + ganhou : j === perdedor ? e - perdeu : e))
       let frase = `${this.rotulo(vencedor)} copiou ${ganhou} de energia de ${this.rotulo(perdedor)}!`
       if (!perdeu) frase = `...mas ${this.rotulo(perdedor)} estava sem energia!`
       else if (ganhou < perdeu) frase = `${this.rotulo(perdedor)} perdeu ${perdeu} (${this.rotulo(vencedor)} já estava cheio)`
       this.subtitulo.setText(frase).setColor('#000000')
       await this.esperar(350)
       if (this.parado) return
-      await this.voarEnergia(perdedor, vencedor, perdeu, ganhou)
+      await this.voarEnergia(perdedor, vencedor, perdeu, ganhou, antes)
       if (this.parado) return
       this.atualizarPastas()
       await this.esperar(RESULTADO_MS - 500)
@@ -423,6 +453,25 @@ export default class Copia {
     this.estagio = 'fechando'
     tocar(a, 'fecharJanela')
     await this.tween({ targets: this.janela, scaleX: 0.1, scaleY: 0.05, alpha: 0, duration: 200, ease: 'Cubic.easeIn' })
+  }
+
+  // Apura (pvp/bonus.js: apurarCopia) e passa a energia pelas regras. Sozinho
+  // com os apertos daqui; em rede só o host chama, com o total final dos dois.
+  //   -> { apertos, cabo, vencedor, quantia, perdeu, ganhou, energias (antes da cópia) }
+  decidir(apertos = this.apertos, cabo = this.cabo) {
+    const { vencedor, quantia } = apurarCopia(cabo, this.cfg)
+    const energias = [0, 1].map((j) => this.energia(j))
+    const { perdeu, ganhou } = vencedor === null ? { perdeu: 0, ganhou: 0 } : copiarEnergia(this.arena.estado, outro(vencedor), vencedor, quantia)
+    return { apertos: [...apertos], cabo, vencedor, quantia, perdeu, ganhou, energias }
+  }
+
+  // o placar que valeu (em rede o do host: o "×n" e a barra ficam iguais nos dois)
+  mostrarApertos(apertos, cabo) {
+    this.apertos = [...apertos]
+    this.cabo = cabo
+    this.exibido = cabo
+    this.desenharBarra()
+    for (const t of this.teclasJ ?? []) t.conta.setText(`×${this.apertos[t.j]}`)
   }
 
   // a caixinha de erro do empate
@@ -446,17 +495,19 @@ export default class Copia {
   }
 
   // as gemas saem do HUD de quem perdeu e entram no de quem copiou (uma por vez)
-  async voarEnergia(de, para, perdeu, ganhou) {
+  //   antes: a energia dos dois antes da cópia
+  async voarEnergia(de, para, perdeu, ganhou, antes) {
     const a = this.arena
     const huds = a.huds
     if (!perdeu || !huds?.[de] || !huds?.[para]) {
-      a.atualizarHuds?.()
+      // o convidado em rede não aplicou nada: o HUD dele espera a arena sincronizar
+      if (!this.rede || this.rede.souHost) a.atualizarHuds?.()
       return
     }
     const origem = huds[de].pontoEnergia
     const destino = huds[para].pontoEnergia
-    const energiaDe = this.energia(de) + perdeu
-    const energiaPara = this.energia(para) - ganhou
+    const energiaDe = antes[de]
+    const energiaPara = antes[para]
     const voos = []
     for (let k = 0; k < perdeu; k++) {
       voos.push(
@@ -516,6 +567,7 @@ export default class Copia {
     if (this.estagio !== 'luta' || this.motivo) return
     this.motivo = motivo
     this.estagio = 'fim'
+    this.rede?.acabei(motivo, this.apertos[this.rede.meuLado])
     this.aoAcabar?.()
   }
 
@@ -533,6 +585,7 @@ export default class Copia {
     if (this.limpo) return
     this.limpo = true
     this.estagio = this.parado ? 'parado' : 'acabou'
+    this.rede?.desligar()
     const a = this.arena
     if (a.textoRelogio?.scene) a.textoRelogio.setText('')
     for (const o of this.objetos) {
@@ -548,7 +601,7 @@ export default class Copia {
 
   // humano apertou A no lado j
   atacar(j) {
-    if (this.bots[j]) return
+    if (this.bots[j] || !this.daqui(j)) return
     this.apertar(j)
   }
 
@@ -561,15 +614,36 @@ export default class Copia {
     if (this.relogio - this.ultimoAperto[j] < this.cfg.intervaloMinMs) return false
     this.ultimoAperto[j] = this.relogio
     this.apertos[j]++
-    this.cabo = Math.max(-this.cfg.cheio, Math.min(this.cfg.cheio, this.cabo + (j ? -1 : 1)))
+    this.rede?.apertei(this.apertos[j])
     this.efeitoAperto(j)
+    this.mudouCabo()
+    return true
+  }
+
+  // o cabo (a diferença dos apertos: pvp/bonus.js caboDaCopia), quem lidera e a barra cheia
+  mudouCabo() {
+    this.cabo = caboDaCopia(this.apertos, this.cfg)
     const lider = this.cabo > 0 ? 0 : this.cabo < 0 ? 1 : null
     if (lider !== this.lider) {
       this.lider = lider
       this.subtitulo.setText(lider === null ? 'quem vai copiar quem?' : `copiando energia de ${this.rotulo(outro(lider))} para ${this.rotulo(lider)}...`)
     }
     if (Math.abs(this.cabo) >= this.cfg.cheio) this.acabar('cheio')
-    return true
+  }
+
+  // em rede: o total de apertos do outro chegou (copiaApertos, ou o copiaFinal dele)
+  apertosDoOutro(n) {
+    const j = this.rede?.outroLado
+    if (j === undefined || !(n > this.apertos[j]) || !['contagem', 'luta'].includes(this.estagio)) return
+    this.apertos[j] = Math.floor(n)
+    this.efeitoAperto(j)
+    this.mudouCabo()
+  }
+
+  // em rede: a disputa acabou no PC do outro (copiaFinal): acaba aqui também
+  fimDoOutro({ apertos, motivo } = {}) {
+    this.apertosDoOutro(Number(apertos) || 0)
+    this.acabar(motivo === 'cheio' ? 'cheio' : 'tempo')
   }
 
   efeitoAperto(j) {
@@ -661,6 +735,7 @@ export default class Copia {
       cpu: this.bots.map(Boolean),
       final: this.final ? { ...this.final } : null,
       objetos: this.objetos.size,
+      rede: this.rede ? { meuLado: this.rede.meuLado, souHost: this.rede.souHost } : null,
     }
   }
 }
