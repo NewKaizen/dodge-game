@@ -28,7 +28,8 @@ function trocarCena(game, destino) {
 export function instalarOnline(game) {
   let comParceiro = false // host com a partida online rolando e o convidado na sala
   return lan.subscribe((s) => {
-    const naSala = s.fase === 'sala' && s.online && s.papel === 'host'
+    // o PVP em rede tem o próprio vigia (game/rede.js); aqui é o CO-OP (Remote Play)
+    const naSala = s.fase === 'sala' && s.online && s.papel === 'host' && s.sala?.modo !== 'pvp'
     const agora = naSala && Boolean(s.sala?.emPartida) && s.sala.membros.length > 1
     if (comParceiro && !agora) {
       if (!naSala) trocarCena(game, 'Menu') // a sala caiu

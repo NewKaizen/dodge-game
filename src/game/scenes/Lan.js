@@ -22,6 +22,7 @@ import {
   encerrarPartida,
 } from '../../lib/lan/rede.js'
 import { tela, pingPartida, ROTAS, corDoPing } from '../../lib/lan/transmissao.js'
+import { encerrarRede } from '../rede.js'
 
 // Lobby do modo LAN e do ONLINE (Menu -> ONLINE; docs/lan.md, docs/online.md).
 // Quem decide é o servidor que serviu a página: `npm run lan` é LAN, o site na
@@ -70,6 +71,7 @@ export default class Lan extends Phaser.Scene {
     this.montarCabecalho()
 
     abrirLobby()
+    encerrarRede() // no lobby não tem partida em rede
     this.s = null
     this.tela = null
     const pararLan = lan.subscribe((s) => (this.s = s))
