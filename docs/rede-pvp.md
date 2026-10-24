@@ -47,15 +47,17 @@ Como cada tela usa essas mensagens:
 
 | Tipo | Chave | De → para | Dados |
 | --- | --- | --- | --- |
-| `inicio` | rodada | host → conv. | `{ estado }` depois de `iniciarRodada` (mãos iguais nos dois) |
+| `inicio` | rodada | host → conv. | `{ estado, bonusPendente }` depois de `iniciarRodada` (mãos iguais nos dois) e de decidir se a rodada é bônus (`true`, ou o id forçado por `forcarBonus`) |
 | `jogada` | rodada | os dois | `{ jogada }`: id da carta ou `null` (passou; também quando o tempo acaba) |
-| `resolucao` | rodada | host → conv. | `{ jogadas, bonus, trocas, resultado, estado }`: o que a rodada deu (evento sorteado, malucas, resultado de `resolverRodada`/`resolverDuelo`/`resolverCopia`) |
-| `coracao` (rápida) | | os dois | `{ x, y, ... }` posição do MEU coração na caixa onde ele está |
-| `dano` | | dono → outro | `{ lado, dano }` (o outro aplica com as regras: escudo, 2ª chance...) |
-| `graze` | | dono → outro | `{ lado, n }` |
-| `fimEsquiva` | rodada | os dois | `{ acertos, perfeito, ... }` do meu coração: terminei a minha caixa |
+| `cursor` (rápida) | | os dois | `{ tela: 'arena', indice, passar, r }`: o cursor da minha mão (`r` = rodada) |
+| `resolucao` | rodada | host → conv. | `{ jogadas, bonus, adiado, resultado, estado }`: o que a rodada deu (`bonus` = id do evento sorteado ou `null`; `adiado` = bônus empurrado pelo SUPER; `resultado` de `resolverRodada`/`resolverDuelo`/`resolverCopia`, com `resultado.trocas` nas cartas malucas) |
+| `coracao` (rápida) | | os dois | `{ x, y, k, r }` posição do MEU coração na caixa `k` onde ele está (`r` = rodada) |
+| `dano` | | dono → outro | `{ lado, dano, r }` (o outro aplica com as regras: escudo, 2ª chance...) |
+| `graze` | | dono → outro | `{ lado, n, r }` |
+| `fimEsquiva` | rodada | os dois | `{ acertos, ko }` do meu coração: terminei a minha caixa (também depois do duelo e do CTRL+C CTRL+V) |
 | `fimRodada` | rodada | host → conv. | `{ estado, vencedor }` |
-| `resultado` | | host → conv. | dados da `PvpResultado` (vai junto com `irParaCena`) |
+| `resultadoPronto` | rodada | conv. → host | `{}`: o replay do K.O. acabou aqui (o host espera, no máximo 20 s, e abre a `PvpResultado` nos dois com `irParaCena`) |
+| `debug` (só no dev) | | os dois | `{ acao, args }`: `forcarMao`/`setHp`/`setEnergia` valem nos dois PCs; `forcarBonus` do convidado vai para o host |
 
 ### Duelo e CTRL+C CTRL+V (parte C)
 
@@ -76,10 +78,25 @@ Como cada tela usa essas mensagens:
 - Em rede, o duelo só chama `arena.acertou(j, dano)` para `j === meuLado` (o coração daqui). A arena (B) manda o `dano` para o outro PC e aplica o dano que chega dele. O duelo nunca aplica dano no coração do outro.
 - `arena.nocaute(j)` e `duelo.nocaute(j)` continuam como estão: a arena chama quando o HP zera, venha o dano daqui ou de lá.
 
+## A arena em rede (parte B)
+
+`PvpArena` cria `pvp/rede/ArenaRede.js` (`this.rede`) quando abre com `emRede()`; sem rede `this.rede` é `null` e tudo é como antes (2 locais, CPU, e a `CoopArena`, que estende a `PvpArena` e nunca entra em rede). As peças puras (comparar estados, interpolar o coração do outro) ficam em `pvp/rede/sincronia.js`, testadas em `pvp/__tests__/redeArena.test.js`.
+
+Uma rodada em rede:
+
+1. **inicio**: o host faz `iniciarRodada` e decide se é bônus; manda `inicio`. O convidado faz a mesma conta (só para conferir) e fica com o estado do host.
+2. **escolha**: cada um escolhe na própria mão; a mão do outro mostra o cursor dele (`cursor`) e "PRONTO!" quando a `jogada` dele chega (a carta dele vira na mão, como no local). O relógio só passa o **meu** lado. Confirmar é definitivo.
+3. **resolução**: o host valida as jogadas (inválida vira passar, com aviso), sorteia o evento bônus, as malucas e a arma do duelo (`rngBonus`, só no host) e resolve; manda `resolucao`. Os dois mostram a mesma roleta e a mesma revelação. A roleta e os efeitos dos eventos (`pvp/bonus/eventos/`) usam RNGs próprios da rodada (`<semente>:roleta:<rodada>`, `<semente>:efeito:<rodada>`): iguais nos dois PCs e sem mexer no `rngBonus` de regra.
+4. **esquiva**: cada PC simula a caixa onde está o **seu** coração (no CORAÇÃO TROCADO, a do outro). `acertou`/`grazeou` só valem para o coração daqui (vêm das pistas, dos eventos como ESTÁTUA e BRASAS, e do duelo): aplicam na hora e mandam `dano`/`graze`. O que chega do outro entra em `aplicarAcerto`/`aplicarGraze` (as regras daqui, sem mandar de volta) e o coração espelho pisca; se chegar antes da esquiva começar aqui (o outro está adiantado), espera numa fila até ela começar. A outra caixa tem `pista.espelho = true`: o coração dela não anda pelo joystick nem colide; anda pelas posições de `coracao` (~30/s), 100 ms atrasado e interpolado. ♦ Q/K inverte o joystick do coração daqui (a caixa espelho só mostra o aviso). Quando a minha caixa acaba mando `fimEsquiva` (e o meu coração não leva mais nada nesta rodada); os dois esperam o do outro. Como o canal é em ordem, depois disso os dois têm os mesmos acertos e K.O.s, e o desvio perfeito sai igual.
+5. **duelo / CTRL+C CTRL+V**: a arena cria o `Duelo`/`Copia` com `rede` (contrato acima), aplica o `dano` que chega e, no fim, também troca `fimEsquiva`.
+6. **fim**: o host faz `fimDaRodada` e manda `fimRodada`; o convidado confere e troca. O K.O. (câmera lenta, replay) acontece nos dois quando o HP zera, venha o dano daqui ou de lá. Depois do "VENCEU!" o convidado manda `resultadoPronto` e fica esperando; o host espera por ele e abre a `PvpResultado` nos dois com os dados de sempre (as estatísticas do host valem: ele aplicou o dano e os grazes dos dois).
+
+Estado divergiu? O convidado avisa no console (`[rede] estado divergiu`, com os caminhos que mudaram) e segue com o do host. Esperas de sincronia param quando a cena sai (`this.saindo`: o outro saiu e `rede.js` tirou os dois da cena) e avisam no console a cada 30 s parados.
+
 ## Testando
 
 - `ONLINE=1 npx vite --port <porta> --strictPort` liga o jogo com o lobby online.
 - Duas abas (dois contextos do Playwright) entram na mesma sala pelo código. No host, `debugRede.iniciar('PvpArena', { p1: 'kris', p2: 'susie' })` abre a arena em rede nos dois, pulando as telas antes.
 - `debugRede.atraso(150, 50)` nas duas abas simula internet ruim (150 ms + até 50 de variação em cada sentido). **Todo o PVP precisa funcionar assim**: o coração de cada um responde na hora, e só o que vem do outro chega atrasado.
-- `window.pvpArena` (dev) tem `estadoDebug()`, `forcarMao`, `setHp`, `forcarBonus(id)`.
+- `window.pvpArena` (dev) tem `estadoDebug()` (com `rede: { meuLado, souHost, espelhos }`), `forcarMao`, `setHp`, `setEnergia`, `forcarBonus(id)`. Em rede, chamados num PC valem nos dois (o `forcarBonus` vale na próxima rodada, decidida pelo host).
 - Os testes `npm test` continuam passando; a lógica pura nova ganha teste em `__tests__`.

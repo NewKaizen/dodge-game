@@ -29,6 +29,8 @@ import { fogoArtificio, canhoesConfete, chuvaConfete } from '../effects/festa.js
 import { anunciarSuper } from '../pvp/super/anuncio.js'
 import FimDePartida from '../pvp/fimDePartida/index.js'
 import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe } from '../../lib/saida.js'
+import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
+import ArenaRede from '../pvp/rede/ArenaRede.js'
 
 // Partida PvP de cartas. Junta as peças de pvp/ (regras, baralho, cartas,
 // Pista) com o visual das cartas (Carta, Mao). Regras em docs/pvp-regras.md.
@@ -45,6 +47,7 @@ import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe } from '../../lib/
 //   'escolha'    os dois escolhem juntos (←/→, A confirma, B desfaz). No fim
 //                da mão (lado de dentro) fica o PASSAR (+1 energia). Com tempo
 //                limite: quem não escolheu passa sozinho
+//   'bonus'      só na rodada bônus: a roleta sorteia o evento (ver abaixo)
 //   'revelacao'  as duas cartas vão ao centro, viram juntas e mostram o efeito
 //                (resolverRodada: Ases, copas, escudo, roubo, compra)
 //   'super'      só se alguém jogou a carta SUPER (★, custa 10): a animação do
@@ -52,7 +55,7 @@ import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe } from '../../lib/
 //                outro) e a música especial (super_<personagem>.mid) no lugar da
 //                de batalha até o fim da rodada (terminarRodada volta a normal
 //                de onde parou). O SUPER é imparável: Anular e Espelho não pegam
-////   'arremesso'  as mãos descem, as caixas abrem e cada carta de ataque voa
+//   'arremesso'  as mãos descem, as caixas abrem e cada carta de ataque voa
 //                até a caixa de quem vai desviar dela (o espelho rebate)
 //   'esquiva'    as duas Pistas rodam ao mesmo tempo; acertos tiram HP do dono
 //                da pista (aplicarDano), grazes viram energia (registrarGrazes)
@@ -99,6 +102,33 @@ import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe } from '../../lib/
 //
 // Com 1 jogador no painel, o P2 é a CPU (pvp/bot.js escolhe a carta,
 // pvp/botEsquiva.js desvia). Nível: registry 'pvpNivelBot' (tela PvpEscolha, ↑/↓).
+//
+// EM REDE (numa sala com o modo PVP, docs/rede-pvp.md): se emRede() na hora
+// do create, cada PC roda esta cena com os mesmos dados (irParaCena, mesma
+// semente) e this.rede (pvp/rede/ArenaRede.js) liga as duas. Os controles
+// daqui só comandam o meu lado (meuLado(): host P1, convidado P2); sem pausa.
+//   'inicio'     o host faz iniciarRodada (e decide se é bônus) e manda o
+//                estado; o convidado espera por ele e troca o dele
+//   'escolha'    cada um escolhe na própria mão; o cursor do outro chega pela
+//                rede. Confirmar é definitivo (B não desfaz). O relógio só passa
+//                o MEU lado; a jogada do outro chega quando ele confirma/passa
+//   'bonus'...   decidirRodada: só o host sorteia o evento, as malucas, a arma
+//                do duelo e resolve; manda a resolução (com o estado) e os dois
+//                mostram a mesma roleta/revelação (a roleta e os efeitos dos
+//                eventos usam RNGs próprios da rodada, iguais nos dois PCs)
+//   'esquiva'    cada PC simula a caixa onde está o SEU coração (com CORAÇÃO
+//                TROCADO, a do outro) e é dono do dano/graze/perfeito dele: acertou/
+//                grazeou só valem para ele e vão para o outro PC, que aplica com
+//                aplicarAcerto/aplicarGraze (sem mandar de volta). A outra caixa é
+//                espelho (pista.espelho): mesmo ataque, mesma semente, o coração de
+//                lá anda pelas posições recebidas e não colide. Cada um avisa quando
+//                a sua caixa acabou e espera o aviso do outro
+//   'duelo'      Duelo/Copia recebem a opção `rede` (contrato com eles no doc);
+//                depois do duelo os dois também se encontram (fimEsquiva)
+//   'fim'        o host faz fimDaRodada e manda o estado. K.O. vale nos dois,
+//                venha o dano daqui ou de lá; no fim o convidado avisa que o
+//                replay acabou e o host abre a PvpResultado nos dois (irParaCena)
+// forcarMao/setHp/setEnergia (dev) valem nos dois PCs; forcarBonus vai ao host.
 //
 // Música: a da arena (public/assets/musicas/<arena.musica>.mid; sem o arquivo, pvp.mid).
 //
@@ -167,6 +197,9 @@ export default class PvpArena extends Phaser.Scene {
   }
 
   create() {
+    // partida EM REDE (docs/rede-pvp.md): cada PC roda esta cena; pvp/rede/ArenaRede.js
+    // faz a ponte (quem decide é o host, cada um é dono do próprio coração)
+    this.rede = emRede() ? new ArenaRede(this, { canal, meuLado: meuLado(), souHost: souHostDaRede() }) : null
     this.controles = new Controles(this)
     this.numJogadores = this.controles.numJogadores
     // sozinho: o P2 é a CPU
@@ -249,6 +282,7 @@ export default class PvpArena extends Phaser.Scene {
       reforcarGrave(0)
       this.duelo?.parar()
       this.duelo = null
+      this.rede?.destruir()
       this.pistas.forEach((p) => p.destruir())
       this.voltarDaMusicaEspecial()
       velocidadeMusica(1) // a próxima tela não herda a música acelerada
@@ -316,11 +350,14 @@ export default class PvpArena extends Phaser.Scene {
     this.textoRelogio = texto(22, 22, TEXTO.selecionado)
     this.textoTreino = texto(50, 9, '#9be7ff')
     if (this.cpu !== null) this.textoTreino.setText(`VS CPU · ${{ facil: 'fácil', normal: 'normal', dificil: 'difícil', imbativel: 'IMBATÍVEL' }[this.nivelBot]}`)
+    // em rede: de que lado você está (os controles daqui só mexem nele)
+    else if (this.rede) this.textoTreino.setText(`EM REDE · você é o P${this.rede.meuLado + 1}`)
+    const linhaExtra = Boolean(this.textoTreino.text)
     // morte súbita: logo abaixo do "VS CPU" (escondido enquanto for x1)
     // bonus round: nome do evento enquanto a rodada dura
     // (com a CPU o selo de velocidade ocupa a linha de baixo do "VS CPU": o do bônus desce)
-    this.textoBonus = texto(this.cpu !== null ? 81 : 70, 11, TEXTO.selecionado).setOrigin(0.5)
-    this.indicadorVelocidade = new IndicadorVelocidade(this, LARGURA / 2, this.cpu !== null ? 61 : 50, { tamanho: 10 })
+    this.textoBonus = texto(linhaExtra ? 81 : 70, 11, TEXTO.selecionado).setOrigin(0.5)
+    this.indicadorVelocidade = new IndicadorVelocidade(this, LARGURA / 2, linhaExtra ? 61 : 50, { tamanho: 10 })
   }
 
   // monte de cada jogador (3 versos empilhados e quantas cartas restam)
@@ -485,27 +522,21 @@ export default class PvpArena extends Phaser.Scene {
     while (!this.saindo) {
       await this.inicioDaRodada()
       if (this.saindo) return
-      let jogadas = await this.escolha()
+      const jogadas = await this.escolha()
       if (this.saindo) return
-      // bonus round: o evento só é revelado agora, com as cartas já escolhidas
-      await this.sortearBonus(jogadas)
+      // bonus round: o evento só é sorteado agora, com as cartas já escolhidas
+      // (em rede o host decide tudo e o convidado recebe)
+      const decisao = await this.decidirRodada(jogadas)
+      if (this.saindo || !decisao) return
+      await this.anunciarBonusDaRodada(decisao)
       if (this.saindo) return
-      if (this.bonus?.cartas === 'duelo' || this.bonus?.cartas === 'copia') {
-        const duelo = this.bonus.cartas === 'copia' ? resolverCopia(this.estado, jogadas[0], jogadas[1]) : resolverDuelo(this.estado, jogadas[0], jogadas[1], this.rngBonus)
-        this.contarJogadas(duelo)
-        await this.revelacaoDuelo(duelo)
+      const resultado = decisao.resultado
+      this.contarJogadas(resultado)
+      if (resultado.duelo || resultado.copia) {
+        await this.revelacaoDuelo(resultado)
         if (this.saindo) return
-        await this.rodarDuelo(duelo)
+        await this.rodarDuelo(resultado)
       } else {
-        // cartas malucas: cada carta vira outra antes de resolver (o baralho volta ao normal logo depois)
-        let trocas = null
-        if (this.bonus?.cartas === 'malucas') ({ jogadas, trocas } = transformarMalucas(this.estado, jogadas, this.rngBonus))
-        const resultado = resolverRodada(this.estado, jogadas[0], jogadas[1])
-        if (trocas) {
-          desfazerMalucas(this.estado, trocas)
-          resultado.trocas = trocas
-        }
-        this.contarJogadas(resultado)
         await this.revelacao(resultado)
         if (this.saindo) return
         await this.anunciarSupers(resultado)
@@ -558,7 +589,10 @@ export default class PvpArena extends Phaser.Scene {
 
   async inicioDaRodada() {
     this.fase = 'inicio'
-    iniciarRodada(this.estado)
+    // em rede: o host começa a rodada e manda o estado; o convidado espera por ele
+    if (this.rede) {
+      if (!(await this.rede.iniciarRodada())) return
+    } else this.comecarRodada()
     const acelerou = this.atualizarAceleracao()
     this.textoRodada.setText(`RODADA ${this.estado.rodada}`)
     this.tweens.add({ targets: this.textoRodada, scale: { from: 1.5, to: 1 }, duration: 260, ease: 'Back.easeOut' })
@@ -570,53 +604,113 @@ export default class PvpArena extends Phaser.Scene {
     await this.sincronizarMaos()
     this.atualizarMontes()
     if (acelerou && !this.saindo) await this.avisarAceleracao()
-    if (!this.saindo) this.prepararBonus()
+    if (!this.saindo) this.mostrarSeloBonus()
+  }
+
+  // A conta do começo da rodada (energia, mãos) e se ela é bônus
+  comecarRodada() {
+    iniciarRodada(this.estado)
+    this.prepararBonus()
   }
 
   // ---------- bonus round ----------
 
-  // Começo da rodada: é bônus (a cada 3, ou a forçada por forcarBonus)? Só
-  // avisa no alto ("BONUS ROUND: ???"); o evento é sorteado depois da escolha
+  // Começo da rodada: é bônus (a cada 3, ou a forçada por forcarBonus)? O
+  // evento é sorteado depois da escolha (decidirRodada)
   prepararBonus() {
     const forcado = this.bonusProximo
     this.bonusProximo = null
     this.bonusPendente = null
     if (!forcado && !ehRodadaBonus(this.estado.rodada)) return
     this.bonusPendente = forcado || true
+  }
+
+  // rodada bônus: só avisa no alto ("BONUS ROUND: ???")
+  mostrarSeloBonus() {
+    if (!this.bonusPendente) return
     this.textoBonus.setText('★ BONUS ROUND: ??? ★').setColor(TEXTO.selecionado).setAlpha(1)
     this.tweens.add({ targets: this.textoBonus, scale: { from: 1.6, to: 1 }, duration: 260, ease: 'Back.easeOut' })
   }
 
-  // Depois da escolha das cartas: roleta e o nome do evento no selo do alto.
-  // Com SUPER na mesa não tem roleta: o bonus passa para a próxima rodada
-  async sortearBonus(jogadas) {
+  // a versão da arena do evento `id` (nome/descrição próprios), se for dela
+  eventoDaArena(id) {
+    const ev = EVENTO[id]
+    return ev && (this.eventosArena.find((e) => e.id === ev.id) ?? ev)
+  }
+
+  // Depois da escolha: sorteia o evento da rodada bônus (se tem) e resolve a
+  // rodada. Devolve { bonus (id ou null), adiado, resultado } para as animações.
+  // Em rede só o host faz a conta (todo sorteio de regra é dele) e manda; o
+  // convidado recebe (rede.receberResolucao)
+  async decidirRodada(jogadas) {
+    if (this.rede && !this.rede.souHost) return this.rede.receberResolucao()
+    if (this.rede) jogadas = this.rede.validarJogadas(jogadas)
+    const decisao = this.resolverRodadaAqui(jogadas)
+    this.rede?.enviarResolucao(jogadas, decisao)
+    return decisao
+  }
+
+  resolverRodadaAqui(jogadas) {
+    const { evento, adiado } = this.sortearEventoBonus(jogadas)
+    if (evento) this.bonus = evento
+    let resultado
+    if (evento?.cartas === 'copia') resultado = resolverCopia(this.estado, jogadas[0], jogadas[1])
+    else if (evento?.cartas === 'duelo') resultado = resolverDuelo(this.estado, jogadas[0], jogadas[1], this.rngBonus)
+    else {
+      // cartas malucas: cada carta vira outra antes de resolver (o baralho volta ao normal logo depois)
+      let trocas = null
+      if (evento?.cartas === 'malucas') ({ jogadas, trocas } = transformarMalucas(this.estado, jogadas, this.rngBonus))
+      resultado = resolverRodada(this.estado, jogadas[0], jogadas[1])
+      if (trocas) {
+        desfazerMalucas(this.estado, trocas)
+        resultado.trocas = trocas
+      }
+    }
+    return { bonus: evento?.id ?? null, adiado, resultado }
+  }
+
+  // O evento da rodada bônus (sem animação). Com SUPER na mesa não tem
+  // roleta: o bonus passa para a próxima rodada (adiado)
+  sortearEventoBonus(jogadas) {
     const forcado = this.bonusPendente
     this.bonusPendente = null
-    if (!forcado) return
+    if (!forcado) return { evento: null, adiado: false }
     if (adiarBonus(this.estado, jogadas)) {
       this.bonusProximo = forcado
+      return { evento: null, adiado: true }
+    }
+    const disponiveis = this.eventosArena.map((e) => e.id)
+    const id = EVENTO[forcado] ? forcado : EVENTO[this.bonusForcado] ? this.bonusForcado : sortearEvento(this.rngBonus, { anterior: this.bonusAnterior, disponiveis }).id
+    this.bonusAnterior = id
+    return { evento: this.eventoDaArena(id), adiado: false }
+  }
+
+  // A roleta do evento e o nome dele no selo do alto (adiado: o selo some).
+  // A roleta gira com um RNG só dela, igual nos dois PCs em rede
+  async anunciarBonusDaRodada({ adiado }) {
+    if (adiado) {
       this.tweens.add({ targets: this.textoBonus, alpha: 0, duration: 300 })
       return
     }
+    const evento = this.bonus
+    if (!evento) return
     this.fase = 'bonus'
-    // a versão da arena (nome/descrição próprios), se o evento for dela
-    const daArena = (ev) => ev && (this.eventosArena.find((e) => e.id === ev.id) ?? ev)
-    const disponiveis = this.eventosArena.map((e) => e.id)
-    const evento = daArena(EVENTO[forcado] ?? EVENTO[this.bonusForcado] ?? sortearEvento(this.rngBonus, { anterior: this.bonusAnterior, disponiveis }))
-    this.bonus = evento
-    this.bonusAnterior = evento.id
     this.esconderBanner() // o "RODADA N" não fica por cima da roleta
-    await anunciarBonus(this, evento, { eventos: this.eventosArena.length > 1 ? this.eventosArena : EVENTOS, rng: () => aleatorio(this.rngBonus) })
+    const rng = criarRng(`${this.semente}:roleta:${this.estado.rodada}`)
+    await anunciarBonus(this, evento, { eventos: this.eventosArena.length > 1 ? this.eventosArena : EVENTOS, rng: () => aleatorio(rng) })
     if (this.saindo) return
     this.textoBonus.setText(`★ BONUS: ${evento.nome} ★`).setColor(corTexto(evento.cor)).setAlpha(1)
     this.tweens.add({ targets: this.textoBonus, scale: { from: 1.6, to: 1 }, duration: 260, ease: 'Back.easeOut' })
   }
 
-  // Liga o efeito do evento (se ele tem um) quando a esquiva começa
+  // Liga o efeito do evento (se ele tem um) quando a esquiva começa. O RNG do
+  // efeito é só visual/da esquiva e sai da semente da rodada: igual nos dois
+  // PCs em rede, sem gastar o rngBonus (que é dos sorteios de regra, no host)
   iniciarEfeitoBonus() {
     const criar = this.bonus && EFEITOS[this.bonus.id]
     if (!criar) return
-    this.efeitoBonus = criar(this, { rng: () => aleatorio(this.rngBonus), rodada: this.estado.rodada, aceleracao: this.aceleracao })
+    const rng = criarRng(`${this.semente}:efeito:${this.estado.rodada}`)
+    this.efeitoBonus = criar(this, { rng: () => aleatorio(rng), rodada: this.estado.rodada, aceleracao: this.aceleracao })
     this.efeitoBonus.comecar?.()
   }
 
@@ -681,21 +775,34 @@ export default class PvpArena extends Phaser.Scene {
     this.fase = 'duelo'
     this.ko = [false, false]
     const semente = `${this.semente}:duelo:${this.estado.rodada}`
+    // em rede (contrato com o Duelo/Copia em docs/rede-pvp.md): o duelo só fere o
+    // coração daqui (acertou manda o dano); o dano do outro chega pela rede
+    const rede = this.rede?.opcoesDuelo() ?? null
     if (r.copia) {
       // CTRL+C CTRL+V: o minigame ocupa o lugar do duelo (mesma interface)
       this.dica.setText('aperte A sem parar!')
-      this.duelo = new Copia(this, { cpu: this.cpu, nivelBot: this.nivelBot, semente })
+      this.duelo = new Copia(this, { cpu: this.cpu, nivelBot: this.nivelBot, semente, rede })
     } else {
       this.dica.setText(this.cpu === null ? 'mira automática   A: atacar' : 'mira automática   A: atacar   (a CPU também luta!)')
-      this.duelo = new Duelo(this, { armas: r.armas, cpu: this.cpu, nivelBot: this.nivelBot, semente, aceleracao: this.aceleracao })
+      this.duelo = new Duelo(this, { armas: r.armas, cpu: this.cpu, nivelBot: this.nivelBot, semente, aceleracao: this.aceleracao, rede })
     }
-    await this.duelo.rodar()
+    const luta = this.duelo.rodar()
+    // depois do rodar() (ele zera os K.O.s): o dano que o outro já mandou vale agora
+    this.rede?.comecarLuta()
+    await luta
+    // os dois se encontram aqui: todo o dano do outro já chegou (fimRodada igual nos dois)
+    if (this.rede && !this.saindo) await this.rede.esperarFimLuta()
     this.duelo = null
     this.dica.setText('')
   }
 
   // dev: a próxima rodada é bônus com o evento `id` (ou sorteado, sem id)
   forcarBonus(id = null) {
+    // em rede quem decide o bônus é o host (o convidado pede a ele)
+    if (this.rede && !this.rede.souHost) {
+      this.rede.espalhar('forcarBonus', [id])
+      return EVENTO[id] ? id : true
+    }
     this.bonusProximo = EVENTO[id] ? id : true
     return this.bonusProximo
   }
@@ -788,13 +895,18 @@ export default class PvpArena extends Phaser.Scene {
       b.setEscolhido(false)
       b.setFoco(false)
     })
+    this.tempoEsgotado = false
     this.dica.setText(
       this.bonus?.cartas === 'duelo'
         ? 'DUELO: qualquer carta vale!   ♥ tiro   ♠ espada   ♦ bumerangue   ♣ explosão'
-        : '←/→ escolher   A: confirmar   B: desfazer / ir para PASSAR   C: pausa',
+        : this.rede
+          ? '←/→ escolher   A: confirmar (não dá para desfazer)   B: ir para PASSAR'
+          : '←/→ escolher   A: confirmar   B: desfazer / ir para PASSAR   C: pausa',
     )
     this.atualizarEscolha()
     if (this.cpu !== null) this.jogadaDaCpu(this.cpu, this.estado.rodada)
+    // em rede: o cursor e a jogada do outro chegam pela rede
+    this.rede?.comecarEscolha()
     return new Promise((resolver) => (this.fimDaEscolha = resolver))
   }
 
@@ -819,11 +931,12 @@ export default class PvpArena extends Phaser.Scene {
       let texto = ''
       if (escolhendo) {
         if (this.escolhas[j] !== undefined) texto = 'PRONTO!'
-        else texto = j === this.cpu ? 'CPU pensando...' : 'escolha uma carta'
+        else texto = j === this.cpu ? 'CPU pensando...' : this.rede && j !== this.rede.meuLado ? 'escolhendo...' : 'escolha uma carta'
       }
       this.status[j].setText(texto)
       this.atualizarPrevia(j)
     }
+    this.rede?.enviarCursor() // o meu cursor mudou? o outro PC mostra
   }
 
   // prévia ampliada da carta sob o cursor (ou a explicação do PASSAR)
@@ -907,7 +1020,8 @@ export default class PvpArena extends Phaser.Scene {
     if (this.fase !== 'escolha') return
     // cada um desfaz a sua
     const m = this.ladoDoControle(j)
-    if (this.escolhas[m] !== undefined) return this.desfazer(m)
+    // em rede confirmar é definitivo (a jogada já foi para o outro PC)
+    if (this.escolhas[m] !== undefined) return this.rede ? undefined : this.desfazer(m)
     // nada escolhido: atalho para o PASSAR
     const a = this.ladoDoControle(j)
     if (this.escolhas[a] !== undefined || this.noPassar[a]) return
@@ -916,10 +1030,12 @@ export default class PvpArena extends Phaser.Scene {
     this.atualizarEscolha()
   }
 
-  escolher(m, id, { automatico = false } = {}) {
+  // remoto: a jogada do outro PC (rede) — não volta para lá
+  escolher(m, id, { automatico = false, remoto = false } = {}) {
     this.escolhas[m] = id
+    if (this.rede && !remoto) this.rede.enviarJogada(id)
     if (id) {
-      this.maos[m].selecionada.confirmar()
+      this.maos[m].selecionada?.confirmar()
     } else {
       tocar(this, 'passar')
       this.noPassar[m] = true
@@ -1007,9 +1123,11 @@ export default class PvpArena extends Phaser.Scene {
         this.tweens.add({ targets: this.textoRelogio, scale: { from: 1.4, to: 1 }, duration: 200 })
       }
     }
-    if (this.relogio <= 0) {
+    if (this.relogio <= 0 && !this.tempoEsgotado) {
+      this.tempoEsgotado = true
       tocar(this, 'erro')
-      for (const j of [0, 1]) if (this.escolhas[j] === undefined && this.fase === 'escolha') this.escolher(j, null, { automatico: true })
+      // em rede cada um passa só o seu lado (o do outro chega pela rede quando o relógio de lá acabar)
+      for (const j of [0, 1]) if (this.escolhas[j] === undefined && this.fase === 'escolha' && (!this.rede || j === this.rede.meuLado)) this.escolher(j, null, { automatico: true })
     }
   }
 
@@ -1337,7 +1455,14 @@ export default class PvpArena extends Phaser.Scene {
       return pista.rodar(ataque, { dano: caixa.dano, ritmo: caixa.ritmo, semente: `${this.semente}:${this.estado.rodada}:${j}`, aceleracao: this.aceleracao })
     })
     if (bonus) this.iniciarEfeitoBonus()
-    await Promise.all(promessas.filter(Boolean))
+    if (this.rede) {
+      // em rede: depois do CORAÇÃO TROCADO trocar (a caixa espelho é a do coração do outro);
+      // o dano que o outro já mandou vale agora. Termina quando as duas caixas acabaram
+      // aqui E o outro avisou que acabou a dele
+      this.rede.comecarLuta()
+      await this.rede.esperarFimEsquiva(promessas)
+    } else await Promise.all(promessas.filter(Boolean))
+    if (this.saindo) return
     // antes de encerrar o efeito: com CORAÇÃO TROCADO o donoDaPista ainda vale
     const perfeitos = this.registrarDesviosPerfeitos(r, comAtaque)
     this.encerrarEfeitoBonus()
@@ -1457,7 +1582,17 @@ export default class PvpArena extends Phaser.Scene {
     this.huds[j].comboQuebrou()
   }
 
+  // Acerto no coração do jogador j (pistas, efeitos de bônus, duelo). Em rede
+  // só vale para o coração daqui: aplica e manda o dano para o outro PC (o do
+  // outro chega pela rede e entra direto em aplicarAcerto, sem voltar para lá)
   acertou(j, dano) {
+    if (this.rede && !this.rede.ehMeu(j)) return false
+    const ok = this.aplicarAcerto(j, dano)
+    if (ok) this.rede?.enviarDano(j, dano)
+    return ok
+  }
+
+  aplicarAcerto(j, dano) {
     if ((this.fase !== 'esquiva' && this.fase !== 'duelo') || this.ko[j] || debug.invencivel) return false
     this.acertosRodada[j]++ // levou acerto: sem desvio perfeito nesta rodada
     const sequenciaAntes = this.estado.jogadores[j].sequencia ?? 0
@@ -1469,7 +1604,8 @@ export default class PvpArena extends Phaser.Scene {
     const hud = this.huds[j]
     hud.setHp(jog.hp)
     hud.tremer()
-    if (j < this.numJogadores) levouGolpe(j) // buzzer no joystick de quem levou
+    const joystick = this.joystickDoLado(j)
+    if (joystick >= 0) levouGolpe(joystick) // buzzer no joystick de quem levou
     numero(this, hud.pontoHp.x, hud.pontoHp.y + 4, efetivo ? `-${efetivo}` : '0', TEXTO.caido, { tamanho: 16, desvio: 12 })
     const k = this.pistaDe(j) // a pista onde o coração dele está (CORAÇÃO TROCADO)
     this.pistas[k].caixa.tremer(110, 2) // só a caixa de quem levou (a tela toda tremendo enjoa)
@@ -1516,8 +1652,14 @@ export default class PvpArena extends Phaser.Scene {
     })
   }
 
+  // Graze do coração do jogador j; em rede, como o acertou (só o daqui, e avisa o outro)
   grazeou(j) {
-    if ((this.fase !== 'esquiva' && this.fase !== 'duelo') || this.ko[j]) return
+    if (this.rede && !this.rede.ehMeu(j)) return
+    if (this.aplicarGraze(j)) this.rede?.enviarGraze(j)
+  }
+
+  aplicarGraze(j) {
+    if ((this.fase !== 'esquiva' && this.fase !== 'duelo') || this.ko[j]) return false
     this.estatisticas[j].grazes++
     this.grazesRodada[j]++
     const ganho = registrarGrazes(this.estado, j, 1)
@@ -1527,6 +1669,7 @@ export default class PvpArena extends Phaser.Scene {
       numero(this, hud.pontoEnergia.x, hud.pontoEnergia.y, `+${ganho}`, '#7fd8ff', { tamanho: 14 })
       tocar(this, 'tpMax')
     }
+    return true
   }
 
   // ---------- fim da rodada ----------
@@ -1534,7 +1677,9 @@ export default class PvpArena extends Phaser.Scene {
   async terminarRodada() {
     this.fase = 'fim'
     this.voltarDaMusicaEspecial() // fim do SUPER: a música de batalha volta de onde parou
-    const vencedor = fimDaRodada(this.estado)
+    // em rede o host calcula e manda o estado; o convidado fica com o dele
+    const vencedor = this.rede ? await this.rede.fimDaRodada() : fimDaRodada(this.estado)
+    if (this.saindo) return null
     if (this.bonus) {
       this.bonus = null
       this.tweens.add({ targets: this.textoBonus, alpha: 0, duration: 300 })
@@ -1576,19 +1721,25 @@ export default class PvpArena extends Phaser.Scene {
     claraoCamera(this.cameras.main, 250, 255, 255, 255)
     await this.esperar(1800)
     if (this.saindo) return
+    // em rede o host troca a cena nos dois (depois do replay do convidado acabar);
+    // o convidado fica no "VENCEU!" até lá
+    if (this.rede && !(await this.rede.prontoParaResultado())) return
     this.cameras.main.fadeOut(400, 0, 0, 0)
     await this.esperar(420)
     if (this.saindo) return
     this.saindo = true
-    this.scene.start('PvpResultado', {
+    const dados = {
       vencedor: v,
       p1: this.ids[0],
       p2: this.ids[1],
       arena: this.arena.id,
       rodadas: this.estado.rodada,
       cpu: this.cpu !== null,
+      // em rede o host recebeu o dano/graze dos dois: as estatísticas dele valem
       estatisticas: { p1: { ...this.estatisticas[0] }, p2: { ...this.estatisticas[1] } },
-    })
+    }
+    if (this.rede) irParaCena(this, 'PvpResultado', dados)
+    else this.scene.start('PvpResultado', dados)
   }
 
   // ---------- pause (botão C) ----------
@@ -1670,6 +1821,8 @@ export default class PvpArena extends Phaser.Scene {
     })
     this.efeitoBonus?.atualizar?.(delta)
     if (this.fase === 'duelo') this.duelo?.atualizar(delta)
+    // em rede: manda a posição do meu coração e põe o do outro na caixa espelho
+    this.rede?.atualizar(delta)
   }
 
   // joystick da CPU na pista dela (pvp/botEsquiva.js)
@@ -1677,9 +1830,18 @@ export default class PvpArena extends Phaser.Scene {
   // joystick). saida.js só manda quando o número muda
   informarVidas() {
     for (let j = 0; j < this.numJogadores; j++) {
+      const joystick = this.joystickDoLado(j)
+      if (joystick < 0) continue
       const jog = this.estado.jogadores[j]
-      informarVida(j, jog.hp, jog.hpMax)
+      informarVida(joystick, jog.hp, jog.hpMax)
     }
+  }
+
+  // o joystick daqui que joga com o lado j (-1 = nenhum). Em rede o joystick
+  // deste PC (o 1º) é sempre o do meu lado; o outro lado está no outro PC
+  joystickDoLado(j) {
+    if (this.rede) return j === this.rede.meuLado ? 0 : -1
+    return j < this.numJogadores ? j : -1
   }
 
   joyDaCpu(pista, delta, invertido) {
@@ -1701,6 +1863,7 @@ export default class PvpArena extends Phaser.Scene {
 
   // Coloca na mão do jogador j as cartas pedidas (ids do baralho dele), na escolha
   forcarMao(j, ids) {
+    this.rede?.espalhar('forcarMao', [j, ids]) // em rede vale nos dois PCs (o estado não diverge)
     const b = this.estado.jogadores[j].baralho
     for (const id of ids) {
       if (b.mao.some((c) => c.id === id)) continue
@@ -1724,11 +1887,13 @@ export default class PvpArena extends Phaser.Scene {
   }
 
   setHp(j, hp) {
+    this.rede?.espalhar('setHp', [j, hp])
     this.estado.jogadores[j].hp = hp
     this.huds[j].setHp(hp)
   }
 
   setEnergia(j, energia) {
+    this.rede?.espalhar('setEnergia', [j, energia])
     this.estado.jogadores[j].energia = energia
     this.huds[j].setEnergia(energia)
     this.maos[j].setEnergia(energia)
@@ -1738,6 +1903,7 @@ export default class PvpArena extends Phaser.Scene {
     return {
       fase: this.fase,
       rodada: this.estado.rodada,
+      rede: this.rede ? { meuLado: this.rede.meuLado, souHost: this.rede.souHost, espelhos: this.pistas.map((p) => p.espelho) } : null,
       cpu: this.cpu,
       nivelBot: this.cpu === null ? null : this.nivelBot,
       relogio: Math.round(this.relogio),
