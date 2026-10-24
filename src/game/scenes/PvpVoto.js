@@ -8,6 +8,7 @@ import { estilhacos } from '../effects/entrada.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 import { tremerCamera } from '../effects/shake.js'
 import { claraoCamera } from '../effects/flash.js'
+import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
 
 // Votação da arena do PvP (PvpEscolha -> PvpVoto -> PvpArena).
 //   Um cartão por arena (pvp/arenas.js) e o "?" (ALEATÓRIA: vale como voto numa
@@ -20,6 +21,13 @@ import { claraoCamera } from '../effects/flash.js'
 //   roleta entre as empatadas; a vencedora cresce no meio da tela e a partida
 //   começa (registry 'pvp'.arena guarda a escolha para a revanche).
 //
+// EM REDE (sala PVP, game/rede.js, docs/rede-pvp.md): cada PC move e vota só
+// com o próprio coração (meuLado()); o cursor do outro chega pelo canal
+// ('cursor', rápida) e o voto também ('voto'). Votar é definitivo. Quem manda
+// é o host: ele conta o tempo, apura (o sorteio é só dele) e manda a
+// 'apuracao' (votos que valeram + resultado) para o convidado passar a mesma
+// animação; no fim leva os dois para a PvpArena com uma semente nova.
+//
 // No dev: debugJogo.jogo.scene.start('PvpVoto', { p1: 'kris', p2: 'dess' })
 // e window.pvpVoto (votar(j, id), estadoDebug()).
 
@@ -27,6 +35,7 @@ const TEMPO_MS = 12000
 const CARTAO = { y: 142, largura: 80, altura: 112, espaco: 6 }
 const PAINEL = { x: 22, y: 232, largura: LARGURA - 44, altura: 196 }
 const VEU = 0.42 // véu escuro por cima do fundo da arena (o texto precisa ler)
+const CURSOR_MS = 300 // em rede: de quanto em quanto o meu cursor vai de novo para o outro PC
 
 export default class PvpVoto extends Phaser.Scene {
   constructor() {
@@ -43,6 +52,8 @@ export default class PvpVoto extends Phaser.Scene {
     this.controles = new Controles(this)
     this.controles.onBotao((j, botao) => (botao === 'A' ? this.votar(j) : this.desfazer(j)))
     this.solo = this.controles.numJogadores === 1
+    this.rede = emRede()
+    this.eu = this.rede ? meuLado() : 0 // em rede: o lado que este PC controla
     this.eleitores = this.solo ? [0] : [0, 1]
     this.opcoes = [...ARENAS.map((a) => a.id), ALEATORIA]
     this.votos = [null, null]
@@ -50,7 +61,7 @@ export default class PvpVoto extends Phaser.Scene {
     this.apurando = false
     this.fundo = null
     this.fundoId = null
-    this.focoDe = 0 // jogador que mexeu por último (o painel mostra o foco dele)
+    this.focoDe = this.eu // jogador que mexeu por último (o painel mostra o foco dele; em rede, sempre o meu)
 
     this.veu = this.add.rectangle(0, 0, LARGURA, ALTURA, 0x000000, VEU).setOrigin(0).setDepth(-4)
     this.texto = (x, y, conteudo, tamanho, cor = TEXTO.normal, extra = {}) =>
@@ -68,12 +79,14 @@ export default class PvpVoto extends Phaser.Scene {
       coracao: this.add.image(0, 0, 'coracao').setTint(CORES.almas[j]).setScale(1.3).setDepth(6),
     }))
     const salvo = this.registry.get('pvp')?.arena
-    if (ARENA[salvo]) this.cursores[0].indice = this.opcoes.indexOf(salvo)
-    this.dica = this.texto(LARGURA / 2, ALTURA - 14, '← → escolher     A: votar     B: desfazer', 13, TEXTO.desabilitado, { strokeThickness: 0 })
+    if (ARENA[salvo]) this.cursores[this.eu].indice = this.opcoes.indexOf(salvo)
+    this.dica = this.texto(LARGURA / 2, ALTURA - 14, this.rede ? '← → escolher     A: votar' : '← → escolher     A: votar     B: desfazer', 13, TEXTO.desabilitado, { strokeThickness: 0 })
+    if (this.rede) this.status.setText(`você é o P${this.eu + 1}: vote na sua arena  ·  a mais votada ganha (empate = roleta)`)
 
-    this.trocarFundo(this.opcoes[this.cursores[0].indice])
+    this.trocarFundo(this.opcoes[this.cursores[this.eu].indice])
     this.atualizarTela()
 
+    if (this.rede) this.ligarRede()
     if (import.meta.env.DEV) window.pvpVoto = this
     this.events.once('shutdown', () => {
       this.fundo?.destruir()
@@ -81,6 +94,30 @@ export default class PvpVoto extends Phaser.Scene {
     })
     musica('pvpEscolha')
     this.cameras.main.fadeIn(250)
+  }
+
+  // ---------- em rede ----------
+
+  ligarRede() {
+    const outro = 1 - this.eu
+    const desligar = [
+      canal.ao('cursor', (d) => {
+        const cursor = this.cursores[outro]
+        if (d?.tela !== 'voto' || this.apurando || this.votos[outro] || !this.opcoes[d.indice] || cursor.indice === d.indice) return
+        cursor.indice = d.indice
+        this.atualizarTela()
+      }),
+      canal.ao('voto', (d) => this.opcoes.includes(d?.arena) && this.votar(outro, d.arena)),
+    ]
+    if (!souHostDaRede()) desligar.push(canal.ao('apuracao', (d) => d?.arena && this.apurar(d)))
+    this.events.once('shutdown', () => desligar.forEach((fn) => fn()))
+    this.mandarCursor()
+    this.time.addEvent({ delay: CURSOR_MS, loop: true, callback: () => this.mandarCursor() })
+  }
+
+  mandarCursor() {
+    if (this.apurando || this.votos[this.eu]) return
+    canal.enviarRapido('cursor', { tela: 'voto', indice: this.cursores[this.eu].indice })
   }
 
   // ---------- montagem ----------
@@ -138,15 +175,17 @@ export default class PvpVoto extends Phaser.Scene {
     if (id) cursor.indice = this.opcoes.indexOf(id)
     if (this.votos[j]) return
     this.votos[j] = this.opcoes[cursor.indice]
+    if (this.rede && j === this.eu) canal.enviar('voto', null, { arena: this.votos[j] })
     tocar(this, 'confirmar')
     const cartao = this.cartoes[cursor.indice]
     this.tweens.add({ targets: cartao.c, scale: 1.14, duration: 90, yoyo: true })
     this.atualizarTela()
-    if (this.eleitores.every((e) => this.votos[e])) this.time.delayedCall(350, () => this.apurar())
+    // em rede só o host apura (o convidado espera a 'apuracao')
+    if (this.eleitores.every((e) => this.votos[e]) && (!this.rede || souHostDaRede())) this.time.delayedCall(350, () => this.apurar())
   }
 
   desfazer(j) {
-    if (this.apurando || !this.votos[j]) return
+    if (this.rede || this.apurando || !this.votos[j]) return // em rede o voto é definitivo
     this.votos[j] = null
     tocar(this, 'cancelar')
     this.atualizarTela()
@@ -158,6 +197,7 @@ export default class PvpVoto extends Phaser.Scene {
     cursor.indice = (cursor.indice + passo + this.opcoes.length) % this.opcoes.length
     this.focoDe = j
     tocar(this, 'mover')
+    if (this.rede) this.mandarCursor()
     this.trocarFundo(this.opcoes[cursor.indice])
     this.atualizarTela()
   }
@@ -178,14 +218,27 @@ export default class PvpVoto extends Phaser.Scene {
 
   // ---------- apuração ----------
 
-  async apurar() {
+  // doHost: em rede, no convidado, a 'apuracao' que o host mandou
+  // ({ votos, arena, contagem, empatadas, sorteios }); sem ela o convidado não apura
+  async apurar(doHost = null) {
     if (this.apurando) return
+    if (this.rede && !souHostDaRede() && !doHost) return
     this.apurando = true
     this.cursores.forEach((c) => c.coracao.setVisible(false))
     this.dica.setText('')
     this.status.setText('APURAÇÃO!')
     this.tweens.add({ targets: this.status, scale: { from: 1.4, to: 1 }, duration: 200, ease: 'Back.easeOut' })
-    const r = apurarVotos(this.votos, criarRng(`voto:${Date.now()}`))
+    let r
+    if (doHost) {
+      // valem os votos que o host contou (um voto que chegou lá depois do tempo ficou de fora)
+      const { votos, ...resultado } = doHost
+      this.votos = [0, 1].map((j) => (this.opcoes.includes(votos?.[j]) ? votos[j] : null))
+      r = resultado
+      this.atualizarTela()
+    } else {
+      r = apurarVotos(this.votos, criarRng(`voto:${Date.now()}`))
+      if (this.rede) canal.enviar('apuracao', null, { votos: [...this.votos], ...r })
+    }
     const esperar = (ms) => new Promise((ok) => this.time.delayedCall(ms, ok))
     await esperar(400)
 
@@ -285,7 +338,9 @@ export default class PvpVoto extends Phaser.Scene {
     await esperar(1500)
     this.cameras.main.fadeOut(300, 0, 0, 0)
     await esperar(320)
-    this.scene.start('PvpArena', { p1: this.p1, p2: this.p2, arena: id })
+    // em rede o host abre a arena nos dois, com uma semente nova (o convidado espera)
+    if (!this.rede) this.scene.start('PvpArena', { p1: this.p1, p2: this.p2, arena: id })
+    else if (souHostDaRede()) irParaCena(this, 'PvpArena', { p1: this.p1, p2: this.p2, arena: id, semente: `rede:${Date.now()}` })
   }
 
   // ---------- tela ----------
@@ -331,7 +386,7 @@ export default class PvpVoto extends Phaser.Scene {
     const foco = this.cursores.find((c) => c.j === this.focoDe) ?? this.cursores[0]
     this.mostrarPainel(this.opcoes[foco.indice])
     const faltam = this.eleitores.filter((j) => !this.votos[j])
-    if (!this.solo && faltam.length === 1) this.status.setText(`esperando o voto do P${faltam[0] + 1}...`)
+    if (!this.solo && faltam.length === 1 && (!this.rede || faltam[0] !== this.eu)) this.status.setText(`esperando o voto do P${faltam[0] + 1}...`)
   }
 
   update(time, delta) {
@@ -350,7 +405,7 @@ export default class PvpVoto extends Phaser.Scene {
       const y = c.c.y - CARTAO.altura / 2 - 12
       cur.coracao.setPosition(x, y + Math.sin(time / 200 + cur.j) * 2).setVisible(!this.votos[cur.j])
     }
-    // tempo: quem não votou fica de fora
+    // tempo: quem não votou fica de fora (em rede quem decide que acabou é o host)
     this.restante -= delta
     const p = Math.max(0, this.restante / TEMPO_MS)
     this.barra.clear().fillStyle(0xffffff, 0.15).fillRect(LARGURA / 2 - 150, 56, 300, 4)

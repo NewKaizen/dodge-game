@@ -35,6 +35,14 @@ Numa sala (LAN ou ONLINE) com o modo **PVP**, o jogo roda **nos dois PCs**. Cada
 | `apuracao` | host → conv. | `{ arena, ... }`: resultado da votação (para a animação mostrar o mesmo) |
 | `voltarLobby` | conv. → host | `{}`: o convidado apertou para voltar ao lobby (o host decide) |
 
+Como cada tela usa essas mensagens:
+
+- **Lobby** (`Lan.js`): com o modo PVP, o **COMEÇAR PARTIDA** do host marca a partida (`iniciarPartida()`) e, depois do "VALENDO!", faz `irParaCena(this, 'PvpEscolha')`. O convidado vê o "VALENDO!" quando a sala aparece marcada e espera a cena chegar; no PVP ele nunca fica na tela ASSISTINDO (ela é do CO-OP). Se o convidado sai nesse meio-tempo, o host fica no lobby.
+- **PvpEscolha**: `cursor` com `{ tela: 'escolha', indice }` (índice na grade) a cada movimento e de novo a cada 300 ms (quem abriu a tela depois do outro, ou perdeu uma rápida, acerta em seguida). Confirmar manda `personagem` e é definitivo. **B antes de alguém confirmar** volta os dois ao lobby: no host é `irParaCena(this, 'Lan')`; no convidado vai `voltarLobby` e o host faz o mesmo (com alguém confirmado, B só faz o som de erro). Com os dois confirmados, cada PC passa o "P1 VS P2" e o host faz `irParaCena(this, 'PvpVoto', { p1, p2 })` (p1 = o do host, p2 = o do convidado).
+- **PvpVoto**: `cursor` com `{ tela: 'voto', indice }` (índice nos cartões, o "?" é o último) e `voto` com `{ arena }` (definitivo). O fundo e o painel seguem o **meu** cursor. Só o host conta o tempo e apura: `apuracao` = `{ votos, arena, contagem, empatadas, sorteios }` (os votos que valeram + o resultado de `apurarVotos`); o convidado troca os votos dele por esses (um voto que chegou no host depois do tempo fica de fora) e passa a mesma animação. No fim o host faz `irParaCena(this, 'PvpArena', { p1, p2, arena, semente })`, com uma semente nova (`rede:<hora>`).
+- **PvpResultado**: em rede (e em qualquer partida ONLINE) só tem **A: VOLTAR AO LOBBY**. O A do host faz `irParaCena(this, 'Lan')`; o A do convidado manda `voltarLobby` e o host faz o mesmo, mesmo que ainda esteja na animação. A cena Lan do host desmarca a partida (`encerrarPartida()`), e a sala continua aberta para outra partida (o convidado marca **ESTOU PRONTO!** de novo).
+- **Imagem parada**: com a sala no modo PVP o host não manda vídeo nem som pelo WebRTC (`transmissao.js` tira as faixas com `replaceTrack(null)` e solta a captura do canvas; a imagem reserva também para). A conexão continua: o canal de dados direto é o da partida e o ping vem dela. Quando o modo vira CO-OP, a imagem volta sem negociar de novo. A barra de cima mostra "partida em rede" no lugar do estado da imagem.
+
 ### Arena (parte B)
 
 | Tipo | Chave | De → para | Dados |

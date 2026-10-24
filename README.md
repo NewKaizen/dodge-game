@@ -4,7 +4,7 @@ Jogo de esquiva estilo Deltarune/Undertale com cartas, feito com Svelte + Phaser
 
 - **CO-OP**: a dupla (ou 1 jogador + CPU aliada) contra um chefe que também joga cartas. Regras em [docs/coop-cartas.md](docs/coop-cartas.md).
 - **PVP**: um contra o outro (ou contra a CPU). Regras em [docs/pvp-regras.md](docs/pvp-regras.md).
-- **ONLINE**: os dois modos contra (ou com) um amigo pela internet: nome de usuário, sala com código, chat e pronto. Como subir o servidor em [docs/online.md](docs/online.md).
+- **ONLINE**: os dois modos contra (ou com) um amigo pela internet: nome de usuário, sala com código, chat e pronto. O PVP roda no PC de cada um ([docs/rede-pvp.md](docs/rede-pvp.md)); o CO-OP roda no PC do host, que manda a imagem. Como subir o servidor em [docs/online.md](docs/online.md).
 - **LAN**: o mesmo lobby com o outro jogador em outro PC da mesma rede (salas achadas sozinhas). Como ligar em [docs/lan.md](docs/lan.md).
 
 Controle: joystick pela porta serial ([docs/protocolo-serial.md](docs/protocolo-serial.md)) ou o simulador de teclado da página.

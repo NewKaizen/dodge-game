@@ -21,6 +21,13 @@ import { contextoAudio } from '../../game/audio.js'
 // A cada segundo lê o ping da ligação direta, por onde ela passa e os quadros
 // por segundo da imagem (store `ligacao`).
 //
+// PVP numa sala é partida em rede (game/rede.js): cada PC roda o próprio jogo
+// e a imagem não serve para nada. A conexão continua (o canal de dados direto
+// é o da partida e o ping vem dela), mas enquanto o modo da sala é PVP o host
+// não manda imagem nem som: tira as faixas dos remetentes (replaceTrack(null))
+// e solta a captura do canvas; a reserva também não manda quadros. Quando o
+// modo vira CO-OP, captura de novo e põe as faixas de volta.
+//
 //   ligarJogo(game)            host: o Phaser.Game de onde sai a imagem
 //   ligarTela(video, canvas)   convidado: onde a imagem aparece
 //   tela                       store { modo: null | 'video' | 'reserva', estado, fps }
@@ -68,6 +75,7 @@ let timerPedido = null // convidado: pede a imagem de novo enquanto ela não che
 let canal = null // RTCDataChannel aberto com o outro PC
 let timerStats = null
 let ultimosQuadros = null // { quadros, t } para calcular os fps
+let midia = null // host: { remetenteVideo, remetenteSom, faixaVideo, som, pausada } da conexão atual
 const ouvintesRapido = new Set()
 
 export const ligarJogo = (g) => (game = g)
@@ -79,6 +87,9 @@ export function ligarTela(elVideo, elCanvas) {
 }
 
 const mudar = (parcial) => tela.update((s) => ({ ...s, ...parcial }))
+
+// sala PVP: partida em rede, sem imagem (veja no topo)
+const semImagem = () => get(lan).sala?.modo === 'pvp'
 
 // ---------- canal direto (controles) ----------
 
@@ -173,15 +184,17 @@ async function comecarHost() {
     if (pc.connectionState === 'failed') ligarReservaHost()
   }
 
-  const imagem = game.canvas.captureStream(60)
-  const faixaVideo = imagem.getVideoTracks()[0]
-  if ('contentHint' in faixaVideo) faixaVideo.contentHint = 'motion'
+  const faixaVideo = capturarCanvas()
   const stream = new MediaStream([faixaVideo])
   const som = faixaDeAudio(contextoAudio())
   if (som) stream.addTrack(som)
   const remetente = pc.addTrack(faixaVideo, stream)
-  if (som) pc.addTrack(som, stream)
+  const remetenteSom = som ? pc.addTrack(som, stream) : null
   preferirH264(pc)
+  // as faixas entram na negociação mesmo no PVP (para o CO-OP poder voltar sem
+  // negociar de novo); aí já pausa
+  midia = { remetenteVideo: remetente, remetenteSom, faixaVideo, som, pausada: false }
+  atualizarImagem()
 
   const ajustar = async () => {
     if (meu !== pc) return
@@ -203,6 +216,31 @@ async function comecarHost() {
   enviarAoParceiro({ tipo: 'oferta', sdp: pc.localDescription.sdp })
   ajustar()
   timerReserva = setTimeout(() => meu === pc && pc.connectionState !== 'connected' && ligarReservaHost(), ajustes().esperaReserva)
+}
+
+function capturarCanvas() {
+  const faixa = game.canvas.captureStream(60).getVideoTracks()[0]
+  if ('contentHint' in faixa) faixa.contentHint = 'motion'
+  return faixa
+}
+
+// host: pausa / retoma a imagem e o som conforme o modo da sala
+function atualizarImagem() {
+  if (papelAtual !== 'host' || !midia) return
+  const pausar = semImagem()
+  if (pausar === midia.pausada) return
+  midia.pausada = pausar
+  const trocar = (remetente, faixa) => remetente?.replaceTrack(faixa).catch((e) => console.warn('[lan] replaceTrack', e))
+  if (pausar) {
+    trocar(midia.remetenteVideo, null)
+    trocar(midia.remetenteSom, null)
+    midia.faixaVideo?.stop() // a captura do canvas também custa: solta
+    midia.faixaVideo = null
+    return
+  }
+  midia.faixaVideo = capturarCanvas()
+  trocar(midia.remetenteVideo, midia.faixaVideo)
+  trocar(midia.remetenteSom, midia.som)
 }
 
 function preferirH264(conexao) {
@@ -230,7 +268,7 @@ function ligarReservaHost() {
   const { quadrosReserva, qualidadeReserva } = ajustes()
   const aoDesenhar = () => {
     const agora = performance.now()
-    if (ocupado || agora - ultimo < 1000 / quadrosReserva) return
+    if (ocupado || agora - ultimo < 1000 / quadrosReserva || semImagem()) return
     ultimo = agora
     ctx.drawImage(game.canvas, 0, 0, tela2d.width, tela2d.height)
     ocupado = true
@@ -354,6 +392,8 @@ function pararTudo() {
   ligacao.set({ ping: null, rota: null, fps: null })
   pararReservaHost()
   candidatosPendentes = []
+  midia?.faixaVideo?.stop()
+  midia = null
   if (pc) {
     const velho = pc
     pc = null
@@ -415,4 +455,5 @@ lan.subscribe((s) => {
     timerPedido = setInterval(pedir, 5000)
   }
   if (s.papel === 'host' && parceiroAtual && parceiroAtual !== outro.id) pararTudo() // trocou o convidado: ele pede de novo
+  atualizarImagem() // o host mudou o modo (PVP sem imagem, CO-OP com)
 })

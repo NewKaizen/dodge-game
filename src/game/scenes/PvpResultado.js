@@ -10,6 +10,7 @@ import { TEXTO_JOGADOR } from '../pvp/perfil.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 import { claraoCamera } from '../effects/flash.js'
 import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
+import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
 
 // Tela de fim da partida PvP, em etapas (como a Vitoria):
 //   ENTRADA DO VENCEDOR (não tem no empate; ver entradaVencedor: faixa na cor
@@ -19,6 +20,10 @@ import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
 //   lado a lado, rolando com contador.
 // A ou B durante a animação pula para o fim. Depois:
 //   A: REVANCHE (mesmos personagens) · B: TROCAR PERSONAGENS (PvpEscolha)
+// Numa sala (ONLINE, ou o PVP em rede da LAN também) não tem revanche: só
+// A: VOLTAR AO LOBBY. Em rede (game/rede.js) os dois veem esta tela, cada um
+// no seu PC: o A do host leva os dois de volta ao lobby da sala (irParaCena);
+// o A do convidado pede ao host ('voltarLobby') e ele faz o mesmo.
 //
 // Recebe de PvpArena:
 //   { vencedor: 1 | 2 | 0 (empate), p1, p2, rodadas,
@@ -94,6 +99,13 @@ export default class PvpResultado extends Phaser.Scene {
 
     this.controles = new Controles(this)
     this.controles.onBotao((_, botao) => this.aoBotao(botao))
+    this.rede = emRede()
+    this.naSala = this.rede || partidaOnline() // sem revanche: só voltar ao lobby
+    // em rede, o host volta com os dois quando o convidado pede (mesmo no meio da animação)
+    if (this.rede && souHostDaRede()) {
+      const parar = canal.ao('voltarLobby', () => this.voltarAoLobby())
+      this.events.once('shutdown', parar)
+    }
     this.cameras.main.fadeIn(300)
   }
 
@@ -143,16 +155,22 @@ export default class PvpResultado extends Phaser.Scene {
       if (this.etapas.length) this.pular()
       return
     }
+    if (this.naSala) return this.voltarAoLobby() // na sala não tem revanche: os dois voltam ao lobby
     this.saindo = true
-    const online = partidaOnline() // online não tem revanche: os dois voltam ao lobby da sala
-    tocar(this, botao === 'A' || online ? 'confirmar' : 'cancelar')
+    tocar(this, botao === 'A' ? 'confirmar' : 'cancelar')
     this.cameras.main.fadeOut(250, 0, 0, 0)
     const { p1, p2, arena } = this
-    this.time.delayedCall(260, () => {
-      if (online) voltarAoLobbyOnline(this)
-      else if (botao === 'A') this.scene.start('PvpArena', { p1, p2, arena })
-      else this.scene.start('PvpEscolha')
-    })
+    this.time.delayedCall(260, () => (botao === 'A' ? this.scene.start('PvpArena', { p1, p2, arena }) : this.scene.start('PvpEscolha')))
+  }
+
+  voltarAoLobby() {
+    if (this.saindo) return
+    this.saindo = true
+    tocar(this, 'confirmar')
+    this.cameras.main.fadeOut(250, 0, 0, 0)
+    // convidado em rede: pede ao host, que traz os dois (a cena Lan chega pelo canal)
+    if (this.rede && !souHostDaRede()) return canal.enviar('voltarLobby', null, {})
+    this.time.delayedCall(260, () => (this.rede ? irParaCena(this, 'Lan') : voltarAoLobbyOnline(this)))
   }
 
   // ---------- entrada do vencedor ----------
@@ -585,7 +603,7 @@ export default class PvpResultado extends Phaser.Scene {
     if (rapido) this.time.delayedCall(400, () => (this.liberado = true))
     else this.liberado = true
     const opcoes = this.add
-      .text(LARGURA / 2, ALTURA - 26, partidaOnline() ? 'A: VOLTAR AO LOBBY' : 'A: REVANCHE     B: TROCAR PERSONAGENS', estilo(16))
+      .text(LARGURA / 2, ALTURA - 26, this.naSala ? 'A: VOLTAR AO LOBBY' : 'A: REVANCHE     B: TROCAR PERSONAGENS', estilo(16))
       .setOrigin(0.5)
       .setDepth(10)
       .setAlpha(0)
