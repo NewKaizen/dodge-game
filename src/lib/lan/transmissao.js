@@ -1,4 +1,4 @@
-import { writable, get } from 'svelte/store'
+import { writable, derived, get } from 'svelte/store'
 import { lan, aoParceiro, enviarAoParceiro, enviarQuadro, aoQuadro, parceiro } from './rede.js'
 import { faixaDeAudio } from './audioTap.js'
 import { contextoAudio } from '../../game/audio.js'
@@ -15,10 +15,34 @@ import { contextoAudio } from '../../game/audio.js'
 // imagem vai com menos banda (a internet de casa não é a LAN) e a reserva
 // manda menos quadros (eles passam pelo servidor).
 //
+// Junto com a imagem vai um canal de dados (RTCDataChannel) direto entre os
+// dois PCs: os controles do convidado vão por ele, sem dar a volta pelo
+// servidor (que pode estar em outro país). Sem ele (reserva), vão pelo servidor.
+// A cada segundo lê o ping da ligação direta, por onde ela passa e os quadros
+// por segundo da imagem (store `ligacao`).
+//
 //   ligarJogo(game)            host: o Phaser.Game de onde sai a imagem
 //   ligarTela(video, canvas)   convidado: onde a imagem aparece
 //   tela                       store { modo: null | 'video' | 'reserva', estado, fps }
+//   ligacao                    store { ping, rota, fps }: ping (ms) da ligação direta,
+//                              rota 'direta' | 'turn' | null, fps da imagem
+//   enviarRapido(dados) · aoRapido(fn)   controles: pelo canal direto (ou pelo servidor)
 export const tela = writable({ modo: null, estado: 'parada' }) // estado: parada | conectando | ao-vivo | reserva
+export const ligacao = writable({ ping: null, rota: null, fps: null })
+
+// O ping que importa na partida: o da ligação direta entre os dois PCs (por
+// onde vão a imagem e os controles). Sem ela, a volta pelo servidor: o meu
+// ping até ele mais o do outro. { ms, rota: 'direta' | 'turn' | 'servidor' | null, fps }
+export const pingPartida = derived([lan, ligacao], ([s, l]) => {
+  const outro = s.fase === 'sala' ? s.sala?.membros.find((m) => m.id !== s.eu.id) : null
+  if (!outro) return { ms: null, rota: null, fps: null }
+  if (l.ping != null) return { ms: l.ping, rota: l.rota, fps: l.fps }
+  const ms = s.ping != null && outro.ping != null ? s.ping + outro.ping : null
+  return { ms, rota: ms == null ? null : 'servidor', fps: l.fps }
+})
+export const ROTAS = { direta: 'direto', turn: 'por TURN', servidor: 'pelo servidor' }
+// verde / amarelo / vermelho
+export const corDoPing = (ms) => (ms == null ? '#9a9ab0' : ms <= 80 ? '#6dffb0' : ms <= 150 ? '#ffd23a' : '#ff6070')
 
 const ALTURA_MAX = 720 // linhas mandadas no vídeo (o resto vira escala)
 // LAN x ONLINE
@@ -41,6 +65,10 @@ let reserva = null // host: { parar() }
 let candidatosPendentes = []
 let inicioHost = 0 // quando o host começou a conexão atual
 let timerPedido = null // convidado: pede a imagem de novo enquanto ela não chega
+let canal = null // RTCDataChannel aberto com o outro PC
+let timerStats = null
+let ultimosQuadros = null // { quadros, t } para calcular os fps
+const ouvintesRapido = new Set()
 
 export const ligarJogo = (g) => (game = g)
 export function ligarTela(elVideo, elCanvas) {
@@ -51,6 +79,74 @@ export function ligarTela(elVideo, elCanvas) {
 }
 
 const mudar = (parcial) => tela.update((s) => ({ ...s, ...parcial }))
+
+// ---------- canal direto (controles) ----------
+
+export function enviarRapido(dados) {
+  if (canal?.readyState === 'open') {
+    try {
+      canal.send(JSON.stringify(dados))
+      return
+    } catch {}
+  }
+  enviarAoParceiro(dados)
+}
+
+// fn(dados) recebe tanto o que vem pelo canal direto quanto pelo servidor
+export function aoRapido(fn) {
+  ouvintesRapido.add(fn)
+  const parar = aoParceiro(fn)
+  return () => {
+    ouvintesRapido.delete(fn)
+    parar()
+  }
+}
+
+function usarCanal(c) {
+  c.onopen = () => (canal = c)
+  c.onclose = () => canal === c && (canal = null)
+  c.onmessage = (e) => {
+    let dados
+    try {
+      dados = JSON.parse(e.data)
+    } catch {
+      return
+    }
+    ouvintesRapido.forEach((fn) => fn(dados))
+  }
+  if (c.readyState === 'open') canal = c
+}
+
+// ping e rota da ligação direta, fps da imagem (os dois lados)
+function comecarStats(conexao) {
+  clearInterval(timerStats)
+  ultimosQuadros = null
+  timerStats = setInterval(async () => {
+    if (conexao !== pc) return
+    let relatorio
+    try {
+      relatorio = await conexao.getStats()
+    } catch {
+      return
+    }
+    const itens = [...relatorio.values()]
+    const transporte = itens.find((r) => r.type === 'transport' && r.selectedCandidatePairId)
+    const par = transporte ? relatorio.get(transporte.selectedCandidatePairId) : itens.find((r) => r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded')
+    const local = par && relatorio.get(par.localCandidateId)
+    const remoto = par && relatorio.get(par.remoteCandidateId)
+    const ping = par?.currentRoundTripTime != null ? Math.round(par.currentRoundTripTime * 1000) : null
+    const rota = !par ? null : local?.candidateType === 'relay' || remoto?.candidateType === 'relay' ? 'turn' : 'direta'
+    const video = itens.find((r) => (r.type === 'inbound-rtp' || r.type === 'outbound-rtp') && r.kind === 'video')
+    let fps = video?.framesPerSecond ?? null
+    const quadros = video?.framesDecoded ?? video?.framesEncoded
+    if (fps == null && quadros != null) {
+      const agora = performance.now()
+      if (ultimosQuadros) fps = Math.round(((quadros - ultimosQuadros.quadros) * 1000) / (agora - ultimosQuadros.t))
+      ultimosQuadros = { quadros, t: agora }
+    }
+    ligacao.set({ ping, rota, fps: fps == null ? null : Math.round(fps) })
+  }, 1000)
+}
 
 // ---------- host ----------
 
@@ -63,6 +159,8 @@ async function comecarHost() {
   if (!game?.canvas) return
   pc = new RTCPeerConnection(configRtc())
   const meu = pc
+  usarCanal(pc.createDataChannel('controles', { ordered: true }))
+  comecarStats(pc)
   pc.onicecandidate = (e) => e.candidate && enviarAoParceiro({ tipo: 'ice', candidato: e.candidate.toJSON() })
   pc.onconnectionstatechange = () => {
     if (meu !== pc) return
@@ -165,6 +263,8 @@ async function receberOferta(sdp) {
   mudar({ estado: 'conectando' })
   pc = new RTCPeerConnection(configRtc())
   const meu = pc
+  pc.ondatachannel = (e) => meu === pc && usarCanal(e.channel)
+  comecarStats(pc)
   pc.onicecandidate = (e) => e.candidate && enviarAoParceiro({ tipo: 'ice', candidato: e.candidate.toJSON() })
   pc.ontrack = (e) => {
     if (meu !== pc) return
@@ -249,6 +349,9 @@ function desenharQuadro(blob) {
 function pararTudo() {
   clearTimeout(timerReserva)
   clearInterval(timerEscala)
+  clearInterval(timerStats)
+  canal = null
+  ligacao.set({ ping: null, rota: null, fps: null })
   pararReservaHost()
   candidatosPendentes = []
   if (pc) {
