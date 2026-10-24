@@ -793,6 +793,7 @@ export default class PvpArena extends Phaser.Scene {
     // os dois se encontram aqui: todo o dano do outro já chegou (fimRodada igual nos dois)
     if (this.rede && !this.saindo) await this.rede.esperarFimLuta()
     this.duelo = null
+    if (this.saindo) return // a cena já fechou (o outro saiu, ou SAIR na pausa): os textos foram destruídos
     this.dica.setText('')
   }
 

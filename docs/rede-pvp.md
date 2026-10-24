@@ -61,22 +61,49 @@ Como cada tela usa essas mensagens:
 
 ### Duelo e CTRL+C CTRL+V (parte C)
 
+Peças: `pvp/bonus/redeDuelo.js` (Duelo), `pvp/bonus/redeCopia.js` (Copia) e `pvp/bonus/redeMinigame.js` (o interpolador do coração do outro e as mensagens da rodada, lógica pura testada em `__tests__/redeMinigame.test.js`). Com `rede: null` o Duelo e a Copia não criam nada disso.
+
 | Tipo | Chave | De → para | Dados |
 | --- | --- | --- | --- |
-| `dueloPronto` | rodada | os dois | `{}`: abri o duelo (os dois começam o 3-2-1 juntos) |
-| `dueloCoracao` (rápida) | | os dois | posição/velocidade do meu coração no duelo |
-| `dueloAtaque` | rodada | os dois | `{ arma, x, y, angulo, t }`: ataquei (o outro cria a mesma arma, só de enfeite) |
-| `dueloDano` | rodada | vítima → outro | dano que **eu** levei (via `arena.acertou(meuLado, dano)`) |
-| `dueloFim` | rodada | os dois | `{ motivo, ... }` acabou para mim |
-| `copiaApertos` (rápida) | | os dois | `{ n }`: quantos A eu apertei até agora |
-| `copiaFinal` | rodada | os dois | `{ apertos }` |
-| `copiaResultado` | rodada | host → conv. | `{ vencedor, quantia, ... }` (só o host aplica `copiarEnergia`) |
+| `dueloPronto` | rodada | os dois | `{}`: abri a caixa do duelo (quem chega primeiro espera o outro para o 3-2-1) |
+| `dueloCoracao` (rápida) | | os dois | `{ r, t, x, y, vx, vy }`: meu coração, ~30 por segundo (`r` = rodada, `t` = meu relógio em ms) |
+| `dueloAtaque` | rodada | os dois | `{ arma, id, ... }`: ataquei. `tiro { x, y, angulo }`, `espada { angulo, lado }`, `bumerangue { x, y, dx, dy, ate }`, `explosao { x0, y0, alvos, giros }`. O outro cria a mesma arma (réplica) com o mesmo `id` |
+| `dueloDano` | rodada | vítima → outro | `{ de, dano, x, y, ref }`: levei este golpe (`ref` = id do tiro/golpe que acertou). Só o enfeite e o placar do duelo: o **HP** vai pela mensagem `dano` da arena |
+| `dueloRebate` | rodada | dono da espada → dono da arma | `{ id, tipo }`: minha espada quebrou o seu tiro (`tiro`) / virou o seu bumerangue (`bumerangue`) |
+| `dueloFim` | rodada | os dois | `{ motivo }` (`'tempo'` ou `'ko'`): a luta acabou para mim |
+| `copiaPronto` | rodada | os dois | `{}`: abri a janela da cópia (quem chega primeiro espera o outro para o 3-2-1) |
+| `copiaApertos` (rápida) | | os dois | `{ r, n }`: quantos A eu apertei até agora (cumulativo) |
+| `copiaFinal` | rodada | os dois | `{ apertos, motivo }`: acabou para mim, com este total (`'tempo'` ou `'cheio'`) |
+| `copiaResultado` | rodada | host → conv. | `{ apertos, cabo, vencedor, quantia, perdeu, ganhou, energias, motivo }` (`energias`: a dos dois **antes** da cópia, para a animação) |
+
+**Duelo**
+
+- Cada PC simula só o **próprio** coração (movimento, i-frames, empurrão) e manda a posição. O do outro anda pelas posições que chegam, desenhado um pouco no passado (interpolado entre duas amostras). O atraso do desenho se ajusta à variação da rede (no mínimo 60 ms além do caminho mais rápido) e muda aos poucos (o relógio do desenho anda entre 0,7x e 1,3x): o coração do outro nunca pula nem volta para trás.
+- Ataque: a arma sai **aqui na hora** e vai `dueloAtaque`; lá ela vira réplica, com os mesmos números (mira, alvos das bombas, giro dos estilhaços). Cada projétil tem `id` (`lado:n`, as bombas `lado:n:k`, os estilhaços `...:k`).
+- **A vítima decide** (`duelo.decide(j)`: o coração `j` é daqui?). Cada PC confere golpes só no coração daqui (inclusive das réplicas das armas do outro) e chama `arena.acertou(meuLado, dano)`; o golpe no coração do outro nunca é conferido aqui. Aceito o golpe, o duelo manda `dueloDano`; lá ele só faz o enfeite (partículas, borda, piscar), conta o placar do duelo (`acertos`, `dano`) e some com o tiro que acertou.
+- **Espada**: a espada daqui acerta o coração do outro só no PC dele (a réplica dela lá). O **aparo** (quebrar tiros/estilhaços, virar o bumerangue) é de quem segura a espada: ela protege o dono, que é a vítima daqueles projéteis. A espada daqui apara as réplicas e manda `dueloRebate`; o dono da arma quebra/vira a de verdade. A réplica da espada do outro não apara nada aqui.
+- **Empurrão**: quem leva o golpe se empurra no próprio PC; o outro vê pela posição.
+- **Bomba**: as duas explodem igual (mesmos alvos e giros); o dano é de quem estiver no raio, conferido por ele.
+- **Começo**: cada um manda `dueloPronto` ao abrir a caixa e espera o do outro (até 10 s; sem resposta, segue sozinho). Os dois começam o 3-2-1 com a diferença de uma ida da rede.
+- **Fim**: o tempo de cada um corre no próprio PC. Quem acaba (tempo, ou o K.O. depois da folga de `DUELO.fimMs`) manda `dueloFim`, e o outro acaba na hora quando ele chega. O `rodar()` só resolve depois do `dueloFim` do outro (até 6 s): como o canal é em ordem, aí já chegou todo dano que ele levou, e o resultado (`acertos`, `dano`, `ko`, `motivo`) sai igual nos dois. O K.O. vale quando o HP zera, venha o dano daqui ou de lá (a arena chama `duelo.nocaute(j)`); com algum K.O. o motivo é `'ko'` nos dois.
+- Replay do K.O.: igual ao local (o gravador fotografa os objetos do duelo, réplicas inclusive, e as posições dos dois corações como aparecem aqui).
+
+**CTRL+C CTRL+V**
+
+- Cada PC conta só os **próprios** A (sem atraso) e manda o total (`copiaApertos`); o cabo na tela é a diferença dos dois totais (`caboDaCopia` em `pvp/bonus.js`), com o do outro chegando um pouco atrasado.
+- Começo como no duelo (`copiaPronto`). Quando o tempo acaba ou a barra enche **na tela de um**, ele manda `copiaFinal` com o total dele e o outro acaba na hora quando ele chega.
+- **Só o host apura**: espera o `copiaFinal` do convidado (até 4 s; sem ele, vale o último total que chegou), calcula com os dois totais (`apurarCopia`), aplica `copiarEnergia` e manda `copiaResultado`. O convidado espera o resultado (até 8 s) e mostra o mesmo (barra, `×n`, quem copiou, as gemas voando nos HUDs) **sem aplicar regra**: o `estado` dele só muda quando a arena sincroniza no fim da rodada. Sem resultado (o host sumiu), mostra "erro ao copiar".
+
+**O outro sumiu**: toda espera tem timeout e o `parar()` (cena trocada por `game/rede.js` quando a sala cai) solta todas; o `rodar()` sempre resolve.
 
 ### Contrato entre a arena (B) e o duelo (C)
 
 - A arena cria `new Duelo(arena, { ..., rede })` / `new Copia(arena, { ..., rede })` com `rede = emRede() ? { canal, meuLado: meuLado(), souHost: souHostDaRede(), rodada } : null`. Com `rede: null` tudo funciona como antes (local e contra a CPU).
-- Em rede, o duelo só chama `arena.acertou(j, dano)` para `j === meuLado` (o coração daqui). A arena (B) manda o `dano` para o outro PC e aplica o dano que chega dele. O duelo nunca aplica dano no coração do outro.
+- Em rede, o duelo só chama `arena.acertou(j, dano)` para `j === meuLado` (o coração daqui). A arena (B) manda o `dano` para o outro PC e aplica o dano que chega dele. O duelo nunca aplica dano no coração do outro (o `dueloDano` dele é só enfeite e placar do duelo).
+- O `dano` da arena precisa ir pelo canal confiável (`canal.enviar`): assim ele chega antes do `dueloFim` de quem levou, e o HP no fim do duelo é igual nos dois.
 - `arena.nocaute(j)` e `duelo.nocaute(j)` continuam como estão: a arena chama quando o HP zera, venha o dano daqui ou de lá.
+- O botão A em rede chega como `duelo.atacar(meuLado)` (a Controles já manda todo botão daqui para o meu lado); o duelo ignora o A do outro lado.
+- Na cópia, o convidado não muda o `estado`: a arena sincroniza no fim da rodada (o HUD dele já mostra a energia certa pela animação).
 
 ## A arena em rede (parte B)
 
