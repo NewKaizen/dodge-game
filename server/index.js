@@ -1,7 +1,16 @@
-// `npm run lan`: serve o jogo já compilado (dist/) para a rede e liga o lobby
-// LAN (server/lan.js). Os dois PCs abrem o endereço que aparece no terminal
-// (ou cada um roda o seu: as salas de um aparecem no lobby do outro).
-//   PORTA=5180 (padrão)
+// Serve o jogo já compilado (dist/) e liga o lobby (server/lan.js).
+//
+//   `npm run lan`   modo LAN: os dois PCs abrem o endereço que aparece no
+//                   terminal (ou cada um roda o seu: as salas de um aparecem
+//                   no lobby do outro). docs/lan.md
+//   `npm start`     modo ONLINE (--online): o servidor na internet (Render,
+//                   Railway, VPS...); os amigos abrem o site e entram na sala
+//                   pelo código. docs/online.md
+//
+//   PORTA ou PORT=5180 (padrão)
+//   ONLINE=1                     o mesmo que --online
+//   STUN_URLS=stun:a:3478,stun:b:3478   (online; padrão: os do Google)
+//   TURN_URL, TURN_USUARIO, TURN_SENHA  (online; para quem o STUN não resolve)
 import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -9,7 +18,25 @@ import { fileURLToPath } from 'node:url'
 import { anexarLan, enderecosDoJogo } from './lan.js'
 
 const PORTA = Number(process.env.PORTA ?? process.env.PORT ?? 5180)
+const ONLINE = process.argv.includes('--online') || ['1', 'true', 'sim'].includes(String(process.env.ONLINE ?? '').toLowerCase())
 const PASTA = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist')
+const STUN_PADRAO = 'stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302'
+
+// Servidores do WebRTC que os navegadores usam para se achar pela internet
+function servidoresIce() {
+  const env = process.env
+  const lista = []
+  const stun = String(env.STUN_URLS ?? (ONLINE ? STUN_PADRAO : ''))
+    .split(',')
+    .map((u) => u.trim())
+    .filter(Boolean)
+  if (stun.length) lista.push({ urls: stun })
+  if (env.TURN_URL) {
+    const turn = env.TURN_URL.split(',').map((u) => u.trim()).filter(Boolean)
+    lista.push({ urls: turn, username: env.TURN_USUARIO ?? '', credential: env.TURN_SENHA ?? '' })
+  }
+  return lista
+}
 const TIPOS = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -42,8 +69,14 @@ const servidor = http.createServer((req, res) => {
     res.writeHead(400).end()
     return
   }
+  if (caminho === '/saude') {
+    // para o "health check" da hospedagem
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }).end('ok')
+    return
+  }
   let arquivo = path.join(PASTA, caminho)
-  if (!arquivo.startsWith(PASTA)) {
+  // path.sep no fim: "/dist-outra/..." também começa com ".../dist"
+  if (arquivo !== PASTA && !arquivo.startsWith(PASTA + path.sep)) {
     res.writeHead(403).end()
     return
   }
@@ -52,12 +85,21 @@ const servidor = http.createServer((req, res) => {
   fs.createReadStream(arquivo).pipe(res)
 })
 
-anexarLan(servidor)
+const ice = servidoresIce()
+anexarLan(servidor, { online: ONLINE, ice })
 servidor.on('error', (erro) => {
-  console.error(erro.code === 'EADDRINUSE' ? `A porta ${PORTA} já está em uso. Tente: PORTA=5181 npm run lan` : erro)
+  console.error(erro.code === 'EADDRINUSE' ? `A porta ${PORTA} já está em uso. Tente: PORTA=5181 npm run ${ONLINE ? 'start' : 'lan'}` : erro)
   process.exit(1)
 })
 servidor.listen(PORTA, '0.0.0.0', () => {
+  if (ONLINE) {
+    console.log(`\n  DODGE · modo ONLINE ligado na porta ${PORTA}\n`)
+    console.log(`  Neste PC: http://localhost:${PORTA}`)
+    console.log(`  WebRTC:   ${ice.length ? ice.map((s) => [s.urls].flat().join(', ')).join(' | ') : 'sem STUN/TURN'}`)
+    if (!process.env.TURN_URL) console.log('  (sem TURN: quem estiver atrás de NAT difícil cai na imagem reserva, sem som)')
+    console.log('\n  Os amigos abrem o endereço público do site, um cria a sala e passa o código.\n')
+    return
+  }
   console.log('\n  DODGE · modo LAN ligado\n')
   console.log(`  Neste PC:       http://localhost:${PORTA}`)
   for (const url of enderecosDoJogo(PORTA)) console.log(`  Na rede (LAN):  ${url}`)

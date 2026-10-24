@@ -7,7 +7,7 @@
   import { lan, sairSala } from '../lib/lan/rede.js'
   import { tela } from '../lib/lan/transmissao.js'
 
-  // modo LAN: na sala o número de jogadores é o da sala (sempre 2)
+  // modo LAN/ONLINE: na sala o número de jogadores é o da sala (sempre 2)
   let naSala = $derived($lan.fase === 'sala')
   let outro = $derived($lan.sala?.membros.find((m) => m.id !== $lan.eu.id))
   const ESTADOS = { parada: 'sem imagem', conectando: 'ligando a imagem…', 'ao-vivo': 'imagem ao vivo', reserva: 'imagem reserva (sem som)' }
@@ -39,7 +39,7 @@
 
 {#if naSala}
   <div class="conectar lan">
-    <span>LAN · {$lan.sala.nome} · você é {$lan.papel === 'host' ? 'o HOST (P1)' : 'o CONVIDADO (P2)'}</span>
+    <span>{$lan.online ? `ONLINE · sala ${$lan.sala.codigo}` : `LAN · ${$lan.sala.nome}`} · você é {$lan.papel === 'host' ? 'o HOST (P1)' : 'o CONVIDADO (P2)'}</span>
     {#if outro}
       <span class="dica">com {outro.nome}{outro.ping != null ? ` · ${outro.ping} ms` : ''} · {ESTADOS[$tela.estado]}</span>
     {:else}

@@ -1,6 +1,9 @@
 {
   "name": "dodge-game",
   "private": true,
+  "engines": {
+    "node": ">=20.19"
+  },
   "version": "0.0.0",
   "type": "module",
   "scripts": {
@@ -9,6 +12,8 @@
     "preview": "vite preview",
     "lan": "vite build && node server/index.js",
     "lan:servir": "node server/index.js",
+    "start": "node server/index.js --online",
+    "online": "vite build && node server/index.js --online",
     "test": "node --test src/game/pvp/__tests__/*.test.js src/game/coop/__tests__/*.test.js src/game/grimorio/__tests__/*.test.js src/game/__tests__/*.test.js src/lib/__tests__/*.test.js server/__tests__/*.test.js"
   },
   "devDependencies": {

@@ -1,0 +1,20 @@
+# Render (render.com): New → Blueprint → este repositório. Sobe o servidor do
+# modo ONLINE no plano grátis (docs/online.md).
+services:
+  - type: web
+    name: dodge-game
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /saude
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      # TURN (opcional, para quem o STUN não resolve): preencha no painel
+      - key: TURN_URL
+        sync: false
+      - key: TURN_USUARIO
+        sync: false
+      - key: TURN_SENHA
+        sync: false

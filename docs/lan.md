@@ -1,6 +1,6 @@
 # Modo LAN (dois PCs na mesma rede)
 
-Menu → **LAN**. Um PC cria a sala (o **host**, P1, coração vermelho) e o outro entra (o **convidado**, P2, coração amarelo). Vale para o **PVP** e para o **CO-OP**, com todas as telas do jogo.
+Menu → **ONLINE** (com a página servida pelo `npm run lan` o lobby é o da LAN; pela internet, veja [online.md](online.md)). Um PC cria a sala (o **host**, P1, coração vermelho) e o outro entra (o **convidado**, P2, coração amarelo). Vale para o **PVP** e para o **CO-OP**, com todas as telas do jogo.
 
 ## Como ligar
 
