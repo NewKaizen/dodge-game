@@ -11,15 +11,23 @@ import { contextoAudio } from '../../game/audio.js'
 // Se o WebRTC não conectar em alguns segundos (firewall, rede estranha), cai
 // na RESERVA: JPEGs pelo WebSocket do servidor, sem som.
 //
+// ONLINE (docs/online.md): o WebRTC usa os STUN/TURN que o servidor mandou, a
+// imagem vai com menos banda (a internet de casa não é a LAN) e a reserva
+// manda menos quadros (eles passam pelo servidor).
+//
 //   ligarJogo(game)            host: o Phaser.Game de onde sai a imagem
 //   ligarTela(video, canvas)   convidado: onde a imagem aparece
 //   tela                       store { modo: null | 'video' | 'reserva', estado, fps }
 export const tela = writable({ modo: null, estado: 'parada' }) // estado: parada | conectando | ao-vivo | reserva
 
-const ESPERA_RESERVA_MS = 7000
-const QUADROS_RESERVA = 30 // por segundo
 const ALTURA_MAX = 720 // linhas mandadas no vídeo (o resto vira escala)
-const BITRATE = 12_000_000
+// LAN x ONLINE
+const AJUSTES = {
+  lan: { esperaReserva: 7000, quadrosReserva: 30, qualidadeReserva: 0.72, bitrate: 12_000_000 },
+  online: { esperaReserva: 12000, quadrosReserva: 15, qualidadeReserva: 0.6, bitrate: 4_000_000 },
+}
+const ajustes = () => (get(lan).online ? AJUSTES.online : AJUSTES.lan)
+const configRtc = () => ({ iceServers: get(lan).ice ?? [] })
 
 let game = null
 let video = null
@@ -53,7 +61,7 @@ async function comecarHost() {
   inicioHost = performance.now()
   mudar({ modo: null, estado: 'conectando', stream: null })
   if (!game?.canvas) return
-  pc = new RTCPeerConnection({ iceServers: [] })
+  pc = new RTCPeerConnection(configRtc())
   const meu = pc
   pc.onicecandidate = (e) => e.candidate && enviarAoParceiro({ tipo: 'ice', candidato: e.candidate.toJSON() })
   pc.onconnectionstatechange = () => {
@@ -82,7 +90,7 @@ async function comecarHost() {
     try {
       const p = remetente.getParameters()
       if (!p.encodings?.length) p.encodings = [{}]
-      p.encodings[0].maxBitrate = BITRATE
+      p.encodings[0].maxBitrate = ajustes().bitrate
       p.encodings[0].maxFramerate = 60
       p.encodings[0].scaleResolutionDownBy = Math.max(1, (game.canvas.height || ALTURA_MAX) / ALTURA_MAX)
       p.degradationPreference = 'balanced'
@@ -96,7 +104,7 @@ async function comecarHost() {
   await pc.setLocalDescription(oferta)
   enviarAoParceiro({ tipo: 'oferta', sdp: pc.localDescription.sdp })
   ajustar()
-  timerReserva = setTimeout(() => meu === pc && pc.connectionState !== 'connected' && ligarReservaHost(), ESPERA_RESERVA_MS)
+  timerReserva = setTimeout(() => meu === pc && pc.connectionState !== 'connected' && ligarReservaHost(), ajustes().esperaReserva)
 }
 
 function preferirH264(conexao) {
@@ -111,7 +119,7 @@ function preferirH264(conexao) {
 }
 
 // Reserva do host: JPEG do canvas logo depois de cada desenho (o WebGL limpa a
-// imagem depois), no máximo QUADROS_RESERVA por segundo
+// imagem depois), no máximo ajustes().quadrosReserva por segundo
 function ligarReservaHost() {
   if (reserva || papelAtual !== 'host' || !game) return
   clearTimeout(timerReserva)
@@ -121,9 +129,10 @@ function ligarReservaHost() {
   const ctx = tela2d.getContext('2d')
   let ultimo = 0
   let ocupado = false
+  const { quadrosReserva, qualidadeReserva } = ajustes()
   const aoDesenhar = () => {
     const agora = performance.now()
-    if (ocupado || agora - ultimo < 1000 / QUADROS_RESERVA) return
+    if (ocupado || agora - ultimo < 1000 / quadrosReserva) return
     ultimo = agora
     ctx.drawImage(game.canvas, 0, 0, tela2d.width, tela2d.height)
     ocupado = true
@@ -133,7 +142,7 @@ function ligarReservaHost() {
         if (blob) enviarQuadro(blob)
       },
       'image/jpeg',
-      0.72,
+      qualidadeReserva,
     )
   }
   game.events.on('postrender', aoDesenhar)
@@ -154,7 +163,7 @@ async function receberOferta(sdp) {
   papelAtual = 'convidado'
   parceiroAtual = parceiro()?.id
   mudar({ estado: 'conectando' })
-  pc = new RTCPeerConnection({ iceServers: [] })
+  pc = new RTCPeerConnection(configRtc())
   const meu = pc
   pc.onicecandidate = (e) => e.candidate && enviarAoParceiro({ tipo: 'ice', candidato: e.candidate.toJSON() })
   pc.ontrack = (e) => {
@@ -174,9 +183,10 @@ async function receberOferta(sdp) {
 
 // Na LAN sobra banda: o Chrome do host já começa mandando a imagem com
 // qualidade boa em vez de subir aos poucos (x-google-*-bitrate, em kbps, nos
-// codecs de vídeo da resposta que o host recebe)
+// codecs de vídeo da resposta que o host recebe). Online, com o teto menor.
 function bitrateDeLan(sdp) {
-  const extra = `x-google-start-bitrate=${BITRATE / 2000};x-google-min-bitrate=${BITRATE / 6000};x-google-max-bitrate=${BITRATE / 1000}`
+  const { bitrate } = ajustes()
+  const extra = `x-google-start-bitrate=${bitrate / 2000};x-google-min-bitrate=${bitrate / 6000};x-google-max-bitrate=${bitrate / 1000}`
   const linhas = sdp.split('\r\n')
   const video = new Set()
   let emVideo = false
@@ -272,7 +282,7 @@ aoParceiro(async (dados) => {
       // o convidado pediu (entrou agora, ou perdeu a imagem): começa de novo,
       // a não ser que a conexão de agora ainda esteja tentando
       if (get(lan).papel !== 'host') return
-      const tentando = pc && get(tela).estado === 'conectando' && performance.now() - inicioHost < ESPERA_RESERVA_MS + 3000
+      const tentando = pc && get(tela).estado === 'conectando' && performance.now() - inicioHost < ajustes().esperaReserva + 3000
       if (!tentando) comecarHost().catch((e) => console.warn('[lan] transmissão', e))
       break
     }

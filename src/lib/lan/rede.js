@@ -1,11 +1,13 @@
 import { writable, get } from 'svelte/store'
 import { jogo } from '../estado.js'
 
-// Conexão do modo LAN com o servidor (server/lan.js, docs/lan.md) e o estado
-// do lobby, lido pela cena Lan (Phaser) e pelos painéis Svelte.
+// Conexão do modo LAN/ONLINE com o servidor (server/lan.js, docs/lan.md,
+// docs/online.md) e o estado do lobby, lido pela cena Lan (Phaser) e pelos
+// painéis Svelte. O servidor diz nas boas-vindas se é ONLINE (na internet:
+// salas só por código) e quais servidores STUN/TURN o WebRTC usa.
 //
-//   abrirLobby() / fecharLobby()        entra / sai do modo LAN
-//   criarSala() · entrarSala(resumo) · conectarIp('192.168.0.10[:porta]') · sairSala()
+//   abrirLobby() / fecharLobby()        entra / sai do lobby
+//   criarSala() · entrarSala(resumo) · entrarCodigo('K7QX2') · conectarIp('192.168.0.10[:porta]') · sairSala()
 //   alternarPronto() · mudarModo('pvp'|'coop') · enviarChat(texto) · expulsar() · mudarNome(nome)
 //   iniciarPartida() / encerrarPartida()  (host) a partida começa / volta ao lobby
 //   enviarAoParceiro(dados) · aoParceiro(fn)   mensagens para o outro PC da sala
@@ -17,19 +19,22 @@ const MAX_CHAT = 40 // mensagens guardadas
 const LISTAR_MS = 1500
 const PING_MS = 2000
 
-function lerNome() {
+function nomeSalvo() {
   try {
-    const salvo = localStorage.getItem(CHAVE_NOME)
-    if (salvo) return salvo
-  } catch {}
-  return `JOGADOR ${Math.floor(100 + Math.random() * 900)}`
+    return localStorage.getItem(CHAVE_NOME) || null
+  } catch {
+    return null
+  }
 }
+const lerNome = () => nomeSalvo() ?? `JOGADOR ${Math.floor(100 + Math.random() * 900)}`
 
 const INICIAL = {
   fase: 'fora', // fora | conectando | navegando | sala
   servidor: null, // ws://.../lan da conexão atual
   enderecos: [], // http://ip:porta onde o servidor de casa serve o jogo (dica para o outro PC)
-  eu: { id: null, nome: lerNome() },
+  eu: { id: null, nome: lerNome(), escolheuNome: Boolean(nomeSalvo()) },
+  online: false, // servidor na internet: salas só por código
+  ice: [], // servidores STUN/TURN que o servidor mandou (WebRTC)
   papel: null, // 'host' | 'convidado' (na sala)
   sala: null, // { id, nome, modo, emPartida, max, membros: [{ id, nome, papel, pronto, ping }] }
   salas: [], // [{ id, nome, host, jogadores, max, modo, emPartida, endereco? , ip? }]
@@ -55,6 +60,7 @@ const estado = () => get(lan)
 export const souHost = () => estado().fase === 'sala' && estado().papel === 'host'
 export const souConvidado = () => estado().fase === 'sala' && estado().papel === 'convidado'
 export const emPartida = () => estado().fase === 'sala' && Boolean(estado().sala?.emPartida)
+export const souOnline = () => estado().online
 export const parceiro = () => estado().sala?.membros.find((m) => m.id !== estado().eu.id) ?? null
 
 function enderecoCasa() {
@@ -109,6 +115,8 @@ function conectar(url) {
           erro: '',
           eu: { ...s.eu, id: m.id },
           enderecos: url === casa ? m.enderecos ?? [] : s.enderecos,
+          online: Boolean(m.online),
+          ice: Array.isArray(m.ice) ? m.ice : [],
         }))
         comecarTimers()
         resolve(true)
@@ -126,7 +134,8 @@ function conectar(url) {
       pararTimers()
       const s = estado()
       if (!aberto) {
-        mudar({ fase: 'navegando', sala: null, papel: null, salas: [], erro: url === casa ? 'servidor LAN não encontrado: rode "npm run lan" neste PC' : `não deu para conectar em ${url.replace(/^wss?:\/\//, '').replace(/\/lan$/, '')}` })
+        const semCasa = s.online ? 'sem conexão com o servidor: tentando de novo…' : 'servidor LAN não encontrado: rode "npm run lan" neste PC'
+        mudar({ fase: 'navegando', sala: null, papel: null, salas: [], erro: url === casa ? semCasa : `não deu para conectar em ${url.replace(/^wss?:\/\//, '').replace(/\/lan$/, '')}` })
         resolve(false)
         // tenta de novo o servidor daqui (pode ser que ele ainda vá ser ligado)
         if (s.fase !== 'fora') setTimeout(() => estado().fase === 'navegando' && !ws && conectar(casa), url === casa ? 3000 : 2500)
@@ -280,6 +289,16 @@ export async function entrarSala(resumo) {
   enviar({ t: 'entrar', sala: resumo.id })
 }
 
+// a sala de um amigo pelo código que ele passou (ex.: K7QX2)
+export function entrarCodigo(texto) {
+  const codigo = String(texto ?? '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+  if (!codigo) return
+  if (estado().fase !== 'navegando') return mudar({ erro: 'espere conectar no servidor' })
+  enviar({ t: 'entrar', codigo })
+}
+
 // '192.168.0.10' ou '192.168.0.10:5180': conecta no servidor de lá e, se ele
 // tiver uma sala só, entra nela
 export async function conectarIp(texto) {
@@ -319,7 +338,7 @@ export function mudarNome(nome) {
   try {
     localStorage.setItem(CHAVE_NOME, limpo)
   } catch {}
-  lan.update((s) => ({ ...s, eu: { ...s.eu, nome: limpo } }))
+  lan.update((s) => ({ ...s, eu: { ...s.eu, nome: limpo, escolheuNome: true } }))
   enviar({ t: 'nome', nome: limpo })
 }
 

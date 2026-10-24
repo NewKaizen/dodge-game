@@ -1,13 +1,19 @@
-// Servidor do modo LAN (docs/lan.md): lobby por WebSocket em /lan e descoberta
-// de salas por broadcast UDP. Roda dentro do `npm run lan` (server/index.js) e
-// do `npm run dev` (plugin no vite.config.js).
+// Servidor do modo LAN (docs/lan.md) e do modo ONLINE (docs/online.md): lobby
+// por WebSocket em /lan e, na LAN, descoberta de salas por broadcast UDP. Roda
+// dentro do `npm run lan` / `npm start` (server/index.js) e do `npm run dev`
+// (plugin no vite.config.js).
+//
+// ONLINE (servidor na internet): as salas não aparecem numa lista; cada uma
+// tem um CÓDIGO (ex.: K7QX2) que o host passa para o amigo. Sem descoberta UDP
+// e sem trocar o mDNS (na internet o WebRTC se acha pelo STUN/TURN, que o
+// servidor manda para os navegadores nas boas-vindas).
 //
 // O servidor só junta as pessoas: guarda as salas, repassa o chat, os sinais
 // do WebRTC (a imagem do host vai direto para o convidado) e os controles do
 // convidado. Mensagens em JSON, { t: 'tipo', ... }; binário = quadro da
 // transmissão reserva (JPEG), repassado ao outro membro da sala.
 //
-//   anexarLan(httpServer)   liga o /lan num servidor http; devolve { fechar() }
+//   anexarLan(httpServer, { online, ice })   liga o /lan num servidor http; devolve { fechar() }
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
@@ -22,8 +28,22 @@ const BATIMENTO_MS = 5000
 const MAX_NOME = 16
 const MAX_CHAT = 120
 const MODOS = ['pvp', 'coop']
+// Limite de mensagens por cliente (balde de fichas): sobra para os controles e
+// o WebRTC, mas segura quem martela o servidor
+const FICHAS_POR_SEGUNDO = 120
+const MAX_FICHAS = 240
+const MAX_SALAS = 500
+const MAX_CLIENTES = 1000
+// código das salas: sem letras que se confundem (0/O, 1/I/L)
+const LETRAS_CODIGO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+export const TAMANHO_CODIGO = 5
 
 const novoId = () => crypto.randomBytes(4).toString('hex')
+export const normalizarCodigo = (texto) =>
+  String(texto ?? '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 12)
 const limpar = (texto, max) =>
   String(texto ?? '')
     .replace(/[\u0000-\u001f\u007f]/g, '')
@@ -69,9 +89,35 @@ export const trocarMdns = (texto, ip) => (typeof texto === 'string' ? texto.repl
 
 // salasRede(): as salas que a descoberta achou em outros servidores
 // enderecos(): http://ip:porta onde este servidor serve o jogo (dica no lobby)
-export function criarLobby({ locais = enderecosLocais, salasRede = () => [], enderecos = () => [] } = {}) {
+// online: servidor na internet (salas só por código); ice: servidores STUN/TURN
+// para o WebRTC dos navegadores; agora(): relógio (os testes trocam)
+export function criarLobby({ locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now } = {}) {
   const clientes = new Map() // id -> cliente
   const salas = new Map() // id -> sala
+  const codigos = new Map() // código -> id da sala
+
+  const novoCodigo = () => {
+    for (;;) {
+      const bytes = crypto.randomBytes(TAMANHO_CODIGO)
+      const codigo = [...bytes].map((b) => LETRAS_CODIGO[b % LETRAS_CODIGO.length]).join('')
+      if (!codigos.has(codigo)) return codigo
+    }
+  }
+
+  const fecharSala = (sala) => {
+    salas.delete(sala.id)
+    codigos.delete(sala.codigo)
+  }
+
+  // balde de fichas: false = mensagem demais, joga fora
+  const temFicha = (cliente) => {
+    const t = agora()
+    cliente.fichas = Math.min(MAX_FICHAS, cliente.fichas + ((t - cliente.recarga) / 1000) * FICHAS_POR_SEGUNDO)
+    cliente.recarga = t
+    if (cliente.fichas < 1) return false
+    cliente.fichas -= 1
+    return true
+  }
 
   const enviar = (cliente, msg) => {
     if (cliente.ws.readyState === 1) cliente.ws.send(JSON.stringify(msg))
@@ -79,6 +125,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
 
   const publica = (sala) => ({
     id: sala.id,
+    codigo: sala.codigo,
     nome: sala.nome,
     modo: sala.modo,
     emPartida: sala.emPartida,
@@ -111,7 +158,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     if (!sala) return
     sala.membros.delete(cliente.id)
     if (cliente.id === sala.host) {
-      salas.delete(sala.id)
+      fecharSala(sala)
       for (const id of sala.membros) {
         const outro = clientes.get(id)
         outro.sala = null
@@ -131,7 +178,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       if (m.protocolo !== PROTOCOLO) return enviar(c, { t: 'erro', msg: `versão diferente do jogo (protocolo ${m.protocolo} x ${PROTOCOLO}): atualize os dois PCs` })
       c.nome = limpar(m.nome, MAX_NOME) || 'JOGADOR'
       c.ok = true
-      enviar(c, { t: 'bemvindo', id: c.id, ip: c.ip, protocolo: PROTOCOLO, enderecos: enderecos() })
+      enviar(c, { t: 'bemvindo', id: c.id, ip: c.ip, protocolo: PROTOCOLO, enderecos: online ? [] : enderecos(), online, ice })
     },
     nome(c, m) {
       c.nome = limpar(m.nome, MAX_NOME) || c.nome
@@ -139,19 +186,25 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       if (sala) avisarSala(sala)
     },
     listar(c) {
+      // online as salas são privadas: só entra quem tem o código
+      if (online) return enviar(c, { t: 'salas', salas: [], rede: [] })
       enviar(c, { t: 'salas', salas: [...salas.values()].map(resumo), rede: salasRede() })
     },
     criar(c, m) {
       sair(c)
-      const sala = { id: novoId(), nome: limpar(m.nome, 24) || `SALA DE ${c.nome}`, host: c.id, membros: new Set([c.id]), modo: 'pvp', emPartida: false }
+      if (salas.size >= maxSalas) return enviar(c, { t: 'erro', msg: 'o servidor está lotado: tente de novo daqui a pouco' })
+      const sala = { id: novoId(), codigo: novoCodigo(), nome: limpar(m.nome, 24) || `SALA DE ${c.nome}`, host: c.id, membros: new Set([c.id]), modo: 'pvp', emPartida: false }
       salas.set(sala.id, sala)
+      codigos.set(sala.codigo, sala.id)
       c.sala = sala.id
       c.pronto = true
       avisarSala(sala)
     },
+    // pela lista (m.sala, só na LAN) ou pelo código (m.codigo)
     entrar(c, m) {
-      const sala = salas.get(m.sala)
-      if (!sala) return enviar(c, { t: 'erro', msg: 'essa sala não existe mais' })
+      const codigo = normalizarCodigo(m.codigo)
+      const sala = codigo ? salas.get(codigos.get(codigo)) : online ? null : salas.get(m.sala)
+      if (!sala) return enviar(c, { t: 'erro', msg: codigo ? `não achei a sala ${codigo}: confira o código` : 'essa sala não existe mais' })
       if (sala.membros.has(c.id)) return avisarSala(sala)
       if (sala.membros.size >= MAX_MEMBROS) return enviar(c, { t: 'erro', msg: 'a sala está cheia' })
       if (sala.emPartida) return enviar(c, { t: 'erro', msg: 'a sala está no meio de uma partida' })
@@ -215,6 +268,10 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
         if (id === c.id) continue
         const outro = clientes.get(id)
         let dados = m.dados
+        if (online) {
+          enviar(outro, { t: 'de', de: c.id, dados })
+          continue
+        }
         if (dados.tipo === 'ice' && dados.candidato) dados = { ...dados, candidato: { ...dados.candidato, candidate: trocarMdns(dados.candidato.candidate, ipVisto(c, outro)) } }
         if ((dados.tipo === 'oferta' || dados.tipo === 'resposta') && dados.sdp) dados = { ...dados, sdp: trocarMdns(dados.sdp, ipVisto(c, outro)) }
         enviar(outro, { t: 'de', de: c.id, dados })
@@ -227,11 +284,12 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     salas,
     resumos: () => [...salas.values()].map(resumo),
     conectar(ws, ip) {
-      const cliente = { id: novoId(), ws, ip: semPrefixo(ip), nome: 'JOGADOR', sala: null, pronto: false, ping: null, ok: false }
+      const cliente = { id: novoId(), ws, ip: semPrefixo(ip), nome: 'JOGADOR', sala: null, pronto: false, ping: null, ok: false, fichas: MAX_FICHAS, recarga: agora() }
       clientes.set(cliente.id, cliente)
       return cliente
     },
     receber(cliente, texto, binario) {
+      if (!temFicha(cliente)) return
       if (binario) {
         const sala = salas.get(cliente.sala)
         if (!sala || sala.host !== cliente.id) return // só o host transmite
@@ -317,12 +375,14 @@ function criarDescoberta(lobby, porta, log) {
 
 // ---------- servidor ----------
 
-export function anexarLan(httpServer, { log = console.log, descoberta = true } = {}) {
+// online: servidor na internet (sem descoberta UDP, salas por código)
+// ice: [{ urls, username?, credential? }] para o WebRTC dos navegadores
+export function anexarLan(httpServer, { log = console.log, descoberta = true, online = false, ice = [], maxClientes = MAX_CLIENTES } = {}) {
   let rede = null
   const porta = () => httpServer.address()?.port
-  const lobby = criarLobby({ salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
+  const lobby = criarLobby({ online, ice, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 * 1024 })
-  if (descoberta) rede = criarDescoberta(lobby, porta, log)
+  if (descoberta && !online) rede = criarDescoberta(lobby, porta, log)
 
   const aoUpgrade = (req, socket, head) => {
     if (new URL(req.url, 'http://x').pathname !== '/lan') return // o resto (ex.: o HMR do Vite) não é com a gente
@@ -331,6 +391,10 @@ export function anexarLan(httpServer, { log = console.log, descoberta = true } =
   httpServer.on('upgrade', aoUpgrade)
 
   wss.on('connection', (ws, req) => {
+    if (wss.clients.size > maxClientes) {
+      ws.close(1013, 'servidor lotado')
+      return
+    }
     const cliente = lobby.conectar(ws, req.socket.remoteAddress)
     ws.vivo = true
     ws.on('pong', () => (ws.vivo = true))

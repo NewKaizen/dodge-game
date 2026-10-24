@@ -139,3 +139,96 @@ test('expulsar e chat', () => {
   assert.equal(conv.ultima('fechada').motivo, 'o host tirou você da sala')
   assert.equal(host.ultima('sala').sala.membros.length, 1)
 })
+
+// ---------- ONLINE ----------
+
+function montarOnline(extra = {}) {
+  const lobby = criarLobby({ locais: () => LOCAIS, online: true, ice: [{ urls: ['stun:stun.exemplo:3478'] }], ...extra })
+  const entrar = (ip, nome) => {
+    const recebidas = []
+    const ws = { readyState: 1, bufferedAmount: 0, send: (m) => recebidas.push(typeof m === 'string' ? JSON.parse(m) : m) }
+    const c = lobby.conectar(ws, ip)
+    const mandar = (m) => lobby.receber(c, JSON.stringify(m))
+    mandar({ t: 'ola', protocolo: PROTOCOLO, nome })
+    return { c, recebidas, mandar, ultima: (t) => recebidas.filter((m) => m.t === t).at(-1) }
+  }
+  return { lobby, entrar }
+}
+
+test('online: boas-vindas dizem que é online e mandam o STUN/TURN', () => {
+  const { entrar } = montarOnline()
+  const ana = entrar('200.1.2.3', 'ANA')
+  const ola = ana.ultima('bemvindo')
+  assert.equal(ola.online, true)
+  assert.deepEqual(ola.ice, [{ urls: ['stun:stun.exemplo:3478'] }])
+  assert.deepEqual(ola.enderecos, [], 'na internet não mostra o IP da máquina')
+})
+
+test('online: salas não aparecem na lista; entra pelo código', () => {
+  const { lobby, entrar } = montarOnline()
+  const host = entrar('200.1.2.3', 'ANA')
+  const conv = entrar('177.4.5.6', 'BETO')
+  host.mandar({ t: 'criar' })
+  const sala = host.ultima('sala').sala
+  assert.match(sala.codigo, /^[A-Z2-9]{5}$/)
+  assert.doesNotMatch(sala.codigo, /[01OIL]/)
+
+  conv.mandar({ t: 'listar' })
+  assert.deepEqual(conv.ultima('salas').salas, [])
+  conv.mandar({ t: 'entrar', sala: sala.id }) // pelo id não dá
+  assert.match(conv.ultima('erro').msg, /não existe/)
+  assert.equal(lobby.salas.get(sala.id).membros.size, 1)
+
+  conv.mandar({ t: 'entrar', codigo: 'ZZZZZ' })
+  assert.equal(conv.ultima('erro').msg, 'não achei a sala ZZZZZ: confira o código')
+
+  conv.mandar({ t: 'entrar', codigo: ` ${sala.codigo.toLowerCase()} ` }) // minúsculo e com espaço vale
+  assert.deepEqual(conv.ultima('sala').sala.membros.map((m) => m.nome), ['ANA', 'BETO'])
+})
+
+test('online: o código some quando a sala fecha', () => {
+  const { lobby, entrar } = montarOnline()
+  const host = entrar('200.1.2.3', 'ANA')
+  host.mandar({ t: 'criar' })
+  const { codigo } = host.ultima('sala').sala
+  lobby.desconectar(host.c)
+  const conv = entrar('177.4.5.6', 'BETO')
+  conv.mandar({ t: 'entrar', codigo })
+  assert.match(conv.ultima('erro').msg, /não achei a sala/)
+})
+
+test('online: repassa os sinais do WebRTC sem mexer', () => {
+  const { entrar } = montarOnline()
+  const host = entrar('200.1.2.3', 'ANA')
+  const conv = entrar('177.4.5.6', 'BETO')
+  host.mandar({ t: 'criar' })
+  conv.mandar({ t: 'entrar', codigo: host.ultima('sala').sala.codigo })
+  const candidato = { candidate: 'candidate:1 1 udp 1 abc-1.local 5000 typ host', sdpMid: '0' }
+  host.mandar({ t: 'para', dados: { tipo: 'ice', candidato } })
+  assert.deepEqual(conv.ultima('de').dados.candidato, candidato)
+})
+
+test('online: servidor lotado não cria sala', () => {
+  const { lobby, entrar } = montarOnline({ maxSalas: 1 })
+  entrar('200.1.2.3', 'ANA').mandar({ t: 'criar' })
+  const beto = entrar('177.4.5.6', 'BETO')
+  beto.mandar({ t: 'criar' })
+  assert.match(beto.ultima('erro').msg, /lotado/)
+  assert.equal(lobby.salas.size, 1)
+})
+
+test('limita quem manda mensagem demais', () => {
+  let t = 0
+  const { entrar } = montarOnline({ agora: () => t })
+  const host = entrar('200.1.2.3', 'ANA')
+  const conv = entrar('177.4.5.6', 'BETO')
+  host.mandar({ t: 'criar' })
+  conv.mandar({ t: 'entrar', codigo: host.ultima('sala').sala.codigo })
+  const antes = host.recebidas.length
+  for (let i = 0; i < 1000; i++) conv.mandar({ t: 'para', dados: { tipo: 'joy', x: i, y: 0 } })
+  const passaram = host.recebidas.length - antes
+  assert.ok(passaram > 100 && passaram < 300, `passaram ${passaram}`)
+  t += 1000 // um segundo depois, volta a passar
+  conv.mandar({ t: 'para', dados: { tipo: 'joy', x: 1, y: 0 } })
+  assert.deepEqual(host.ultima('de').dados, { tipo: 'joy', x: 1, y: 0 })
+})
