@@ -8,6 +8,7 @@ import { shake } from '../../effects/shake.js'
 import { flashTela } from '../../effects/flash.js'
 import { particulas } from '../../effects/particulas.js'
 import { BotDuelo, difAngulo } from './botDuelo.js'
+import { RedeDuelo } from './redeDuelo.js'
 
 // DUELO (bonus round): as duas pistas fecham e abre UMA caixa grande no meio
 // com os dois corações dentro. Cada um luta com a arma do naipe da carta que
@@ -19,6 +20,8 @@ import { BotDuelo, difAngulo } from './botDuelo.js'
 //   const duelo = new Duelo(arena, { armas, cpu: arena.cpu, nivelBot: arena.nivelBot, semente, aceleracao: arena.aceleracao })
 //     armas  resolverDuelo(...).armas -> [{ arma, forca, dano, carta }, {...}]
 //     cpu    lado da CPU (ou null); `cpus: [0, 1]` põe a CPU nos dois (testes)
+//     rede   partida EM REDE (docs/rede-pvp.md): { canal, meuLado, souHost, rodada }
+//            ou null (local / CPU, como sempre). Ver "Em rede" abaixo.
 //   await duelo.rodar()     o duelo inteiro (abre, apresenta, 3-2-1, luta, fecha);
 //                           resolve com { motivo: 'tempo' | 'ko' | 'parado', ko, acertos, dano }
 //   duelo.atualizar(delta)  todo frame (a arena chama enquanto fase === 'duelo')
@@ -38,6 +41,16 @@ import { BotDuelo, difAngulo } from './botDuelo.js'
 // Replay do K.O. (pvp/fimDePartida/index.js, fonteDuelo): o gravador fotografa
 // `objetos` (menos a `borda` e os sprites de `coracoes`) dentro da `caixa`
 // aberta (`abertura`), enquanto o `estagio` é de luta.
+//
+// Em rede (redeDuelo.js): cada PC simula só o PRÓPRIO coração (o do outro anda
+// pelas posições que chegam) e cada ataque daqui vira réplica lá. Quem decide
+// o dano é a VÍTIMA: decide(j) diz se o coração j é daqui; colisões, aparos da
+// espada e arena.acertou só acontecem para ele. O dano no coração do outro
+// chega pela arena (HP, K.O.: arena.nocaute -> duelo.nocaute) e pelo
+// dueloDano (danoNoOutro: o enfeite e o placar do duelo). O 3-2-1 começa com o
+// dueloPronto dos dois; o fim de um (dueloFim) acaba a luta do outro, e o
+// rodar() só resolve depois do dueloFim do outro (ou do timeout, se ele sumiu).
+// Cada projétil tem `id` (lado:número) para os dois PCs falarem do mesmo.
 
 export const DUELO = {
   duracaoMs: 15000, // tempo de luta (encurta com a morte súbita, até duracaoMinMs)
@@ -82,7 +95,7 @@ const limitar = (v, a, b) => Math.max(a, Math.min(b, v))
 const outro = (j) => 1 - j
 
 export default class Duelo {
-  constructor(arena, { armas, cpu = null, cpus = null, nivelBot = 'normal', semente = 'duelo', aceleracao = 1 } = {}) {
+  constructor(arena, { armas, cpu = null, cpus = null, nivelBot = 'normal', semente = 'duelo', aceleracao = 1, rede = null } = {}) {
     this.arena = arena
     this.armas = [0, 1].map((j) => armas?.[j] ?? { arma: 'tiro', forca: 0, dano: 3, carta: null })
     this.aceleracao = aceleracao
@@ -90,7 +103,8 @@ export default class Duelo {
     this.velocidade = (arena.registry?.get('velocidade') ?? CORACAO.velocidadePadrao) * this.fatorCoracao
     this.duracao = Math.max(DUELO.duracaoMinMs, Math.round(DUELO.duracaoMs / aceleracao / 500) * 500)
     this.params = this.armas.map((a) => this.parametros(a))
-    const ladosCpu = cpus ?? (cpu === null || cpu === undefined ? [] : [cpu])
+    // em rede os dois lados são gente (cada um no seu PC)
+    const ladosCpu = rede ? [] : cpus ?? (cpu === null || cpu === undefined ? [] : [cpu])
     const rng = criarRng(`${semente}:duelo`)
     const sorte = () => aleatorio(rng)
     this.bots = [0, 1].map((j) => (ladosCpu.includes(j) ? new BotDuelo({ nivel: nivelBot, rng: sorte }) : null))
@@ -115,9 +129,16 @@ export default class Duelo {
     this.objetos = new Set() // tudo o que precisa ser destruído no fim
     this.pendentes = new Set() // promessas de espera (parar() resolve todas)
     this.ultimoSegundo = null
+    this.proximoId = 0 // id dos ataques daqui ("lado:n"), para os dois PCs falarem do mesmo projétil
+    this.rede = rede ? new RedeDuelo(this, rede) : null
   }
 
   // ---------- utilidades ----------
+
+  // o coração j é deste PC? (sem rede: os dois). Só ele leva dano e apara aqui.
+  decide(j) {
+    return !this.rede || this.rede.decide(j)
+  }
 
   parametros({ arma, forca: f = 0 }) {
     const c = ARMAS_DUELO[arma] ?? ARMAS_DUELO.tiro
@@ -222,6 +243,9 @@ export default class Duelo {
       if (this.arena.ko) this.arena.ko = [false, false]
       await this.abrir()
       if (this.parado) return this.resultado()
+      // em rede: o 3-2-1 começa quando os dois abriram a caixa
+      await this.rede?.sincronizarInicio()
+      if (this.parado) return this.resultado()
       await this.apresentar()
       if (this.parado) return this.resultado()
       this.estagio = 'luta'
@@ -236,6 +260,11 @@ export default class Duelo {
       })
       if (this.parado) return this.resultado()
       await this.encerrar()
+      if (this.rede && !this.parado) {
+        // o fim do outro: depois dele já chegou todo o dano que ele levou (placar igual nos dois)
+        await this.rede.esperarFimDoOutro()
+        if (this.coracoes.some((c) => c.ko)) this.motivo = 'ko'
+      }
       return this.resultado()
     } finally {
       this.limpar()
@@ -406,6 +435,7 @@ export default class Duelo {
     if (this.estagio === 'fim' || this.estagio === 'fechando' || this.motivo) return
     this.motivo = motivo
     this.estagio = 'fim'
+    this.rede?.acabei(motivo)
     this.aoAcabar?.()
   }
 
@@ -423,6 +453,7 @@ export default class Duelo {
     if (this.limpo) return
     this.limpo = true
     this.estagio = this.parado ? 'parado' : 'acabou'
+    this.rede?.desligar()
     const a = this.arena
     if (a.textoRelogio?.scene) a.textoRelogio.setText('')
     for (const o of this.objetos) {
@@ -441,7 +472,7 @@ export default class Duelo {
 
   // humano apertou A no lado j
   atacar(j) {
-    if (this.bots[j] || !this.coracoes[j]) return
+    if (this.bots[j] || !this.coracoes[j] || !this.decide(j)) return
     if (this.estagio !== 'luta' && this.estagio !== 'final') return
     if (!this.tentarAtacar(j)) this.coracoes[j].pedidoMs = DUELO.bufferMs
   }
@@ -450,27 +481,61 @@ export default class Duelo {
     if (!this.pronto(j)) return false
     const c = this.coracoes[j]
     const p = this.params[j]
+    const id = `${j}:${this.proximoId++}`
+    let ataque
     switch (this.armas[j].arma) {
       case 'espada':
-        this.golpear(j)
+        ataque = this.golpear(j, id)
         break
       case 'bumerangue':
-        this.lancarBumerangue(j)
+        ataque = this.lancarBumerangue(j, id)
         break
       case 'explosao':
-        this.jogarBomba(j)
+        ataque = this.jogarBomba(j, id)
         break
       default:
-        this.atirar(j)
+        ataque = this.atirar(j, id)
     }
     c.recargaMs = c.recargaTotal = p.recargaMs
     c.pedidoMs = 0
+    // em rede: o outro PC cria a mesma arma (réplica)
+    this.rede?.ataquei(ataque)
     return true
+  }
+
+  // em rede: o outro (lado j) atacou no PC dele; a réplica sai daqui com os
+  // mesmos números (ela só machuca o coração daqui, que é quem decide)
+  replicarAtaque(j, ataque) {
+    const c = this.coracoes[j]
+    if (!c || c.ko || !ataque || !['contagem', 'luta', 'final'].includes(this.estagio)) return
+    switch (ataque.arma) {
+      case 'espada':
+        c.ladoGolpe = ataque.lado
+        c.angulo = ataque.angulo
+        c.dir = { x: Math.cos(ataque.angulo), y: Math.sin(ataque.angulo) }
+        this.criarGolpe(j, ataque)
+        break
+      case 'bumerangue':
+        this.criarBumerangue(j, ataque)
+        break
+      case 'explosao':
+        this.criarBombas(j, ataque)
+        break
+      case 'tiro':
+        this.criarTiro(j, ataque)
+        break
+      default:
+        return
+    }
+    c.recargaMs = c.recargaTotal = this.params[j].recargaMs
   }
 
   // ---------- armas ----------
 
-  atirar(j) {
+  // Cada arma tem duas partes: a MIRA (atirar, golpear...: só no PC de quem
+  // ataca; devolve o ataque, que em rede vai para o outro) e o CRIAR (criarTiro,
+  // criarGolpe...: põe a arma na tela a partir do ataque; a réplica usa só ele).
+  atirar(j, id) {
     const c = this.coracoes[j]
     const p = this.params[j]
     // mira adiantada: onde o outro vai estar quando o tiro chegar (uma parte disso)
@@ -480,26 +545,44 @@ export default class Duelo {
       const voo = Math.hypot(alvo.x - c.x, alvo.y - c.y) / p.velocidade
       ang = Math.atan2(alvo.y + alvo.vy * voo * p.antecipa - c.y, alvo.x + alvo.vx * voo * p.antecipa - c.x)
     }
+    const ataque = { arma: 'tiro', id, x: c.x + Math.cos(ang) * 10, y: c.y + Math.sin(ang) * 10, angulo: ang }
+    this.criarTiro(j, ataque)
+    return ataque
+  }
+
+  criarTiro(j, { id, x, y, angulo: ang }) {
+    const c = this.coracoes[j]
+    const p = this.params[j]
     const dx = Math.cos(ang)
     const dy = Math.sin(ang)
-    const x = c.x + dx * 10
-    const y = c.y + dy * 10
     const sprite = this.imagem('tiro', x, y, { cor: c.cor, tamanho: p.raio * 2.6, profundidade: PROFUNDIDADE.tiro }).setRotation(ang)
-    this.tiros.push({ tipo: 'tiro', dono: j, x, y, vx: dx * p.velocidade, vy: dy * p.velocidade, raio: p.raio, sprite })
+    this.tiros.push({ tipo: 'tiro', id, dono: j, x, y, vx: dx * p.velocidade, vy: dy * p.velocidade, raio: p.raio, sprite })
     tocar(this.arena, 'tiro')
     // coice: o coração "pula" para trás no visual
     c.sprite.setScale(ESCALA.coracao * 1.25)
     this.arena.tweens.add({ targets: c.sprite, scale: ESCALA.coracao, duration: 120 })
   }
 
-  golpear(j) {
+  golpear(j, id) {
+    const c = this.coracoes[j]
+    c.ladoGolpe *= -1
+    const ataque = { arma: 'espada', id, angulo: c.angulo, lado: c.ladoGolpe }
+    this.criarGolpe(j, ataque)
+    return ataque
+  }
+
+  criarGolpe(j, { id, angulo, lado }) {
     const c = this.coracoes[j]
     const p = this.params[j]
-    c.ladoGolpe *= -1
+    if (c.golpe) {
+      // réplica chegando com o golpe anterior ainda na tela (a rede junta os dois)
+      this.soltar(c.golpe.sprite)
+      this.soltar(c.golpe.rastro)
+    }
     const sprite = this.imagem('espada', c.x, c.y, { cor: 0xffffff, profundidade: PROFUNDIDADE.golpe }).setOrigin(0.12, 0.5)
     sprite.setScale((p.alcance + 6) / sprite.width)
     const rastro = this.registrar(this.arena.add.graphics().setDepth(PROFUNDIDADE.golpe - 1))
-    c.golpe = { idade: 0, angulo: c.angulo, lado: c.ladoGolpe, sprite, rastro, acertou: false, somou: false }
+    c.golpe = { id, idade: 0, angulo, lado, sprite, rastro, acertou: false, somou: false }
     this.posicionarGolpe(c)
   }
 
@@ -549,21 +632,26 @@ export default class Duelo {
         return d <= p.alcance + raio && Math.abs(difAngulo(Math.atan2(y - c.y, x - c.x), g.angulo)) <= meio
       }
       const alvo = this.coracoes[outro(c.j)]
-      if (!g.acertou && alvo && !alvo.ko && naLamina(alvo.x, alvo.y, DUELO.hitbox + 2)) {
-        g.acertou = this.ferir(alvo.j, c.j, alvo.x, alvo.y)
+      if (!g.acertou && alvo && !alvo.ko && this.decide(alvo.j) && naLamina(alvo.x, alvo.y, DUELO.hitbox + 2)) {
+        g.acertou = this.ferir(alvo.j, c.j, alvo.x, alvo.y, 1, g.id)
       }
-      // aparar: tiros do inimigo quebram, o bumerangue dele volta
-      for (const t of this.tiros) {
-        if (t.dono === c.j || t.morto || !naLamina(t.x, t.y, t.raio)) continue
-        t.morto = true
-        particulas(this.arena, t.x, t.y, { cor: 0xffffff, quantidade: 6, velocidade: 90 })
-        tocar(this.arena, 'estalo')
-      }
-      for (const b of this.bumerangues) {
-        if (b.dono === c.j || b.fase !== 'ida' || !naLamina(b.x, b.y, b.raio)) continue
-        this.virarBumerangue(b)
-        particulas(this.arena, b.x, b.y, { cor: 0xffffff, quantidade: 6, velocidade: 90 })
-        tocar(this.arena, 'estalo')
+      // aparar: tiros do inimigo quebram, o bumerangue dele volta. Em rede só a
+      // espada daqui apara (ela protege o coração daqui) e avisa o dono da arma
+      if (this.decide(c.j)) {
+        for (const t of this.tiros) {
+          if (t.dono === c.j || t.morto || !naLamina(t.x, t.y, t.raio)) continue
+          t.morto = true
+          particulas(this.arena, t.x, t.y, { cor: 0xffffff, quantidade: 6, velocidade: 90 })
+          tocar(this.arena, 'estalo')
+          this.rede?.rebati({ id: t.id, tipo: 'tiro' })
+        }
+        for (const b of this.bumerangues) {
+          if (b.dono === c.j || b.fase !== 'ida' || !naLamina(b.x, b.y, b.raio)) continue
+          this.virarBumerangue(b)
+          particulas(this.arena, b.x, b.y, { cor: 0xffffff, quantidade: 6, velocidade: 90 })
+          tocar(this.arena, 'estalo')
+          this.rede?.rebati({ id: b.id, tipo: 'bumerangue' })
+        }
       }
     }
     if (g.idade > p.preparoMs + p.golpeMs + 70) {
@@ -573,17 +661,23 @@ export default class Duelo {
     }
   }
 
-  lancarBumerangue(j) {
+  lancarBumerangue(j, id) {
     const c = this.coracoes[j]
     const p = this.params[j]
-    const x = c.x + c.dir.x * 10
-    const y = c.y + c.dir.y * 10
-    const sprite = this.imagem('bumerangue', x, y, { cor: c.cor, tamanho: p.raio * 2.6, profundidade: PROFUNDIDADE.tiro })
     // vai até um pouco depois do outro (no máximo `distancia`), desacelerando: v² = 2·a·d
     const alvo = this.coracoes[outro(j)]
     const ate = alvo && !alvo.ko ? limitar(Math.hypot(alvo.x - c.x, alvo.y - c.y) + 30, 70, p.distancia) : p.distancia
+    const ataque = { arma: 'bumerangue', id, x: c.x + c.dir.x * 10, y: c.y + c.dir.y * 10, dx: c.dir.x, dy: c.dir.y, ate }
+    this.criarBumerangue(j, ataque)
+    return ataque
+  }
+
+  criarBumerangue(j, { id, x, y, dx, dy, ate }) {
+    const c = this.coracoes[j]
+    const p = this.params[j]
+    const sprite = this.imagem('bumerangue', x, y, { cor: c.cor, tamanho: p.raio * 2.6, profundidade: PROFUNDIDADE.tiro })
     const desaceleracao = (p.velocidade * p.velocidade) / (2 * ate)
-    this.bumerangues.push({ tipo: 'bumerangue', dono: j, x, y, vx: c.dir.x * p.velocidade, vy: c.dir.y * p.velocidade, v: p.velocidade, a: desaceleracao, raio: p.raio, fase: 'ida', acertou: false, idade: 0, sprite })
+    this.bumerangues.push({ tipo: 'bumerangue', id, dono: j, x, y, vx: dx * p.velocidade, vy: dy * p.velocidade, v: p.velocidade, a: desaceleracao, raio: p.raio, fase: 'ida', acertou: false, idade: 0, sprite })
     tocar(this.arena, 'bumerangue')
   }
 
@@ -632,12 +726,12 @@ export default class Duelo {
     }
     b.sprite.setPosition(b.x, b.y).setRotation(b.sprite.rotation + 0.024 * dt)
     const alvo = this.coracoes[outro(b.dono)]
-    if (!b.acertou && alvo && !alvo.ko && Math.hypot(alvo.x - b.x, alvo.y - b.y) < b.raio + DUELO.hitbox) {
-      b.acertou = this.ferir(alvo.j, b.dono, b.x, b.y)
+    if (!b.acertou && alvo && !alvo.ko && this.decide(alvo.j) && Math.hypot(alvo.x - b.x, alvo.y - b.y) < b.raio + DUELO.hitbox) {
+      b.acertou = this.ferir(alvo.j, b.dono, b.x, b.y, 1, b.id)
     }
   }
 
-  jogarBomba(j) {
+  jogarBomba(j, id) {
     const c = this.coracoes[j]
     const p = this.params[j]
     const m = 12
@@ -654,15 +748,26 @@ export default class Duelo {
       dist = Math.min(p.distancia, d)
     }
     // leque: uma bomba em cima do outro e as outras dos lados (perpendicular ao arremesso)
+    const alvos = []
     for (let k = 0; k < p.bombas; k++) {
       const lado = k === 0 ? 0 : (k % 2 ? 1 : -1) * Math.ceil(k / 2) * p.leque
-      const alvo = {
+      alvos.push({
         x: limitar(c.x + dir.x * dist - dir.y * lado, this.area.left + m, this.area.right - m),
         y: limitar(c.y + dir.y * dist + dir.x * lado, this.area.top + m, this.area.bottom - m),
-      }
-      const sprite = this.imagem('bomba', c.x, c.y, { tamanho: k ? 16 : 20, profundidade: PROFUNDIDADE.bomba })
+      })
+    }
+    // o giro dos estilhaços de cada bomba já sai daqui (a réplica explode igual)
+    const ataque = { arma: 'explosao', id, x0: c.x, y0: c.y, alvos, giros: alvos.map(() => Math.random() * Math.PI) }
+    this.criarBombas(j, ataque)
+    return ataque
+  }
+
+  criarBombas(j, { id, x0, y0, alvos, giros }) {
+    const p = this.params[j]
+    for (const [k, alvo] of alvos.entries()) {
+      const sprite = this.imagem('bomba', x0, y0, { tamanho: k ? 16 : 20, profundidade: PROFUNDIDADE.bomba })
       const aviso = this.registrar(this.arena.add.graphics().setDepth(PROFUNDIDADE.aviso))
-      this.bombas.push({ tipo: 'bomba', dono: j, x0: c.x, y0: c.y, alvo, x: c.x, y: c.y, raio: p.raio, estado: 'voo', idade: 0, sprite, aviso, escala: sprite.scale })
+      this.bombas.push({ tipo: 'bomba', id: `${id}:${k}`, dono: j, x0, y0, alvo: { ...alvo }, x: x0, y: y0, raio: p.raio, giro: giros?.[k] ?? 0, estado: 'voo', idade: 0, sprite, aviso, escala: sprite.scale })
     }
     tocar(this.arena, 'voo')
   }
@@ -714,22 +819,21 @@ export default class Duelo {
     const tamanho = b.raio * 2.4
     sprite.setScale(tamanho / Math.max(sprite.width, sprite.height))
     this.explosoes.push({ x: b.x, y: b.y, idade: 0, sprite })
-    // machuca o outro coração no raio (o dono não)
+    // machuca o outro coração no raio (o dono não; em rede, só o coração daqui)
     for (const c of this.coracoes) {
-      if (c.ko || c.j === b.dono) continue
-      if (Math.hypot(c.x - b.x, c.y - b.y) <= b.raio + DUELO.hitbox) this.ferir(c.j, b.dono, b.x, b.y)
+      if (c.ko || c.j === b.dono || !this.decide(c.j)) continue
+      if (Math.hypot(c.x - b.x, c.y - b.y) <= b.raio + DUELO.hitbox) this.ferir(c.j, b.dono, b.x, b.y, 1, b.id)
     }
     // e apaga os tiros que estavam no raio
     for (const t of this.tiros) if (Math.hypot(t.x - b.x, t.y - b.y) <= b.raio) t.morto = true
     // estilhaços em volta (giram um pouco a cada bomba)
     const p = this.params[b.dono]
-    const giro = Math.random() * Math.PI
     for (let k = 0; k < p.estilhacos; k++) {
-      const ang = giro + (k * Math.PI * 2) / p.estilhacos
+      const ang = b.giro + (k * Math.PI * 2) / p.estilhacos
       const x = b.x + Math.cos(ang) * b.raio * 0.5
       const y = b.y + Math.sin(ang) * b.raio * 0.5
       const sprite = this.imagem('tiro', x, y, { cor: 0xffa040, tamanho: 10, profundidade: PROFUNDIDADE.tiro }).setRotation(ang)
-      this.tiros.push({ tipo: 'estilhaco', dono: b.dono, x, y, vx: Math.cos(ang) * p.velocidadeEstilhaco, vy: Math.sin(ang) * p.velocidadeEstilhaco, raio: 4, fator: p.fatorEstilhaco, sprite })
+      this.tiros.push({ tipo: 'estilhaco', id: `${b.id}:${k}`, dono: b.dono, x, y, vx: Math.cos(ang) * p.velocidadeEstilhaco, vy: Math.sin(ang) * p.velocidadeEstilhaco, raio: 4, fator: p.fatorEstilhaco, sprite })
     }
   }
 
@@ -755,20 +859,15 @@ export default class Duelo {
 
   // o lado `j` levou um golpe do lado `de` (de === j: a própria bomba)
   // fator: fração do dano da arma (estilhaço da bomba)
-  ferir(j, de, x, y, fator = 1) {
+  // ref: id do projétil/golpe que acertou (em rede o outro PC tira ele da tela)
+  ferir(j, de, x, y, fator = 1, ref = null) {
     const c = this.coracoes[j]
-    if (!c || c.ko || c.invencivelMs > 0) return false
+    if (!c || c.ko || c.invencivelMs > 0 || !this.decide(j)) return false
     if (this.estagio !== 'luta' && this.estagio !== 'final') return false
     const dano = Math.max(1, Math.round(this.armas[de].dano * fator))
     const ok = this.arena.acertou?.(j, dano)
     if (ok === false) return false
-    c.invencivelMs = DUELO.invencivelMs
-    c.levou++
-    c.danoLevado += dano
-    if (de !== j) this.coracoes[de].deu++
-    tocar(this.arena, 'dano')
-    particulas(this.arena, c.x, c.y, { cor: c.cor, quantidade: 10, velocidade: 110 })
-    this.piscarBorda(0xff3048)
+    this.efeitoDano(c, de, dano)
     // empurrão para longe do golpe (a espada empurra mais)
     const dx = c.x - x
     const dy = c.y - y
@@ -776,12 +875,60 @@ export default class Duelo {
     const empurrao = this.params[de].empurrao ?? 10
     c.x = limitar(c.x + (dx / d) * empurrao, this.limites.left, this.limites.right)
     c.y = limitar(c.y + (dy / d) * empurrao, this.limites.top, this.limites.bottom)
-    c.sprite.setScale(ESCALA.coracao * 1.8)
-    this.arena.tweens.add({ targets: c.sprite, scale: ESCALA.coracao, duration: 180, ease: 'Back.easeOut' })
+    this.rede?.leveiGolpe({ de, dano, x: Math.round(x), y: Math.round(y), ref })
     // a arena avisa o K.O. (nocaute); confere aqui também, caso não avise
     const hp = this.arena.estado?.jogadores?.[j]?.hp
     if (hp !== undefined && hp <= 0) this.nocaute(j)
     return true
+  }
+
+  // o que todo acerto faz (no coração daqui e, em rede, no do outro quando o dueloDano chega)
+  efeitoDano(c, de, dano) {
+    c.invencivelMs = DUELO.invencivelMs
+    c.levou++
+    c.danoLevado += dano
+    if (de !== c.j) this.coracoes[de].deu++
+    tocar(this.arena, 'dano')
+    particulas(this.arena, c.x, c.y, { cor: c.cor, quantidade: 10, velocidade: 110 })
+    this.piscarBorda(0xff3048)
+    if (c.ko) return
+    c.sprite.setScale(ESCALA.coracao * 1.8)
+    this.arena.tweens.add({ targets: c.sprite, scale: ESCALA.coracao, duration: 180, ease: 'Back.easeOut' })
+  }
+
+  // ---------- rede (redeDuelo.js) ----------
+
+  // o outro levou um golpe no PC dele (dueloDano). O HP já veio pela arena
+  // (dano -> arena.acertou; o K.O. pela arena.nocaute): aqui só o enfeite, o
+  // placar do duelo e o golpe que acertou sumindo
+  danoNoOutro({ de, dano, ref } = {}) {
+    const c = this.coracoes[this.rede?.outroLado]
+    if (!c || (de !== 0 && de !== 1) || !(dano > 0) || this.limpo) return
+    this.efeitoDano(c, de, dano)
+    if (ref === null || ref === undefined) return
+    for (const t of this.tiros) if (t.id === ref) t.morto = true
+    for (const b of this.bumerangues) if (b.id === ref) b.acertou = true
+    const golpe = this.coracoes[de]?.golpe
+    if (golpe?.id === ref) golpe.acertou = true
+  }
+
+  // a espada do outro quebrou o meu tiro / virou o meu bumerangue (dueloRebate)
+  rebatido({ id, tipo } = {}) {
+    if (this.limpo) return
+    const lista = tipo === 'bumerangue' ? this.bumerangues : this.tiros
+    const o = lista.find((p) => p.id === id && !p.morto)
+    if (!o) return
+    if (tipo === 'bumerangue') {
+      if (o.fase !== 'ida') return
+      this.virarBumerangue(o)
+    } else o.morto = true
+    particulas(this.arena, o.x, o.y, { cor: 0xffffff, quantidade: 6, velocidade: 90 })
+    tocar(this.arena, 'estalo')
+  }
+
+  // a luta acabou no PC do outro (dueloFim): acaba aqui também
+  fimDoOutro({ motivo } = {}) {
+    if (this.estagio === 'luta' || this.estagio === 'final') this.acabar(motivo === 'ko' ? 'ko' : 'tempo')
   }
 
   nocaute(j) {
@@ -830,7 +977,9 @@ export default class Duelo {
         joy = r.joy
         atacar = r.atacar
       } else joy = this.arena.controles?.joy(j) ?? { x: 0, y: 0 }
-      if (mexe) this.mover(c, joy, dt)
+      // em rede o coração do outro anda pelas posições que chegam dele
+      if (mexe && this.decide(j)) this.mover(c, joy, dt)
+      else if (mexe) this.rede.moverOutro(c)
       this.mirar(c)
       c.invencivelMs = Math.max(0, c.invencivelMs - dt)
       if (!lutando) continue
@@ -842,6 +991,7 @@ export default class Duelo {
       }
       if (c.golpe) this.atualizarGolpe(c, dt)
     }
+    if (mexe) this.rede?.atualizar(this.coracoes[this.rede.meuLado])
 
     if (this.estagio !== 'fim') {
       this.atualizarTiros(dt)
@@ -901,8 +1051,8 @@ export default class Duelo {
         continue
       }
       const alvo = this.coracoes[outro(t.dono)]
-      if (alvo && !alvo.ko && Math.hypot(alvo.x - t.x, alvo.y - t.y) < t.raio + DUELO.hitbox) {
-        if (this.ferir(alvo.j, t.dono, t.x, t.y, t.fator)) t.morto = true
+      if (alvo && !alvo.ko && this.decide(alvo.j) && Math.hypot(alvo.x - t.x, alvo.y - t.y) < t.raio + DUELO.hitbox) {
+        if (this.ferir(alvo.j, t.dono, t.x, t.y, t.fator, t.id)) t.morto = true
       }
     }
   }
@@ -1015,6 +1165,7 @@ export default class Duelo {
       bombas: this.bombas.map((b) => ({ dono: b.dono, estado: b.estado, x: Math.round(b.alvo.x), y: Math.round(b.alvo.y), restanteMs: Math.round(this.restanteBomba(b)) })),
       explosoes: this.explosoes.length,
       objetos: this.objetos.size,
+      rede: this.rede?.estadoDebug() ?? null,
     }
   }
 }

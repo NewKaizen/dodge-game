@@ -11,6 +11,7 @@ import { estilhacos, faixasDiagonais } from '../effects/entrada.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 import { tremerCamera } from '../effects/shake.js'
 import { claraoCamera } from '../effects/flash.js'
+import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
 
 // Área da grade de personagens e dos painéis de cada jogador (px)
 const GRADE = { topo: 62, base: 190, esquerda: 20, direita: 620, espaco: 8, larguraMax: 96, alturaMax: 128 }
@@ -18,6 +19,8 @@ const PAINEL = { y: 198, altura: 250, espaco: 8 }
 const CHAVE_SALVA = 'dodge-pvp' // última escolha (também fica no registry 'pvp')
 const CHAVE_NIVEL = 'dodge-pvp-cpu' // nível da CPU (também fica no registry 'pvpNivelBot')
 const NOMES_NIVEL = { facil: 'FÁCIL', normal: 'NORMAL', dificil: 'DIFÍCIL', imbativel: 'IMBATÍVEL' }
+
+const CURSOR_MS = 300 // em rede: de quanto em quanto o meu cursor vai de novo para o outro PC
 
 // Transição "P1 VS P2" (ms desde a confirmação do segundo jogador)
 const VS = { entrada: 120, batida: 560, espelho: 760, saida: 1500, fim: 1760 }
@@ -44,6 +47,15 @@ function caber(texto, conteudo, largura, tamanho) {
 // composição do baralho por naipe, as 3 cartas mais fortes e o estilo.
 // Quando os dois confirmam: "P1 VS P2", grava registry 'pvp' = { p1, p2 }
 // e vai para a votação da arena (PvpVoto), que começa a PvpArena.
+//   EM REDE (sala PVP, game/rede.js, docs/rede-pvp.md): cada PC move só o
+//                próprio cursor (meuLado()); o do outro chega pelo canal
+//                ('cursor', rápida, repetida de tempos em tempos para quem
+//                abriu a tela depois) e o confirmado também ('personagem').
+//                Confirmar é definitivo (B não desfaz). B sem ninguém
+//                confirmado volta os dois ao lobby: no host direto; no
+//                convidado ele pede ('voltarLobby') e o host decide. Com os
+//                dois confirmados, cada PC passa o VS e o host leva os dois
+//                para a PvpVoto.
 export default class PvpEscolha extends Phaser.Scene {
   constructor() {
     super('PvpEscolha')
@@ -55,6 +67,8 @@ export default class PvpEscolha extends Phaser.Scene {
     this.controles = new Controles(this)
     this.controles.onBotao((jogador, botao) => (botao === 'A' ? this.confirmar(jogador) : this.desfazer(jogador)))
     this.solo = this.controles.numJogadores === 1
+    this.rede = emRede()
+    this.eu = this.rede ? meuLado() : null // em rede: o lado que este PC controla
     this.etapa = 0 // contra a CPU: qual jogador o controle está escolhendo
     this.nivelBot = this.lerNivelBot()
     this.confirmados = [null, null]
@@ -81,17 +95,44 @@ export default class PvpEscolha extends Phaser.Scene {
     }))
 
     this.montarPaineis()
-    this.texto(LARGURA / 2, ALTURA - 14, '← → escolher     A: confirmar     B: desfazer / voltar', 13, TEXTO.desabilitado, { strokeThickness: 0 })
+    const dica = this.rede ? '← → escolher     A: confirmar     B: voltar ao lobby' : '← → escolher     A: confirmar     B: desfazer / voltar'
+    this.texto(LARGURA / 2, ALTURA - 14, dica, 13, TEXTO.desabilitado, { strokeThickness: 0 })
 
     this.atualizarTela()
 
     // o painel Svelte pode mudar o número de jogadores a qualquer momento
-    const aoMudar = (_, valor, anterior) => valor !== anterior && !this.vs && this.scene.restart()
+    const aoMudar = (_, valor, anterior) => valor !== anterior && !this.vs && !this.rede && this.scene.restart()
     this.registry.events.on('changedata-numJogadores', aoMudar)
     this.events.once('shutdown', () => this.registry.events.off('changedata-numJogadores', aoMudar))
+    if (this.rede) this.ligarRede()
 
     musica('pvpEscolha')
     this.cameras.main.fadeIn(250)
+  }
+
+  // ---------- em rede ----------
+
+  ligarRede() {
+    const outro = 1 - this.eu
+    const desligar = [
+      canal.ao('cursor', (d) => {
+        if (d?.tela !== 'escolha' || this.confirmados[outro] || this.saindo || !this.ids[d.indice]) return
+        if (this.cursores[outro].indice === d.indice) return
+        this.cursores[outro].indice = d.indice
+        this.atualizarTela()
+      }),
+      canal.ao('personagem', (d) => this.ids.includes(d?.id) && this.marcar(outro, d.id)),
+    ]
+    // o convidado quer voltar ao lobby (B antes de alguém confirmar): o host leva os dois
+    if (souHostDaRede()) desligar.push(canal.ao('voltarLobby', () => this.voltar()))
+    this.events.once('shutdown', () => desligar.forEach((fn) => fn()))
+    this.mandarCursor()
+    this.time.addEvent({ delay: CURSOR_MS, loop: true, callback: () => this.mandarCursor() })
+  }
+
+  mandarCursor() {
+    if (this.confirmados[this.eu] || this.saindo) return
+    canal.enviarRapido('cursor', { tela: 'escolha', indice: this.cursores[this.eu].indice })
   }
 
   // nome curto de cada lado (contra a CPU, o P2 é "CPU")
@@ -243,8 +284,16 @@ export default class PvpEscolha extends Phaser.Scene {
     if (this.saindo) return
     const j = this.alvo(jogador)
     if (this.confirmados[j]) return
+    const id = this.ids[this.cursores[j].indice]
+    if (this.rede) canal.enviar('personagem', null, { id })
+    this.marcar(j, id)
+  }
+
+  // o lado j confirmou o personagem id (daqui ou, em rede, do outro PC)
+  marcar(j, id) {
+    if (this.saindo || this.confirmados[j]) return
     const cursor = this.cursores[j]
-    const id = this.ids[cursor.indice]
+    cursor.indice = this.ids.indexOf(id)
     this.confirmados[j] = id
     tocar(this, 'confirmar')
     const card = this.cards[cursor.indice]
@@ -258,6 +307,14 @@ export default class PvpEscolha extends Phaser.Scene {
 
   desfazer(jogador) {
     if (this.saindo) return
+    if (this.rede) {
+      // em rede confirmar é definitivo; sem ninguém confirmado, B volta ao lobby
+      if (this.confirmados.some(Boolean)) return tocar(this, 'erro')
+      if (souHostDaRede()) return this.voltar()
+      tocar(this, 'cancelar')
+      this.status.setText('voltando ao lobby...').setColor(TEXTO.desabilitado)
+      return canal.enviar('voltarLobby', null, {})
+    }
     if (this.solo) {
       if (this.etapa === 1) {
         this.etapa = 0
@@ -291,10 +348,12 @@ export default class PvpEscolha extends Phaser.Scene {
   }
 
   voltar() {
+    if (this.saindo) return
     this.saindo = true
     tocar(this, 'cancelar')
     this.cameras.main.fadeOut(200, 0, 0, 0)
-    this.time.delayedCall(220, () => this.scene.start('Menu'))
+    // em rede (só o host chega aqui): os dois voltam ao lobby da sala
+    this.time.delayedCall(220, () => (this.rede ? irParaCena(this, 'Lan') : this.scene.start('Menu')))
   }
 
   // ---------- navegação ----------
@@ -306,6 +365,7 @@ export default class PvpEscolha extends Phaser.Scene {
     const n = this.ids.length
     cursor.indice = (cursor.indice + passo + n) % n
     if (comSom) tocar(this, 'mover')
+    if (this.rede) this.mandarCursor()
     this.atualizarTela()
   }
 
@@ -355,6 +415,14 @@ export default class PvpEscolha extends Phaser.Scene {
 
     if (this.solo) {
       this.status.setText(`VOCÊ x CPU  ·  nível da CPU: ${NOMES_NIVEL[this.nivelBot]}  (↑/↓ muda)`).setColor(TEXTO.selecionado)
+    } else if (this.rede) {
+      const outro = 1 - this.eu
+      const texto = !this.confirmados[this.eu]
+        ? `você é o P${this.eu + 1}: escolha o seu lutador  ·  pode repetir!`
+        : !this.confirmados[outro]
+          ? `esperando o P${outro + 1} escolher...`
+          : ''
+      this.status.setText(texto).setColor(TEXTO.normal)
     } else {
       const faltam = this.confirmados.filter((c) => !c).length
       this.status.setText(faltam ? 'cada jogador escolhe 1 lutador  ·  pode repetir!' : '').setColor(TEXTO.normal)
@@ -372,8 +440,11 @@ export default class PvpEscolha extends Phaser.Scene {
     let rodape
     let cor = TEXTO.normal
     if (this.confirmados[j]) {
-      rodape = this.solo ? 'PRONTO!' : 'PRONTO!  (B desfaz)'
+      rodape = this.solo || this.rede ? 'PRONTO!' : 'PRONTO!  (B desfaz)'
       cor = TEXTO.cura
+    } else if (this.rede && j !== this.eu) {
+      rodape = 'escolhendo...'
+      cor = TEXTO.desabilitado
     } else if (this.solo && j > this.etapa) {
       rodape = 'depois: o lutador da CPU'
       cor = TEXTO.desabilitado
@@ -545,7 +616,11 @@ export default class PvpEscolha extends Phaser.Scene {
       metades.forEach((g, j) => this.tweens.add({ targets: g, alpha: 0.6, duration: 200 }))
       camera.fadeOut(240, 0, 0, 0)
     })
-    this.time.delayedCall(VS.fim, () => this.scene.start('PvpVoto', { p1, p2 }))
+    // em rede o host leva os dois para a votação (o convidado espera a cena chegar)
+    this.time.delayedCall(VS.fim, () => {
+      if (!this.rede) this.scene.start('PvpVoto', { p1, p2 })
+      else if (souHostDaRede()) irParaCena(this, 'PvpVoto', { p1, p2 })
+    })
   }
 
   update(time, delta) {

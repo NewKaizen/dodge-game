@@ -42,8 +42,10 @@ aoRapido((dados) => {
 
 lan.subscribe((s) => {
   const naSala = s.fase === 'sala'
-  const partida = naSala && Boolean(s.sala?.emPartida)
-  setTecladoUnico(naSala && s.papel === 'host')
+  // PVP na sala é partida em rede (game/rede.js): cada um joga no próprio PC,
+  // sem repassar controle; o repasse é só do CO-OP (Remote Play)
+  const partida = naSala && Boolean(s.sala?.emPartida) && s.sala.modo !== 'pvp'
+  setTecladoUnico(naSala)
 
   // sem convidado (caiu no meio da partida) o P2 solta tudo
   const agoraHost = partida && s.papel === 'host' && s.sala.membros.length > 1

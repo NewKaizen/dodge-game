@@ -6,7 +6,7 @@ import { tocar, musica, pararMusica } from '../audio.js'
 import { formatarTempo } from '../coop/nota.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, NIVEIS } from '../constants.js'
 import { tremerCamera } from '../effects/shake.js'
-import { partidaOnline, sairDaPartidaOnline } from '../online.js'
+import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
 
 // Tela de game over (os dois caíram na CoopArena).
 // Em etapas: ronco grave no escuro -> letras de GAME OVER despencando uma a
@@ -194,9 +194,9 @@ export default class GameOver extends Phaser.Scene {
     this.saindo = true
     tocar(this, 'confirmar')
     this.cameras.main.fadeOut(300, 0, 0, 0)
-    const online = partidaOnline() // online: os dois voltam ao menu
+    const online = partidaOnline() // online: os dois voltam ao lobby da sala
     this.time.delayedCall(320, () => {
-      if (online) sairDaPartidaOnline(this)
+      if (online) voltarAoLobbyOnline(this)
       else if (botao === 'A') this.scene.start('CoopArena', { chefe: this.idChefe, nivel: this.nivel })
       else this.scene.start('Selecao', { chefe: this.idChefe })
     })
@@ -387,7 +387,7 @@ export default class GameOver extends Phaser.Scene {
       return [icone, t]
     }
     const itens = partidaOnline()
-      ? opcao(LARGURA / 2 + 30, 'A', 'VOLTAR AO MENU', CORES.almas[0])
+      ? opcao(LARGURA / 2 + 30, 'A', 'VOLTAR AO LOBBY', CORES.almas[0])
       : [...opcao(LARGURA / 2 - 120, 'A', 'TENTAR DE NOVO', CORES.almas[0]), ...opcao(LARGURA / 2 + 160, 'B', 'ESCOLHER CHEFE', 0xb0b0b0)]
     for (const o of itens) {
       o.setAlpha(0)

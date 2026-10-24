@@ -6,6 +6,7 @@
   import { ligarBridge } from '../game/bridge.js'
   import { registrarDebug } from '../game/debug.js'
   import { instalarOnline } from '../game/online.js'
+  import { instalarRede } from '../game/rede.js'
   import { instalarTelaCheia } from '../lib/telaCheia.js'
   import { lan } from '../lib/lan/rede.js'
   import { tela, ligarJogo, ligarTela, pingPartida, ROTAS, corDoPing } from '../lib/lan/transmissao.js'
@@ -17,7 +18,8 @@
   let reserva
 
   // Modo LAN, convidado: durante a partida a imagem do host cobre o jogo daqui
-  let assistindo = $derived($lan.fase === 'sala' && $lan.papel === 'convidado' && $lan.sala?.emPartida)
+  // (só no CO-OP: o PVP na sala roda no PC de cada um, game/rede.js)
+  let assistindo = $derived($lan.fase === 'sala' && $lan.papel === 'convidado' && $lan.sala?.emPartida && $lan.sala.modo !== 'pvp')
   // LAN/ONLINE: o ping fica no canto durante a partida (aparece também em tela cheia)
   let emPartidaRemota = $derived($lan.fase === 'sala' && $lan.sala?.emPartida && $lan.sala.membros.length > 1)
   let volume = $derived($jogo.som ? Math.min(1, ($jogo.volume.musica + $jogo.volume.efeitos) / 200) : 0)
@@ -32,11 +34,13 @@
     const desligarTelaCheia = instalarTelaCheia(container)
     registrarDebug(game)
     const desligarOnline = instalarOnline(game)
+    const desligarRede = instalarRede(game)
     ligarJogo(game)
     ligarTela(video, reserva)
 
     return () => {
       desligarOnline()
+      desligarRede()
       desligarTelaCheia()
       desligarResolucao()
       desligar()

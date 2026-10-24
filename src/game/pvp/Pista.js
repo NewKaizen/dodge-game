@@ -53,6 +53,10 @@ import { tocar } from '../audio.js'
 //                                        Ex.: DANÇA DA ESTÁTUA. Quem liga desliga.
 //   pista.atacando                       o ataque em si já começou (passou o respiro/preparo inicial)
 //                                        e ainda não acabou
+//   pista.espelho                        true = caixa ESPELHO da partida em rede (docs/rede-pvp.md):
+//                                        o coração dela é do outro PC. Ele não anda pelo joy (quem
+//                                        o põe no lugar é a arena, com as posições que chegam) e
+//                                        não leva dano nem grazeia aqui (o dono dele decide e avisa)
 //
 //   pista.caixa (BattleBox), pista.balas (Balas), pista.coracoes (Heart[]), pista.rodando
 export default class Pista {
@@ -84,6 +88,7 @@ export default class Pista {
     this.balas.velocidadeMax = velocidadeMax
     this.fatorCoracao = 1
     this.congelada = false
+    this.espelho = false
     this.coracoes = this.jogadores.map((j) => new Heart(cena, this.caixa, cor ?? CORES.almas[j] ?? CORES.almas[0], j))
     this.caixa.aoMudar = () => this.coracoes.forEach((c) => c.ativo && c.ajustar()) // a caixa empurra os corações
 
@@ -241,7 +246,7 @@ export default class Pista {
 
   passo(dt, joy) {
     const velocidade = this.velocidadeCoracao
-    for (const c of this.coracoes) if (c.ativo) c.update(typeof joy === 'function' ? joy(c.jogador) : joy, velocidade, dt)
+    if (!this.espelho) for (const c of this.coracoes) if (c.ativo) c.update(typeof joy === 'function' ? joy(c.jogador) : joy, velocidade, dt)
 
     if (this.congelada) {
       // o tempo do ataque não passa (nem a duração dele): só o coração encosta nas balas paradas
@@ -273,7 +278,7 @@ export default class Pista {
   }
 
   acertou(coracao, bala) {
-    if (coracao.invencivel) return false
+    if (coracao.invencivel || this.espelho) return false
     if (this.aoAcertar?.(bala.dano, bala, coracao) === false) return false
     coracao.tomarDano(TEMPOS.invencivelMs)
     particulas(this.cena, coracao.x, coracao.y, { cor: coracao.cor, quantidade: 10, velocidade: 110 })
@@ -282,7 +287,7 @@ export default class Pista {
   }
 
   grazeou(coracao, bala) {
-    if (coracao.invencivel) return
+    if (coracao.invencivel || this.espelho) return
     coracao.piscarGraze()
     if (this.cena.time.now - this.ultimoGraze > 70) tocar(this.cena, 'graze')
     this.ultimoGraze = this.cena.time.now
