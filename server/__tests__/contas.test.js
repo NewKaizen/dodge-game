@@ -56,6 +56,14 @@ test('config: sem variáveis = indisponível; a pública nunca tem a service_rol
   assert.doesNotMatch(JSON.stringify(configPublica(cfg)), /"s"/)
 })
 
+test('config: aceita os nomes novos do Supabase (publishable/secret)', () => {
+  const cfg = lerConfig({ SUPABASE_URL: 'https://x.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_a', SUPABASE_SECRET_KEY: 'sb_secret_s' })
+  assert.equal(cfg.disponivel, true)
+  assert.equal(cfg.serviceKey, 'sb_secret_s')
+  assert.deepEqual(configPublica(cfg), { disponivel: true, url: 'https://x.supabase.co', anonKey: 'sb_publishable_a' })
+  assert.equal(lerConfig({ SUPABASE_URL: 'https://x.supabase.co', SUPABASE_PUBLISHABLE_KEY: 'a' }).disponivel, false)
+})
+
 test('GET /api/config', async () => {
   const r = await fetch(`${base}/api/config`)
   assert.equal(r.status, 200)

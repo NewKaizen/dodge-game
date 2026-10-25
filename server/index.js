@@ -11,7 +11,9 @@
 //   ONLINE=1                     o mesmo que --online
 //   STUN_URLS=stun:a:3478,stun:b:3478   (online; padrão: os do Google)
 //   TURN_URL, TURN_USUARIO, TURN_SENHA  (online; para quem o STUN não resolve)
-//   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+//   SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY
+//                                (ou os nomes antigos SUPABASE_ANON_KEY e
+//                                SUPABASE_SERVICE_ROLE_KEY)
 //                                (contas com login Google; opcionais: sem elas
 //                                o jogo roda igual, só sem contas. docs/supabase.md.
 //                                A service_role fica só aqui no servidor)

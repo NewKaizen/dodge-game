@@ -87,8 +87,11 @@ Em **Project Settings → API** (ou **API Keys**):
 | Variável | Onde está | Pode ir para o navegador? |
 | --- | --- | --- |
 | `SUPABASE_URL` | *Project URL* (`https://<ref>.supabase.co`) | sim |
-| `SUPABASE_ANON_KEY` | chave `anon` / *publishable* | sim (o RLS protege) |
-| `SUPABASE_SERVICE_ROLE_KEY` | chave `service_role` / *secret* | **nunca** |
+| `SUPABASE_PUBLISHABLE_KEY` | chave *publishable* (`sb_publishable_...`; antiga `anon`) | sim (o RLS protege) |
+| `SUPABASE_SECRET_KEY` | chave *secret* (`sb_secret_...`; antiga `service_role`) | **nunca** |
+
+Os nomes antigos `SUPABASE_ANON_KEY` e `SUPABASE_SERVICE_ROLE_KEY` continuam valendo.
+`SUPABASE_JWKS_URL` não é usada (o servidor valida o token com `auth.getUser`).
 
 ## 6. Configurar no Render
 
@@ -99,15 +102,15 @@ valores). Salve: o Render reinicia o serviço.
 No log do deploy deve aparecer `Contas:   ligadas (Supabase)`.
 
 Docker / outra hospedagem: passe as três variáveis ao **rodar** o contêiner
-(`docker run -e SUPABASE_URL=... -e SUPABASE_ANON_KEY=... -e SUPABASE_SERVICE_ROLE_KEY=...`).
+(`docker run -e SUPABASE_URL=... -e SUPABASE_PUBLISHABLE_KEY=... -e SUPABASE_SECRET_KEY=...`).
 Não precisam existir no build.
 
 ## 7. Testar localmente
 
 ```bash
 export SUPABASE_URL=https://<ref>.supabase.co
-export SUPABASE_ANON_KEY=<anon>
-export SUPABASE_SERVICE_ROLE_KEY=<service_role>
+export SUPABASE_PUBLISHABLE_KEY=<sb_publishable_...>
+export SUPABASE_SECRET_KEY=<sb_secret_...>
 
 npm run online          # compila e sobe em http://localhost:5180
 # ou: npm run dev       # http://localhost:5173 (o Vite também liga /api/*)
@@ -152,5 +155,5 @@ falso (`server/supabase/fake.js`).
 | Google diz `redirect_uri_mismatch` | a URI de redirecionamento no Google não é a `.../auth/v1/callback` do Supabase |
 | Volta do Google para outra página | o endereço não está em **Redirect URLs** do Supabase |
 | "não deu para carregar o perfil" | a migration não rodou (sem a tabela `perfis` ou sem o gatilho) — rode de novo |
-| Foto dá erro 502 | o bucket `avatares` não existe, ou a `SUPABASE_SERVICE_ROLE_KEY` está errada |
+| Foto dá erro 502 | o bucket `avatares` não existe, ou a `SUPABASE_SECRET_KEY` está errada |
 | Conta criada antes da migration sem perfil | rode a migration de novo: ela cria o perfil de quem ainda não tem |
