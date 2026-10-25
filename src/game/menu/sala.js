@@ -41,9 +41,9 @@ const JEITO = {
 }
 
 // pose de cada jeito: t = fração da batida desde o pulso (0..1), n = nº da batida.
-// Devolve deslocamentos em pixels de tela, sempre em degraus de 3 (1 pixel da arte).
-const P = ESCALA
-const JEITOS = {
+// Devolve deslocamentos em pixels de tela, sempre em degraus de P (1 pixel da
+// arte: 3 aqui, 2 na mesa de cartas, que usa só o "cabeca", para baixo).
+export const jeitos = (P) => ({
   cabeca: (t) => ({ cabeca: t < 0.3 ? P : 0 }),
   headbang: (t) => ({ cabeca: t < 0.18 ? 2 * P : t < 0.36 ? P : 0, corpo: t < 0.18 ? P : 0 }),
   balanco: (t, n) => ({ x: n % 2 ? P : -P, cabeca: n % 2 === 0 && t < 0.3 ? P : 0 }),
@@ -51,7 +51,8 @@ const JEITOS = {
   pulo: (t, n) => ({ y: n % 2 === 0 ? (t < 0.14 ? -2 * P : t < 0.28 ? -P : 0) : 0, cabeca: n % 2 && t < 0.25 ? P : 0 }),
   roqueira: (t, n) => ({ cabeca: t < 0.25 ? P : 0, y: n % 4 === 0 && t < 0.2 ? -P : 0 }),
   saltinho: (t) => ({ y: t < 0.22 ? -P : 0 }),
-}
+})
+const JEITOS = jeitos(ESCALA)
 
 const POEIRA = 16
 const AREA_POEIRA = { x0: 420, x1: 830, y0: 270, y1: 446 }
