@@ -3,10 +3,9 @@ import { lan, iniciarPartida } from '../lib/lan/rede.js'
 import { enviarRapido as enviarTransporte, aoRapido } from '../lib/lan/transmissao.js'
 import { criarCanal } from '../lib/lan/canal.js'
 
-// Partida EM REDE (docs/rede-pvp.md): o PVP numa sala (LAN ou ONLINE) roda no
-// PC de cada um; só as decisões viajam, pelo canal (lib/lan/canal.js) direto
-// entre os PCs (WebRTC) ou pelo servidor. O CO-OP numa sala continua no
-// "Remote Play" (o jogo no host, imagem para o convidado).
+// Partida EM REDE (docs/rede-pvp.md): numa sala (LAN ou ONLINE) o PVP e o
+// CO-OP rodam no PC de cada um; só as decisões viajam, pelo canal
+// (lib/lan/canal.js) direto entre os PCs (WebRTC) ou pelo servidor.
 //
 // O HOST manda nas trocas de cena: irParaCena() abre a cena aqui e manda o
 // convidado abrir a mesma, com os mesmos dados (semente, personagens...).
