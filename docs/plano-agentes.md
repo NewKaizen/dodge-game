@@ -76,7 +76,7 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 | Etapa | Estado |
 | --- | --- |
 | A0 Reconhecimento | concluído (`docs/mapa-integracao.md`) |
-| 1A Contas e perfil | em andamento (branch `claude/practical-darwin-nc9pwz`) |
+| 1A Contas e perfil | implementado na branch `claude/practical-darwin-nc9pwz` (falta validar com o Supabase real: `docs/supabase.md`) |
 
 ### Controle de custo
 

@@ -95,14 +95,15 @@ $$;
 
 -- ---------- criação do perfil junto com a conta ----------
 
-create or replace function public.criar_perfil_novo_usuario()
-returns trigger
+-- cria o perfil (e as estatísticas zeradas) de um usuário do Auth
+create or replace function public.criar_perfil(p_id uuid, p_meta jsonb)
+returns void
 language plpgsql
 security definer
 set search_path = ''
 as $$
 declare
-  v_bruto text := coalesce(new.raw_user_meta_data ->> 'full_name', new.raw_user_meta_data ->> 'name', '');
+  v_bruto text := coalesce(p_meta ->> 'full_name', p_meta ->> 'name', '');
   v_nome text;
   v_base text;
   v_tag text;
@@ -136,8 +137,21 @@ begin
     end if;
   end loop;
 
-  insert into public.perfis (id, tag, nome_exibicao) values (new.id, v_tag, v_nome);
-  insert into public.estatisticas_basicas (usuario_id) values (new.id);
+  insert into public.perfis (id, tag, nome_exibicao) values (p_id, v_tag, v_nome)
+    on conflict (id) do nothing;
+  insert into public.estatisticas_basicas (usuario_id) values (p_id)
+    on conflict (usuario_id) do nothing;
+end;
+$$;
+
+create or replace function public.criar_perfil_novo_usuario()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform public.criar_perfil(new.id, new.raw_user_meta_data);
   return new;
 end;
 $$;
@@ -145,6 +159,18 @@ $$;
 drop trigger if exists ao_criar_usuario on auth.users;
 create trigger ao_criar_usuario after insert on auth.users
   for each row execute function public.criar_perfil_novo_usuario();
+
+-- contas que já existiam antes desta migration também ganham perfil
+do $$
+declare
+  u record;
+begin
+  for u in select a.id, a.raw_user_meta_data from auth.users a
+           where not exists (select 1 from public.perfis p where p.id = a.id) loop
+    perform public.criar_perfil(u.id, u.raw_user_meta_data);
+  end loop;
+end;
+$$;
 
 -- ---------- o que o próprio usuário pode mudar ----------
 
@@ -238,6 +264,7 @@ create policy estatisticas_leitura on public.estatisticas_basicas
 revoke all on function public.atualizar_perfil(text, text, text) from public, anon;
 grant execute on function public.atualizar_perfil(text, text, text) to authenticated;
 revoke all on function public.criar_perfil_novo_usuario() from public, anon, authenticated;
+revoke all on function public.criar_perfil(uuid, jsonb) from public, anon, authenticated;
 revoke all on function public.normalizar_nome(text) from anon;
 
 -- ---------- Storage: fotos de perfil ----------
