@@ -114,7 +114,7 @@ Convidado joga normalmente, só não tem amigos.
 - **Link**: **copiar link da sala** gera `https://<site>/?sala=CODIGO`. Quem
   abre (mesmo sem conta) vai direto para a tela ONLINE e entra na sala; o
   código de 5 letras continua valendo.
-- **Protocolo**: o lobby subiu para a versão 3 (hoje 4, com a fila do Jogar Rápido abaixo) (`PROTOCOLO` em `server/lan.js`
+- **Protocolo**: o lobby subiu para a versão 3 (hoje 5: a fila do Jogar Rápido e o XP, abaixo) (`PROTOCOLO` em `server/lan.js`
   e `src/lib/lan/rede.js`): atualize os dois PCs. Mensagens novas: `convidar`,
   `responderConvite`, `amigosMudaram` (cliente) e `presencas`, `presenca`,
   `convite`, `conviteEnviado`, `conviteResposta`, `conviteFim`, `conviteNegado`,
@@ -161,7 +161,8 @@ conta e para convidado (convidado joga, mas a partida não dá XP: aviso na tela
 - Limite: **30 ações por minuto** (fila, confirmar, revanche) por conexão, além
   do limite geral de mensagens.
 - Para a Fase 1D (registro de partidas): a sala casual guarda `casual: true`,
-  `participantes` (`usuario` de cada um, ou `convidado: true`) e `criadaEm`.
+  `participantes` (`usuario` de cada um, ou `convidado: true`) e `criadaEm`
+  (o registro de verdade está em "XP, níveis e Coleção", abaixo).
 
 ### Protocolo (versão 4)
 
@@ -172,7 +173,7 @@ conta e para convidado (convidado joga, mas a partida não dá XP: aviso na tela
 
 A sala ganhou `casual` no `sala {...}` e o `fechada` da sala casual vem com
 `casual: true`. `PROTOCOLO` subiu para **4** (`server/lan.js` e
-`src/lib/lan/rede.js`): atualize os dois PCs.
+`src/lib/lan/rede.js`; hoje **5**, com o XP): atualize os dois PCs.
 
 ### Testar com duas janelas
 
@@ -180,3 +181,128 @@ A sala ganhou `casual` no `sala {...}` e o `fechada` da sala casual vem com
 anônima serve de convidado; a outra pode estar logada), use o **SIMULADOR
 (TECLADO)** nas duas, ONLINE → JOGAR RÁPIDO nas duas e aceite com A. Para ver a
 oferta da CPU, entre só com uma e espere 30 s.
+
+## XP, níveis e Coleção (Fase 1D)
+
+Quem joga **PVP online com conta** (Jogar Rápido ou sala de amigos) ganha XP no
+fim da partida, sobe de nível e libera cosméticos. Convidado joga igual, mas não
+ganha nada ("convidado: crie uma conta para ganhar XP"). CPU e PVP local (dois
+no mesmo PC) não dão XP. CO-OP ainda não dá XP (fica para depois, com as mesmas
+regras).
+
+**O navegador nunca grava XP, nível nem itens.** O caminho é sempre:
+
+1. O host começa a partida (ou a revanche é aceita): o servidor cria o registro
+   (`partidas`, com os dois lados e a conta de cada um, tirada do JWT validado
+   no `ola`) e põe o `partidaId` na sala.
+2. No fim, **cada** PC manda `resultado {partidaId, vencedorLado, rodadas,
+   duracao, personagem}` **uma vez** (o cliente guarda os ids já mandados:
+   revanche e cena reiniciando não reenviam; o servidor também ignora repetido).
+3. O servidor compara os dois relatos com o que ele mesmo sabe (quando a partida
+   começou, quem saiu da sala e quando) e decide (`server/partidas.js`).
+4. O banco concede (`conceder_recompensa(partida_id)`, só o servidor chama,
+   idempotente) e o servidor manda `recompensa` para cada um.
+5. A tela de resultado mostra o painel de XP (barra animada, subiu de nível,
+   itens novos, próxima recompensa); A/B pula. Sem resposta em ~5 s, mostra o
+   motivo (convidado, partida curta, …) e o XP aparece no perfil quando chegar.
+
+### Política de validação
+
+O "fim" para o servidor é o **primeiro relato** que chega; a duração é medida
+pelo **relógio do servidor** (do começo até esse fim), nunca a do cliente.
+
+| Situação | Resultado |
+| --- | --- |
+| os dois relatam e concordam | **validada**: vencedor = participação + bônus; perdedor = participação; empate = participação para os dois |
+| os dois relatam e discordam | **contestada**: só participação para os dois, ninguém leva o bônus; vai para o log do servidor |
+| só um relata e o outro continua na sala (ou saiu **depois** desse relato) | **contestada**: quem relatou fica só com a participação; o outro, nada. Um cliente sozinho nunca tira a vitória de quem ainda está lá |
+| só um relata e o outro saiu **antes** desse relato | **validada** pelo relato de quem ficou; quem saiu não ganha nada (abandono) |
+| ninguém relatou e um saiu no meio | **validada**: vitória de quem ficou (participação + bônus); quem saiu, nada |
+| ninguém relatou (os dois saíram ou o prazo acabou) | **encerrada**, sem XP |
+
+- Prazo para o segundo relato: **20 s** depois do primeiro. Quem sai da sala sem
+  ter relatado dá **3 s** para o relato do outro que podia estar a caminho.
+- "Saiu" = saiu da sala ou desconectou por conta própria. Quem foi tirado porque
+  a sala fechou (o host caiu, o oponente da casual saiu) não conta como abandono.
+- Abandono na casual não tira XP de ninguém: quem saiu só não ganha nada naquela partida.
+- O host não pode expulsar no meio da partida (não vira "vitória por abandono").
+- Relato repetido não muda nada; relato atrasado (depois da decisão) recebe a
+  resposta que já existe. Reconectar com a mesma conta recebe a recompensa no
+  cliente novo. Nada disso concede duas vezes: o banco tem `UNIQUE (partida_id,
+  user_id)` em `concessoes` e o servidor decide cada partida uma vez só.
+
+### Regras do XP
+
+| Regra | Valor |
+| --- | --- |
+| participação (partida jogada até o fim) | **40 XP** |
+| bônus de vitória (só com resultado confirmado) | **+20 XP** |
+| duração mínima (relógio do servidor) | **60 s**, e pelo menos **2 rodadas** quando o resultado diz |
+| contra o mesmo oponente no mesmo dia (fuso de São Paulo) | as **3** primeiras valem tudo, a 4ª e a 5ª valem **metade**, depois **0** até o dia seguinte |
+| convidado do outro lado | todos os convidados contam como **um só** oponente para esse limite |
+| a mesma conta dos dois lados (duas abas) | **0** |
+
+Salas de amigos contam como a casual, com os mesmos limites. Os números moram
+nas funções de constante de `supabase/migrations/0003_progresso.sql`;
+`src/lib/progresso.js` é o espelho em JS (um teste confere os dois e esta tabela).
+
+### Curva de níveis
+
+Para passar do nível N ao N+1: **100 + 25 × (N − 1)** XP (máximo: nível 99).
+O `perfis.xp` é o total acumulado.
+
+| Nível | XP total | Para o próximo |
+| --- | --- | --- |
+| 1 | 0 | 100 |
+| 2 | 100 | 125 |
+| 3 | 225 | 150 |
+| 4 | 375 | 175 |
+| 5 | 550 | 200 |
+| 6 | 750 | 225 |
+| 7 | 975 | 250 |
+| 8 | 1225 | 275 |
+| 9 | 1500 | 300 |
+| 10 | 1800 | 325 |
+| 11 | 2125 | 350 |
+| 12 | 2475 | 375 |
+| 13 | 2850 | 400 |
+| 14 | 3250 | 425 |
+| 15 | 3675 | 450 |
+
+### Trilha de cosméticos (Coleção)
+
+Todo mundo tem o título **Novato**, a moldura **Simples** e o verso **Clássico**.
+Um item por nível, do 2 ao 15: título Esquivador (2), moldura Bronze (3), verso
+Estrelado (4), avatar King (5), título Duelista (6), moldura Prata (7), verso
+Carmesim (8), avatar Queen (9), título Veterano da Mesa (10), moldura Ouro (11),
+verso Dourado (12), avatar Jevil (13), título Cartomante (14), moldura Arco-íris (15).
+
+No perfil: **Coleção…** lista tudo (o que tem e o que falta, com o nível) e
+equipa título, moldura, verso e avatar (`equipar(tipo, item)`: o banco confere
+se a conta tem o item). O título aparece no perfil e a moldura em volta do
+avatar. O verso por enquanto só aparece na Coleção (aplicar nas cartas da
+partida precisa mandar o verso do oponente pela rede: fica para a consolidação).
+Cosmético nunca muda nada no jogo.
+
+### Protocolo (versão 5)
+
+| Sentido | Mensagem |
+| --- | --- |
+| cliente → servidor | `resultado {partidaId, vencedorLado: 0\|1\|null, rodadas, duracao, personagem}` |
+| servidor → cliente | `recompensa {partidaId, xpGanho, xpTotal?, nivelAntes?, nivelDepois?, itensNovos?, motivo}` |
+
+`sala {...}` ganhou `partidaId`. `motivo` é um código (`vitoria`, `derrota`,
+`empate`, `contestada`, `participacao`, `abandono`, `sem_relato`, `curta`,
+`repeticao`, `repeticao_metade`, `convidado`, `mesma_conta`, `nao_registrada`,
+`indisponivel`, `erro`); o texto para o jogador está em `src/lib/progresso.js`.
+
+### Testar com duas contas
+
+Precisa da migration 0003 (docs/supabase.md). `npm run online` (ou `ONLINE=1
+npm run dev`), duas janelas com **contas Google diferentes** (uma normal, outra
+anônima ou outro navegador), ONLINE → JOGAR RÁPIDO nas duas e joguem uma partida
+inteira (mais de 60 s). No fim, o painel mostra +60 (quem venceu) e +40.
+Conferir no Supabase: **Table Editor → partidas** (estado `recompensada`),
+`concessoes` (uma linha por conta) e `perfis.xp`. Para ver a Coleção, suba o XP
+de uma conta à mão no Table Editor só para testar (ex.: `xp = 600`) e jogue mais
+uma: os itens até o nível chegam no inventário.

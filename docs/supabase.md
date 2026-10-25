@@ -13,6 +13,7 @@ Como as peças se juntam:
 | Storage (bucket `avatares`) | fotos de perfil, leitura pública; **só o servidor grava** |
 | Servidor Node (`server/contas.js`) | entrega a URL + chave anon em `GET /api/config`, valida o JWT no lobby e recebe as fotos (`/api/avatar`) |
 | Postgres (`amizades`, `pedidos_amizade`, `bloqueios`) | amigos (migration 0002); o navegador só usa as funções, o servidor lê para filtrar presença e convites |
+| Postgres (`partidas`, `concessoes`, `inventario`, `catalogo_itens`) | XP, níveis e Coleção (migration 0003); só o servidor concede (`conceder_recompensa`), o navegador lê o catálogo e o próprio inventário e equipa |
 
 A chave `service_role` fica **só no servidor**. O navegador recebe a URL e a
 chave `anon` pelo `/api/config` (nada de `VITE_*` no build).
@@ -56,6 +57,32 @@ dos dois lados. Também pode rodar de novo sem problema.
 Conferir: em **Table Editor** as três tabelas aparecem com o cadeado de RLS; o
 servidor (chave secret) lê essas tabelas para a presença e os convites, então
 nada muda nas variáveis de ambiente.
+
+### 2.2 Migration 0003: XP, níveis e Coleção (Fase 1D)
+
+Depois da 0002, rode do mesmo jeito o conteúdo de
+`supabase/migrations/0003_progresso.sql`. Ela cria:
+
+- `partidas` e `partida_participantes` (o registro de cada partida PVP online),
+  `concessoes` (uma linha por conta por partida: o que impede dar XP duas vezes),
+  `catalogo_itens` (a trilha de cosméticos, já preenchida) e `inventario`;
+- as colunas `moldura_equipada` e `verso_equipado` em `perfis`;
+- as funções **do servidor** `registrar_partida`, `encerrar_partida` e
+  `conceder_recompensa` (o navegador não consegue chamar: `revoke` para `anon`
+  e `authenticated`; o servidor chama com a chave secret);
+- a função do navegador `equipar(tipo, item)` (só equipa o que a conta tem).
+
+RLS: o navegador lê o catálogo e **só o próprio** inventário; não lê partidas
+nem concessões e não escreve em nada disso. Pode rodar de novo sem problema.
+
+Conferir: em **Table Editor** aparecem as cinco tabelas novas com o cadeado de
+RLS, e `catalogo_itens` tem 17 linhas. Nada muda nas variáveis de ambiente.
+Regras do XP, da validação dos resultados e a curva: `docs/online.md`.
+
+Para testar o SQL num Postgres local (descartável):
+`DODGE_PG="-h /caminho/do/socket -p 5432 -U postgres" npm test` roda as três
+migrations duas vezes num banco temporário e confere a `conceder_recompensa`
+(idempotente, duas sessões ao mesmo tempo, permissões do navegador).
 
 ## 3. Conferir o bucket
 
@@ -138,7 +165,7 @@ npm run online          # compila e sobe em http://localhost:5180
 
 1. Abra a página: embaixo dos botões do joystick aparece **Entrar com Google**.
 2. Entre: volta para o jogo com o seu avatar e nome. Clique nele para abrir o
-   **PERFIL** (nome, `#tag`, nível, XP, título, estatísticas zeradas até a 1D).
+   **PERFIL** (nome, `#tag`, nível, XP, título, estatísticas, **Coleção…**).
 3. Troque o nome, escolha um personagem como avatar, envie uma foto (recorte
    quadrado com prévia) e remova a foto.
 4. No **Table Editor → perfis** confira as mudanças; em **Storage → avatares**
@@ -149,6 +176,10 @@ npm run online          # compila e sobe em http://localhost:5180
    (`nome#1234`, no perfil) → **Enviar pedido**. Na outra, **Aceitar**. Os dois
    aparecem com bolinha verde; **Convidar** cria uma sala e a outra conta
    recebe a notificação com **Aceitar**.
+7. XP (precisa da migration 0003): com as duas contas, joguem uma partida PVP
+   online inteira (Jogar Rápido ou sala de amigos, mais de 60 s). O painel de
+   XP aparece no fim; no **Table Editor** confira `partidas` (`recompensada`),
+   `concessoes` e o `xp` em `perfis`. Roteiro completo em `docs/online.md`.
 
 Sem as variáveis, `curl localhost:5180/api/config` responde
 `{"disponivel":false}` e o jogo mostra "contas indisponíveis".
@@ -165,6 +196,8 @@ falso (`server/supabase/fake.js`).
   fixa (não muda com o nome). É por ela que os amigos vão achar você (1B).
 - **Nível, XP, tag e foto** (`avatar_url`): o navegador não consegue gravar
   (sem `GRANT` de escrita e sem política de update). Quem grava é o servidor.
+- **XP e itens**: só pela `conceder_recompensa`, que só o servidor chama, uma
+  vez por partida (as regras estão em `docs/online.md`).
 - **Foto**: PNG/JPEG/WebP de até 2 MB e entre 64 e 4096 px de lado. O servidor
   confere os bytes do arquivo (não a extensão), recodifica em WebP 256×256 sem
   metadados (sai EXIF/GPS) e grava em `avatares/<id>.webp`. Máximo de 5
