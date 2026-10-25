@@ -46,7 +46,7 @@ trabalho é dividido entre agentes, em que ordem e com que custo aproximado.
 | Agente | Tipo | Branch / PR | Entrega | Tokens (estimativa) |
 | --- | --- | --- | --- | --- |
 | **A0** Reconhecimento | Explore | — (relatório) | Mapa de `server/lan.js`, `src/game/online.js`, `rede.js`, `src/ui/*`, `menu/`, fluxo de sala/código, cenas de resultado e pontos de integração. Alimenta todos os outros. | ~150k |
-| **1A** Contas e perfil | general-purpose, worktree | `claude/fase1a-contas` → PR | Migrations (`profiles`, `avatar`, RLS), cliente Supabase no front, login Google, sessão persistente, edição de nome com identificador único (`#tag`), avatares do jogo, upload com recorte/prévia e pipeline `sharp`, perfil com estatísticas básicas, `docs/supabase.md`, testes. | ~600k–900k |
+| **1A** Contas e perfil | general-purpose | `claude/practical-darwin-nc9pwz` → PR | Migrations (`profiles`, `avatar`, RLS), cliente Supabase no front, login Google, sessão persistente, edição de nome com identificador único (`#tag`), avatares do jogo, upload com recorte/prévia e pipeline `sharp`, perfil com estatísticas básicas, `docs/supabase.md`, testes. | ~600k–900k |
 | **R1** Revisão 1A | general-purpose | comentários no PR | Segurança (RLS, upload, JWT), testes, aderência ao layout. Corrige o que achar. | ~200k |
 | **1B** Amigos e convites | general-purpose, worktree | `claude/fase1b-amigos` (base 1A) → PR | Tabelas `amizades`/`bloqueios`/`convites`, pedidos, lista com presença (via servidor de salas), convite com expiração, entrar na sala do amigo (PVP/CO-OP 2), link/código, limites de envio. | ~500k–700k |
 | **1C** Jogar Rápido | general-purpose, worktree | `claude/fase1c-fila` (base 1A) → PR | Fila casual PVP 1x1 no servidor Node, cancelar, espera visível, confirmação dupla, sala automática, oferta explícita de CPU, revanche com aceite duplo, convidado sem XP, todos os casos de queda/cancelamento com testes. | ~600k–800k |
@@ -58,6 +58,25 @@ trabalho é dividido entre agentes, em que ordem e com que custo aproximado.
 
 **Total estimado da rodada:** ~4M–5,5M tokens. Cabe no orçamento atual com folga para
 retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
+
+### Modelo por agente e ritmo (plano Pro)
+
+| Modelo | Usado em |
+| --- | --- |
+| **Haiku** | Tarefas mecânicas: guias (`docs/supabase.md`), checklists, textos de UI, rebase de PR empilhado sem conflito. |
+| **Sonnet** | Padrão: A0, 1B, 1D (telas/inventário), 1E, P2 e implementação em geral. |
+| **Opus** | Só o que é sensível: RLS/JWT/upload da 1A, máquina de estados da fila (1C), `conceder_recompensa` (1D) e a revisão final R3. |
+
+- **Um agente por janela de 5 horas**, sem paralelo; a ordem segue o fluxo acima (1B e 1C viram sequenciais).
+- As revisões R1/R2 são absorvidas: cada agente se revisa e roda `npm test` antes do PR; a sessão principal faz a conferência rápida do diff. O R3 continua.
+- A sessão principal agenda o retorno a cada 5 horas, retoma do ponto anotado na seção "Progresso" e dispara o próximo agente.
+
+## Progresso
+
+| Etapa | Estado |
+| --- | --- |
+| A0 Reconhecimento | concluído (`docs/mapa-integracao.md`) |
+| 1A Contas e perfil | em andamento (branch `claude/practical-darwin-nc9pwz`) |
 
 ### Controle de custo
 
