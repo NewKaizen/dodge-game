@@ -287,7 +287,7 @@ export default class GameOver extends Phaser.Scene {
     this.tweens.add({ targets: halo, alpha: 0.35, duration: rapido ? 1 : 900 })
     this.tweens.add({ targets: halo, scaleX: 9.8, alpha: 0.2, delay: 900, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
     // linha fina sob o título
-    const linha = this.add.rectangle(LARGURA / 2, TITULO.y + 20, 430, 2, 0x8a1020).setDepth(6).setScale(0, 1)
+    const linha = this.add.rectangle(LARGURA / 2, TITULO.y + 20, 520, 2, 0x8a1020).setDepth(6).setScale(0, 1)
     this.tweens.add({ targets: linha, scaleX: 1, duration: rapido ? 1 : 700, ease: 'Cubic.easeOut' })
   }
 

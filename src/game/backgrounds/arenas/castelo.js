@@ -26,7 +26,7 @@ export default function castelo(scene, objetos) {
   const brilho = add(scene.add.graphics())
   const NAIPES = ['espadas', 'copas', 'ouros', 'paus']
   const CORES_NAIPES = [0x9a8bff, 0xff5f8a, 0xffd24c, 0x7fe0c0]
-  const naipes = Array.from({ length: 16 }, (_, i) => ({
+  const naipes = Array.from({ length: 22 }, (_, i) => ({
     img: add(scene.add.image(0, 0, `bala-${NAIPES[i % 4]}`).setTint(CORES_NAIPES[i % 4]).setAlpha(0.1 + (i % 3) * 0.03).setScale(0.8 + (i % 4) * 0.35)),
     x: 30 + ((i * 167) % (LARGURA - 60)),
     y: (i * 89) % ALTURA,

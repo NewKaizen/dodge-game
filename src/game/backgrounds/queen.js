@@ -17,7 +17,7 @@ export default function queen(scene, objetos) {
   const grade = add(scene.add.graphics())
   const dados = add(scene.add.graphics())
 
-  const linhas = Array.from({ length: 28 }, (_, i) => ({
+  const linhas = Array.from({ length: 38 }, (_, i) => ({
     x: (i * 23 + 7) % LARGURA,
     y: (i * 61) % ALTURA,
     v: 60 + (i % 7) * 25,

@@ -18,7 +18,7 @@ export default function king(scene, objetos) {
     add(scene.add.rectangle(x, 0, 30, 10, 0x2a1650).setOrigin(0.5, 0))
   }
 
-  const particulas = Array.from({ length: 36 }, (_, i) => {
+  const particulas = Array.from({ length: 48 }, (_, i) => {
     const p = add(scene.add.rectangle(0, 0, 2, 2, i % 3 ? 0x8a6cff : 0x4a7aff))
     return { p, x: (i * 97) % LARGURA, y: (i * 53) % ALTURA, v: 12 + (i % 5) * 6, fase: i }
   })
