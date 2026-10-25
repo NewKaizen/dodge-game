@@ -13,13 +13,17 @@
 // convidado. Mensagens em JSON, { t: 'tipo', ... }; binário = quadro da
 // transmissão reserva (JPEG), repassado ao outro membro da sala.
 //
-//   anexarLan(httpServer, { online, ice })   liga o /lan num servidor http; devolve { fechar() }
+//   anexarLan(httpServer, { online, ice, autenticar })   liga o /lan num servidor http; devolve { fechar() }
+//
+// CONTAS (server/contas.js): o "ola" pode trazer o token (JWT do Supabase).
+// Com token, o servidor valida (autenticar) ANTES de dar as boas-vindas; token
+// inválido ou sem resposta = entra como convidado, sem derrubar ninguém.
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
 import crypto from 'node:crypto'
 
-export const PROTOCOLO = 1
+export const PROTOCOLO = 2
 export const PORTA_DESCOBERTA = 47777
 export const MAX_MEMBROS = 2
 const ANUNCIO_MS = 1500
@@ -39,6 +43,18 @@ const LETRAS_CODIGO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
 export const TAMANHO_CODIGO = 5
 
 const novoId = () => crypto.randomBytes(4).toString('hex')
+
+// o que os outros veem da conta (nada de id do usuário nem e-mail)
+const resumoPerfil = (p) =>
+  p && {
+    tag: String(p.tag ?? ''),
+    nome: limpar(p.nome_exibicao, MAX_NOME),
+    avatar: { tipo: p.avatar_tipo ?? 'padrao', id: p.avatar_id ?? null, url: p.avatar_url ?? null },
+    titulo: p.titulo_equipado ?? null,
+    nivel: Number(p.nivel) || 1,
+    xp: Number(p.xp) || 0,
+  }
+const contaPublica = (c) => (c.perfil ? { tag: c.perfil.tag, avatar: c.perfil.avatar, nivel: c.perfil.nivel, titulo: c.perfil.titulo } : null)
 export const normalizarCodigo = (texto) =>
   String(texto ?? '')
     .toUpperCase()
@@ -91,7 +107,9 @@ export const trocarMdns = (texto, ip) => (typeof texto === 'string' ? texto.repl
 // enderecos(): http://ip:porta onde este servidor serve o jogo (dica no lobby)
 // online: servidor na internet (salas só por código); ice: servidores STUN/TURN
 // para o WebRTC dos navegadores; agora(): relógio (os testes trocam)
-export function criarLobby({ locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now } = {}) {
+// autenticar(token): { id, perfil } | null (server/contas.js; sem ele, todo
+// mundo é convidado)
+export function criarLobby({ locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null } = {}) {
   const clientes = new Map() // id -> cliente
   const salas = new Map() // id -> sala
   const codigos = new Map() // código -> id da sala
@@ -132,7 +150,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     max: MAX_MEMBROS,
     membros: [...sala.membros].map((id) => {
       const c = clientes.get(id)
-      return { id, nome: c.nome, papel: id === sala.host ? 'host' : 'convidado', pronto: c.pronto, ping: c.ping }
+      return { id, nome: c.nome, papel: id === sala.host ? 'host' : 'convidado', pronto: c.pronto, ping: c.ping, conta: contaPublica(c) }
     }),
   })
 
@@ -173,17 +191,69 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   // IP de `de` como `para` enxerga (para os candidatos do WebRTC)
   const ipVisto = (de, para) => (ehLoopback(de.ip) ? ipParaAlcancar(para.ip, locais()) : de.ip)
 
+  const boasVindas = (c, m, conta, tentouConta) => {
+    c.usuario = conta?.id ?? null
+    c.perfil = conta?.id ? resumoPerfil(conta.perfil) : null
+    c.nome = (c.perfil?.nome ?? limpar(m.nome, MAX_NOME)) || 'JOGADOR'
+    c.ok = true
+    enviar(c, {
+      t: 'bemvindo',
+      id: c.id,
+      ip: c.ip,
+      protocolo: PROTOCOLO,
+      enderecos: online ? [] : enderecos(),
+      online,
+      ice,
+      conta: c.perfil,
+      ...(tentouConta && !c.usuario && { contaInvalida: true }),
+    })
+  }
+
   const acoes = {
     ola(c, m) {
+      if (c.ok || c.validando) return
       if (m.protocolo !== PROTOCOLO) return enviar(c, { t: 'erro', msg: `versão diferente do jogo (protocolo ${m.protocolo} x ${PROTOCOLO}): atualize os dois PCs` })
-      c.nome = limpar(m.nome, MAX_NOME) || 'JOGADOR'
-      c.ok = true
-      enviar(c, { t: 'bemvindo', id: c.id, ip: c.ip, protocolo: PROTOCOLO, enderecos: online ? [] : enderecos(), online, ice })
+      const token = typeof m.token === 'string' && m.token.length <= 4096 ? m.token : null
+      if (!token || !autenticar) return boasVindas(c, m, null, Boolean(m.token && autenticar))
+      // o resto das mensagens espera (c.ok só depois de validar)
+      c.validando = true
+      Promise.resolve()
+        .then(() => autenticar(token))
+        .catch(() => null)
+        .then((conta) => {
+          c.validando = false
+          if (!clientes.has(c.id)) return // saiu enquanto validava
+          boasVindas(c, m, conta, true)
+        })
     },
     nome(c, m) {
+      // com conta, o nome é o do perfil (muda pelo perfil e chega pelo "conta")
+      if (c.perfil) return
       c.nome = limpar(m.nome, MAX_NOME) || c.nome
       const sala = salas.get(c.sala)
       if (sala) avisarSala(sala)
+    },
+    // entrou, saiu ou mudou o perfil sem reconectar: { token } (null = saiu da conta)
+    conta(c, m) {
+      if (c.validando) return
+      const token = typeof m.token === 'string' && m.token.length <= 4096 ? m.token : null
+      const aplicar = (conta) => {
+        c.usuario = conta?.id ?? null
+        c.perfil = conta?.id ? resumoPerfil(conta.perfil) : null
+        if (c.perfil?.nome) c.nome = c.perfil.nome
+        enviar(c, { t: 'conta', conta: c.perfil, ...(token && autenticar && !c.usuario && { contaInvalida: true }) })
+        const sala = salas.get(c.sala)
+        if (sala) avisarSala(sala)
+      }
+      if (!token || !autenticar) return aplicar(null)
+      c.validando = true
+      Promise.resolve()
+        .then(() => autenticar(token))
+        .catch(() => null)
+        .then((conta) => {
+          c.validando = false
+          if (clientes.has(c.id)) aplicar(conta)
+        })
     },
     listar(c) {
       // online as salas são privadas: só entra quem tem o código
@@ -284,7 +354,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     salas,
     resumos: () => [...salas.values()].map(resumo),
     conectar(ws, ip) {
-      const cliente = { id: novoId(), ws, ip: semPrefixo(ip), nome: 'JOGADOR', sala: null, pronto: false, ping: null, ok: false, fichas: MAX_FICHAS, recarga: agora() }
+      const cliente = { id: novoId(), ws, ip: semPrefixo(ip), nome: 'JOGADOR', sala: null, pronto: false, ping: null, ok: false, validando: false, usuario: null, perfil: null, fichas: MAX_FICHAS, recarga: agora() }
       clientes.set(cliente.id, cliente)
       return cliente
     },
@@ -377,10 +447,10 @@ function criarDescoberta(lobby, porta, log) {
 
 // online: servidor na internet (sem descoberta UDP, salas por código)
 // ice: [{ urls, username?, credential? }] para o WebRTC dos navegadores
-export function anexarLan(httpServer, { log = console.log, descoberta = true, online = false, ice = [], maxClientes = MAX_CLIENTES } = {}) {
+export function anexarLan(httpServer, { log = console.log, descoberta = true, online = false, ice = [], maxClientes = MAX_CLIENTES, autenticar = null } = {}) {
   let rede = null
   const porta = () => httpServer.address()?.port
-  const lobby = criarLobby({ online, ice, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
+  const lobby = criarLobby({ online, ice, autenticar, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 * 1024 })
   if (descoberta && !online) rede = criarDescoberta(lobby, porta, log)
 
