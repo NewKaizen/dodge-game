@@ -11,11 +11,16 @@
 //   ONLINE=1                     o mesmo que --online
 //   STUN_URLS=stun:a:3478,stun:b:3478   (online; padrão: os do Google)
 //   TURN_URL, TURN_USUARIO, TURN_SENHA  (online; para quem o STUN não resolve)
+//   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+//                                (contas com login Google; opcionais: sem elas
+//                                o jogo roda igual, só sem contas. docs/supabase.md.
+//                                A service_role fica só aqui no servidor)
 import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { anexarLan, enderecosDoJogo } from './lan.js'
+import { iniciarContas } from './contas.js'
 
 const PORTA = Number(process.env.PORTA ?? process.env.PORT ?? 5180)
 const ONLINE = process.argv.includes('--online') || ['1', 'true', 'sim'].includes(String(process.env.ONLINE ?? '').toLowerCase())
@@ -61,7 +66,11 @@ if (!fs.existsSync(path.join(PASTA, 'index.html'))) {
   process.exit(1)
 }
 
+const contas = await iniciarContas(process.env)
+
 const servidor = http.createServer((req, res) => {
+  // /api/config, /api/avatar (server/contas.js)
+  if (contas.tratar(req, res)) return
   let caminho
   try {
     caminho = decodeURIComponent(new URL(req.url, 'http://x').pathname)
@@ -86,7 +95,7 @@ const servidor = http.createServer((req, res) => {
 })
 
 const ice = servidoresIce()
-anexarLan(servidor, { online: ONLINE, ice })
+anexarLan(servidor, { online: ONLINE, ice, autenticar: contas.autenticar })
 servidor.on('error', (erro) => {
   console.error(erro.code === 'EADDRINUSE' ? `A porta ${PORTA} já está em uso. Tente: PORTA=5181 npm run ${ONLINE ? 'start' : 'lan'}` : erro)
   process.exit(1)
@@ -96,6 +105,7 @@ servidor.listen(PORTA, '0.0.0.0', () => {
     console.log(`\n  DODGE · modo ONLINE ligado na porta ${PORTA}\n`)
     console.log(`  Neste PC: http://localhost:${PORTA}`)
     console.log(`  WebRTC:   ${ice.length ? ice.map((s) => [s.urls].flat().join(', ')).join(' | ') : 'sem STUN/TURN'}`)
+    console.log(`  Contas:   ${contas.disponivel ? 'ligadas (Supabase)' : 'desligadas (sem SUPABASE_*: docs/supabase.md)'}`)
     if (!process.env.TURN_URL) console.log('  (sem TURN: quem estiver atrás de NAT difícil cai na imagem reserva, sem som)')
     console.log('\n  Os amigos abrem o endereço público do site, um cria a sala e passa o código.\n')
     return

@@ -14,5 +14,8 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY server ./server
 COPY --from=build /app/dist ./dist
+# Contas (opcional, docs/supabase.md): passe SUPABASE_URL, SUPABASE_ANON_KEY e
+# SUPABASE_SERVICE_ROLE_KEY ao RODAR o contêiner (não no build: o navegador
+# recebe a config pelo /api/config)
 EXPOSE 5180
 CMD ["node", "server/index.js", "--online"]
