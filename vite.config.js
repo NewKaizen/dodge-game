@@ -11,7 +11,7 @@ const online = ['1', 'true', 'sim'].includes(String(process.env.ONLINE ?? '').to
 const ligar = async (server) => {
   const contas = await iniciarContas(process.env)
   server.middlewares.use((req, res, next) => (contas.tratar(req, res) ? undefined : next()))
-  if (server.httpServer) anexarLan(server.httpServer, { online, autenticar: contas.autenticar, relacoes: contas.relacoes })
+  if (server.httpServer) anexarLan(server.httpServer, { online, autenticar: contas.autenticar, relacoes: contas.relacoes, registro: contas.registro })
 }
 const lan = () => ({
   name: 'dodge-lan',

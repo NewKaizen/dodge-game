@@ -76,7 +76,7 @@ const confirmar = (p, aceitar = true) => p.mandar({ t: 'confirmar', id: p.ultima
 test('protocolo igual nos dois lados (servidor e cliente)', async () => {
   const fs = await import('node:fs')
   const rede = fs.readFileSync(new URL('../../src/lib/lan/rede.js', import.meta.url), 'utf8')
-  assert.equal(PROTOCOLO, 4)
+  assert.equal(PROTOCOLO, 5)
   assert.match(rede, new RegExp(`export const PROTOCOLO = ${PROTOCOLO}\\b`))
 })
 
@@ -411,7 +411,7 @@ test('sala casual: quem sai fecha a sala para o outro', async () => {
 })
 
 test('revanche: os dois aceitam', async () => {
-  const { ana, beto, sala, relogio } = await casual()
+  const { lobby, ana, beto, sala, relogio } = await casual()
   beto.mandar({ t: 'revanche', aceitar: true })
   assert.equal(ana.ultima('revanche').estado, 'pedida')
   assert.equal(ana.ultima('revanche').de, beto.c.id)
@@ -421,7 +421,8 @@ test('revanche: os dois aceitam', async () => {
   ana.mandar({ t: 'revanche', aceitar: true })
   for (const p of [ana, beto]) assert.deepEqual(p.ultima('revanche'), { t: 'revanche', estado: 'aceita', host: ana.c.id })
   assert.equal(sala.revanche, null)
-  assert.equal(relogio.ativos(), 0)
+  // sobra só o prazo do relato da partida anterior (server/partidas.js)
+  assert.equal(relogio.ativos(), lobby.partidas.timers())
 })
 
 test('revanche: recusada, expirada ou com o oponente saindo', async () => {
@@ -447,7 +448,7 @@ test('revanche: recusada, expirada ou com o oponente saindo', async () => {
     beto.sair()
     assert.equal(lobby.salas.size, 0)
     assert.equal(ana.ultima('fechada').motivo, 'o oponente saiu da partida')
-    assert.equal(relogio.ativos(), 0, 'o timer da revanche foi junto')
+    assert.equal(relogio.ativos(), lobby.partidas.timers(), 'o timer da revanche foi junto (sobra só o do registro da partida)')
     relogio.andar(REVANCHE_MS * 2)
     assert.equal(ana.tipo('revanche').at(-1).estado, 'pedida', 'nada expira depois')
   }

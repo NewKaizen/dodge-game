@@ -13,15 +13,19 @@ import { validarNome, AVATARES_JOGO } from './contaRegras.js'
 //   mudarNomeExibicao(nome) · escolherAvatar('padrao'|'jogo'|'enviado', id?)
 //   enviarFoto(blob) · removerFoto()  pelo servidor (POST/DELETE /api/avatar)
 //   tokenConta()                      JWT da sessão (o lobby manda no "ola")
+//   recarregarPerfil()                relê perfil, estatísticas e inventário (chegou XP)
+//   carregarInventario() · equipar(tipo, itemId)   Coleção (Fase 1D; o banco confere se tem o item)
 //   aoMudarConta(fn)                  entrou / saiu / perfil mudou -> fn(token)
 //
 // O store `conta`, lido pelo Svelte e pelas cenas (get(conta)):
 //   estado: 'indisponivel' | 'deslogado' | 'carregando' | 'logado'
-//   perfil: { id, tag, nome_exibicao, avatar_tipo, avatar_id, avatar_url, titulo_equipado, nivel, xp }
+//   perfil: { id, tag, nome_exibicao, avatar_tipo, avatar_id, avatar_url, titulo_equipado, moldura_equipada, verso_equipado, nivel, xp }
+//     (xp = total acumulado; a barra do nível sai de lib/progresso.js)
 //   estatisticas: { partidas, vitorias, personagem_favorito }
-export const conta = writable({ estado: 'carregando', perfil: null, estatisticas: null, erro: '' })
+//   inventario: Set dos ids do catálogo que a conta tem (null = ainda não carregou)
+export const conta = writable({ estado: 'carregando', perfil: null, estatisticas: null, inventario: null, erro: '' })
 
-const COLUNAS = 'id, tag, nome_exibicao, avatar_tipo, avatar_id, avatar_url, titulo_equipado, nivel, xp'
+const COLUNAS = 'id, tag, nome_exibicao, avatar_tipo, avatar_id, avatar_url, titulo_equipado, moldura_equipada, verso_equipado, nivel, xp'
 const ESTATISTICAS_ZERO = { partidas: 0, vitorias: 0, personagem_favorito: null }
 
 let supabase = null
@@ -91,7 +95,7 @@ function limparUrlDoLogin() {
 
 function sairLocal() {
   sessao = null
-  mudar({ estado: 'deslogado', perfil: null, estatisticas: null })
+  mudar({ estado: 'deslogado', perfil: null, estatisticas: null, inventario: null })
   avisar()
 }
 
@@ -109,6 +113,28 @@ async function carregarPerfil() {
   }
   mudar({ estado: 'logado', perfil: p.data, estatisticas: e.data ?? ESTATISTICAS_ZERO, erro: '' })
   avisar()
+  carregarInventario()
+}
+
+// chegou XP (lib/lan/rede.js, "recompensa"): o banco mudou nível, XP e itens
+export const recarregarPerfil = () => carregarPerfil().catch(() => {})
+
+// os itens que a conta ganhou (RLS: cada um lê só o seu)
+export async function carregarInventario() {
+  if (!supabase || !sessao) return
+  const r = await supabase.from('inventario').select('item_id')
+  if (!r.error) mudar({ inventario: new Set((r.data ?? []).map((l) => l.item_id)) })
+}
+
+// tipo: 'titulo' | 'moldura' | 'verso' | 'avatar'; itemId null tira (menos o avatar)
+export async function equipar(tipo, itemId) {
+  if (!supabase || !sessao) return { ok: false, erro: 'entre na conta primeiro' }
+  const { data, error } = await supabase.rpc('equipar', { p_tipo: tipo, p_item: itemId ?? null })
+  if (error) return { ok: false, erro: /item|tipo|avatar/i.test(String(error.message)) ? error.message : 'não deu para equipar: tente de novo' }
+  const perfil = Array.isArray(data) ? data[0] : data
+  if (perfil) mudar({ perfil: { ...get(conta).perfil, ...perfil } })
+  avisar()
+  return { ok: true }
 }
 
 export async function entrarComGoogle() {
