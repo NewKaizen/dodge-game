@@ -76,8 +76,8 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 | Etapa | Estado |
 | --- | --- |
 | A0 Reconhecimento | concluído (`docs/mapa-integracao.md`) |
-| 1A Contas e perfil | PR aberto: NewKaizen/dodge-game#37 (falta validar com o Supabase real: `docs/supabase.md`) |
-| 1B Amigos e convites | próximo (Sonnet, branch `claude/fase1b-amigos` a partir da 1A) |
+| 1A Contas e perfil | concluído e validado em produção (NewKaizen/dodge-game#37, #38: chaves novas do Supabase) |
+| 1B Amigos e convites | em andamento (Sonnet, branch `claude/practical-darwin-nc9pwz`) |
 
 ### Controle de custo
 
