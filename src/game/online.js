@@ -5,7 +5,9 @@ import { partidaOnline } from '../lib/lan/rede.js'
 //   - não tem pausa (Controles ignora o C: pausar travaria o amigo);
 //   - não tem revanche: no fim (PvpResultado, Vitoria, GameOver) a única
 //     opção é voltar ao lobby da sala (cena Lan), onde dá para conversar e
-//     começar outra partida; a sala continua aberta;
+//     começar outra partida; a sala continua aberta. A exceção é a sala
+//     casual do JOGAR RÁPIDO: revanche com o aceite dos dois, jogar de novo
+//     (fila) ou voltar ao menu (PvpResultado);
 //   - se o outro sai no meio, quem ficou volta para o lobby da sala; se a sala
 //     cai, volta ao menu (quem vigia é game/rede.js: a partida numa sala, PVP
 //     ou CO-OP, é sempre em rede).

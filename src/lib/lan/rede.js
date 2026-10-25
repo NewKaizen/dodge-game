@@ -20,6 +20,12 @@ import { codigoDaBusca, limparSalaDaUrl } from '../salaLink.js'
 // chegarem. aoServidor(fn) entrega a amigos.js as mensagens dele; enviarLobby
 // manda as ações dele (convidar, responderConvite, amigosMudaram).
 //
+// JOGAR RÁPIDO (server/fila.js, docs/online.md): fila casual de PVP 1x1.
+//   entrarFila() · sairFila() · responderPartida(aceitar)   procurar / desistir / aceitar o par
+//   consumirCasual()        (cena Lan, host) o id da sala casual a começar agora, uma vez só
+//   pedirRevanche(aceitar) · limparRevanche() · salaCasual()   (PvpResultado) revanche com aceite duplo
+//   estado: fila (procurando/pareado), filaAviso, casual, revanche, ultimaCasual
+//
 // Link de convite (?sala=CODIGO, lib/salaLink.js): salaDoLink() diz se há uma
 // sala esperando; ao conectar, o lobby entra nela sozinho.
 //
@@ -32,6 +38,7 @@ const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
 const LISTAR_MS = 1500
 const PING_MS = 2000
+export const CPU_APOS_MS = 30_000 // procurando há tanto tempo: oferece jogar contra a CPU
 
 function nomeSalvo() {
   try {
@@ -55,6 +62,12 @@ const INICIAL = {
   chat: [], // [{ nome, texto, meu, sistema }]
   ping: null, // ms até o servidor da sala
   erro: '',
+  // JOGAR RÁPIDO
+  fila: null, // null | { estado: 'procurando', inicio, convidado } | { estado: 'pareado', id, oponente: { nome, tag?, avatar? }, expira, eu, oponenteOk } (horários do relógio daqui)
+  filaAviso: '', // o que aconteceu na fila (o oponente recusou, você não confirmou...)
+  casual: null, // id da sala casual que o host começa sozinho (partidaCasual)
+  revanche: null, // null | { estado: 'pedida' | 'aceita' | 'recusada' | 'expirada' | 'indisponivel', minha, expira? }
+  ultimaCasual: false, // a última sala era casual: quem fica sem ela volta para a tela ONLINE
 }
 export const lan = writable({ ...INICIAL })
 
@@ -164,6 +177,7 @@ function conectar(url) {
       ws = null
       pararTimers()
       ouvintesServidor.forEach((fn) => fn({ t: '_fechou' }))
+      if (estado().fila) mudar({ fila: null, filaAviso: 'a conexão caiu: você saiu da fila' })
       const s = estado()
       if (!aberto) {
         const semCasa = s.online ? 'sem conexão com o servidor: tentando de novo…' : 'servidor LAN não encontrado: rode "npm run lan" neste PC'
@@ -245,12 +259,12 @@ function receber(m) {
         for (const x of m.sala.membros) if (!antes.membros.some((a) => a.id === x.id)) avisoChat(`${x.nome} entrou na sala`)
         for (const a of antes.membros) if (!m.sala.membros.some((x) => x.id === a.id)) avisoChat(`${a.nome} saiu da sala`)
       } else avisoChat(papel === 'host' ? 'sala criada: esperando alguém entrar' : `você entrou na sala de ${m.sala.membros.find((x) => x.papel === 'host')?.nome ?? '?'}`)
-      mudar({ fase: 'sala', sala: m.sala, papel, erro: '' })
+      mudar({ fase: 'sala', sala: m.sala, papel, erro: '', ultimaCasual: Boolean(m.sala.casual) })
       break
     }
     case 'fechada':
       sairDaSalaLocal(m.motivo)
-      mudar({ erro: m.motivo })
+      mudar({ erro: m.motivo, ...(m.casual && { ultimaCasual: true }) })
       voltarParaCasa()
       break
     case 'erro':
@@ -267,12 +281,43 @@ function receber(m) {
       if (t0 === undefined) return
       const ms = Math.round(performance.now() - t0)
       mudar({ ping: ms })
-      if (estado().fase === 'sala') enviar({ t: 'meuPing', ms })
+      if (estado().fase === 'sala' || estado().fila) enviar({ t: 'meuPing', ms }) // na fila o ping ajuda a escolher o host
       break
     }
     case 'de':
       ouvintesParceiro.forEach((fn) => fn(m.dados, m.de))
       break
+    // ---------- JOGAR RÁPIDO ----------
+    case 'fila':
+      if (m.estado === 'procurando') mudar({ fila: { estado: 'procurando', inicio: Date.now() - (Number(m.esperaMs) || 0), convidado: Boolean(m.convidado) } })
+      else mudar({ fila: null, ...(m.motivo && { filaAviso: m.motivo }) })
+      break
+    case 'pareado':
+      mudar({ fila: { estado: 'pareado', id: m.id, oponente: m.oponente ?? { nome: '?' }, expira: Date.now() + (Number(m.restanteMs) || 0), eu: false, oponenteOk: false }, filaAviso: '', erro: '' })
+      break
+    case 'pareadoEstado': {
+      const f = estado().fila
+      if (f?.id === m.id) mudar({ fila: { ...f, eu: Boolean(m.eu), oponenteOk: Boolean(m.oponente) } })
+      break
+    }
+    case 'pareadoFim': {
+      const f = estado().fila
+      if (f?.estado !== 'pareado' || f.id !== m.id) break // de um par velho
+      // voltou: o "procurando" chega logo depois
+      mudar({ fila: m.voltou ? { estado: 'procurando', inicio: Date.now(), convidado: !estado().eu.conta } : null, filaAviso: m.motivo ?? '' })
+      break
+    }
+    case 'filaNegada':
+      mudar({ ...(m.estado === 'fora' && { fila: null }), erro: m.msg })
+      break
+    case 'partidaCasual':
+      mudar({ casual: m.salaId, fila: null, filaAviso: '' })
+      break
+    case 'revanche': {
+      const minha = m.de === estado().eu.id
+      mudar({ revanche: { estado: m.estado, minha, ...(m.estado === 'pedida' && { expira: Date.now() + (Number(m.restanteMs) || 0) }) } })
+      break
+    }
     default:
       ouvintesServidor.forEach((fn) => fn(m))
   }
@@ -292,7 +337,7 @@ function sairDaSalaLocal(motivo) {
   if (s.fase !== 'sala') return
   if (motivo) avisoChat(motivo)
   restaurarJogadores()
-  mudar({ fase: 'navegando', sala: null, papel: null })
+  mudar({ fase: 'navegando', sala: null, papel: null, casual: null, revanche: null })
 }
 
 // se a conexão era com o servidor de outro PC, volta para o daqui
@@ -337,11 +382,12 @@ export function fecharLobby() {
     limparSalaDaUrl()
   }
   if (estado().fase === 'fora') return
+  sairFila()
   enviar({ t: 'sair' })
   // logado: a conexão com o servidor de casa continua (presença e convites)
   if (manter && estado().servidor === casa && ws) {
     restaurarJogadores()
-    return mudar({ fase: 'navegando', sala: null, papel: null, salas: [], chat: [], ping: null, erro: '' })
+    return mudar({ fase: 'navegando', sala: null, papel: null, salas: [], chat: [], ping: null, erro: '', filaAviso: '', casual: null, revanche: null })
   }
   fecharConexao()
   restaurarJogadores()
@@ -442,6 +488,43 @@ export function encerrarPartida() {
   lan.update((s) => ({ ...s, sala: { ...s.sala, emPartida: false } }))
   enviar({ t: 'partida', valor: false })
 }
+
+// ---------- JOGAR RÁPIDO ----------
+
+// entra na fila (fora de sala); o servidor confirma com o "procurando"
+export function entrarFila() {
+  const s = estado()
+  if (s.fase !== 'navegando' || !ws) return mudar({ erro: 'espere conectar no servidor' })
+  if (s.fila) return
+  mudar({ fila: { estado: 'procurando', inicio: Date.now(), convidado: !s.eu.conta }, filaAviso: '', erro: '' })
+  enviar({ t: 'fila', acao: 'entrar' })
+  if (s.ping != null) enviar({ t: 'meuPing', ms: s.ping })
+}
+
+export function sairFila() {
+  if (!estado().fila) return
+  enviar({ t: 'fila', acao: 'sair' })
+  mudar({ fila: null })
+}
+
+// aceitar (ou recusar) o oponente que a fila achou
+export function responderPartida(aceitar) {
+  const f = estado().fila
+  if (f?.estado !== 'pareado') return
+  enviar({ t: 'confirmar', id: f.id, aceitar: Boolean(aceitar) })
+  mudar({ fila: aceitar ? { ...f, eu: true } : null })
+}
+
+// (host) a sala casual acabou de nascer: começa uma vez só
+export function consumirCasual() {
+  const id = estado().casual
+  if (id) mudar({ casual: null })
+  return id
+}
+
+export const salaCasual = () => estado().fase === 'sala' && Boolean(estado().sala?.casual)
+export const pedirRevanche = (aceitar) => salaCasual() && enviar({ t: 'revanche', aceitar: Boolean(aceitar) })
+export const limparRevanche = () => mudar({ revanche: null })
 
 // ---------- canal com o outro PC (pelo servidor) ----------
 

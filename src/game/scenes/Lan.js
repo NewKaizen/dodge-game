@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { get } from 'svelte/store'
 import Controles from '../controles.js'
 import { tocar, musica } from '../audio.js'
 import { ASSETS } from '../assets.js'
@@ -20,7 +21,13 @@ import {
   mudarNome,
   iniciarPartida,
   encerrarPartida,
+  entrarFila,
+  sairFila,
+  responderPartida,
+  consumirCasual,
+  CPU_APOS_MS,
 } from '../../lib/lan/rede.js'
+import { jogo } from '../../lib/estado.js'
 import { pingPartida, ROTAS, corDoPing } from '../../lib/lan/transmissao.js'
 import { encerrarRede, irParaCena } from '../rede.js'
 
@@ -33,6 +40,11 @@ import { encerrarRede, irParaCena } from '../rede.js'
 //               na primeira vez o jogo já pede o nome)
 //   SALA        os dois jogadores (nome, ping, pronto), o modo (PVP/CO-OP),
 //               o chat e as ações; o host começa quando o convidado está pronto
+//   FILA        (ONLINE: JOGAR RÁPIDO, docs/online.md) procurando com o tempo de
+//               espera, o oponente achado (A aceita, B recusa, com contagem) e,
+//               depois de CPU_APOS_MS, a oferta de jogar contra a CPU. Os dois
+//               aceitaram: o servidor cria a sala casual e o host começa sozinho
+//               (o mesmo comecar() de sempre, PvpEscolha)
 // PVP e CO-OP: partida em rede (game/rede.js, docs/rede-pvp.md): o jogo roda
 // nos dois PCs; o host começa e irParaCena leva os dois para a primeira tela
 // do modo (PvpEscolha / EscolhaParty). O Menu manda o host de volta para cá
@@ -41,7 +53,7 @@ import { encerrarRede, irParaCena } from '../rede.js'
 // Música: public/assets/musicas/lobby.mid (sem ele, a do menu). O nome no
 // canto vem de ASSETS.tituloMusicaLobby.
 //   cima/baixo escolher · esquerda/direita mudar o modo · A confirmar · B voltar
-const COR = { tema: '#3fd6c8', temaNum: 0x3fd6c8, ok: '#6dffb0', okNum: 0x6dffb0, painel: 0x0b0914, apagado: '#5a5a6a' }
+const COR = { tema: '#3fd6c8', temaNum: 0x3fd6c8, ok: '#6dffb0', okNum: 0x6dffb0, painel: 0x0b0914, apagado: '#5a5a6a', rapido: '#ffd23a', rapidoNum: 0xffd23a }
 const MODOS = { pvp: { rotulo: 'PVP', cor: '#ff3d6e', cena: 'PvpEscolha' }, coop: { rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty' } }
 const LINHAS_SALAS = 5 // salas visíveis na lista
 const LINHAS_CHAT = 9
@@ -164,6 +176,7 @@ export default class Lan extends Phaser.Scene {
   get modoTela() {
     const s = this.s
     if (s.fase === 'sala') return 'sala'
+    if (s.fila) return 'fila'
     return 'salas'
   }
 
@@ -182,9 +195,27 @@ export default class Lan extends Phaser.Scene {
 
   itens() {
     const s = this.s
+    if (this.modoTela === 'fila') {
+      const f = s.fila
+      if (f.estado === 'pareado')
+        return f.eu
+          ? [{ id: 'cancelar', rotulo: 'DESISTIR', acao: () => sairFila() }]
+          : [
+              { id: 'aceitar', rotulo: 'ACEITAR PARTIDA', acao: () => responderPartida(true) },
+              { id: 'recusar', rotulo: 'RECUSAR', acao: () => responderPartida(false) },
+            ]
+      const cancelar = { id: 'cancelar', rotulo: 'SAIR DA FILA', acao: () => sairFila() }
+      if (Date.now() - f.inicio < CPU_APOS_MS) return [cancelar]
+      return [
+        { id: 'esperar', rotulo: 'CONTINUAR PROCURANDO', acao: () => {} },
+        { id: 'cpu', rotulo: 'JOGAR CONTRA A CPU', acao: () => this.jogarContraCpu() },
+        cancelar,
+      ]
+    }
     if (this.modoTela === 'salas' && s.online)
       return [
         { id: 'nome', tipo: 'nome', acao: () => this.digitar('nome') },
+        { id: 'rapido', rotulo: 'JOGAR RÁPIDO', ativo: s.fase === 'navegando', acao: () => entrarFila() },
         { id: 'criar', rotulo: '+ CRIAR SALA', ativo: s.fase === 'navegando', acao: () => criarSala() },
         { id: 'codigo', rotulo: 'ENTRAR COM CÓDIGO…', ativo: s.fase === 'navegando', acao: () => this.digitar('codigo') },
       ]
@@ -204,12 +235,13 @@ export default class Lan extends Phaser.Scene {
       const host = s.papel === 'host'
       const outro = s.sala.membros.find((m) => m.id !== s.eu.id)
       const eu = s.sala.membros.find((m) => m.id === s.eu.id)
+      const casual = Boolean(s.sala.casual) // partida rápida: sempre PVP, sem tirar ninguém
       if (host)
         return [
-          { id: 'modo', tipo: 'modo', acao: () => this.trocarModo(1) },
+          ...(casual ? [] : [{ id: 'modo', tipo: 'modo', acao: () => this.trocarModo(1) }]),
           { id: 'comecar', rotulo: 'COMEÇAR PARTIDA', ativo: Boolean(outro?.pronto), acao: () => this.comecar() },
           { id: 'chat', rotulo: 'CONVERSAR', acao: () => this.digitar('chat') },
-          ...(outro ? [{ id: 'expulsar', rotulo: `TIRAR ${outro.nome}`, acao: () => expulsar() }] : []),
+          ...(outro && !casual ? [{ id: 'expulsar', rotulo: `TIRAR ${outro.nome}`, acao: () => expulsar() }] : []),
           { id: 'sair', rotulo: 'FECHAR SALA', acao: () => this.sairDaSala() },
         ]
       return [
@@ -225,7 +257,7 @@ export default class Lan extends Phaser.Scene {
     let i = itens.findIndex((it) => it.id === this.selId)
     if (i < 0) {
       // padrão: a primeira ação útil (criar sala / começar / pronto)
-      i = Math.max(0, itens.findIndex((it) => ['criar', 'comecar', 'pronto'].includes(it.id)))
+      i = Math.max(0, itens.findIndex((it) => ['rapido', 'criar', 'comecar', 'pronto'].includes(it.id)))
       this.selId = itens[i]?.id ?? null
     }
     return i
@@ -236,13 +268,16 @@ export default class Lan extends Phaser.Scene {
     const s = this.s
     const itens = this.itens()
     const i = this.indiceSelecionado(itens)
-    const assinatura = JSON.stringify([this.modoTela, s.fase, s.online, s.eu.nome, s.salas, s.sala, s.chat.length, s.erro, s.enderecos, this.selId, this.digitando, s.ping, this.pingPartida])
+    // na fila, o relógio (espera / contagem) também muda a tela
+    const relogioFila = s.fila ? Math.floor((s.fila.estado === 'pareado' ? s.fila.expira - Date.now() : Date.now() - s.fila.inicio) / 1000) : null
+    const assinatura = JSON.stringify([this.modoTela, s.fase, s.online, s.eu.nome, s.eu.conta?.tag, s.salas, s.sala, s.chat.length, s.erro, s.enderecos, this.selId, this.digitando, s.ping, this.pingPartida, s.fila, s.filaAviso, relogioFila])
     if (assinatura === this.assinatura) return
     this.assinatura = assinatura
     this.view.removeAll(true)
     this.dinamicos = []
     this.atualizarTitulo()
-    if (this.modoTela === 'salas' && s.online) this.telaOnline(itens, i)
+    if (this.modoTela === 'fila') this.telaFila(itens, i)
+    else if (this.modoTela === 'salas' && s.online) this.telaOnline(itens, i)
     else if (this.modoTela === 'salas') this.telaSalas(itens, i)
     else this.telaSala(itens, i)
     this.atualizarMusica()
@@ -341,13 +376,17 @@ export default class Lan extends Phaser.Scene {
     else t(nome.x + nome.width + 10, yNome, sel === 0 ? '(A: mudar)' : '', 11, COR.apagado).setOrigin(0, 0.5)
     if (sel === 0) this.cursor(24, yNome)
 
-    // criar / entrar com código
-    const topo = 150
+    // jogar rápido / criar / entrar com código
+    const topo = 136
     const passo = 46
-    this.add2(this.add.rectangle(20, topo - 6, LARGURA - 40, passo * 2 + 50, COR.painel, 0.82).setOrigin(0).setStrokeStyle(2, COR.temaNum, 0.6))
-    t(36, topo + 8, 'JOGAR COM UM AMIGO', 12, COR.tema).setOrigin(0, 0.5)
+    this.add2(this.add.rectangle(20, topo - 6, LARGURA - 40, passo * 3 + 50, COR.painel, 0.82).setOrigin(0).setStrokeStyle(2, COR.temaNum, 0.6))
+    t(36, topo + 8, 'JOGAR', 12, COR.tema).setOrigin(0, 0.5)
     t(LARGURA - 36, topo + 8, s.fase === 'conectando' ? 'conectando…' : s.fase === 'navegando' ? 'conectado' : '', 11, '#9a9ab0').setOrigin(1, 0.5)
-    const explica = { criar: 'você vira o host e recebe um código para passar', codigo: 'digite o código que o seu amigo passou' }
+    const explica = {
+      rapido: s.eu.conta ? 'PVP 1x1 contra alguém da fila' : 'PVP 1x1 contra alguém da fila · como convidado, sem XP',
+      criar: 'jogar com um amigo: você vira o host e recebe um código para passar',
+      codigo: 'digite o código que o seu amigo passou',
+    }
     itens.slice(1).forEach((it, k) => {
       const y = topo + 44 + k * passo
       const ativo = it.ativo !== false
@@ -358,15 +397,68 @@ export default class Lan extends Phaser.Scene {
       if (it.id === 'codigo' && this.digitando?.campo === 'codigo') {
         const campo = t(60, y - 6, `CÓDIGO: ${this.campoTexto('codigo', '')}`, 16, TEXTO.selecionado).setOrigin(0, 0.5)
         this.dinamicos.push({ tipo: 'campo', obj: campo, campo: 'codigo', prefixo: 'CÓDIGO: ' })
-      } else t(60, y - 6, it.rotulo, 16, ativo ? (it.id === 'criar' ? COR.ok : TEXTO.normal) : COR.apagado).setOrigin(0, 0.5)
+      } else t(60, y - 6, it.rotulo, it.id === 'rapido' ? 18 : 16, ativo ? (it.id === 'rapido' ? COR.rapido : it.id === 'criar' ? COR.ok : TEXTO.normal) : COR.apagado).setOrigin(0, 0.5)
       t(60, y + 11, explica[it.id], 10, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
     })
 
-    const yInfo = topo + passo * 2 + 74
+    const yInfo = topo + passo * 3 + 62
+    if (s.filaAviso && !s.erro) t(LARGURA / 2, yInfo, s.filaAviso, 13, '#ffb040', { wordWrap: { width: LARGURA - 60 }, align: 'center' }).setOrigin(0.5)
     if (s.erro) t(LARGURA / 2, yInfo, s.erro, 13, '#ff6070', { wordWrap: { width: LARGURA - 60 }, align: 'center' }).setOrigin(0.5)
     t(LARGURA / 2, yInfo + 34, `o amigo abre  ${location.host}  no Chrome/Edge`, 12, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0.5)
     t(LARGURA / 2, yInfo + 54, 'PVP e CO-OP: cada um joga no próprio PC', 10, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
     this.rodape(this.digitando ? 'digite  ·  Enter: confirmar  ·  Esc: cancelar' : '↑↓ escolher     A: confirmar     B: voltar ao menu')
+  }
+
+  // JOGAR RÁPIDO: procurando (com a espera), o oponente achado (aceitar com
+  // contagem) e, depois de um tempo, a oferta da CPU (sempre dita como CPU)
+  telaFila(itens, sel) {
+    const s = this.s
+    const f = s.fila
+    const t = (...a) => this.add2(this.texto(...a))
+    const topo = 76
+    this.add2(this.add.rectangle(20, topo - 6, LARGURA - 40, 250, COR.painel, 0.85).setOrigin(0).setStrokeStyle(2, COR.rapidoNum, 0.7))
+    t(36, topo + 8, 'JOGAR RÁPIDO  ·  PVP 1x1', 12, COR.rapido).setOrigin(0, 0.5)
+    t(LARGURA - 36, topo + 8, f.convidado ? 'convidado: partida sem XP' : 'partida casual', 11, '#9a9ab0').setOrigin(1, 0.5)
+
+    const cx = LARGURA / 2
+    if (f.estado === 'pareado') {
+      const resta = Math.max(0, Math.ceil((f.expira - Date.now()) / 1000))
+      t(cx, topo + 50, 'OPONENTE ENCONTRADO!', 24, COR.ok, { strokeThickness: 5 }).setOrigin(0.5)
+      const quem = f.oponente?.tag ? `${f.oponente.nome}  ·  ${f.oponente.tag}` : `${f.oponente?.nome ?? '?'}  (convidado)`
+      t(cx, topo + 92, quem, 18, TEXTO.normal).setOrigin(0.5)
+      t(cx, topo + 130, `${resta}`, 30, resta <= 3 ? '#ff6070' : COR.rapido, { strokeThickness: 5 }).setOrigin(0.5)
+      const situacao = f.eu ? (f.oponenteOk ? 'os dois aceitaram: montando a sala…' : 'você aceitou: esperando o oponente…') : f.oponenteOk ? 'o oponente já aceitou!' : 'aceite antes de o tempo acabar'
+      const linha = t(cx, topo + 166, situacao, 13, f.eu ? COR.ok : '#c8c8d8').setOrigin(0.5)
+      if (f.eu) this.dinamicos.push({ tipo: 'pontos', obj: linha, base: situacao.replace(/…$/, '') })
+    } else {
+      const espera = Math.floor((Date.now() - f.inicio) / 1000)
+      const procurando = t(cx, topo + 50, 'PROCURANDO OPONENTE', 22, TEXTO.normal, { strokeThickness: 5 }).setOrigin(0.5)
+      this.dinamicos.push({ tipo: 'pontos', obj: procurando, base: 'PROCURANDO OPONENTE' })
+      t(cx, topo + 90, `${Math.floor(espera / 60)}:${String(espera % 60).padStart(2, '0')}`, 26, COR.rapido, { strokeThickness: 5 }).setOrigin(0.5)
+      if (itens.some((it) => it.id === 'cpu')) {
+        t(cx, topo + 128, 'Ninguém por enquanto — jogar contra a CPU?', 15, TEXTO.selecionado).setOrigin(0.5)
+        t(cx, topo + 148, 'a CPU é o bot do jogo, não uma pessoa (sem XP)', 11, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0.5)
+      } else t(cx, topo + 128, 'quando alguém aparecer, os dois confirmam e a partida começa', 12, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0.5)
+    }
+
+    // ações
+    const yOp = topo + 194
+    itens.forEach((it, k) => {
+      const x = cx + (k - (itens.length - 1) / 2) * 230
+      if (k === sel) {
+        this.add2(this.add.rectangle(x - 105, yOp - 14, 210, 28, COR.rapidoNum, 0.14).setOrigin(0))
+        this.cursor(x - 96, yOp)
+      }
+      const cor = it.id === 'aceitar' || it.id === 'cpu' ? COR.ok : it.id === 'recusar' || it.id === 'cancelar' ? '#ff8090' : TEXTO.normal
+      t(x + 6, yOp, it.rotulo, 14, cor).setOrigin(0.5)
+    })
+
+    const yInfo = topo + 280
+    if (s.erro) t(cx, yInfo, s.erro, 13, '#ff6070', { wordWrap: { width: LARGURA - 60 }, align: 'center' }).setOrigin(0.5)
+    else if (s.filaAviso) t(cx, yInfo, s.filaAviso, 13, '#ffb040', { wordWrap: { width: LARGURA - 60 }, align: 'center' }).setOrigin(0.5)
+    if (f.convidado) t(cx, yInfo + 34, 'crie uma conta (botão CONTA) para salvar seu progresso', 11, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
+    const b = f.estado === 'pareado' && !f.eu ? 'B: recusar' : 'B: sair da fila'
+    this.rodape(itens.length > 1 ? `←→ escolher     A: confirmar     ${b}` : `A: confirmar     ${b}`)
   }
 
   telaSala(itens, sel) {
@@ -483,6 +575,7 @@ export default class Lan extends Phaser.Scene {
     }
     if (botao === 'B') {
       tocar(this, 'cancelar')
+      if (this.modoTela === 'fila') return this.s.fila.estado === 'pareado' && !this.s.fila.eu ? responderPartida(false) : sairFila()
       if (this.modoTela === 'sala') this.sairDaSala()
       else this.voltarAoMenu()
     }
@@ -547,6 +640,18 @@ export default class Lan extends Phaser.Scene {
     this.time.delayedCall(240, () => this.scene.start('Menu'))
   }
 
+  // a fila não achou ninguém e o jogador topou: sai da fila e joga o PVP
+  // local contra a CPU (o de sempre, Menu > PVP com 1 jogador)
+  jogarContraCpu() {
+    this.saindo = true
+    sairFila()
+    fecharLobby()
+    if (get(jogo).numJogadores !== 1) jogo.update((x) => ({ ...x, numJogadores: 1 }))
+    this.registry.set('modo', 'pvp')
+    this.cameras.main.fadeOut(220, 0, 0, 0)
+    this.time.delayedCall(240, () => this.scene.start('PvpEscolha'))
+  }
+
   comecar() {
     const modo = MODOS[this.s.sala.modo] ?? MODOS.pvp
     this.comecando = true
@@ -602,13 +707,24 @@ export default class Lan extends Phaser.Scene {
     if (!this.saindo && !this.comecando && !this.digitando) {
       for (let j = 0; j < this.controles.numJogadores; j++) {
         const d = this.controles.toque(j)
-        if (d === 'cima') this.mover(-1)
-        if (d === 'baixo') this.mover(1)
+        const fila = this.modoTela === 'fila' // na fila as ações ficam lado a lado
+        if (d === 'cima' || (fila && d === 'esquerda')) this.mover(-1)
+        if (d === 'baixo' || (fila && d === 'direita')) this.mover(1)
         if ((d === 'esquerda' || d === 'direita') && this.selId === 'modo') this.trocarModo(d === 'direita' ? 1 : -1)
       }
     }
 
     this.acompanharComeco()
+
+    // JOGAR RÁPIDO: a sala casual nasceu com os dois; o host começa sozinho
+    const s = this.s
+    if (s.fase === 'sala' && s.papel === 'host' && s.sala?.casual && s.casual === s.sala.id && s.sala.membros.length > 1 && !this.comecando && !this.saindo) {
+      consumirCasual()
+      this.digitando = null
+      this.cancelarTexto?.()
+      this.cancelarTexto = null
+      this.comecar()
+    }
 
     // online, na primeira vez: o jogo já pede o nome de usuário
     if (this.s.online && !this.s.eu.escolheuNome && !this.pediuNome && this.s.fase === 'navegando' && !this.digitando && !this.saindo) {

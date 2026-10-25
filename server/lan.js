@@ -36,7 +36,7 @@
 //   cliente -> servidor  fila {acao: 'entrar'|'sair'} · confirmar {id, aceitar} · revanche {aceitar}
 //   servidor -> cliente  fila {estado: 'procurando'|'fora', desde?, esperaMs?, convidado?, motivo?}
 //                        pareado {id, oponente, expiraEm, restanteMs} · pareadoEstado {id, eu, oponente}
-//                        pareadoFim {id, voltou, motivo} · partidaCasual {salaId, host} · filaNegada {msg}
+//                        pareadoFim {id, voltou, motivo} · partidaCasual {salaId, host} · filaNegada {msg, estado}
 //                        revanche {estado: 'pedida'|'aceita'|'recusada'|'expirada'|'indisponivel', ...}
 // HOST da sala casual: quem tem o menor ping até o servidor, se os dois são
 // conhecidos e a diferença passa de FOLGA_PING_MS; senão, quem confirmou primeiro.
@@ -349,6 +349,9 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     },
   })
 
+  // estado: onde ele ficou (o cliente acerta a tela por ele)
+  const negarFila = (c, msg) => enviar(c, { t: 'filaNegada', msg, estado: fila.estado(c) })
+
   // tira `c` da fila (procurando ou pareado); true se estava nela
   function removerDaFila(c, motivo) {
     const estava = fila.estado(c)
@@ -615,13 +618,13 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     },
     // JOGAR RÁPIDO: entrar / sair da fila
     fila(c, m) {
-      if (!limiteFila.usar(c.id)) return enviar(c, { t: 'filaNegada', msg: 'calma: ações demais na fila, espere um pouco' })
+      if (!limiteFila.usar(c.id)) return negarFila(c, 'calma: ações demais na fila, espere um pouco')
       if (m.acao === 'sair') {
         if (!removerDaFila(c, 'saiu')) enviar(c, { t: 'fila', estado: 'fora', motivo: '' }) // já estava fora: confirma
         return
       }
       if (m.acao !== 'entrar') return
-      const negar = (msg) => enviar(c, { t: 'filaNegada', msg })
+      const negar = (msg) => negarFila(c, msg)
       const estado = fila.estado(c)
       if (estado === 'procurando') return enviar(c, { t: 'fila', estado, desde: fila.desde(c), esperaMs: agora() - fila.desde(c), convidado: !c.usuario })
       if (estado === 'pareado') return // a confirmação já está na tela dele
@@ -632,13 +635,13 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     },
     // aceitar (ou recusar) a partida achada: { id, aceitar }
     confirmar(c, m) {
-      if (!limiteFila.usar(c.id)) return enviar(c, { t: 'filaNegada', msg: 'calma: ações demais na fila, espere um pouco' })
+      if (!limiteFila.usar(c.id)) return negarFila(c, 'calma: ações demais na fila, espere um pouco')
       const id = String(m.id ?? '')
       if (fila.responder(c, id, m.aceitar !== false) === 'expirado') enviar(c, { t: 'pareadoFim', id, voltou: false, motivo: 'essa partida não vale mais' })
     },
     // revanche na sala casual: { aceitar }
     revanche(c, m) {
-      if (!limiteFila.usar(c.id)) return enviar(c, { t: 'filaNegada', msg: 'calma: ações demais, espere um pouco' })
+      if (!limiteFila.usar(c.id)) return negarFila(c, 'calma: ações demais, espere um pouco')
       const sala = salas.get(c.sala)
       if (!sala?.casual) return
       if (sala.membros.size < MAX_MEMBROS) return enviar(c, { t: 'revanche', estado: 'indisponivel', motivo: 'o oponente já saiu' })
