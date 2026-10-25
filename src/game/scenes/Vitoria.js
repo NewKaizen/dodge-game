@@ -9,7 +9,7 @@ import { partyDe } from '../data/batalha.js'
 import { fogoArtificio, canhoesConfete, chuvaConfete, raiosDeLuz, CORES_FESTA } from '../effects/festa.js'
 import { shake } from '../effects/shake.js'
 import { flashTela, claraoCamera } from '../effects/flash.js'
-import { FONTE, LARGURA, ALTURA, TEXTO, NIVEIS } from '../constants.js'
+import { FONTE, LARGURA, ALTURA, CENTRO_X, TEXTO, NIVEIS } from '../constants.js'
 import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
 import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
 
@@ -37,8 +37,10 @@ const TEMPO = {
   opcoes: 900, // depois do carimbo
 }
 
-const PAINEL = { x: 196, y: 140, largura: 248, altura: 246, linhaY: 156, espaco: 23 }
-const NOTA = { x: 548, y: 248 }
+// três blocos lado a lado, centrados em 854: chefe e party (x 144), painel (270..560) e nota (x 700)
+const COLUNA_PARTY = 144
+const PAINEL = { x: 270, y: 140, largura: 290, altura: 246, linhaY: 156, espaco: 23 }
+const NOTA = { x: 700, y: 248 }
 const COR_DERROTADO = '#ff4050'
 
 const estilo = (tamanho, cor = TEXTO.normal, extra = {}) => ({
@@ -176,7 +178,7 @@ export default class Vitoria extends Phaser.Scene {
       tocar(this, 'estouroFesta')
       claraoCamera(this.cameras.main, 260, 255, 255, 240)
       shake(this, 220, 0.012)
-      for (let i = 0; i < 3; i++) this.time.delayedCall(i * 140, () => fogoArtificio(this, 120 + i * 200 + Phaser.Math.Between(-30, 30), Phaser.Math.Between(60, 150)))
+      for (let i = 0; i < 3; i++) this.time.delayedCall(i * 140, () => fogoArtificio(this, CENTRO_X - 200 + i * 200 + Phaser.Math.Between(-30, 30), Phaser.Math.Between(60, 150)))
     }
     canhoesConfete(this)
     this.tweens.add({ targets: this.veu, alpha: 0.5, duration: rapido ? 1 : 500 })
@@ -220,7 +222,7 @@ export default class Vitoria extends Phaser.Scene {
       loop: true,
       callback: () => {
         const lado = Math.random() < 0.5
-        const x = lado ? Phaser.Math.Between(30, 170) : Phaser.Math.Between(470, 610)
+        const x = lado ? Phaser.Math.Between(30, 200) : Phaser.Math.Between(LARGURA - 200, LARGURA - 30)
         fogoArtificio(this, x, Phaser.Math.Between(40, 140), undefined, { quantidade: 28, profundidade: -1 })
         tocar(this, 'fogo')
       },
@@ -284,7 +286,7 @@ export default class Vitoria extends Phaser.Scene {
 
   // Chefe (retrato à esquerda) e party comemorando embaixo dele
   entrarParty(rapido) {
-    const chefe = this.add.image(108, 192, this.def.sprite).setScale(ESCALA.chefe * 0.62).setDepth(5)
+    const chefe = this.add.image(COLUNA_PARTY, 192, this.def.sprite).setScale(ESCALA.chefe * 0.62).setDepth(5)
     chefe.setTint(0x6a6a6a).setAlpha(0.6).setAngle(-12)
     this.tweens.add({ targets: chefe, angle: -9, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
 
@@ -293,7 +295,7 @@ export default class Vitoria extends Phaser.Scene {
     const party = partyDe(this.registry)
     const membros = party.map((id, i) => ({
       textura: id,
-      x: 108 + (i - (party.length - 1) / 2) * Math.min(68, 150 / Math.max(1, party.length - 1)),
+      x: COLUNA_PARTY + (i - (party.length - 1) / 2) * Math.min(68, 150 / Math.max(1, party.length - 1)),
       atraso: i * 210,
     }))
     membros.forEach(({ textura, x, atraso }, i) => {

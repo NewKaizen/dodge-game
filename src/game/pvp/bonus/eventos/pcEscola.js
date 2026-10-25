@@ -1,4 +1,4 @@
-import { FONTE, LARGURA } from '../../../constants.js'
+import { FONTE, LARGURA, ALTURA } from '../../../constants.js'
 import { tocar } from '../../../audio.js'
 import { ignorarNasCaixas } from '../../../recorte.js'
 import { RES } from '../../../resolucao.js'
@@ -71,7 +71,7 @@ export default function criar(arena, { rng }) {
         // (uma listra a cada 2 "pixels" grandes, para casar com o filtro)
         const linhas = arena.add.graphics().setDepth(12)
         linhas.fillStyle(0x000000, 0.16)
-        for (let y = 0; y < 480; y += PIXEL * 2) linhas.fillRect(0, y, LARGURA, PIXEL)
+        for (let y = 0; y < ALTURA; y += PIXEL * 2) linhas.fillRect(0, y, LARGURA, PIXEL)
         const contador = arena.add.text(0, 0, '', { fontFamily: FONTE, fontSize: '11px', color: AMARELO, stroke: '#000000', strokeThickness: 3 }).setOrigin(0, 1).setDepth(41)
         pista.caixa.recortar(linhas)
         ignorarNasCaixas(arena, contador)

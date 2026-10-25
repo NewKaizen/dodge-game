@@ -145,6 +145,7 @@ export default class Menu extends Phaser.Scene {
     this.barras = [0, 1, 2, 3].map((i) =>
       this.add.rectangle(xBarras + i * 5, y + 7, 3, 14, 0x3fd6c8).setOrigin(0.5, 1).setDepth(30).setScale(1, 0.5),
     )
+    this.add.rectangle(LARGURA - 196, ALTURA - 32, 190, 28, 0x000000, 0.5).setOrigin(0).setDepth(29)
     const dica = (x, letra, texto) => {
       this.add.circle(x, ALTURA - 18, 7).setStrokeStyle(1.5, 0xc8c8d8).setDepth(30)
       this.add.text(x, ALTURA - 18, letra, estilo(10, '#c8c8d8')).setOrigin(0.5).setDepth(30)

@@ -17,7 +17,7 @@ export default function jevil(scene, objetos) {
   const espiral = add(scene.add.graphics())
   const aneis = add(scene.add.graphics())
 
-  const naipes = Array.from({ length: 18 }, (_, i) => {
+  const naipes = Array.from({ length: 24 }, (_, i) => {
     const forma = NAIPES[i % 4]
     const img = add(scene.add.image(0, 0, `bala-${forma}`).setTint(CORES_NAIPES[forma]).setAlpha(0.35).setScale(0.9 + (i % 3) * 0.4))
     return { img, x: (i * 131) % LARGURA, y: (i * 71) % ALTURA, vx: ((i % 5) - 2) * 8, vy: -10 - (i % 4) * 6, giro: ((i % 3) - 1) * 1.5 }

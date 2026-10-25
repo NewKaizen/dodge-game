@@ -1,4 +1,4 @@
-import { CORES, FONTE, TEXTO, corTexto } from '../../constants.js'
+import { CENTRO_X, CORES, FONTE, TEXTO, corTexto } from '../../constants.js'
 import { tocar } from '../../audio.js'
 import { CORES_CARTA } from '../../entities/Carta.js'
 import { criarRng, aleatorio } from '../baralho.js'
@@ -45,7 +45,7 @@ import { claraoCamera } from '../../effects/flash.js'
 // arena sincroniza o `estado` no fim da rodada; até lá a animação usa os
 // números do host).
 
-const JANELA = { x: 320, y: 200, largura: 430, altura: 228, titulo: 18 }
+const JANELA = { x: CENTRO_X, y: 200, largura: 430, altura: 228, titulo: 18 }
 const W = JANELA.largura / 2
 const H = JANELA.altura / 2
 // posições (relativas ao meio da janela)

@@ -10,7 +10,7 @@ import { claraoCamera } from '../effects/flash.js'
 import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
 
 // Área da grade de personagens e dos painéis de detalhes (px)
-const GRADE = { topo: 72, base: 282, esquerda: 20, direita: 620, espaco: 8, larguraMax: 180, alturaMax: 200 }
+const GRADE = { topo: 72, base: 282, esquerda: 40, direita: LARGURA - 40, espaco: 10, larguraMax: 188, alturaMax: 200 }
 const DETALHE = { y: 290, altura: 150, espaco: 8, linha: 17, linhasPorColuna: 5 }
 const TAMANHO_PARTY = 2 // com 1 jogador ele escolhe todos; com 2, cada um escolhe 1
 const CHAVE_SALVA = 'dodge-party' // última party (também fica no registry)

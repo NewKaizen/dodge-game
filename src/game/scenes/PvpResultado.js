@@ -7,7 +7,7 @@ import { tocar, musica } from '../audio.js'
 import { fogoArtificio, canhoesConfete, chuvaConfete, raiosDeLuz, CORES_FESTA } from '../effects/festa.js'
 import { shake } from '../effects/shake.js'
 import { TEXTO_JOGADOR } from '../pvp/perfil.js'
-import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
+import { CORES, FONTE, LARGURA, ALTURA, CENTRO_X, TEXTO, corTexto } from '../constants.js'
 import { claraoCamera } from '../effects/flash.js'
 import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
 import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
@@ -44,9 +44,9 @@ const TEMPO = {
 // entrada do vencedor (antes da tela de sempre; não tem no empate)
 const ENTRADA = { golpe: 330, saida: 1750, duracao: 1950, y: 228, altura: 180, angulo: 0.16, escala: 9, tamanhoNome: 76, profundidade: 50 }
 
-const PAINEL = { x: 140, y: 118, largura: 360, altura: 290, linhaY: 176, espaco: 40 }
-const COLUNA = [PAINEL.x + 64, PAINEL.x + PAINEL.largura - 64] // centro dos valores do P1 e do P2
-const LUTADOR = { x: [70, LARGURA - 70], chao: 318, escala: 4 }
+const PAINEL = { x: CENTRO_X - 230, y: 118, largura: 460, altura: 290, linhaY: 176, espaco: 40 } // centrado em 854
+const COLUNA = [PAINEL.x + 76, PAINEL.x + PAINEL.largura - 76] // centro dos valores do P1 e do P2
+const LUTADOR = { x: [100, LARGURA - 100], chao: 318, escala: 4 }
 const COR_EMPATE = '#c8c8d8'
 
 const VAZIO = { danoCausado: 0, danoRecebido: 0, cartasJogadas: 0, maiorCarta: null, grazes: 0, ases: 0 }
@@ -337,13 +337,13 @@ export default class PvpResultado extends Phaser.Scene {
       const cor = this.corNumero
       // fogos de tempos em tempos, do lado do vencedor (e alguns do outro)
       const ladoVencedor = this.vencedor === 1 ? 0 : 1
-      if (!rapido) for (let i = 0; i < 3; i++) this.time.delayedCall(i * 140, () => fogoArtificio(this, 140 + i * 180, Phaser.Math.Between(50, 120), i === 1 ? cor : undefined))
+      if (!rapido) for (let i = 0; i < 3; i++) this.time.delayedCall(i * 140, () => fogoArtificio(this, CENTRO_X - 180 + i * 180, Phaser.Math.Between(50, 120), i === 1 ? cor : undefined))
       this.time.addEvent({
         delay: 850,
         loop: true,
         callback: () => {
           const lado = Math.random() < 0.7 ? ladoVencedor : 1 - ladoVencedor
-          const x = lado === 0 ? Phaser.Math.Between(24, 150) : Phaser.Math.Between(490, 616)
+          const x = lado === 0 ? Phaser.Math.Between(30, 190) : Phaser.Math.Between(LARGURA - 190, LARGURA - 30)
           fogoArtificio(this, x, Phaser.Math.Between(40, 170), Math.random() < 0.5 ? cor : undefined, { quantidade: 28, profundidade: -1 })
           tocar(this, 'fogo')
         },

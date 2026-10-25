@@ -1,4 +1,4 @@
-import { LARGURA, ALTURA } from '../../constants.js'
+import { LARGURA, ALTURA, CENTRO_X } from '../../constants.js'
 import { texturaCanvas, misturar, semente } from '../../arte/pixelCanvas.js'
 
 // COLISEU: a arena dos gladiadores ao meio-dia. De trás para a frente:
@@ -18,15 +18,16 @@ import { texturaCanvas, misturar, semente } from '../../arte/pixelCanvas.js'
 // As caixas ficam em cima das arquibancadas e as mãos de cartas em cima da
 // areia: nada pisca forte ali, e o véu da arena (moldura.alpha) escurece tudo.
 
-const CX = 320 // centro da elipse da arena (fica abaixo das caixas: as curvas sobem para os lados)
+const CX = CENTRO_X // centro da elipse da arena (fica abaixo das caixas: as curvas sobem para os lados)
 const CY = 338
-const PODIO = { a: 430, b: 142, altura: 24 } // onde a areia encontra o muro, e a altura do muro
+const ESCALA_X = LARGURA / 640 // o estádio foi desenhado em 640: a elipse alarga junto (a plateia não estica, só ganha mais gente)
+const PODIO = { a: Math.round(430 * ESCALA_X), b: 142, altura: 24 } // onde a areia encontra o muro, e a altura do muro
 const DEGRAUS = 7 // fileiras de arquibancada
-const DEGRAU = { a: 40, b: 17 } // quanto cada fileira cresce na elipse
+const DEGRAU = { a: Math.round(40 * ESCALA_X), b: 17 } // quanto cada fileira cresce na elipse
 const ATICO = 28 // altura do anel de cima
-const ESCADAS = [72, 168, 472, 568] // x das escadas entre os setores
+const ESCADAS = [-248, -152, 152, 248].map((d) => Math.round(CX + d * ESCALA_X)) // x das escadas entre os setores
 const TRIBUNA = { x0: CX - 46, x1: CX + 46, fileiras: 4 } // a plateia não senta atrás da tribuna
-const PORTOES = [56, 584]
+const PORTOES = [-264, 264].map((d) => Math.round(CX + d * ESCALA_X))
 const BLOCO = 16 // largura de um pedaço da plateia (4 pessoas)
 const PLATEIA_MS = 70 // a plateia troca de quadro neste ritmo
 const OLA = { primeira: 3500, periodo: 12500, velocidade: 0.24, largura: 48 } // px/ms
@@ -57,18 +58,19 @@ const textura = texturaCanvas
 // ---------- texturas ----------
 
 function texturaCeu(scene) {
+  const SOL_X = Math.round(LARGURA * 0.875)
   return textura(scene, 'arena-coliseu-ceu', LARGURA, 150, (ctx, px) => {
     for (let y = 0; y < 150; y += 2) px(0, y, LARGURA, 2, misturar(CEU.alto, CEU.baixo, Math.min(1, y / 120)))
     // sol forte fora da tela, no canto: halo largo e raios bem suaves
-    const halo = ctx.createRadialGradient(560, -30, 10, 560, -30, 260)
+    const halo = ctx.createRadialGradient(SOL_X, -30, 10, SOL_X, -30, 260)
     halo.addColorStop(0, 'rgba(255,250,225,0.95)')
     halo.addColorStop(0.18, 'rgba(255,240,190,0.55)')
     halo.addColorStop(0.5, 'rgba(255,230,170,0.15)')
     halo.addColorStop(1, 'rgba(255,230,170,0)')
     ctx.fillStyle = halo
     ctx.fillRect(0, 0, LARGURA, 150)
-    px(548, 0, 24, 6, 0xfffbe8)
-    px(552, 6, 16, 2, 0xfffbe8)
+    px(SOL_X - 12, 0, 24, 6, 0xfffbe8)
+    px(SOL_X - 8, 6, 16, 2, 0xfffbe8)
   })
 }
 
@@ -198,7 +200,7 @@ function texturaEstadio(scene) {
     for (const s of [0.385, 0.485, 0.725]) oval(s, AREIA.escura, 0.35, 5, 3, 1)
     // pegadas
     for (let i = 0; i < 46; i++) {
-      const x = 20 + r() * 600
+      const x = 20 + r() * (LARGURA - 40)
       const y = yAreia(x) + 14 + r() * (ALTURA - yAreia(x) - 20)
       px(x, y, 2, 1, AREIA.escura, 0.6)
       px(x + 3, y + 2, 2, 1, AREIA.escura, 0.6)
@@ -213,9 +215,10 @@ function texturaEstadio(scene) {
       px(x0 - 14, y0 + 6, 28, 2, 0x5a3a1a, 0.35)
     }
     escudo(28, 318)
-    for (let i = 0; i < 34; i++) px(616 - i * 0.45, 322 - i, 2, 1, i > 28 ? 0xc8d0d8 : 0x7a5230)
-    px(608, 321, 14, 2, 0x5a3a1a, 0.35)
-    px(605, 290, 5, 2, 0xc8d0d8)
+    const lx = LARGURA - 24 // lança cravada
+    for (let i = 0; i < 34; i++) px(lx - i * 0.45, 322 - i, 2, 1, i > 28 ? 0xc8d0d8 : 0x7a5230)
+    px(lx - 8, 321, 14, 2, 0x5a3a1a, 0.35)
+    px(lx - 11, 290, 5, 2, 0xc8d0d8)
 
     // tribuna do imperador: bloco saliente com colunas, toldo roxo e friso dourado
     const t0 = TRIBUNA.x0 + 4
@@ -450,7 +453,7 @@ export default function coliseu(scene, objetos) {
   add(scene.add.image(0, 0, texturaCeu(scene)).setOrigin(0))
   const nuvens = [0, 1, 2].map((k) => ({
     obj: add(scene.add.image(0, 0, texturaNuvem(scene, k)).setOrigin(0).setAlpha(0.95)),
-    x: [40, 300, 520][k],
+    x: [40, 380, 700][k],
     y: [4, 22, 12][k] + k * 4,
     v: 3 + k * 1.5,
   }))
@@ -460,7 +463,7 @@ export default function coliseu(scene, objetos) {
 
   // toldos do velário pendurados no ático (entre os mastros) e flâmulas nos mastros
   const toldos = []
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < Math.ceil(LARGURA / 64) + 1; i++) {
     const x0 = i * 64 + 31
     const x1 = x0 + 64
     const xm = (x0 + x1) / 2
@@ -505,7 +508,7 @@ export default function coliseu(scene, objetos) {
   add(scene.add.image(CX + 30, yPisoTribuna - 1, texturaGuarda(scene)).setOrigin(0.5, 1).setFlipX(true))
 
   // estandartes no muro do pódio
-  const estandartes = [24, 104, 192, 448, 536, 616].map((x, i) => ({
+  const estandartes = [-296, -216, -128, 128, 216, 296].map((d) => Math.round(CX + d * ESCALA_X)).map((x, i) => ({
     obj: add(scene.add.image(x, Math.round(yLinha(0, x)) + 3, texturaEstandarte(scene, i % 3)).setOrigin(0.5, 0)),
     fase: i * 1.3,
   }))

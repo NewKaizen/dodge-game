@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { LARGURA, ALTURA } from '../../constants.js'
+import { LARGURA, ALTURA, CENTRO_X } from '../../constants.js'
 import { texturasJardim, NUM_FLORES } from '../../arte/jardim.js'
 import { ignorarNasCaixas } from '../../recorte.js'
 
@@ -22,13 +22,13 @@ const CEU = [0x24173f, 0x2f1a4a, 0x3d1d54, 0x4f2259, 0x63285c, 0x7a2f5e, 0x93385
 const HORIZONTE = 292 // onde o céu acaba atrás das colinas
 // sete sóis: deslocamento x do centro, raio e cor (o do meio é o maior e mais claro)
 const SOIS = [
-  { dx: -292, r: 7, cor: 0xff8a7a },
-  { dx: -200, r: 8, cor: 0xffa35a },
-  { dx: -100, r: 9, cor: 0xffc65a },
+  { dx: -390, r: 7, cor: 0xff8a7a },
+  { dx: -266, r: 8, cor: 0xffa35a },
+  { dx: -133, r: 9, cor: 0xffc65a },
   { dx: 0, r: 11, cor: 0xfff0a8 },
-  { dx: 100, r: 9, cor: 0xffc65a },
-  { dx: 200, r: 8, cor: 0xffa35a },
-  { dx: 292, r: 7, cor: 0xff8a7a },
+  { dx: 133, r: 9, cor: 0xffc65a },
+  { dx: 266, r: 8, cor: 0xffa35a },
+  { dx: 390, r: 7, cor: 0xff8a7a },
 ]
 const ARCO = { y: 76, raio: 1060 } // arco dos sóis: topo em y, círculo enorme (curva suave)
 const PARALLAX = { longe: 3, meio: 7, perto: 12, periodo: 52000 }
@@ -66,14 +66,14 @@ export default function jardim(scene, objetos) {
   })
   ceu.fillStyle(CEU[CEU.length - 1], 1).fillRect(0, HORIZONTE, LARGURA, ALTURA - HORIZONTE)
 
-  const estrelas = Array.from({ length: 22 }, () => {
+  const estrelas = Array.from({ length: 30 }, () => {
     const e = add(scene.add.rectangle(sorte() * LARGURA, 4 + sorte() * 90, 1.5, 1.5, 0xfff2d8))
     return { e, fase: sorte() * Math.PI * 2, v: 0.6 + sorte() * 1.2 }
   })
 
   // ---------- sete sóis ----------
   const sois = SOIS.map((s, i) => {
-    const x = LARGURA / 2 + s.dx
+    const x = CENTRO_X + s.dx
     const y = ARCO.y + ARCO.raio - Math.sqrt(ARCO.raio ** 2 - s.dx ** 2)
     const halo = add(scene.add.image(x, y, 'jardim-brilho').setTint(s.cor).setBlendMode(Phaser.BlendModes.ADD))
     // raios: 12 pontas (longas e curtas alternadas), desenhados uma vez e girados
@@ -99,7 +99,7 @@ export default function jardim(scene, objetos) {
   })
 
   // ---------- nuvens ----------
-  const nuvens = Array.from({ length: 5 }, (_, i) => {
+  const nuvens = Array.from({ length: 7 }, (_, i) => {
     const g = add(scene.add.graphics())
     const larg = 50 + sorte() * 40
     const bolas = 4 + Math.floor(sorte() * 3)
@@ -111,7 +111,7 @@ export default function jardim(scene, objetos) {
         g.fillEllipse(fx * larg, dy - Math.cos(fx * Math.PI) * 6 + (cor === 0xffd0a8 ? -2 : 0), larg * 0.42, 14 - Math.abs(fx) * 6)
       }
     }
-    return { g, x: (i * 157 + sorte() * 60) % (LARGURA + 160) - 80, y: 128 + sorte() * 80, v: 2.5 + sorte() * 3, larg }
+    return { g, x: (i * 140 + sorte() * 60) % (LARGURA + 160) - 80, y: 128 + sorte() * 80, v: 2.5 + sorte() * 3, larg }
   })
 
   // ---------- colinas (três camadas) ----------
@@ -179,7 +179,7 @@ export default function jardim(scene, objetos) {
 
   // ---------- canteiros ----------
   const canteiros = add(scene.add.graphics())
-  for (const [x0, x1] of [[16, 304], [336, 624]]) {
+  for (const [x0, x1] of [[16, CENTRO_X - 16], [CENTRO_X + 16, LARGURA - 16]]) {
     canteiros.fillStyle(0x3a2418, 1).fillRoundedRect(x0, 378, x1 - x0, 96, 10)
     canteiros.fillStyle(0x5a3a26, 1).fillRoundedRect(x0 + 3, 381, x1 - x0 - 6, 90, 8)
     // pedrinhas na borda do canteiro
@@ -192,7 +192,7 @@ export default function jardim(scene, objetos) {
     girassois.push({ img, x, fase: x * 0.1 })
   }
   const flores = []
-  for (const [x0, x1] of [[24, 300], [344, 620]]) {
+  for (const [x0, x1] of [[24, CENTRO_X - 20], [CENTRO_X + 20, LARGURA - 24]]) {
     for (const [y, escala] of [[402, 2], [430, 2.2], [462, 2.4]]) {
       for (let x = x0 + 6; x < x1 - 4; x += 16 + sorte() * 8) {
         const tipo = Math.floor(sorte() * NUM_FLORES)
@@ -203,14 +203,14 @@ export default function jardim(scene, objetos) {
   }
 
   // ---------- vida no ar ----------
-  const petalas = Array.from({ length: 28 }, (_, i) => {
+  const petalas = Array.from({ length: 36 }, (_, i) => {
     const polen = i % 3 !== 0
     const obj = polen
       ? add(scene.add.rectangle(0, 0, 2, 2, 0xfff0a0).setAlpha(0.55))
       : add(scene.add.image(0, 0, 'jardim-petala').setTint([0xff9ad2, 0xfff6e8, 0xffb0c0][i % 3]).setAlpha(0.8).setScale(1.5))
     return { obj, polen, x: sorte() * LARGURA, y: 90 + sorte() * 380, v: 6 + sorte() * 10, fase: sorte() * 10 }
   })
-  const vagalumes = Array.from({ length: 16 }, () => {
+  const vagalumes = Array.from({ length: 22 }, () => {
     const halo = add(scene.add.image(0, 0, 'jardim-brilho').setTint(0xd8ff6a).setBlendMode(Phaser.BlendModes.ADD).setScale(0.32))
     const ponto = add(scene.add.rectangle(0, 0, 2, 2, 0xf6ffb0))
     return { halo, ponto, x: sorte() * LARGURA, y: 300 + sorte() * 170, fase: sorte() * 20, v: 0.5 + sorte() * 0.6 }
@@ -274,7 +274,7 @@ export default function jardim(scene, objetos) {
         v.ponto.setPosition(x, y).setAlpha(0.25 + a * 0.75)
       }
       for (const b of borboletas) {
-        const x = LARGURA / 2 + Math.sin(t * b.a + b.p) * 300 + Math.sin(t * 0.9 + b.q) * 18
+        const x = CENTRO_X + Math.sin(t * b.a + b.p) * 400 + Math.sin(t * 0.9 + b.q) * 18
         const y = 250 + Math.sin(t * b.b + b.q) * 175 + Math.sin(t * 2.1 + b.p) * 6
         const bate = Math.abs(Math.cos(t * b.bate + b.p))
         b.img.setPosition(x, y).setScale(1.6 * (0.2 + 0.8 * bate), 1.6)

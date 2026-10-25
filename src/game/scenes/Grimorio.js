@@ -51,15 +51,15 @@ const GRUPOS_ABAS = [
   { tipo: 'arena', rotulo: 'ARENAS DO PVP · RODADAS BÔNUS' },
 ]
 
-const ABAS = { y: 32, tamanho: 34, passo: 41, x: 170, folga: 12, larguraArena: 70, passoArena: 76 } // abas das páginas
-const INFO = { x: 8, y: 58, largura: 318, altura: 292 } // painel da carta / evento em foco (esquerda)
-const PREVIA = { x: 332, y: 58, largura: 300, altura: 292 } // painel da prévia / janela da arena (direita)
+const ABAS = { y: 32, tamanho: 34, passo: 46, x: 214, folga: 16, larguraArena: 84, passoArena: 92 } // abas das páginas
+const INFO = { x: 24, y: 58, largura: 380, altura: 292 } // painel da carta / evento em foco (esquerda)
+const PREVIA = { x: 414, y: 58, largura: 416, altura: 292 } // painel da prévia / janela da arena (direita)
 const CAIXA = { largura: 220, altura: 170 } // a mesma caixa da arena PvP
 const CAMPO = { esquerda: PREVIA.x + 2, direita: PREVIA.x + PREVIA.largura - 2, topo: PREVIA.y + 20, base: PREVIA.y + PREVIA.altura - 20 }
 const CARTA_GRANDE = { x: INFO.x + 54, y: INFO.y + 74, escala: 1.3 }
 const FICHA_GRANDE = { x: INFO.x + 54, y: INFO.y + 66, largura: 88, altura: 104 } // o "selo" do evento em foco
-const FILEIRA = { y: 404, largura: 44, passoMax: 34, esquerda: 14, direita: LARGURA - 14, folgaGrupo: 8 }
-const FICHA = { largura: 54, altura: 62, passoMax: 60 } // fichas dos eventos na fileira (arenas)
+const FILEIRA = { y: 404, largura: 44, passoMax: 38, esquerda: 24, direita: LARGURA - 24, folgaGrupo: 8 }
+const FICHA = { largura: 58, altura: 66, passoMax: 70 } // fichas dos eventos na fileira (arenas)
 const REPETIR = { espera: 320, intervalo: 85 } // segurar ←/→
 const PAUSA_ENTRE_VOLTAS = 650 // ms entre uma volta da prévia e a próxima
 const ESPERA_PREVIA = 260 // ms parado numa carta até a prévia começar (passar rápido não liga caixas à toa)
@@ -160,8 +160,8 @@ export default class Grimorio extends Phaser.Scene {
   // ---------- montagem ----------
 
   montarTopo() {
-    const titulo = this.texto(14, 5, 'GUIA', 24, TEXTO.selecionado, { strokeThickness: 4 })
-    this.nomePagina = this.texto(15, 34, '', 13, TEXTO.normal)
+    const titulo = this.texto(24, 5, 'GUIA', 24, TEXTO.selecionado, { strokeThickness: 4 })
+    this.nomePagina = this.texto(25, 34, '', 13, TEXTO.normal)
     // as seções ao lado do título: a da página atual acende
     const x = titulo.x + titulo.width + 12
     this.rotulosSecao = SECOES.map((s, i) => this.texto(x, 8 + i * 13, s.rotulo, 10, '#6a6a80', { strokeThickness: 2 }))

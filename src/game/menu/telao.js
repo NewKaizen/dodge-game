@@ -31,7 +31,7 @@ import { fatores } from '../acessibilidade.js'
 const MAX_BALAS = 80
 const ONDA_BATIDAS = 8
 const MOLDURA = { x: -16, y: -14 } // canto da moldura em relação à TELA (bate com telao.py)
-const LED = { x: 315, y: 219 } // posição do LED dentro da moldura
+const LED = { x: 415, y: 223 } // posição do LED dentro da moldura
 const MARGEM = 6 // quanto a bala pode passar da borda (escondida pelo bisel) antes de sumir
 const VEL_ALMA = 105
 const P = {

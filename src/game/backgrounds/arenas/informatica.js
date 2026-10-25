@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { LARGURA, ALTURA } from '../../constants.js'
+import { LARGURA, ALTURA, CENTRO_X } from '../../constants.js'
 
 // SALA DE INFORMÁTICA: o laboratório da escola à noite, visto do fundo da sala.
 // Fileiras de mesas com monitores de tubo (CRT) em perspectiva, um corredor no
@@ -8,8 +8,8 @@ import { LARGURA, ALTURA } from '../../constants.js'
 // das telas batendo nas mesas. Cada tela roda um protetor de tela diferente
 // (estrelas, labirinto, logo quicando, canos, código verde subindo, prompt).
 //
-// Tudo em pixel art: a sala parada é desenhada UMA vez num canvas de 320x240
-// (um pixel da arte = 2 px do jogo), sem antialias (polígonos preenchidos
+// Tudo em pixel art: a sala parada é desenhada UMA vez num canvas de 428x240
+// (um pixel da arte = 2 px do jogo; o corredor fica no centro, em CENTRO_X), sem antialias (polígonos preenchidos
 // linha a linha), e vira a textura 'arena-informatica-sala'. Por cima, uma
 // Graphics redesenha só o que mexe (telas, LEDs, estrelas, nuvem) a ~15 FPS
 // (cara de monitor velho e quase nada de custo), e brilhos suaves (ADD) das
@@ -19,18 +19,21 @@ import { LARGURA, ALTURA } from '../../constants.js'
 // fileiras de baixo. Nada de brilho forte: telas em tons médios.
 
 const P = 2 // px do jogo por pixel da arte
-const W = LARGURA / P
+const W = Math.ceil(LARGURA / P / 2) * 2 // par: o centro cai num pixel da arte (428 = 856 px do jogo, 1 px sobra fora da tela)
 const H = ALTURA / P
-const FUGA = { x: 160, y: 96 } // ponto de fuga (altura do olho)
-const PAREDE = { x0: 64, x1: 256, y0: 18, y1: 116 } // parede do fundo
-const JANELA = { x0: 134, x1: 186, y0: 34, y1: 92 }
-const LUA = { x: 171, y: 50, r: 7 }
+const FUGA = { x: W / 2, y: 96 } // ponto de fuga (altura do olho)
+const DX = FUGA.x - 160 // a sala foi desenhada em 320 de largura: o miolo (parede do fundo, janela, quadro) desloca DX para o centro
+const OX = CENTRO_X - FUGA.x * P // onde a arte começa no jogo (-1: o corredor fica exatamente no meio)
+const PAREDE = { x0: 52 + DX, x1: 268 + DX, y0: 18, y1: 116 } // parede do fundo (um pouco mais larga que a de 320)
+const JANELA = { x0: 134 + DX, x1: 186 + DX, y0: 34, y1: 92 }
+const LUA = { x: 171 + DX, y: 50, r: 7 }
+const ciclo = (n, tipos) => Array.from({ length: n }, (_, i) => tipos[i % tipos.length])
 const QUADRO_MS = 1000 / 15 // as telas atualizam a 15 FPS
 
 // Fileiras (de trás para a frente): y do tampo da mesa (borda da frente) e os
 // protetores de tela de cada monitor, do corredor para fora
 const FILEIRAS = [
-  { y: 122, esq: ['off', 'estrelas', 'off', 'logo'], dir: ['prompt', 'off', 'estrelas', 'off'] },
+  { y: 122, esq: ciclo(12, ['off', 'estrelas', 'off', 'logo', 'canos', 'off', 'codigo']), dir: ciclo(12, ['prompt', 'off', 'estrelas', 'off', 'logo', 'off', 'canos', 'estrelas']) },
   { y: 168, esq: ['labirinto', 'estrelas', 'codigo', 'off'], dir: ['logo', 'canos', 'off', 'estrelas'] },
   { y: 236, esq: ['codigo', 'logo', 'canos'], dir: ['estrelas', 'labirinto', 'prompt'] },
 ]
@@ -206,14 +209,20 @@ function desenharSala(g, leds) {
   poligono(g, [{ x: 0, y: -40 }, { x: PAREDE.x0, y: PAREDE.y0 }, { x: PAREDE.x0, y: PAREDE.y1 }, { x: 0, y: PAREDE.y1 + 14 }], C.lateralClara)
   poligono(g, [{ x: W, y: -40 }, { x: PAREDE.x1, y: PAREDE.y0 }, { x: PAREDE.x1, y: PAREDE.y1 }, { x: W, y: PAREDE.y1 + 14 }], C.lateralClara)
   // ar-condicionado na lateral esquerda e porta + SAÍDA na direita
+  g.save()
+  g.translate(24, 0)
   poligono(g, [{ x: 16, y: 38 }, { x: 46, y: 41 }, { x: 46, y: 50 }, { x: 16, y: 50 }], C.ar)
   linha(g, 18, 47, 44, 48, '#1c2636')
   ret(g, 42, 43, 2, 1, '#3cff7a')
+  g.restore()
+  g.save()
+  g.translate(W - 320 - 14, 0) // porta e SAÍDA ficam a mesma distância da borda direita
   poligono(g, [{ x: 280, y: 50 }, { x: 300, y: 47 }, { x: 300, y: 124 }, { x: 280, y: 121 }], '#0a1424')
   poligono(g, [{ x: 282, y: 52 }, { x: 298, y: 50 }, { x: 298, y: 122 }, { x: 282, y: 119 }], '#14223a')
   ret(g, 284, 88, 2, 3, '#56708f')
   ret(g, 279, 37, 23, 9, '#0c2a18')
   escrever(g, 'SAIDA', 280, 39, C.saida)
+  g.restore()
 
   // parede do fundo: degradê em faixas + rodapé
   for (let y = PAREDE.y0; y < PAREDE.y1; y++) {
@@ -221,6 +230,8 @@ function desenharSala(g, leds) {
     ret(g, PAREDE.x0, y, PAREDE.x1 - PAREDE.x0, 1, k < 0.5 ? C.paredeAlto : C.paredeBaixo)
   }
   ret(g, PAREDE.x0, PAREDE.y1 - 3, PAREDE.x1 - PAREDE.x0, 3, C.rodape)
+  g.save()
+  g.translate(DX, 0)
   // quadro branco à esquerda (com rabiscos) e relógio à direita da janela
   ret(g, 76, 38, 52, 34, C.quadroBorda)
   ret(g, 77, 39, 50, 32, '#8e9aa8')
@@ -238,6 +249,7 @@ function desenharSala(g, leds) {
   ret(g, 239, 45, 10, 6, '#e8c890')
   ret(g, 240, 53, 8, 1, '#5a2a18')
   ret(g, 240, 56, 6, 1, '#5a2a18')
+  g.restore()
 
   // janela: céu em faixas, estrelas fixas, lua, cidade e moldura
   const jw = JANELA.x1 - JANELA.x0
@@ -267,10 +279,10 @@ function desenharSala(g, leds) {
   ret(g, LUA.x - 1, LUA.y + 4, 1, 1, C.luaCratera)
   // cidade lá fora: prédios em duas camadas, janelinhas acesas
   const predios = [[134, 80], [140, 74], [147, 78], [152, 70], [158, 76], [165, 72], [171, 79], [177, 68], [182, 75]]
-  predios.forEach(([x, topo]) => ret(g, x, topo + 4, 7, JANELA.y1 - topo - 4, C.cidade2))
+  predios.forEach(([x, topo]) => ret(g, x + DX, topo + 4, 7, JANELA.y1 - topo - 4, C.cidade2))
   const perto = [[134, 84], [143, 82], [151, 86], [160, 81], [168, 85], [176, 83], [183, 86]]
-  perto.forEach(([x, topo]) => ret(g, x, topo, 9, JANELA.y1 - topo, C.cidade))
-  for (const [x, y] of [[142, 80], [155, 75], [156, 79], [179, 72], [184, 79], [167, 76], [145, 86], [162, 84]]) ret(g, x, y, 1, 1, C.janelinha)
+  perto.forEach(([x, topo]) => ret(g, x + DX, topo, 9, JANELA.y1 - topo, C.cidade))
+  for (const [x, y] of [[142, 80], [155, 75], [156, 79], [179, 72], [184, 79], [167, 76], [145, 86], [162, 84]]) ret(g, x + DX, y, 1, 1, C.janelinha)
   // moldura: borda, cruzeta, peitoril com um cacto
   ret(g, JANELA.x0 - 2, JANELA.y0 - 2, jw + 4, 2, C.molduraClara)
   ret(g, JANELA.x0 - 2, JANELA.y0, 2, jh, C.moldura)
@@ -279,9 +291,9 @@ function desenharSala(g, leds) {
   ret(g, JANELA.x0, JANELA.y0 + 30, jw, 2, C.moldura)
   ret(g, JANELA.x0 - 4, JANELA.y1, jw + 8, 2, C.molduraClara)
   ret(g, JANELA.x0 - 3, JANELA.y1 + 2, jw + 6, 1, '#24324a')
-  ret(g, 140, JANELA.y1 - 4, 4, 4, '#7a4a30')
-  ret(g, 141, JANELA.y1 - 9, 2, 5, '#2f6a3e')
-  ret(g, 140, JANELA.y1 - 7, 1, 2, '#2f6a3e')
+  ret(g, 140 + DX, JANELA.y1 - 4, 4, 4, '#7a4a30')
+  ret(g, 141 + DX, JANELA.y1 - 9, 2, 5, '#2f6a3e')
+  ret(g, 140 + DX, JANELA.y1 - 7, 1, 2, '#2f6a3e')
   // persiana meio abaixada (lâminas)
   for (let y = JANELA.y0; y < JANELA.y0 + 9; y += 2) ret(g, JANELA.x0, y, jw, 1, '#3e5272')
   ret(g, JANELA.x0, JANELA.y0 + 9, jw, 1, '#56708f')
@@ -295,7 +307,7 @@ function desenharSala(g, leds) {
     ret(g, 0, Math.round(y), W, 1, C.pisoLinha)
     par = !par
   }
-  for (let k = -12; k <= 12; k++) linha(g, FUGA.x + k * 9, topoPiso, FUGA.x + k * 52, H, C.pisoLinha)
+  for (let k = -14; k <= 14; k++) linha(g, FUGA.x + k * 9, topoPiso, FUGA.x + k * 52, H, C.pisoLinha)
   // as laterais cobrem o piso fora da parede do fundo
   poligono(g, [{ x: 0, y: PAREDE.y1 + 14 }, { x: PAREDE.x0, y: PAREDE.y1 }, { x: 0, y: PAREDE.y1 }], C.lateralClara)
   poligono(g, [{ x: W, y: PAREDE.y1 + 14 }, { x: PAREDE.x1, y: PAREDE.y1 }, { x: W, y: PAREDE.y1 }], C.lateralClara)
@@ -303,19 +315,22 @@ function desenharSala(g, leds) {
   linha(g, W, PAREDE.y1 + 14, PAREDE.x1, PAREDE.y1, C.rodape)
 
   // luar entrando pela janela e caindo no corredor (bem fraquinho)
-  poligono(g, [{ x: JANELA.x0, y: JANELA.y1 + 3 }, { x: JANELA.x1, y: JANELA.y1 + 3 }, { x: 214, y: 150 }, { x: 118, y: 150 }], '#101e32')
+  poligono(g, [{ x: JANELA.x0, y: JANELA.y1 + 3 }, { x: JANELA.x1, y: JANELA.y1 + 3 }, { x: 214 + DX, y: 150 }, { x: 118 + DX, y: 150 }], '#101e32')
 
   // fileiras de mesas (de trás para a frente: as da frente cobrem as de trás)
   const monitores = []
   FILEIRAS.forEach((f, i) => {
     // cabos atravessando o chão logo atrás da fileira da frente
     if (i === 2) {
+      g.save()
+      g.translate(DX, 0)
       curva(g, { x: 40, y: 192 }, { x: 110, y: 214 }, { x: 150, y: 200 }, C.cabo, 2)
       curva(g, { x: 150, y: 200 }, { x: 175, y: 192 }, { x: 214, y: 198 }, C.cabo, 2)
       curva(g, { x: 190, y: 186 }, { x: 240, y: 206 }, { x: 300, y: 194 }, C.caboAzul, 1)
       curva(g, { x: 92, y: 188 }, { x: 128, y: 196 }, { x: 140, y: 214 }, C.caboAzul, 1)
       ret(g, 148, 198, 4, 3, '#2a3444') // filtro de linha no meio do caminho
       ret(g, 149, 199, 1, 1, '#ff5040')
+      g.restore()
     }
     desenharFileira(g, f, monitores, leds)
   })
@@ -453,23 +468,23 @@ export default function informatica(scene, objetos) {
     return o.setDepth(-10)
   }
   const { chave, monitores, leds } = texturaSala(scene)
-  add(scene.add.image(0, 0, chave).setOrigin(0).setScale(P))
+  add(scene.add.image(OX, 0, chave).setOrigin(0).setScale(P))
 
   // luz fria das telas ligadas batendo no tampo da mesa (respira com o tubo)
   const brilho = texturaBrilho(scene)
   const ligados = monitores.filter((m) => m.tipo !== 'off')
   const luzes = ligados.map((m, i) => {
-    const img = add(scene.add.image((m.x + m.w / 2) * P, (m.y + m.h) * P, brilho))
+    const img = add(scene.add.image(OX + (m.x + m.w / 2) * P, (m.y + m.h) * P, brilho))
     img.setDisplaySize(m.w * P * 2.2, m.h * P * 1.3).setTint(LUZ[m.tipo]).setBlendMode(Phaser.BlendModes.ADD)
     return { img, base: 0.16, fase: i * 1.7 }
   })
   // luar no corredor (faixa clara bem fraca, respirando devagar)
   // a placa de SAÍDA e a lua acesas de leve
-  add(scene.add.image(290 * P, 41 * P, brilho).setDisplaySize(60 * P, 26 * P).setTint(0x3cff7a).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.14))
-  add(scene.add.image(LUA.x * P, LUA.y * P, brilho).setDisplaySize(44 * P, 44 * P).setTint(0xbcd4ff).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.12))
-  const luar = add(scene.add.image(160 * P, 128 * P, brilho).setDisplaySize(110 * P, 60 * P).setTint(0x8fb4ff).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.08))
+  add(scene.add.image(OX + (290 + W - 320 - 14) * P, 41 * P, brilho).setDisplaySize(60 * P, 26 * P).setTint(0x3cff7a).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.14))
+  add(scene.add.image(OX + LUA.x * P, LUA.y * P, brilho).setDisplaySize(44 * P, 44 * P).setTint(0xbcd4ff).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.12))
+  const luar = add(scene.add.image(OX + FUGA.x * P, 128 * P, brilho).setDisplaySize(110 * P, 60 * P).setTint(0x8fb4ff).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.08))
 
-  const g = add(scene.add.graphics())
+  const g = add(scene.add.graphics({ x: OX, y: 0 }))
   // estado de cada protetor de tela
   const telas = monitores.map((m, i) => {
     const t = m.tela
@@ -661,7 +676,7 @@ export default function informatica(scene, objetos) {
       }
       // ponteiro dos segundos do relógio da parede
       const ang = (seg / 60) * Math.PI * 2 - Math.PI / 2
-      px(221 + Math.round(Math.cos(ang) * 4), 45 + Math.round(Math.sin(ang) * 4), 1, 1, 0xd04040)
+      px(221 + DX + Math.round(Math.cos(ang) * 4), 45 + Math.round(Math.sin(ang) * 4), 1, 1, 0xd04040)
     },
   }
 }

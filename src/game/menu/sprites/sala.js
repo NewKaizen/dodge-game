@@ -6,9 +6,11 @@ const PASTA = 'assets/sprites/menu/sala'
 
 export default {
   imagens: [
-    { chave: 'menu-sala-fundo', arquivo: `${PASTA}/fundo.png` }, // o quarto na penumbra (640x480)
+    { chave: 'menu-sala-fundo', arquivo: `${PASTA}/fundo.png` }, // a sala acesa pelo abajur e pelas luzinhas (854x480)
     { chave: 'menu-sala-luz-parede', arquivo: `${PASTA}/luz-parede.png` }, // o que a luz do telão revela na parede (cinza, ADD)
     { chave: 'menu-sala-luz-chao', arquivo: `${PASTA}/luz-chao.png` }, // o cone de luz no chão (cinza, ADD)
+    { chave: 'menu-sala-luzinhas', arquivo: `${PASTA}/luzinhas.png` }, // brilho das lâmpadas do varal e do abajur (ADD, cintila)
+    { chave: 'menu-sala-frente', arquivo: `${PASTA}/frente.png` }, // primeiro plano: almofadas, controle e folhas na frente da turma
     { chave: 'menu-sala-vinheta', arquivo: `${PASTA}/vinheta.png` }, // escurece cantos, logo e opções
     { chave: 'menu-sala-poeira', arquivo: `${PASTA}/poeira.png` }, // grão de poeira 2x2
   ],

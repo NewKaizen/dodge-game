@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { LARGURA, ALTURA, FONTE } from '../../constants.js'
+import { LARGURA, LARGURA_BASE, ALTURA, FONTE } from '../../constants.js'
 import { tocar, velocidadeMusica, fitaMusica, cortarMusica, abaixarMusica, restaurarMusica, calarTransmissao } from '../../audio.js'
 import { ESCALA } from '../../arte/texturas.js'
 import { GRAVACAO } from './gravador.js'
@@ -173,7 +173,7 @@ export default class Transmissao {
       const base = { x: TV.longe.x + i * 5000, y: TV.longe.y }
       const campo = this.campos[k]
       const vw = duas ? LARGURA / 2 : LARGURA
-      // viewport em pixels reais da tela (o canvas tem 640x480 x RES.escala); o zoom também leva a escala (ver posicionar)
+      // viewport em pixels reais da tela (o canvas tem LARGURAxALTURA x RES.escala); o zoom também leva a escala (ver posicionar)
       const e = RES.escala
       const cam = cena.cameras.add(Math.round((duas ? i * vw : 0) * e), 0, Math.round(vw * e), Math.round(ALTURA * e)).setBackgroundColor(0x07070c).setVisible(false)
       this.cameras.push(cam)
@@ -311,14 +311,17 @@ export default class Transmissao {
         true,
       )
     }
-    faixa(-600, 70, 0xffffff, 0.9)
-    faixa(-520, 40, TV.ouro)
-    faixa(0, 960, this.cor)
-    faixa(0, 960, 0x000000, 0.18) // o tom escuro da faixa: o selo salta
-    faixa(-300, 18, 0xffffff, 0.35)
-    faixa(300, 18, 0xffffff, 0.35)
-    faixa(540, 50, TV.corBarra)
-    faixa(610, 26, TV.ouro)
+    // a tarja é larga o bastante para cobrir a tela inteira mesmo inclinada; as listras de acompanhamento
+    // ficam nas pontas (proporcionais à largura da tela)
+    const esc = LARGURA / LARGURA_BASE
+    faixa(-600 * esc, 70, 0xffffff, 0.9)
+    faixa(-520 * esc, 40, TV.ouro)
+    faixa(0, 960 * esc, this.cor)
+    faixa(0, 960 * esc, 0x000000, 0.18) // o tom escuro da faixa: o selo salta
+    faixa(-300 * esc, 18, 0xffffff, 0.35)
+    faixa(300 * esc, 18, 0xffffff, 0.35)
+    faixa(540 * esc, 50, TV.corBarra)
+    faixa(610 * esc, 26, TV.ouro)
     this.tarja.add(gt)
     // o selo: círculo com o coração e "INSTANT REPLAY"
     const logo = add(cena.add.container(LARGURA / 2, ALTURA / 2).setVisible(false))

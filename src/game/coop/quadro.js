@@ -1,3 +1,5 @@
+import { CENTRO_X } from '../constants.js'
+
 // O QUADRO ÚNICO do CO-OP de cartas (docs/coop-cartas.md): a caixa onde os
 // dois jogadores desviam juntos do MESMO ataque do chefe. Lógica pura (sem
 // Phaser): a CoopArena monta a Pista com isto, e scripts/balanceamento/
@@ -17,13 +19,13 @@
 //                           levava em média 23% menos acertos que na caixa de um jogador
 //                           (medirChefes.mjs); com mais 30% de densidade volta ao de antes
 export const QUADRO = {
-  x: 320,
+  x: CENTRO_X,
   y: 350,
   largura: 336,
   altura: 180,
   ritmo: { velocidade: 1, densidade: 1.3 },
-  campo: { esquerda: 92, direita: 548, topo: 252, base: 448 },
-  faixa: { esquerda: 72, direita: 568, topo: 244, base: 456 },
+  campo: { esquerda: CENTRO_X - 228, direita: CENTRO_X + 228, topo: 252, base: 448 },
+  faixa: { esquerda: CENTRO_X - 248, direita: CENTRO_X + 248, topo: 244, base: 456 },
 }
 
 // Onde cada coração aparece quando o quadro abre (os dois lado a lado, embaixo):

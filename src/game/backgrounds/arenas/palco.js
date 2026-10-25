@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { LARGURA, ALTURA } from '../../constants.js'
+import { LARGURA, ALTURA, CENTRO_X } from '../../constants.js'
 
 // PALCO: show de rock à noite, visto da plateia. De trás para a frente:
 //   1. cenário de fundo (canvas desenhado UMA vez): parede do palco com tubos de
@@ -28,7 +28,8 @@ const PONTO = 'arena-palco-ponto' // pixel branco (poeira, telinhas)
 const PESSOA = 'arena-palco-pessoa' // -0 .. -5
 const PISO_Y = 318 // começo do piso do palco
 const BEIRA_Y = 392 // beira do palco (daqui para baixo é a plateia)
-const TELAO = { x: 278, y: 70, w: 84, h: 58 }
+const TELAO = { w: 84, h: 58, x: CENTRO_X - 42, y: 70 }
+const DX = CENTRO_X - 320 // o palco (bateria, microfone) foi desenhado em 640: o miolo desloca DX para o centro
 
 const ROSA = 0xff4fa8
 const VIOLETA = 0x9a6aff
@@ -39,25 +40,32 @@ const AMBAR = 0xffc04f
 // amplitude e período da varredura, em rad / ms). Os das pontas varrem para
 // dentro; os do meio balançam pouco sobre a coluna do meio
 const REFLETORES = [
-  { x: 34, cor: AMBAR },
-  { x: 92, cor: ROSA, feixe: { base: -0.42, amp: 0.2, periodo: 9100, fase: 0.4 } },
-  { x: 150, cor: CIANO },
-  { x: 214, cor: VIOLETA, feixe: { base: -0.16, amp: 0.2, periodo: 7300, fase: 2.1 } },
-  { x: 270, cor: ROSA, feixe: { base: 0.05, amp: 0.13, periodo: 6100, fase: 1.2 } },
-  { x: 370, cor: CIANO, feixe: { base: -0.05, amp: 0.13, periodo: 6700, fase: 3.6 } },
-  { x: 426, cor: AMBAR, feixe: { base: 0.16, amp: 0.2, periodo: 7900, fase: 5.0 } },
-  { x: 490, cor: VIOLETA },
-  { x: 548, cor: ROSA, feixe: { base: 0.42, amp: 0.2, periodo: 8600, fase: 4.4 } },
-  { x: 606, cor: CIANO },
+  { x: CENTRO_X - 402, cor: AMBAR },
+  { x: CENTRO_X - 344, cor: CIANO, feixe: { base: -0.5, amp: 0.2, periodo: 8300, fase: 2.7 } },
+  { x: CENTRO_X - 286, cor: AMBAR },
+  { x: CENTRO_X - 228, cor: ROSA, feixe: { base: -0.42, amp: 0.2, periodo: 9100, fase: 0.4 } },
+  { x: CENTRO_X - 170, cor: CIANO },
+  { x: CENTRO_X - 106, cor: VIOLETA, feixe: { base: -0.16, amp: 0.2, periodo: 7300, fase: 2.1 } },
+  { x: CENTRO_X - 50, cor: ROSA, feixe: { base: 0.05, amp: 0.13, periodo: 6100, fase: 1.2 } },
+  { x: CENTRO_X + 50, cor: CIANO, feixe: { base: -0.05, amp: 0.13, periodo: 6700, fase: 3.6 } },
+  { x: CENTRO_X + 106, cor: AMBAR, feixe: { base: 0.16, amp: 0.2, periodo: 7900, fase: 5.0 } },
+  { x: CENTRO_X + 170, cor: VIOLETA },
+  { x: CENTRO_X + 228, cor: ROSA, feixe: { base: 0.42, amp: 0.2, periodo: 8600, fase: 4.4 } },
+  { x: CENTRO_X + 286, cor: CIANO },
+  { x: CENTRO_X + 344, cor: VIOLETA, feixe: { base: 0.5, amp: 0.2, periodo: 7700, fase: 1.6 } },
+  { x: CENTRO_X + 402, cor: AMBAR },
 ]
 const LENTE_Y = 57
 
 // fileiras da plateia (de trás para a frente): mais escuras e maiores na frente
 const FILEIRAS = [
-  { base: 438, escala: 0.72, cor: 0x230b28, n: 26, pulo: 3, deriva: 3 },
-  { base: 463, escala: 0.95, cor: 0x15071b, n: 19, pulo: 4, deriva: 5 },
-  { base: 497, escala: 1.28, cor: 0x070309, n: 13, pulo: 6, deriva: 8 },
+  { base: 438, escala: 0.72, cor: 0x230b28, n: 35, pulo: 3, deriva: 3 },
+  { base: 463, escala: 0.95, cor: 0x15071b, n: 25, pulo: 4, deriva: 5 },
+  { base: 497, escala: 1.28, cor: 0x070309, n: 17, pulo: 6, deriva: 8 },
 ]
+
+const NUM_RIBALTA = 13
+const xRibalta = (k) => CENTRO_X + (k - (NUM_RIBALTA - 1) / 2) * 68 // luzinhas da beira do palco, simétricas
 
 const hex = (c) => '#' + c.toString(16).padStart(6, '0')
 
@@ -107,15 +115,15 @@ export default function palco(scene, objetos) {
   }))
 
   // ribalta: luzinhas na beira do palco, brilho subindo
-  const ribalta = Array.from({ length: 9 }, (_, k) => {
-    const x = 48 + k * 68
+  const ribalta = Array.from({ length: NUM_RIBALTA }, (_, k) => {
+    const x = xRibalta(k)
     return add(scene.add.image(x, BEIRA_Y + 1, BRILHO).setTint(k % 2 ? ROSA : AMBAR).setBlendMode(Phaser.BlendModes.ADD).setScale(0.5, 0.28))
   })
 
   // fumaça rasteira no piso do palco e uma névoa alta, bem fracas
   const nevoas = [
-    ...Array.from({ length: 5 }, (_, k) => ({ y: PISO_Y + 26 + (k % 3) * 14, escala: 1.6 + (k % 2) * 0.5, v: 5 + k * 2, x: k * 150, alpha: 0.09, cor: 0xd8a8ff })),
-    ...Array.from({ length: 3 }, (_, k) => ({ y: 84 + k * 18, escala: 2.2, v: -3 - k * 2, x: k * 230, alpha: 0.05, cor: 0xff9ad0 })),
+    ...Array.from({ length: 7 }, (_, k) => ({ y: PISO_Y + 26 + (k % 3) * 14, escala: 1.6 + (k % 2) * 0.5, v: 5 + k * 2, x: k * 150, alpha: 0.09, cor: 0xd8a8ff })),
+    ...Array.from({ length: 4 }, (_, k) => ({ y: 84 + k * 18, escala: 2.2, v: -3 - k * 2, x: k * 230, alpha: 0.05, cor: 0xff9ad0 })),
   ].map((n) => ({ ...n, obj: add(scene.add.image(n.x, n.y, NEBLINA).setTint(n.cor).setAlpha(n.alpha).setScale(n.escala, n.escala * 0.6)) }))
 
   // ---------- plateia ----------
@@ -376,17 +384,19 @@ function desenharFundo(ctx) {
   for (let y = 66; y < PISO_Y - 10; y += 8) for (let x = 24 + ((y / 8) % 2) * 4; x < LARGURA; x += 8) ret(ctx, '#211029', x, y, 1, 1)
   // tubos de neon na parede (apagadinhos, só um contorno colorido)
   const neons = [
-    [96, '#5a1c48', '#8a2a6e'],
-    [176, '#2c2060', '#4a3a9a'],
-    [464, '#2c2060', '#4a3a9a'],
-    [544, '#5a1c48', '#8a2a6e'],
+    [CENTRO_X - 304, '#2c2060', '#4a3a9a'],
+    [CENTRO_X - 224, '#5a1c48', '#8a2a6e'],
+    [CENTRO_X - 144, '#2c2060', '#4a3a9a'],
+    [CENTRO_X + 144, '#2c2060', '#4a3a9a'],
+    [CENTRO_X + 224, '#5a1c48', '#8a2a6e'],
+    [CENTRO_X + 304, '#2c2060', '#4a3a9a'],
   ]
   for (const [x, escuro, claro] of neons) {
     ret(ctx, escuro, x - 1, 74, 3, 210)
     ret(ctx, claro, x, 76, 1, 206)
   }
   // céu estrelado no alto (o show é ao ar livre), atrás da bambolina
-  for (let k = 0; k < 40; k++) {
+  for (let k = 0; k < 54; k++) {
     const x = (k * 151) % LARGURA
     const y = 2 + ((k * 37) % 30)
     ret(ctx, k % 5 === 0 ? '#9a88c8' : '#4a3e6a', x, y, 1, 1)
@@ -449,23 +459,25 @@ function desenharFundo(ctx) {
 // ----- cenário da frente: equipamento, beira do palco, cortinas -----
 
 function desenharFrente(ctx) {
+  ctx.save()
+  ctx.translate(DX, 0) // bateria e microfone no centro
   desenharBateria(ctx)
-  desenharAmplificador(ctx, 66, 258)
-  desenharAmplificador(ctx, 526, 258)
-  desenharRetorno(ctx, 176, 374, 1)
-  desenharRetorno(ctx, 424, 374, -1)
   // pedestal do microfone na frente
   ret(ctx, '#2a2a36', 319, 336, 2, 52)
   ret(ctx, '#3a3a4a', 314, 388, 12, 2)
   ret(ctx, '#4a4a5c', 317, 332, 6, 5)
   ret(ctx, '#8a8aa0', 318, 332, 2, 2)
+  ctx.restore()
+  // amplificadores em pilhas de cada lado (duas por lado) e os retornos no chão
+  for (const dx of [-354, -254, 206, 306]) desenharAmplificador(ctx, CENTRO_X + dx, 258)
+  for (const [dx, lado] of [[-244, 1], [-144, 1], [104, -1], [244, -1]]) desenharRetorno(ctx, CENTRO_X + dx, 374, lado)
 
   // beira do palco com as caixinhas da ribalta
   ret(ctx, '#0e0605', 0, BEIRA_Y, LARGURA, 8)
   ret(ctx, '#5a3420', 0, BEIRA_Y, LARGURA, 1)
   ret(ctx, '#2a160c', 0, BEIRA_Y + 1, LARGURA, 1)
-  for (let k = 0; k < 9; k++) {
-    const x = 48 + k * 68
+  for (let k = 0; k < NUM_RIBALTA; k++) {
+    const x = xRibalta(k)
     ret(ctx, '#1a1a24', x - 6, BEIRA_Y - 3, 12, 5)
     ret(ctx, '#3a3a4a', x - 6, BEIRA_Y - 3, 12, 1)
     ret(ctx, k % 2 ? '#ff8ac8' : '#ffd890', x - 3, BEIRA_Y - 1, 6, 1)

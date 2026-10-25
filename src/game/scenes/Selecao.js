@@ -9,7 +9,7 @@ import { CORES, DIFICULDADES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants
 import { claraoCamera } from '../effects/flash.js'
 import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
 
-const CARTA = { largura: 142, altura: 270, y: 245, passo: 152 }
+const CARTA = { largura: 176, altura: 270, y: 245, passo: 200 } // 4 cartas largas: usam o 16:9 inteiro
 const CURSOR_MS = 300 // em rede: de quanto em quanto o host manda o cursor de novo
 
 // Tela de seleção de chefe (com a dificuldade base); depois vem a tela do nível (Dificuldade)

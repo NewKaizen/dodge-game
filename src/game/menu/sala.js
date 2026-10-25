@@ -1,10 +1,11 @@
 import Phaser from 'phaser'
 import { LARGURA } from '../constants.js'
-import { BATIDA, PES } from './layout.js'
+import { BATIDA, TURMA } from './layout.js'
+import { COSTAS, chaveCostas, criarTexturasCostas } from './costas.js'
 import { fatores } from '../acessibilidade.js'
 
-// O quarto escuro do menu: parede, chão, a luz que o telão joga no chão e as
-// silhuetas dos sete lutadores assistindo a tela (contornadas pela luz dela).
+// A sala do menu (um quarto aconchegante de noite): parede, chão, a luz que o telão joga no chão e as
+// sete lutadores sentados de costas assistindo a tela (contornados pela luz dela).
 //
 //   const sala = criarSala(cena, { tela })   tela = TELA de layout.js
 //   sala.iluminar(cor)    cor atual do telão: a luz no chão e o contorno seguem ela
@@ -12,37 +13,32 @@ import { fatores } from '../acessibilidade.js'
 //   sala.atualizar(delta)
 //
 // Profundidades 0-9:
-//   0 o quarto na penumbra · 1 luz na parede · 2 cone de luz no chão · 3 sombras
-//   das silhuetas · 4 fileira de trás · 6 fileira da frente · 7 poeira na luz · 9 vinheta
+//   0 a sala · 1 luz na parede · 1.5 luzinhas · 2 cone de luz no chão · 5 a turma
+//   (sentada de costas) · 7 poeira na luz · 8 o que fica na frente dela · 9 vinheta
 //
 // A arte (scripts/menu/sala.py) vem em camadas: o fundo é o quarto só com a luz
 // ambiente; as camadas de luz são cinza e somam por cima (ADD) pintadas com a
-// cor do telão, então os detalhes (tapete, machado, varal...) só aparecem com
-// a luz. As silhuetas são as texturas dos personagens escurecidas, cortadas em
+// cor do telão. A turma usa os sprites de costas (costas.js), cortados em
 // cabeça e corpo para a cabeça balançar sozinha, com uma cópia chapada na cor
 // da luz um pouco deslocada para cima/para o telão por trás (o contorno de luz).
 //
 // Preferências (acessibilidade.js), lidas a cada quadro: no gráfico mínimo a
-// poeira some e as silhuetas param de dançar (só a luz muda de cor); com
+// poeira some e a turma para de dançar (só a luz muda de cor); com
 // "reduzir animações" a luz quase não pulsa nem tremula.
 
 const ESCALA = 3 // a mesma dos personagens na luta
-const SILHUETA = 0x11141e // multiplica a textura: quase preto, só um fio do volume
-const TRAS = 20 // a fileira de trás pisa um pouco mais para dentro (mais perto do telão)
-const CABECA = 9 // linhas da textura (a partir do topo do desenho) que formam a cabeça
+const TOM = 0xd6c2dc // multiplica a textura: a cor do personagem na meia-luz quente da sala
 
-// quem fica onde (x = centro dos pés) e o jeito de curtir a música.
-// Fileira de trás um pouco mais perto do telão; ninguém à esquerda de x≈320
-// para não cobrir as opções.
-const ELENCO = [
-  { id: 'ralsei', x: 382, tras: true, jeito: 'balanco' },
-  { id: 'noelle', x: 470, tras: true, jeito: 'timida', virar: true },
-  { id: 'dess', x: 562, tras: true, jeito: 'roqueira' },
-  { id: 'berdly', x: 334, jeito: 'pulo' },
-  { id: 'kris', x: 426, jeito: 'cabeca' },
-  { id: 'susie', x: 516, jeito: 'headbang', virar: true },
-  { id: 'asriel', x: 604, jeito: 'saltinho' },
-]
+// quem senta onde (TURMA de layout.js, na ordem) e o jeito de curtir a música
+const JEITO = {
+  berdly: 'pulo',
+  ralsei: 'balanco',
+  kris: 'cabeca',
+  noelle: 'timida',
+  susie: 'headbang',
+  dess: 'roqueira',
+  asriel: 'saltinho',
+}
 
 // pose de cada jeito: t = fração da batida desde o pulso (0..1), n = nº da batida.
 // Devolve deslocamentos em pixels de tela, sempre em degraus de 3 (1 pixel da arte).
@@ -58,7 +54,7 @@ const JEITOS = {
 }
 
 const POEIRA = 16
-const AREA_POEIRA = { x0: 300, x1: 630, y0: 250, y1: 446 }
+const AREA_POEIRA = { x0: 420, x1: 830, y0: 270, y1: 446 }
 
 export function criarSala(cena, { tela } = {}) {
   const centroTela = tela ? tela.x + tela.largura / 2 : LARGURA * 0.7
@@ -66,9 +62,14 @@ export function criarSala(cena, { tela } = {}) {
   cena.add.image(0, 0, 'menu-sala-fundo').setOrigin(0).setDepth(0)
   const luzParede = cena.add.image(0, 0, 'menu-sala-luz-parede').setOrigin(0).setDepth(1).setBlendMode(Phaser.BlendModes.ADD)
   const luzChao = cena.add.image(0, 0, 'menu-sala-luz-chao').setOrigin(0).setDepth(2).setBlendMode(Phaser.BlendModes.ADD)
+  // lâmpadas do varal e abajur: brilho que cintila (cada uma a seu tempo)
+  const luzinhas = cena.add.image(0, 0, 'menu-sala-luzinhas').setOrigin(0).setDepth(1.5).setBlendMode(Phaser.BlendModes.ADD)
+  // o que fica na frente da turma: almofadas, controle e as folhas no canto
+  cena.add.image(0, 0, 'menu-sala-frente').setOrigin(0).setDepth(8)
   cena.add.image(0, 0, 'menu-sala-vinheta').setOrigin(0).setDepth(9)
 
-  const figuras = ELENCO.map((d) => figura(cena, d, centroTela))
+  criarTexturasCostas(cena)
+  const figuras = TURMA.map((d, i) => figura(cena, d, i, centroTela))
 
   const poeira = Array.from({ length: POEIRA }, (_, i) => {
     const img = cena.add.image(0, 0, 'menu-sala-poeira').setDepth(7).setBlendMode(Phaser.BlendModes.ADD)
@@ -116,12 +117,13 @@ export function criarSala(cena, { tela } = {}) {
     const { nivel, piscar } = fatores()
     const forca = piscar ? 0.86 + 0.22 * pulso + 0.035 * tremor : 0.9 + 0.05 * pulso
 
+    luzinhas.setAlpha(nivel === 0 ? 0.6 : 0.62 + 0.14 * Math.sin(relogio / 380) + 0.08 * Math.sin(relogio / 137 + 1.3) + 0.1 * pulso)
     luzParede.setTint(cor).setAlpha(Math.min(1, forca + 0.06 * pulso))
     luzChao.setTint(cor).setAlpha(Math.min(1, forca * 0.95))
 
     const t = nivel === 0 ? Infinity : desde / BATIDA // mínimo: ninguém dança (pose de descanso)
-    const corSilhueta = misturar(SILHUETA, cor, 0.07)
-    for (const f of figuras) posar(f, t, n, cor, corSilhueta, forca)
+    const tom = misturar(TOM, cor, 0.12)
+    for (const f of figuras) posar(f, t, n, cor, tom, forca)
 
     for (const g of poeira) {
       g.img.setVisible(nivel > 0)
@@ -137,57 +139,37 @@ export function criarSala(cena, { tela } = {}) {
   return { iluminar, batida, atualizar }
 }
 
-// Um lutador de costas: sombra no chão, contorno de luz (atrás) e a silhueta,
-// cada um cortado em corpo + cabeça.
-function figura(cena, def, centroTela) {
-  const frame = cena.textures.getFrame(def.id)
+// Um lutador sentado de costas: contorno de luz (atrás) e o corpo, cada um
+// cortado em costas + cabeça para a cabeça balançar sozinha
+function figura(cena, def, i, centroTela) {
+  const chave = chaveCostas(def.id)
+  const frame = cena.textures.getFrame(chave)
   const w = frame.width
   const h = frame.height
-  const topo = primeiraLinha(cena, def.id, w, h)
-  const corte = Math.min(h - 1, topo + CABECA)
-  const y = PES - (def.tras ? TRAS : 0)
-  const prof = def.tras ? 4 : 6
+  const corte = COSTAS[def.id].cabeca
+  const prof = 5 + (i % 2 ? 0 : 0.5) // quem está mais na frente fica por cima
   // o contorno sai para o lado do telão (e para cima): quem está à esquerda da
   // tela ganha luz na direita, e vice-versa; quem está no meio, só em cima
-  const lado = Phaser.Math.Clamp((centroTela - def.x) / 70, -1, 1)
+  const lado = Phaser.Math.Clamp((centroTela - def.x) / 90, -1, 1)
   const rim = { x: Math.round(lado * 2), y: -2 }
 
-  const peca = (ini, alt, d) =>
-    cena.add.image(def.x, y, def.id).setOrigin(0.5, 1).setScale(ESCALA).setFlipX(Boolean(def.virar)).setCrop(0, ini, w, alt).setDepth(d)
+  const peca = (ini, alt, d) => cena.add.image(def.x, def.y, chave).setOrigin(0.5, 1).setScale(ESCALA).setCrop(0, ini, w, alt).setDepth(d)
   const rimCorpo = peca(corte, h - corte, prof).setTintMode(Phaser.TintModes.FILL)
   const rimCabeca = peca(0, corte, prof).setTintMode(Phaser.TintModes.FILL)
   const corpo = peca(corte, h - corte, prof + 0.1)
   const cabeca = peca(0, corte, prof + 0.1)
-  const sombra = cena.add
-    .image(def.x, y, def.id)
-    .setOrigin(0.5, 1)
-    .setScale(ESCALA, -ESCALA * 0.42) // achatada e virada para nós (a luz vem de trás)
-    .setFlipX(Boolean(def.virar))
-    .setTint(0x000000)
-    .setTintMode(Phaser.TintModes.FILL)
-    .setDepth(3)
-  return { def, y, rim, rimCorpo, rimCabeca, corpo, cabeca, sombra, jeito: JEITOS[def.jeito] ?? JEITOS.cabeca }
+  return { def, y: def.y, rim, rimCorpo, rimCabeca, corpo, cabeca, jeito: JEITOS[JEITO[def.id]] ?? JEITOS.cabeca }
 }
 
-function posar(f, t, n, cor, corSilhueta, forca) {
+function posar(f, t, n, cor, tom, forca) {
   const pose = t <= 1 ? f.jeito(t, n) : {}
   const x = f.def.x + (pose.x ?? 0)
   const yCorpo = f.y + (pose.y ?? 0) + (pose.corpo ?? 0)
   const yCabeca = f.y + (pose.y ?? 0) + (pose.cabeca ?? 0)
-  f.corpo.setPosition(x, yCorpo).setTint(corSilhueta)
-  f.cabeca.setPosition(x, yCabeca).setTint(corSilhueta)
-  f.rimCorpo.setPosition(x + f.rim.x, yCorpo + f.rim.y).setTint(cor).setAlpha(Math.min(1, 0.8 * forca))
-  f.rimCabeca.setPosition(x + f.rim.x, yCabeca + f.rim.y).setTint(cor).setAlpha(Math.min(1, 0.9 * forca))
-  // a sombra fica no chão (quem pula se afasta dela) e some quando a luz cai
-  f.sombra.setX(x).setAlpha(0.42 * Math.min(1, forca) * brilhoDe(cor))
-}
-
-// primeira linha com desenho na textura (para saber onde a cabeça termina)
-function primeiraLinha(cena, chave, w, h) {
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) if (cena.textures.getPixelAlpha(x, y, chave) > 0) return y
-  }
-  return 0
+  f.corpo.setPosition(x, yCorpo).setTint(tom)
+  f.cabeca.setPosition(x, yCabeca).setTint(tom)
+  f.rimCorpo.setPosition(x + f.rim.x, yCorpo + f.rim.y).setTint(cor).setAlpha(Math.min(1, 0.55 * forca))
+  f.rimCabeca.setPosition(x + f.rim.x, yCabeca + f.rim.y).setTint(cor).setAlpha(Math.min(1, 0.7 * forca))
 }
 
 function soltar(g, espalhar) {
@@ -206,8 +188,4 @@ function misturar(a, b, t) {
     return Math.round(x + (y - x) * t) << s
   }
   return c(16) | c(8) | c(0)
-}
-
-function brilhoDe(cor) {
-  return Math.max((cor >> 16) & 0xff, (cor >> 8) & 0xff, cor & 0xff) / 255
 }

@@ -1,4 +1,4 @@
-import { CORES, CORACAO, FONTE, TEXTO, ACELERACAO, parteDoFator, corTexto } from '../../constants.js'
+import { CENTRO_X, CORES, CORACAO, FONTE, TEXTO, ACELERACAO, parteDoFator, corTexto } from '../../constants.js'
 import { tocar } from '../../audio.js'
 import { ESCALA } from '../../arte/texturas.js'
 import { SIMBOLOS } from '../cartas.js'
@@ -55,7 +55,7 @@ import { RedeDuelo } from './redeDuelo.js'
 export const DUELO = {
   duracaoMs: 15000, // tempo de luta (encurta com a morte súbita, até duracaoMinMs)
   duracaoMinMs: 9000,
-  caixa: { x: 320, y: 200, largura: 430, altura: 228 }, // dentro de y 74..334
+  caixa: { x: CENTRO_X, y: 200, largura: 430, altura: 228 }, // dentro de y 74..334
   borda: 4,
   invencivelMs: 700,
   fimMs: 900, // depois de um K.O. a luta ainda corre isso (dá para os dois caírem)

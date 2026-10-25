@@ -33,13 +33,14 @@ import { capturarTecla } from '../../lib/simulador.js'
 const daltonismo = Object.values(import.meta.glob('../daltonismo.js', { eager: true }))[0] ?? null
 
 const REPETIR = { espera: 320, intervalo: 55 } // segurar ←/→ numa barra
-const TITULO = { x: 18, y: 6 }
-const ABAS_UI = { y: 54, altura: 26, esquerda: 30, direita: 610, folga: 6, recuo: 22 } // recuo: lugar do coração
-const LISTA = { x: 12, y: 78, largura: 372, altura: 358 }
-const PAINEL = { x: 394, y: 78, largura: 234, altura: 358, margem: 14 }
+const TITULO = { x: 28, y: 6 }
+const ABAS_UI = { y: 54, altura: 26, esquerda: 44, direita: LARGURA - 44, folga: 6, recuo: 22 } // recuo: lugar do coração
+// lista (24..524) e painel (534..830) ocupam o 16:9 com 24 px de folga de cada lado
+const LISTA = { x: 24, y: 78, largura: 500, altura: 358 }
+const PAINEL = { x: 534, y: 78, largura: 296, altura: 358, margem: 14 }
 const LINHA = { primeira: LISTA.y + 24, passo: 33, rotuloX: 36, direita: LISTA.x + LISTA.largura - 14 }
 const RODAPE = { linha: 446, y: 463 }
-const BARRA = { largura: 100, altura: 10, segmentos: 20 }
+const BARRA = { largura: 140, altura: 10, segmentos: 28 }
 const COR = {
   borda: CORES.caixa,
   bordaApagada: 0x4a4a5c,
@@ -748,7 +749,7 @@ export default class Config extends Phaser.Scene {
   // teclas como "teclinhas" alinhadas à direita; as que não cabem viram "+N"
   desenharTeclas(l, codes, ativo) {
     const g = l.g
-    const maximo = 170
+    const maximo = 230
     const caps = []
     let total = 0
     for (const code of codes) {
