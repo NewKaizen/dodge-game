@@ -13,7 +13,8 @@ mostra reduzida para 854x480, com filtro suave). O script:
   1. apaga o que a ilustração traz pintado e o jogo desenha ao vivo: o logo,
      as opções, as dicas e o nome da música;
   2. corrige a Noelle (na ilustração ela segura as cartas E põe as mãos no
-     rosto: quatro braços); as mãos no rosto saem e o rosto é repintado;
+     rosto: quatro braços); as cartas e as mãos que as seguram saem, e as
+     mãos no rosto ganham os antebraços (cotovelos na mesa);
   3. devolve ao chapéu e à capa do Ralsei o verde do sprite dele;
   4. desenha os olhos fechados de quem pisca (Ralsei, Asriel e Berdly);
   5. separa o que fica NA FRENTE da tela do telão (o cabelo da Susie e o "!!"),
@@ -84,38 +85,31 @@ TELA = (974, 41, 1419, 317)  # a tela do telão (onde passa a luta ao vivo)
 EXCLAMACAO = (1068, 278, 1122, 352)  # o "!!" da Susie
 RAIVA = (1528, 443, 1582, 497)  # o "💢" do Berdly
 CARTA_SUPER = (952, 578, 1028, 632)  # a carta SUPER que a Susie bate na mesa
-# as mãos da Noelle no rosto (o par a mais) e o que é repintado no lugar delas:
-# pele dentro do maxilar (com blush); por fora, o cabelo comprido caindo pelos
-# lados (o da esquerda copiado do cabelo logo ao lado, o da direita espelhado
-# dele: do lado direito a cópia trazia pedaços do fundo) terminando em pontas
-# por cima do ombro e, junto do pescoço, um triângulo da gola (copiado de logo
-# abaixo), separado do cabelo por um contorno na diagonal
-MAOS_NOELLE = [
+# A Noelle: na ilustração ela põe as mãos no rosto E segura as cartas (quatro
+# braços). Ficam as mãos no rosto; as cartas e as mãos que as seguram viram a
+# frente da blusa, e dois antebraços (mangas da blusa) descem dos pulsos até os
+# cotovelos na mesa: a pose de "cotovelos na mesa, rosto nas mãos".
+MAOS_ROSTO_NOELLE = [  # as mãos no rosto (voltam por cima dos punhos, como na ilustração)
     [(1180, 455), (1192, 451), (1204, 455), (1213, 470), (1214, 488), (1208, 506), (1184, 506), (1177, 490)],
     [(1247, 455), (1261, 451), (1276, 455), (1285, 470), (1285, 506), (1251, 506), (1245, 488), (1246, 470)],
 ]
-ROSTO_NOELLE = [(1199, 446), (1199, 462), (1203, 472), (1209, 480), (1217, 486), (1230, 489), (1243, 486), (1251, 480), (1257, 472), (1261, 462), (1261, 446)]
-MAXILAR_NOELLE = ROSTO_NOELLE[2:-2]  # o contorno escuro só embaixo (perto dos olhos o cabelo cobre)
-# a gola de cada lado: o que fica do lado de dentro da linha (a, b), junto do ponto `dentro`
-GOLA_NOELLE = [
-    {'a': (1215, 484), 'b': (1196, 507), 'dentro': (1213, 505)},
-    {'a': (1245, 484), 'b': (1264, 507), 'dentro': (1247, 505)},
-]
-GOLA_DE_BAIXO = 16  # a gola é copiada de 16 px abaixo
-CABELO_DX = -26  # o cabelo da esquerda vem de 26 px para a esquerda
-ESPELHO_X = 2460  # o da direita é o da esquerda espelhado em x = 1230 (o meio do rosto)
-PONTAS_NOELLE = [  # pontas das mechas por cima do ombro (triângulos)
-    [(1179, 505), (1185, 517), (1189, 505)],
-    [(1189, 505), (1194, 514), (1198, 505)],
-    [(1281, 505), (1275, 517), (1271, 505)],
-    [(1271, 505), (1266, 514), (1262, 505)],
-]
+CARTAS_NOELLE = [(1184, 513), (1198, 505), (1262, 505), (1266, 520), (1266, 563), (1184, 563)]  # cartas + mãos de baixo
+BARRA_NOELLE = 556  # a barra da blusa (dali para baixo, a mesa)
+# o antebraço esquerdo (manga fofa: estreita no punho, larga no meio, cotovelo
+# redondo na mesa); o direito é ele espelhado no meio do corpo (x = 1230)
+ANTEBRACO_NOELLE = [(1189, 496), (1205, 496), (1209, 512), (1211, 530), (1210, 548), (1205, 558), (1196, 561), (1187, 558), (1182, 548), (1182, 530), (1184, 512)]
+SOMBRA_ANTEBRACO = [(1184, 512), (1182, 530), (1182, 548), (1187, 558), (1196, 561), (1205, 558), (1208, 551), (1194, 552), (1188, 540), (1188, 515)]
+PUNHO_NOELLE = [(1189, 496), (1205, 496), (1207, 504), (1187, 504)]
+DOBRA_ANTEBRACO = [(1187, 527), (1194, 531), (1203, 529)]
+GOLA_BAIXO_NOELLE = [(1206, 505), (1218, 509), (1230, 510), (1242, 509), (1254, 505)]  # a dobra de baixo da gola alta
+DOBRAS_BLUSA = [[(1214, 522), (1222, 528)], [(1246, 522), (1238, 528)]]
+MEIO_NOELLE = 2460  # espelho: x -> 2460 - x
 COR_NOELLE = {
-    'pele': (247, 136, 102),
-    'blush': (255, 112, 104),
-    'contorno': (74, 30, 34),
-    'cabelo': (252, 180, 70),
-    'contorno_cabelo': (62, 22, 31),
+    'blusa': (209, 230, 242),
+    'sombra': (183, 204, 229),
+    'dobra': (150, 172, 208),
+    'punho': (142, 159, 199),
+    'contorno': (26, 37, 65),
 }
 BRILHOS = [(1142, 420), (1124, 447), (1327, 413), (1322, 455), (1112, 487), (1338, 380)]  # ✦ em volta da Noelle
 # onde não procurar lâmpadas (cabelo loiro e brilhos da Noelle, a tela, o logo, a mesa)
@@ -147,48 +141,51 @@ def dilatar(m, px):
 
 
 def corrigir_noelle(img):
-    """Tira as mãos do rosto da Noelle e repinta o lugar delas (pixel art, sem borrão)."""
+    """Tira as cartas e o par de mãos que as segura; no lugar, a blusa e os
+    antebraços das mãos que estão no rosto (pixel art, cores da blusa dela)."""
     from PIL import ImageDraw
 
-    def poligono(pts):
-        im = Image.new('1', (L, A), 0)
-        ImageDraw.Draw(im).polygon(pts, fill=1)
-        return np.asarray(im, bool)
-
-    ys, xs = np.mgrid[0:A, 0:L]
-    rosto = poligono(ROSTO_NOELLE + [(1261, 436), (1199, 436)])
-    maos = np.zeros((A, L), bool)
-    gola = np.zeros((A, L), bool)
-    for contorno, g in zip(MAOS_NOELLE, GOLA_NOELLE):  # cada gola só dentro da sua mão
-        mao = poligono(contorno)
-        (ax, ay), (bx, by), (dx, dy) = g['a'], g['b'], g['dentro']
-        lado = lambda x, y: np.sign((bx - ax) * (y - ay) - (by - ay) * (x - ax))
-        maos |= mao
-        gola |= mao & (lado(xs, ys) == lado(dx, dy))
-    original = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    arr = original.copy()
+    espelho = lambda pts: [(MEIO_NOELLE - x, y) for x, y in pts]
+    original = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    orig = np.asarray(original)
     c = COR_NOELLE
-    cabelo = maos & ~rosto & ~gola
-    esquerda = cabelo & (xs < 1230)
-    yy, xx = np.nonzero(esquerda)
-    arr[yy, xx] = original[yy, xx + CABELO_DX]
-    yy, xx = np.nonzero(cabelo & (xs >= 1230))
-    arr[yy, xx] = arr[yy, ESPELHO_X - xx]  # espelho do lado esquerdo (já repintado)
-    yy, xx = np.nonzero(maos & ~rosto & gola)
-    arr[yy, xx] = original[yy + GOLA_DE_BAIXO, xx]
-    pele = maos & rosto
-    arr[pele] = c['pele']
-    for cx in (1206, 1254):  # blush
-        arr[pele & (((xs - cx) / 7) ** 2 + ((ys - 466) / 4) ** 2 <= 1)] = c['blush']
+    # a frente da blusa: degradê suave de cima (clara) para baixo (sombra)
+    frente = Image.new('1', (L, A), 0)
+    ImageDraw.Draw(frente).polygon(CARTAS_NOELLE, fill=1)
+    f = np.asarray(frente, bool)
+    arr = orig.copy()
+    ys = np.arange(A)[:, None]
+    t = np.clip((ys - 505) / (BARRA_NOELLE - 505), 0, 1)
+    degrade = (np.array(c['blusa']) * (1 - t[..., None]) + np.array(c['sombra']) * t[..., None]).astype(np.uint8)
+    arr[f] = np.broadcast_to(degrade, (A, L, 3))[f]
+    # da barra para baixo volta a mesa (copiada de logo abaixo)
+    arr[BARRA_NOELLE + 1:564, 1184:1267] = orig[BARRA_NOELLE + 9:572, 1184:1267]
     out = Image.fromarray(arr)
     d = ImageDraw.Draw(out)
-    for ponta in PONTAS_NOELLE:
-        d.polygon(ponta, fill=c['cabelo'])
-        d.line(ponta, fill=c['contorno_cabelo'], width=2)
-    for g in GOLA_NOELLE:  # a mecha caindo por cima do ombro
-        d.line([g['a'], g['b']], fill=c['contorno_cabelo'], width=2)
-    d.line(MAXILAR_NOELLE, fill=c['contorno'], width=2)
-    return cv2.cvtColor(np.asarray(out), cv2.COLOR_RGB2BGR)
+    d.line([(1184, BARRA_NOELLE), (1266, BARRA_NOELLE)], fill=c['contorno'], width=2)
+    d.line(GOLA_BAIXO_NOELLE, fill=c['dobra'], width=2)
+    for dobra in DOBRAS_BLUSA:
+        d.line(dobra, fill=c['dobra'], width=1)
+    # os antebraços (o esquerdo e o direito, espelhado)
+    for lado in (lambda p: p, espelho):
+        d.polygon(lado(ANTEBRACO_NOELLE), fill=c['blusa'])
+        d.polygon(lado(SOMBRA_ANTEBRACO), fill=c['sombra'])
+        d.line(lado(DOBRA_ANTEBRACO), fill=c['dobra'], width=1)
+        d.line(lado(ANTEBRACO_NOELLE) + [lado(ANTEBRACO_NOELLE)[0]], fill=c['contorno'], width=2)
+        d.polygon(lado(PUNHO_NOELLE), fill=c['punho'])
+        for x in range(1191, 1205, 3):  # o canelado do punho
+            d.line(lado([(x, 498), (x, 502)]), fill=c['dobra'], width=1)
+        d.line(lado(PUNHO_NOELLE) + [lado(PUNHO_NOELLE)[0]], fill=c['contorno'], width=2)
+    # as mãos no rosto por cima dos punhos, como na ilustração
+    maos = Image.new('1', (L, A), 0)
+    for mao in MAOS_ROSTO_NOELLE:
+        ImageDraw.Draw(maos).polygon(mao, fill=1)
+    m = np.asarray(maos, bool)
+    pele = m & (np.abs(orig.astype(int) - np.array([247, 140, 105])).sum(axis=2) < 120)  # a pele e o contorno da mão
+    pele |= m & (orig.sum(axis=2) < 200)
+    arr = np.asarray(out).copy()
+    arr[pele] = orig[pele]
+    return cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
 
 
 def mascara_interface(img):
