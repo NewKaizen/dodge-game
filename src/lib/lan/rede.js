@@ -1,6 +1,7 @@
 import { writable, get } from 'svelte/store'
 import { jogo } from '../estado.js'
 import { tokenConta, aoMudarConta } from '../conta.js'
+import { codigoDaBusca, limparSalaDaUrl } from '../salaLink.js'
 
 // Conexão do modo LAN/ONLINE com o servidor (server/lan.js, docs/lan.md,
 // docs/online.md) e o estado do lobby, lido pela cena Lan (Phaser) e pelos
@@ -14,10 +15,18 @@ import { tokenConta, aoMudarConta } from '../conta.js'
 //   enviarAoParceiro(dados) · aoParceiro(fn)   mensagens para o outro PC da sala
 //   enviarQuadro(blob) · aoQuadro(fn)          transmissão reserva (JPEG pelo servidor)
 //
+// Amigos (lib/amigos.js): logado, a conexão com o servidor de casa fica aberta
+// mesmo fora da tela ONLINE (manterLobby) para a presença e os convites
+// chegarem. aoServidor(fn) entrega a amigos.js as mensagens dele; enviarLobby
+// manda as ações dele (convidar, responderConvite, amigosMudaram).
+//
+// Link de convite (?sala=CODIGO, lib/salaLink.js): salaDoLink() diz se há uma
+// sala esperando; ao conectar, o lobby entra nela sozinho.
+//
 // Conta (lib/conta.js): logado, o "ola" leva o JWT e o servidor responde com o
 // resumo do perfil (eu.conta). O token só vai para o servidor que serviu a
 // página (casa), nunca para o de outro PC da LAN.
-export const PROTOCOLO = 2
+export const PROTOCOLO = 3
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
@@ -57,6 +66,10 @@ let pingEnviado = new Map()
 let numPing = 0
 let numJogadoresAntes = null
 let aoListar = null // conectarIp esperando a primeira lista
+let manter = false // logado: não fecha a conexão ao sair da tela ONLINE
+let telaAberta = false // a tela ONLINE (cena Lan) está aberta: só então lista as salas
+let salaPendente = typeof location === 'undefined' ? '' : codigoDaBusca(location.search) // do link ?sala=
+const ouvintesServidor = new Set()
 const ouvintesParceiro = new Set()
 const ouvintesQuadro = new Set()
 
@@ -66,6 +79,14 @@ export const souHost = () => estado().fase === 'sala' && estado().papel === 'hos
 export const souConvidado = () => estado().fase === 'sala' && estado().papel === 'convidado'
 export const emPartida = () => estado().fase === 'sala' && Boolean(estado().sala?.emPartida)
 export const souOnline = () => estado().online
+export const salaDoLink = () => salaPendente
+
+// mensagens do servidor que são do amigos.js (t: 'presenca', 'convite'...); '_fechou' = a conexão caiu
+export function aoServidor(fn) {
+  ouvintesServidor.add(fn)
+  return () => ouvintesServidor.delete(fn)
+}
+export const enviarLobby = (msg) => enviar(msg)
 // partida ONLINE rolando (sem pausa, sem revanche: game/online.js)
 export const partidaOnline = () => estado().online && emPartida()
 export const parceiro = () => estado().sala?.membros.find((m) => m.id !== estado().eu.id) ?? null
@@ -126,6 +147,7 @@ function conectar(url) {
           ice: Array.isArray(m.ice) ? m.ice : [],
         }))
         comecarTimers()
+        entrarNaSalaDoLink()
         resolve(true)
         return
       }
@@ -141,6 +163,7 @@ function conectar(url) {
       if (ws !== socket) return
       ws = null
       pararTimers()
+      ouvintesServidor.forEach((fn) => fn({ t: '_fechou' }))
       const s = estado()
       if (!aberto) {
         const semCasa = s.online ? 'sem conexão com o servidor: tentando de novo…' : 'servidor LAN não encontrado: rode "npm run lan" neste PC'
@@ -165,11 +188,12 @@ function fecharConexao() {
   ws = null
   velho.onclose = null
   velho.close()
+  ouvintesServidor.forEach((fn) => fn({ t: '_fechou' }))
 }
 
 function comecarTimers() {
   pararTimers()
-  const listar = () => estado().fase === 'navegando' && enviar({ t: 'listar' })
+  const listar = () => telaAberta && estado().fase === 'navegando' && enviar({ t: 'listar' })
   listar()
   timerListar = setInterval(listar, LISTAR_MS)
   timerPing = setInterval(() => {
@@ -249,7 +273,18 @@ function receber(m) {
     case 'de':
       ouvintesParceiro.forEach((fn) => fn(m.dados, m.de))
       break
+    default:
+      ouvintesServidor.forEach((fn) => fn(m))
   }
+}
+
+// abriu o jogo por um link ?sala=CODIGO: entra na sala assim que o lobby deixar
+function entrarNaSalaDoLink() {
+  if (!salaPendente || estado().fase !== 'navegando' || ws?.readyState !== WebSocket.OPEN) return
+  const codigo = salaPendente
+  salaPendente = ''
+  limparSalaDaUrl()
+  enviar({ t: 'entrar', codigo })
 }
 
 function sairDaSalaLocal(motivo) {
@@ -283,18 +318,41 @@ function restaurarJogadores() {
 // ---------- API ----------
 
 export function abrirLobby() {
-  if (estado().fase !== 'fora') return
+  telaAberta = true
+  if (estado().fase !== 'fora') return entrarNaSalaDoLink()
   casa = enderecoCasa()
   mudar({ ...INICIAL, eu: { ...estado().eu, id: null } })
   conectar(casa)
 }
 
 export function fecharLobby() {
+  telaAberta = false
   if (estado().fase === 'fora') return
   enviar({ t: 'sair' })
+  // logado: a conexão com o servidor de casa continua (presença e convites)
+  if (manter && estado().servidor === casa && ws) {
+    restaurarJogadores()
+    return mudar({ fase: 'navegando', sala: null, papel: null, salas: [], chat: [], ping: null, erro: '' })
+  }
   fecharConexao()
   restaurarJogadores()
   mudar({ ...INICIAL, eu: { ...estado().eu, id: null } })
+  if (manter) manterLobby(true) // estava no servidor de outro PC: volta para o de casa
+}
+
+// amigos.js: logado, mantém (e abre, se preciso) a conexão com o servidor de casa
+export function manterLobby(valor) {
+  manter = Boolean(valor)
+  if (manter) {
+    if (estado().fase === 'fora') {
+      casa = enderecoCasa()
+      mudar({ ...INICIAL, eu: { ...estado().eu, id: null } })
+      conectar(casa)
+    }
+  } else if (!telaAberta && estado().fase === 'navegando') {
+    fecharConexao()
+    mudar({ ...INICIAL, eu: { ...estado().eu, id: null } })
+  }
 }
 
 export function criarSala() {
