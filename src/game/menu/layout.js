@@ -1,8 +1,9 @@
 // Onde cada peça do menu inicial fica (coordenadas do jogo, 854x480) e o pulso
 // da música. Menu.js monta as peças: sala.js (o quarto), telao.js (o caos na
 // tela da parede) e logo.js (o título); a lista de opções é do próprio Menu.
-// O menu alternativo (MESA DE CARTAS, mesa.js) troca a sala e o telão pela
-// ilustração da turma jogando cartas: o logo e as opções caem no lugar delas lá.
+// A MESA DE CARTAS (mesa.js, o menu padrão; a SALA DE TV é a outra opção) troca a
+// sala e o telão pela ilustração da turma jogando cartas: o logo e as opções caem
+// no lugar delas lá.
 //
 // Profundidades: sala 0-9 · telão 10-19 · logo 20-29 · opções e avisos 30+
 export const BATIDA = 468 // ms (~128 bpm)

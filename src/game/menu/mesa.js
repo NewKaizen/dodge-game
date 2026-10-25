@@ -3,42 +3,38 @@ import { LARGURA, ALTURA } from '../constants.js'
 import { RES } from '../resolucao.js'
 import { fatores } from '../acessibilidade.js'
 import { tremerCamera } from '../effects/shake.js'
-import { BATIDA } from './layout.js'
-import { jeitos } from './sala.js'
 import { criarTelao } from './telao.js'
 import { DADOS_MESA as D } from './sprites/mesa.js'
 
-// A MESA DE CARTAS: o menu inicial alternativo (Config > Gráficos > MENU
-// INICIAL). A turma jogando cartas na sala, com o telão ao fundo passando a
-// mesma luta do outro menu. Mesmo papel da sala.js (e o telão vem junto):
+// A MESA DE CARTAS: o menu inicial (Config > Gráficos > MENU INICIAL; a SALA DE
+// TV é a outra opção). A turma jogando cartas na sala, com o telão ao fundo
+// passando a mesma luta do outro menu. Mesmo papel da sala.js (e o telão vem junto):
 //
 //   const mesa = criarMesa(cena)
 //   mesa.telao             o telão (ligar, batida, cor, atualizar; explodir é o da mesa)
 //   mesa.iluminar(cor)     cor do telão: o brilho dele na sala segue ela
-//   mesa.batida(n)         pulso da música: as cabeças balançam, o "!!" e o 💢 pulsam
+//   mesa.batida(n)         pulso da música: o "!!" e o 💢 brilham, as luzes pulsam
 //   mesa.atualizar(delta)
 //
-// A arte (scripts/menu/mesa.py) é a ilustração já na grade de pixel art do
-// jogo: o fundo sem as cabeças e cada cabeça numa camada por cima, no lugar.
-// A cabeça só DESCE no balanço (para cima ou para o lado apareceria o que foi
-// preenchido atrás dela), em degraus de 1 pixel da arte.
+// A arte (scripts/menu/mesa.py) é a ilustração na resolução dela (1672x941),
+// mostrada reduzida para 854x480 com filtro suave. Ninguém se mexe: quem tem
+// os olhos à mostra (Ralsei, Asriel, Berdly) pisca de vez em quando, e as
+// luzes, os ✦ e a carta SUPER cintilam.
 //
 // O telão: a luta roda fora da tela (à direita do mundo, onde a câmera não
 // olha) num tamanho com a proporção da tela da ilustração, e a cada quadro é
 // fotografada numa textura dinâmica (na resolução real da tela) que aparece
-// no lugar da tela, por baixo das cabeças (o cabelo da Susie fica na frente).
+// no lugar da tela. O cabelo da Susie e o "!!" ficam por cima (frente.png).
 //
-// Profundidades 0-9: 0 a sala · 1 a tela do telão · 2 luzes e brilho do telão
-// · 3 as cabeças (olhos, 💢, "!!" e ✦ logo acima) · 6 vinheta.
+// Profundidades 0-9: 0 a sala · 1 a tela do telão · 1.5 o que fica na frente
+// dela · 2 luzes e brilho do telão · 3 olhos fechados, 💢, ✦ · 6 vinheta.
 //
-// Preferências (acessibilidade.js): no gráfico mínimo ninguém balança e as luzes
-// param; com "reduzir animações" as luzes quase não tremulam.
+// Preferências (acessibilidade.js): no gráfico mínimo as luzes param e ninguém
+// pisca; com "reduzir animações" as luzes quase não tremulam.
 
-const P = 2 // 1 pixel da arte, em px de jogo
-const JEITOS = jeitos(P)
 const FORA = { x: LARGURA + 400, y: 40 } // onde a luta do telão roda (fora da tela)
 const ALTURA_TELAO = 190 // altura da luta (a largura sai da proporção da tela da ilustração)
-const PISCAR = { min: 2200, max: 5600, dura: 130 }
+const PISCAR = { min: 2400, max: 6000, dura: 140, dupla: 0.25 } // dupla: chance de piscar duas vezes seguidas
 const COR_LUZ = 0xffb45a
 
 let geracao = 0 // chave única da textura da tela (a cena é recriada a cada volta ao menu)
@@ -47,8 +43,14 @@ const sorte = Phaser.Math.FloatBetween
 
 export function criarMesa(cena) {
   const T = D.tela
+  const E = D.arte.escala
+  // a ilustração é grande (reduzida no jogo): filtro suave, não o de pixel art
+  for (const { chave } of [{ chave: 'menu-mesa-fundo' }, D.frente, D.raiva, D.exclamacao, ...D.olhos]) {
+    cena.textures.get(chave).setFilter(Phaser.Textures.FilterMode.LINEAR)
+  }
+  const pedaco = (p, prof) => cena.add.image(p.x * E, p.y * E, p.chave).setOrigin(0).setScale(E).setDepth(prof)
 
-  cena.add.image(0, 0, 'menu-mesa-fundo').setOrigin(0).setDepth(0)
+  cena.add.image(0, 0, 'menu-mesa-fundo').setOrigin(0).setScale(E).setDepth(0)
 
   // ---------- o telão (fora da tela) e a foto dele no lugar da tela ----------
   const nativa = { x: FORA.x, y: FORA.y, altura: ALTURA_TELAO, largura: Math.round((ALTURA_TELAO * T.largura) / T.altura) }
@@ -76,6 +78,8 @@ export function criarMesa(cena) {
   }
   cena.events.once('shutdown', () => foto && cena.textures.remove(chave))
 
+  pedaco(D.frente, 1.5) // o cabelo da Susie e o "!!", na frente da tela
+
   // o brilho do telão na sala (na cor dele)
   const brilhoTela = cena.add
     .image(T.x + T.largura / 2, T.y + T.altura / 2, 'menu-telao-brilho')
@@ -91,29 +95,19 @@ export function criarMesa(cena) {
       .setDepth(2)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setTint(COR_LUZ)
-      .setDisplaySize(10 + 5 * l.tamanho, 10 + 5 * l.tamanho),
+      .setDisplaySize(10 + 6 * l.tamanho, 10 + 6 * l.tamanho),
     fase: sorte(0, 20),
     ritmo: sorte(0.6, 1.4),
   }))
   const carta = cena.add.image(D.cartaSuper.x, D.cartaSuper.y, 'brilho').setDepth(2).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffd24a).setDisplaySize(84, 60)
 
-  // ---------- a turma ----------
-  const cabecas = D.cabecas.map((c) => {
-    const cab = { def: c, img: cena.add.image(c.x, c.y, c.chave).setOrigin(0).setDepth(3), jeito: JEITOS[c.jeito] ?? JEITOS.cabeca, desce: 0 }
-    if (c.olhos) {
-      cab.olhos = cena.add.image(c.x + c.olhos.dx, c.y + c.olhos.dy, c.olhos.chave).setOrigin(0).setDepth(3.1).setVisible(false)
-      cab.piscaEm = sorte(PISCAR.min, PISCAR.max)
-    }
-    if (c.raiva) {
-      const r = c.raiva
-      cab.raiva = cena.add.image(c.x + r.dx + r.largura / 2, c.y + r.dy + r.altura / 2, r.chave).setDepth(3.2)
-    }
-    return cab
-  })
-  const E = D.exclamacao
-  const exclamacao = cena.add.image(E.x + E.largura / 2, E.y + E.altura, E.chave).setOrigin(0.5, 1).setDepth(3.3)
+  // ---------- a turma: olhos fechados (piscar) e o que brilha na batida ----------
+  const olhos = D.olhos.map((o) => ({ img: pedaco(o, 3).setVisible(false), piscaEm: sorte(500, PISCAR.max), segunda: false }))
+  // cópias somadas (ADD) por cima: brilham sem mudar de tamanho (nada de imagem dobrada)
+  const raiva = pedaco(D.raiva, 3).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
+  const exclamacao = pedaco(D.exclamacao, 3).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
   const brilhos = D.brilhos.map((b, i) => ({
-    img: cena.add.image(b.x, b.y, 'estrela').setDepth(3.4).setBlendMode(Phaser.BlendModes.ADD).setTint(0xfff1b0).setScale(0.4),
+    img: cena.add.image(b.x, b.y, 'estrela').setDepth(3).setBlendMode(Phaser.BlendModes.ADD).setTint(0xfff1b0).setScale(0.4),
     fase: i * 1.9,
   }))
 
@@ -122,8 +116,6 @@ export function criarMesa(cena) {
   // ---------- estado ----------
   let cor = 0xffffff
   let pulso = 0
-  let n = 0
-  let desde = Infinity // ms desde a última batida (antes da música: parados)
   let relogio = 0
 
   function iluminar(c) {
@@ -131,43 +123,37 @@ export function criarMesa(cena) {
   }
 
   function batida(num) {
-    n = num
-    desde = 0
     pulso = num % 4 === 1 ? 1 : 0.6
+  }
+
+  function piscar(o, dt, vivo) {
+    o.piscaEm -= dt
+    if (o.piscaEm <= -PISCAR.dura) {
+      // às vezes pisca duas vezes seguidas
+      o.segunda = !o.segunda && Math.random() < PISCAR.dupla
+      o.piscaEm = o.segunda ? sorte(110, 170) : sorte(PISCAR.min, PISCAR.max)
+    }
+    o.img.setVisible(vivo && o.piscaEm <= 0)
   }
 
   function atualizar(delta) {
     const dt = Math.min(delta, 100)
     relogio += dt
-    desde += dt
     pulso *= Math.exp(-dt / 170)
-    const { nivel, piscar } = fatores()
+    const { nivel, piscar: tremular } = fatores()
     const vivo = nivel > 0
 
     fotografar()
     brilhoTela.setTint(cor).setAlpha(0.16 + 0.14 * pulso)
 
     for (const l of luzes) {
-      const tremula = vivo ? (piscar ? 0.18 : 0.06) * Math.sin((relogio / 260) * l.ritmo + l.fase) + (piscar ? 0.06 * Math.sin(relogio / 71 + l.fase * 3) : 0) : 0
-      l.img.setAlpha(0.42 + tremula + 0.08 * pulso)
+      const onda = vivo ? (tremular ? 0.18 : 0.06) * Math.sin((relogio / 260) * l.ritmo + l.fase) + (tremular ? 0.06 * Math.sin(relogio / 71 + l.fase * 3) : 0) : 0
+      l.img.setAlpha(0.42 + onda + 0.08 * pulso)
     }
-    carta.setAlpha(0.22 + 0.1 * Math.sin(relogio / 400) + 0.25 * pulso)
-
-    // cabeças: balançam no compasso (só para baixo)
-    const t = vivo ? desde / BATIDA : Infinity
-    for (const cab of cabecas) {
-      const pose = t <= 1 ? cab.jeito(t, n) : {}
-      const desce = pose.cabeca || (pose.y ? P : 0)
-      const { x, y } = cab.def
-      cab.img.setY(y + desce)
-      if (cab.raiva) cab.raiva.setY(y + cab.def.raiva.dy + cab.def.raiva.altura / 2 + desce).setScale(1 + 0.35 * pulso)
-      if (cab.olhos) {
-        cab.piscaEm -= dt
-        if (cab.piscaEm <= -PISCAR.dura) cab.piscaEm = sorte(PISCAR.min, PISCAR.max)
-        cab.olhos.setPosition(x + cab.def.olhos.dx, y + cab.def.olhos.dy + desce).setVisible(cab.piscaEm <= 0)
-      }
-    }
-    exclamacao.setScale(1 + 0.25 * pulso).setAlpha(0.75 + 0.25 * pulso)
+    carta.setAlpha(0.22 + (vivo ? 0.1 * Math.sin(relogio / 400) : 0) + 0.25 * pulso)
+    for (const o of olhos) piscar(o, dt, vivo)
+    raiva.setAlpha(0.55 * pulso)
+    exclamacao.setAlpha(0.6 * pulso)
     for (const b of brilhos) {
       const s = vivo ? Math.max(0, Math.sin(relogio / 380 + b.fase)) : 0.5
       b.img.setAlpha(s).setScale(0.25 + 0.2 * s)

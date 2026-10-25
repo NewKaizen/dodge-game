@@ -11,10 +11,10 @@ import { criarMesa } from '../menu/mesa.js'
 import { pref } from '../preferencias.js'
 import { souHost } from '../../lib/lan/rede.js'
 
-// Tela inicial: uma sala aconchegante, com o caos preso no telão da parede
-// (uma luta de balas rolando) e a luz dele iluminando a sala e a turma
-// assistindo. Ou, com MENU INICIAL = MESA DE CARTAS (Config > Gráficos), a
-// turma jogando cartas na mesa com o telão ao fundo (menu/mesa.js). Logo no canto de cima à esquerda, opções alinhadas à
+// Tela inicial: a turma jogando cartas na mesa, com o caos preso no telão ao
+// fundo (uma luta de balas rolando) (menu/mesa.js). Ou, com MENU INICIAL = SALA
+// DE TV (Config > Gráficos), uma sala aconchegante com a turma sentada no tapete
+// assistindo e a luz do telão iluminando tudo (menu/sala.js). Logo no canto de cima à esquerda, opções alinhadas à
 // esquerda. CO-OP (-> EscolhaParty) e PVP (-> PvpEscolha): a luz do telão engole
 // a sala. ONLINE (-> Lan: lobby para jogar com amigos, pela internet ou pela rede), GUIA (-> Grimorio:
 // todas as cartas com a prévia do ataque e as rodadas bônus de cada arena) e
@@ -60,7 +60,7 @@ export default class Menu extends Phaser.Scene {
     const rapido = Boolean(this.registry.get('menuVisto'))
     this.registry.set('menuVisto', true)
 
-    // o cenário: a SALA DE TV (padrão) ou a MESA DE CARTAS (Config > Gráficos > MENU INICIAL)
+    // o cenário: a MESA DE CARTAS (padrão) ou a SALA DE TV (Config > Gráficos > MENU INICIAL)
     const mesa = pref('menu') === 'mesa'
     this.pos = mesa ? OPCOES_MESA : POS_SALA
     if (mesa) {

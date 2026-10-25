@@ -1,28 +1,29 @@
 #!/usr/bin/env python3
-"""Gera a arte da MESA DE CARTAS (o menu inicial alternativo) em
-public/assets/sprites/menu/mesa/ e as posições em src/game/menu/sprites/mesa.js.
+"""Gera a arte da MESA DE CARTAS (o menu inicial) em public/assets/sprites/menu/mesa/
+e as posições em src/game/menu/sprites/mesa.js.
 
 Uso (na raiz do projeto):  python3 scripts/menu/mesa.py
 Precisa do Pillow, do numpy e do OpenCV (pip install opencv-python-headless).
 Saída determinística (sementes fixas).
 
 Parte da ilustração scripts/menu/arte/mesa-original.webp (1672x941): a turma
-jogando cartas numa mesa, com o telão ao fundo. O script:
+jogando cartas numa mesa, com o telão ao fundo. Fica na resolução dela (o jogo
+mostra reduzida para 854x480, com filtro suave). O script:
 
   1. apaga o que a ilustração traz pintado e o jogo desenha ao vivo: o logo,
-     as opções, as dicas, o nome da música e o que passa no telão;
+     as opções, as dicas e o nome da música;
   2. corrige a Noelle (na ilustração ela segura as cartas E põe as mãos no
-     rosto: quatro braços); as mãos no rosto saem;
-  3. separa a cabeça de cada um (GrabCut) para ela balançar no ritmo;
-  4. reduz tudo para a grade de pixel art do jogo (427x240, um pixel de arte =
-     2x2 na tela, como a sala do outro menu) com uma paleta só de 96 cores;
-     o chapéu e a capa do Ralsei voltam ao verde do sprite dele.
+     rosto: quatro braços); as mãos no rosto saem e o rosto é repintado;
+  3. devolve ao chapéu e à capa do Ralsei o verde do sprite dele;
+  4. desenha os olhos fechados de quem pisca (Ralsei, Asriel e Berdly);
+  5. separa o que fica NA FRENTE da tela do telão (o cabelo da Susie e o "!!"),
+     porque a luta passa ao vivo por cima da tela.
 
-Saída (854x480 e pedaços):
-  fundo.png             a sala sem as cabeças (o que fica atrás delas é preenchido)
-  cabeca-<id>.png       a cabeça de cada um (desenhada por cima, no lugar)
-  olhos-<id>.png        os olhos fechados de quem pisca (por cima da cabeça)
-  exclamacao.png        o "!!" da Susie (pulsa na batida)
+Saída:
+  fundo.webp            a sala inteira (1672x941)
+  olhos-<id>.png        os olhos fechados de quem pisca (pedaço, no lugar)
+  frente.png            o que fica na frente da tela do telão (pedaço, no lugar)
+  raiva.png             o "💢" do Berdly (o jogo faz brilhar na batida)
   src/game/menu/sprites/mesa.js   manifesto + DADOS_MESA (posições em px de jogo)
 """
 
@@ -38,26 +39,31 @@ ORIGINAL = os.path.join(RAIZ, 'scripts', 'menu', 'arte', 'mesa-original.webp')
 SAIDA = os.path.join(RAIZ, 'public', 'assets', 'sprites', 'menu', 'mesa')
 MANIFESTO = os.path.join(RAIZ, 'src', 'game', 'menu', 'sprites', 'mesa.js')
 
-L, A = 427, 240  # grade da arte (ampliada 2x no jogo)
-CORES = 96
+L, A = 1672, 941
+ESCALA = 854 / L  # px da ilustração -> px de jogo
 SEED = 7
 
-# ---------- regiões na ilustração original (px de 1672x941) ----------
+# ---------- regiões na ilustração (px de 1672x941) ----------
 
-# cabeças: retângulo do GrabCut (o de baixo é o corte do pescoço) e o jeito de curtir a música
-CABECAS = {
-    'kris': {'caixa': (370, 430, 610, 600), 'jeito': 'cabeca'},
-    'ralsei': {'caixa': (640, 345, 815, 505), 'jeito': 'balanco'},
-    'susie': {'caixa': (785, 255, 1115, 455), 'jeito': 'headbang'},
-    'noelle': {'caixa': (1110, 335, 1335, 505), 'jeito': 'timida'},
-    'berdly': {'caixa': (1405, 380, 1600, 545), 'jeito': 'pulo'},
-    'asriel': {'caixa': (1355, 575, 1570, 715), 'jeito': 'saltinho'},
-    'dess': {'caixa': (620, 600, 915, 830), 'jeito': 'roqueira'},
-}
-# pupilas de quem pisca (as outras estão de olhos fechados, de costas ou bravas)
+# GrabCut: o Ralsei (para o verde) e a Susie (o cabelo dela fica na frente da tela)
+RALSEI = (640, 345, 815, 505)
+RALSEI_CAPA = (640, 470, 830, 640)
+SUSIE = (785, 255, 1115, 455)
+# olhos de quem pisca. Atrás de óculos (Ralsei, Berdly): a lente (a parte clara
+# da caixa) fica e só a pupila some. Sem óculos (Asriel): a elipse do olho
+# inteira vira pelo (um degradê ajustado ao pelo em volta). Mais a cor e a curva do traço.
 OLHOS = {
-    'ralsei': [(723, 452, 736, 478), (753, 447, 765, 473)],
-    'asriel': [(1410, 655, 1424, 684), (1431, 658, 1441, 678)],
+    'ralsei': [
+        {'lente': (724, 455, 737, 478), 'traco': (24, 58, 44), 'curva': 2},
+        {'lente': (754, 450, 766, 473), 'traco': (24, 58, 44), 'curva': 2},
+    ],
+    'asriel': [
+        {'elipse': (1420, 671, 10, 17), 'traco': (52, 28, 46), 'curva': 3},
+    ],
+    'berdly': [
+        {'lente': (1446, 473, 1472, 494), 'traco': (14, 20, 48), 'curva': 1},
+        {'lente': (1485, 470, 1520, 494), 'traco': (14, 20, 48), 'curva': 1},
+    ],
 }
 # o que o jogo desenha ao vivo
 OPCOES = [  # (caixa, faixa de matiz em graus, saturação mínima) de cada linha
@@ -76,24 +82,26 @@ MUSICA = (1440, 18, 1662, 76)  # "CATSWING" e as barrinhas
 DICAS = (1310, 860, 1640, 918)  # "↑↓ MOVER  (A) ESCOLHER"
 TELA = (974, 41, 1419, 317)  # a tela do telão (onde passa a luta ao vivo)
 EXCLAMACAO = (1068, 278, 1122, 352)  # o "!!" da Susie
-RAIVA = (1528, 443, 1582, 497)  # o "💢" do Berdly (pulsa por cima da cabeça)
+RAIVA = (1528, 443, 1582, 497)  # o "💢" do Berdly
 CARTA_SUPER = (952, 578, 1028, 632)  # a carta SUPER que a Susie bate na mesa
-# as mãos da Noelle no rosto (o par a mais) e o contorno do queixo que fica no lugar
+# as mãos da Noelle no rosto (o par a mais) e o rosto repintado no lugar delas:
+# pele dentro do maxilar (com blush) e, por fora, o cabelo copiado de um pouco
+# mais para o lado (dx) e, da gola para baixo, a blusa copiada de logo abaixo
 MAOS_NOELLE = [
-    [(1180, 446), (1203, 444), (1212, 468), (1214, 496), (1196, 503), (1180, 492)],
-    [(1250, 444), (1274, 446), (1280, 490), (1268, 503), (1248, 497), (1247, 468)],
+    {'contorno': [(1180, 455), (1192, 451), (1204, 455), (1213, 470), (1214, 488), (1208, 506), (1184, 506), (1177, 490)], 'dx': -26},
+    {'contorno': [(1247, 455), (1261, 451), (1276, 455), (1285, 470), (1285, 506), (1251, 506), (1245, 488), (1246, 470)], 'dx': 34},
 ]
-QUEIXO_NOELLE = [(1203, 446), (1205, 468), (1213, 486), (1230, 497), (1247, 486), (1255, 468), (1257, 446)]
+ROSTO_NOELLE = [(1199, 446), (1199, 462), (1203, 472), (1209, 480), (1217, 486), (1230, 489), (1243, 486), (1251, 480), (1257, 472), (1261, 462), (1261, 446)]
+MAXILAR_NOELLE = ROSTO_NOELLE[2:-2]  # o contorno escuro só embaixo (perto dos olhos o cabelo cobre)
+COR_NOELLE = {'pele': (247, 136, 102), 'blush': (255, 112, 104), 'contorno': (74, 30, 34)}
+GOLA_NOELLE = (488, 16)  # da linha 488 para baixo vem a blusa, de 16 px abaixo
 BRILHOS = [(1142, 420), (1124, 447), (1327, 413), (1322, 455), (1112, 487), (1338, 380)]  # ✦ em volta da Noelle
-
-
-def para_arte(x, y):
-    return x * L / 1672, y * A / 941
+# onde não procurar lâmpadas (cabelo loiro e brilhos da Noelle, a tela, o logo, a mesa)
+SEM_LUZES = [TELA, LOGO, SUBTITULO, (1100, 330, 1345, 530), (0, 470, L, A)]
 
 
 def para_jogo(x, y):
-    ax, ay = para_arte(x, y)
-    return round(ax * 2), round(ay * 2)
+    return round(x * ESCALA, 1), round(y * ESCALA, 1)
 
 
 def hsv(img):
@@ -101,8 +109,8 @@ def hsv(img):
     return h[..., 0] * 360 / 256, h[..., 1] / 255, h[..., 2] / 255
 
 
-def caixa_mascara(forma, caixa):
-    m = np.zeros(forma, bool)
+def caixa_mascara(caixa):
+    m = np.zeros((A, L), bool)
     x0, y0, x1, y1 = caixa
     m[y0:y1, x0:x1] = True
     return m
@@ -113,235 +121,216 @@ def dilatar(m, px):
     return cv2.dilate(m.astype(np.uint8), k) > 0
 
 
-def preencher(img, m, raio=6):
-    return cv2.inpaint(img, m.astype(np.uint8) * 255, raio, cv2.INPAINT_TELEA)
-
-
-# ---------- 1-2. limpeza e correção na resolução original ----------
+# ---------- limpeza e correções ----------
 
 
 def corrigir_noelle(img):
-    m = np.zeros(img.shape[:2], np.uint8)
+    """Tira as mãos do rosto da Noelle e repinta o lugar delas (pixel art, sem borrão)."""
+    from PIL import ImageDraw
+
+    rosto = Image.new('1', (L, A), 0)
+    ImageDraw.Draw(rosto).polygon(ROSTO_NOELLE + [(1261, 436), (1199, 436)], fill=1)
+    r = np.asarray(rosto, bool)
+    original = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    arr = original.copy()
+    ys, xs = np.mgrid[0:A, 0:L]
+    pele_toda = np.zeros((A, L), bool)
     for mao in MAOS_NOELLE:
-        cv2.fillPoly(m, [np.array(mao, np.int32)], 255)
-    img = cv2.inpaint(img, m, 7, cv2.INPAINT_TELEA)
-    # o queixo: contorno escuro no lugar onde as mãos tapavam
-    cv2.polylines(img, [np.array(QUEIXO_NOELLE, np.int32)], False, (38, 46, 92), 3, cv2.LINE_8)
-    return img
+        im = Image.new('1', (L, A), 0)
+        ImageDraw.Draw(im).polygon(mao['contorno'], fill=1)
+        m = np.asarray(im, bool)
+        fora = m & ~r
+        yy, xx = np.nonzero(fora & (ys < GOLA_NOELLE[0]))
+        arr[yy, xx] = original[yy, xx + mao['dx']]  # carimbo: o cabelo de ao lado
+        yy, xx = np.nonzero(fora & (ys >= GOLA_NOELLE[0]))
+        arr[yy, xx] = original[yy + GOLA_NOELLE[1], xx]  # e a blusa de logo abaixo
+        pele_toda |= m & r
+    arr[pele_toda] = COR_NOELLE['pele']
+    for cx in (1206, 1254):  # blush
+        arr[pele_toda & (((xs - cx) / 7) ** 2 + ((ys - 466) / 4) ** 2 <= 1)] = COR_NOELLE['blush']
+    out = Image.fromarray(arr)
+    ImageDraw.Draw(out).line(MAXILAR_NOELLE, fill=COR_NOELLE['contorno'], width=2)
+    return cv2.cvtColor(np.asarray(out), cv2.COLOR_RGB2BGR)
 
 
 def mascara_interface(img):
     H, S, V = hsv(img)
-    forma = img.shape[:2]
-    m = np.zeros(forma, bool)
+    m = np.zeros((A, L), bool)
     for caixa, (h0, h1), smin in OPCOES:
-        dentro = caixa_mascara(forma, caixa)
+        dentro = caixa_mascara(caixa)
         letra = (H >= h0) & (H <= h1) & (S >= smin) & (V > 0.5)
         m |= dilatar(dentro & letra, 4) & dentro
-    dentro = caixa_mascara(forma, DICA)
+    dentro = caixa_mascara(DICA)
     m |= dilatar(dentro & (S < 0.25) & (V > 0.7), 3) & dentro
-    m |= caixa_mascara(forma, LOGO) | caixa_mascara(forma, SUBTITULO)
+    m |= caixa_mascara(LOGO) | caixa_mascara(SUBTITULO)
     (cx, cy), r = RADAR
-    ys, xs = np.mgrid[0:forma[0], 0:forma[1]]
+    ys, xs = np.mgrid[0:A, 0:L]
     disco = (xs - cx) ** 2 + (ys - cy) ** 2 <= r * r
     m |= dilatar(disco & (H >= 165) & (H <= 205) & (S > 0.35) & (V > 0.3), 2)
     for caixa in (MUSICA, DICAS):
-        dentro = caixa_mascara(forma, caixa)
+        dentro = caixa_mascara(caixa)
         m |= dilatar(dentro & (V > 0.45) & ((S < 0.3) | ((H > 165) & (H < 205))), 3) & dentro
     return m
 
 
 def mascara_cor(img, caixa, cond, folga=2):
     H, S, V = hsv(img)
-    dentro = caixa_mascara(img.shape[:2], caixa)
+    dentro = caixa_mascara(caixa)
     return dilatar(dentro & cond(H, S, V), folga) & dentro
 
 
-def cabecas(img):
-    cv2.setRNGSeed(SEED)
-    out = {}
-    for nome, d in CABECAS.items():
-        x0, y0, x1, y1 = d['caixa']
-        m = np.zeros(img.shape[:2], np.uint8)
-        bgd, fgd = np.zeros((1, 65), np.float64), np.zeros((1, 65), np.float64)
-        cv2.grabCut(img, m, (x0, y0, x1 - x0, y1 - y0), bgd, fgd, 6, cv2.GC_INIT_WITH_RECT)
-        fg = ((m == 1) | (m == 3)).astype(np.uint8)
-        # só o pedaço principal (sem ilhas soltas) e sem buracos
-        n, rot, stats, _ = cv2.connectedComponentsWithStats(fg)
-        if n > 1:
-            maior = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
-            fg = (rot == maior).astype(np.uint8)
-        cont, _ = cv2.findContours(fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        cheio = np.zeros_like(fg)
-        cv2.drawContours(cheio, cont, -1, 1, -1)
-        out[nome] = cheio > 0
-    return out
+def recortar_figura(img, caixa):
+    """GrabCut no retângulo (o de baixo é o corte), só o pedaço principal e sem buracos."""
+    x0, y0, x1, y1 = caixa
+    m = np.zeros((A, L), np.uint8)
+    bgd, fgd = np.zeros((1, 65), np.float64), np.zeros((1, 65), np.float64)
+    cv2.grabCut(img, m, (x0, y0, x1 - x0, y1 - y0), bgd, fgd, 6, cv2.GC_INIT_WITH_RECT)
+    fg = ((m == 1) | (m == 3)).astype(np.uint8)
+    n, rot, stats, _ = cv2.connectedComponentsWithStats(fg)
+    if n > 1:
+        fg = (rot == 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))).astype(np.uint8)
+    return fg > 0
 
 
-# ---------- 3-4. grade de pixel art ----------
-
-
-def reduzir(img_bgr):
-    rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-    return np.asarray(Image.fromarray(rgb).resize((L, A), Image.BOX), np.float32)
-
-
-def reduzir_mascara(m):
-    v = np.asarray(Image.fromarray((m * 255).astype(np.uint8)).resize((L, A), Image.BOX), np.float32) / 255
-    return v >= 0.5
-
-
-def ralsei_verde(arte, m):
+def ralsei_verde(img, m):
     """O chapéu e a capa do Ralsei saem verde-azulados na ilustração: puxa para o verde do sprite."""
-    bgr = cv2.cvtColor(np.clip(arte, 0, 255).astype(np.uint8), cv2.COLOR_RGB2BGR)
-    h = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV_FULL).astype(np.int32)
+    h = cv2.cvtColor(img, cv2.COLOR_BGR2HSV_FULL).astype(np.int32)
     graus = h[..., 0] * 360 / 256
     alvo = m & (graus > 150) & (graus < 205) & (h[..., 1] > 70)
     h[..., 0] = np.where(alvo, h[..., 0] - int(28 * 256 / 360), h[..., 0]) % 256
-    h[..., 1] = np.where(alvo, np.minimum(255, h[..., 1] * 1.05), h[..., 1])
-    rgb = cv2.cvtColor(cv2.cvtColor(h.astype(np.uint8), cv2.COLOR_HSV2BGR_FULL), cv2.COLOR_BGR2RGB)
-    return np.where(alvo[..., None], rgb.astype(np.float32), arte)
+    verde = cv2.cvtColor(h.astype(np.uint8), cv2.COLOR_HSV2BGR_FULL)
+    return np.where(alvo[..., None], verde, img)
 
 
-def paletizar(arte, paleta=None):
-    img = Image.fromarray(np.clip(arte, 0, 255).astype(np.uint8))
-    if paleta is None:
-        paleta = img.quantize(colors=CORES, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
-        return np.asarray(paleta.convert('RGB')), paleta
-    return np.asarray(img.quantize(palette=paleta, dither=Image.Dither.NONE).convert('RGB')), paleta
+# ---------- camadas ----------
 
 
-def ampliar(arr):
-    return np.repeat(np.repeat(arr, 2, axis=0), 2, axis=1)
+def salvar(bgr, alfa, nome):
+    rgba = np.dstack([cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB), alfa]) if alfa is not None else cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+    img = Image.fromarray(rgba.astype(np.uint8))
+    if nome.endswith('.webp'):  # o fundo inteiro: WebP (a ilustração já vem em WebP; PNG daria 2 MB)
+        img.save(os.path.join(SAIDA, nome), quality=92, method=6)
+    else:
+        img.save(os.path.join(SAIDA, nome), optimize=True)
 
 
-def salvar(arr, nome):
-    modo = 'RGBA' if arr.shape[-1] == 4 else 'RGB'
-    Image.fromarray(ampliar(arr).astype(np.uint8), modo).save(os.path.join(SAIDA, nome), optimize=True)
-
-
-def recorte(q, m, nome, folga=0):
-    """Camada RGBA só com os pixels de m, cortada no menor retângulo. Devolve a posição em px de jogo."""
+def pedaco(img, m, nome):
+    """Camada só com os pixels de m, cortada no menor retângulo. Devolve a posição (px da ilustração)."""
     ys, xs = np.nonzero(m)
-    y0, y1, x0, x1 = ys.min() - folga, ys.max() + 1 + folga, xs.min() - folga, xs.max() + 1 + folga
-    rgba = np.zeros((y1 - y0, x1 - x0, 4), np.uint8)
-    rgba[..., :3] = q[y0:y1, x0:x1]
-    rgba[..., 3] = np.where(m[y0:y1, x0:x1], 255, 0)
-    salvar(rgba, nome)
-    return {'x': int(x0 * 2), 'y': int(y0 * 2), 'largura': int((x1 - x0) * 2), 'altura': int((y1 - y0) * 2)}
+    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+    alfa = np.where(m[y0:y1, x0:x1], 255, 0).astype(np.uint8)
+    salvar(img[y0:y1, x0:x1], alfa, nome)
+    return int(x0), int(y0)
 
 
-def olhos_fechados(q, mcab, caixas):
-    """Pálpebras: a pupila vira a cor da pele em volta e ganha um tracinho escuro no meio."""
-    out = q.copy()
-    m = np.zeros(mcab.shape, bool)
-    for caixa in caixas:
-        x0, y0 = (int(v) for v in para_arte(caixa[0], caixa[1]))
-        x1, y1 = (int(np.ceil(v)) for v in para_arte(caixa[2], caixa[3]))
-        reg = out[y0:y1 + 1, x0:x1 + 1].astype(np.float32)
-        lum = reg @ np.array([0.3, 0.55, 0.15])
-        escuro = lum < 95
-        if not escuro.any() or escuro.all():
-            continue
-        pele = np.median(reg[~escuro], axis=0)
-        traco = reg[escuro].min(axis=0)
-        reg[escuro] = pele
-        ys, xs = np.nonzero(escuro)
-        meio = int(round(ys.mean()))
-        reg[meio, max(0, xs.min() - 1):xs.max() + 2] = traco
-        out[y0:y1 + 1, x0:x1 + 1] = reg
-        m[y0:y1 + 1, x0:x1 + 1] = True
-    return out, m & mcab
+def fechar_olhos(img, olhos):
+    """Pálpebras: o olho vira a cor da pele (ou da lente) com um traço escuro no
+    meio, curvo para baixo (olho fechado sorrindo)."""
+    out = img.copy()
+    m = np.zeros((A, L), bool)
+    H, S, V = hsv(img)
+    ys, xs = np.mgrid[0:A, 0:L]
+    for o in olhos:
+        if 'lente' in o:
+            caixa = caixa_mascara(o['lente'])
+            claro = caixa & (V > 0.7) & (S < 0.35)
+            pts = np.argwhere(claro)[:, ::-1].astype(np.int32)
+            olho = np.zeros((A, L), np.uint8)
+            cv2.fillConvexPoly(olho, cv2.convexHull(pts), 1)
+            olho = (olho > 0) & caixa & ~(caixa & (S > 0.35) & (V > 0.35) & ~claro)  # a armação colorida fica
+            cor = np.median(img[claro], axis=0)
+        else:
+            cx, cy, rx, ry = o['elipse']
+            d = ((xs - cx) / rx) ** 2 + ((ys - cy) / ry) ** 2
+            olho = d <= 1
+            cor = None
+        if cor is None:
+            # um plano de cor (a + b·x + c·y, por canal) ajustado ao pelo do anel em volta
+            anel = (d > 1.3) & (d < 2.6) & (V > 0.8) & (S < 0.35)  # o rosto claro (não o cabelo)
+            yy, xx = np.nonzero(anel)
+            base = np.column_stack([np.ones_like(xx), xx, yy]).astype(np.float64)
+            coef, *_ = np.linalg.lstsq(base, img[anel].astype(np.float64), rcond=None)
+            yo, xo = np.nonzero(olho)
+            out[olho] = np.clip(np.column_stack([np.ones_like(xo), xo, yo]) @ coef, 0, 255).astype(np.uint8)
+        else:
+            out[olho] = cor.astype(np.uint8)
+        yy, xx = np.nonzero(olho)
+        xa, xb, cy = xx.min() + 1, xx.max() - 1, int(round(yy.mean())) + 1
+        traco = [(int(x), int(round(cy + o['curva'] * np.sin(np.pi * (x - xa) / max(1, xb - xa))))) for x in range(xa, xb + 1)]
+        cv2.polylines(out, [np.array(traco, np.int32)], False, o['traco'][::-1], 3, cv2.LINE_AA)  # traço em RGB; o OpenCV pinta em BGR
+        m |= olho | caixa_mascara((xa - 1, cy - abs(o['curva']) - 2, xb + 2, cy + abs(o['curva']) + 3))
+    return out, m
 
 
-def luzes(q, livre):
-    """Lâmpadas, velas e o abajur: os pontos de luz quente acima da mesa (para cintilar no jogo)."""
-    r, g, b = q[..., 0].astype(int), q[..., 1].astype(int), q[..., 2].astype(int)
-    quente = (r > 235) & (g > 170) & (b < 170) & (r - b > 80) & livre
-    quente[125:] = False  # da mesa para baixo é carta, pipoca e pizza, não lâmpada
+def luzes(img):
+    """Lâmpadas, velas e o abajur: os pontos de luz quente (para cintilar no jogo)."""
+    b, g, r = (img[..., i].astype(int) for i in range(3))
+    quente = (r > 235) & (g > 165) & (b < 175) & (r - b > 80)
+    for caixa in SEM_LUZES:
+        quente &= ~caixa_mascara(caixa)
     n, _, stats, cent = cv2.connectedComponentsWithStats(quente.astype(np.uint8))
     pontos = []
     for i in range(1, n):
         area = int(stats[i, cv2.CC_STAT_AREA])
-        if area > 16:
+        if area < 6 or area > 260:
             continue
-        x, y = cent[i]
-        pontos.append({'x': round(float(x) * 2), 'y': round(float(y) * 2), 'tamanho': min(4, area)})
+        x, y = para_jogo(*cent[i])
+        pontos.append({'x': x, 'y': y, 'tamanho': round(min(4.0, (area ** 0.5) / 4), 1)})
     return pontos
 
 
 def main():
     os.makedirs(SAIDA, exist_ok=True)
+    for velho in os.listdir(SAIDA):  # da versão anterior (cabeças separadas)
+        os.remove(os.path.join(SAIDA, velho))
+    cv2.setRNGSeed(SEED)
     img = cv2.imread(ORIGINAL)  # BGR
-    assert img is not None and img.shape[:2] == (941, 1672), 'mesa-original.webp tem que ter 1672x941'
+    assert img is not None and img.shape[:2] == (A, L), 'mesa-original.webp tem que ter 1672x941'
 
     img = corrigir_noelle(img)
-    mcab = cabecas(img)
+    msusie = recortar_figura(img, SUSIE)
+    mralsei = recortar_figura(img, RALSEI) | caixa_mascara(RALSEI_CAPA)
     amarelo = lambda H, S, V: (H > 40) & (H < 70) & (S > 0.5) & (V > 0.7)
-    mexcl = mascara_cor(img, EXCLAMACAO, amarelo, 2)
+    mexcl = mascara_cor(img, EXCLAMACAO, amarelo, 3)
     vermelho = lambda H, S, V: ((H < 15) | (H > 345)) & (S > 0.5) & (V > 0.55)
     mraiva = mascara_cor(img, RAIVA, vermelho, 1)
 
-    # a tela do telão: escura (a luta ao vivo cobre), menos o que está na frente dela
-    frente = dilatar(mcab['susie'], 4) | dilatar(mexcl, 2)
-    tela = caixa_mascara(img.shape[:2], TELA) & ~frente
-    img[tela] = (14, 8, 10)
-    img = preencher(img, mascara_interface(img) & ~frente)
+    img = cv2.inpaint(img, mascara_interface(img).astype(np.uint8) * 255, 6, cv2.INPAINT_TELEA)
+    img = ralsei_verde(img, mralsei)
+    salvar(img, None, 'fundo.webp')
 
-    arte = reduzir(img)
-    mcab_a = {k: reduzir_mascara(m) for k, m in mcab.items()}
-    mexcl_a = reduzir_mascara(dilatar(mexcl, 2))
-    mraiva_a = reduzir_mascara(mraiva)
-    ralsei = mcab_a['ralsei'] | reduzir_mascara(caixa_mascara(img.shape[:2], (640, 470, 830, 640)))
-    arte = ralsei_verde(arte, ralsei)
+    dados = {'arte': {'largura': L, 'altura': A, 'escala': ESCALA}, 'olhos': [], 'luzes': luzes(img)}
+    for nome, olhos in OLHOS.items():
+        fechado, m = fechar_olhos(img, olhos)
+        x, y = pedaco(fechado, m, f'olhos-{nome}.png')
+        dados['olhos'].append({'id': nome, 'chave': f'menu-mesa-olhos-{nome}', 'x': x, 'y': y})
+    # na frente da tela: o cabelo da Susie e o "!!" (a luta ao vivo passa por baixo deles)
+    frente = (dilatar(msusie, 1) | mexcl) & dilatar(caixa_mascara(TELA), 6)
+    frente |= mexcl
+    x, y = pedaco(img, frente, 'frente.png')
+    dados['frente'] = {'chave': 'menu-mesa-frente', 'x': x, 'y': y}
+    x, y = pedaco(img, mraiva, 'raiva.png')
+    dados['raiva'] = {'chave': 'menu-mesa-raiva', 'x': x, 'y': y}
+    ex, ey = pedaco(img, mexcl, 'exclamacao.png')
+    dados['exclamacao'] = {'chave': 'menu-mesa-exclamacao', 'x': ex, 'y': ey}
 
-    q, paleta = paletizar(arte)
-
-    # camadas por cima (cada uma com a cor da paleta já aplicada)
-    dados = {'cabecas': [], 'brilhos': [], 'luzes': []}
-    for nome, m in mcab_a.items():
-        pos = recorte(q, m, f'cabeca-{nome}.png')
-        cab = {'id': nome, 'chave': f'menu-mesa-cabeca-{nome}', **pos, 'jeito': CABECAS[nome]['jeito']}
-        if nome in OLHOS:
-            fechado, mo = olhos_fechados(q, m, OLHOS[nome])
-            if mo.any():
-                po = recorte(fechado, mo, f'olhos-{nome}.png')
-                cab['olhos'] = {'chave': f'menu-mesa-olhos-{nome}', 'dx': po['x'] - pos['x'], 'dy': po['y'] - pos['y']}
-        if nome == 'berdly' and (mraiva_a & m).any():
-            pr = recorte(q, mraiva_a & m, 'raiva.png')
-            cab['raiva'] = {'chave': 'menu-mesa-raiva', 'dx': pr['x'] - pos['x'], 'dy': pr['y'] - pos['y'], 'largura': pr['largura'], 'altura': pr['altura']}
-        dados['cabecas'].append(cab)
-    dados['exclamacao'] = {'chave': 'menu-mesa-exclamacao', **recorte(q, mexcl_a, 'exclamacao.png')}
-
-    # o fundo: sem as cabeças nem o "!!" (o buraco é preenchido; só aparece 1 px dele quando a cabeça balança)
-    buraco = dilatar(np.logical_or.reduce(list(mcab_a.values())) | mexcl_a, 1)
-    limpa = cv2.inpaint(np.clip(arte, 0, 255).astype(np.uint8), buraco.astype(np.uint8) * 255, 3, cv2.INPAINT_TELEA)
-    fundo, _ = paletizar(limpa.astype(np.float32), paleta)
-    salvar(fundo, 'fundo.png')
-
-    # posições (px de jogo)
     x0, y0 = para_jogo(TELA[0], TELA[1])
     x1, y1 = para_jogo(TELA[2], TELA[3])
-    dados['tela'] = {'x': x0, 'y': y0, 'largura': x1 - x0, 'altura': y1 - y0}
+    dados['tela'] = {'x': x0, 'y': y0, 'largura': round(x1 - x0, 1), 'altura': round(y1 - y0, 1)}
     cx, cy = para_jogo((CARTA_SUPER[0] + CARTA_SUPER[2]) / 2, (CARTA_SUPER[1] + CARTA_SUPER[3]) / 2)
     dados['cartaSuper'] = {'x': cx, 'y': cy}
     dados['brilhos'] = [dict(zip(('x', 'y'), para_jogo(x, y))) for x, y in BRILHOS]
-    livre = ~reduzir_mascara(caixa_mascara(img.shape[:2], TELA)) & ~reduzir_mascara(caixa_mascara(img.shape[:2], LOGO))
-    livre &= ~dilatar(np.logical_or.reduce(list(mcab_a.values())), 2)
-    dados['luzes'] = luzes(fundo, livre)
 
-    imagens = ['fundo'] + [f'cabeca-{k}' for k in CABECAS] + ['exclamacao']
-    imagens += [f'olhos-{c["id"]}' for c in dados['cabecas'] if 'olhos' in c]
-    imagens += ['raiva'] if any('raiva' in c for c in dados['cabecas']) else []
-    linhas = ',\n'.join(f"    {{ chave: 'menu-mesa-{n}', arquivo: `${{PASTA}}/{n}.png` }}" for n in imagens)
+    imagens = ['fundo.webp', 'frente.png', 'raiva.png', 'exclamacao.png'] + [f'olhos-{k}.png' for k in OLHOS]
+    linhas = ',\n'.join(f"    {{ chave: 'menu-mesa-{n.split('.')[0]}', arquivo: `${{PASTA}}/{n}` }}" for n in imagens)
     js = f"""// GERADO por scripts/menu/mesa.py (não edite à mão: rode o script de novo)
-// Sprites e posições da MESA DE CARTAS (menu inicial alternativo), carregados pela Boot.
+// Sprites e posições da MESA DE CARTAS (menu inicial), carregados pela Boot.
 //   imagens: [{{ chave, arquivo }}]
-//   DADOS_MESA: posições em px de jogo (854x480)
-//     tela        a tela do telão na ilustração (onde a luta passa ao vivo)
-//     cabecas     [{{ id, chave, x, y, largura, altura, jeito, olhos?: {{ chave, dx, dy }}, raiva?: {{ ... }} }}]
-//     exclamacao  o "!!" da Susie · cartaSuper: a carta que ela bate na mesa
-//     brilhos     os ✦ em volta da Noelle · luzes: lâmpadas e velas (cintilam)
+//   DADOS_MESA
+//     arte        tamanho da ilustração e a escala dela no jogo (px da ilustração -> px de jogo)
+//     olhos, frente, raiva, exclamacao   pedaços por cima do fundo: x, y em px DA ILUSTRAÇÃO
+//     tela        a tela do telão (onde a luta passa ao vivo), em px de jogo
+//     cartaSuper, brilhos (✦ em volta da Noelle), luzes (lâmpadas e velas): px de jogo
 const PASTA = 'assets/sprites/menu/mesa'
 
 export default {{
