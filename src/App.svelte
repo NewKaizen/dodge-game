@@ -1,16 +1,21 @@
 <script>
   import Conectar from './ui/Conectar.svelte'
   import Conta from './ui/Conta.svelte'
+  import Amigos from './ui/Amigos.svelte'
   import Game from './ui/Game.svelte'
   import { iniciarConta } from './lib/conta.js'
+  import { iniciarAmigos } from './lib/amigos.js'
 
   // contas (login Google): sem config no servidor fica "indisponível" e o jogo segue igual
   iniciarConta()
+  // amigos e convites: só funcionam logado (lib/amigos.js)
+  iniciarAmigos()
 </script>
 
 <main>
   <Conectar />
   <Conta />
+  <Amigos />
   <Game />
 </main>
 

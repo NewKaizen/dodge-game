@@ -97,7 +97,7 @@ const servidor = http.createServer((req, res) => {
 })
 
 const ice = servidoresIce()
-anexarLan(servidor, { online: ONLINE, ice, autenticar: contas.autenticar })
+anexarLan(servidor, { online: ONLINE, ice, autenticar: contas.autenticar, relacoes: contas.relacoes })
 servidor.on('error', (erro) => {
   console.error(erro.code === 'EADDRINUSE' ? `A porta ${PORTA} já está em uso. Tente: PORTA=5181 npm run ${ONLINE ? 'start' : 'lan'}` : erro)
   process.exit(1)

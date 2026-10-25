@@ -9,7 +9,7 @@ import { criarTelao } from '../menu/telao.js'
 import { criarLogo } from '../menu/logo.js'
 import { criarMesa } from '../menu/mesa.js'
 import { pref } from '../preferencias.js'
-import { souHost } from '../../lib/lan/rede.js'
+import { souHost, salaDoLink } from '../../lib/lan/rede.js'
 
 // Tela inicial: a turma jogando cartas na mesa, com o caos preso no telão ao
 // fundo (uma luta de balas rolando) (menu/mesa.js). Ou, com MENU INICIAL = SALA
@@ -46,8 +46,9 @@ export default class Menu extends Phaser.Scene {
   }
 
   create() {
-    // host de uma sala LAN: o "menu" dele é o lobby
-    if (souHost()) {
+    // host de uma sala LAN: o "menu" dele é o lobby. Aberto por um link
+    // ?sala=CODIGO: vai direto para a tela ONLINE, que entra na sala
+    if (souHost() || salaDoLink()) {
       this.scene.start('Lan')
       return
     }

@@ -16,6 +16,8 @@ import { criarCanal } from '../lib/lan/canal.js'
 //   souHostDaRede()             o host é quem decide (sorteios, resultado da rodada)
 //   irParaCena(cena, chave, dados)  (host) troca de cena aqui e no convidado;
 //                               'Lan' encerra a partida em rede (os dois voltam ao lobby)
+//   podeEntrarEmSala()          true se o jogador está num menu (não no meio de uma
+//                               partida): aceitar convite de amigo só ali
 //   instalarRede(game)          (Game.svelte) o convidado segue o host; se a sala
 //                               cai no meio, cada um volta para onde dá
 //
@@ -27,6 +29,11 @@ export const canal = criarCanal({ enviarBruto: (msg) => enviarTransporte(msg), m
 aoRapido((dados) => canal.entregar(dados))
 
 let ativa = false
+let jogoAtual = null
+// cenas de menu: dali um convite aceito leva direto ao lobby da sala (Lan)
+const CENAS_DE_MENU = ['Menu', 'Config', 'Grimorio', 'GuiaBonus']
+const cenasAtivas = () => jogoAtual?.scene.getScenes(true).map((c) => c.scene.key) ?? []
+export const podeEntrarEmSala = () => cenasAtivas().every((k) => k === 'Lan' || CENAS_DE_MENU.includes(k))
 
 const naSalaComParceiro = (s) => s.fase === 'sala' && (s.sala?.membros.length ?? 0) > 1
 
@@ -55,6 +62,7 @@ export function irParaCena(cena, chave, dados = {}) {
 export const encerrarRede = () => ativa && ativar(false)
 
 export function instalarRede(game) {
+  jogoAtual = game
   const pararCena = canal.ao('cena', ({ chave, dados } = {}) => {
     if (souHostDaRede() || !chave) return
     ativar(chave !== 'Lan')
@@ -62,7 +70,15 @@ export function instalarRede(game) {
   })
   // o parceiro saiu (ou a sala caiu) no meio da partida em rede
   let parceiro = null
+  let faseAntes = null
   const pararSala = lan.subscribe((s) => {
+    // entrou numa sala por um convite de amigo, parado num menu: vai para o lobby da sala
+    const entrouNaSala = s.fase === 'sala' && faseAntes !== 'sala'
+    faseAntes = s.fase
+    if (entrouNaSala) {
+      const cenas = cenasAtivas()
+      if (cenas.length && !cenas.includes('Lan') && cenas.every((k) => CENAS_DE_MENU.includes(k))) trocarCena(game, 'Lan')
+    }
     const outro = s.fase === 'sala' ? s.sala?.membros.find((m) => m.id !== s.eu.id)?.id ?? null : null
     if (parceiro && outro !== parceiro) canal.esquecer(parceiro)
     parceiro = outro
@@ -90,5 +106,6 @@ export function instalarRede(game) {
   return () => {
     pararCena()
     pararSala()
+    jogoAtual = null
   }
 }

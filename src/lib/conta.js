@@ -31,6 +31,8 @@ const ouvintes = new Set()
 
 const mudar = (parcial) => conta.update((s) => ({ ...s, ...parcial }))
 export const tokenConta = () => sessao?.access_token ?? null
+// cliente do Supabase (chave anon + sessão do usuário) para as funções do banco; null sem contas
+export const clienteSupabase = () => supabase
 export const contasDisponiveis = () => get(conta).estado !== 'indisponivel'
 
 export function aoMudarConta(fn) {
