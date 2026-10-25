@@ -71,10 +71,10 @@ const opcaoPref = (chave) => ({
 const NOMES_TREMOR = { normal: 'NORMAL', reduzido: 'REDUZIDO', desligado: 'DESLIGADO' }
 const NOMES_DALTONISMO = { nenhum: 'NENHUM', protanopia: 'PROTANOPIA', deuteranopia: 'DEUTERANOPIA', tritanopia: 'TRITANOPIA' }
 const NOMES_GRAFICOS = { minimo: 'MÍNIMO', medio: 'MÉDIO', maximo: 'MÁXIMO' }
-const NOMES_MENU = { sala: 'SALA DE TV', mesa: 'MESA DE CARTAS' }
+const NOMES_MENU = { mesa: 'MESA DE CARTAS', sala: 'SALA DE TV' }
 const TEXTO_MENU = {
-  sala: 'A turma sentada no tapete, de costas, assistindo a luta no telão da sala.',
   mesa: 'A turma jogando cartas na mesa, com a luta passando no telão ao fundo.',
+  sala: 'A turma sentada no tapete, de costas, assistindo a luta no telão da sala.',
 }
 
 // o que muda em cada qualidade (painel da aba GRÁFICOS): 1 a 3 quadradinhos

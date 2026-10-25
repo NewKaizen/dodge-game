@@ -15,7 +15,7 @@
 //   flashes           true/false  clarões de tela (false = nenhum clarão branco/colorido)
 //   daltonismo        'nenhum' | 'protanopia' | 'deuteranopia' | 'tritanopia'  paleta das cores
 //                     que importam no jogo (avisos, corações, balas do tema)
-//   menu              'sala' | 'mesa'  o menu inicial: a SALA DE TV ou a MESA DE CARTAS
+//   menu              'mesa' | 'sala'  o menu inicial: a MESA DE CARTAS (padrão) ou a SALA DE TV
 //   teclas            null (padrão) ou { p1: { cima: [...], baixo, esquerda, direita, A, B, C },
 //                     p2: {...} } com códigos de KeyboardEvent.code (ver lib/simulador.js)
 const CHAVE = 'dodge-preferencias'
@@ -26,7 +26,7 @@ export const PREFERENCIAS_PADRAO = {
   tremor: 'normal',
   flashes: true,
   daltonismo: 'nenhum',
-  menu: 'sala',
+  menu: 'mesa',
   teclas: null,
 }
 
@@ -34,7 +34,7 @@ export const OPCOES = {
   graficos: ['minimo', 'medio', 'maximo'],
   tremor: ['normal', 'reduzido', 'desligado'],
   daltonismo: ['nenhum', 'protanopia', 'deuteranopia', 'tritanopia'],
-  menu: ['sala', 'mesa'],
+  menu: ['mesa', 'sala'],
 }
 
 function valido(chave, valor) {
