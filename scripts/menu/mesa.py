@@ -84,17 +84,39 @@ TELA = (974, 41, 1419, 317)  # a tela do telão (onde passa a luta ao vivo)
 EXCLAMACAO = (1068, 278, 1122, 352)  # o "!!" da Susie
 RAIVA = (1528, 443, 1582, 497)  # o "💢" do Berdly
 CARTA_SUPER = (952, 578, 1028, 632)  # a carta SUPER que a Susie bate na mesa
-# as mãos da Noelle no rosto (o par a mais) e o rosto repintado no lugar delas:
-# pele dentro do maxilar (com blush) e, por fora, o cabelo copiado de um pouco
-# mais para o lado (dx) e, da gola para baixo, a blusa copiada de logo abaixo
+# as mãos da Noelle no rosto (o par a mais) e o que é repintado no lugar delas:
+# pele dentro do maxilar (com blush); por fora, o cabelo comprido caindo pelos
+# lados (o da esquerda copiado do cabelo logo ao lado, o da direita espelhado
+# dele: do lado direito a cópia trazia pedaços do fundo) terminando em pontas
+# por cima do ombro e, junto do pescoço, um triângulo da gola (copiado de logo
+# abaixo), separado do cabelo por um contorno na diagonal
 MAOS_NOELLE = [
-    {'contorno': [(1180, 455), (1192, 451), (1204, 455), (1213, 470), (1214, 488), (1208, 506), (1184, 506), (1177, 490)], 'dx': -26},
-    {'contorno': [(1247, 455), (1261, 451), (1276, 455), (1285, 470), (1285, 506), (1251, 506), (1245, 488), (1246, 470)], 'dx': 34},
+    [(1180, 455), (1192, 451), (1204, 455), (1213, 470), (1214, 488), (1208, 506), (1184, 506), (1177, 490)],
+    [(1247, 455), (1261, 451), (1276, 455), (1285, 470), (1285, 506), (1251, 506), (1245, 488), (1246, 470)],
 ]
 ROSTO_NOELLE = [(1199, 446), (1199, 462), (1203, 472), (1209, 480), (1217, 486), (1230, 489), (1243, 486), (1251, 480), (1257, 472), (1261, 462), (1261, 446)]
 MAXILAR_NOELLE = ROSTO_NOELLE[2:-2]  # o contorno escuro só embaixo (perto dos olhos o cabelo cobre)
-COR_NOELLE = {'pele': (247, 136, 102), 'blush': (255, 112, 104), 'contorno': (74, 30, 34)}
-GOLA_NOELLE = (488, 16)  # da linha 488 para baixo vem a blusa, de 16 px abaixo
+# a gola de cada lado: o que fica do lado de dentro da linha (a, b), junto do ponto `dentro`
+GOLA_NOELLE = [
+    {'a': (1215, 484), 'b': (1196, 507), 'dentro': (1213, 505)},
+    {'a': (1245, 484), 'b': (1264, 507), 'dentro': (1247, 505)},
+]
+GOLA_DE_BAIXO = 16  # a gola é copiada de 16 px abaixo
+CABELO_DX = -26  # o cabelo da esquerda vem de 26 px para a esquerda
+ESPELHO_X = 2460  # o da direita é o da esquerda espelhado em x = 1230 (o meio do rosto)
+PONTAS_NOELLE = [  # pontas das mechas por cima do ombro (triângulos)
+    [(1179, 505), (1185, 517), (1189, 505)],
+    [(1189, 505), (1194, 514), (1198, 505)],
+    [(1281, 505), (1275, 517), (1271, 505)],
+    [(1271, 505), (1266, 514), (1262, 505)],
+]
+COR_NOELLE = {
+    'pele': (247, 136, 102),
+    'blush': (255, 112, 104),
+    'contorno': (74, 30, 34),
+    'cabelo': (252, 180, 70),
+    'contorno_cabelo': (62, 22, 31),
+}
 BRILHOS = [(1142, 420), (1124, 447), (1327, 413), (1322, 455), (1112, 487), (1338, 380)]  # ✦ em volta da Noelle
 # onde não procurar lâmpadas (cabelo loiro e brilhos da Noelle, a tela, o logo, a mesa)
 SEM_LUZES = [TELA, LOGO, SUBTITULO, (1100, 330, 1345, 530), (0, 470, L, A)]
@@ -128,28 +150,44 @@ def corrigir_noelle(img):
     """Tira as mãos do rosto da Noelle e repinta o lugar delas (pixel art, sem borrão)."""
     from PIL import ImageDraw
 
-    rosto = Image.new('1', (L, A), 0)
-    ImageDraw.Draw(rosto).polygon(ROSTO_NOELLE + [(1261, 436), (1199, 436)], fill=1)
-    r = np.asarray(rosto, bool)
+    def poligono(pts):
+        im = Image.new('1', (L, A), 0)
+        ImageDraw.Draw(im).polygon(pts, fill=1)
+        return np.asarray(im, bool)
+
+    ys, xs = np.mgrid[0:A, 0:L]
+    rosto = poligono(ROSTO_NOELLE + [(1261, 436), (1199, 436)])
+    maos = np.zeros((A, L), bool)
+    gola = np.zeros((A, L), bool)
+    for contorno, g in zip(MAOS_NOELLE, GOLA_NOELLE):  # cada gola só dentro da sua mão
+        mao = poligono(contorno)
+        (ax, ay), (bx, by), (dx, dy) = g['a'], g['b'], g['dentro']
+        lado = lambda x, y: np.sign((bx - ax) * (y - ay) - (by - ay) * (x - ax))
+        maos |= mao
+        gola |= mao & (lado(xs, ys) == lado(dx, dy))
     original = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     arr = original.copy()
-    ys, xs = np.mgrid[0:A, 0:L]
-    pele_toda = np.zeros((A, L), bool)
-    for mao in MAOS_NOELLE:
-        im = Image.new('1', (L, A), 0)
-        ImageDraw.Draw(im).polygon(mao['contorno'], fill=1)
-        m = np.asarray(im, bool)
-        fora = m & ~r
-        yy, xx = np.nonzero(fora & (ys < GOLA_NOELLE[0]))
-        arr[yy, xx] = original[yy, xx + mao['dx']]  # carimbo: o cabelo de ao lado
-        yy, xx = np.nonzero(fora & (ys >= GOLA_NOELLE[0]))
-        arr[yy, xx] = original[yy + GOLA_NOELLE[1], xx]  # e a blusa de logo abaixo
-        pele_toda |= m & r
-    arr[pele_toda] = COR_NOELLE['pele']
+    c = COR_NOELLE
+    cabelo = maos & ~rosto & ~gola
+    esquerda = cabelo & (xs < 1230)
+    yy, xx = np.nonzero(esquerda)
+    arr[yy, xx] = original[yy, xx + CABELO_DX]
+    yy, xx = np.nonzero(cabelo & (xs >= 1230))
+    arr[yy, xx] = arr[yy, ESPELHO_X - xx]  # espelho do lado esquerdo (já repintado)
+    yy, xx = np.nonzero(maos & ~rosto & gola)
+    arr[yy, xx] = original[yy + GOLA_DE_BAIXO, xx]
+    pele = maos & rosto
+    arr[pele] = c['pele']
     for cx in (1206, 1254):  # blush
-        arr[pele_toda & (((xs - cx) / 7) ** 2 + ((ys - 466) / 4) ** 2 <= 1)] = COR_NOELLE['blush']
+        arr[pele & (((xs - cx) / 7) ** 2 + ((ys - 466) / 4) ** 2 <= 1)] = c['blush']
     out = Image.fromarray(arr)
-    ImageDraw.Draw(out).line(MAXILAR_NOELLE, fill=COR_NOELLE['contorno'], width=2)
+    d = ImageDraw.Draw(out)
+    for ponta in PONTAS_NOELLE:
+        d.polygon(ponta, fill=c['cabelo'])
+        d.line(ponta, fill=c['contorno_cabelo'], width=2)
+    for g in GOLA_NOELLE:  # a mecha caindo por cima do ombro
+        d.line([g['a'], g['b']], fill=c['contorno_cabelo'], width=2)
+    d.line(MAXILAR_NOELLE, fill=c['contorno'], width=2)
     return cv2.cvtColor(np.asarray(out), cv2.COLOR_RGB2BGR)
 
 
