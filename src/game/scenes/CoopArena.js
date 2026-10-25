@@ -1,5 +1,5 @@
 import PvpArena, { LAYOUT_PVP } from './PvpArena.js'
-import { LARGURA, ALTURA, FONTE, CORES, TEXTO, corTexto, DESAFIO, NIVEIS, DIFICULDADES } from '../constants.js'
+import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, DESAFIO, NIVEIS, DIFICULDADES } from '../constants.js'
 import Controles from '../controles.js'
 import { tocar, musica, velocidadeMusica, pausarMusica } from '../audio.js'
 import { debug } from '../debug.js'
@@ -97,15 +97,15 @@ import { entrarNoJogo, voltarAoMenu, levouGolpe } from '../../lib/saida.js'
 
 const { MAOS, ESCALA_MESA, HP_BAIXO } = LAYOUT_PVP
 
-const CHEFE = { x: 320, y: 196 }
+const CHEFE = { x: CENTRO_X, y: 196 }
 // a carta do chefe (a intenção), embaixo dele: uma só, para os dois. O nome
 // (ATAQUE, CONTROLE...) fica do lado dela: embaixo passa a dica da escolha
 const INTENCAO = { x: QUADRO.x, y: 278 }
 const LARGURA_INTENCAO = 42
 const ROTULO_INTENCAO = { x: INTENCAO.x + 30, y: INTENCAO.y }
 const MESA = [
-  { x: 160, y: 188 },
-  { x: 480, y: 188 },
+  { x: CENTRO_X - 160, y: 188 },
+  { x: CENTRO_X + 160, y: 188 },
 ]
 // a carta de ataque de cada um fica carregando no canto dele (em cima do personagem):
 // o meio da mesa, embaixo do chefe, é do quadro

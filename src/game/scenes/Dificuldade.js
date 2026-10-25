@@ -11,8 +11,9 @@ import { claraoCamera, alphaClarao } from '../effects/flash.js'
 import { partyDe } from '../data/batalha.js'
 import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
 
-const OPCAO = { x: 440, largura: 330, altura: 100, y: 128, passo: 112 }
-const CHEFE = { x: 138, y: 200 }
+// painel do chefe à esquerda (62..282) e as opções à direita (322..792): bloco centralizado em 854
+const OPCAO = { x: 557, largura: 470, altura: 100, y: 128, passo: 112 }
+const CHEFE = { x: 172, y: 200 }
 
 // Transição de entrada na batalha (ms desde o A). Cada nível soma `porNivel`
 // ao clímax: DIFÍCIL segura a tensão um pouco mais e explode mais forte.
@@ -63,7 +64,7 @@ export default class Dificuldade extends Phaser.Scene {
 
     // chefe escolhido, à esquerda
     const cx = CHEFE.x
-    this.add.rectangle(cx, 240, 200, 290, CORES.painel, 0.88).setStrokeStyle(3, 0x505050)
+    this.add.rectangle(cx, 240, 220, 290, CORES.painel, 0.88).setStrokeStyle(3, 0x505050)
     this.sprite = this.add.image(cx, CHEFE.y, def.sprite).setScale(ESCALA.chefe * 0.9)
     texto(cx, 310, def.nome.toUpperCase(), def.nome.length > 11 ? 16 : 20)
     texto(cx, 336, `base: ${base.rotulo}`, 14, base.cor)

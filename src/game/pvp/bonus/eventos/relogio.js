@@ -1,4 +1,4 @@
-import { FONTE, ACELERACAO, parteDoFator } from '../../../constants.js'
+import { CENTRO_X, FONTE, ACELERACAO, parteDoFator } from '../../../constants.js'
 import { tocar, velocidadeMusica } from '../../../audio.js'
 import { ignorarNasCaixas } from '../../../recorte.js'
 import { shake } from '../../../effects/shake.js'
@@ -27,7 +27,7 @@ const DURACAO = { normal: 1300, lento: 2700, rapido: 2000 } // ms (tempo real) e
 const AVISO_MS = 1000
 const RAMPA_MS = 200 // a troca de ritmo não é seca (sem tranco)
 const TIQUE_MS = 520 // intervalo do tique-taque no ritmo normal
-const RELOGIO = { x: 320, y: 176, r: 30 }
+const RELOGIO = { x: CENTRO_X, y: 176, r: 30 }
 const PENDULO = { comprimento: 46, amplitude: 0.38, periodoMs: 1300 }
 
 export default function criar(arena, { rng } = {}) {

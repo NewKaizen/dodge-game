@@ -2,6 +2,7 @@ import { writable, derived, get } from 'svelte/store'
 import { lan, aoParceiro, enviarAoParceiro, enviarQuadro, aoQuadro, parceiro } from './rede.js'
 import { faixaDeAudio } from './audioTap.js'
 import { contextoAudio } from '../../game/audio.js'
+import { LARGURA, ALTURA } from '../../game/constants.js'
 
 // Conexão direta do modo LAN/ONLINE (docs/lan.md): um WebRTC entre os dois
 // PCs da sala, com um canal de dados (o da partida em rede, game/rede.js) e o
@@ -266,8 +267,8 @@ function ligarReservaHost() {
   if (reserva || papelAtual !== 'host' || !game) return
   clearTimeout(timerReserva)
   const tela2d = document.createElement('canvas')
-  tela2d.width = 640
-  tela2d.height = 480
+  tela2d.width = LARGURA
+  tela2d.height = ALTURA
   const ctx = tela2d.getContext('2d')
   let ultimo = 0
   let ocupado = false

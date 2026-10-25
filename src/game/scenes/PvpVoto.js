@@ -32,8 +32,8 @@ import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
 // e window.pvpVoto (votar(j, id), estadoDebug()).
 
 const TEMPO_MS = 12000
-const CARTAO = { y: 142, largura: 80, altura: 112, espaco: 6 }
-const PAINEL = { x: 22, y: 232, largura: LARGURA - 44, altura: 196 }
+const CARTAO = { y: 142, largura: 100, altura: 114, espaco: 10 } // 7 cartões = 760 px, a mesma largura do painel
+const PAINEL = { x: (LARGURA - 760) / 2, y: 232, largura: 760, altura: 196 }
 const VEU = 0.42 // véu escuro por cima do fundo da arena (o texto precisa ler)
 const CURSOR_MS = 300 // em rede: de quanto em quanto o meu cursor vai de novo para o outro PC
 

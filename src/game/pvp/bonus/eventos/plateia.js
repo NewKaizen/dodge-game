@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { ALTURA } from '../../../constants.js'
+import { ALTURA, LARGURA } from '../../../constants.js'
 import { tocar } from '../../../audio.js'
 import { particulas } from '../../../effects/particulas.js'
 import { ignorarNasCaixas } from '../../../recorte.js'
@@ -200,7 +200,7 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
     // o objeto voando, por cima de tudo (câmera principal)
     const voador = guardar(arena.add.image(x, ALTURA + 20, chave).setDepth(94))
     ignorarNasCaixas(arena, voador)
-    const x0 = Phaser.Math.Clamp(x + entre(-70, 70), 20, 620)
+    const x0 = Phaser.Math.Clamp(x + entre(-70, 70), 20, LARGURA - 20)
     voos.push({ j, x, y, x0, t: 0, sombra, voador, bala, giro: entre(-10, 10) })
     if (t - ultimoSom > 140) {
       ultimoSom = t

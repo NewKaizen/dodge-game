@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
-import { LARGURA } from '../../constants.js'
-import { gerarArteTemplo, TEMPLO, P, N_CHAMAS } from './temploArte.js'
+import { LARGURA, CENTRO_X } from '../../constants.js'
+import { gerarArteTemplo, TEMPLO, P, N_CHAMAS, L } from './temploArte.js'
 
 // TEMPLO: o salão de um templo antigo em ruínas (arte em temploArte.js).
 // Camadas, de trás para a frente:
@@ -21,12 +21,15 @@ import { gerarArteTemplo, TEMPLO, P, N_CHAMAS } from './temploArte.js'
 
 const ONDA = { periodo: 9000, duracao: 2600, largura: 0.16 } // ms; "ordem" dos glifos (TEMPLO.glifos)
 const POEIRA = 46
-const FEIXE = { x: 316, y: 52 } // onde o feixe sai (pixels do jogo)
+
 const MORCEGOS_MS = { min: 13000, max: 22000 }
 const PEDRINHA_MS = { min: 5000, max: 9000 }
 
-// pixels da arte -> pixels do jogo
+// pixels da arte -> pixels do jogo (px: medidas e y; pxx: x, já com a folga da arte, que tem 1 px a mais que o centro)
+const OX = CENTRO_X - (L / 2) * P
 const px = (v) => v * P
+const pxx = (v) => v * P + OX
+const FEIXE = { x: pxx(TEMPLO.buraco.x) - 4, y: 52 } // onde o feixe sai (pixels do jogo)
 
 // ruído suave (soma de senos) para o tremor das tochas: 0..1
 const tremor = (t, fase) => 0.5 + 0.25 * Math.sin(t / 97 + fase) + 0.15 * Math.sin(t / 41 + fase * 2.3) + 0.1 * Math.sin(t / 23 + fase * 0.7)
@@ -40,14 +43,14 @@ export default function templo(scene, objetos) {
   const sorte = Phaser.Math.RND
   const ADD = Phaser.BlendModes.ADD
 
-  add(scene.add.image(0, 0, 'arena-templo-fundo').setOrigin(0).setScale(P))
+  add(scene.add.image(OX, 0, 'arena-templo-fundo').setOrigin(0).setScale(P))
 
   // ---------- luz do sol ----------
   const feixes = [
     add(scene.add.image(FEIXE.x, FEIXE.y, 'arena-templo-feixe').setOrigin(65 / 150, 0).setBlendMode(ADD).setTint(0xffd890)),
     add(scene.add.image(FEIXE.x + 4, FEIXE.y - 10, 'arena-templo-feixe').setOrigin(65 / 150, 0).setScale(1.3, 1.05).setBlendMode(ADD).setTint(0xffc060)),
   ]
-  const poca = add(scene.add.image(px(TEMPLO.altar.x) + 6, px(TEMPLO.altar.y), 'arena-templo-brilho').setDisplaySize(170, 34).setBlendMode(ADD).setTint(0xffd070))
+  const poca = add(scene.add.image(pxx(TEMPLO.altar.x) + 6, px(TEMPLO.altar.y), 'arena-templo-brilho').setDisplaySize(170, 34).setBlendMode(ADD).setTint(0xffd070))
   const poeira = Array.from({ length: POEIRA }, (_, i) => ({
     obj: add(scene.add.rectangle(0, 0, i % 5 === 0 ? 2 : 1, i % 5 === 0 ? 2 : 1, 0xffeab8).setOrigin(0)),
     u: sorte.realInRange(-1, 1),
@@ -63,19 +66,19 @@ export default function templo(scene, objetos) {
   let proximaPedrinha = sorte.between(PEDRINHA_MS.min, PEDRINHA_MS.max) / 2
 
   // ---------- camada da frente (parallax) ----------
-  const frente = add(scene.add.image(0, 0, 'arena-templo-frente').setOrigin(0).setScale(P))
+  const frente = add(scene.add.image(OX, 0, 'arena-templo-frente').setOrigin(0).setScale(P))
 
   // ---------- hieróglifos e o ídolo (onda dourada) ----------
   const glifos = TEMPLO.glifos.map((g) => ({
     ...g,
-    obj: add(scene.add.image(px(g.x - 1), px(g.y - 1), `arena-templo-glifo-${g.forma}`).setOrigin(0).setScale(P).setBlendMode(ADD).setAlpha(0)),
+    obj: add(scene.add.image(pxx(g.x - 1), px(g.y - 1), `arena-templo-glifo-${g.forma}`).setOrigin(0).setScale(P).setBlendMode(ADD).setAlpha(0)),
   }))
-  const disco = add(scene.add.image(px(TEMPLO.disco.x), px(TEMPLO.disco.y), 'arena-templo-brilho').setDisplaySize(84, 84).setBlendMode(ADD).setTint(0xffc040).setAlpha(0))
-  const olhos = TEMPLO.olhos.map((o) => add(scene.add.rectangle(px(o.x), px(o.y), 4, 2, 0xffe070).setOrigin(0).setBlendMode(ADD)))
+  const disco = add(scene.add.image(pxx(TEMPLO.disco.x), px(TEMPLO.disco.y), 'arena-templo-brilho').setDisplaySize(84, 84).setBlendMode(ADD).setTint(0xffc040).setAlpha(0))
+  const olhos = TEMPLO.olhos.map((o) => add(scene.add.rectangle(pxx(o.x), px(o.y), 4, 2, 0xffe070).setOrigin(0).setBlendMode(ADD)))
 
   // ---------- tochas ----------
   const tochas = TEMPLO.tochas.map((t, i) => {
-    const x = px(t.x) + 1
+    const x = pxx(t.x) + 1
     const y = px(t.y + 2)
     return {
       ...t,
@@ -98,14 +101,14 @@ export default function templo(scene, objetos) {
 
   // ---------- cipós balançando ----------
   const cipos = [
-    { x: 283, y: 58, n: 22, fase: 0 },
-    { x: 293, y: 66, n: 12, fase: 1.3 },
-    { x: 349, y: 62, n: 17, fase: 2.1 },
-    { x: 359, y: 56, n: 26, fase: 0.6 },
+    { x: FEIXE.x - 33, y: 58, n: 22, fase: 0 },
+    { x: FEIXE.x - 23, y: 66, n: 12, fase: 1.3 },
+    { x: FEIXE.x + 33, y: 62, n: 17, fase: 2.1 },
+    { x: FEIXE.x + 43, y: 56, n: 26, fase: 0.6 },
     { x: 12, y: 112, n: 18, fase: 1.7, frente: true },
     { x: 40, y: 110, n: 12, fase: 2.9, frente: true },
-    { x: 628, y: 112, n: 20, fase: 0.9, frente: true },
-    { x: 600, y: 110, n: 10, fase: 2.4, frente: true },
+    { x: LARGURA - 12, y: 112, n: 20, fase: 0.9, frente: true },
+    { x: LARGURA - 40, y: 110, n: 10, fase: 2.4, frente: true },
   ].map((c) => ({ ...c, folhas: Array.from({ length: c.n }, (_, i) => (i * 7 + c.n) % 5 === 0) }))
   const gCipos = add(scene.add.graphics())
 
@@ -113,7 +116,7 @@ export default function templo(scene, objetos) {
   const morcegos = Array.from({ length: 3 }, () => ({ obj: add(scene.add.image(0, 0, 'arena-templo-morcego-0').setScale(P).setVisible(false)), voando: false }))
   let proximoBando = sorte.between(MORCEGOS_MS.min, MORCEGOS_MS.max) / 2
 
-  add(scene.add.image(0, 0, 'arena-templo-vinheta').setOrigin(0).setScale(P))
+  add(scene.add.image(OX, 0, 'arena-templo-vinheta').setOrigin(0).setScale(P))
 
   // ---------- animação ----------
 
@@ -140,7 +143,7 @@ export default function templo(scene, objetos) {
     if (!queda && proximaPedrinha <= 0) {
       proximaPedrinha = sorte.between(PEDRINHA_MS.min, PEDRINHA_MS.max)
       const esquerda = sorte.frac() < 0.5
-      queda = { x: esquerda ? px(TEMPLO.quebra.esq) - 2 : px(TEMPLO.quebra.dir) + 2, y: px(TEMPLO.quebra.y) - 2, vy: 0, chao: px(TEMPLO.altar.y) - 4 + sorte.between(0, 6) }
+      queda = { x: esquerda ? pxx(TEMPLO.quebra.esq) - 2 : pxx(TEMPLO.quebra.dir) + 2, y: px(TEMPLO.quebra.y) - 2, vy: 0, chao: px(TEMPLO.altar.y) - 4 + sorte.between(0, 6) }
       pedrinha.setVisible(true)
     }
     if (queda) {
@@ -196,7 +199,7 @@ export default function templo(scene, objetos) {
       const rastro = d > 0 ? Math.exp(-d / 0.3) * 0.45 : 0
       return Math.max(pico, rastro) * Math.min(1, (ONDA.duracao - fase) / 500)
     }
-    for (const g of glifos) g.obj.setPosition(px(g.x - 1) + (g.frente ? ox : 0), px(g.y - 1)).setAlpha(0.05 + 0.9 * luz(g.ordem))
+    for (const g of glifos) g.obj.setPosition(pxx(g.x - 1) + (g.frente ? ox : 0), px(g.y - 1)).setAlpha(0.05 + 0.9 * luz(g.ordem))
     const idolo = luz(-0.12)
     // os olhos do ídolo nunca apagam de todo: brilham fraquinho e pulsam devagar
     const respira = 0.3 + 0.15 * Math.sin(t / 900)
@@ -226,7 +229,7 @@ export default function templo(scene, objetos) {
       const lado = sorte.frac() < 0.5 ? -1 : 1
       morcegos.forEach((m, k) => {
         if (k > 0 && sorte.frac() < 0.4) return
-        Object.assign(m, { voando: true, x: px(TEMPLO.buraco.x) + sorte.between(-20, 20), y: 8 + k * 4, vx: lado * (110 + sorte.between(0, 50)), atraso: k * 260, fase: sorte.realInRange(0, 6) })
+        Object.assign(m, { voando: true, x: pxx(TEMPLO.buraco.x) + sorte.between(-20, 20), y: 8 + k * 4, vx: lado * (110 + sorte.between(0, 50)), atraso: k * 260, fase: sorte.realInRange(0, 6) })
       })
     }
     for (const m of morcegos) {
@@ -254,7 +257,7 @@ export default function templo(scene, objetos) {
       const t = estado.tempo
       // parallax: a frente balança até 2 px enquanto o salão fica parado
       const ox = Math.round(Math.sin(t / 3100) * 2)
-      frente.setX(ox)
+      frente.setX(OX + ox)
       // o sol "respira" devagar (nuvens passando lá fora)
       const sol = 0.75 + 0.15 * Math.sin(t / 2300) + 0.1 * Math.sin(t / 830)
       feixes[0].setAlpha(0.26 * sol)

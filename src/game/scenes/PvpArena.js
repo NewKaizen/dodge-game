@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { LARGURA, ALTURA, FONTE, CORES, TEXTO, corTexto, ACELERACAO, fatorAceleracao, nivelAceleracao, parteDoFator } from '../constants.js'
+import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, ACELERACAO, fatorAceleracao, nivelAceleracao, parteDoFator } from '../constants.js'
 import Controles from '../controles.js'
 import { tocar, musica, pausarMusica, retomarMusica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal, tomMusica, cortarMusica, reforcarGrave } from '../audio.js'
 import { debug } from '../debug.js'
@@ -146,27 +146,27 @@ const PISTA = { largura: 220, altura: 170, y: 198 }
 const CENTROS = [LARGURA / 4, (LARGURA * 3) / 4]
 // região de cada pista: a caixa muda de forma sem invadir a metade da outra
 const CAMPOS = [
-  { esquerda: 8, direita: LARGURA / 2 - 8, topo: 74, base: 334 },
-  { esquerda: LARGURA / 2 + 8, direita: LARGURA - 8, topo: 74, base: 334 },
+  { esquerda: 8, direita: CENTRO_X - 8, topo: 74, base: 334 },
+  { esquerda: CENTRO_X + 8, direita: LARGURA - 8, topo: 74, base: 334 },
 ]
 const MAOS = [
-  { x: 150, y: 424, monte: { x: 28, y: 366 } },
-  { x: 490, y: 424, monte: { x: 612, y: 366 } },
+  { x: CENTROS[0] - 10, y: 424, monte: { x: 28, y: 366 } },
+  { x: CENTROS[1] + 10, y: 424, monte: { x: LARGURA - 28, y: 366 } },
 ]
 const MAO_ESCONDIDA = 512 // y das mãos durante a esquiva (só a pontinha aparece)
 const LARGURA_MAO = 150
 // botão PASSAR: do lado de dentro de cada mão (P1 à direita, P2 à esquerda)
 const PASSAR = [
-  { x: 292, y: 426, lado: 'direita' },
-  { x: 348, y: 426, lado: 'esquerda' },
+  { x: CENTRO_X - 28, y: 426, lado: 'direita' },
+  { x: CENTRO_X + 28, y: 426, lado: 'esquerda' },
 ]
 const PREVIAS = [
-  { x: 160, y: 176, escala: 1.5 },
-  { x: 480, y: 176, escala: 1.5 },
+  { x: CENTROS[0], y: 176, escala: 1.5 },
+  { x: CENTROS[1], y: 176, escala: 1.5 },
 ]
 const MESA = [
-  { x: 244, y: 184 },
-  { x: 396, y: 184 },
+  { x: CENTRO_X - 76, y: 184 },
+  { x: CENTRO_X + 76, y: 184 },
 ]
 const ESCALA_MESA = 1.45
 const COLUNA = [150, 262] // y das cartas na coluna entre as caixas, antes do arremesso
@@ -317,10 +317,10 @@ export default class PvpArena extends Phaser.Scene {
     // metade de cada jogador: um brilho bem fraco na cor do coração
     for (const j of [0, 1]) {
       g.fillStyle(CORES.almas[j], 0.05)
-      g.fillRect(j ? LARGURA / 2 + 2 : 8, 68, LARGURA / 2 - 10, ALTURA - 76)
+      g.fillRect(j ? CENTRO_X + 2 : 8, 68, CENTRO_X - 10, ALTURA - 76)
     }
     g.lineStyle(1, cor, 0.9)
-    for (let y = 76; y < 340; y += 12) g.lineBetween(LARGURA / 2, y, LARGURA / 2, y + 6)
+    for (let y = 76; y < 340; y += 12) g.lineBetween(CENTRO_X, y, CENTRO_X, y + 6)
   }
 
   criarPistas() {
@@ -345,7 +345,7 @@ export default class PvpArena extends Phaser.Scene {
 
   criarTopo() {
     const texto = (y, tamanho, cor) =>
-      this.add.text(LARGURA / 2, y, '', { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(70)
+      this.add.text(CENTRO_X, y, '', { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(70)
     this.textoRodada = texto(5, 13, TEXTO.normal)
     this.textoRelogio = texto(22, 22, TEXTO.selecionado)
     this.textoTreino = texto(50, 9, '#9be7ff')
@@ -357,7 +357,7 @@ export default class PvpArena extends Phaser.Scene {
     // bonus round: nome do evento enquanto a rodada dura
     // (com a CPU o selo de velocidade ocupa a linha de baixo do "VS CPU": o do bônus desce)
     this.textoBonus = texto(linhaExtra ? 81 : 70, 11, TEXTO.selecionado).setOrigin(0.5)
-    this.indicadorVelocidade = new IndicadorVelocidade(this, LARGURA / 2, linhaExtra ? 61 : 50, { tamanho: 10 })
+    this.indicadorVelocidade = new IndicadorVelocidade(this, CENTRO_X, linhaExtra ? 61 : 50, { tamanho: 10 })
   }
 
   // monte de cada jogador (3 versos empilhados e quantas cartas restam)
@@ -428,9 +428,9 @@ export default class PvpArena extends Phaser.Scene {
 
   criarTextos() {
     const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 4, align: 'center' })
-    this.banner = this.add.text(LARGURA / 2, 92, '', estilo(26, TEXTO.selecionado)).setOrigin(0.5).setDepth(96)
+    this.banner = this.add.text(CENTRO_X, 92, '', estilo(26, TEXTO.selecionado)).setOrigin(0.5).setDepth(96)
     this.status = [0, 1].map((j) => this.add.text(CENTROS[j], 84, '', estilo(11, corTexto(CORES.almas[j]))).setOrigin(0.5).setDepth(40))
-    this.dica = this.add.text(LARGURA / 2, 322, '', { ...estilo(9, TEXTO.desabilitado), strokeThickness: 2 }).setOrigin(0.5).setDepth(40)
+    this.dica = this.add.text(CENTRO_X, 322, '', { ...estilo(9, TEXTO.desabilitado), strokeThickness: 2 }).setOrigin(0.5).setDepth(40)
     this.infoPista = [0, 1].map((j) => this.add.text(CENTROS[j], 342, '', estilo(10, TEXTO.normal)).setOrigin(0.5, 0).setDepth(40))
     this.avisoPista = [0, 1].map((j) => this.add.text(CENTROS[j], 92, '', estilo(12, TEXTO.caido)).setOrigin(0.5).setDepth(41))
   }
@@ -562,7 +562,7 @@ export default class PvpArena extends Phaser.Scene {
     const nomes = this.ids.map((id) => PERSONAGENS[id]?.nome?.toUpperCase() ?? id.toUpperCase())
     const textos = [0, 1].map((j) =>
       this.add
-        .text(LARGURA / 2 + (j ? 1 : -1) * 90, 200, nomes[j], {
+        .text(CENTRO_X + (j ? 1 : -1) * 90, 200, nomes[j], {
           fontFamily: FONTE,
           fontSize: '30px',
           color: corTexto(PERSONAGENS[this.ids[j]]?.cor ?? 0xffffff),
@@ -573,16 +573,16 @@ export default class PvpArena extends Phaser.Scene {
         .setDepth(96)
         .setX(j ? LARGURA + 120 : -120),
     )
-    const vs = this.add.text(LARGURA / 2, 200, 'VS', { fontFamily: FONTE, fontSize: '22px', color: TEXTO.selecionado, stroke: '#000000', strokeThickness: 5 }).setOrigin(0.5).setDepth(96).setScale(0)
+    const vs = this.add.text(CENTRO_X, 200, 'VS', { fontFamily: FONTE, fontSize: '22px', color: TEXTO.selecionado, stroke: '#000000', strokeThickness: 5 }).setOrigin(0.5).setDepth(96).setScale(0)
     const tags = [0, 1].map((j) =>
       this.add
-        .text(LARGURA / 2 + (j ? 1 : -1) * 90, 232, `P${j + 1}`, { fontFamily: FONTE, fontSize: '13px', color: corTexto(CORES.almas[j]), stroke: '#000000', strokeThickness: 3 })
+        .text(CENTRO_X + (j ? 1 : -1) * 90, 232, `P${j + 1}`, { fontFamily: FONTE, fontSize: '13px', color: corTexto(CORES.almas[j]), stroke: '#000000', strokeThickness: 3 })
         .setOrigin(0.5)
         .setDepth(96)
         .setAlpha(0),
     )
     tocar(this, 'voo')
-    await Promise.all(textos.map((t, j) => this.tween({ targets: t, x: LARGURA / 2 + (j ? 1 : -1) * 110, duration: 380, ease: 'Back.easeOut' })))
+    await Promise.all(textos.map((t, j) => this.tween({ targets: t, x: CENTRO_X + (j ? 1 : -1) * 110, duration: 380, ease: 'Back.easeOut' })))
     tocar(this, 'impacto')
     shake(this, 160, 0.01)
     this.tweens.add({ targets: tags, alpha: 1, duration: 200 })
@@ -837,7 +837,7 @@ export default class PvpArena extends Phaser.Scene {
     shake(this, 220, 0.008)
     flashTela(this, 0xff8a1a, 0.18, 260)
     this.mostrarBanner(`VELOCIDADE x${this.aceleracao.toFixed(2)}!`, '#ff9a3a', { y: 200, tamanho: 28, ms: 1300 })
-    this.etiquetaEm(LARGURA / 2, 232, maximo ? 'VELOCIDADE MÁXIMA!' : 'a partida está demorando: tudo acelera!', maximo ? TEXTO.caido : TEXTO.normal, {
+    this.etiquetaEm(CENTRO_X, 232, maximo ? 'VELOCIDADE MÁXIMA!' : 'a partida está demorando: tudo acelera!', maximo ? TEXTO.caido : TEXTO.normal, {
       atraso: 200,
       tamanho: 12,
       ms: 1100,
@@ -1388,7 +1388,7 @@ export default class PvpArena extends Phaser.Scene {
     if (usadas.size) tocar(this, 'cartaDeslizar')
     await Promise.all([
       ...this.pistas.map((p) => p.mostrar()),
-      ...[...usadas].map((j) => this.tween({ targets: this.reveladas[j], x: LARGURA / 2, y: COLUNA[j], scaleX: 0.8, scaleY: 0.8, duration: 260, ease: 'Cubic.easeOut' })),
+      ...[...usadas].map((j) => this.tween({ targets: this.reveladas[j], x: CENTRO_X, y: COLUNA[j], scaleX: 0.8, scaleY: 0.8, duration: 260, ease: 'Cubic.easeOut' })),
     ])
     const voos = [0, 1].map(async (j) => {
       const caixa = r.caixas[j]

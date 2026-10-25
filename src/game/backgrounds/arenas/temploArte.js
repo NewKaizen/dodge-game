@@ -1,6 +1,7 @@
 // Arte do fundo do TEMPLO (templo.js), desenhada por código uma vez só e
 // guardada como textura (scene.textures.addCanvas). Tudo em pixel art na
-// METADE da resolução do jogo (320x240, cada pixel da arte vira 2x2 na tela).
+// METADE da resolução do jogo (428x240, cada pixel da arte vira 2x2 na tela; o
+// salão é simétrico em torno de VP.x, que cai em CENTRO_X no jogo).
 //
 // Salão em perspectiva de um ponto (ponto de fuga no meio, atrás das cartas
 // reveladas): teto com um buraco por onde entra o sol, paredes de blocos,
@@ -11,14 +12,18 @@
 //   gerarArteTemplo(scene)  cria as texturas (se ainda não existem)
 //   TEMPLO                  onde fica cada coisa (tochas, glifos, olhos...) em pixels da arte
 
+import { LARGURA } from '../../constants.js'
+
 export const P = 2 // pixels do jogo por pixel da arte
-const L = 320
+export const L = Math.ceil(LARGURA / P / 2) * 2 // par: o meio cai num pixel da arte (1 px sobra fora da tela)
 const A = 240
-const VP = { x: 160, y: 96 } // ponto de fuga
+const HW = L / 2 // meia largura da "boca" do salão
+const DX = HW - 160 // o salão foi desenhado em 320 de largura: o que é do miolo (buraco, nicho, ídolo) desloca DX
+const VP = { x: HW, y: 96 } // ponto de fuga
 const S = 0.325 // escala da parede do fundo (quanto ela é menor que a "boca" do salão)
-const FUNDO = { esq: VP.x - 160 * S, dir: VP.x + 160 * S, topo: VP.y - 96 * S, base: VP.y + 144 * S }
-const VIGA = { topo: 34, base: 52, quebraEsq: 138, quebraDir: 182 } // viga da frente (com a quebra no meio)
-const NICHO = { esq: 143, dir: 177, topo: 70 }
+const FUNDO = { esq: VP.x - HW * S, dir: VP.x + HW * S, topo: VP.y - 96 * S, base: VP.y + 144 * S }
+const VIGA = { topo: 34, base: 52, quebraEsq: 138 + DX, quebraDir: 182 + DX } // viga da frente (com a quebra no meio)
+const NICHO = { esq: 143 + DX, dir: 177 + DX, topo: 70 }
 
 const COR = {
   breu: 0x0b0705,
@@ -79,7 +84,7 @@ export const TEMPLO = {
   VP,
   // ordem da onda dourada: 0 no meio da viga, 1 nas pontas, >1 descendo as colunas
   glifos: [
-    ...glifosViga.map((g) => ({ ...g, ordem: Math.abs(g.x + 2.5 - VP.x) / 160, frente: true })),
+    ...glifosViga.map((g) => ({ ...g, ordem: Math.abs(g.x + 2.5 - VP.x) / HW, frente: true })),
     ...glifosColunas.map((g) => ({ ...g, ordem: 1.05 + ((g.y - 126) / 10) * 0.08, frente: true })),
   ],
   tochas: [
@@ -88,15 +93,15 @@ export const TEMPLO = {
     { x: NICHO.esq - 4, y: 101, frente: false },
     { x: NICHO.dir + 4, y: 101, frente: false },
   ],
-  idolo: { x: 160, y: 77 }, // meio, alto da cabeça
+  idolo: { x: VP.x, y: 77 }, // meio, alto da cabeça
   olhos: [
-    { x: 156, y: 87 },
-    { x: 161, y: 87 },
+    { x: VP.x - 4, y: 87 },
+    { x: VP.x + 1, y: 87 },
   ],
-  disco: { x: 160, y: 85, r: 15 },
-  buraco: { x: 160, y: 20 },
+  disco: { x: VP.x, y: 85, r: 15 },
+  buraco: { x: VP.x, y: 20 },
   quebra: { esq: VIGA.quebraEsq, dir: VIGA.quebraDir, y: VIGA.base },
-  altar: { x: 160, y: FUNDO.base + 3 },
+  altar: { x: VP.x, y: FUNDO.base + 3 },
   nGlifos: GLIFOS.length,
 }
 
@@ -248,22 +253,25 @@ function desenharGlifo(p, forma, x, y, fundo, luz) {
 function desenharTeto(p, rnd) {
   for (let y = 0; y < FUNDO.topo; y++) {
     const s = (VP.y - y) / 96
-    const x0 = VP.x - 160 * s
-    p.ret(x0, y, 320 * s, 1, tom(COR.pedra1, luzProf(s) * 0.75))
+    const x0 = VP.x - HW * s
+    p.ret(x0, y, 2 * HW * s, 1, tom(COR.pedra1, luzProf(s) * 0.75))
   }
   // vigas do teto convergindo para o fundo e traves atravessadas
-  for (let xf = -160; xf <= 160; xf += 40) p.linha(VP.x + xf, 0, VP.x + xf * S, FUNDO.topo, COR.junta)
+  for (let k = 0; k <= 10; k++) {
+    const xf = -HW + (k * HW) / 5
+    p.linha(VP.x + xf, 0, VP.x + xf * S, FUNDO.topo, COR.junta)
+  }
   for (const z of [1.25, 1.6, 2.05, 2.6]) {
     const s = 1 / z
     const y = VP.y - 96 * s
-    p.ret(VP.x - 160 * s, y, 320 * s, 1, COR.junta)
-    p.ret(VP.x - 160 * s, y + 1, 320 * s, 1, tom(COR.pedra3, luzProf(s) * 0.7))
+    p.ret(VP.x - HW * s, y, 2 * HW * s, 1, COR.junta)
+    p.ret(VP.x - HW * s, y + 1, 2 * HW * s, 1, tom(COR.pedra3, luzProf(s) * 0.7))
   }
   // o buraco: um pedaço do teto caiu (e quebrou a viga da frente) e o sol entra por ele
   const buraco = [
     [126, 0], [194, 0], [192, 7], [187, 12], [189, 19], [184, 26], [180, 33], [176, 40],
     [168, 43], [160, 41], [152, 44], [145, 39], [140, 32], [134, 25], [136, 17], [130, 10],
-  ]
+  ].map(([x, y]) => [x + DX, y])
   // céu em degradê, linha a linha, recortado pelo polígono
   const ys = buraco.map((q) => q[1])
   for (let y = 0; y < Math.max(...ys); y++) {
@@ -293,7 +301,7 @@ function desenharTeto(p, rnd) {
   for (const [x, y0, n] of [
     [137, 14, 16], [143, 30, 18], [152, 0, 12], [171, 0, 9], [183, 20, 15], [189, 8, 10], [164, 0, 6],
   ]) {
-    let xx = x
+    let xx = x + DX
     for (let i = 0; i < n; i++) {
       p.pix(xx, y0 + i, i % 4 === 0 ? COR.folha1 : COR.folha0)
       if (rnd() < 0.3) xx += rnd() < 0.5 ? -1 : 1
@@ -308,10 +316,10 @@ function desenharTeto(p, rnd) {
 }
 
 function desenharParedeLateral(p, rnd, lado) {
-  const xDe = (s) => (lado < 0 ? VP.x - 160 * s : VP.x + 160 * s)
-  const larg = Math.round(160 - 160 * S)
+  const xDe = (s) => (lado < 0 ? VP.x - HW * s : VP.x + HW * s)
+  const larg = Math.round(HW - HW * S)
   for (let i = 0; i < larg; i++) {
-    const s = (160 - i - 0.5) / 160
+    const s = (HW - i - 0.5) / HW
     const x = lado < 0 ? i : L - 1 - i
     const yt = VP.y - 96 * s
     const yb = VP.y + 144 * s
@@ -334,21 +342,21 @@ function desenharParedeLateral(p, rnd, lado) {
     }
   }
   // textura: pontinhos mais claros e mais escuros
-  for (let k = 0; k < 520; k++) {
+  for (let k = 0; k < 700; k++) {
     const i = Math.floor(rnd() * larg)
-    const s = (160 - i) / 160
+    const s = (HW - i) / HW
     const y = VP.y - 96 * s + rnd() * 240 * s
     p.pix(lado < 0 ? i : L - 1 - i, y, tom(rnd() < 0.5 ? COR.pedra1 : COR.pedra3, luzProf(s)))
   }
   // rachaduras e musgo descendo do teto / subindo do chão
-  for (let k = 0; k < 6; k++) {
+  for (let k = 0; k < 8; k++) {
     const i = 6 + Math.floor(rnd() * (larg - 12))
-    const s = (160 - i) / 160
+    const s = (HW - i) / HW
     rachadura(p, rnd, lado < 0 ? i : L - 1 - i, VP.y - 96 * s + rnd() * 120 * s, 6 + Math.floor(rnd() * 14), COR.junta)
   }
-  for (let k = 0; k < 9; k++) {
+  for (let k = 0; k < 12; k++) {
     const i = Math.floor(rnd() * (larg - 4))
-    const s = (160 - i) / 160
+    const s = (HW - i) / HW
     const x = lado < 0 ? i : L - 1 - i
     trepadeira(p, rnd, x, VP.y + 144 * s - 1, Math.floor((10 + rnd() * 30) * s), { largura: 1, escala: s })
   }
@@ -356,7 +364,7 @@ function desenharParedeLateral(p, rnd, lado) {
 
 function desenharChao(p, rnd) {
   // lajotas em perspectiva: colunas que convergem e fileiras que se apertam
-  const xfs = Array.from({ length: 13 }, (_, i) => -160 + (i * 320) / 12)
+  const xfs = Array.from({ length: 17 }, (_, i) => -HW + (i * 2 * HW) / 16)
   const zs = [1, 1.18, 1.4, 1.66, 1.98, 2.36, 2.78, 1 / S]
   for (let j = 0; j + 1 < zs.length; j++) {
     const s0 = 1 / zs[j]
@@ -379,12 +387,12 @@ function desenharChao(p, rnd) {
   for (const xf of xfs) p.linha(VP.x + xf, A, VP.x + xf * S, FUNDO.base, COR.junta)
   for (const z of zs) {
     const s = 1 / z
-    p.ret(VP.x - 160 * s, VP.y + 144 * s, 320 * s, 1, COR.junta)
+    p.ret(VP.x - HW * s, VP.y + 144 * s, 2 * HW * s, 1, COR.junta)
   }
   // rachaduras, cascalho e moedinhas perdidas perto do altar
-  for (let k = 0; k < 10; k++) {
+  for (let k = 0; k < 14; k++) {
     const s = S + rnd() * (1 - S)
-    const x = VP.x + (rnd() * 2 - 1) * 150 * s
+    const x = VP.x + (rnd() * 2 - 1) * (HW - 10) * s
     const y = VP.y + 144 * s
     let xx = x
     for (let i = 0; i < 4 + rnd() * 10; i++) {
@@ -392,19 +400,19 @@ function desenharChao(p, rnd) {
       xx += rnd() < 0.5 ? -1 : 1
     }
   }
-  for (let k = 0; k < 60; k++) {
+  for (let k = 0; k < 80; k++) {
     const s = S + rnd() * (1 - S)
-    p.pix(VP.x + (rnd() * 2 - 1) * 158 * s, VP.y + 144 * s - rnd() * 6, tom(rnd() < 0.5 ? COR.pedra4 : COR.pedra1, luzProf(s)))
+    p.pix(VP.x + (rnd() * 2 - 1) * (HW - 2) * s, VP.y + 144 * s - rnd() * 6, tom(rnd() < 0.5 ? COR.pedra4 : COR.pedra1, luzProf(s)))
   }
   for (const [x, y] of [[136, 158], [140, 160], [185, 157], [189, 161], [178, 166], [130, 170]]) {
-    p.pix(x, y, COR.ouro1)
-    p.pix(x + 1, y, COR.ouro0)
+    p.pix(x + DX, y, COR.ouro1)
+    p.pix(x + DX + 1, y, COR.ouro0)
   }
 }
 
 function desenharColuna(p, rnd, lado, s) {
   // coluna encostada na parede lateral, na profundidade s
-  const parede = lado < 0 ? VP.x - 160 * s : VP.x + 160 * s
+  const parede = lado < 0 ? VP.x - HW * s : VP.x + HW * s
   const w = Math.max(4, Math.round(20 * s))
   const x0 = lado < 0 ? parede + 3 * s : parede - 3 * s - w
   const yt = VP.y - 96 * s
@@ -595,7 +603,7 @@ function gerarFundo() {
   desenharParedeLateral(p, rnd, 1)
   desenharChao(p, rnd)
   desenharFundoSalao(p, rnd)
-  for (const s of [0.4, 0.52, 0.68, 0.84]) {
+  for (const s of [0.4, 0.5, 0.6, 0.72, 0.84]) {
     desenharColuna(p, rnd, -1, s)
     desenharColuna(p, rnd, 1, s)
   }
@@ -672,12 +680,12 @@ function gerarFrente() {
   for (const gl of TEMPLO.glifos) desenharGlifo(p, gl.forma, gl.x, gl.y, COR.pedra0, gl.coluna ? COR.pedra4 : COR.pedra5)
   // rachaduras na viga
   for (let k = 0; k < 7; k++) {
-    const x = rnd() < 0.5 ? 6 + rnd() * 120 : L - 6 - rnd() * 120
+    const x = rnd() < 0.5 ? 6 + rnd() * (VIGA.quebraEsq - 20) : L - 6 - rnd() * (VIGA.quebraEsq - 20)
     rachadura(p, rnd, x, VIGA.topo + 1, 4 + Math.floor(rnd() * 12), COR.junta)
   }
   // trepadeiras escorrendo da viga e subindo pelas colunas
-  for (let k = 0; k < 12; k++) {
-    const x = rnd() < 0.5 ? 2 + rnd() * 128 : L - 2 - rnd() * 128
+  for (let k = 0; k < 16; k++) {
+    const x = rnd() < 0.5 ? 2 + rnd() * (VIGA.quebraEsq - 10) : L - 2 - rnd() * (VIGA.quebraEsq - 10)
     trepadeira(p, rnd, x, VIGA.topo + 1, 4 + Math.floor(rnd() * 14), { dir: 1, largura: 1 })
   }
   for (const x of [8, 20, L - 8, L - 20]) trepadeira(p, rnd, x, A - 10, 60 + Math.floor(rnd() * 70), { largura: 3 })
@@ -767,7 +775,7 @@ function gerarGlifoAceso(forma) {
 
 function gerarVinheta() {
   const [c, g] = tela(L, A)
-  const grad = g.createRadialGradient(L / 2, A * 0.42, A * 0.25, L / 2, A * 0.5, L * 0.72)
+  const grad = g.createRadialGradient(L / 2, A * 0.42, A * 0.25, L / 2, A * 0.5, L * 0.62)
   grad.addColorStop(0, 'rgba(0,0,0,0)')
   grad.addColorStop(0.6, 'rgba(0,0,0,0.25)')
   grad.addColorStop(1, 'rgba(0,0,0,0.7)')

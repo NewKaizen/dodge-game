@@ -8,13 +8,13 @@ import { desenharNaipe } from '../entities/Carta.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { tocar, musica, pararMusica } from '../audio.js'
 import { estilhacos, faixasDiagonais } from '../effects/entrada.js'
-import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
+import { CORES, FONTE, LARGURA, ALTURA, CENTRO_X, TEXTO, corTexto } from '../constants.js'
 import { tremerCamera } from '../effects/shake.js'
 import { claraoCamera } from '../effects/flash.js'
 import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
 
 // Área da grade de personagens e dos painéis de cada jogador (px)
-const GRADE = { topo: 62, base: 190, esquerda: 20, direita: 620, espaco: 8, larguraMax: 96, alturaMax: 128 }
+const GRADE = { topo: 62, base: 190, esquerda: 40, direita: LARGURA - 40, espaco: 8, larguraMax: 104, alturaMax: 128 }
 const PAINEL = { y: 198, altura: 250, espaco: 8 }
 const CHAVE_SALVA = 'dodge-pvp' // última escolha (também fica no registry 'pvp')
 const CHAVE_NIVEL = 'dodge-pvp-cpu' // nível da CPU (também fica no registry 'pvpNivelBot')
@@ -517,7 +517,7 @@ export default class PvpEscolha extends Phaser.Scene {
     this.tweens.add({ targets: veu, alpha: 1, duration: 160 })
 
     // metade de cada jogador, cortada na diagonal, entrando pelos lados
-    const meio = { cima: 372, baixo: 268 }
+    const meio = { cima: CENTRO_X + 52, baixo: CENTRO_X - 52 }
     const metade = (j) => {
       const g = this.add.graphics().setDepth(topo + 1)
       const pontos =
@@ -539,7 +539,7 @@ export default class PvpEscolha extends Phaser.Scene {
     const lutadores = [p1, p2].map((id, j) => {
       const def = PERSONAGENS[id]
       const lado = j === 0 ? -1 : 1
-      const x = LARGURA / 2 + lado * 170
+      const x = CENTRO_X + lado * 200
       const sombra = this.add.ellipse(x, chao + 3, 80, 16, 0x000000, 0.6).setDepth(topo + 4)
       const sprite = this.add.image(x, chao, id).setOrigin(0.5, 1).setScale(5).setDepth(topo + 5).setFlipX(j === 1)
       const etiqueta = this.add

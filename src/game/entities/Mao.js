@@ -33,7 +33,7 @@ export default class Mao {
     this.scene = scene
     this.jogador = opcoes.jogador ?? 0
     this.cor = CORES.almas[this.jogador] ?? 0xffffff
-    this.x = opcoes.x ?? 320
+    this.x = opcoes.x ?? CENTRO_X
     this.y = opcoes.y ?? 430
     this.angulo = opcoes.angulo ?? 0
     this.espelhar = opcoes.espelhar ?? false
