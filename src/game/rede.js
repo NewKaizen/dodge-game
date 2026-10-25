@@ -58,7 +58,9 @@ export function irParaCena(cena, chave, dados = {}) {
   cena.scene.start(chave, dados)
 }
 
-// a cena Lan chama ao abrir: no lobby não tem partida em rede
+// a cena Lan chama ao abrir: no lobby não tem partida em rede. PvpResultado
+// chama antes de sair da sala casual (JOGAR NOVAMENTE / VOLTAR), para a troca
+// de cena ser a dela
 export const encerrarRede = () => ativa && ativar(false)
 
 export function instalarRede(game) {
@@ -84,7 +86,8 @@ export function instalarRede(game) {
     parceiro = outro
     if (!ativa || naSalaComParceiro(s)) return
     ativar(false)
-    trocarCena(game, s.fase === 'sala' ? 'Lan' : s.online ? 'Menu' : 'Lan')
+    // partida rápida (casual): volta para a tela ONLINE, onde dá para procurar outra
+    trocarCena(game, s.fase === 'sala' || s.ultimaCasual || !s.online ? 'Lan' : 'Menu')
   })
 
   if (import.meta.env.DEV)

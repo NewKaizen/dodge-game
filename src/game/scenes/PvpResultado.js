@@ -10,7 +10,8 @@ import { TEXTO_JOGADOR } from '../pvp/perfil.js'
 import { CORES, FONTE, LARGURA, ALTURA, CENTRO_X, TEXTO, corTexto } from '../constants.js'
 import { claraoCamera } from '../effects/flash.js'
 import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
-import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
+import { canal, emRede, souHostDaRede, irParaCena, encerrarRede } from '../rede.js'
+import { lan, salaCasual, pedirRevanche, limparRevanche, sairSala, entrarFila, fecharLobby } from '../../lib/lan/rede.js'
 
 // Tela de fim da partida PvP, em etapas (como a Vitoria):
 //   ENTRADA DO VENCEDOR (não tem no empate; ver entradaVencedor: faixa na cor
@@ -24,6 +25,14 @@ import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
 // A: VOLTAR AO LOBBY. Em rede (game/rede.js) os dois veem esta tela, cada um
 // no seu PC: o A do host leva os dois de volta ao lobby da sala (irParaCena);
 // o A do convidado pede ao host ('voltarLobby') e ele faz o mesmo.
+// PARTIDA RÁPIDA (sala casual, JOGAR RÁPIDO; docs/online.md): três opções
+// (←→/↑↓ escolher, A confirmar, B = VOLTAR):
+//   REVANCHE          pede ao servidor; os dois aceitando (15 s), o host leva os
+//                     dois de novo para a escolha de personagem
+//   JOGAR NOVAMENTE   sai da sala e volta para a fila (cena Lan)
+//   VOLTAR            sai da sala e vai para o menu
+// O oponente saindo fecha a sala: game/rede.js leva quem ficou para a tela
+// ONLINE com o aviso (dali dá para entrar na fila de novo ou voltar).
 //
 // Recebe de PvpArena:
 //   { vencedor: 1 | 2 | 0 (empate), p1, p2, rodadas,
@@ -48,6 +57,12 @@ const PAINEL = { x: CENTRO_X - 230, y: 118, largura: 460, altura: 290, linhaY: 1
 const COLUNA = [PAINEL.x + 76, PAINEL.x + PAINEL.largura - 76] // centro dos valores do P1 e do P2
 const LUTADOR = { x: [100, LARGURA - 100], chao: 318, escala: 4 }
 const COR_EMPATE = '#c8c8d8'
+
+const OPCOES_CASUAL = [
+  { id: 'revanche', rotulo: 'REVANCHE' },
+  { id: 'fila', rotulo: 'JOGAR NOVAMENTE' },
+  { id: 'voltar', rotulo: 'VOLTAR' },
+]
 
 const VAZIO = { danoCausado: 0, danoRecebido: 0, cartasJogadas: 0, maiorCarta: null, grazes: 0, ases: 0 }
 
@@ -101,8 +116,17 @@ export default class PvpResultado extends Phaser.Scene {
     this.controles.onBotao((_, botao) => this.aoBotao(botao))
     this.rede = emRede()
     this.naSala = this.rede || partidaOnline() // sem revanche: só voltar ao lobby
+    // partida rápida: revanche com o aceite dos dois, fila ou menu
+    this.casual = this.rede && salaCasual()
+    this.opcao = 0
+    this.revanche = null
+    if (this.casual) {
+      limparRevanche()
+      const parar = lan.subscribe((s) => this.aoRevanche(s.revanche))
+      this.events.once('shutdown', parar)
+    }
     // em rede, o host volta com os dois quando o convidado pede (mesmo no meio da animação)
-    if (this.rede && souHostDaRede()) {
+    if (this.rede && souHostDaRede() && !this.casual) {
       const parar = canal.ao('voltarLobby', () => this.voltarAoLobby())
       this.events.once('shutdown', parar)
     }
@@ -155,12 +179,76 @@ export default class PvpResultado extends Phaser.Scene {
       if (this.etapas.length) this.pular()
       return
     }
+    if (this.casual) return botao === 'B' ? this.escolherCasual('voltar') : this.escolherCasual(OPCOES_CASUAL[this.opcao].id)
     if (this.naSala) return this.voltarAoLobby() // na sala não tem revanche: os dois voltam ao lobby
     this.saindo = true
     tocar(this, botao === 'A' ? 'confirmar' : 'cancelar')
     this.cameras.main.fadeOut(250, 0, 0, 0)
     const { p1, p2, arena } = this
     this.time.delayedCall(260, () => (botao === 'A' ? this.scene.start('PvpArena', { p1, p2, arena }) : this.scene.start('PvpEscolha')))
+  }
+
+  // ---------- partida rápida (sala casual) ----------
+
+  escolherCasual(id) {
+    if (this.saindo) return
+    if (id === 'revanche') {
+      const r = this.revanche
+      if (r?.estado === 'pedida' && r.minha) return tocar(this, 'cancelar') // já pediu: esperando o outro
+      tocar(this, 'confirmar')
+      pedirRevanche(true)
+      return
+    }
+    this.saindo = true
+    tocar(this, id === 'voltar' ? 'cancelar' : 'confirmar')
+    // sair da sala casual fecha ela para o outro (ele vai para a tela ONLINE com o aviso)
+    encerrarRede()
+    if (id === 'fila') {
+      sairSala()
+      entrarFila()
+    } else fecharLobby()
+    this.cameras.main.fadeOut(250, 0, 0, 0)
+    this.time.delayedCall(260, () => this.scene.start(id === 'fila' ? 'Lan' : 'Menu'))
+  }
+
+  aoRevanche(r) {
+    this.revanche = r
+    if (r?.estado === 'aceita' && !this.saindo) {
+      // os dois toparam: o host recomeça pela escolha de personagem (o convidado vai junto pelo canal)
+      if (souHostDaRede()) {
+        this.saindo = true
+        tocar(this, 'superAtivar')
+        this.cameras.main.fadeOut(250, 0, 0, 0)
+        this.time.delayedCall(260, () => irParaCena(this, 'PvpEscolha'))
+      }
+    }
+    this.atualizarCasual()
+  }
+
+  textoRevanche() {
+    const r = this.revanche
+    if (!r) return ''
+    const resta = r.expira ? Math.max(0, Math.ceil((r.expira - Date.now()) / 1000)) : 0
+    if (r.estado === 'pedida') return r.minha ? `esperando o oponente aceitar a revanche… ${resta}s` : `o oponente quer revanche! (${resta}s)  A em REVANCHE para aceitar`
+    if (r.estado === 'aceita') return 'REVANCHE! escolham os lutadores…'
+    if (r.estado === 'recusada') return r.minha ? 'você recusou a revanche' : 'o oponente recusou a revanche: fila ou menu?'
+    if (r.estado === 'expirada') return 'a revanche expirou: fila ou menu?'
+    return 'o oponente já saiu'
+  }
+
+  montarCasual() {
+    this.linhasCasual = OPCOES_CASUAL.map((o, k) => this.add.text(LARGURA / 2 + (k - 1) * 210, ALTURA - 26, o.rotulo, estilo(16)).setOrigin(0.5).setDepth(10))
+    this.cursorCasual = this.add.image(0, ALTURA - 26, 'coracao').setTint(CORES.almas[0]).setDepth(10)
+    this.avisoCasual = this.add.text(LARGURA / 2, ALTURA - 52, '', estilo(13, TEXTO.selecionado)).setOrigin(0.5).setDepth(10)
+    this.atualizarCasual()
+  }
+
+  atualizarCasual() {
+    if (!this.linhasCasual) return
+    this.linhasCasual.forEach((l, k) => l.setColor(k === this.opcao ? TEXTO.selecionado : '#9a9ab0').setAlpha(k === this.opcao ? 1 : 0.75))
+    const l = this.linhasCasual[this.opcao]
+    this.cursorCasual.setX(l.x - l.width / 2 - 16)
+    this.avisoCasual.setText(this.textoRevanche())
   }
 
   voltarAoLobby() {
@@ -602,6 +690,8 @@ export default class PvpResultado extends Phaser.Scene {
   liberar(rapido) {
     if (rapido) this.time.delayedCall(400, () => (this.liberado = true))
     else this.liberado = true
+    this.dicaPular?.destroy()
+    if (this.casual) return this.montarCasual()
     const opcoes = this.add
       .text(LARGURA / 2, ALTURA - 26, this.naSala ? 'A: VOLTAR AO LOBBY' : 'A: REVANCHE     B: TROCAR PERSONAGENS', estilo(16))
       .setOrigin(0.5)
@@ -613,7 +703,6 @@ export default class PvpResultado extends Phaser.Scene {
       duration: 300,
       onComplete: () => this.tweens.add({ targets: opcoes, alpha: 0.5, duration: 550, yoyo: true, repeat: -1 }),
     })
-    this.dicaPular?.destroy()
   }
 
   update(time, delta) {
@@ -623,6 +712,19 @@ export default class PvpResultado extends Phaser.Scene {
 
     this.relogio += delta
     while (this.etapas.length && this.relogio >= this.etapas[0].t) this.etapas.shift().f(false)
+
+    // partida rápida: escolher entre as três opções (e a contagem da revanche)
+    if (this.linhasCasual && !this.saindo) {
+      for (let j = 0; j < this.controles.numJogadores; j++) {
+        const d = this.controles.toque(j)
+        const passo = d === 'esquerda' || d === 'cima' ? -1 : d === 'direita' || d === 'baixo' ? 1 : 0
+        if (!passo) continue
+        this.opcao = (this.opcao + passo + OPCOES_CASUAL.length) % OPCOES_CASUAL.length
+        tocar(this, 'mover')
+      }
+      this.atualizarCasual()
+      this.cursorCasual.setAlpha(0.6 + 0.4 * Math.abs(Math.sin(time / 260)))
+    }
 
     if (!this.dicaPular && !this.liberado && this.relogio > TEMPO.estouro) {
       this.dicaPular = this.add.text(LARGURA - 10, ALTURA - 10, 'A: pular', estilo(12, '#9090a0')).setOrigin(1, 1).setDepth(10)

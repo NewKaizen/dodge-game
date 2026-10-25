@@ -12,7 +12,7 @@ As salas online são privadas: não aparecem em lista nenhuma, só entra quem te
 ### Regras da partida online
 
 - **Sem pausa**: o C (e o Esc) não fazem nada durante a partida (pausar travaria o amigo).
-- **Sem revanche**: no fim, a única opção é **A: VOLTAR AO LOBBY** (do host ou do convidado): os dois voltam para o lobby da sala (que continua aberta), com o chat, e o host começa outra partida quando quiser.
+- **Sem revanche** (fora do Jogar Rápido, abaixo): no fim, a única opção é **A: VOLTAR AO LOBBY** (do host ou do convidado): os dois voltam para o lobby da sala (que continua aberta), com o chat, e o host começa outra partida quando quiser.
 - Se o outro sai no meio, quem ficou volta para o lobby da sala (se a sala cai, volta ao menu); para sair no meio, use **Sair da sala** na barra de cima.
 
 ### Ping
@@ -114,8 +114,69 @@ Convidado joga normalmente, só não tem amigos.
 - **Link**: **copiar link da sala** gera `https://<site>/?sala=CODIGO`. Quem
   abre (mesmo sem conta) vai direto para a tela ONLINE e entra na sala; o
   código de 5 letras continua valendo.
-- **Protocolo**: o lobby subiu para a versão 3 (`PROTOCOLO` em `server/lan.js`
+- **Protocolo**: o lobby subiu para a versão 3 (hoje 4, com a fila do Jogar Rápido abaixo) (`PROTOCOLO` em `server/lan.js`
   e `src/lib/lan/rede.js`): atualize os dois PCs. Mensagens novas: `convidar`,
   `responderConvite`, `amigosMudaram` (cliente) e `presencas`, `presenca`,
   `convite`, `conviteEnviado`, `conviteResposta`, `conviteFim`, `conviteNegado`,
   `amigosAtualizar` (servidor).
+
+## Jogar Rápido (fila casual de PVP 1x1)
+
+Menu → **ONLINE** → **JOGAR RÁPIDO** (a primeira opção). Vale para quem tem
+conta e para convidado (convidado joga, mas a partida não dá XP: aviso na tela).
+
+- **Procurando**: a tela mostra o tempo de espera; **B** sai da fila. Sair da
+  tela ONLINE, entrar numa sala (criar, código, link) ou aceitar convite de
+  amigo também tira da fila.
+- **Achou**: aparece o oponente (nome e tag; "convidado" se não tem conta) e
+  uma contagem de **10 s**. **A** aceita, **B** recusa. Os dois aceitaram: o
+  servidor cria a sala sozinho (PVP, marcada como **casual**) e o host já leva
+  os dois para a escolha de personagem, como numa sala normal.
+- Um recusou ou deixou o tempo acabar: ele sai da fila; o outro volta a
+  procurar **na frente da fila**, com o tempo de espera de antes.
+- **CPU**: depois de **30 s** sem ninguém, a tela pergunta "Ninguém por enquanto
+  — jogar contra a CPU?". Aceitar sai da fila e abre o PVP local contra a CPU
+  (sempre dita como CPU, nunca como pessoa). Dá para continuar procurando.
+- **Fim da partida**: **REVANCHE** (os dois precisam aceitar em **15 s**; aí o
+  host leva os dois de novo para a escolha de personagem), **JOGAR NOVAMENTE**
+  (sai da sala e volta para a fila) ou **VOLTAR** (menu). Na sala casual, quem
+  sai fecha a sala: o outro volta para a tela ONLINE com "o oponente saiu da
+  partida" e pode procurar outra.
+- Salas de amigos (código, link, convite) continuam como antes: sem revanche,
+  só voltar ao lobby da sala.
+
+### Regras do servidor (`server/fila.js`, `server/lan.js`)
+
+- **FIFO**, sem rating: do mais antigo para o mais novo, cada um pareia com o
+  primeiro compatível depois dele. Não pareia a mesma conta (duas abas; a conta
+  também não entra duas vezes na fila) nem quem se bloqueou (em qualquer direção).
+- Só entra na fila quem não está em sala e não está na fila; uma conta logada
+  espera os bloqueios carregarem.
+- **Host da sala casual**: o de menor ping até o servidor, se os dois pings são
+  conhecidos e a diferença é de pelo menos **30 ms** (o cliente manda o ping
+  também enquanto está na fila); senão, quem **confirmou primeiro**. O servidor
+  escreve a escolha no log (`[fila] partida rápida ...`).
+- Desconectar procurando ou com partida achada tira da fila e libera o outro.
+  Confirmação atrasada (depois dos 10 s) não vale: "essa partida não vale mais".
+- Limite: **30 ações por minuto** (fila, confirmar, revanche) por conexão, além
+  do limite geral de mensagens.
+- Para a Fase 1D (registro de partidas): a sala casual guarda `casual: true`,
+  `participantes` (`usuario` de cada um, ou `convidado: true`) e `criadaEm`.
+
+### Protocolo (versão 4)
+
+| Sentido | Mensagem |
+| --- | --- |
+| cliente → servidor | `fila {acao: 'entrar'\|'sair'}` · `confirmar {id, aceitar}` · `revanche {aceitar}` |
+| servidor → cliente | `fila {estado: 'procurando'\|'fora', desde, esperaMs, convidado, motivo}` · `pareado {id, oponente: {nome, tag?, avatar?, nivel?}, expiraEm, restanteMs}` · `pareadoEstado {id, eu, oponente}` · `pareadoFim {id, voltou, motivo}` · `partidaCasual {salaId, host}` · `filaNegada {msg, estado}` · `revanche {estado: 'pedida'\|'aceita'\|'recusada'\|'expirada'\|'indisponivel', de?, expiraEm?, restanteMs?, host?}` |
+
+A sala ganhou `casual` no `sala {...}` e o `fechada` da sala casual vem com
+`casual: true`. `PROTOCOLO` subiu para **4** (`server/lan.js` e
+`src/lib/lan/rede.js`): atualize os dois PCs.
+
+### Testar com duas janelas
+
+`ONLINE=1 npm run dev` (ou `npm run online`), abra o jogo em duas janelas (uma
+anônima serve de convidado; a outra pode estar logada), use o **SIMULADOR
+(TECLADO)** nas duas, ONLINE → JOGAR RÁPIDO nas duas e aceite com A. Para ver a
+oferta da CPU, entre só com uma e espere 30 s.

@@ -52,10 +52,10 @@ function montar({ amizades = [], bloqueios = [], pedidos = [] } = {}) {
 
 const mapa = (p) => p.ultima('presencas')?.mapa
 
-test('protocolo foi para 3 nos dois lados (servidor e cliente)', () => {
-  assert.equal(PROTOCOLO, 3)
+test('protocolo igual nos dois lados (servidor e cliente)', () => {
+  assert.ok(PROTOCOLO >= 3)
   const rede = fs.readFileSync(new URL('../../src/lib/lan/rede.js', import.meta.url), 'utf8')
-  assert.match(rede, /export const PROTOCOLO = 3\b/)
+  assert.match(rede, new RegExp(`export const PROTOCOLO = ${PROTOCOLO}\\b`))
 })
 
 test('presença: só os amigos veem, e o status acompanha a sala', async () => {
