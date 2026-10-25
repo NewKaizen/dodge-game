@@ -6,13 +6,25 @@
 // grazes, desvio perfeito. O estado tem o mesmo formato do PvP em
 // `jogadores` (as funções de energia do PvP valem aqui) e mais o `chefe`.
 //
+// QUADRO ÚNICO: o chefe joga UMA carta por rodada (a intenção, com o naipe à
+// vista) e o ataque dela roda num quadro só, no meio da mesa, com os dois
+// corações dentro: os dois desviam do MESMO ataque. O que mexe na carta do
+// chefe (SUPER, A♠, A♦, A♣, a lentidão do ♦) vale para os dois; escudo, dano,
+// grazes, desvio perfeito, combo de perfeitos e CRÍTICO continuam POR JOGADOR.
+// Quem está caído quando o chefe mostra a carta fica fora do quadro.
+//
 //   const estado = criarPartidaCoop({ party: ['kris', 'susie'], chefe: 'king', nivel: 'facil', semente })
-//   iniciarRodadaCoop(estado)          energia, mãos, quem caiu volta, o chefe mostra as intenções
+//   iniciarRodadaCoop(estado)          energia, mãos, quem caiu volta, o chefe mostra a intenção
 //   podeJogarCoop(estado, j, id)       { ok, motivo }
 //   const r = resolverRodadaCoop(estado, jogadaP1, jogadaP2)
-//     r.caixas[j]   o que o jogador j desvia: { carta (do chefe), dano, ritmo, inverter, escudo, lento } ou null
+//     r.destino     o que aconteceu com a carta do chefe: 'quadro' | 'varrida' |
+//                   'refletida' | 'anulada' | 'roubada' (null: o chefe não jogou)
+//     r.quadro      o ataque que os dois desviam: { carta (do chefe), dano, danos[j],
+//                   escudos[j], jogadores[j], ritmo, inverter, lento } ou null
+//                   (danos[j] = o dano por acerto em j, já com o escudo dele;
+//                   jogadores[j] = j está no quadro)
 //     r.golpes[j]   o contra-ataque do jogador j: { carta, tipo, base } ou null
-//   ... esquiva: aplicarDanoCoop(estado, j, dano) a cada acerto (HP 0 = caiu),
+//   ... esquiva: aplicarDanoCoop(estado, j, r.quadro.danos[j]) a cada acerto (HP 0 = caiu),
 //       registrarGrazes / registrarPerfeitoCombo do PvP (reexportados aqui)
 //       COMBO DE PERFEITOS igual ao PvP: rodadas seguidas com desvio perfeito
 //       multiplicam a ENERGIA do perfeito (x1, x2, x3, x4 = COMBO_PERFEITO.teto);
@@ -39,7 +51,9 @@ import { CARTAS_CHEFES, faseDoChefe, suporteDoChefe, danoDaCartaChefe, ritmoDaCa
 //   critico          desvio perfeito multiplica o contra-ataque
 //   combo / par      os dois atacam com o mesmo naipe / o mesmo valor
 //   grazeArmadilha   ♣: cada graze na esquiva soma esta fração ao golpe (até grazeArmadilhaMax)
-//   lentidao         ♦: fator da velocidade das balas do chefe na caixa de quem jogou (Q/K: nas duas)
+//   lentidao         ♦: fator da velocidade das balas do ataque do chefe (o quadro é
+//                    dos dois: vale para os dois); ♦ Q/K: lentidaoForte. Não soma: vale o
+//                    ♦ mais forte da rodada
 //   superGolpe       dano base do SUPER de um jogador: esta fração do HP máximo do
 //                    chefe (o HP já vem com o nível), nunca menos que superPiso
 //   custoSuper       energia do SUPER no CO-OP (no PvP custa 10)
@@ -50,6 +64,13 @@ import { CARTAS_CHEFES, faseDoChefe, suporteDoChefe, danoDaCartaChefe, ritmoDaCa
 //                    HP máximo; acima disso ele aguenta com pelo menos superSobra. E nunca
 //                    pula uma fase inteira do chefe (avança no máximo uma). Ver limiteDoSuper
 //   cargaSuper       o SUPER do chefe sai a cada tantas rodadas (a carga sobe 1 por rodada)
+//   danoQuadro       multiplica o dano por acerto do ataque do chefe no quadro: lá o A♠,
+//                    o A♦, o A♣ e o SUPER de qualquer um dos dois tiram o ataque dos DOIS
+//                    (antes cada um protegia só uma caixa); o acerto dói um pouco mais
+//                    para a luta continuar com o mesmo perigo (scripts/balanceamento/)
+//   curaChefe        multiplica a cura das cartas ♥ do chefe: ele joga UMA carta por
+//                    rodada (antes eram duas), então cura com a metade da frequência;
+//                    curando o dobro, a cura dele por rodada continua a mesma de antes
 //   rouboEnergia     energia que o A♣ dá
 //   anularCarga      quanto o A♦ tira da carga do SUPER do chefe
 //   segundaChance    fração do HP máx que o A♥ cura nos dois
@@ -63,6 +84,7 @@ export const COOP = {
   grazeArmadilha: 0.06,
   grazeArmadilhaMax: 0.6,
   lentidao: 0.85,
+  lentidaoForte: 0.75,
   superGolpe: 0.33,
   superPiso: 60,
   custoSuper: 8,
@@ -70,6 +92,8 @@ export const COOP = {
   superFinaliza: 0.5,
   superSobra: 0.1,
   cargaSuper: 10,
+  curaChefe: 2,
+  danoQuadro: 1.1,
   rouboEnergia: 2,
   anularCarga: 2,
   segundaChance: 0.25,
@@ -83,6 +107,14 @@ export const GOLPE = {
 }
 const ECO = 7 // Espelho sem nada para refletir: golpe de um 7♠
 
+// Fator da velocidade das balas que um ♦ de valor v põe no ataque do chefe
+export const lentidaoDoOuros = (v) => (v >= 12 ? COOP.lentidaoForte : COOP.lentidao)
+
+// Dano por acerto com o escudo (fração do dano; null = sem escudo), nunca menos que 1
+export function danoComEscudo(dano, escudo) {
+  return escudo == null ? dano : Math.max(1, Math.ceil(dano * escudo))
+}
+
 const pct = (f) => `${Math.round(f * 100)}%`
 
 // Texto da carta no CO-OP (a prévia ampliada mostra este no lugar do texto do PvP).
@@ -93,19 +125,19 @@ export function descricaoCoop(carta, luta = null) {
     const fim = `Com mais da metade do HP, o chefe aguenta.`
     if (!luta) {
       const combos = Object.values(COOP.superCombo)
-      return `SUPER: golpe de ${pct(COOP.superGolpe)} do HP do chefe e varre a carta dele da sua caixa (não o SUPER dele). Os dois na mesma rodada: SUPER COMBO de ${pct(Math.min(...combos))} a ${pct(Math.max(...combos))} (pelo nível)! ${fim}`
+      return `SUPER: golpe de ${pct(COOP.superGolpe)} do HP do chefe e varre o ataque dele do quadro, para os dois (não o SUPER dele). Os dois na mesma rodada: SUPER COMBO de ${pct(Math.min(...combos))} a ${pct(Math.max(...combos))} (pelo nível)! ${fim}`
     }
     const combo = Math.round(luta.hpMax * fracaoDoCombo(luta.nivel))
-    return `SUPER: golpe de ${danoDoSuper(luta)} (${pct(COOP.superGolpe)} do HP do chefe) e varre a carta dele da sua caixa (não o SUPER dele). Os dois na mesma rodada: SUPER COMBO de ${combo} (${pct(fracaoDoCombo(luta.nivel))})! ${fim}`
+    return `SUPER: golpe de ${danoDoSuper(luta)} (${pct(COOP.superGolpe)} do HP do chefe) e varre o ataque dele do quadro, para os dois (não o SUPER dele). Os dois na mesma rodada: SUPER COMBO de ${combo} (${pct(fracaoDoCombo(luta.nivel))})! ${fim}`
   }
   const especial = especialDaCarta(carta)
-  if (especial === 'espelho') return `ESPECIAL: a carta do chefe na sua caixa volta e acerta ele. Sem nada para refletir (ou contra o SUPER dele), golpe de ${GOLPE.espadas(ECO)}.`
-  if (especial === 'anular') return `ESPECIAL: cancela a carta do chefe na sua caixa e tira ${COOP.anularCarga} da carga do SUPER dele.`
-  if (especial === 'roubo') return `ESPECIAL: rouba a carta do chefe que ia no parceiro (a caixa dele fica livre) e você ganha +${COOP.rouboEnergia} de energia.`
+  if (especial === 'espelho') return `ESPECIAL: o ataque do chefe volta e acerta ele (ninguém desvia). Sem nada para refletir (ou contra o SUPER dele), golpe de ${GOLPE.espadas(ECO)}.`
+  if (especial === 'anular') return `ESPECIAL: cancela o ataque do chefe (ninguém desvia) e tira ${COOP.anularCarga} da carga do SUPER dele.`
+  if (especial === 'roubo') return `ESPECIAL: rouba o ataque do chefe (ninguém desvia) e você ganha +${COOP.rouboEnergia} de energia.`
   if (especial === 'segundaChance') return `ESPECIAL: VOCÊ E O PARCEIRO curam ${pct(COOP.segundaChance)} do HP máximo e ninguém cai nesta rodada. Levanta o parceiro caído.`
   const v = carta.valor
   if (carta.naipe === 'espadas') return `Contra-ataque: golpe de ${GOLPE.espadas(v)} no chefe depois da esquiva (CRÍTICO x${COOP.critico} se você não levar dano).`
-  if (carta.naipe === 'ouros') return `Contra-ataque: golpe de ${GOLPE.ouros(v)} e a carta do chefe ${v >= 12 ? 'nas DUAS caixas fica' : 'na sua caixa fica'} mais lenta.`
+  if (carta.naipe === 'ouros') return `Contra-ataque: golpe de ${GOLPE.ouros(v)} e o ataque do chefe fica ${pct(1 - lentidaoDoOuros(v))} mais lento para os dois.`
   if (carta.naipe === 'paus') return `Armadilha: golpe de ${GOLPE.paus(v)} no chefe, +${pct(COOP.grazeArmadilha)} a cada graze na esquiva (até +${pct(COOP.grazeArmadilhaMax)}).`
   const ef = efeitosDaCarta(carta) ?? {}
   const partes = []
@@ -117,7 +149,6 @@ export function descricaoCoop(carta, luta = null) {
 }
 
 const ID_JOGADOR = ['p1', 'p2']
-const outro = (j) => 1 - j
 
 // ---------- partida ----------
 
@@ -172,7 +203,7 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
       cargaMax: COOP.cargaSuper,
       monte: embaralhar(CARTAS_CHEFES[chefe].fases[0].map((c) => ({ ...c })), rng),
       descarte: [],
-      intencoes: [null, null], // carta virada que o chefe vai jogar em cada jogador
+      intencao: null, // a carta virada que o chefe vai jogar nesta rodada (no quadro, nos dois)
     },
     vencedor: null,
     historico: [],
@@ -208,8 +239,9 @@ function derrubar(estado, j) {
 const emPe = (estado) => [0, 1].filter((j) => !estado.jogadores[j].caido)
 
 // Começo da rodada: quem caiu há tempo suficiente volta, energia e mãos (como
-// no PvP), a carga do SUPER do chefe sobe (cheia: SUPER nas duas caixas) e ele escolhe uma carta para cada
-// jogador em pé (as intenções). Devolve os eventos ({ tipo, j? }).
+// no PvP), a carga do SUPER do chefe sobe e ele escolhe UMA carta para a
+// rodada (a intenção: o ataque dela vai no quadro, nos dois). Carga cheia: a
+// carta é o SUPER dele. Devolve os eventos ({ tipo, j? }).
 export function iniciarRodadaCoop(estado) {
   if (estado.vencedor) return []
   estado.rodada++
@@ -225,25 +257,14 @@ export function iniciarRodadaCoop(estado) {
   })
 
   const c = estado.chefe
-  c.intencoes = [null, null]
-  const alvos = emPe(estado)
+  c.intencao = null
   c.carga = Math.min(c.cargaMax, c.carga + 1)
-  if (c.carga >= c.cargaMax && alvos.length) {
-    c.carga = 0
-    for (const j of alvos) c.intencoes[j] = { ...CARTAS_CHEFES[c.id].super }
-    eventos.push({ tipo: 'superChefe' })
-  } else {
-    let anterior = null
-    for (const j of alvos) {
-      let carta = comprarDoChefe(estado)
-      // duas curas na mesma rodada não: a segunda volta para o fundo do monte
-      if (carta?.naipe === 'copas' && anterior?.naipe === 'copas') {
-        c.monte.push(carta)
-        carta = comprarDoChefe(estado)
-      }
-      c.intencoes[j] = carta
-      anterior = carta
-    }
+  if (emPe(estado).length) {
+    if (c.carga >= c.cargaMax) {
+      c.carga = 0
+      c.intencao = { ...CARTAS_CHEFES[c.id].super }
+      eventos.push({ tipo: 'superChefe' })
+    } else c.intencao = comprarDoChefe(estado)
   }
   estado.fase = 'escolha'
   return eventos
@@ -265,17 +286,21 @@ export function podeJogarCoop(estado, j, jogada) {
 }
 
 function novoEfeito() {
-  return { cura: 0, escudo: null, energia: 0, compradas: [], levantou: false, segundaChance: false, anulou: false, roubou: null, lento: false }
+  return { cura: 0, escudo: null, energia: 0, compradas: [], levantou: false, segundaChance: false, anulou: false, roubou: false, lento: false }
 }
 
 // Resolve a rodada com as duas jogadas reveladas (inválida -> erro, nada muda). Ordem:
 //   1. paga a energia e descarta (quem passa ganha ENERGIA.passar)
 //   2. ♥ e A♥: cura/escudo nos dois (cura levanta o parceiro caído), energia/compra em quem jogou
-//   3. contra as intenções do chefe: SUPER varre a da própria caixa, A♠ reflete
-//      a da própria caixa, A♦ anula a da própria caixa, A♣ rouba a do parceiro
-//      (o SUPER do chefe é imparável)
-//   4. ♥ do chefe que sobrou: ele se cura e levanta a guarda
-//   5. caixas (com o escudo de quem recebe e a lentidão do ♦) e golpes
+//   3. contra a carta do chefe (a do quadro, que é dos dois): o SUPER de um
+//      jogador varre, A♠ reflete, A♦ anula, A♣ rouba; vale o primeiro, nessa
+//      ordem (o 2º A♠ vira o eco, o 2º A♦ ainda tira carga, o 2º A♣ ainda dá
+//      energia). O SUPER do chefe é imparável
+//   4. ♥ do chefe que ficou: ele se cura e levanta a guarda
+//   5. o quadro (dano de cada um com o próprio escudo; a lentidão do ♦ mais
+//      forte) e os golpes
+// Fica no quadro quem estava de pé quando o chefe mostrou a carta: quem
+// levanta agora (cura, A♥) volta à mesa e entra na próxima.
 export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
   if (estado.vencedor) throw new Error('a partida já acabou')
   const jogadas = [jogadaP1, jogadaP2]
@@ -286,6 +311,8 @@ export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
   const c = estado.chefe
   const eventos = []
   const efeitos = [novoEfeito(), novoEfeito()]
+  // no quadro: quem estava de pé quando o chefe mostrou a carta (antes das curas desta rodada)
+  const noQuadro = estado.jogadores.map((jog) => !jog.caido)
 
   // 1. paga e descarta
   const cartas = jogadas.map((jogada, j) => {
@@ -353,27 +380,26 @@ export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
     if (sup.compra) efeitos[j].compradas.push(...comprar(jog.baralho, sup.compra).map((x) => x.id))
   }
 
-  // 3. contra as intenções do chefe
-  const intencoes = [...c.intencoes]
-  const destinos = intencoes.map((i) => (i ? 'caixa' : null)) // 'caixa' | 'varrida' | 'refletida' | 'anulada' | 'roubada'
-  const livre = (k) => destinos[k] === 'caixa' && !ehSuper(intencoes[k])
+  // 3. contra a carta do chefe (o SUPER dos jogadores primeiro, depois Espelho, Anular e Roubo)
+  const intencao = c.intencao
+  let destino = intencao ? 'quadro' : null // 'quadro' | 'varrida' | 'refletida' | 'anulada' | 'roubada'
+  const livre = () => destino === 'quadro' && !ehSuper(intencao)
   const golpes = [null, null]
-  // SUPER dos jogadores primeiro (varre), depois Espelho, Anular e Roubo
   for (const j of [0, 1]) {
     if (!ehSuper(cartas[j])) continue
-    if (livre(j)) destinos[j] = 'varrida'
+    if (livre()) destino = 'varrida'
     golpes[j] = { carta: cartas[j], tipo: 'super', base: danoDoSuper(c) }
   }
   for (const j of [0, 1]) {
     if (especiais[j] !== 'espelho') continue
-    if (livre(j)) {
-      destinos[j] = 'refletida'
-      golpes[j] = { carta: cartas[j], tipo: 'espelho', base: poderDaCartaChefe(intencoes[j], estado.fatorDano), refletida: intencoes[j] }
+    if (livre()) {
+      destino = 'refletida'
+      golpes[j] = { carta: cartas[j], tipo: 'espelho', base: poderDaCartaChefe(intencao, estado.fatorDano), refletida: intencao }
     } else golpes[j] = { carta: cartas[j], tipo: 'eco', base: GOLPE.espadas(ECO) }
   }
   for (const j of [0, 1]) {
     if (especiais[j] !== 'anular') continue
-    if (livre(j)) destinos[j] = 'anulada'
+    if (livre()) destino = 'anulada'
     const antes = c.carga
     c.carga = Math.max(0, c.carga - COOP.anularCarga)
     efeitos[j].anulou = true
@@ -381,82 +407,78 @@ export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
   }
   for (const j of [0, 1]) {
     if (especiais[j] !== 'roubo') continue
-    const alvo = livre(outro(j)) ? outro(j) : livre(j) ? j : null
-    if (alvo !== null) destinos[alvo] = 'roubada'
-    efeitos[j].roubou = alvo
+    if (livre()) {
+      destino = 'roubada'
+      efeitos[j].roubou = true
+    }
     const jog = estado.jogadores[j]
     const antes = jog.energia
     jog.energia = Math.min(ENERGIA.maxima, jog.energia + COOP.rouboEnergia)
     efeitos[j].energia += jog.energia - antes
   }
-  // golpes das cartas de ataque e a lentidão do ♦
-  const lento = [false, false]
+  // golpes das cartas de ataque e a lentidão do ♦ (o ataque é dos dois: vale o ♦ mais forte)
+  let lentidao = 1
   for (const j of [0, 1]) {
     const carta = cartas[j]
     if (!carta || especiais[j] || ehSuper(carta) || !GOLPE[carta.naipe]) continue
     golpes[j] = { carta, tipo: carta.naipe, base: GOLPE[carta.naipe](carta.valor) }
     if (carta.naipe === 'ouros') {
-      lento[j] = true
-      if (carta.valor >= 12) lento[outro(j)] = true
+      lentidao = Math.min(lentidao, lentidaoDoOuros(carta.valor))
       efeitos[j].lento = true
     }
   }
 
   // 4. ♥ do chefe que ficou na mesa
   let curaChefe = 0
-  for (const k of [0, 1]) {
-    if (destinos[k] !== 'caixa') continue
-    const sup = suporteDoChefe(intencoes[k])
-    if (!sup) continue
-    const antes = c.hp
-    c.hp = Math.min(c.hpMax, c.hp + sup.cura)
-    curaChefe += c.hp - antes
-    if (sup.guarda) c.guarda = Math.min(c.guarda ?? 1, sup.guarda)
+  if (destino === 'quadro') {
+    const sup = suporteDoChefe(intencao)
+    if (sup) {
+      const antes = c.hp
+      c.hp = Math.min(c.hpMax, c.hp + Math.round(sup.cura * COOP.curaChefe))
+      curaChefe = c.hp - antes
+      if (sup.guarda) c.guarda = Math.min(c.guarda ?? 1, sup.guarda)
+    }
   }
 
-  // 5. caixas
-  const caixas = [0, 1].map((j) => {
-    if (destinos[j] !== 'caixa') return null
-    const carta = intencoes[j]
-    const jog = estado.jogadores[j]
-    const ritmo = ritmoDaCartaChefe(carta)
-    if (lento[j]) ritmo.velocidade = Math.round(ritmo.velocidade * COOP.lentidao * 100) / 100
-    const caixa = { carta, dano: danoDaCartaChefe(carta, estado.fatorDano), ritmo, inverter: inverteControles(carta), escudo: null, lento: lento[j] }
-    if (jog.escudo != null) {
-      caixa.escudo = jog.escudo
-      caixa.dano = Math.max(1, Math.ceil(caixa.dano * jog.escudo))
-      jog.escudo = null
-    }
-    return caixa
-  })
+  // 5. o quadro: o mesmo ataque para os dois; o dano por acerto de cada um sai com o escudo dele
+  let quadro = null
+  if (destino === 'quadro' && noQuadro.some(Boolean)) {
+    const ritmo = ritmoDaCartaChefe(intencao)
+    if (lentidao < 1) ritmo.velocidade = Math.round(ritmo.velocidade * lentidao * 100) / 100
+    const dano = danoDaCartaChefe(intencao, estado.fatorDano * COOP.danoQuadro)
+    const escudos = [null, null]
+    const danos = [0, 1].map((j) => {
+      if (!noQuadro[j]) return null
+      const jog = estado.jogadores[j]
+      escudos[j] = jog.escudo ?? null
+      jog.escudo = null // o escudo vale para este ataque inteiro e acaba
+      return danoComEscudo(dano, escudos[j])
+    })
+    quadro = { carta: intencao, dano, danos, escudos, jogadores: noQuadro, ritmo, inverter: inverteControles(intencao), lento: lentidao < 1 }
+  }
 
-  // as cartas do chefe vão para o descarte dele (o SUPER não)
-  for (const carta of intencoes) if (carta && !ehSuper(carta)) c.descarte.push(carta)
-  c.intencoes = [null, null]
+  // a carta do chefe vai para o descarte dele (o SUPER não)
+  if (intencao && !ehSuper(intencao)) c.descarte.push(intencao)
+  c.intencao = null
   estado.fase = 'esquiva'
   const resultado = {
     rodada: estado.rodada,
     jogadas: cartas.map((carta, j) => ({ carta, especial: especiais[j], passou: !carta, super: ehSuper(carta) })),
-    intencoes,
-    destinos,
-    caixas,
+    intencao,
+    destino,
+    quadro,
     golpes,
     efeitos,
     chefe: { cura: curaChefe, guarda: c.guarda, carga: c.carga },
     eventos,
   }
-  estado.historico.push({
-    rodada: estado.rodada,
-    cartas: cartas.map((x) => x?.id ?? null),
-    chefe: intencoes.map((x) => x?.id ?? null),
-    destinos,
-  })
+  estado.historico.push({ rodada: estado.rodada, cartas: cartas.map((x) => x?.id ?? null), chefe: intencao?.id ?? null, destino })
   return resultado
 }
 
 // ---------- esquiva ----------
 
-// Um acerto no jogador j (o escudo já vem em caixa.dano). HP 0 = caiu (a não
+// Um acerto no jogador j (o escudo já vem em quadro.danos[j]). HP 0 = caiu (a não
 // ser com a segunda chance). Devolve o dano efetivo.
 export function aplicarDanoCoop(estado, j, dano) {
   const jog = estado.jogadores[j]

@@ -1,6 +1,6 @@
 import Phaser from 'phaser'
 import Controles from '../controles.js'
-import { tocar, musica, pararMusica } from '../audio.js'
+import { tocar, musica } from '../audio.js'
 import { ASSETS } from '../assets.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 import { capturarTexto } from '../../lib/simulador.js'
@@ -21,7 +21,7 @@ import {
   iniciarPartida,
   encerrarPartida,
 } from '../../lib/lan/rede.js'
-import { tela, pingPartida, ROTAS, corDoPing } from '../../lib/lan/transmissao.js'
+import { pingPartida, ROTAS, corDoPing } from '../../lib/lan/transmissao.js'
 import { encerrarRede, irParaCena } from '../rede.js'
 
 // Lobby do modo LAN e do ONLINE (Menu -> ONLINE; docs/lan.md, docs/online.md).
@@ -33,12 +33,9 @@ import { encerrarRede, irParaCena } from '../rede.js'
 //               na primeira vez o jogo já pede o nome)
 //   SALA        os dois jogadores (nome, ping, pronto), o modo (PVP/CO-OP),
 //               o chat e as ações; o host começa quando o convidado está pronto
-//   ASSISTINDO  (convidado, com a partida CO-OP rolando) a imagem do host cobre
-//               esta tela (Game.svelte); enquanto ela não chega, um aviso
-// PVP: partida em rede (game/rede.js, docs/rede-pvp.md): o jogo roda nos dois
-// PCs; o host começa e irParaCena leva os dois para a PvpEscolha.
-// CO-OP: "Remote Play": o host joga a partida normal (EscolhaParty) com 2
-// jogadores e o convidado assiste. O Menu manda o host de volta para cá
+// PVP e CO-OP: partida em rede (game/rede.js, docs/rede-pvp.md): o jogo roda
+// nos dois PCs; o host começa e irParaCena leva os dois para a primeira tela
+// do modo (PvpEscolha / EscolhaParty). O Menu manda o host de volta para cá
 // enquanto ele estiver numa sala.
 //
 // Música: public/assets/musicas/lobby.mid (sem ele, a do menu). O nome no
@@ -66,7 +63,6 @@ export default class Lan extends Phaser.Scene {
     this.comecando = false
     this.musicaTocando = false
     this.pediuNome = false // online: já abriu o campo do nome sozinho
-    this.estavaAssistindo = false
     this.flash = null // "VALENDO!" do começo da partida
     this.view = this.add.container(0, 0).setDepth(10)
     this.dinamicos = [] // objetos animados no update() (cursor, pontinhos)
@@ -77,19 +73,16 @@ export default class Lan extends Phaser.Scene {
     abrirLobby()
     encerrarRede() // no lobby não tem partida em rede
     this.s = null
-    this.tela = null
     const pararLan = lan.subscribe((s) => (this.s = s))
-    const pararTela = tela.subscribe((t) => (this.tela = t))
     const pararPing = pingPartida.subscribe((p) => (this.pingPartida = p))
     // voltou de uma partida (o Menu mandou para cá): avisa que acabou
     if (this.s.papel === 'host' && this.s.sala?.emPartida) encerrarPartida()
-    // convidado: o host começar uma partida PVP é avisado no update (só a
+    // convidado: o host começar uma partida é avisado no update (só a
     // virada conta: na volta de uma partida a sala ainda pode estar marcada)
-    this.pvpComecou = this.convidadoNoPvp()
+    this.convidadoComecou = this.convidadoEmPartida()
 
     this.events.once('shutdown', () => {
       pararLan()
-      pararTela()
       pararPing()
       this.cancelarTexto?.()
     })
@@ -160,16 +153,16 @@ export default class Lan extends Phaser.Scene {
 
   // ---------- estado -> tela ----------
 
-  // convidado numa sala PVP com a partida marcada (o host começou)
-  convidadoNoPvp() {
+  // convidado numa sala com a partida marcada (o host começou)
+  convidadoEmPartida() {
     const s = this.s
-    return s.fase === 'sala' && s.papel === 'convidado' && Boolean(s.sala?.emPartida) && s.sala.modo === 'pvp'
+    return s.fase === 'sala' && s.papel === 'convidado' && Boolean(s.sala?.emPartida)
   }
 
+  // (o convidado não fica mais ASSISTINDO a imagem do host: nos dois modos ele
+  // joga nas cenas do jogo, no PC dele)
   get modoTela() {
     const s = this.s
-    // no PVP o convidado não assiste: ele joga nas cenas do jogo, no PC dele
-    if (s.fase === 'sala' && s.papel === 'convidado' && s.sala?.emPartida && s.sala.modo !== 'pvp') return 'assistindo'
     if (s.fase === 'sala') return 'sala'
     return 'salas'
   }
@@ -243,7 +236,7 @@ export default class Lan extends Phaser.Scene {
     const s = this.s
     const itens = this.itens()
     const i = this.indiceSelecionado(itens)
-    const assinatura = JSON.stringify([this.modoTela, s.fase, s.online, s.eu.nome, s.salas, s.sala, s.chat.length, s.erro, s.enderecos, this.selId, this.digitando, this.tela?.estado, this.tela?.modo, s.ping, this.pingPartida])
+    const assinatura = JSON.stringify([this.modoTela, s.fase, s.online, s.eu.nome, s.salas, s.sala, s.chat.length, s.erro, s.enderecos, this.selId, this.digitando, s.ping, this.pingPartida])
     if (assinatura === this.assinatura) return
     this.assinatura = assinatura
     this.view.removeAll(true)
@@ -251,8 +244,7 @@ export default class Lan extends Phaser.Scene {
     this.atualizarTitulo()
     if (this.modoTela === 'salas' && s.online) this.telaOnline(itens, i)
     else if (this.modoTela === 'salas') this.telaSalas(itens, i)
-    else if (this.modoTela === 'sala') this.telaSala(itens, i)
-    else this.telaAssistindo()
+    else this.telaSala(itens, i)
     this.atualizarMusica()
   }
 
@@ -373,7 +365,7 @@ export default class Lan extends Phaser.Scene {
     const yInfo = topo + passo * 2 + 74
     if (s.erro) t(LARGURA / 2, yInfo, s.erro, 13, '#ff6070', { wordWrap: { width: LARGURA - 60 }, align: 'center' }).setOrigin(0.5)
     t(LARGURA / 2, yInfo + 34, `o amigo abre  ${location.host}  no Chrome/Edge`, 12, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0.5)
-    t(LARGURA / 2, yInfo + 54, 'PVP: cada um joga no próprio PC  ·  CO-OP: o jogo roda no PC do host e o convidado recebe a imagem', 10, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
+    t(LARGURA / 2, yInfo + 54, 'PVP e CO-OP: cada um joga no próprio PC', 10, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
     this.rodape(this.digitando ? 'digite  ·  Enter: confirmar  ·  Esc: cancelar' : '↑↓ escolher     A: confirmar     B: voltar ao menu')
   }
 
@@ -465,38 +457,21 @@ export default class Lan extends Phaser.Scene {
     this.rodape(this.digitando ? 'digite  ·  Enter: mandar  ·  Esc: cancelar' : host ? '↑↓ escolher   ←→ modo   A: confirmar   B: fechar sala' : '↑↓ escolher     A: confirmar     B: sair da sala')
   }
 
-  telaAssistindo() {
-    const s = this.s
-    const t = (...a) => this.add2(this.texto(...a))
-    const host = s.sala.membros.find((m) => m.papel === 'host')
-    const modo = MODOS[s.sala.modo] ?? MODOS.pvp
-    this.add2(this.add.rectangle(0, 0, LARGURA, ALTURA, 0x000000, 0.75).setOrigin(0))
-    t(LARGURA / 2, ALTURA / 2 - 40, `PARTIDA ${modo.rotulo}`, 26, modo.cor, { strokeThickness: 5 }).setOrigin(0.5)
-    t(LARGURA / 2, ALTURA / 2, `no PC de ${host?.nome ?? '?'}`, 16).setOrigin(0.5)
-    const estado = { parada: 'pedindo a imagem', conectando: 'ligando a imagem', 'ao-vivo': 'imagem chegando', reserva: 'imagem reserva' }[this.tela?.estado] ?? 'ligando a imagem'
-    const aviso = t(LARGURA / 2, ALTURA / 2 + 36, estado, 13, '#9a9ab0').setOrigin(0.5)
-    this.dinamicos.push({ tipo: 'pontos', obj: aviso, base: estado })
-    t(LARGURA / 2, ALTURA - 40, 'você é o P2 (coração amarelo): seus controles vão para o PC do host', 11, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0.5)
-  }
-
   rodape(texto) {
     this.add2(this.texto(LARGURA / 2, ALTURA - 14, texto, 12, TEXTO.desabilitado, { strokeThickness: 0 }).setOrigin(0.5))
   }
 
-  // a música do lobby toca fora da partida; assistindo, quem toca é o host
+  // a música do lobby toca enquanto a cena está aberta
   atualizarMusica() {
-    const tocarAgora = this.modoTela !== 'assistindo'
-    if (tocarAgora === this.musicaTocando) return
-    this.musicaTocando = tocarAgora
-    if (tocarAgora) musica('lobby', 'menu')
-    else pararMusica()
+    if (this.musicaTocando) return
+    this.musicaTocando = true
+    musica('lobby', 'menu')
   }
 
   // ---------- ações ----------
 
   aoBotao(botao) {
     if (this.saindo || this.comecando || this.digitando || !this.s) return
-    if (this.modoTela === 'assistindo') return
     if (botao === 'A') {
       const itens = this.itens()
       const it = itens[this.indiceSelecionado(itens)]
@@ -574,22 +549,21 @@ export default class Lan extends Phaser.Scene {
 
   comecar() {
     const modo = MODOS[this.s.sala.modo] ?? MODOS.pvp
-    const pvp = this.s.sala.modo === 'pvp'
     this.comecando = true
     iniciarPartida()
     this.registry.set('modo', this.s.sala.modo)
     this.valendo(modo.cor)
     this.time.delayedCall(560, () => {
-      if (!pvp) return this.scene.start(modo.cena)
-      // PVP: partida em rede (game/rede.js), o convidado abre a escolha junto.
-      // Se ele saiu nesse meio-tempo, fica no lobby (o create desmarca a partida)
+      // partida em rede (game/rede.js), nos dois modos: o convidado abre a
+      // primeira tela junto. Se ele saiu nesse meio-tempo, fica no lobby (o
+      // create desmarca a partida)
       if ((this.s.sala?.membros.length ?? 0) < 2) return this.scene.restart()
       irParaCena(this, modo.cena)
     })
   }
 
-  // o "VALENDO!" e a tela escurecendo (o host ao começar; o convidado no PVP,
-  // enquanto a cena que o host mandou não chega)
+  // o "VALENDO!" e a tela escurecendo (o host ao começar; o convidado enquanto
+  // a cena que o host mandou não chega)
   valendo(cor) {
     tocar(this, 'superAtivar')
     this.flash = this.add.text(LARGURA / 2, ALTURA / 2, 'VALENDO!', { fontFamily: FONTE, fontSize: '44px', color: cor, stroke: '#000000', strokeThickness: 6 }).setOrigin(0.5).setDepth(50).setScale(0.4)
@@ -597,24 +571,24 @@ export default class Lan extends Phaser.Scene {
     this.cameras.main.fadeOut(520, 0, 0, 0)
   }
 
-  // convidado: o host começou o PVP (a PvpEscolha chega pelo game/rede.js) ou
+  // convidado: o host começou (a primeira tela chega pelo game/rede.js) ou
   // desistiu antes de mandar (a sala voltou ao normal)
   acompanharComeco() {
-    const agora = this.convidadoNoPvp()
-    if (agora && !this.pvpComecou && !this.saindo) {
+    const agora = this.convidadoEmPartida()
+    if (agora && !this.convidadoComecou && !this.saindo) {
       this.comecando = true
       this.digitando = null
       this.cancelarTexto?.()
       this.cancelarTexto = null
-      this.valendo(MODOS.pvp.cor)
-    } else if (!agora && this.pvpComecou && this.comecando) {
+      this.valendo((MODOS[this.s.sala.modo] ?? MODOS.pvp).cor)
+    } else if (!agora && this.convidadoComecou && this.comecando) {
       this.comecando = false
       this.flash?.destroy()
       this.flash = null
       this.cameras.main.resetFX()
       this.cameras.main.fadeIn(200)
     }
-    this.pvpComecou = agora
+    this.convidadoComecou = agora
   }
 
   // ---------- quadro a quadro ----------
@@ -625,7 +599,7 @@ export default class Lan extends Phaser.Scene {
     this.barras.forEach((b, i) => b.setScale(1, this.musicaTocando ? 0.35 + 0.65 * Math.abs(Math.sin(time / 230 + i * 1.3)) : 0.2))
 
     this.controles.atualizar()
-    if (!this.saindo && !this.comecando && !this.digitando && this.modoTela !== 'assistindo') {
+    if (!this.saindo && !this.comecando && !this.digitando) {
       for (let j = 0; j < this.controles.numJogadores; j++) {
         const d = this.controles.toque(j)
         if (d === 'cima') this.mover(-1)
@@ -635,11 +609,6 @@ export default class Lan extends Phaser.Scene {
     }
 
     this.acompanharComeco()
-
-    // convidado online: a partida acabou (ou a sala caiu) -> menu inicial (game/online.js)
-    const assistindo = this.modoTela === 'assistindo'
-    if (this.estavaAssistindo && !assistindo && this.s.online && !this.saindo && this.s.fase !== 'sala') return this.voltarAoMenu()
-    this.estavaAssistindo = assistindo
 
     // online, na primeira vez: o jogo já pede o nome de usuário
     if (this.s.online && !this.s.eu.escolheuNome && !this.pediuNome && this.s.fase === 'navegando' && !this.digitando && !this.saindo) {

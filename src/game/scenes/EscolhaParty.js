@@ -7,12 +7,14 @@ import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 import { perfilPvp, rotuloCarta } from '../pvp/perfil.js'
 import { SIMBOLOS } from '../pvp/cartas.js'
 import { claraoCamera } from '../effects/flash.js'
+import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
 
 // Área da grade de personagens e dos painéis de detalhes (px)
 const GRADE = { topo: 72, base: 282, esquerda: 20, direita: 620, espaco: 8, larguraMax: 180, alturaMax: 200 }
 const DETALHE = { y: 290, altura: 150, espaco: 8, linha: 17, linhasPorColuna: 5 }
 const TAMANHO_PARTY = 2 // com 1 jogador ele escolhe todos; com 2, cada um escolhe 1
 const CHAVE_SALVA = 'dodge-party' // última party (também fica no registry)
+const CURSOR_MS = 300 // em rede: de quanto em quanto o meu cursor vai de novo para o outro PC
 
 // Escolha da party do CO-OP (Menu -> EscolhaParty -> Selecao).
 // Lista TODOS os personagens de data/personagens.js, na ordem do arquivo.
@@ -21,6 +23,17 @@ const CHAVE_SALVA = 'dodge-party' // última party (também fica no registry)
 //                B desfaz a própria escolha
 // Quando todos confirmam, grava registry 'party' (ids na ordem; party[0] é do
 // jogador 1) e segue para a escolha do chefe. B sem nada para desfazer: volta ao Menu.
+//   EM REDE (sala CO-OP, game/rede.js, docs/rede-pvp.md): cada PC move só o
+//                próprio cursor (meuLado()); o do outro chega pelo canal
+//                ('cursor', rápida, repetida de tempos em tempos para quem
+//                abriu a tela depois) e o confirmado também ('personagem').
+//                Confirmar é definitivo (B não desfaz). Se os dois confirmam o
+//                mesmo personagem ao mesmo tempo, vale o do host: o convidado
+//                perde o dele e escolhe de novo (a regra é a mesma nos dois PCs,
+//                então os dois chegam na mesma party). B sem ninguém confirmado
+//                volta os dois ao lobby (no convidado ele pede: 'voltarLobby').
+//                Com os dois confirmados, o host leva os dois para a Selecao,
+//                com a party nos dados (o registry é de cada PC).
 export default class EscolhaParty extends Phaser.Scene {
   constructor() {
     super('EscolhaParty')
@@ -31,6 +44,9 @@ export default class EscolhaParty extends Phaser.Scene {
     this.controles = new Controles(this)
     this.controles.onBotao((jogador, botao) => (botao === 'A' ? this.confirmar(jogador) : this.desfazer(jogador)))
     this.numJogadores = this.controles.numJogadores
+    this.rede = emRede() // em rede são sempre 2 jogadores (Controles)
+    this.eu = this.rede ? meuLado() : null // em rede: o lado que este PC controla
+    this.aviso = null // em rede: o host pegou o meu personagem primeiro
     this.saindo = false
     this.texto = (x, y, conteudo, tamanho, cor = TEXTO.normal, extra = {}) =>
       this.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra }).setOrigin(0.5)
@@ -56,18 +72,45 @@ export default class EscolhaParty extends Phaser.Scene {
     this.confirmados = Array(this.numJogadores).fill(null) // id de cada jogador (2 jogadores)
 
     this.montarDetalhes()
-    this.texto(LARGURA / 2, ALTURA - 18, '← → ↑ ↓ escolher     A: confirmar     B: desfazer / voltar', 13, TEXTO.desabilitado, { strokeThickness: 0 })
+    const dica = this.rede ? '← → ↑ ↓ escolher     A: confirmar     B: voltar ao lobby' : '← → ↑ ↓ escolher     A: confirmar     B: desfazer / voltar'
+    this.texto(LARGURA / 2, ALTURA - 18, dica, 13, TEXTO.desabilitado, { strokeThickness: 0 })
 
     this.cursores.forEach((_, j) => this.mover(j, 0, false))
     this.atualizarTela()
 
     // o painel Svelte pode mudar o número de jogadores a qualquer momento
-    const aoMudar = (_, valor, anterior) => valor !== anterior && this.scene.restart()
+    const aoMudar = (_, valor, anterior) => valor !== anterior && !this.rede && this.scene.restart()
     this.registry.events.on('changedata-numJogadores', aoMudar)
     this.events.once('shutdown', () => this.registry.events.off('changedata-numJogadores', aoMudar))
+    if (this.rede) this.ligarRede()
 
     musica('selecao')
     this.cameras.main.fadeIn(250)
+  }
+
+  // ---------- em rede ----------
+
+  ligarRede() {
+    const outro = 1 - this.eu
+    const desligar = [
+      canal.ao('cursor', (d) => {
+        if (d?.tela !== 'party' || this.confirmados[outro] || this.saindo || !this.ids[d.indice]) return
+        if (this.cursores[outro].indice === d.indice) return
+        this.cursores[outro].indice = d.indice
+        this.atualizarTela()
+      }),
+      canal.ao('personagem', (d) => this.ids.includes(d?.id) && this.marcar(outro, d.id)),
+    ]
+    // o convidado quer voltar ao lobby (B antes de alguém confirmar): o host leva os dois
+    if (souHostDaRede()) desligar.push(canal.ao('voltarLobby', () => this.voltar()))
+    this.events.once('shutdown', () => desligar.forEach((fn) => fn()))
+    this.mandarCursor()
+    this.time.addEvent({ delay: CURSOR_MS, loop: true, callback: () => this.mandarCursor() })
+  }
+
+  mandarCursor() {
+    if (this.confirmados[this.eu] || this.saindo) return
+    canal.enviarRapido('cursor', { tela: 'party', indice: this.cursores[this.eu].indice })
   }
 
   ultimaParty() {
@@ -190,8 +233,18 @@ export default class EscolhaParty extends Phaser.Scene {
     } else {
       if (this.confirmados[jogador]) return
       if (this.ocupado(id, jogador)) return tocar(this, 'erro')
+      if (this.rede) {
+        // em rede: definitivo, e o outro PC fica sabendo
+        canal.enviar('personagem', null, { id })
+        return this.marcar(jogador, id)
+      }
       this.confirmados[jogador] = id
     }
+    this.festejar(jogador)
+  }
+
+  // o card escolhido pula e, com todos confirmados, a party está pronta
+  festejar(jogador) {
     tocar(this, 'confirmar')
     const card = this.cards[this.cursores[jogador].indice]
     this.tweens.add({ targets: card.sprite, scale: card.sprite.escalaBase * 1.25, duration: 90, yoyo: true })
@@ -200,8 +253,33 @@ export default class EscolhaParty extends Phaser.Scene {
     if (party.length >= TAMANHO_PARTY && party.every(Boolean)) this.terminar([...party])
   }
 
+  // em rede: o lado j confirmou o personagem id (daqui ou do outro PC)
+  marcar(j, id) {
+    if (this.saindo || this.confirmados[j]) return
+    if (this.confirmados[1 - j] === id) {
+      // os dois pegaram o mesmo ao mesmo tempo: vale o do host (lado 0)
+      if (j === 1) return // o do convidado não vale (o host já tinha esse)
+      this.confirmados[1] = null
+      if (this.eu === 1) {
+        tocar(this, 'erro')
+        this.aviso = `o P1 pegou ${PERSONAGENS[id].nome.toUpperCase()} primeiro: escolha outro`
+      }
+    }
+    this.cursores[j].indice = this.ids.indexOf(id)
+    this.confirmados[j] = id
+    this.festejar(j)
+  }
+
   desfazer(jogador) {
     if (this.saindo) return
+    if (this.rede) {
+      // em rede confirmar é definitivo; sem ninguém confirmado, B volta ao lobby
+      if (this.confirmados.some(Boolean)) return tocar(this, 'erro')
+      if (souHostDaRede()) return this.voltar()
+      tocar(this, 'cancelar')
+      this.status.setText('voltando ao lobby...').setColor(TEXTO.desabilitado)
+      return canal.enviar('voltarLobby', null, {})
+    }
     if (this.numJogadores === 1 && this.escolhidos.length) {
       this.escolhidos.pop()
     } else if (this.numJogadores > 1 && this.confirmados[jogador]) {
@@ -223,17 +301,25 @@ export default class EscolhaParty extends Phaser.Scene {
     } catch {
       // sem armazenamento (aba anônima etc.): fica só no registry
     }
-    this.status.setText('PARTY PRONTA!')
+    this.status.setText('PARTY PRONTA!').setColor(TEXTO.selecionado)
     claraoCamera(this.cameras.main, 200, 255, 255, 255)
     this.time.delayedCall(420, () => this.cameras.main.fadeOut(300, 0, 0, 0))
-    this.time.delayedCall(740, () => this.scene.start('Selecao'))
+    // a party vai nos dados (sempre: sem dados o Phaser repete os da última vez
+    // que a cena abriu). Em rede o host leva os dois, com o chefe da última
+    // luta, para os dois cursores começarem no mesmo lugar; o convidado espera
+    this.time.delayedCall(740, () => {
+      if (!this.rede) this.scene.start('Selecao', { party })
+      else if (souHostDaRede()) irParaCena(this, 'Selecao', { party, chefe: this.registry.get('chefe') })
+    })
   }
 
   voltar() {
+    if (this.saindo) return
     this.saindo = true
     tocar(this, 'cancelar')
     this.cameras.main.fadeOut(200, 0, 0, 0)
-    this.time.delayedCall(220, () => this.scene.start('Menu'))
+    // em rede (só o host chega aqui): os dois voltam ao lobby da sala
+    this.time.delayedCall(220, () => (this.rede ? irParaCena(this, 'Lan') : this.scene.start('Menu')))
   }
 
   // ---------- navegação ----------
@@ -244,6 +330,10 @@ export default class EscolhaParty extends Phaser.Scene {
     const n = this.ids.length
     cursor.indice = (cursor.indice + passo + n) % n
     if (comSom) tocar(this, 'mover')
+    if (this.rede && passo) {
+      this.aviso = null
+      this.mandarCursor()
+    }
     this.atualizarTela()
   }
 
@@ -290,6 +380,12 @@ export default class EscolhaParty extends Phaser.Scene {
     if (solo) {
       const k = this.escolhidos.length
       this.status.setText(k < TAMANHO_PARTY ? `escolha o ${k + 1}º personagem` : '')
+    } else if (this.rede) {
+      const outro = 1 - this.eu
+      const texto = this.confirmados[this.eu]
+        ? this.confirmados[outro] ? '' : `esperando o P${outro + 1} escolher...`
+        : this.aviso ?? `você é o P${this.eu + 1}: escolha o seu personagem`
+      this.status.setText(texto).setColor(this.aviso && !this.confirmados[this.eu] ? TEXTO.caido : TEXTO.selecionado)
     } else {
       const faltam = this.confirmados.filter((c) => !c).length
       this.status.setText(faltam ? 'cada jogador escolhe 1 personagem' : '')
@@ -325,11 +421,14 @@ export default class EscolhaParty extends Phaser.Scene {
       const k = this.escolhidos.length
       rodape = k >= TAMANHO_PARTY ? 'PRONTO!' : this.ocupado(id) ? 'já está na party' : `A: escolher como ${k + 1}º`
     } else if (this.confirmados[j]) {
-      rodape = 'PRONTO!  (B desfaz)'
+      rodape = this.rede ? 'PRONTO!' : 'PRONTO!  (B desfaz)'
+    } else if (this.rede && j !== this.eu) {
+      rodape = 'escolhendo...'
     } else {
       rodape = this.ocupado(id, j) ? `o P${2 - j} já pegou` : 'A: escolher'
     }
-    p.rodape.setText(rodape).setColor(rodape.startsWith('PRONTO') ? TEXTO.cura : rodape.startsWith('A:') ? TEXTO.normal : TEXTO.caido)
+    const cor = rodape.startsWith('PRONTO') ? TEXTO.cura : rodape.startsWith('A:') ? TEXTO.normal : rodape === 'escolhendo...' ? TEXTO.desabilitado : TEXTO.caido
+    p.rodape.setText(rodape).setColor(cor)
   }
 
   update(time, delta) {

@@ -13,33 +13,30 @@ As salas online são privadas: não aparecem em lista nenhuma, só entra quem te
 
 - **Sem pausa**: o C (e o Esc) não fazem nada durante a partida (pausar travaria o amigo).
 - **Sem revanche**: no fim, a única opção é **A: VOLTAR AO LOBBY** (do host ou do convidado): os dois voltam para o lobby da sala (que continua aberta), com o chat, e o host começa outra partida quando quiser.
-- Se o convidado sai no meio, o host volta para o lobby da sala; para sair no meio, use **Sair da sala** na barra de cima.
+- Se o outro sai no meio, quem ficou volta para o lobby da sala (se a sala cai, volta ao menu); para sair no meio, use **Sair da sala** na barra de cima.
 
 ### Ping
 
 - **Durante a partida**, no canto de baixo da tela (aparece também em tela cheia): o ping **entre vocês dois**, que é o que vale no jogo. Verde até 80 ms, amarelo até 150, vermelho acima.
-- **Na barra de cima**: o mesmo ping, por onde a ligação passa (**direto**, **por TURN** ou **pelo servidor**), o ping de cada um até o servidor e, no CO-OP, o estado e os quadros por segundo da imagem (no PVP aparece "partida em rede").
+- **Na barra de cima**: "partida em rede", o mesmo ping, por onde a ligação passa (**direto**, **por TURN** ou **pelo servidor**) e o ping de cada um até o servidor.
 - **No lobby da sala**: o ping de cada um até o servidor e, embaixo, o ping entre vocês.
 
 ## Como funciona
 
 Igual à LAN ([lan.md](lan.md)):
 
-- **PVP: o jogo roda no PC de cada um** ([rede-pvp.md](rede-pvp.md)). Cada um desvia na própria caixa sem atraso nenhum; pela rede vão só as decisões (personagem, voto, carta, dano, resultado) e a posição do coração do outro. O host manda nas trocas de tela e nos sorteios.
-- **CO-OP: o "Remote Play"**: **o jogo roda só no PC do host**; o convidado recebe a imagem e o som por WebRTC e manda os controles.
+- **PVP e CO-OP: o jogo roda no PC de cada um** ([rede-pvp.md](rede-pvp.md)). Cada um joga no próprio PC sem atraso nenhum; pela rede vão só as decisões (personagem, voto, chefe, nível, carta, dano, resultado) e o que for preciso para desenhar o outro (a posição do coração, o cursor). O host manda nas trocas de tela e nos sorteios.
 
-Os dois usam um **canal de dados direto** entre os PCs (WebRTC): as mensagens não dão a volta pelo servidor, que pode estar em outro país. Só se o WebRTC não conectar é que elas passam pelo servidor (no CO-OP, com a imagem reserva). No PVP a conexão fica ligada só pelo canal e pelo ping: o host não manda imagem. Diferenças no online:
+As mensagens vão por um **canal de dados direto** entre os PCs (WebRTC): não dão a volta pelo servidor, que pode estar em outro país. Só se o WebRTC não conectar é que elas passam pelo servidor. A conexão fica ligada só pelo canal e pelo ping: ninguém manda imagem (a imagem do antigo "Remote Play" do CO-OP não é mais usada, [lan.md](lan.md)). Diferenças no online:
 
 - O servidor manda para os navegadores os servidores **STUN** (e **TURN**, se configurado) que o WebRTC usa para atravessar o roteador de casa.
-- A imagem vai com no máximo **4 Mbps** (na LAN são 12): cabe no upload de uma internet de casa comum.
-- Se o WebRTC não conectar em 12 s, cai na **imagem reserva** (JPEG pelo servidor, 15 quadros por segundo, sem som).
 - O servidor limita mensagens por jogador, salas (500) e conexões (1000), para aguentar ficar aberto na internet.
 
-No PVP ninguém sente atraso no próprio coração: o ping só atrasa o que vem do outro. No CO-OP o atraso que o convidado sente é o caminho direto entre os dois PCs (em geral 20–80 ms dentro do Brasil); o host joga sem atraso nenhum.
+Ninguém sente atraso no próprio coração: o ping só atrasa o que vem do outro.
 
 ### Onde fica o servidor
 
-O Render não tem servidor na América do Sul, e o padrão dele é **Oregon** (costa oeste dos EUA, ~180–250 ms do Brasil). Com os controles indo direto, isso só pesa no lobby e na imagem reserva, mas se for criar o serviço de novo, prefira **Virginia** (US East, ~120 ms). O Render não muda a região de um serviço que já existe: precisa criar outro.
+O Render não tem servidor na América do Sul, e o padrão dele é **Oregon** (costa oeste dos EUA, ~180–250 ms do Brasil). Com as mensagens da partida indo direto, isso só pesa no lobby (e na partida quando o canal direto não abre), mas se for criar o serviço de novo, prefira **Virginia** (US East, ~120 ms). O Render não muda a região de um serviço que já existe: precisa criar outro.
 
 ## Subir o servidor
 
@@ -77,9 +74,9 @@ A porta vem de `PORT` (as hospedagens já põem) ou `PORTA`.
 | `STUN_URLS` | STUN separados por vírgula (padrão: os do Google) |
 | `TURN_URL`, `TURN_USUARIO`, `TURN_SENHA` | servidor **TURN** (veja abaixo) |
 
-### TURN: quando a imagem cai na reserva
+### TURN: quando a ligação direta não passa
 
-Com só STUN, a maioria das conexões de casa funciona. Algumas redes (4G, faculdade, empresa, "NAT simétrico") não deixam os dois navegadores se falarem direto: no PVP as mensagens passam a dar a volta pelo servidor (ping maior) e no CO-OP o convidado fica na imagem reserva, sem som. Um servidor **TURN** resolve: ele repassa os dados quando o caminho direto não existe.
+Com só STUN, a maioria das conexões de casa funciona. Algumas redes (4G, faculdade, empresa, "NAT simétrico") não deixam os dois navegadores se falarem direto: as mensagens da partida passam a dar a volta pelo servidor (ping maior). Um servidor **TURN** resolve: ele repassa os dados quando o caminho direto não existe.
 
 Dá para usar um grátis (ex.: o Open Relay da Metered, com cadastro) ou subir o seu (`coturn`). Depois é só preencher, por exemplo:
 
@@ -93,8 +90,5 @@ TURN_SENHA=...
 
 - **"sem conexão com o servidor"**: o servidor caiu ou está acordando (Render grátis). O jogo tenta de novo sozinho.
 - **"não achei a sala …"**: código errado, ou o host já fechou a sala (ela some quando o host sai).
-- **Ping alto e jogo travado**: olhe a barra de cima. Se diz **imagem reserva** ou **pelo servidor**, a ligação direta não passou e tudo está dando a volta pelo servidor: configure um TURN (acima). Se diz **direto** com ping alto, é a internet de um dos dois (Wi-Fi fraco, download rolando); cabo ajuda muito.
-- **Poucos quadros por segundo (fps) com ping baixo** (CO-OP): o PC ou o upload do host não está dando conta da imagem. Feche outros programas no host.
-- **"imagem reserva (sem som)"** (CO-OP): o WebRTC não passou. Configure um TURN (acima).
-- **A imagem congela** (CO-OP): a aba do host precisa ficar visível.
-- **Imagem travando** (CO-OP): a internet do host não está dando conta do upload. Feche downloads/streams no PC do host.
+- **Ping alto**: olhe a barra de cima. Se diz **pelo servidor**, a ligação direta não passou e tudo está dando a volta pelo servidor: configure um TURN (acima). Se diz **direto** com ping alto, é a internet de um dos dois (Wi-Fi fraco, download rolando); cabo ajuda muito.
+- **A partida parou esperando o outro**: a aba do outro precisa ficar visível (o navegador para o jogo numa aba escondida).

@@ -1,7 +1,8 @@
 // Simula partidas inteiras do CO-OP de cartas (regras de verdade, CPU aliada
 // jogando as cartas dos dois lados) usando os acertos MEDIDOS de cada carta
-// do chefe (medirChefes.mjs): a cada caixa, sorteia uma das amostras daquela
-// carta, naquele nível, para aquele tipo de jogador.
+// do chefe (medirChefes.mjs, modo quadro): a cada rodada, cada coração que
+// está no quadro sorteia uma das amostras daquela carta, naquele nível, para
+// aquele tipo de jogador (os dois desviam do mesmo ataque).
 //
 //   node scripts/balanceamento/simularCoop.mjs chefes.json [partidas] [jogadores]
 //     jogadores: 'dificil' (os dois jogam como o bot perfeito), 'normal'
@@ -31,14 +32,14 @@ function simular(chefe, nivel, jogadores, i) {
   for (; r < 60 && !fim; r++) {
     iniciarRodadaCoop(e)
     const res = resolverRodadaCoop(e, ...[0, 1].map((j) => escolherJogadaCoop(e, j, { rng })))
+    const q = res.quadro
     const desempenho = [0, 1].map((j) => {
-      const cx = res.caixas[j]
-      if (!cx) return { perfeito: false, grazes: 0 }
-      const lista = amostras[cx.carta.id]?.[nivel]?.[bots[j]]?.acertos ?? [1]
+      if (!q?.jogadores[j]) return { perfeito: false, grazes: 0 }
+      const lista = amostras[q.carta.id]?.[nivel]?.[bots[j]]?.acertos ?? [1]
       const k = lista[Math.floor(sorteio() * lista.length)]
-      for (let h = 0; h < k; h++) aplicarDanoCoop(e, j, cx.dano)
+      for (let h = 0; h < k; h++) aplicarDanoCoop(e, j, q.danos[j])
       const perfeito = k === 0 && !e.jogadores[j].caido
-      if (perfeito) registrarPerfeitoCombo(e, j, cx.carta)
+      if (perfeito) registrarPerfeitoCombo(e, j, q.carta)
       return { perfeito, grazes: GRAZES[bots[j]] }
     })
     calcularGolpes(e, res.golpes, desempenho).forEach((g) => aplicarGolpe(e, g.dano))
