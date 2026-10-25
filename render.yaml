@@ -19,10 +19,11 @@ services:
       - key: TURN_SENHA
         sync: false
       # Contas (login Google, perfil, foto): docs/supabase.md. Opcionais; a
-      # SERVICE_ROLE é secreta e fica só no servidor
+      # SECRET_KEY é secreta e fica só no servidor (os nomes antigos
+      # SUPABASE_ANON_KEY/SUPABASE_SERVICE_ROLE_KEY também valem)
       - key: SUPABASE_URL
         sync: false
-      - key: SUPABASE_ANON_KEY
+      - key: SUPABASE_PUBLISHABLE_KEY
         sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
+      - key: SUPABASE_SECRET_KEY
         sync: false

@@ -30,8 +30,9 @@ export const COLUNAS_PERFIL = 'id, tag, nome_exibicao, avatar_tipo, avatar_id, a
 
 export function lerConfig(env = process.env) {
   const url = String(env.SUPABASE_URL ?? '').trim()
-  const anonKey = String(env.SUPABASE_ANON_KEY ?? '').trim()
-  const serviceKey = String(env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim()
+  // nomes novos do Supabase (publishable/secret) ou os antigos (anon/service_role)
+  const anonKey = String(env.SUPABASE_PUBLISHABLE_KEY || env.SUPABASE_ANON_KEY || '').trim()
+  const serviceKey = String(env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY || '').trim()
   const urlValida = /^https?:\/\/[^\s/]+/.test(url)
   return { url: url.replace(/\/+$/, ''), anonKey, serviceKey, disponivel: Boolean(urlValida && anonKey && serviceKey) }
 }
@@ -262,7 +263,7 @@ export function criarContas({ config = { disponivel: false }, supabase = null, a
 export async function iniciarContas(env = process.env, { log = console.log } = {}) {
   const config = lerConfig(env)
   if (!config.disponivel) {
-    if (env.SUPABASE_URL || env.SUPABASE_ANON_KEY || env.SUPABASE_SERVICE_ROLE_KEY) log('[contas] faltam variáveis SUPABASE_*: contas desligadas (docs/supabase.md)')
+    if (Object.keys(env).some((k) => k.startsWith('SUPABASE_') && env[k])) log('[contas] faltam variáveis SUPABASE_*: contas desligadas (docs/supabase.md)')
     return criarContas()
   }
   try {
