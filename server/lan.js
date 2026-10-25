@@ -27,14 +27,28 @@
 //   servidor -> cliente  presencas {mapa} · presenca {id, status} · convite {...}
 //                        conviteEnviado · conviteResposta · conviteFim · conviteNegado
 //                        amigosAtualizar
+//
+// JOGAR RÁPIDO (server/fila.js, Fase 1C): fila casual de PVP 1x1, FIFO, para
+// conta ou convidado (convidado não ganha XP). Achou par: os dois confirmam em
+// CONFIRMAR_MS; confirmaram, o servidor cria a sala (casual: true, PVP) e o
+// host já começa a partida (escolha de personagem). Revanche só com o aceite
+// dos dois (REVANCHE_MS). Numa sala casual, quem sai fecha a sala.
+//   cliente -> servidor  fila {acao: 'entrar'|'sair'} · confirmar {id, aceitar} · revanche {aceitar}
+//   servidor -> cliente  fila {estado: 'procurando'|'fora', desde?, esperaMs?, convidado?, motivo?}
+//                        pareado {id, oponente, expiraEm, restanteMs} · pareadoEstado {id, eu, oponente}
+//                        pareadoFim {id, voltou, motivo} · partidaCasual {salaId, host} · filaNegada {msg}
+//                        revanche {estado: 'pedida'|'aceita'|'recusada'|'expirada'|'indisponivel', ...}
+// HOST da sala casual: quem tem o menor ping até o servidor, se os dois são
+// conhecidos e a diferença passa de FOLGA_PING_MS; senão, quem confirmou primeiro.
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
 import crypto from 'node:crypto'
 import { criarLimite } from './contas.js'
 import { CONVITE_MS, CONVITES_POR_MINUTO, MAX_CONVITES_RECEBIDOS } from './amigos.js'
+import { criarFila, agendarPadrao, ACOES_FILA_POR_MINUTO, REVANCHE_MS, FOLGA_PING_MS } from './fila.js'
 
-export const PROTOCOLO = 3
+export const PROTOCOLO = 4
 export const PORTA_DESCOBERTA = 47777
 export const MAX_MEMBROS = 2
 const ANUNCIO_MS = 1500
@@ -122,13 +136,16 @@ export const trocarMdns = (texto, ip) => (typeof texto === 'string' ? texto.repl
 // mundo é convidado)
 // relacoes(userId): { amigos, bloqueios, pedidos } | null (server/amigos.js;
 // sem ele não há presença nem convites)
-export function criarLobby({ locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null, relacoes = null } = {}) {
+// agendar(fn, ms) -> cancelar: timers da fila e da revanche (os testes trocam);
+// log: linhas para o console do servidor (host escolhido na fila)
+export function criarLobby({ locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null, relacoes = null, agendar = agendarPadrao, log = () => {} } = {}) {
   const clientes = new Map() // id -> cliente
   const salas = new Map() // id -> sala
   const codigos = new Map() // código -> id da sala
   const presenca = new Map() // id do usuário (conta) -> cliente
   const convites = new Map() // id do convite -> { id, de, deUsuario, para, salaId, expira, timer }
   const limiteConvites = criarLimite({ max: CONVITES_POR_MINUTO, agora })
+  const limiteFila = criarLimite({ max: ACOES_FILA_POR_MINUTO, agora })
 
   const novoCodigo = () => {
     for (;;) {
@@ -139,6 +156,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   }
 
   const fecharSala = (sala) => {
+    encerrarRevanche(sala)
     salas.delete(sala.id)
     codigos.delete(sala.codigo)
     for (const conv of [...convites.values()]) if (conv.salaId === sala.id) encerrarConvite(conv, 'cancelado', 'a sala foi fechada')
@@ -164,6 +182,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     nome: sala.nome,
     modo: sala.modo,
     emPartida: sala.emPartida,
+    casual: Boolean(sala.casual),
     max: MAX_MEMBROS,
     membros: [...sala.membros].map((id) => {
       const c = clientes.get(id)
@@ -193,13 +212,14 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     if (!sala) return
     sala.membros.delete(cliente.id)
     atualizarStatus(cliente)
-    if (cliente.id === sala.host) {
+    // sala casual (JOGAR RÁPIDO): sem o oponente não tem o que fazer nela
+    if (cliente.id === sala.host || sala.casual) {
       fecharSala(sala)
       for (const id of sala.membros) {
         const outro = clientes.get(id)
         outro.sala = null
         outro.pronto = false
-        enviar(outro, { t: 'fechada', motivo })
+        enviar(outro, { t: 'fechada', motivo: sala.casual ? 'o oponente saiu da partida' : motivo, ...(sala.casual && { casual: true }) })
         atualizarStatus(outro)
       }
       return
@@ -296,6 +316,89 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     for (const conv of [...convites.values()]) if (conv.expira <= t) encerrarConvite(conv, 'expirado')
   }
 
+  // ---------- JOGAR RÁPIDO (fila casual, server/fila.js) ----------
+
+  const bloqueados = (a, b) => Boolean(a.usuario && b.usuario && (a.bloqueios.has(b.usuario) || b.bloqueios.has(a.usuario)))
+  // nunca a mesma conta (duas abas) nem quem se bloqueou; os dois fora de sala
+  const podeParear = (a, b) => a !== b && clientes.has(a.id) && clientes.has(b.id) && !a.sala && !b.sala && !(a.usuario && a.usuario === b.usuario) && !bloqueados(a, b)
+  const oponente = (c) => ({ nome: c.nome, ...(c.perfil && { tag: c.perfil.tag, avatar: c.perfil.avatar, nivel: c.perfil.nivel }) })
+  const MOTIVO_FORA = { tempo: 'você não confirmou a tempo', recusou: 'você recusou a partida' }
+  const MOTIVO_VOLTA = { tempo: 'o oponente não confirmou a tempo', recusou: 'o oponente recusou a partida' }
+  const fila = criarFila({
+    agora,
+    agendar,
+    podeParear,
+    avisos: {
+      procurando: (c, desde) => enviar(c, { t: 'fila', estado: 'procurando', desde, esperaMs: Math.max(0, agora() - desde), convidado: !c.usuario }),
+      pareado(par) {
+        for (const [eu, outro] of [[par.a, par.b], [par.b, par.a]])
+          enviar(eu, { t: 'pareado', id: par.id, oponente: oponente(outro), expiraEm: par.expira, restanteMs: Math.max(0, par.expira - agora()) })
+      },
+      respostas(par) {
+        for (const [eu, outro] of [[par.a, par.b], [par.b, par.a]]) enviar(eu, { t: 'pareadoEstado', id: par.id, eu: par.confirmados.includes(eu), oponente: par.confirmados.includes(outro) })
+      },
+      desfeito(par, { volta, fora }) {
+        const culpa = fora[0]?.motivo
+        for (const c of volta) enviar(c, { t: 'pareadoFim', id: par.id, voltou: true, motivo: `${MOTIVO_VOLTA[culpa] ?? 'o oponente desistiu'}: voltando para a fila` })
+        for (const { c, motivo } of fora) {
+          enviar(c, { t: 'pareadoFim', id: par.id, voltou: false, motivo: MOTIVO_FORA[motivo] ?? '' })
+          enviar(c, { t: 'fila', estado: 'fora', motivo: MOTIVO_FORA[motivo] ?? '' })
+        }
+      },
+      fechado: (par, ordem) => criarCasual(ordem),
+    },
+  })
+
+  // tira `c` da fila (procurando ou pareado); true se estava nela
+  function removerDaFila(c, motivo) {
+    const estava = fila.estado(c)
+    if (estava === 'fora') return false
+    fila.sair(c, motivo)
+    // pareado: o desfeito já avisou
+    if (estava === 'procurando') enviar(c, { t: 'fila', estado: 'fora', motivo: '' })
+    return true
+  }
+
+  // os dois confirmaram: a sala casual, com o host já escolhido
+  function escolherHost([primeiro, segundo]) {
+    const [p, q] = [primeiro.ping, segundo.ping]
+    const medidos = Number.isFinite(p) && Number.isFinite(q)
+    if (medidos && Math.abs(p - q) >= FOLGA_PING_MS) return p <= q ? { host: primeiro, outro: segundo, regra: 'menor ping' } : { host: segundo, outro: primeiro, regra: 'menor ping' }
+    return { host: primeiro, outro: segundo, regra: 'confirmou primeiro' }
+  }
+  function criarCasual(ordem) {
+    const { host, outro, regra } = escolherHost(ordem)
+    const sala = criarSalaDe(host, 'PARTIDA RÁPIDA')
+    if (!sala) {
+      enviar(outro, { t: 'erro', msg: 'o servidor está lotado: tente de novo daqui a pouco' })
+      for (const c of ordem) enviar(c, { t: 'fila', estado: 'fora', motivo: 'o servidor está lotado' })
+      return
+    }
+    sala.casual = true
+    // para o registro de partidas (1D): quem jogou, com conta ou convidado
+    sala.participantes = [host, outro].map((c) => ({ cliente: c.id, usuario: c.usuario, convidado: !c.usuario }))
+    sala.criadaEm = agora()
+    entrarNaSala(outro, sala)
+    outro.pronto = true
+    avisarSala(sala)
+    for (const c of [host, outro]) enviar(c, { t: 'partidaCasual', salaId: sala.id, host: host.id })
+    log(`[fila] partida rápida ${sala.codigo}: host ${host.nome} (${host.ping ?? '?'} ms) x ${outro.nome} (${outro.ping ?? '?'} ms), regra: ${regra}`)
+  }
+
+  // revanche na sala casual: os dois aceitam em REVANCHE_MS
+  function encerrarRevanche(sala) {
+    sala.revanche?.cancelar?.()
+    sala.revanche = null
+  }
+  const avisarMembros = (sala, msg) => {
+    for (const id of sala.membros) enviar(clientes.get(id), msg)
+  }
+  function verificarRevanche(sala) {
+    if (!sala.revanche || sala.revanche.expira > agora()) return
+    encerrarRevanche(sala)
+    if (salas.get(sala.id) === sala) avisarMembros(sala, { t: 'revanche', estado: 'expirada' })
+  }
+
   // IP de `de` como `para` enxerga (para os candidatos do WebRTC)
   const ipVisto = (de, para) => (ehLoopback(de.ip) ? ipParaAlcancar(para.ip, locais()) : de.ip)
 
@@ -320,6 +423,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
 
   // cria a sala de `c` (saindo da atual); null se o servidor está lotado
   function criarSalaDe(c, nome) {
+    removerDaFila(c, 'sala')
     sair(c)
     if (salas.size >= maxSalas) {
       enviar(c, { t: 'erro', msg: 'o servidor está lotado: tente de novo daqui a pouco' })
@@ -335,6 +439,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   }
 
   function entrarNaSala(c, sala) {
+    removerDaFila(c, 'sala')
     sair(c)
     sala.membros.add(c.id)
     c.sala = sala.id
@@ -375,6 +480,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       const aplicar = (conta) => {
         const antes = c.usuario
         const depois = conta?.id ?? null
+        if (antes !== depois) removerDaFila(c, 'conta') // a fila olha a conta (mesma conta, bloqueios)
         if (antes && antes !== depois) {
           desregistrar(c, antes)
           Object.assign(c, { amigos: new Set(), bloqueios: new Set(), pedidos: new Set(), statusPub: 'offline' })
@@ -426,7 +532,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     },
     modo(c, m) {
       const sala = salas.get(c.sala)
-      if (!sala || sala.host !== c.id || !MODOS.includes(m.modo)) return
+      if (!sala || sala.host !== c.id || !MODOS.includes(m.modo) || sala.casual) return // a casual é PVP
       sala.modo = m.modo
       for (const id of sala.membros) if (id !== sala.host) clientes.get(id).pronto = false // mudou o combinado: confirma de novo
       avisarSala(sala)
@@ -446,7 +552,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     expulsar(c, m) {
       const sala = salas.get(c.sala)
       const alvo = clientes.get(m.id)
-      if (!sala || sala.host !== c.id || !alvo || alvo.sala !== sala.id || alvo === c) return
+      if (!sala || sala.host !== c.id || !alvo || alvo.sala !== sala.id || alvo === c || sala.casual) return
       sair(alvo)
       enviar(alvo, { t: 'fechada', motivo: 'o host tirou você da sala' })
     },
@@ -506,6 +612,53 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       }
       entrarNaSala(c, sala)
       enviar(remetente, { t: 'conviteResposta', id: conv.id, para: conv.para, resultado: 'aceito' })
+    },
+    // JOGAR RÁPIDO: entrar / sair da fila
+    fila(c, m) {
+      if (!limiteFila.usar(c.id)) return enviar(c, { t: 'filaNegada', msg: 'calma: ações demais na fila, espere um pouco' })
+      if (m.acao === 'sair') {
+        if (!removerDaFila(c, 'saiu')) enviar(c, { t: 'fila', estado: 'fora', motivo: '' }) // já estava fora: confirma
+        return
+      }
+      if (m.acao !== 'entrar') return
+      const negar = (msg) => enviar(c, { t: 'filaNegada', msg })
+      const estado = fila.estado(c)
+      if (estado === 'procurando') return enviar(c, { t: 'fila', estado, desde: fila.desde(c), esperaMs: agora() - fila.desde(c), convidado: !c.usuario })
+      if (estado === 'pareado') return // a confirmação já está na tela dele
+      if (c.validando) return negar('espere a conta carregar')
+      if (c.sala) return negar('saia da sala para entrar na fila')
+      if (c.usuario && [...clientes.values()].some((o) => o !== c && o.usuario === c.usuario && fila.estado(o) !== 'fora')) return negar('sua conta já está na fila em outra aba')
+      fila.entrar(c)
+    },
+    // aceitar (ou recusar) a partida achada: { id, aceitar }
+    confirmar(c, m) {
+      if (!limiteFila.usar(c.id)) return enviar(c, { t: 'filaNegada', msg: 'calma: ações demais na fila, espere um pouco' })
+      const id = String(m.id ?? '')
+      if (fila.responder(c, id, m.aceitar !== false) === 'expirado') enviar(c, { t: 'pareadoFim', id, voltou: false, motivo: 'essa partida não vale mais' })
+    },
+    // revanche na sala casual: { aceitar }
+    revanche(c, m) {
+      if (!limiteFila.usar(c.id)) return enviar(c, { t: 'filaNegada', msg: 'calma: ações demais, espere um pouco' })
+      const sala = salas.get(c.sala)
+      if (!sala?.casual) return
+      if (sala.membros.size < MAX_MEMBROS) return enviar(c, { t: 'revanche', estado: 'indisponivel', motivo: 'o oponente já saiu' })
+      verificarRevanche(sala)
+      if (m.aceitar !== true) {
+        encerrarRevanche(sala)
+        return avisarMembros(sala, { t: 'revanche', estado: 'recusada', de: c.id })
+      }
+      if (!sala.revanche) {
+        const expira = agora() + REVANCHE_MS
+        sala.revanche = { votos: new Set(), expira, cancelar: agendar(() => verificarRevanche(sala), REVANCHE_MS + 50) }
+      }
+      const r = sala.revanche
+      r.votos.add(c.id)
+      if ([...sala.membros].every((id) => r.votos.has(id))) {
+        encerrarRevanche(sala)
+        sala.revanches = (sala.revanches ?? 0) + 1
+        return avisarMembros(sala, { t: 'revanche', estado: 'aceita', host: sala.host })
+      }
+      avisarMembros(sala, { t: 'revanche', estado: 'pedida', de: c.id, expiraEm: r.expira, restanteMs: Math.max(0, r.expira - agora()) })
     },
     ping(c, m) {
       enviar(c, { t: 'pong', n: m.n })
@@ -569,7 +722,10 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     },
     // convites pendentes (os testes conferem a expiração)
     expirarConvites,
+    // fila casual (os testes conferem os estados e vencem os prazos)
+    fila,
     desconectar(cliente) {
+      removerDaFila(cliente, 'saiu')
       desregistrar(cliente, cliente.usuario)
       sair(cliente, 'o host desconectou')
       clientes.delete(cliente.id)
@@ -640,7 +796,7 @@ function criarDescoberta(lobby, porta, log) {
 export function anexarLan(httpServer, { log = console.log, descoberta = true, online = false, ice = [], maxClientes = MAX_CLIENTES, autenticar = null, relacoes = null } = {}) {
   let rede = null
   const porta = () => httpServer.address()?.port
-  const lobby = criarLobby({ online, ice, autenticar, relacoes, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
+  const lobby = criarLobby({ online, ice, autenticar, relacoes, log, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 * 1024 })
   if (descoberta && !online) rede = criarDescoberta(lobby, porta, log)
 
