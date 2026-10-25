@@ -24,6 +24,8 @@ quanto cada ponto recebe da luz do telão; daí saem as camadas:
   poeira.png       2x2      um grão de poeira (branco) que flutua na luz
   luzinhas.png     854x480  brilho das lâmpadas do varal e do abajur (soma
                             por cima, o jogo faz cintilar)
+  frente.png       854x480  primeiro plano, na frente da turma: almofadas,
+                            controle e as folhas no canto (já com a luz da sala)
 
 As posições batem com src/game/menu/layout.js (TELA, PES) e com telao.py.
 """
@@ -43,6 +45,8 @@ L, A = 427, 240  # arte em meia resolução
 TV = (202, 26, 407, 126)  # x0, y0, x1, y1
 TV_CX = (TV[0] + TV[2]) / 2
 TAMPO = 146  # topo do rack: onde a TV (com a barra de som) está apoiada
+# a turma sentada no tapete (TURMA de layout.js ÷ 2): x do centro e base do sprite
+TURMA = [(216, 226), (246, 221), (276, 226), (306, 221), (336, 226), (366, 221), (396, 226)]
 CHAO = 172
 SEED = 7
 
@@ -75,7 +79,7 @@ LARANJA = (232, 126, 52)
 ROSA = (232, 96, 150)
 AMARELO = (255, 214, 96)
 
-LAMPADAS = [(255, 226, 130), (255, 160, 80), (255, 120, 170), (140, 226, 255), (255, 226, 130)]
+LAMPADAS = [(255, 214, 120), (255, 170, 90), (255, 232, 160), (255, 140, 120), (255, 200, 110), (170, 230, 255)]
 
 # luz ambiente (multiplica o albedo no fundo): noite quente, mais viva no centro
 AMBIENTE = np.array([0.96, 0.84, 0.94])
@@ -110,8 +114,8 @@ class Quadro:
     """Albedo (RGB) + receptividade à luz do telão (R: 0 = de costas para a luz,
     1 = normal, >1 = quina virada para a tela que brilha mais)."""
 
-    def __init__(self):
-        self.img = Image.new('RGB', (L, A), PAREDE_BAIXO)
+    def __init__(self, modo='RGB'):
+        self.img = Image.new(modo, (L, A), PAREDE_BAIXO if modo == 'RGB' else (0, 0, 0, 0))
         self.d = ImageDraw.Draw(self.img)
         self.r = Image.new('F', (L, A), 1.0)
         self.dr = ImageDraw.Draw(self.r)
@@ -206,7 +210,7 @@ def janela(q, rnd):
 
 
 def varal(q, rnd):
-    """Varal de lâmpadas coloridas no alto da parede (acesas: soma brilho)."""
+    """Varal de lâmpadas quentes no alto da parede (acesas: soma brilho)."""
     vao = 71
     pts = []
     for x in range(0, L + 2, 1):
@@ -218,17 +222,18 @@ def varal(q, rnd):
     for x in range(0, L + vao, vao):  # pregos
         q.ret(x - 1, 2, x + 1, 4, METAL_ESCURO)
     n = 0
-    for x in range(7, L, 13):
+    for x in range(6, L, 14):
         seg = x % vao
         y = int(4 + 8 * math.sin(math.pi * seg / vao))
-        cor = LAMPADAS[n % len(LAMPADAS)]
+        cor = LAMPADAS[(n * 7) % len(LAMPADAS)]
         n += 1
-        q.px(x, y + 1, CORDA)
-        q.ret(x - 1, y + 2, x + 1, y + 5, mais(cor, -50), r=1.0)
-        q.ret(x, y + 2, x, y + 4, cor, r=2.4)
-        q.px(x, y + 3, mais(cor, 40), r=3.0)
-        brilho(BRILHO, x, y + 4, 9, cor, 0.5)
-        brilho(LUZINHAS, x, y + 4, 12, cor, 0.7)
+        q.ret(x - 1, y + 1, x + 1, y + 2, (70, 60, 56))  # soquete
+        q.ret(x - 1, y + 3, x + 1, y + 7, mais(cor, -30), r=1.0)
+        q.ret(x, y + 3, x, y + 6, cor, r=2.4)
+        q.px(x - 1, y + 4, mais(cor, 50), r=3.0)
+        q.px(x, y + 8, mais(cor, -60))
+        brilho(BRILHO, x, y + 5, 13, cor, 0.6)
+        brilho(LUZINHAS, x, y + 5, 17, cor, 0.85)
 
 
 def quadros(q):
@@ -300,35 +305,47 @@ def folha_g(q, cx, cy, raio):
 # ---------- plantas ----------
 
 
-def monstera(q, cx, base, altura, espalho, vaso=True, flip=1):
-    """Planta grande de folhas largas (nascem de um vaso e se abrem em leque)."""
-    n = 9
+def folha_larga(q, hx, hy, w, h, ang, cor):
+    """Folha de costela-de-adão: gota larga com contorno, nervura e veios."""
+    pts, borda = [], []
+    for k in range(20):
+        a = k / 20 * 2 * math.pi
+        px_ = math.cos(a) * w
+        py_ = math.sin(a) * h * (1 - 0.3 * math.cos(a))  # mais gorda perto do talo
+        for lista, f in ((pts, 1.0), (borda, 1.18)):
+            lista.append((hx + (px_ * math.cos(ang) - py_ * math.sin(ang)) * f, hy + (px_ * math.sin(ang) + py_ * math.cos(ang)) * f))
+    q.poli(borda, FOLHA_ESCURA, r=0.8)
+    q.poli(pts, cor, r=1.1)
+    ca, sa = math.cos(ang), math.sin(ang)
+    q.linha([(hx - w * 0.9 * ca, hy - w * 0.9 * sa), (hx + w * 0.8 * ca, hy + w * 0.8 * sa)], FOLHA_ESCURA, r=0.7)  # nervura
+    for k in (-0.45, 0.0, 0.45):  # veios (os recortes da folha)
+        bx, by = hx + w * k * ca, hy + w * k * sa
+        for lado in (-1, 1):
+            q.linha([(bx, by), (bx - lado * h * 0.8 * sa + w * 0.18 * ca, by + lado * h * 0.8 * ca + w * 0.18 * sa)], mais(cor, -34), r=0.8)
+    # brilho do lado de cima
+    q.linha([(hx - w * 0.5 * ca - h * 0.45 * sa, hy - w * 0.5 * sa + h * 0.45 * ca * -1), (hx + w * 0.2 * ca - h * 0.5 * sa, hy + w * 0.2 * sa - h * 0.5 * ca)], FOLHA_CLARA, r=2.2)
+
+
+def monstera(q, cx, base, altura, espalho, vaso=True, flip=1, n=8):
+    """Planta cheia de folhas largas saindo de um vaso (ou do canto da tela)."""
+    rnd = random.Random(int(cx * 7 + base))
+    folhas = []
     for i in range(n):
         t = i / (n - 1)
-        ang = (-1.05 + 2.1 * t) * flip
-        comp = altura * (0.62 + 0.38 * math.cos((t - 0.5) * 2.2))
-        hx = cx + math.sin(ang) * comp * (espalho / altura + 0.25)
+        ang = (-1.1 + 2.2 * t) * flip
+        comp = altura * (0.55 + 0.45 * math.cos((t - 0.5) * 2.0)) * rnd.uniform(0.85, 1.05)
+        hx = cx + math.sin(ang) * espalho * rnd.uniform(0.75, 1.0)
         hy = base - 4 - math.cos(ang) * comp
-        # haste
-        q.linha([(cx, base - 4), (hx, hy + 4)], FOLHA_ESCURA, r=0.9)
-        # folha: elipse inclinada (polígono) com recortes
-        w, h = 9 + (i % 3) * 2, 6 + (i % 2) * 2
-        pts = []
-        for k in range(14):
-            a = k / 14 * 2 * math.pi
-            px_, py_ = math.cos(a) * w, math.sin(a) * h
-            rot = ang * 0.9
-            pts.append((hx + px_ * math.cos(rot) - py_ * math.sin(rot), hy + px_ * math.sin(rot) + py_ * math.cos(rot)))
-        q.poli(pts, FOLHA if i % 2 else mais(FOLHA, -14), r=1.1)
-        q.linha([(hx - w * 0.6 * math.cos(ang), hy), (hx + w * 0.6 * math.cos(ang), hy)], FOLHA_ESCURA, r=0.8)
-        q.px(hx - 2, hy - 2, FOLHA_CLARA, r=2.2)
-        q.px(hx - 1, hy - 3, FOLHA_CLARA, r=2.4)
-        q.px(hx, hy + 1, mais(FOLHA_ESCURA, 14), r=0.8)
+        folhas.append((comp, hx, hy, ang, i))
+    for comp, hx, hy, ang, i in sorted(folhas, key=lambda f: f[0]):  # as mais altas atrás
+        q.linha([(cx, base - 4), ((cx + hx) / 2, hy + comp * 0.35), (hx, hy + 5)], FOLHA_ESCURA, r=0.9, largura=2)
+        w, h = 12 + (i % 3) * 2, 8 + (i % 2) * 2
+        folha_larga(q, hx, hy, w, h, ang * 0.8 + (0.5 if ang > 0 else -0.5), FOLHA if i % 2 else mais(FOLHA, -12))
     if vaso:
-        q.poli([(cx - 9, base - 6), (cx + 9, base - 6), (cx + 7, base + 6), (cx - 7, base + 6)], VASO, r=1.0)
-        q.ret(cx - 10, base - 7, cx + 10, base - 5, mais(VASO, 26), r=1.7)
-        q.ret(cx - 7, base + 4, cx + 7, base + 6, VASO_ESCURO)
-        q.ret(cx + 4, base - 4, cx + 6, base + 3, mais(VASO, -22))
+        q.poli([(cx - 10, base - 6), (cx + 10, base - 6), (cx + 8, base + 7), (cx - 8, base + 7)], VASO, r=1.0)
+        q.ret(cx - 11, base - 8, cx + 11, base - 5, mais(VASO, 26), r=1.7)
+        q.ret(cx - 8, base + 5, cx + 8, base + 7, VASO_ESCURO)
+        q.ret(cx + 5, base - 4, cx + 7, base + 4, mais(VASO, -22))
 
 
 def planta_direita(q):
@@ -393,15 +410,16 @@ def criado_mudo(q):
     q.poli([(ax - 7, topo - 14), (ax + 7, topo - 14), (ax + 11, topo - 28), (ax - 11, topo - 28)], (255, 200, 96), r=1.2)
     q.poli([(ax - 7, topo - 14), (ax - 3, topo - 14), (ax - 5, topo - 28), (ax - 11, topo - 28)], (232, 160, 70), r=1.0)
     q.ret(ax - 11, topo - 29, ax + 11, topo - 28, (255, 232, 150), r=2.0)
-    # estrela acesa na cúpula
-    estrela = ['..X..', '..X..', 'XXXXX', '.XXX.', 'XX.XX']
+    # estrela acesa na frente da cúpula (é o que dá a luz quente do canto)
+    estrela = ['....X....', '...XXX...', '...XXX...', 'XXXXXXXXX', '.XXXXXXX.', '..XXXXX..', '..XXXXX..', '.XXX.XXX.', '.XX...XX.']
     for j, fila in enumerate(estrela):
         for i, c in enumerate(fila):
             if c == 'X':
-                q.px(ax - 2 + i, topo - 25 + j, (255, 250, 200), r=2.4)
-    brilho(BRILHO, ax, topo - 20, 40, (255, 190, 90), 0.5)
-    brilho(BRILHO, ax, topo - 20, 18, (255, 220, 140), 0.55)
-    brilho(LUZINHAS, ax, topo - 20, 22, (255, 210, 120), 0.5)
+                borda = j in (0, 3, 8) or i in (0, 8) or (fila[i - 1] if i else '.') == '.' or (fila[i + 1] if i < 8 else '.') == '.'
+                q.px(ax - 4 + i, topo - 38 + j, (255, 196, 80) if borda else (255, 250, 200), r=2.4)
+    brilho(BRILHO, ax, topo - 26, 46, (255, 170, 70), 0.5)
+    brilho(BRILHO, ax, topo - 34, 14, (255, 225, 150), 0.35)
+    brilho(LUZINHAS, ax, topo - 30, 24, (255, 200, 110), 0.5)
     # caneca com coração
     mx = 162
     q.ret(mx - 5, topo - 11, mx + 4, topo - 1, (246, 240, 248), r=1.3)
@@ -541,7 +559,7 @@ def chao(q, rnd):
 
 
 def tapete(q):
-    """Tapete xadrez grande (roxo e laranja) na frente da TV."""
+    """Tapete xadrez grande (vinho, roxo e laranja) na frente da TV."""
     ya = CHAO + 5
     K = 2200
 
@@ -554,35 +572,47 @@ def tapete(q):
         for x in range(max(0, int(math.ceil(xa))), min(L, int(xb) + 1)):
             u = (x - PF[0]) * (CHAO - PF[1]) / (y - PF[1])
             i, j = int(math.floor((u + 600) / 22)), int(math.floor(v / 2.4))
-            xadrez = (i + j) % 2
-            c = ROXO_ESCURO if xadrez else mais(ROXO_ESCURO, -26)
             fu, fv = ((u + 600) % 22) / 22, (v / 2.4) % 1
-            if (i % 2 == 0 and 0.4 < fu < 0.6) or (j % 2 == 0 and 0.4 < fv < 0.6):
-                c = misturar(c, LARANJA, 0.82)  # faixas laranja cruzando o xadrez
-            elif (fu < 0.07 or fv < 0.07):
-                c = mais(c, -14)
+            c = (126, 54, 112) if (i + j) % 2 else (88, 42, 100)
+            faixa_u = i % 2 == 0 and 0.36 < fu < 0.64
+            faixa_v = j % 2 == 0 and 0.36 < fv < 0.64
+            if faixa_u and faixa_v:
+                c = (246, 150, 70)  # cruzamento das faixas: mais claro
+            elif faixa_u or faixa_v:
+                c = misturar(c, LARANJA, 0.7)
+            if 0.48 < fu < 0.52 or 0.47 < fv < 0.53:
+                c = misturar(c, (255, 206, 120), 0.6)  # fio amarelo no meio
+            elif fu < 0.05 or fv < 0.05:
+                c = mais(c, -16)
             q.img.putpixel((x, y), c)
             q.r.putpixel((x, y), 1.15)
-        # borda
-        for x in (int(xa), int(xa) + 1, int(xb) - 1, int(xb)):
-            q.px(x, y, (60, 34, 72), r=0.9)
+        for x in (int(xa), int(xa) + 1, int(xb) - 1, int(xb)):  # borda
+            q.px(x, y, (60, 30, 66), r=0.9)
     xa, xb = limites(ya)
-    q.linha([(xa, ya), (xb, ya)], (60, 34, 72), r=1.2)
+    q.linha([(xa, ya), (xb, ya)], (60, 30, 66), r=1.2)
 
 
-def almofadas_chao(q):
-    """Almofadas redondas onde a turma senta: laranja (com estrela) e rosa."""
-    for cx, cy, rx, ry, cor, estrela in ((304, 226, 26, 11, LARANJA, True), (386, 230, 30, 12, (214, 70, 120), False), (212, 232, 24, 10, (120, 86, 200), False)):
-        q.elipse(cx - rx - 2, cy - ry + 3, cx + rx + 2, cy + ry + 3, (30, 18, 36))  # sombra
-        q.elipse(cx - rx, cy - ry, cx + rx, cy + ry, mais(cor, -42), r=1.0)
-        q.elipse(cx - rx + 1, cy - ry, cx + rx - 1, cy + ry - 3, cor, r=1.3)
-        q.elipse(cx - rx + 6, cy - ry + 2, cx + rx - 6, cy + ry - 6, mais(cor, 22), r=1.8)
-        q.linha([(cx - rx + 3, cy - 2), (cx + rx - 3, cy - 2)], mais(cor, -26), r=0.8)
-        if estrela:
-            for j, fila in enumerate(['..X..', 'XXXXX', '.XXX.', '.X.X.']):
-                for i, c in enumerate(fila):
-                    if c == 'X':
-                        q.px(cx - 2 + i, cy - 6 + j, (255, 240, 170), r=2.0)
+def almofada(q, cx, cy, rx, ry, cor, estrela=False):
+    """Almofada redonda e fofa vista de cima, com sombra no chão."""
+    q.elipse(cx - rx - 2, cy - ry + 3, cx + rx + 2, cy + ry + 3, (30, 16, 34))  # sombra
+    q.elipse(cx - rx, cy - ry, cx + rx, cy + ry, mais(cor, -46), r=1.0)
+    q.elipse(cx - rx + 1, cy - ry, cx + rx - 1, cy + ry - 3, cor, r=1.3)
+    q.elipse(cx - rx + rx // 3, cy - ry + 2, cx + rx - rx // 3, cy + ry - ry, mais(cor, 24), r=1.8)
+    q.linha([(cx - rx + 3, cy - 1), (cx + rx - 3, cy - 1)], mais(cor, -24), r=0.8)  # costura
+    if estrela:
+        for j, fila in enumerate(['..X..', 'XXXXX', '.XXX.', '.X.X.']):
+            for i, c in enumerate(fila):
+                if c == 'X':
+                    q.px(cx - 2 + i, cy - 5 + j, (255, 240, 170), r=2.0)
+
+
+ASSENTOS = [(120, 86, 200), (214, 70, 120), LARANJA, (92, 160, 200), (214, 70, 120), (120, 86, 200), (232, 160, 70)]
+
+
+def assentos(q):
+    """A almofada em que cada um da turma está sentado (aparece dos lados)."""
+    for (x, y), cor in zip(TURMA, ASSENTOS):
+        almofada(q, x, y - 1, 16, 5, cor)
 
 
 def sofa(q):
@@ -593,20 +623,34 @@ def sofa(q):
     q.poli(corpo, (82, 56, 128), r=0.9)
     q.poli([(dx - 4, 180 + dy), (dx + 4, 170 + dy), (dx + 36, 164 + dy), (dx + 72, 168 + dy), (dx + 86, 178 + dy), (dx + 50, 186 + dy), (dx + 14, 186 + dy)], (120, 88, 176), r=1.2)
     q.linha([(dx + 4, 170 + dy), (dx + 36, 164 + dy), (dx + 72, 168 + dy), (dx + 86, 178 + dy)], (170, 140, 224), r=2.4)
-    q.linha([(dx - 6, 200 + dy), (dx + 96, 200 + dy)], (62, 40, 100), r=0.5)
-    # almofada xadrez em losango
-    cx, cy, d = dx + 52, 196 + dy, 25
-    pts = [(cx, cy - d), (cx + d, cy), (cx, cy + d), (cx - d, cy)]
-    q.poli(pts, ROXO_ESCURO, r=1.0)
-    for j in range(-6, 6):
-        for i in range(-6, 6):
-            ux, uy = (i * 8), (j * 8)
-            px_, py_ = cx + (ux - uy) * 0.707, cy + (ux + uy) * 0.707
-            casa = [(px_, py_ - 5.6), (px_ + 5.6, py_), (px_, py_ + 5.6), (px_ - 5.6, py_)]
-            if abs(px_ - cx) + abs(py_ - cy) < d - 4:
-                q.poli(casa, ROXO if (i + j) % 2 else ROXO_ESCURO, r=1.2)
-    q.linha(pts + [pts[0]], mais(ROXO_ESCURO, -40), r=0.6)
-    q.linha([(cx - d + 2, cy - 1), (cx, cy - d + 2), (cx + d - 2, cy - 1)], ROXO_LINHA, r=2.4)
+    for bx in (dx + 16, dx + 40, dx + 64):  # botões do capitonê
+        q.px(bx, 176 + dy, (62, 40, 100))
+    # almofada xadrez (tartan) inclinada, estufada no meio
+    cx, cy, lado, giro = dx + 56, 194 + dy, 22, 0.32
+    ca, sa = math.cos(giro), math.sin(giro)
+    for y in range(int(cy - lado * 1.5), int(cy + lado * 1.5)):
+        for x in range(int(cx - lado * 1.5), int(cx + lado * 1.5)):
+            u = (x - cx) * ca + (y - cy) * sa
+            v = -(x - cx) * sa + (y - cy) * ca
+            r4 = (abs(u) / lado) ** 3 + (abs(v) / lado) ** 3
+            if r4 > 1.12:
+                continue
+            if r4 > 1.0:
+                q.px(x, y, (52, 32, 92), r=0.6)  # contorno
+                continue
+            bu, bv = int((u + 60) // 7), int((v + 60) // 7)
+            c = (124, 68, 168)
+            if bu % 2 == 0:
+                c = mais(c, 16)
+            if bv % 2 == 0:
+                c = mais(c, 16)
+            fu, fv = (u + 60) % 14, (v + 60) % 14
+            if fu < 1 or fv < 1:
+                c = (236, 120, 176)  # fio rosa
+            elif 6.5 < fu < 7.5 or 6.5 < fv < 7.5:
+                c = (150, 130, 236)  # fio lilás
+            c = mais(c, int(-30 * r4 + 18 * max(0.0, -(u + v) / lado)))  # estufada: borda escura, quina de cima clara
+            q.px(x, y, c, r=1.2)
 
 
 def copo_boba(q):
@@ -622,9 +666,8 @@ def copo_boba(q):
     q.px(x - 2, y + 4, (255, 255, 255), r=2.4)
 
 
-def controle(q):
-    """Controle de videogame no chão, com o fio enrolado até o rack."""
-    x, y = 236, 224
+def controle(q, x=286, y=229):
+    """Controle de videogame no chão, com o fio enrolado indo até o rack."""
     q.elipse(x - 12, y + 6, x + 14, y + 12, (34, 22, 40))
     q.ret(x - 11, y - 1, x + 11, y + 6, (232, 228, 244), r=1.4)
     q.ret(x - 11, y - 1, x + 11, y - 1, (255, 255, 255), r=2.4)
@@ -635,11 +678,24 @@ def controle(q):
     q.px(x - 6, y + 3, (70, 64, 90))
     q.px(x + 5, y + 1, (232, 80, 110), r=1.8)
     q.px(x + 7, y + 3, (90, 130, 240), r=1.8)
-    # fio sinuoso
-    pts = [(x + 2, y - 1)]
-    for k in range(1, 40):
-        pts.append((x + 2 + k * 2.4, y - 1 - k * 0.9 + math.sin(k * 0.5) * 3))
-    q.linha(pts, (50, 46, 66), r=0.6)
+    pts = [(x - 11, y + 3)]  # fio sinuoso, sai pela esquerda
+    for k in range(1, 22):
+        pts.append((x - 11 - k * 2.2, y + 3 + math.sin(k * 0.6) * 2.5 + k * 0.3))
+    q.linha(pts, (60, 54, 80), r=0.6)
+
+
+def primeiro_plano(q):
+    """O que fica na frente da turma: almofadas, o controle e folhas no canto."""
+    almofada(q, 232, 236, 24, 7, (196, 92, 176))
+    almofada(q, 326, 238, 22, 7, LARANJA, estrela=True)
+    almofada(q, 392, 239, 20, 6, (222, 74, 116))
+    controle(q, 280, 229)
+    # folhagem no canto de baixo à direita (bem perto da câmera, meio escura)
+    for hx, hy, w, h, ang in ((428, 204, 15, 9, -2.0), (424, 222, 14, 8, -2.6), (430, 232, 13, 7, -1.9)):
+        folha_larga(q, hx, hy, w, h, ang, mais(FOLHA, -26))
+    # e um ramo no canto de baixo à esquerda
+    for hx, hy, w, h, ang in ((6, 228, 13, 7, -0.4), (18, 238, 12, 6, -0.2)):
+        folha_larga(q, hx, hy, w, h, ang, mais(FOLHA, -30))
 
 
 # ---------- luz do telão ----------
@@ -716,10 +772,9 @@ def main():
     criado_mudo(q)
     violao(q)
     varal(q, rnd)
-    almofadas_chao(q)
+    assentos(q)
     sofa(q)
     copo_boba(q)
-    controle(q)
 
     alb = np.asarray(q.img, np.float32)
     rec = np.asarray(q.r, np.float32)
@@ -735,9 +790,18 @@ def main():
     fundo = np.clip(fundo, 0, 255)
     salvar(fundo, 'fundo.png', 'RGB')
 
+    # primeiro plano: mesma luz da sala (ambiente + o calor da frente da TV), com transparência
+    f = Quadro('RGBA')
+    primeiro_plano(f)
+    fa = np.asarray(f.img, np.float32)
+    frente = np.zeros_like(fa)
+    frente[..., :3] = np.clip(fa[..., :3] * amb * 0.92 + quente[..., None] * np.array([40, 20, 8], np.float32), 0, 255)
+    frente[..., 3] = fa[..., 3]
+    salvar(frente, 'frente.png', 'RGBA')
+
     # luz do telão: luminância do albedo x campo x receptividade, em degraus
     lum = alb @ np.array([0.3, 0.5, 0.2], np.float32) / 255.0
-    ganho = np.where(ys < CHAO, 1.0, 1.3)
+    ganho = np.where(ys < CHAO, 0.8, 0.55)
     luz = np.clip(lum * campo * rec * ganho, 0, 1)
     luz = quantizar(luz, 16)
     for nome, mascara in (('luz-parede.png', ys < CHAO), ('luz-chao.png', ys >= CHAO)):
