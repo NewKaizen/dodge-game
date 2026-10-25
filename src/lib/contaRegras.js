@@ -29,3 +29,6 @@ export function avatarDoPerfil(perfil) {
   if (perfil?.avatar_tipo === 'jogo' && AVATARES_JOGO.includes(perfil.avatar_id)) return { tipo: 'jogo', id: perfil.avatar_id, url: null }
   return { tipo: 'padrao', id: null, url: null }
 }
+
+// XP para passar do nível: PROVISÓRIO (a curva de verdade chega na 1D)
+export const xpDoNivel = (nivel) => 100 * Math.max(1, Math.floor(Number(nivel) || 1))

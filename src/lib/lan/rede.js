@@ -1,5 +1,6 @@
 import { writable, get } from 'svelte/store'
 import { jogo } from '../estado.js'
+import { tokenConta, aoMudarConta } from '../conta.js'
 
 // Conexão do modo LAN/ONLINE com o servidor (server/lan.js, docs/lan.md,
 // docs/online.md) e o estado do lobby, lido pela cena Lan (Phaser) e pelos
@@ -12,7 +13,11 @@ import { jogo } from '../estado.js'
 //   iniciarPartida() / encerrarPartida()  (host) a partida começa / volta ao lobby
 //   enviarAoParceiro(dados) · aoParceiro(fn)   mensagens para o outro PC da sala
 //   enviarQuadro(blob) · aoQuadro(fn)          transmissão reserva (JPEG pelo servidor)
-export const PROTOCOLO = 1
+//
+// Conta (lib/conta.js): logado, o "ola" leva o JWT e o servidor responde com o
+// resumo do perfil (eu.conta). O token só vai para o servidor que serviu a
+// página (casa), nunca para o de outro PC da LAN.
+export const PROTOCOLO = 2
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
@@ -32,7 +37,7 @@ const INICIAL = {
   fase: 'fora', // fora | conectando | navegando | sala
   servidor: null, // ws://.../lan da conexão atual
   enderecos: [], // http://ip:porta onde o servidor de casa serve o jogo (dica para o outro PC)
-  eu: { id: null, nome: lerNome(), escolheuNome: Boolean(nomeSalvo()) },
+  eu: { id: null, nome: lerNome(), escolheuNome: Boolean(nomeSalvo()), conta: null }, // conta: { tag, nome, avatar, nivel, xp, titulo } | null
   online: false, // servidor na internet: salas só por código
   ice: [], // servidores STUN/TURN que o servidor mandou (WebRTC)
   papel: null, // 'host' | 'convidado' (na sala)
@@ -115,7 +120,7 @@ function conectar(url) {
           ...s,
           fase: s.fase === 'conectando' ? 'navegando' : s.fase,
           erro: '',
-          eu: { ...s.eu, id: m.id },
+          eu: comConta({ ...s.eu, id: m.id }, m.conta),
           enderecos: url === casa ? m.enderecos ?? [] : s.enderecos,
           online: Boolean(m.online),
           ice: Array.isArray(m.ice) ? m.ice : [],
@@ -127,7 +132,9 @@ function conectar(url) {
       receber(m)
     }
     socket.onopen = () => {
-      if (ws === socket) socket.send(JSON.stringify({ t: 'ola', protocolo: PROTOCOLO, nome: estado().eu.nome }))
+      if (ws !== socket) return
+      const token = url === casa ? tokenConta() : null
+      socket.send(JSON.stringify({ t: 'ola', protocolo: PROTOCOLO, nome: estado().eu.nome, ...(token && { token }) }))
     }
     socket.onclose = () => {
       clearTimeout(tempo)
@@ -181,8 +188,19 @@ function pararTimers() {
 
 // ---------- mensagens do servidor ----------
 
+// com conta, o nome no lobby é o do perfil
+const comConta = (eu, c) => ({ ...eu, conta: c ?? null, ...(c?.nome && { nome: c.nome }) })
+
+// entrou / saiu / mudou o perfil com o lobby aberto: avisa o servidor daqui
+aoMudarConta((token) => {
+  if (estado().servidor === casa) enviar({ t: 'conta', token })
+})
+
 function receber(m) {
   switch (m.t) {
+    case 'conta':
+      lan.update((s) => ({ ...s, eu: comConta(s.eu, m.conta) }))
+      break
     case 'salas': {
       // as do servidor desta conexão (sem endereço) e as que ele achou na rede
       const daqui = (m.salas ?? []).map((s) => ({ ...s, endereco: null }))

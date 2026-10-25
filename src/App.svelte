@@ -1,10 +1,16 @@
 <script>
   import Conectar from './ui/Conectar.svelte'
+  import Conta from './ui/Conta.svelte'
   import Game from './ui/Game.svelte'
+  import { iniciarConta } from './lib/conta.js'
+
+  // contas (login Google): sem config no servidor fica "indisponível" e o jogo segue igual
+  iniciarConta()
 </script>
 
 <main>
   <Conectar />
+  <Conta />
   <Game />
 </main>
 

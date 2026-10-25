@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { validarNome, avatarDoPerfil, AVATARES_JOGO } from '../contaRegras.js'
+import { validarNome, avatarDoPerfil, AVATARES_JOGO, xpDoNivel } from '../contaRegras.js'
 
 test('nome: aceita letras com acento, números e _ . -', () => {
   assert.deepEqual(validarNome('João'), { ok: true, nome: 'João' })
@@ -27,4 +27,10 @@ test('avatar do perfil cai no padrão quando não serve', () => {
   assert.deepEqual(avatarDoPerfil({ avatar_tipo: 'enviado', avatar_url: null }).tipo, 'padrao')
   assert.equal(avatarDoPerfil({ avatar_tipo: 'enviado', avatar_url: 'https://x/a.webp' }).url, 'https://x/a.webp')
   assert.equal(AVATARES_JOGO.length, 7)
+})
+
+test('xp do nível (provisório) nunca é zero', () => {
+  assert.equal(xpDoNivel(1), 100)
+  assert.equal(xpDoNivel(0), 100)
+  assert.equal(xpDoNivel('abc'), 100)
 })
