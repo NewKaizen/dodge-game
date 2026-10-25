@@ -327,6 +327,11 @@ export function abrirLobby() {
 
 export function fecharLobby() {
   telaAberta = false
+  if (salaPendente) {
+    // saiu da tela ONLINE sem entrar: o link não vale mais (o menu não volta para cá)
+    salaPendente = ''
+    limparSalaDaUrl()
+  }
   if (estado().fase === 'fora') return
   enviar({ t: 'sair' })
   // logado: a conexão com o servidor de casa continua (presença e convites)

@@ -92,3 +92,30 @@ TURN_SENHA=...
 - **"não achei a sala …"**: código errado, ou o host já fechou a sala (ela some quando o host sai).
 - **Ping alto**: olhe a barra de cima. Se diz **pelo servidor**, a ligação direta não passou e tudo está dando a volta pelo servidor: configure um TURN (acima). Se diz **direto** com ping alto, é a internet de um dos dois (Wi-Fi fraco, download rolando); cabo ajuda muito.
 - **A partida parou esperando o outro**: a aba do outro precisa ficar visível (o navegador para o jogo numa aba escondida).
+
+
+## Amigos e convites (contas)
+
+Quem está logado (docs/supabase.md) ganha o botão **AMIGOS** embaixo do jogo.
+Convidado joga normalmente, só não tem amigos.
+
+- **Adicionar**: pela tag (`nome#1234`) ou pelo botão **Adicionar amigo** de quem
+  está na sua sala (vale também depois da partida, que volta ao lobby da sala).
+  Quem recebe aceita, recusa ou bloqueia. Se os dois se pedirem, vira amizade na hora.
+- **Presença**: cada amigo aparece como disponível, em partida ou offline. O
+  servidor só mostra isso a quem é amigo dos dois lados e sem bloqueio; quem
+  não é amigo (ou foi bloqueado) não vê nada. Logado, a conexão com o servidor
+  fica aberta mesmo fora da tela ONLINE para a presença e os convites chegarem.
+- **Convite**: **Convidar** leva o amigo para a sua sala (cria uma se você não
+  estiver em nenhuma; só o host convida). Ele recebe uma notificação com
+  contagem e vale **60 s**; ao aceitar, entra na sala e o host escolhe PVP ou
+  CO-OP para dois. Limites: 5 convites por minuto por pessoa e 1 pendente por
+  amigo. Só dá para aceitar num menu ou no lobby, nunca no meio de uma partida.
+- **Link**: **copiar link da sala** gera `https://<site>/?sala=CODIGO`. Quem
+  abre (mesmo sem conta) vai direto para a tela ONLINE e entra na sala; o
+  código de 5 letras continua valendo.
+- **Protocolo**: o lobby subiu para a versão 3 (`PROTOCOLO` em `server/lan.js`
+  e `src/lib/lan/rede.js`): atualize os dois PCs. Mensagens novas: `convidar`,
+  `responderConvite`, `amigosMudaram` (cliente) e `presencas`, `presenca`,
+  `convite`, `conviteEnviado`, `conviteResposta`, `conviteFim`, `conviteNegado`,
+  `amigosAtualizar` (servidor).

@@ -77,7 +77,7 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 | --- | --- |
 | A0 Reconhecimento | concluído (`docs/mapa-integracao.md`) |
 | 1A Contas e perfil | concluído e validado em produção (NewKaizen/dodge-game#37, #38: chaves novas do Supabase) |
-| 1B Amigos e convites | em andamento (Sonnet, branch `claude/practical-darwin-nc9pwz`) |
+| 1B Amigos e convites | implementado na branch `claude/practical-darwin-nc9pwz`; falta rodar a migration 0002 e testar com duas contas (`docs/supabase.md`, passo 7.6) |
 
 ### Controle de custo
 
