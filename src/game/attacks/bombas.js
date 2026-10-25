@@ -44,7 +44,8 @@ export default definirAtaque({
       const plantada = mira >= 1
       if (plantada) mira -= 1
       const alvo = plantada ? a.alvo() : null
-      const p = plantada ? pontoPerto(alvo) : a.pontoLonge(cfg.distancia, 20)
+      // (isolado: as tentativas dependem de onde o coração está; ver contexto.js)
+      const p = plantada ? a.isolado(() => pontoPerto(alvo)) : a.pontoLonge(cfg.distancia, 20)
       // bomba plantada: o leque gira para um estilhaço sair direto no coração
       const giro = plantada ? Math.atan2(alvo.y - p.y, alvo.x - p.x) : a.aleatorio(0, Math.PI * 2)
       // arremesso: sai de fora da borda mais perto do ponto e voa até ele (só visual)

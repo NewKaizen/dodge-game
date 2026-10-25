@@ -28,6 +28,12 @@ import { diferencasDeEstado, criarEspelhoCoracao } from './sincronia.js'
 //
 // Esperas: esperar(tipo, chave) pede ao canal em pedaços curtos e desiste
 // quando a arena sai (o outro saiu: game/rede.js tira os dois da cena).
+//
+// A CoopArena (CO-OP de cartas) usa esta mesma ponte estendida
+// (coop/ArenaRedeCoop.js): as esperas, a escolha, o dano/graze e o coração do
+// outro são os mesmos; mudam as regras da rodada e ONDE está o coração do
+// outro (pistaEspelho / coracaoEspelho / marcarEspelhos: lá os dois corações
+// estão no mesmo quadro, e só o do outro é espelho).
 
 const ENVIO_CORACAO_MS = 33 // ~30 posições por segundo
 const ATRASO_ESPELHO_MS = 100 // o coração do outro anda este tanto atrás (desliza mesmo com variação na rede)
@@ -36,7 +42,7 @@ const ESPERA_AVISO_MS = 30000 // esperando há muito tempo: avisa no console (de
 const ESPERA_RESULTADO_MS = 20000 // o host espera o replay do convidado acabar no máximo isto
 const DEBUG_PERMITIDO = new Set(['forcarMao', 'setHp', 'setEnergia', 'forcarBonus'])
 
-const copiar = (estado) => structuredClone(estado)
+export const copiar = (estado) => structuredClone(estado)
 
 export default class ArenaRede {
   constructor(arena, { canal, meuLado, souHost }) {
@@ -53,6 +59,7 @@ export default class ArenaRede {
     this.espelhos = [criarEspelhoCoracao({ atrasoMs: ATRASO_ESPELHO_MS }), criarEspelhoCoracao({ atrasoMs: ATRASO_ESPELHO_MS })]
     this.rodadaEspelho = null
     this.aplicandoDebug = false
+    this.debugPermitido = new Set(DEBUG_PERMITIDO) // ações de debug que valem nos dois PCs
 
     this.desligar = [
       canal.ao('cursor', (d) => this.aoCursor(d)),
@@ -240,7 +247,7 @@ export default class ArenaRede {
   // e, na caixa espelho, o coração dele pisca como pisca lá
   aplicarDoOutro(tipo, { lado, dano, n = 1 }) {
     const a = this.arena
-    const coracao = a.fase === 'esquiva' ? a.pistas[a.pistaDe(lado)]?.coracoes[0] : null
+    const coracao = a.fase === 'esquiva' ? a.coracaoDoLado(lado) : null
     if (tipo === 'dano') {
       if (!a.aplicarAcerto(lado, dano)) return
       if (coracao?.ativo) {
@@ -292,10 +299,10 @@ export default class ArenaRede {
     }
     this.marcarEspelhos()
     a.pistas.forEach((pista, k) => {
-      if (!pista.espelho || !pista.aberta) return
-      const coracao = pista.coracoes[0]
+      const coracao = this.coracaoEspelho(k)
+      if (!coracao || !pista.aberta) return
       const p = this.espelhos[k].posicao(agora)
-      if (!p || !coracao?.ativo) return
+      if (!p || !coracao.ativo) return
       coracao.x = p.x
       coracao.y = p.y
       coracao.ajustar() // dentro da caixa daqui (as duas mudam de forma quase juntas)
@@ -303,16 +310,27 @@ export default class ArenaRede {
     // o meu coração, para a caixa espelho do outro
     this.envioCoracao += delta
     const k = a.pistaDe(this.meuLado)
-    const meu = a.pistas[k]?.coracoes[0]
-    if (this.envioCoracao < ENVIO_CORACAO_MS || !a.pistas[k].aberta || !meu?.ativo) return
+    const meu = a.coracaoDoLado(this.meuLado)
+    if (this.envioCoracao < ENVIO_CORACAO_MS || !a.pistas[k]?.aberta || !meu?.ativo) return
     this.envioCoracao = 0
     this.canal.enviarRapido('coracao', { x: Math.round(meu.x * 10) / 10, y: Math.round(meu.y * 10) / 10, k, r: rodada })
+  }
+
+  // a pista k tem o coração do outro? (no PvP: a caixa do outro; com CORAÇÃO TROCADO, a minha)
+  pistaEspelho(k) {
+    return this.arena.donoDaPista(k) !== this.meuLado
+  }
+
+  // o coração do outro na pista k (null: ela não é espelho aqui)
+  coracaoEspelho(k) {
+    const pista = this.arena.pistas[k]
+    return pista?.espelho ? pista.coracoes[0] : null
   }
 
   // a caixa onde está o coração do outro é espelho aqui
   marcarEspelhos() {
     this.arena.pistas.forEach((pista, k) => {
-      const espelho = this.arena.donoDaPista(k) !== this.meuLado
+      const espelho = this.pistaEspelho(k)
       if (pista.espelho === espelho) return
       pista.espelho = espelho
       this.espelhos[k].limpar()
@@ -321,9 +339,8 @@ export default class ArenaRede {
 
   aoCoracao(d) {
     if (!d || d.r !== this.rodada) return
-    const a = this.arena
     // a caixa k tem que ser espelho aqui (na virada do CORAÇÃO TROCADO os dois PCs trocam quase juntos)
-    if (a.donoDaPista(d.k) === this.meuLado) return
+    if (!this.pistaEspelho(d.k)) return
     this.espelhos[d.k]?.receber(performance.now(), d)
   }
 
@@ -370,12 +387,12 @@ export default class ArenaRede {
   // forcarMao/setHp/setEnergia valem nos dois PCs (senão o estado diverge);
   // forcarBonus vale no host (quem decide o bônus)
   espalhar(acao, args) {
-    if (this.aplicandoDebug || !DEBUG_PERMITIDO.has(acao)) return
+    if (this.aplicandoDebug || !this.debugPermitido.has(acao)) return
     this.canal.enviar('debug', null, { acao, args })
   }
 
   aoDebug({ acao, args } = {}) {
-    if (!DEBUG_PERMITIDO.has(acao) || this.arena.saindo) return
+    if (!this.debugPermitido.has(acao) || this.arena.saindo) return
     this.aplicandoDebug = true
     try {
       this.arena[acao](...(args ?? []))

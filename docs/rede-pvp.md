@@ -107,7 +107,7 @@ Peças: `pvp/bonus/redeDuelo.js` (Duelo), `pvp/bonus/redeCopia.js` (Copia) e `pv
 
 ## A arena em rede (parte B)
 
-`PvpArena` cria `pvp/rede/ArenaRede.js` (`this.rede`) quando abre com `emRede()`; sem rede `this.rede` é `null` e tudo é como antes (2 locais, CPU, e a `CoopArena`, que estende a `PvpArena` e nunca entra em rede). As peças puras (comparar estados, interpolar o coração do outro) ficam em `pvp/rede/sincronia.js`, testadas em `pvp/__tests__/redeArena.test.js`.
+`PvpArena` cria `pvp/rede/ArenaRede.js` (`this.rede`) quando abre com `emRede()`; sem rede `this.rede` é `null` e tudo é como antes (2 locais e CPU). A `CoopArena` (que estende a `PvpArena`) também entra em rede, com a ponte estendida `coop/ArenaRedeCoop.js`: ver "CO-OP em rede" abaixo. As peças puras (comparar estados, interpolar o coração do outro) ficam em `pvp/rede/sincronia.js`, testadas em `pvp/__tests__/redeArena.test.js`.
 
 Uma rodada em rede:
 
@@ -144,3 +144,33 @@ Lobby → `EscolhaParty` → `Selecao` (chefe) → `Dificuldade` (nível) → `C
 - `debugRede.atraso(150, 50)` nas duas abas simula internet ruim (150 ms + até 50 de variação em cada sentido). **Todo o PVP precisa funcionar assim**: o coração de cada um responde na hora, e só o que vem do outro chega atrasado.
 - `window.pvpArena` (dev) tem `estadoDebug()` (com `rede: { meuLado, souHost, espelhos }`), `forcarMao`, `setHp`, `setEnergia`, `forcarBonus(id)`. Em rede, chamados num PC valem nos dois (o `forcarBonus` vale na próxima rodada, decidida pelo host).
 - Os testes `npm test` continuam passando; a lógica pura nova ganha teste em `__tests__`.
+
+## CO-OP em rede (a CoopArena)
+
+As telas antes e depois da arena (EscolhaParty, Selecao, Dificuldade, Vitoria, GameOver) são as do CO-OP; a arena abre nos dois com `irParaCena(this, 'CoopArena', { chefe, nivel, party: [p1, p2], semente })` (a `party` vem sempre nos dados: o registry é de cada PC). O CO-OP tem um **quadro único** ([coop-cartas.md](coop-cartas.md)): o chefe joga uma carta por rodada e os dois desviam do mesmo ataque, no mesmo quadro. A `CoopArena` cria `coop/ArenaRedeCoop.js` (estende `pvp/rede/ArenaRede.js`: as esperas, a escolha, o cursor, o `dano`/`graze`, o coração interpolado, o `fimEsquiva` e o `debug` são os mesmos). Sem CPU aliada (são os dois humanos: host P1, convidado P2) e sem pausa.
+
+As mesmas regras de autoridade do PVP:
+
+- **O host decide tudo que é regra**: a carta do chefe (sai do RNG que mora no `estado`, em `iniciarRodadaCoop`), a resolução das jogadas, o contra-ataque (`calcularGolpes`, com o combo), a fase nova do chefe e o fim da luta. O convidado faz as mesmas contas onde dá (só para conferir) e fica com o `estado` do host.
+- **Cada PC é dono do PRÓPRIO coração no quadro.** O quadro (a pista 0) tem os dois corações: o meu anda pelo joystick daqui e colide aqui; o do outro tem `coracao.espelho = true` (`pvp/Pista.js`): anda pelas posições que chegam (`coracao`, com `k = 0`, interpolado) e não colide nem grazeia aqui. Quem decide o dano (já com o escudo do dono), os grazes e o desvio perfeito de um coração é o PC dele.
+- **O ataque roda nos dois com a mesma semente** (`<semente>:<rodada>:quadro`). Os mirados (`a.alvo()`) olham os dois corações, e o do outro chega um pouco atrasado: o tiro mirado nele pode sair alguns pixels diferente em cada PC (cada um é julgado na própria tela). As escolhas que tentam várias vezes até achar um lugar longe/perto dos corações (`a.pontoLonge`, as bombas, o carrossel) usam `a.isolado()` (`attacks/contexto.js`): gastam sempre um número só da semente, então o resto do ataque continua igual nos dois.
+- **Caído**: quem está caído passa sozinho, e o PC dele manda a `jogada` `null` (o outro espera por ela). Quem cai no meio da esquiva some do quadro nos dois (o K.O. vale venha o dano daqui ou de lá).
+
+| Tipo | Chave | De → para | Dados |
+| --- | --- | --- | --- |
+| `inicio` | rodada | host → conv. | `{ estado, eventos }` depois de `iniciarRodadaCoop` (a carta do chefe já está no `estado`; `eventos`: quem voltou, SUPER do chefe) |
+| `jogada` | rodada | os dois | `{ jogada }` (igual ao PVP; o caído manda `null`) |
+| `cursor` (rápida) | | os dois | igual ao PVP |
+| `resolucao` | rodada | host → conv. | `{ jogadas, resultado, estado }`: `resultado` de `resolverRodadaCoop` (`destino`, `quadro`, `golpes`, `efeitos`...) |
+| `coracao` (rápida) | | os dois | `{ x, y, k: 0, r }`: o MEU coração no quadro |
+| `dano` | | dono → outro | `{ lado, dano, r }`: o dano por acerto já com o escudo do dono (o outro aplica com `aplicarDanoCoop`) |
+| `graze` | | dono → outro | `{ lado, n, r }` |
+| `fimEsquiva` | rodada | os dois | `{ acertos, ko }`: o quadro acabou aqui |
+| `contra` | rodada | host → conv. | `{ golpes, combo }`: a lista de `calcularGolpes` (com o desempenho dos dois, que já chegou: o `fimEsquiva` do outro vem depois de todo dano/graze dele) e o combo da rodada |
+| `fimRodada` | rodada | host → conv. | `{ estado, vencedor, novaFase }` de `fimDaRodadaCoop` |
+| `resultadoPronto` | rodada | conv. → host | `{}`: a animação do fim acabou aqui; o host (espera até 20 s) abre a `Vitoria`/`GameOver` nos dois com `irParaCena(this, chave, { chefe, turnos, estatisticas, hpChefe, hpMaxChefe })` (as estatísticas do host valem) |
+| `debug` (só no dev) | | os dois | `forcarMao`/`setHp`/`setEnergia`/`setHpChefe` valem nos dois PCs |
+
+Uma rodada: `inicio` → escolha (`jogada`, `cursor`) → `resolucao` → revelação e arremesso iguais nos dois → esquiva (`coracao`, `dano`, `graze`, e os dois trocam `fimEsquiva`) → `contra` → `fimRodada`. O outro saiu no meio: `game/rede.js` tira os dois da cena e toda espera solta (`this.saindo`).
+
+Testando: no host, `debugRede.iniciar('CoopArena', { chefe: 'king', nivel: 'facil', party: ['kris', 'susie'] })` abre a arena nos dois; `window.coopArena.estadoDebug()` traz `rede: { meuLado, souHost, espelhos }` (`espelhos[j]`: o coração j é espelho aqui) e o `quadro`; `forcarMao`/`setHp`/`setEnergia`/`setHpChefe` valem nos dois PCs. Com `debugRede.atraso(150, 50)` nas duas abas o coração de cada um continua respondendo na hora.

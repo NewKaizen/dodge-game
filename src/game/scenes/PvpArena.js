@@ -510,6 +510,11 @@ export default class PvpArena extends Phaser.Scene {
     return this.donoDaPista(p)
   }
 
+  // o coração do jogador p (na pista onde ele está); a CoopArena tem os dois no mesmo quadro
+  coracaoDoLado(p) {
+    return this.pistas[this.pistaDe(p)]?.coracoes[0] ?? null
+  }
+
   // qual lado o controle j comanda (sozinho, o controle é sempre o do P1)
   ladoDoControle(j) {
     return j
@@ -1525,9 +1530,8 @@ export default class PvpArena extends Phaser.Scene {
   //   x2 "PERFEITO x2!"       texto maior e com brilho, 5 fogos, canhões de confete
   //   x3 "PERFEITO x3!!"      maior ainda, 7 fogos, tremida leve, clarão dourado
   //   x4 "PERFEITO x4!!!"     (teto) arco-íris, chuva de confete
-  festejarPerfeito({ pista, dono, ganho, base, multiplicador = 1 }) {
-    const x = CENTROS[pista]
-    const y = PISTA.y
+  // (x, y: onde a festa acontece; padrão o meio da pista)
+  festejarPerfeito({ pista, dono, ganho, base, multiplicador = 1, x = CENTROS[pista], y = PISTA.y }) {
     const cor = CORES.almas[dono]
     const n = Math.max(1, multiplicador)
     const teto = n >= COMBO_PERFEITO.teto
@@ -1794,6 +1798,16 @@ export default class PvpArena extends Phaser.Scene {
       this.atualizarRelogio(delta)
     }
 
+    this.atualizarPistas(delta)
+    this.efeitoBonus?.atualizar?.(delta)
+    if (this.fase === 'duelo') this.duelo?.atualizar(delta)
+    // em rede: manda a posição do meu coração e põe o do outro na caixa espelho
+    this.rede?.atualizar(delta)
+  }
+
+  // As pistas andam um frame (o coração de cada uma pelo joystick do dono, ou
+  // pela CPU). A CoopArena troca isto pelo quadro único com os dois corações
+  atualizarPistas(delta) {
     this.pistas.forEach((pista, j) => {
       // controles invertidos: valem enquanto o ataque desta pista roda (do fim
       // do respiro inicial até o fim); acabou o ataque (ou parou no K.O.), acabou
@@ -1820,10 +1834,6 @@ export default class PvpArena extends Phaser.Scene {
       const passo = this.efeitoBonus?.passo ? this.efeitoBonus.passo(j, delta, joy) : delta
       if (passo > 0) pista.atualizar(passo, joy)
     })
-    this.efeitoBonus?.atualizar?.(delta)
-    if (this.fase === 'duelo') this.duelo?.atualizar(delta)
-    // em rede: manda a posição do meu coração e põe o do outro na caixa espelho
-    this.rede?.atualizar(delta)
   }
 
   // joystick da CPU na pista dela (pvp/botEsquiva.js)

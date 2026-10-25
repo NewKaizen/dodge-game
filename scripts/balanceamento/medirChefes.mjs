@@ -9,6 +9,11 @@
 //   node scripts/balanceamento/medirChefes.mjs saida.json [sementes] [chefes] [niveis]
 //     chefes: "king,jevil" (padrão: todos); niveis: "facil,medio,dificil"
 //     URL_JOGO (padrão http://localhost:5175/) e CHROMIUM (executável) no ambiente
+//     MODO=quadro (padrão): o QUADRO ÚNICO do CO-OP (coop/quadro.js), com DOIS
+//       corações, cada um com o seu bot (do mesmo nível), desviando do mesmo
+//       ataque. Cada rodada dá duas amostras (os acertos de cada coração)
+//     MODO=caixa: a caixa antiga de um jogador (220 x 170, um coração), para comparar
+//     RITMO_QUADRO='{"densidade":1.3}': mede com outro aperto do quadro (padrão QUADRO.ritmo)
 //
 // A visão do bot é a mesma do medir.mjs (avisos de área pelas zonas de perigo,
 // balas que andam sozinhas, lâminas girando).
@@ -28,7 +33,7 @@ await page.waitForFunction(() => window.debugJogo && window.debugJogo.cena().len
 await page.waitForTimeout(1500)
 
 const resultado = await page.evaluate(
-  async ({ nSementes, filtroChefes, filtroNiveis, niveisBot }) => {
+  async ({ nSementes, filtroChefes, filtroNiveis, niveisBot, modo, ritmoQuadro }) => {
     const { default: Pista } = await import('/src/game/pvp/Pista.js')
     const { EsquivaBot } = await import('/src/game/pvp/botEsquiva.js')
     const { ehSuper } = await import('/src/game/pvp/cartas.js')
@@ -42,17 +47,13 @@ const resultado = await page.evaluate(
     const anteriores = new WeakMap()
     const jogo = window.debugJogo.jogo
     const cena = jogo.scene.getScenes(true)[0]
-    const pista = new Pista(cena, {
-      x: 160,
-      y: 198,
-      largura: 220,
-      altura: 170,
-      jogador: 0,
-      tema: {},
-      velocidadeMax: 300,
-      velocidade: 180,
-      dinamica: { campo: { esquerda: 8, direita: 312, topo: 74, base: 334 } },
-    })
+    const quadro = modo === 'quadro' ? (await import('/src/game/coop/quadro.js')).QUADRO : null
+    const pista = new Pista(
+      cena,
+      quadro
+        ? { x: quadro.x, y: quadro.y, largura: quadro.largura, altura: quadro.altura, jogador: [0, 1], tema: {}, velocidadeMax: 300, velocidade: 180, dinamica: { campo: quadro.campo }, faixa: quadro.faixa }
+        : { x: 160, y: 198, largura: 220, altura: 170, jogador: 0, tema: {}, velocidadeMax: 300, velocidade: 180, dinamica: { campo: { esquerda: 8, direita: 312, topo: 74, base: 334 } } },
+    )
     await pista.mostrar()
     jogo.loop.sleep()
 
@@ -89,28 +90,33 @@ const resultado = await page.evaluate(
       const dano = danoDaCartaChefe(carta, niv.dano)
       const extra = ritmoDaCartaChefe(carta)
       const d = def.desafio ?? {}
+      // no quadro, o aperto extra dele (QUADRO.ritmo, como na arena)
+      const doQuadro = ritmoQuadro ?? quadro?.ritmo ?? {}
       const ritmo = {
-        velocidade: DESAFIO.velocidade * niv.velocidade * (d.velocidade ?? 1) * extra.velocidade,
-        densidade: DESAFIO.densidade * niv.densidade * (d.densidade ?? 1) * extra.densidade,
+        velocidade: DESAFIO.velocidade * niv.velocidade * (d.velocidade ?? 1) * extra.velocidade * (doQuadro.velocidade ?? 1),
+        densidade: DESAFIO.densidade * niv.densidade * (d.densidade ?? 1) * extra.densidade * (doQuadro.densidade ?? 1),
       }
       pista.velocidadeMaxBase = DIFICULDADES[def.dificuldade].velocidadeMaxBala * DESAFIO.velocidadeMax * niv.velocidadeMax
       const inverterMs = inverteControles(carta) ? 1 : 0
       pista.tema = def.tema
-      const bot = new EsquivaBot({ nivel, sorte: mulberry(semente * 7919 + 13) })
-      let acertos = 0
-      let primeiro = null
+      // um bot para cada coração (no quadro: os dois, cada um com a sua sorte)
+      const coracoes = pista.coracoes
+      const bots = coracoes.map((_, k) => new EsquivaBot({ nivel, sorte: mulberry(semente * 7919 + 13 + k * 104729) }))
+      const acertos = coracoes.map(() => 0)
       let tempoAtivo = 0
-      pista.aoAcertar = (d, bala) => {
+      pista.aoAcertar = (d, bala, coracao) => {
         const chave = `${Math.floor((pista.ataque?.ctx.tempo ?? 0) / 1000)}s:${bala.sprite?.texture?.key}`
         porTextura[chave] = (porTextura[chave] ?? 0) + 1
-        acertos++
+        acertos[coracoes.indexOf(coracao)]++
         return true
       }
       const l = pista.caixa.limites
-      const c = pista.coracoes[0]
-      c.x = l.centerX
-      c.y = l.bottom - 30
-      c.invencivelMs = 0
+      coracoes.forEach((c, k) => {
+        // como na arena: um coração no meio embaixo; dois, lado a lado (coop/quadro.js)
+        c.x = coracoes.length > 1 ? l.x + (l.width * (k + 1)) / 3 : l.centerX
+        c.y = l.bottom - 30
+        c.invencivelMs = 0
+      })
       let pronto = false
       pista.rodar(ataque, { dano, ritmo, semente: `medida:${semente}` }).then(() => (pronto = true))
       for (let i = 0; i < 5; i++) await Promise.resolve()
@@ -150,18 +156,20 @@ const resultado = await page.evaluate(
           }
           return { ...b, vx: ox / s / fator, vy: oy / s / fator, ax: 0, ay: 0, girar: b.tipo === 'segmento' ? oa / s / fator : b.girar }
         })
-        let joy = bot.joy(DT, {
-          coracao: c,
-          limites: pista.caixa.limites,
-          balas: discos.length ? [...vistas, ...discos] : vistas,
-          zonas: pista.balas.zonas,
-          velocidade: pista.velocidadeCoracao,
-          fatorVelocidade: pista.balas.fatorVelocidade,
-          velocidadeMax: pista.balas.velocidadeMax,
-          invertido: inv,
+        const joys = coracoes.map((c, k) => {
+          const joy = bots[k].joy(DT, {
+            coracao: c,
+            limites: pista.caixa.limites,
+            balas: discos.length ? [...vistas, ...discos] : vistas,
+            zonas: pista.balas.zonas,
+            velocidade: pista.velocidadeCoracao,
+            fatorVelocidade: pista.balas.fatorVelocidade,
+            velocidadeMax: pista.balas.velocidadeMax,
+            invertido: inv,
+          })
+          return inv ? { x: -joy.x, y: -joy.y } : joy
         })
-        if (inv) joy = { x: -joy.x, y: -joy.y }
-        pista.atualizar(DT, joy)
+        pista.atualizar(DT, (jogador) => joys[jogador] ?? { x: 0, y: 0 })
         if (pista.atacando) tempoAtivo += DT
         frames++
       }
@@ -170,7 +178,7 @@ const resultado = await page.evaluate(
         await tique()
         for (let k = 0; k < 10 && !pronto; k++) pista.atualizar(DT, { x: 0, y: 0 })
       }
-      return { acertos, dano: acertos * dano, danoBala: dano, ms: Math.round(tempoAtivo) }
+      return { acertos, danoBala: dano, ms: Math.round(tempoAtivo) }
     }
 
     const chefes = Object.keys(CHEFES).filter((c) => !filtroChefes || filtroChefes.split(',').includes(c))
@@ -189,9 +197,11 @@ const resultado = await page.evaluate(
           for (const nivel of niveisBot) {
             const runs = []
             for (let s = 1; s <= nSementes; s++) runs.push(await rodarUma(carta, nivel, s, nivelJogo))
+            // uma amostra por coração (no quadro, duas por rodada)
+            const amostras = runs.flatMap((r) => r.acertos)
             linha[nivelJogo][chaveDoNivel(nivel)] = {
-              acertos: runs.map((r) => r.acertos),
-              media: +(runs.reduce((a, r) => a + r.acertos, 0) / runs.length).toFixed(2),
+              acertos: amostras,
+              media: +(amostras.reduce((a, n) => a + n, 0) / amostras.length).toFixed(2),
               danoBala: runs[0].danoBala,
             }
           }
@@ -202,8 +212,8 @@ const resultado = await page.evaluate(
     }
     return saida
   },
-  { nSementes: Number(nSementes), filtroChefes, filtroNiveis, niveisBot: (process.env.NIVEIS_BOT || 'imbativel,normal').split(',') },
+  { nSementes: Number(nSementes), filtroChefes, filtroNiveis, niveisBot: (process.env.NIVEIS_BOT || 'imbativel,normal').split(','), modo: process.env.MODO || 'quadro', ritmoQuadro: process.env.RITMO_QUADRO ? JSON.parse(process.env.RITMO_QUADRO) : null },
 )
-fs.writeFileSync(saida, JSON.stringify({ resultado, avisos: avisos.filter((a) => !/\[(telegrafo|rota de fuga)\]/.test(a)).slice(0, 30) }, null, 1))
+fs.writeFileSync(saida, JSON.stringify({ modo: process.env.MODO || 'quadro', resultado, avisos: avisos.filter((a) => !/\[(telegrafo|rota de fuga)\]/.test(a)).slice(0, 30) }, null, 1))
 console.log('ok', resultado.length)
 await browser.close()
