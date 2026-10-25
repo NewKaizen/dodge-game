@@ -7,17 +7,15 @@ Precisa do Pillow, do numpy e do OpenCV (pip install opencv-python-headless).
 Saída determinística (sementes fixas).
 
 Parte da ilustração scripts/menu/arte/mesa-original.webp (1672x941): a turma
-jogando cartas numa mesa, com o telão ao fundo. Fica na resolução dela (o jogo
+jogando cartas numa mesa, com o telão ao fundo (a versão com a Noelle já
+corrigida: mãos no rosto, um par de braços só). Fica na resolução dela (o jogo
 mostra reduzida para 854x480, com filtro suave). O script:
 
   1. apaga o que a ilustração traz pintado e o jogo desenha ao vivo: o logo,
      as opções, as dicas e o nome da música;
-  2. corrige a Noelle (na ilustração ela segura as cartas E põe as mãos no
-     rosto: quatro braços); as cartas e as mãos que as seguram saem, e as
-     mãos no rosto ganham os antebraços (cotovelos na mesa);
-  3. devolve ao chapéu e à capa do Ralsei o verde do sprite dele;
-  4. desenha os olhos fechados de quem pisca (Ralsei, Asriel e Berdly);
-  5. separa o que fica NA FRENTE da tela do telão (o cabelo da Susie e o "!!"),
+  2. devolve ao chapéu e à capa do Ralsei o verde do sprite dele;
+  3. desenha os olhos fechados de quem pisca (Ralsei, Asriel e Berdly);
+  4. separa o que fica NA FRENTE da tela do telão (o cabelo da Susie e o "!!"),
      porque a luta passa ao vivo por cima da tela.
 
 Saída:
@@ -59,7 +57,7 @@ OLHOS = {
         {'lente': (754, 450, 766, 473), 'traco': (24, 58, 44), 'curva': 2},
     ],
     'asriel': [
-        {'elipse': (1420, 671, 10, 17), 'traco': (52, 28, 46), 'curva': 3},
+        {'elipse': (1421, 672, 12, 19), 'traco': (52, 28, 46), 'curva': 3},
     ],
     'berdly': [
         {'lente': (1446, 473, 1472, 494), 'traco': (14, 20, 48), 'curva': 1},
@@ -85,33 +83,7 @@ TELA = (974, 41, 1419, 317)  # a tela do telão (onde passa a luta ao vivo)
 EXCLAMACAO = (1068, 278, 1122, 352)  # o "!!" da Susie
 RAIVA = (1528, 443, 1582, 497)  # o "💢" do Berdly
 CARTA_SUPER = (952, 578, 1028, 632)  # a carta SUPER que a Susie bate na mesa
-# A Noelle: na ilustração ela põe as mãos no rosto E segura as cartas (quatro
-# braços). Ficam as mãos no rosto; as cartas e as mãos que as seguram viram a
-# frente da blusa, e dois antebraços (mangas da blusa) descem dos pulsos até os
-# cotovelos na mesa: a pose de "cotovelos na mesa, rosto nas mãos".
-MAOS_ROSTO_NOELLE = [  # as mãos no rosto (voltam por cima dos punhos, como na ilustração)
-    [(1180, 455), (1192, 451), (1204, 455), (1213, 470), (1214, 488), (1208, 506), (1184, 506), (1177, 490)],
-    [(1247, 455), (1261, 451), (1276, 455), (1285, 470), (1285, 506), (1251, 506), (1245, 488), (1246, 470)],
-]
-CARTAS_NOELLE = [(1184, 513), (1198, 505), (1262, 505), (1266, 520), (1266, 563), (1184, 563)]  # cartas + mãos de baixo
-BARRA_NOELLE = 556  # a barra da blusa (dali para baixo, a mesa)
-# o antebraço esquerdo (manga fofa: estreita no punho, larga no meio, cotovelo
-# redondo na mesa); o direito é ele espelhado no meio do corpo (x = 1230)
-ANTEBRACO_NOELLE = [(1189, 496), (1205, 496), (1209, 512), (1211, 530), (1210, 548), (1205, 558), (1196, 561), (1187, 558), (1182, 548), (1182, 530), (1184, 512)]
-SOMBRA_ANTEBRACO = [(1184, 512), (1182, 530), (1182, 548), (1187, 558), (1196, 561), (1205, 558), (1208, 551), (1194, 552), (1188, 540), (1188, 515)]
-PUNHO_NOELLE = [(1189, 496), (1205, 496), (1207, 504), (1187, 504)]
-DOBRA_ANTEBRACO = [(1187, 527), (1194, 531), (1203, 529)]
-GOLA_BAIXO_NOELLE = [(1206, 505), (1218, 509), (1230, 510), (1242, 509), (1254, 505)]  # a dobra de baixo da gola alta
-DOBRAS_BLUSA = [[(1214, 522), (1222, 528)], [(1246, 522), (1238, 528)]]
-MEIO_NOELLE = 2460  # espelho: x -> 2460 - x
-COR_NOELLE = {
-    'blusa': (209, 230, 242),
-    'sombra': (183, 204, 229),
-    'dobra': (150, 172, 208),
-    'punho': (142, 159, 199),
-    'contorno': (26, 37, 65),
-}
-BRILHOS = [(1142, 420), (1124, 447), (1327, 413), (1322, 455), (1112, 487), (1338, 380)]  # ✦ em volta da Noelle
+BRILHOS = [(1144, 420), (1123, 449), (1327, 414)]  # ✦ em volta da Noelle
 # onde não procurar lâmpadas (cabelo loiro e brilhos da Noelle, a tela, o logo, a mesa)
 SEM_LUZES = [TELA, LOGO, SUBTITULO, (1100, 330, 1345, 530), (0, 470, L, A)]
 
@@ -138,54 +110,6 @@ def dilatar(m, px):
 
 
 # ---------- limpeza e correções ----------
-
-
-def corrigir_noelle(img):
-    """Tira as cartas e o par de mãos que as segura; no lugar, a blusa e os
-    antebraços das mãos que estão no rosto (pixel art, cores da blusa dela)."""
-    from PIL import ImageDraw
-
-    espelho = lambda pts: [(MEIO_NOELLE - x, y) for x, y in pts]
-    original = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-    orig = np.asarray(original)
-    c = COR_NOELLE
-    # a frente da blusa: degradê suave de cima (clara) para baixo (sombra)
-    frente = Image.new('1', (L, A), 0)
-    ImageDraw.Draw(frente).polygon(CARTAS_NOELLE, fill=1)
-    f = np.asarray(frente, bool)
-    arr = orig.copy()
-    ys = np.arange(A)[:, None]
-    t = np.clip((ys - 505) / (BARRA_NOELLE - 505), 0, 1)
-    degrade = (np.array(c['blusa']) * (1 - t[..., None]) + np.array(c['sombra']) * t[..., None]).astype(np.uint8)
-    arr[f] = np.broadcast_to(degrade, (A, L, 3))[f]
-    # da barra para baixo volta a mesa (copiada de logo abaixo)
-    arr[BARRA_NOELLE + 1:564, 1184:1267] = orig[BARRA_NOELLE + 9:572, 1184:1267]
-    out = Image.fromarray(arr)
-    d = ImageDraw.Draw(out)
-    d.line([(1184, BARRA_NOELLE), (1266, BARRA_NOELLE)], fill=c['contorno'], width=2)
-    d.line(GOLA_BAIXO_NOELLE, fill=c['dobra'], width=2)
-    for dobra in DOBRAS_BLUSA:
-        d.line(dobra, fill=c['dobra'], width=1)
-    # os antebraços (o esquerdo e o direito, espelhado)
-    for lado in (lambda p: p, espelho):
-        d.polygon(lado(ANTEBRACO_NOELLE), fill=c['blusa'])
-        d.polygon(lado(SOMBRA_ANTEBRACO), fill=c['sombra'])
-        d.line(lado(DOBRA_ANTEBRACO), fill=c['dobra'], width=1)
-        d.line(lado(ANTEBRACO_NOELLE) + [lado(ANTEBRACO_NOELLE)[0]], fill=c['contorno'], width=2)
-        d.polygon(lado(PUNHO_NOELLE), fill=c['punho'])
-        for x in range(1191, 1205, 3):  # o canelado do punho
-            d.line(lado([(x, 498), (x, 502)]), fill=c['dobra'], width=1)
-        d.line(lado(PUNHO_NOELLE) + [lado(PUNHO_NOELLE)[0]], fill=c['contorno'], width=2)
-    # as mãos no rosto por cima dos punhos, como na ilustração
-    maos = Image.new('1', (L, A), 0)
-    for mao in MAOS_ROSTO_NOELLE:
-        ImageDraw.Draw(maos).polygon(mao, fill=1)
-    m = np.asarray(maos, bool)
-    pele = m & (np.abs(orig.astype(int) - np.array([247, 140, 105])).sum(axis=2) < 120)  # a pele e o contorno da mão
-    pele |= m & (orig.sum(axis=2) < 200)
-    arr = np.asarray(out).copy()
-    arr[pele] = orig[pele]
-    return cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
 
 
 def mascara_interface(img):
@@ -322,7 +246,6 @@ def main():
     img = cv2.imread(ORIGINAL)  # BGR
     assert img is not None and img.shape[:2] == (A, L), 'mesa-original.webp tem que ter 1672x941'
 
-    img = corrigir_noelle(img)
     msusie = recortar_figura(img, SUSIE)
     mralsei = recortar_figura(img, RALSEI) | caixa_mascara(RALSEI_CAPA)
     amarelo = lambda H, S, V: (H > 40) & (H < 70) & (S > 0.5) & (V > 0.7)
