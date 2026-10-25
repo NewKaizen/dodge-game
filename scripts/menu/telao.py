@@ -7,13 +7,13 @@ Precisa do Pillow e do numpy. Saída determinística (sementes fixas).
 
 Sprites (chaves em src/game/menu/sprites/telao.js), medidas casadas com TELA
 de src/game/menu/layout.js (310x196):
-  moldura.png   342x250  a TV: bisel grosso e escuro em volta da tela (buraco
-                         transparente de 310x196 em (16,14)), placa "DODGE",
+  moldura.png   442x254  a TV: bisel grosso e escuro em volta da tela (buraco
+                         transparente de 410x200 em (16,14)), placa "DODGE",
                          suportes na parede e a barra de som embaixo
-  reflexo.png   342x250  a luz da tela batendo no bisel (branco + alfa; o jogo
+  reflexo.png   442x254  a luz da tela batendo no bisel (branco + alfa; o jogo
                          pinta com a cor do telão e soma)
-  vidro.png     310x196  cara de tela: scanlines, vinheta e o reflexo do vidro
-  chiado.png    4 quadros 155x98  estática (mostrada em escala 2)
+  vidro.png     410x200  cara de tela: scanlines, vinheta e o reflexo do vidro
+  chiado.png    4 quadros 205x100  estática (mostrada em escala 2)
   grade.png     20x20    ladrilho da grade de fundo da batalha (branco)
   brilho.png    64x64    brilho redondo e suave (halo e a explosão de luz)
 """
@@ -30,23 +30,23 @@ SAIDA = os.path.join(RAIZ, 'public', 'assets', 'sprites', 'menu', 'telao')
 SAIDA_SOM = os.path.join(RAIZ, 'public', 'assets', 'audio', 'menu', 'telao')
 
 # geometria (tem que bater com TELA de layout.js e com telao.js)
-TELA_L, TELA_A = 310, 196
+TELA_L, TELA_A = 410, 200
 BORDA_X, BORDA_TOPO, BORDA_BAIXO = 16, 14, 22
-MOLDURA_L = TELA_L + 2 * BORDA_X  # 342
-CORPO_A = TELA_A + BORDA_TOPO + BORDA_BAIXO  # 232
-MOLDURA_A = 250  # corpo + barra de som
+MOLDURA_L = TELA_L + 2 * BORDA_X  # 442
+CORPO_A = TELA_A + BORDA_TOPO + BORDA_BAIXO  # 236
+MOLDURA_A = CORPO_A + 18  # corpo + barra de som
 
-# paleta (azul-marinho escuro, dessaturada, como o quarto)
-CONTORNO = (4, 5, 10)
-CORPO = (20, 23, 36)
-CORPO_CLARO = (30, 35, 54)
-LUZ = (48, 56, 84)
-SOMBRA = (12, 14, 23)
-LABIO = (8, 9, 15)
-LABIO_LUZ = (26, 30, 46)
-PLACA = (38, 44, 66)
-PLACA_LETRA = (74, 84, 118)
-GRADE_SOM = (9, 10, 17)
+# paleta (roxo-acinzentado escuro, quente como o quarto)
+CONTORNO = (8, 5, 12)
+CORPO = (36, 30, 50)
+CORPO_CLARO = (52, 44, 70)
+LUZ = (84, 72, 108)
+SOMBRA = (20, 15, 30)
+LABIO = (10, 7, 16)
+LABIO_LUZ = (44, 36, 62)
+PLACA = (50, 44, 80)
+PLACA_LETRA = (110, 104, 170)
+GRADE_SOM = (14, 10, 22)
 
 
 def nova(largura, altura):
@@ -215,7 +215,7 @@ def gerar_vidro():
 
 def gerar_chiado():
     rng = np.random.default_rng(77)
-    l, a = 155, 98
+    l, a = TELA_L // 2, TELA_A // 2
     folha = nova(l * 4, a)
     for q in range(4):
         v = rng.random((a, l))

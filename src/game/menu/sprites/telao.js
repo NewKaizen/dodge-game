@@ -10,7 +10,7 @@ export default {
     { chave: 'menu-telao-moldura', arquivo: `${PASTA}/moldura.png` },
     { chave: 'menu-telao-reflexo', arquivo: `${PASTA}/reflexo.png` },
     { chave: 'menu-telao-vidro', arquivo: `${PASTA}/vidro.png` },
-    { chave: 'menu-telao-chiado', arquivo: `${PASTA}/chiado.png`, quadro: { largura: 155, altura: 98 } },
+    { chave: 'menu-telao-chiado', arquivo: `${PASTA}/chiado.png`, quadro: { largura: 205, altura: 100 } },
     { chave: 'menu-telao-grade', arquivo: `${PASTA}/grade.png` },
     { chave: 'menu-telao-brilho', arquivo: `${PASTA}/brilho.png` },
   ],

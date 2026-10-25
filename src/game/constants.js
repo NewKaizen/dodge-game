@@ -1,7 +1,16 @@
 import { ASSETS } from './assets.js'
 
-export const LARGURA = 640
+// Mundo do jogo: 16:9 (854x480). O canvas se ajusta a qualquer janela mantendo essa proporção (resolucao.js).
+export const LARGURA = 854
 export const ALTURA = 480
+
+// O jogo foi desenhado em 640x480 e hoje o mundo é 854x480 (16:9). Ajudas para o layout:
+//   CENTRO_X   meio da tela (use no lugar de 320 / LARGURA / 2 solto)
+//   MARGEM_X   folga de cada lado quando o conteúdo ainda é um bloco 4:3 de 640 de largura:
+//              x_novo = x_antigo + MARGEM_X centraliza o que foi pensado em 640
+export const CENTRO_X = LARGURA / 2
+export const LARGURA_BASE = 640
+export const MARGEM_X = (LARGURA - LARGURA_BASE) / 2
 
 // Fonte pixelada (arquivo em assets.js; a Boot espera ela carregar)
 export const FONTE = `"${ASSETS.fonte.familia}"`

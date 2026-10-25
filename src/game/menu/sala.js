@@ -3,7 +3,7 @@ import { LARGURA } from '../constants.js'
 import { BATIDA, PES } from './layout.js'
 import { fatores } from '../acessibilidade.js'
 
-// O quarto escuro do menu: parede, chão, a luz que o telão joga no chão e as
+// A sala do menu (um quarto aconchegante de noite): parede, chão, a luz que o telão joga no chão e as
 // silhuetas dos sete lutadores assistindo a tela (contornadas pela luz dela).
 //
 //   const sala = criarSala(cena, { tela })   tela = TELA de layout.js
@@ -27,21 +27,21 @@ import { fatores } from '../acessibilidade.js'
 // "reduzir animações" a luz quase não pulsa nem tremula.
 
 const ESCALA = 3 // a mesma dos personagens na luta
-const SILHUETA = 0x11141e // multiplica a textura: quase preto, só um fio do volume
+const SILHUETA = 0x9a8cb4 // multiplica a textura: a cor do personagem na penumbra quente da sala
 const TRAS = 20 // a fileira de trás pisa um pouco mais para dentro (mais perto do telão)
 const CABECA = 9 // linhas da textura (a partir do topo do desenho) que formam a cabeça
 
 // quem fica onde (x = centro dos pés) e o jeito de curtir a música.
-// Fileira de trás um pouco mais perto do telão; ninguém à esquerda de x≈320
-// para não cobrir as opções.
+// Todos de frente para o telão, sentados no tapete (centro da tela em x≈609);
+// fileira de trás um pouco mais perto do telão.
 const ELENCO = [
-  { id: 'ralsei', x: 382, tras: true, jeito: 'balanco' },
-  { id: 'noelle', x: 470, tras: true, jeito: 'timida', virar: true },
-  { id: 'dess', x: 562, tras: true, jeito: 'roqueira' },
-  { id: 'berdly', x: 334, jeito: 'pulo' },
-  { id: 'kris', x: 426, jeito: 'cabeca' },
-  { id: 'susie', x: 516, jeito: 'headbang', virar: true },
-  { id: 'asriel', x: 604, jeito: 'saltinho' },
+  { id: 'ralsei', x: 540, tras: true, jeito: 'balanco' },
+  { id: 'noelle', x: 640, tras: true, jeito: 'timida', virar: true },
+  { id: 'dess', x: 740, tras: true, jeito: 'roqueira' },
+  { id: 'berdly', x: 490, jeito: 'pulo' },
+  { id: 'kris', x: 590, jeito: 'cabeca' },
+  { id: 'susie', x: 690, jeito: 'headbang', virar: true },
+  { id: 'asriel', x: 790, jeito: 'saltinho' },
 ]
 
 // pose de cada jeito: t = fração da batida desde o pulso (0..1), n = nº da batida.
@@ -58,7 +58,7 @@ const JEITOS = {
 }
 
 const POEIRA = 16
-const AREA_POEIRA = { x0: 300, x1: 630, y0: 250, y1: 446 }
+const AREA_POEIRA = { x0: 420, x1: 830, y0: 270, y1: 446 }
 
 export function criarSala(cena, { tela } = {}) {
   const centroTela = tela ? tela.x + tela.largura / 2 : LARGURA * 0.7
@@ -66,6 +66,8 @@ export function criarSala(cena, { tela } = {}) {
   cena.add.image(0, 0, 'menu-sala-fundo').setOrigin(0).setDepth(0)
   const luzParede = cena.add.image(0, 0, 'menu-sala-luz-parede').setOrigin(0).setDepth(1).setBlendMode(Phaser.BlendModes.ADD)
   const luzChao = cena.add.image(0, 0, 'menu-sala-luz-chao').setOrigin(0).setDepth(2).setBlendMode(Phaser.BlendModes.ADD)
+  // lâmpadas do varal e abajur: brilho que cintila (cada uma a seu tempo)
+  const luzinhas = cena.add.image(0, 0, 'menu-sala-luzinhas').setOrigin(0).setDepth(1.5).setBlendMode(Phaser.BlendModes.ADD)
   cena.add.image(0, 0, 'menu-sala-vinheta').setOrigin(0).setDepth(9)
 
   const figuras = ELENCO.map((d) => figura(cena, d, centroTela))
@@ -116,6 +118,7 @@ export function criarSala(cena, { tela } = {}) {
     const { nivel, piscar } = fatores()
     const forca = piscar ? 0.86 + 0.22 * pulso + 0.035 * tremor : 0.9 + 0.05 * pulso
 
+    luzinhas.setAlpha(nivel === 0 ? 0.6 : 0.62 + 0.14 * Math.sin(relogio / 380) + 0.08 * Math.sin(relogio / 137 + 1.3) + 0.1 * pulso)
     luzParede.setTint(cor).setAlpha(Math.min(1, forca + 0.06 * pulso))
     luzChao.setTint(cor).setAlpha(Math.min(1, forca * 0.95))
 

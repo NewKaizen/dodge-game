@@ -1,24 +1,31 @@
 #!/usr/bin/env python3
-"""Gera a arte do QUARTO do menu inicial em public/assets/sprites/menu/sala/.
+"""Gera a arte da SALA do menu inicial em public/assets/sprites/menu/sala/.
 
 Uso (na raiz do projeto):  python3 scripts/menu/sala.py
 Precisa do Pillow e do numpy. Saída determinística (sementes fixas).
 
-O quarto é pintado em 320x240 (um pixel de arte = 2x2 na tela) e ampliado
-para 640x480. A ideia é de iluminação de verdade: pinto o "albedo" (a cor das
-coisas sob luz branca) e um mapa de quanto cada ponto recebe da luz do telão;
-daí saem duas camadas:
+A sala é um quarto aconchegante de noite: paredes roxas, varal de luzinhas,
+violão, plantas, o gato no criado-mudo ao lado do abajur de estrela, o rack
+com a TV, sofá com almofada xadrez e um tapete quadriculado no chão, onde a
+turma senta para assistir. É pintada em 427x240 (um pixel de arte = 2x2 na
+tela) e ampliada para 854x480 (16:9).
 
-  fundo.png        640x480  o quarto na penumbra (só a luz ambiente, azul-marinho)
-  luz-parede.png   640x480  o que a luz do telão revela na parede e nos móveis
-                            encostados nela (cinza; o jogo pinta com a cor do
-                            telão e soma por cima, blend ADD)
-  luz-chao.png     640x480  o cone de luz no chão (tapete, tábuas, pufe) (idem)
-  vinheta.png      640x480  preto com transparência: escurece os cantos, o
+A iluminação é de verdade: pinto o "albedo" (a cor das coisas) e um mapa de
+quanto cada ponto recebe da luz do telão; daí saem as camadas:
+
+  fundo.png        854x480  a sala acesa pela luz ambiente quente (abajur,
+                            luzinhas) e um restinho do telão
+  luz-parede.png   854x480  o que a luz do telão revela na parede e nos móveis
+                            (cinza; o jogo pinta com a cor do telão e soma
+                            por cima, blend ADD)
+  luz-chao.png     854x480  o cone de luz do telão no chão (idem)
+  vinheta.png      854x480  preto com transparência: escurece os cantos, o
                             canto do logo e a faixa das opções
   poeira.png       2x2      um grão de poeira (branco) que flutua na luz
+  luzinhas.png     854x480  brilho das lâmpadas do varal e do abajur (soma
+                            por cima, o jogo faz cintilar)
 
-As posições batem com src/game/menu/layout.js (TELA, CHAO, PES).
+As posições batem com src/game/menu/layout.js (TELA, PES) e com telao.py.
 """
 
 import math
@@ -31,46 +38,50 @@ from PIL import Image, ImageDraw
 RAIZ = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SAIDA = os.path.join(RAIZ, 'public', 'assets', 'sprites', 'menu', 'sala')
 
-L, A = 320, 240  # arte em meia resolução
-# layout.js em coordenadas de arte (÷2)
-TV = (150, 23, 305, 121)  # x0, y0, x1, y1 (área de dentro do telão)
+L, A = 427, 240  # arte em meia resolução
+# TELA de layout.js (404, 52, 410x200) em coordenadas de arte (÷2): área de dentro
+TV = (202, 26, 407, 126)  # x0, y0, x1, y1
 TV_CX = (TV[0] + TV[2]) / 2
-CHAO = 165
+TAMPO = 146  # topo do rack: onde a TV (com a barra de som) está apoiada
+CHAO = 172
 SEED = 7
 
-# ---------- paleta (albedo: como as coisas seriam sob luz branca) ----------
-PAREDE = (74, 88, 104)
-PAREDE_LISTRA = (66, 80, 96)
-PAREDE_FLOR = (84, 98, 114)
-LAMBRI = (58, 68, 84)
-LAMBRI_CLARO = (92, 106, 122)
-LAMBRI_ESCURO = (36, 44, 58)
-RODAPE = (84, 96, 112)
-RODAPE_ESCURO = (40, 48, 60)
-TABUA = (80, 82, 92)
-FRESTA = (34, 38, 48)
-TAPETE = (82, 70, 96)
-TAPETE_BORDA = (56, 48, 72)
-TAPETE_DESENHO = (108, 92, 120)
-TAPETE_FRANJA = (120, 112, 120)
-MADEIRA = (66, 56, 62)
-MADEIRA_CLARA = (104, 92, 96)
-MADEIRA_ESCURA = (36, 30, 38)
-METAL = (130, 136, 148)
-METAL_ESCURO = (70, 74, 86)
-CABO = (78, 56, 46)
-CARTA = (168, 168, 172)
-CARTA_VERSO = (110, 60, 80)
-PRETO = (20, 22, 30)
-TECIDO = (70, 60, 84)
-TECIDO_CLARO = (96, 84, 110)
-CORDA = (40, 40, 48)
-LAMPADA = (150, 150, 140)
-CAIXA = (42, 44, 54)
-CAIXA_CONE = (26, 28, 36)
+# ---------- paleta (albedo) ----------
+PAREDE_CIMA = (66, 42, 92)
+PAREDE_BAIXO = (104, 64, 112)
+PAREDE_LISTRA = -7
+RODAPE = (112, 70, 58)
+RODAPE_LUZ = (150, 100, 78)
+RODAPE_ESCURO = (62, 38, 40)
+MADEIRA = (128, 82, 60)
+MADEIRA_CLARA = (172, 118, 82)
+MADEIRA_ESCURA = (70, 42, 44)
+MADEIRA_FUNDO = (44, 28, 38)
+TABUA = (94, 62, 64)
+FRESTA = (48, 30, 40)
+METAL = (170, 170, 186)
+METAL_ESCURO = (92, 90, 110)
+PRETO = (24, 18, 30)
+CORDA = (40, 30, 44)
+FOLHA = (52, 150, 84)
+FOLHA_ESCURA = (28, 98, 66)
+FOLHA_CLARA = (110, 200, 112)
+VASO = (170, 98, 70)
+VASO_ESCURO = (112, 60, 52)
+ROXO = (140, 108, 204)
+ROXO_ESCURO = (98, 70, 168)
+ROXO_LINHA = (196, 168, 240)
+LARANJA = (232, 126, 52)
+ROSA = (232, 96, 150)
+AMARELO = (255, 214, 96)
 
-# luz ambiente (multiplica o albedo no fundo): penumbra azul-petróleo
-AMBIENTE = np.array([0.24, 0.31, 0.40])
+LAMPADAS = [(255, 226, 130), (255, 160, 80), (255, 120, 170), (140, 226, 255), (255, 226, 130)]
+
+# luz ambiente (multiplica o albedo no fundo): noite quente, mais viva no centro
+AMBIENTE = np.array([0.96, 0.84, 0.94])
+
+BRILHO = np.zeros((A, L, 3), np.float32)  # luz própria (abajur, lâmpadas): soma no fundo
+LUZINHAS = np.zeros((A, L, 3), np.float32)  # só as lâmpadas do varal (camada que cintila)
 
 
 def misturar(a, b, t):
@@ -81,12 +92,26 @@ def mais(cor, d):
     return tuple(max(0, min(255, c + d)) for c in cor)
 
 
+def brilho(alvo, cx, cy, raio, cor, forca):
+    """Luz redonda que decai suave, somada em `alvo` (em degraus, é pixel art)."""
+    x0, x1 = max(0, int(cx - raio)), min(L, int(cx + raio) + 1)
+    y0, y1 = max(0, int(cy - raio)), min(A, int(cy + raio) + 1)
+    if x0 >= x1 or y0 >= y1:
+        return
+    ys, xs = np.mgrid[y0:y1, x0:x1].astype(np.float32)
+    d = np.sqrt((xs - cx) ** 2 + (ys - cy) ** 2) / raio
+    v = np.clip(1 - d, 0, 1) ** 2 * forca
+    v = np.floor(v * 10) / 10  # degraus
+    for i in range(3):
+        alvo[y0:y1, x0:x1, i] += v * (cor[i] / 255.0)
+
+
 class Quadro:
     """Albedo (RGB) + receptividade à luz do telão (R: 0 = de costas para a luz,
     1 = normal, >1 = quina virada para a tela que brilha mais)."""
 
     def __init__(self):
-        self.img = Image.new('RGB', (L, A), PAREDE)
+        self.img = Image.new('RGB', (L, A), PAREDE_BAIXO)
         self.d = ImageDraw.Draw(self.img)
         self.r = Image.new('F', (L, A), 1.0)
         self.dr = ImageDraw.Draw(self.r)
@@ -106,6 +131,9 @@ class Quadro:
             if r is not None:
                 self.r.putpixel((x, y), r)
 
+    def pega(self, x, y):
+        return self.img.getpixel((int(x), int(y)))
+
     def poli(self, pts, cor, r=None):
         self.d.polygon(pts, fill=cor)
         if r is not None:
@@ -122,229 +150,366 @@ class Quadro:
             self.dr.line(pts, fill=r, width=largura)
 
 
+def sombra(q, x0, y0, x1, y1, d=-34):
+    """Escurece uma região (sombra projetada) sem apagar o desenho de baixo."""
+    for y in range(max(0, y0), min(A, y1 + 1)):
+        for x in range(max(0, x0), min(L, x1 + 1)):
+            q.img.putpixel((x, y), mais(q.img.getpixel((x, y)), d))
+
+
 # ---------- parede ----------
 
 
 def parede(q, rnd):
-    # papel de parede: listras verticais largas + um florzinha (losango) bem apagado
-    for x in range(L):
-        faixa = (x // 10) % 2
-        for y in range(CHAO):
-            q.img.putpixel((x, y), PAREDE_LISTRA if faixa else PAREDE)
-    for cy in range(6, 128, 14):
-        for cx in range(5 + (cy // 14 % 2) * 10, L, 20):
-            for dx, dy in ((0, -2), (-1, -1), (1, -1), (-2, 0), (2, 0), (-1, 1), (1, 1), (0, 2), (0, 0)):
-                if (dx, dy) == (0, 0):
-                    q.px(cx, cy, mais(PAREDE_FLOR, 8))
-                elif abs(dx) + abs(dy) == 2:
-                    q.px(cx + dx, cy + dy, PAREDE_FLOR)
-    # granulado (desgaste)
-    for _ in range(900):
-        x, y = rnd.randrange(L), rnd.randrange(CHAO - 30)
-        c = q.img.getpixel((x, y))
-        q.img.putpixel((x, y), mais(c, rnd.choice((-6, -4, 4))))
-    # moldura do teto: uma faixa escura em cima
-    q.ret(0, 0, L - 1, 2, mais(PAREDE, -30))
-    q.ret(0, 3, L - 1, 3, mais(PAREDE, 6), r=0.6)
-    # lambri (meia parede de painéis) e roda-meio
-    topo = 134
-    q.ret(0, topo - 2, L - 1, topo - 1, LAMBRI_CLARO, r=1.4)
-    q.ret(0, topo, L - 1, topo, LAMBRI_ESCURO, r=0.3)
-    q.ret(0, topo + 1, L - 1, CHAO - 7, LAMBRI)
-    for x0 in range(-6, L, 30):
-        x1 = x0 + 25
-        q.ret(x0 + 1, topo + 4, x1, topo + 4, LAMBRI_ESCURO, r=0.4)  # sombra em cima do painel
-        q.ret(x0 + 1, topo + 5, x0 + 1, CHAO - 11, LAMBRI_ESCURO, r=0.4)
-        q.ret(x0 + 2, CHAO - 11, x1, CHAO - 11, LAMBRI_CLARO, r=1.3)  # quina de baixo pega luz
-        q.ret(x1, topo + 5, x1, CHAO - 11, LAMBRI_CLARO, r=1.2)
-    # rodapé
-    q.ret(0, CHAO - 6, L - 1, CHAO - 6, RODAPE, r=1.5)
-    q.ret(0, CHAO - 5, L - 1, CHAO - 2, mais(RODAPE, -14))
+    for y in range(CHAO):
+        t = y / CHAO
+        base = misturar(PAREDE_CIMA, PAREDE_BAIXO, t ** 0.8)
+        for x in range(L):
+            q.img.putpixel((x, y), mais(base, PAREDE_LISTRA if (x // 12) % 2 else 0))
+    # granulado (reboco)
+    for _ in range(1800):
+        x, y = rnd.randrange(L), rnd.randrange(CHAO - 8)
+        q.px(x, y, mais(q.pega(x, y), rnd.choice((-7, -4, 4, 6))))
+    # moldura do teto
+    q.ret(0, 0, L - 1, 1, mais(PAREDE_CIMA, -22))
+    q.ret(0, 2, L - 1, 2, mais(PAREDE_CIMA, 10), r=0.7)
+    # rodapé de madeira
+    q.ret(0, CHAO - 7, L - 1, CHAO - 7, RODAPE_LUZ, r=1.4)
+    q.ret(0, CHAO - 6, L - 1, CHAO - 2, RODAPE)
+    q.ret(0, CHAO - 6, L - 1, CHAO - 6, mais(RODAPE, 14))
     q.ret(0, CHAO - 1, L - 1, CHAO - 1, RODAPE_ESCURO, r=0.3)
 
 
+def janela(q, rnd):
+    """Janela no canto de cima à direita: o céu da noite com estrelas."""
+    x0, y0, x1, y1 = 398, 0, L - 1, 66
+    q.ret(x0 - 2, y0, x1, y1 + 2, (74, 46, 60))
+    q.ret(x0, y0, x1, y1, (24, 26, 78), r=0.8)
+    for y in range(y0, y1 + 1):  # céu: mais claro perto do horizonte
+        t = y / y1
+        q.ret(x0, y, x1, y, misturar((20, 22, 70), (52, 44, 118), t * t))
+    for _ in range(16):
+        x, y = rnd.randrange(x0 + 1, x1), rnd.randrange(2, y1 - 6)
+        q.px(x, y, rnd.choice(((230, 230, 255), (255, 240, 170), (190, 200, 255))))
+    q.px(x0 + 12, 14, (255, 250, 210))
+    q.ret(x0 + 11, 13, x0 + 13, 15, (255, 245, 190))
+    q.ret(x0 + 12, 12, x0 + 12, 16, (255, 250, 220))
+    q.ret(x0 - 2, y1 + 1, x1, y1 + 3, (126, 80, 70), r=1.4)  # peitoril
+    # cortina roxa
+    q.poli([(x0 - 2, 0), (x0 + 9, 0), (x0 + 6, 70), (x0 - 2, 74)], (118, 70, 140))
+    q.poli([(x0 + 2, 0), (x0 + 4, 0), (x0 + 3, 72), (x0 + 1, 72)], (86, 50, 112))
+    # prédio longe
+    for bx, bh in ((x0 + 14, 14), (x0 + 20, 9), (x0 + 24, 12)):
+        q.ret(bx, y1 - bh, bx + 4, y1, (14, 14, 46))
+        for wy in range(y1 - bh + 2, y1, 3):
+            q.px(bx + 1, wy, (255, 220, 120))
+
+
 def varal(q, rnd):
-    """Um varal de lampadinhas apagadas pendurado no alto da parede."""
+    """Varal de lâmpadas coloridas no alto da parede (acesas: soma brilho)."""
+    vao = 71
     pts = []
-    for x in range(0, L + 1, 2):
-        # catenárias entre pregos a cada 80px
-        seg = x % 80
-        y = 5 + 7 * math.sin(math.pi * seg / 80)
+    for x in range(0, L + 2, 1):
+        seg = x % vao
+        y = 4 + 8 * math.sin(math.pi * seg / vao)
         pts.append((x, y))
     for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
         q.linha([(x0, y0), (x1, y1)], CORDA, r=0.5)
-    for x in range(10, L, 16):
-        seg = x % 80
-        y = int(5 + 7 * math.sin(math.pi * seg / 80))
+    for x in range(0, L + vao, vao):  # pregos
+        q.ret(x - 1, 2, x + 1, 4, METAL_ESCURO)
+    n = 0
+    for x in range(7, L, 13):
+        seg = x % vao
+        y = int(4 + 8 * math.sin(math.pi * seg / vao))
+        cor = LAMPADAS[n % len(LAMPADAS)]
+        n += 1
         q.px(x, y + 1, CORDA)
-        q.ret(x - 1, y + 2, x + 1, y + 4, LAMPADA, r=1.0)
-        q.px(x - 1, y + 2, mais(LAMPADA, 40), r=2.2)  # o vidro pega a luz
-        q.px(x, y + 5, mais(LAMPADA, -50))
+        q.ret(x - 1, y + 2, x + 1, y + 5, mais(cor, -50), r=1.0)
+        q.ret(x, y + 2, x, y + 4, cor, r=2.4)
+        q.px(x, y + 3, mais(cor, 40), r=3.0)
+        brilho(BRILHO, x, y + 4, 9, cor, 0.5)
+        brilho(LUZINHAS, x, y + 4, 12, cor, 0.7)
 
 
-def machado(q):
-    """Machado deitado em dois pinos na parede, entre o pôster e o aparador."""
-    # cabo (levemente inclinado), com a quina de cima virada para a luz
-    x0, y0, x1, y1 = 78, 125, 114, 121
-    n = 40
-    for i in range(n + 1):
-        t = i / n
-        x = round(x0 + (x1 - x0) * t)
-        y = round(y0 + (y1 - y0) * t)
-        q.px(x, y - 1, mais(CABO, 30), r=1.8)
-        q.px(x, y, CABO, r=1.0)
-        q.px(x, y + 1, mais(CABO, -26), r=0.4)
-    q.ret(76, 125, 78, 128, mais(CABO, -14), r=0.8)  # pomo
-    for x, y in ((86, 127), (104, 125)):  # pinos
-        q.ret(x - 1, y, x + 1, y + 1, METAL_ESCURO, r=0.8)
-        q.px(x + 1, y, METAL, r=1.6)
-    # cabeça: cunha que sai do cabo e abre para cima; o gume (em cima) é paralelo ao cabo
-    lam = [(110, 119), (105, 108), (102, 103), (112, 101), (123, 102), (121, 108), (117, 119)]
-    q.d.polygon(lam, fill=(46, 50, 62), outline=(20, 20, 28))
-    q.dr.polygon(lam, fill=0.9)
-    q.poli([(108, 109), (105, 104), (112, 103), (121, 104), (119, 109)], (64, 68, 82), r=1.2)
-    q.linha([(102, 102), (112, 100), (123, 101)], (180, 186, 198), r=2.6)  # o gume pega a luz
-    q.linha([(123, 101), (121, 108)], (150, 156, 168), r=2.8)
-    q.px(122, 101, (226, 232, 242), r=3.2)
-    q.ret(109, 118, 118, 124, (36, 38, 46), r=0.9)  # olho abraçando o cabo
-    q.ret(109, 118, 118, 118, (90, 94, 108), r=2.0)
-    q.ret(119, 120, 121, 122, CABO, r=1.2)  # ponta do cabo saindo do olho
+def quadros(q):
+    """Quadros no alto da parede da esquerda: o coração, a águia e fotos."""
 
+    def moldura(x0, y0, x1, y1, fundo, borda=(48, 30, 52)):
+        sombra(q, x0 + 2, y0 + 2, x1 + 2, y1 + 2, -26)
+        q.ret(x0, y0, x1, y1, borda, r=1.0)
+        q.ret(x0 + 1, y0 + 1, x1 - 1, y1 - 1, fundo, r=0.9)
+        q.ret(x0, y0, x1, y0, mais(borda, 30), r=1.8)
 
-def poster(q):
-    """Pôster rasgado na parede: o coração da alma (bem apagado)."""
-    x0, y0, x1, y1 = 44, 102, 74, 129
-    q.ret(x0 + 1, y0 + 1, x1 + 1, y1 + 1, mais(PAREDE, -26))  # sombra
-    q.ret(x0, y0, x1, y1, (60, 58, 72), r=1.0)
-    q.ret(x0 + 2, y0 + 2, x1 - 2, y1 - 6, (40, 38, 52), r=0.9)
+    # coração
+    moldura(8, 12, 32, 44, (150, 60, 120))
     alma = ['.XX.XX.', 'XXXXXXX', 'XXXXXXX', '.XXXXX.', '..XXX..', '...X...']
     for j, fila in enumerate(alma):
         for i, c in enumerate(fila):
             if c == 'X':
-                q.px(x0 + 12 + i, y0 + 6 + j, (120, 48, 64), r=1.3)
-    q.px(x0 + 13, y0 + 7, (170, 110, 120), r=2.0)
-    for i in range(0, x1 - x0 - 5, 3):  # letreiro embaixo
-        q.ret(x0 + 3 + i, y1 - 4, x0 + 4 + i, y1 - 3, (96, 96, 110), r=1.2)
-    q.poli([(x1 - 6, y1), (x1, y1 - 7), (x1, y1)], mais(PAREDE_LISTRA, -4), r=1.0)  # canto rasgado
-    q.px(x0 + 1, y0 + 1, METAL, r=2.0)  # tachinhas
-    q.px(x1 - 1, y0 + 1, METAL, r=2.4)
-    q.ret(x0, y0, x1, y0, (84, 82, 96), r=1.8)
+                q.ret(14 + i * 2 - 1, 20 + j * 2, 14 + i * 2, 21 + j * 2, (232, 54, 84), r=1.5)
+    q.px(17, 21, (255, 170, 190), r=2.4)
+    # águia (rune azul)
+    moldura(2, 58, 30, 92, (50, 66, 150))
+    asa = [(6, 80), (10, 68), (16, 74), (16, 66), (22, 74), (26, 68), (26, 82), (20, 86), (16, 90), (12, 86)]
+    q.poli(asa, (110, 140, 238), r=1.4)
+    q.poli([(11, 72), (16, 78), (21, 72), (16, 70)], (150, 176, 255), r=1.8)
+    q.px(16, 76, (255, 240, 200), r=2.0)
+    # fotinhas
+    moldura(38, 70, 56, 92, (220, 188, 132))
+    q.poli([(40, 90), (47, 80), (54, 90)], (84, 140, 96))
+    q.elipse(48, 73, 53, 78, (255, 238, 150))
+    moldura(60, 78, 74, 100, (96, 150, 190))
+    q.ret(61, 92, 73, 99, (70, 120, 80))
+    q.elipse(64, 82, 70, 88, (255, 255, 255))
+    moldura(42, 100, 62, 118, (176, 120, 180))
+    q.poli([(44, 116), (52, 105), (60, 116)], (110, 70, 130))
 
 
-def guitarra(q):
-    """Violão encostado na parede, no canto esquerdo."""
-    # sombra na parede
-    q.poli([(16, 108), (24, 108), (28, 168), (8, 168)], mais(LAMBRI, -16))
-    # corpo
-    cor, esc, clr = (92, 62, 54), (54, 36, 36), (126, 92, 80)
-    q.elipse(3, 141, 25, 165, esc)
-    q.elipse(4, 141, 24, 164, cor, r=1.0)
-    q.elipse(6, 128, 22, 147, esc)
-    q.elipse(7, 128, 21, 146, cor, r=1.0)
-    q.elipse(11, 145, 16, 150, PRETO, r=0.2)  # boca
-    q.ret(10, 156, 17, 157, esc)  # cavalete
-    # lado direito pega a luz
-    for y in range(129, 164):
-        for x in range(25, 2, -1):
-            if q.img.getpixel((x, y)) == cor:
-                q.px(x, y, clr, r=2.2)
+def prateleira(q):
+    """Prateleira no alto, à esquerda, com planta pendurada e livros."""
+    x0, x1, y = 34, 98, 40
+    sombra(q, x0 + 2, y + 2, x1 + 2, y + 6, -28)
+    q.ret(x0, y, x1, y + 2, MADEIRA, r=1.0)
+    q.ret(x0, y, x1, y, MADEIRA_CLARA, r=1.8)
+    q.ret(x0 + 6, y + 3, x0 + 8, y + 5, MADEIRA_ESCURA)
+    q.ret(x1 - 8, y + 3, x1 - 6, y + 5, MADEIRA_ESCURA)
+    # livros
+    for i, (cor, alt) in enumerate(((ROSA, 14), ((70, 110, 190), 12), (AMARELO, 15), ((100, 200, 160), 11))):
+        q.ret(x0 + 4 + i * 4, y - alt, x0 + 6 + i * 4, y - 1, cor, r=1.2)
+        q.px(x0 + 4 + i * 4, y - alt, mais(cor, 40), r=2.0)
+    # vaso com planta caindo
+    q.ret(66, y - 9, 80, y - 1, VASO, r=1.0)
+    q.ret(66, y - 9, 80, y - 8, mais(VASO, 30), r=1.6)
+    q.ret(66, y - 2, 80, y - 1, VASO_ESCURO)
+    for fx, fy in ((64, 6), (70, 4), (76, 5), (82, 7)):
+        folha_g(q, fx, y - 9 - fy, 4)
+    for cx, comp in ((66, 24), (72, 30), (78, 20), (83, 26), (62, 16)):
+        for k in range(comp):
+            fy = y - 1 + k
+            q.px(cx + int(math.sin(k * 0.6) * 1.5), fy, FOLHA_ESCURA)
+            if k % 3 == 1:
+                q.ret(cx - 1 + int(math.sin(k * 0.6) * 1.5), fy, cx + 1 + int(math.sin(k * 0.6) * 1.5), fy + 1, FOLHA if k % 2 else FOLHA_CLARA, r=1.2)
+
+
+def folha_g(q, cx, cy, raio):
+    q.elipse(cx - raio, cy - raio // 2 - 1, cx + raio, cy + raio // 2 + 1, FOLHA, r=1.1)
+    q.px(cx - 1, cy - 1, FOLHA_CLARA, r=2.0)
+    q.px(cx + 1, cy, FOLHA_ESCURA)
+
+
+# ---------- plantas ----------
+
+
+def monstera(q, cx, base, altura, espalho, vaso=True, flip=1):
+    """Planta grande de folhas largas (nascem de um vaso e se abrem em leque)."""
+    n = 9
+    for i in range(n):
+        t = i / (n - 1)
+        ang = (-1.05 + 2.1 * t) * flip
+        comp = altura * (0.62 + 0.38 * math.cos((t - 0.5) * 2.2))
+        hx = cx + math.sin(ang) * comp * (espalho / altura + 0.25)
+        hy = base - 4 - math.cos(ang) * comp
+        # haste
+        q.linha([(cx, base - 4), (hx, hy + 4)], FOLHA_ESCURA, r=0.9)
+        # folha: elipse inclinada (polígono) com recortes
+        w, h = 9 + (i % 3) * 2, 6 + (i % 2) * 2
+        pts = []
+        for k in range(14):
+            a = k / 14 * 2 * math.pi
+            px_, py_ = math.cos(a) * w, math.sin(a) * h
+            rot = ang * 0.9
+            pts.append((hx + px_ * math.cos(rot) - py_ * math.sin(rot), hy + px_ * math.sin(rot) + py_ * math.cos(rot)))
+        q.poli(pts, FOLHA if i % 2 else mais(FOLHA, -14), r=1.1)
+        q.linha([(hx - w * 0.6 * math.cos(ang), hy), (hx + w * 0.6 * math.cos(ang), hy)], FOLHA_ESCURA, r=0.8)
+        q.px(hx - 2, hy - 2, FOLHA_CLARA, r=2.2)
+        q.px(hx - 1, hy - 3, FOLHA_CLARA, r=2.4)
+        q.px(hx, hy + 1, mais(FOLHA_ESCURA, 14), r=0.8)
+    if vaso:
+        q.poli([(cx - 9, base - 6), (cx + 9, base - 6), (cx + 7, base + 6), (cx - 7, base + 6)], VASO, r=1.0)
+        q.ret(cx - 10, base - 7, cx + 10, base - 5, mais(VASO, 26), r=1.7)
+        q.ret(cx - 7, base + 4, cx + 7, base + 6, VASO_ESCURO)
+        q.ret(cx + 4, base - 4, cx + 6, base + 3, mais(VASO, -22))
+
+
+def planta_direita(q):
+    monstera(q, 420, 148, 62, 40, vaso=False, flip=-1)
+
+
+def planta_esquerda(q):
+    monstera(q, 188, 160, 54, 38, vaso=True)
+
+
+# ---------- móveis ----------
+
+
+def criado_mudo(q):
+    """Mesinha com o gato, o abajur de estrela, livros e uma caneca com coração."""
+    x0, x1, topo = 94, 168, 128
+    sombra(q, x0 - 3, topo, x1 + 3, CHAO, -30)
+    q.ret(x0 - 2, topo - 2, x1 + 2, topo, MADEIRA_CLARA, r=1.8)
+    q.ret(x0 - 2, topo + 1, x1 + 2, topo + 1, MADEIRA_ESCURA, r=0.4)
+    q.ret(x0, topo + 2, x1, CHAO - 5, MADEIRA)
+    q.ret(x0, topo + 2, x0 + 1, CHAO - 5, mais(MADEIRA, -16))
+    for gy in (topo + 5, topo + 22):  # gavetas
+        q.ret(x0 + 4, gy, x1 - 4, gy + 14, MADEIRA_ESCURA, r=0.5)
+        q.ret(x0 + 5, gy + 1, x1 - 5, gy + 13, mais(MADEIRA, 6), r=0.9)
+        q.ret(x0 + 5, gy + 1, x1 - 5, gy + 1, MADEIRA_CLARA, r=1.2)
+        q.ret((x0 + x1) // 2 - 3, gy + 7, (x0 + x1) // 2 + 3, gy + 8, AMARELO, r=1.8)
+    for x in (x0 + 1, x1 - 3):  # pés
+        q.ret(x, CHAO - 5, x + 2, CHAO - 1, MADEIRA_ESCURA)
+
+    # livros empilhados
+    for i, (cor, larg) in enumerate(((ROSA, 14), ((70, 110, 190), 12), (AMARELO, 13))):
+        y = topo - 3 - i * 4
+        q.ret(x0 + 3, y - 3, x0 + 3 + larg, y, cor, r=1.2)
+        q.ret(x0 + 3, y - 3, x0 + 3 + larg, y - 3, mais(cor, 40), r=2.0)
+        q.ret(x0 + 3, y - 1, x0 + 3 + larg, y - 1, mais(cor, -50))
+    # gato branco sentado, de frente
+    gx, gy = 122, topo - 1
+    cor, esc, rosa = (240, 232, 244), (190, 178, 202), (244, 150, 180)
+    q.elipse(gx - 8, gy - 16, gx + 8, gy, esc, r=1.0)  # corpo
+    q.elipse(gx - 7, gy - 16, gx + 7, gy - 1, cor, r=1.1)
+    q.elipse(gx - 7, gy - 24, gx + 7, gy - 10, esc, r=1.0)  # cabeça
+    q.elipse(gx - 6, gy - 24, gx + 6, gy - 11, cor, r=1.4)
+    q.poli([(gx - 7, gy - 19), (gx - 6, gy - 28), (gx - 2, gy - 23)], cor, r=1.4)  # orelhas
+    q.poli([(gx + 7, gy - 19), (gx + 6, gy - 28), (gx + 2, gy - 23)], cor, r=1.4)
+    q.px(gx - 6, gy - 25, rosa, r=1.6)
+    q.px(gx + 6, gy - 25, rosa, r=1.6)
+    q.ret(gx - 4, gy - 18, gx - 3, gy - 16, (30, 24, 40), r=0.8)  # olhos
+    q.ret(gx + 3, gy - 18, gx + 4, gy - 16, (30, 24, 40), r=0.8)
+    q.px(gx, gy - 15, rosa, r=1.2)  # nariz
+    q.px(gx - 1, gy - 14, (120, 90, 110))
+    q.px(gx + 1, gy - 14, (120, 90, 110))
+    q.ret(gx - 5, gy - 2, gx - 3, gy, esc)  # patinhas
+    q.ret(gx + 3, gy - 2, gx + 5, gy, esc)
+    q.linha([(gx + 8, gy - 4), (gx + 13, gy - 8), (gx + 12, gy - 14)], esc, r=1.0, largura=2)  # rabo
+    q.px(gx - 7, gy - 8, (210, 170, 150))  # mancha caramelo
+    q.ret(gx - 6, gy - 9, gx - 4, gy - 7, (222, 178, 140), r=1.0)
+
+    # abajur de estrela
+    ax = 148
+    q.ret(ax - 6, topo - 3, ax + 6, topo - 1, (120, 76, 70), r=1.0)
+    q.ret(ax - 1, topo - 14, ax + 1, topo - 4, (190, 140, 80), r=1.4)
+    q.poli([(ax - 7, topo - 14), (ax + 7, topo - 14), (ax + 11, topo - 28), (ax - 11, topo - 28)], (255, 200, 96), r=1.2)
+    q.poli([(ax - 7, topo - 14), (ax - 3, topo - 14), (ax - 5, topo - 28), (ax - 11, topo - 28)], (232, 160, 70), r=1.0)
+    q.ret(ax - 11, topo - 29, ax + 11, topo - 28, (255, 232, 150), r=2.0)
+    # estrela acesa na cúpula
+    estrela = ['..X..', '..X..', 'XXXXX', '.XXX.', 'XX.XX']
+    for j, fila in enumerate(estrela):
+        for i, c in enumerate(fila):
+            if c == 'X':
+                q.px(ax - 2 + i, topo - 25 + j, (255, 250, 200), r=2.4)
+    brilho(BRILHO, ax, topo - 20, 40, (255, 190, 90), 0.5)
+    brilho(BRILHO, ax, topo - 20, 18, (255, 220, 140), 0.55)
+    brilho(LUZINHAS, ax, topo - 20, 22, (255, 210, 120), 0.5)
+    # caneca com coração
+    mx = 162
+    q.ret(mx - 5, topo - 11, mx + 4, topo - 1, (246, 240, 248), r=1.3)
+    q.ret(mx - 5, topo - 11, mx - 4, topo - 1, (206, 198, 214))
+    q.ret(mx + 4, topo - 9, mx + 7, topo - 4, (246, 240, 248), r=1.2)  # alça
+    q.ret(mx + 5, topo - 8, mx + 5, topo - 5, MADEIRA_FUNDO)
+    q.px(mx - 3, topo - 8, (230, 54, 84), r=1.6)
+    q.px(mx - 1, topo - 8, (230, 54, 84), r=1.6)
+    q.ret(mx - 3, topo - 7, mx - 1, topo - 7, (230, 54, 84), r=1.6)
+    q.px(mx - 2, topo - 6, (230, 54, 84), r=1.6)
+    q.ret(mx - 5, topo - 11, mx + 4, topo - 11, (255, 255, 255), r=2.4)
+
+
+def rack(q, rnd):
+    """Móvel baixo onde a TV está apoiada: prateleiras com livros e o videogame."""
+    x0, x1 = 176, L - 1
+    sombra(q, x0 - 3, TAMPO - 2, x1, CHAO, -30)
+    q.ret(x0 - 3, TAMPO - 1, x1, TAMPO + 1, MADEIRA_CLARA, r=1.8)
+    q.ret(x0 - 3, TAMPO + 2, x1, TAMPO + 2, MADEIRA_ESCURA, r=0.4)
+    q.ret(x0, TAMPO + 3, x1, CHAO - 5, MADEIRA)
+    for x in (x0 + 1, x1 - 3):
+        q.ret(x, CHAO - 5, x + 2, CHAO - 1, MADEIRA_ESCURA)
+    # três vãos separados por montantes
+    vaos = [(x0 + 4, 230), (236, 326), (332, x1 - 4)]
+    for i, (a, b) in enumerate(vaos):
+        q.ret(a, TAMPO + 6, b, CHAO - 8, MADEIRA_FUNDO, r=0.5)
+        q.ret(a, TAMPO + 6, b, TAMPO + 7, mais(MADEIRA_FUNDO, -12), r=0.4)  # sombra do tampo
+        q.ret(a, CHAO - 9, b, CHAO - 8, MADEIRA_CLARA, r=1.4)
+    # vão 1: livros em pé
+    a, b = vaos[0]
+    cores = [ROSA, (80, 120, 200), AMARELO, (110, 200, 150), LARANJA, ROXO, (230, 230, 240)]
+    x = a + 3
+    for k in range(10):
+        alt = 13 + (k * 5) % 6
+        cor = cores[k % len(cores)]
+        q.ret(x, CHAO - 9 - alt, x + 2, CHAO - 10, cor, r=1.2)
+        q.ret(x, CHAO - 9 - alt, x, CHAO - 10, mais(cor, 36), r=1.8)
+        q.px(x + 1, CHAO - 9 - alt + 3, mais(cor, -50))
+        x += 3 + (k % 2)
+        if x > b - 8:
+            break
+    # vão 2: gavetas fechadas (frente de madeira por cima do vão)
+    a, b = vaos[1]
+    q.ret(a, TAMPO + 6, b, CHAO - 8, MADEIRA, r=1.0)
+    q.ret(a, TAMPO + 6, b, TAMPO + 6, MADEIRA_CLARA, r=1.4)
+    q.ret(a, (TAMPO + CHAO) // 2 - 1, b, (TAMPO + CHAO) // 2 - 1, MADEIRA_ESCURA, r=0.5)
+    for cx in ((a + b) // 2,):
+        q.ret(cx - 4, TAMPO + 13, cx + 4, TAMPO + 14, AMARELO, r=1.8)
+    # vão 3: videogame com a luzinha acesa e controles
+    a, b = vaos[2]
+    q.ret(a + 8, CHAO - 17, a + 52, CHAO - 10, (214, 210, 220), r=1.2)
+    q.ret(a + 8, CHAO - 17, a + 52, CHAO - 17, (255, 255, 255), r=2.2)
+    q.ret(a + 10, CHAO - 14, a + 34, CHAO - 13, (80, 76, 96))
+    q.ret(a + 44, CHAO - 15, a + 48, CHAO - 14, (60, 220, 130), r=2.4)
+    brilho(BRILHO, a + 46, CHAO - 14, 6, (60, 220, 130), 0.5)
+    q.ret(a + 60, CHAO - 16, a + 70, CHAO - 10, (90, 84, 110), r=1.2)
+    q.ret(a + 74, CHAO - 15, a + 80, CHAO - 10, (190, 90, 110), r=1.2)
+
+
+def tv_apoio(q):
+    """Sombra do pé da TV no rack e o fio descendo para trás."""
+    q.ret(TV_CX - 60, TAMPO - 2, TV_CX + 60, TAMPO - 1, mais(MADEIRA_CLARA, -50))
+
+
+def violao(q):
+    """Violão encostado na parede, no canto de baixo à esquerda."""
+    sombra(q, 6, 84, 52, CHAO, -22)
+    cor, esc, clr = (212, 124, 56), (118, 62, 40), (250, 176, 100)
+    q.elipse(4, 138, 40, 178, esc)
+    q.elipse(5, 139, 39, 177, cor, r=1.0)
+    q.elipse(10, 118, 36, 148, esc)
+    q.elipse(11, 119, 35, 147, cor, r=1.0)
+    q.elipse(17, 138, 28, 150, PRETO, r=0.2)  # boca
+    q.elipse(18, 139, 27, 149, (60, 34, 40), r=0.3)
+    q.ret(15, 164, 29, 166, esc)  # cavalete
+    for y in range(120, 176):  # borda de luz
+        for x in range(40, 4, -1):
+            if q.pega(x, y) == cor:
+                q.px(x, y, clr, r=2.0)
                 break
     # braço
-    for y in range(98, 130):
-        x = 13 + (130 - y) * 0.06
-        q.ret(int(x) - 1, y, int(x) + 1, y, (60, 44, 40), r=1.0)
-        q.px(int(x) + 1, y, (88, 70, 64), r=2.0)
-        if y % 5 == 0:
-            q.px(int(x), y, METAL, r=1.4)  # trastes
-    q.ret(13, 91, 18, 98, (50, 36, 34), r=1.0)  # mão
-    for y in (92, 94, 96):
-        q.px(12, y, METAL, r=1.2)
-        q.px(19, y, METAL, r=1.8)
-    q.linha([(14, 99), (14, 157)], (150, 150, 150), r=0.8)  # cordas
-
-
-def aparador(q, rnd):
-    """Móvel baixo embaixo do telão, com as coisas em cima (na penumbra)."""
-    x0, x1 = 116, 296
-    tampo = 140
-    # sombra na parede atrás
-    q.ret(x0 - 2, tampo - 1, x1 + 3, CHAO - 1, mais(LAMBRI, -20))
-    # tampo (vemos um pouquinho de cima) e frente
-    q.ret(x0 - 3, tampo - 3, x1 + 3, tampo - 1, MADEIRA_CLARA, r=1.8)
-    q.ret(x0 - 3, tampo, x1 + 3, tampo, MADEIRA_ESCURA, r=0.4)
-    q.ret(x0, tampo + 1, x1, CHAO - 5, MADEIRA)
-    # portas e gavetas
-    larg = (x1 - x0) // 4
-    for i in range(4):
-        a, b = x0 + 3 + i * larg, x0 + (i + 1) * larg - 2
-        q.ret(a, tampo + 4, b, CHAO - 9, MADEIRA_ESCURA, r=0.5)
-        q.ret(a + 1, tampo + 5, b - 1, CHAO - 10, MADEIRA, r=0.9)
-        q.ret(a + 1, tampo + 5, b - 1, tampo + 5, MADEIRA_CLARA, r=1.2)
-        q.ret(a + 1, tampo + 9, b - 1, tampo + 9, MADEIRA_ESCURA, r=0.5)  # gaveta
-        m = (a + b) // 2
-        q.ret(m - 2, tampo + 7, m + 2, tampo + 7, METAL, r=1.8)  # puxador
-    # pés e sombra no chão
-    for x in (x0 + 2, x1 - 3):
-        q.ret(x, CHAO - 5, x + 1, CHAO - 1, MADEIRA_ESCURA)
-    q.ret(x0, CHAO - 4, x1, CHAO - 1, (22, 22, 30))
-
-    # --- em cima ---
-    # abajur apagado na ponta esquerda (a cúpula pega a luz do lado da tela)
-    q.ret(120, tampo - 5, 127, tampo - 4, (48, 46, 56), r=1.0)
-    q.ret(123, tampo - 12, 124, tampo - 6, (70, 66, 74), r=1.2)
-    q.poli([(120, tampo - 20), (126, tampo - 20), (129, tampo - 12), (117, tampo - 12)], (96, 88, 80), r=1.0)
-    q.linha([(126, tampo - 20), (129, tampo - 12)], (140, 130, 116), r=2.4)
-    q.ret(117, tampo - 12, 129, tampo - 12, (70, 64, 60), r=0.8)
-    # pilha de cartas (Jevil)
-    for i in range(7):
-        y = tampo - 4 - i
-        dx = (i * 3) % 2
-        q.ret(131 + dx, y, 141 + dx, y, CARTA if i % 2 == 0 else mais(CARTA, -30), r=1.3)
-    q.ret(131, tampo - 11, 141, tampo - 11, mais(CARTA, 30), r=2.2)
-    q.px(136, tampo - 11, (170, 40, 70), r=1.0)  # naipe
-    # cartas espalhadas
-    for cx, cor in ((144, CARTA_VERSO), (196, CARTA), (205, CARTA_VERSO)):
-        q.poli([(cx, tampo - 4), (cx + 6, tampo - 6), (cx + 8, tampo - 4), (cx + 2, tampo - 3)], cor, r=1.6)
-    # videogame + controle com o fio caindo
-    q.ret(222, tampo - 7, 248, tampo - 4, (54, 56, 66), r=1.0)
-    q.ret(222, tampo - 8, 248, tampo - 8, (92, 96, 108), r=2.0)
-    q.ret(225, tampo - 6, 232, tampo - 6, PRETO)
-    q.px(245, tampo - 6, (60, 140, 120))  # led apagado
-    q.ret(252, tampo - 6, 260, tampo - 4, (60, 60, 72), r=1.3)
-    q.ret(250, tampo - 5, 251, tampo - 4, (60, 60, 72), r=1.3)
-    q.ret(261, tampo - 5, 262, tampo - 4, (60, 60, 72), r=1.3)
-    for i, (x, y) in enumerate(((256, tampo - 3), (257, tampo + 1), (256, tampo + 5), (258, tampo + 9), (260, tampo + 12))):
-        q.px(x, y, (30, 30, 36))
-        q.px(x, y + 1, (30, 30, 36))
-        q.px(x, y + 2, (30, 30, 36))
-    # relógio digital (números apagados) à direita
-    q.ret(268, tampo - 10, 286, tampo - 4, (40, 42, 50), r=1.0)
-    q.ret(268, tampo - 10, 286, tampo - 10, (80, 84, 96), r=2.0)
-    q.ret(270, tampo - 8, 284, tampo - 6, (22, 30, 34))
-    for x in (271, 272, 274, 275, 278, 279, 281, 282):
-        q.px(x, tampo - 7, (40, 66, 70))
-    q.px(276, tampo - 8, (40, 66, 70))
-    q.px(276, tampo - 6, (40, 66, 70))
-
-
-def caixa_de_som(q):
-    """Caixa de som alta no chão, à direita do telão (cortada pela borda)."""
-    x0, y0 = 309, 126
-    q.ret(x0 - 2, y0 + 2, L - 1, CHAO, mais(LAMBRI, -22))  # sombra
-    q.ret(x0, y0, L - 1, CHAO - 1, CAIXA, r=1.0)
-    q.ret(x0, y0, L - 1, y0, mais(CAIXA, 40), r=2.4)
-    q.ret(x0, y0, x0, CHAO - 1, mais(CAIXA, 30), r=2.4)  # quina virada para a tela
-    for cy, raio in ((y0 + 9, 4), (y0 + 25, 7)):
-        cx = x0 + 9
-        q.elipse(cx - raio, cy - raio, cx + raio, cy + raio, CAIXA_CONE, r=0.5)
-        q.elipse(cx - raio + 1, cy - raio + 1, cx + raio - 1, cy + raio - 1, mais(CAIXA_CONE, 10), r=0.7)
-        q.elipse(cx - 1, cy - 1, cx + 1, cy + 1, mais(CAIXA, 30), r=1.4)
-        q.px(cx - raio + 1, cy - raio + 2, mais(CAIXA, 50), r=2.0)
+    for y in range(70, 122):
+        x = 23 - (122 - y) * 0.03
+        q.ret(int(x) - 2, y, int(x) + 2, y, (96, 56, 44), r=1.0)
+        q.px(int(x) + 2, y, (140, 90, 70), r=2.0)
+        if y % 6 == 0:
+            q.ret(int(x) - 2, y, int(x) + 2, y, METAL, r=1.4)  # trastes
+    q.ret(19, 56, 27, 70, (70, 40, 40), r=1.0)  # mão
+    for y in (58, 62, 66):
+        q.px(17, y, METAL, r=1.2)
+        q.px(29, y, METAL, r=1.8)
+    q.linha([(22, 72), (22, 164)], (230, 224, 220), r=0.8)
+    # adesivos: coração rosa, bolinha azul, estrela amarela
+    q.ret(14, 124, 18, 125, ROSA, r=1.6)
+    q.ret(13, 125, 19, 127, ROSA, r=1.6)
+    q.ret(14, 128, 18, 128, ROSA, r=1.6)
+    q.px(16, 129, ROSA, r=1.6)
+    q.elipse(26, 130, 31, 135, (70, 110, 220), r=1.5)
+    q.ret(11, 150, 13, 156, AMARELO, r=1.8)
+    q.ret(9, 152, 15, 154, AMARELO, r=1.8)
+    q.elipse(24, 150, 30, 156, (70, 110, 220), r=1.5)
+    q.elipse(30, 160, 36, 166, ROSA, r=1.5)
+    q.px(32, 162, (255, 220, 230), r=2.2)
 
 
 # ---------- chão ----------
 
-PF = (TV_CX, 52)  # ponto de fuga das tábuas
+PF = (TV_CX, 60)  # ponto de fuga das tábuas
 
 
 def no_chao(x0, y):
@@ -353,113 +518,128 @@ def no_chao(x0, y):
 
 
 def chao(q, rnd):
-    # tábuas que vão em direção à parede
     larg = 13
-    bases = list(range(-900, 1400, larg))
-    # profundidade: emendas mais espaçadas perto de nós
-    emendas = []
-    z = 1.0
-    while True:
-        y = PF[1] + (CHAO - PF[1]) / z
-        if y > A + 20:
-            break
-        emendas.append(y)
-        z *= 0.74
-    cores = {}
     for y in range(CHAO, A):
         for x in range(L):
-            # qual tábua?
             u = PF[0] + (x - PF[0]) * (CHAO - PF[1]) / (y - PF[1])
             i = int((u + 900) // larg)
-            # qual "fileira" de emenda (desencontrada por tábua)
-            k = 0
-            for j, e in enumerate(emendas):
-                if y + (i * 7 % 5) * 3 >= e:
-                    k = j
-            chave = (i, k)
-            if chave not in cores:
-                cores[chave] = mais(TABUA, rnd.choice((-8, -4, 0, 0, 4, 8)))
-            c = cores[chave]
-            # veio da madeira
+            c = mais(TABUA, ((i * 37) % 5 - 2) * 3)
             fu = (u + 900) % larg
             if int(fu * 3) % 7 == 0 and (y + i) % 4 != 0:
                 c = mais(c, -6)
             q.img.putpixel((x, y), c)
-    # frestas entre tábuas
-    for b in bases:
+    for b in range(-900, 1400, larg):
         for y in range(CHAO, A):
             x = no_chao(b, y)
             if -1 <= x <= L:
                 q.px(round(x), y, FRESTA, r=0.4)
-                q.px(round(x) + 1, y, mais(TABUA, 10), r=1.15)
-    # emendas desencontradas
-    for i, b in enumerate(bases):
-        for j, e in enumerate(emendas):
-            y = int(round(e - (i * 7 % 5) * 3))
-            if CHAO + 1 <= y < A:
-                xa, xb = no_chao(b, y), no_chao(b + larg, y)
-                if xb < -2 or xa > L + 2:
-                    continue
-                q.linha([(xa + 1, y), (xb - 1, y)], FRESTA, r=0.4)
-    # sombra que o aparador faz no chão (ele tapa a luz logo à frente dele)
-    for y in range(CHAO, CHAO + 9):
-        t = (y - CHAO) / 9
-        xa, xb = no_chao(118, y) + 2, no_chao(294, y) - 2
-        q.dr.line([(xa, y), (xb, y)], fill=0.25 + 0.5 * t)
+    # sombra que o rack faz no chão
+    for y in range(CHAO, CHAO + 8):
+        t = (y - CHAO) / 8
+        for x in range(L):
+            q.px(x, y, mais(q.pega(x, y), int(-26 * (1 - t))))
 
 
 def tapete(q):
-    """Tapete na frente do telão (losangos que só aparecem com a luz)."""
-    ya, yb = 182, 232
-    def borda(y):
-        return no_chao(140, y), no_chao(318, y)
-    for y in range(ya, yb + 1):
-        xa, xb = borda(y)
-        for x in range(int(math.ceil(xa)), int(xb) + 1):
-            if not (0 <= x < L):
-                continue
-            # coordenadas no tapete (u na largura, v na profundidade)
-            u = (x - xa) / (xb - xa)
-            v = (y - ya) / (yb - ya)
-            c = TAPETE
-            na_borda = u < 0.06 or u > 0.94 or v < 0.1 or v > 0.9
-            if na_borda:
-                c = TAPETE_BORDA
-                if (u < 0.03 or u > 0.97 or v < 0.04 or v > 0.96):
-                    c = mais(TAPETE_BORDA, 14)
-            else:
-                # losangos (ouros)
-                uu = (u - 0.06) / 0.88 * 7
-                vv = (v - 0.1) / 0.8 * 3
-                du, dv = abs(uu % 1 - 0.5), abs(vv % 1 - 0.5)
-                s = du + dv
-                if 0.3 < s < 0.42:
-                    c = TAPETE_DESENHO
-                elif s <= 0.12:
-                    c = mais(TAPETE_DESENHO, 10)
+    """Tapete xadrez grande (roxo e laranja) na frente da TV."""
+    ya = CHAO + 5
+    K = 2200
+
+    def limites(y):
+        return no_chao(TV_CX - 330, y), no_chao(TV_CX + 330, y)
+
+    for y in range(ya, A):
+        xa, xb = limites(y)
+        v = K / (y - PF[1])
+        for x in range(max(0, int(math.ceil(xa))), min(L, int(xb) + 1)):
+            u = (x - PF[0]) * (CHAO - PF[1]) / (y - PF[1])
+            i, j = int(math.floor((u + 600) / 22)), int(math.floor(v / 2.4))
+            xadrez = (i + j) % 2
+            c = ROXO_ESCURO if xadrez else mais(ROXO_ESCURO, -26)
+            fu, fv = ((u + 600) % 22) / 22, (v / 2.4) % 1
+            if (i % 2 == 0 and 0.4 < fu < 0.6) or (j % 2 == 0 and 0.4 < fv < 0.6):
+                c = misturar(c, LARANJA, 0.82)  # faixas laranja cruzando o xadrez
+            elif (fu < 0.07 or fv < 0.07):
+                c = mais(c, -14)
             q.img.putpixel((x, y), c)
-            q.r.putpixel((x, y), 1.1)
-        if y == ya:
-            q.linha([(xa, y), (xb, y)], mais(TAPETE_BORDA, 22), r=1.4)
-    # franjas na frente
-    xa, xb = borda(yb + 1)
-    for x in range(int(xa) + 1, int(xb), 2):
-        q.px(x, yb + 1, TAPETE_FRANJA, r=1.2)
-        q.px(x, yb + 2, mais(TAPETE_FRANJA, -30), r=1.0)
+            q.r.putpixel((x, y), 1.15)
+        # borda
+        for x in (int(xa), int(xa) + 1, int(xb) - 1, int(xb)):
+            q.px(x, y, (60, 34, 72), r=0.9)
+    xa, xb = limites(ya)
+    q.linha([(xa, ya), (xb, ya)], (60, 34, 72), r=1.2)
 
 
-def pufe(q):
-    """Pufe no canto de baixo à esquerda, bem na frente (quase só silhueta)."""
-    q.elipse(-16, 222, 66, 248, (16, 16, 22))  # sombra no chão
-    corpo = [(-8, 244), (-12, 222), (-6, 206), (8, 197), (26, 195), (44, 200), (56, 212), (60, 230), (58, 244)]
-    q.poli(corpo, TECIDO, r=0.7)
-    q.poli([(-2, 210), (10, 201), (28, 199), (44, 204), (50, 212), (36, 216), (14, 216)], TECIDO_CLARO, r=1.3)
-    q.linha([(14, 216), (36, 216), (50, 212)], mais(TECIDO, -24), r=0.4)  # o topo afundado
-    q.linha([(26, 217), (30, 244)], mais(TECIDO, -20), r=0.4)  # costura
-    q.linha([(48, 216), (52, 240)], mais(TECIDO, -20), r=0.4)
-    # a borda de cima/direita pega o que sobra da luz
-    q.linha([(8, 197), (26, 195), (44, 200), (56, 212), (60, 230)], mais(TECIDO_CLARO, 34), r=3.2)
-    q.linha([(10, 198), (26, 196), (43, 201)], mais(TECIDO_CLARO, 16), r=2.2)
+def almofadas_chao(q):
+    """Almofadas redondas onde a turma senta: laranja (com estrela) e rosa."""
+    for cx, cy, rx, ry, cor, estrela in ((304, 226, 26, 11, LARANJA, True), (386, 230, 30, 12, (214, 70, 120), False), (212, 232, 24, 10, (120, 86, 200), False)):
+        q.elipse(cx - rx - 2, cy - ry + 3, cx + rx + 2, cy + ry + 3, (30, 18, 36))  # sombra
+        q.elipse(cx - rx, cy - ry, cx + rx, cy + ry, mais(cor, -42), r=1.0)
+        q.elipse(cx - rx + 1, cy - ry, cx + rx - 1, cy + ry - 3, cor, r=1.3)
+        q.elipse(cx - rx + 6, cy - ry + 2, cx + rx - 6, cy + ry - 6, mais(cor, 22), r=1.8)
+        q.linha([(cx - rx + 3, cy - 2), (cx + rx - 3, cy - 2)], mais(cor, -26), r=0.8)
+        if estrela:
+            for j, fila in enumerate(['..X..', 'XXXXX', '.XXX.', '.X.X.']):
+                for i, c in enumerate(fila):
+                    if c == 'X':
+                        q.px(cx - 2 + i, cy - 6 + j, (255, 240, 170), r=2.0)
+
+
+def sofa(q):
+    """Sofá roxo no canto de baixo, à esquerda do tapete, com almofada xadrez gigante."""
+    dx, dy = 44, 8
+    q.elipse(dx - 20, 214 + dy, dx + 104, 250 + dy, (34, 20, 44))  # sombra
+    corpo = [(dx - 10, 248), (dx - 8, 176 + dy), (dx + 2, 166 + dy), (dx + 34, 160 + dy), (dx + 74, 164 + dy), (dx + 92, 176 + dy), (dx + 100, 248)]
+    q.poli(corpo, (82, 56, 128), r=0.9)
+    q.poli([(dx - 4, 180 + dy), (dx + 4, 170 + dy), (dx + 36, 164 + dy), (dx + 72, 168 + dy), (dx + 86, 178 + dy), (dx + 50, 186 + dy), (dx + 14, 186 + dy)], (120, 88, 176), r=1.2)
+    q.linha([(dx + 4, 170 + dy), (dx + 36, 164 + dy), (dx + 72, 168 + dy), (dx + 86, 178 + dy)], (170, 140, 224), r=2.4)
+    q.linha([(dx - 6, 200 + dy), (dx + 96, 200 + dy)], (62, 40, 100), r=0.5)
+    # almofada xadrez em losango
+    cx, cy, d = dx + 52, 196 + dy, 25
+    pts = [(cx, cy - d), (cx + d, cy), (cx, cy + d), (cx - d, cy)]
+    q.poli(pts, ROXO_ESCURO, r=1.0)
+    for j in range(-6, 6):
+        for i in range(-6, 6):
+            ux, uy = (i * 8), (j * 8)
+            px_, py_ = cx + (ux - uy) * 0.707, cy + (ux + uy) * 0.707
+            casa = [(px_, py_ - 5.6), (px_ + 5.6, py_), (px_, py_ + 5.6), (px_ - 5.6, py_)]
+            if abs(px_ - cx) + abs(py_ - cy) < d - 4:
+                q.poli(casa, ROXO if (i + j) % 2 else ROXO_ESCURO, r=1.2)
+    q.linha(pts + [pts[0]], mais(ROXO_ESCURO, -40), r=0.6)
+    q.linha([(cx - d + 2, cy - 1), (cx, cy - d + 2), (cx + d - 2, cy - 1)], ROXO_LINHA, r=2.4)
+
+
+def copo_boba(q):
+    """Copo de chá de bolha com canudo, no chão ao lado do sofá."""
+    x, y = 188, 207
+    q.elipse(x - 8, y + 20, x + 10, y + 26, (30, 18, 36))
+    q.poli([(x - 8, y), (x + 8, y), (x + 6, y + 22), (x - 6, y + 22)], (255, 210, 120), r=1.2)  # chá
+    q.poli([(x - 8, y), (x - 3, y), (x - 3, y + 22), (x - 6, y + 22)], (255, 238, 190), r=1.8)
+    q.ret(x - 9, y - 2, x + 9, y, (246, 240, 250), r=1.8)  # tampa
+    q.linha([(x + 2, y - 2), (x + 6, y - 16)], (255, 120, 170), r=1.8, largura=2)  # canudo
+    for bx, by in ((x - 4, y + 18), (x - 1, y + 19), (x + 2, y + 18), (x + 4, y + 20), (x - 3, y + 15), (x, y + 16)):
+        q.ret(bx, by, bx + 1, by + 1, (60, 38, 40), r=0.6)
+    q.px(x - 2, y + 4, (255, 255, 255), r=2.4)
+
+
+def controle(q):
+    """Controle de videogame no chão, com o fio enrolado até o rack."""
+    x, y = 236, 224
+    q.elipse(x - 12, y + 6, x + 14, y + 12, (34, 22, 40))
+    q.ret(x - 11, y - 1, x + 11, y + 6, (232, 228, 244), r=1.4)
+    q.ret(x - 11, y - 1, x + 11, y - 1, (255, 255, 255), r=2.4)
+    q.ret(x - 14, y + 1, x - 11, y + 8, (214, 210, 230), r=1.3)
+    q.ret(x + 11, y + 1, x + 14, y + 8, (214, 210, 230), r=1.3)
+    q.ret(x - 8, y + 1, x - 4, y + 2, (70, 64, 90))
+    q.px(x - 6, y, (70, 64, 90))
+    q.px(x - 6, y + 3, (70, 64, 90))
+    q.px(x + 5, y + 1, (232, 80, 110), r=1.8)
+    q.px(x + 7, y + 3, (90, 130, 240), r=1.8)
+    # fio sinuoso
+    pts = [(x + 2, y - 1)]
+    for k in range(1, 40):
+        pts.append((x + 2 + k * 2.4, y - 1 - k * 0.9 + math.sin(k * 0.5) * 3))
+    q.linha(pts, (50, 46, 66), r=0.6)
 
 
 # ---------- luz do telão ----------
@@ -472,16 +652,13 @@ def campo_de_luz():
     dx = np.maximum(np.maximum(x0 - xs, 0), xs - x1)
     dy = np.maximum(np.maximum(y0 - ys, 0), ys - y1)
     d = np.sqrt(dx * dx + dy * dy)
-    parede = 0.95 * np.exp(-d / 16) + 0.28 * np.exp(-d / 70)
-    # chão: o cone (trapézio) a partir da base da parede, com faixa interna
+    parede = 0.95 * np.exp(-d / 18) + 0.28 * np.exp(-d / 80)
     t = (ys - CHAO) / (A - CHAO)
-    abre = 1 + 0.55 * t
-    meio = TV_CX
+    abre = 1 + 0.9 * t
     meia = (TV[2] - TV[0]) / 2
-    rel = np.abs(xs - meio) / (meia * abre)
+    rel = np.abs(xs - TV_CX) / (meia * abre)
     cone = np.where(rel < 1.0, 0.62, 0.0) + np.where(rel < 0.78, 0.16, 0.0)
-    cone *= 1.0 - 0.38 * t  # vai perdendo força longe da parede
-    # um pouquinho de luz espalhada fora do cone
+    cone *= 1.0 - 0.38 * t
     esp = 0.2 * np.exp(-np.maximum(rel - 1, 0) * 2.2) * (1 - 0.4 * t)
     chao = np.maximum(cone, esp)
     return np.where(ys < CHAO, parede, chao).astype(np.float32)
@@ -512,11 +689,11 @@ def vinheta():
     ys, xs = np.mgrid[0:A, 0:L].astype(np.float32)
     nx, ny = xs / L, ys / A
     # cantos (elipse) + canto do logo + faixa das opções (esquerda)
-    borda = np.clip((np.sqrt(((nx - 0.6) / 0.75) ** 2 + ((ny - 0.55) / 0.72) ** 2) - 0.62) / 0.45, 0, 1)
-    logo = np.exp(-(((xs - 80) / 95) ** 2 + ((ys - 55) / 70) ** 2))
-    opcoes = np.exp(-(((xs - 70) / 95) ** 2 + ((ys - 168) / 30) ** 2))
-    a = np.clip(0.75 * borda + 0.42 * logo + 0.35 * opcoes, 0, 0.82)
-    a = np.clip(quantizar(a, 12), 0, 0.82)
+    borda = np.clip((np.sqrt(((nx - 0.55) / 0.8) ** 2 + ((ny - 0.5) / 0.78) ** 2) - 0.66) / 0.5, 0, 1)
+    logo = np.exp(-(((xs - 78) / 85) ** 2 + ((ys - 52) / 62) ** 2))
+    opcoes = np.exp(-(((xs - 78) / 90) ** 2 + ((ys - 172) / 38) ** 2))
+    a = np.clip(0.62 * borda + 0.3 * logo + 0.32 * opcoes, 0, 0.7)
+    a = np.clip(quantizar(a, 12), 0, 0.7)
     out = np.zeros((A, L, 4), np.float32)
     out[..., 3] = a * 255
     return out
@@ -527,29 +704,40 @@ def main():
     rnd = random.Random(SEED)
     q = Quadro()
     parede(q, rnd)
-    varal(q, rnd)
+    janela(q, rnd)
     chao(q, rnd)
     tapete(q)
-    aparador(q, rnd)
-    caixa_de_som(q)
-    guitarra(q)
-    machado(q)
-    poster(q)
-    pufe(q)
+    quadros(q)
+    prateleira(q)
+    planta_direita(q)
+    rack(q, rnd)
+    tv_apoio(q)
+    planta_esquerda(q)
+    criado_mudo(q)
+    violao(q)
+    varal(q, rnd)
+    almofadas_chao(q)
+    sofa(q)
+    copo_boba(q)
+    controle(q)
 
     alb = np.asarray(q.img, np.float32)
     rec = np.asarray(q.r, np.float32)
     campo = campo_de_luz()
 
-    # fundo: albedo na luz ambiente (+ um restinho frio do telão, sempre ligado)
-    amb = AMBIENTE[None, None, :] * (0.8 + 0.35 * campo[..., None])
-    fundo = np.clip(alb * amb, 0, 255)
+    # fundo: albedo na luz ambiente quente (+ o telão, sempre ligado) + luz própria
+    amb = AMBIENTE[None, None, :] * (0.78 + 0.3 * campo[..., None])
+    # brilho quente no chão, na frente da TV
+    ys, xs = np.mgrid[0:A, 0:L].astype(np.float32)
+    quente = np.exp(-(((xs - TV_CX) / 120) ** 2 + ((ys - 205) / 40) ** 2))
+    fundo = alb * amb + BRILHO * 255 * 0.9
+    fundo += quente[..., None] * np.array([70, 34, 14], np.float32)
+    fundo = np.clip(fundo, 0, 255)
     salvar(fundo, 'fundo.png', 'RGB')
 
-    # luz: luminância do albedo x campo x receptividade, em degraus
+    # luz do telão: luminância do albedo x campo x receptividade, em degraus
     lum = alb @ np.array([0.3, 0.5, 0.2], np.float32) / 255.0
-    ys = np.arange(A)[:, None]
-    ganho = np.where(ys < CHAO, 1.25, 1.6)
+    ganho = np.where(ys < CHAO, 1.0, 1.3)
     luz = np.clip(lum * campo * rec * ganho, 0, 1)
     luz = quantizar(luz, 16)
     for nome, mascara in (('luz-parede.png', ys < CHAO), ('luz-chao.png', ys >= CHAO)):
@@ -558,6 +746,13 @@ def main():
         rgba[..., 0] = rgba[..., 1] = rgba[..., 2] = v
         rgba[..., 3] = np.where(v > 0, 255, 0)
         salvar(rgba, nome, 'RGBA')
+
+    # lâmpadas do varal: cor própria, soma por cima (o jogo cintila)
+    lz = np.clip(LUZINHAS * 255, 0, 255)
+    rgba = np.zeros((A, L, 4), np.float32)
+    rgba[..., :3] = lz
+    rgba[..., 3] = 255
+    salvar(rgba, 'luzinhas.png', 'RGBA')
 
     salvar(vinheta(), 'vinheta.png', 'RGBA')
 
