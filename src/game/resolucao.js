@@ -3,19 +3,21 @@ import { LARGURA, ALTURA } from './constants.js'
 
 // Resolução de desenho.
 //
-// O jogo continua pensado em 640x480 (LARGURA x ALTURA): posições, caixas e
-// layouts usam essas coordenadas. Mas o canvas é criado do tamanho REAL em
+// O mundo do jogo é fixo em 854x480 (LARGURA x ALTURA, 16:9): posições, caixas
+// e layouts usam essas coordenadas, e a página encaixa o mundo inteiro em
+// qualquer janela (sobra faixa preta em telas mais altas ou mais largas). Mas o canvas é criado do tamanho REAL em
 // que ele aparece na tela (vezes o devicePixelRatio), e cada câmera dá zoom
 // de `escala`. Assim texto e formas são desenhados na resolução da tela, em
 // vez de desenhar pequeno e esticar (o que borrava a fonte).
 //
-//   RES.zoom     quantas vezes o 640x480 é ampliado na página (CSS)
+//   RES.zoom     quantas vezes o 854x480 é ampliado (ou reduzido) na página (CSS)
 //   RES.dpr      pixels do monitor por pixel CSS (telas HiDPI)
 //   RES.escala   zoom x dpr: pixels reais por pixel do jogo
 export const RES = { zoom: 1, dpr: 1, escala: 1 }
 
 const MARGEM_VERTICAL = 110 // barra de conexão acima do jogo
 const DPR_MAX = 2 // acima disso o canvas fica pesado sem ganho visível
+const ZOOM_MIN = 0.25 // nunca menor que isso (abaixo, nem dá para ler)
 
 function medir() {
   // em tela cheia (lib/telaCheia.js) só o jogo aparece: sem margens, ocupa tudo
@@ -23,8 +25,9 @@ function medir() {
   const zoomLivre = cheia
     ? Math.min(window.innerWidth / LARGURA, window.innerHeight / ALTURA)
     : Math.min((window.innerWidth - 32) / LARGURA, (window.innerHeight - MARGEM_VERTICAL) / ALTURA)
-  // fora da tela cheia: passos de 5%, para não recriar tudo a cada pixel de resize
-  const zoom = cheia ? zoomLivre : Math.max(1, Math.floor(zoomLivre * 20) / 20)
+  // fora da tela cheia: passos de 5%, para não recriar tudo a cada pixel de resize.
+  // Janela estreita (menos que os 854 do mundo): encolhe em vez de vazar para o lado
+  const zoom = cheia ? zoomLivre : Math.max(ZOOM_MIN, Math.floor(zoomLivre * 20) / 20)
   const dpr = Math.min(window.devicePixelRatio || 1, DPR_MAX)
   return { zoom, dpr, escala: zoom * dpr }
 }
