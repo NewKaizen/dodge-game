@@ -77,7 +77,16 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 | --- | --- |
 | A0 Reconhecimento | concluído (`docs/mapa-integracao.md`) |
 | 1A Contas e perfil | concluído e validado em produção (NewKaizen/dodge-game#37, #38: chaves novas do Supabase) |
-| 1B Amigos e convites | implementado na branch `claude/practical-darwin-nc9pwz`; falta rodar a migration 0002 e testar com duas contas (`docs/supabase.md`, passo 7.6) |
+| 1B Amigos e convites | concluído (NewKaizen/dodge-game#39); falta validar com duas contas em produção |
+| 1C Jogar Rápido | em andamento (Opus, branch `claude/practical-darwin-nc9pwz`) |
+
+### Consolidação (depois das features da Fase 1)
+
+Decisão do usuário: primeiro as features, depois organizar tudo. Itens anotados:
+
+- Trazer perfil, amigos e conta **para dentro do jogo** (cenas/visual da Mesa de Cartas), em vez das barras/overlays Svelte "fora do jogo".
+- Toast de aviso quando chega pedido de amizade (hoje só selo no botão).
+- Decidir se bloquear tira o bloqueado da sala atual (hoje não tira).
 
 ### Controle de custo
 
