@@ -319,7 +319,11 @@ function restaurarJogadores() {
 
 export function abrirLobby() {
   telaAberta = true
-  if (estado().fase !== 'fora') return entrarNaSalaDoLink()
+  if (estado().fase !== 'fora') {
+    // a conexão já estava aberta (logado): pede as salas agora, sem esperar o timer
+    if (estado().fase === 'navegando') enviar({ t: 'listar' })
+    return entrarNaSalaDoLink()
+  }
   casa = enderecoCasa()
   mudar({ ...INICIAL, eu: { ...estado().eu, id: null } })
   conectar(casa)
