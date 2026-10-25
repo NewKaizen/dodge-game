@@ -6,6 +6,8 @@
 // caído vem antes de tudo; com o SUPER do chefe chegando, defesa; com HP
 // baixo (dela ou do parceiro), cura; senão, o golpe que mais tira do chefe
 // por energia. Guarda energia para o próprio SUPER quando está perto.
+// O chefe joga UMA carta, que os dois desviam juntos no quadro: o A♠, o A♦ e o
+// A♣ tiram o ataque dos DOIS (valem mais com o parceiro de pé no quadro).
 import { especialDaCarta, efeitosDaCarta, ehSuper } from '../pvp/cartas.js'
 import { aleatorio } from '../pvp/baralho.js'
 import { GOLPE } from './regras.js'
@@ -15,16 +17,20 @@ const fracao = (jog) => (jog.caido ? 0 : jog.hp / jog.hpMax)
 function notaDaCartaCoop(estado, j, carta) {
   const jog = estado.jogadores[j]
   const parceiro = estado.jogadores[1 - j]
-  const intencao = estado.chefe.intencoes[j]
-  const intParceiro = estado.chefe.intencoes[1 - j]
-  const superVindo = ehSuper(intencao) || ehSuper(intParceiro)
+  const intencao = estado.chefe.intencao
+  const superVindo = ehSuper(intencao)
   const apertado = fracao(jog) < 0.35 || (!parceiro.caido && fracao(parceiro) < 0.35)
+  // carta do chefe que dá para tirar do quadro (o SUPER dele não sai); refletir a de
+  // copas quase não machuca, mas anular/roubar ela ainda tira a cura dele
+  const tiravel = Boolean(intencao) && !superVindo
+  // tirar o ataque do quadro protege os dois: vale mais com o parceiro de pé
+  const dupla = parceiro.caido ? 1 : 1.3
   if (ehSuper(carta)) return 100
   const especial = especialDaCarta(carta)
   if (especial === 'segundaChance') return parceiro.caido ? 80 : superVindo || apertado ? 60 : 1
-  if (especial === 'espelho') return intencao && !superVindo && intencao.naipe !== 'copas' ? 14 + intencao.valor * 2 : 6
-  if (especial === 'anular') return intencao && !ehSuper(intencao) ? 8 + intencao.valor * 1.5 + (estado.chefe.carga >= estado.chefe.cargaMax - 1 ? 10 : 0) : 3
-  if (especial === 'roubo') return intParceiro && !ehSuper(intParceiro) && !parceiro.caido ? 10 + intParceiro.valor * 1.5 : 4
+  if (especial === 'espelho') return tiravel && intencao.naipe !== 'copas' ? (14 + intencao.valor * 2) * dupla : 6
+  if (especial === 'anular') return tiravel ? (8 + intencao.valor * 1.5) * dupla + (estado.chefe.carga >= estado.chefe.cargaMax - 1 ? 10 : 0) : 3
+  if (especial === 'roubo') return tiravel ? (10 + intencao.valor * 1.5) * dupla : 4
   if (carta.naipe === 'copas') {
     const ef = efeitosDaCarta(carta) ?? {}
     let nota = 0

@@ -96,21 +96,25 @@ export default definirAtaque({
       const passo = (Math.PI * 2) / anel.quantidade
       // cada anel começa girado num ângulo sorteado; das tentativas, fica a que
       // não monta nenhuma bala em cima de um coração (a montagem não é armadilha)
-      let giro0 = 0
-      let melhor = -1
-      for (let tentativa = 0; tentativa < 8 && melhor < 26; tentativa++) {
-        const g = a.aleatorio(0, Math.PI * 2)
-        let perto = Infinity
-        for (let j = cfg.vaos; j < anel.quantidade; j++) {
-          const x = centro.x + Math.cos(j * passo + g) * anel.raio
-          const y = centro.y + Math.sin(j * passo + g) * anel.raio
-          for (const c of coracoes) perto = Math.min(perto, Math.hypot(c.x - x, c.y - y))
+      // (isolado: as tentativas dependem de onde os corações estão; ver contexto.js)
+      const giro0 = a.isolado(() => {
+        let giro = 0
+        let melhor = -1
+        for (let tentativa = 0; tentativa < 8 && melhor < 26; tentativa++) {
+          const g = a.aleatorio(0, Math.PI * 2)
+          let perto = Infinity
+          for (let j = cfg.vaos; j < anel.quantidade; j++) {
+            const x = centro.x + Math.cos(j * passo + g) * anel.raio
+            const y = centro.y + Math.sin(j * passo + g) * anel.raio
+            for (const c of coracoes) perto = Math.min(perto, Math.hypot(c.x - x, c.y - y))
+          }
+          if (perto > melhor) {
+            melhor = perto
+            giro = g
+          }
         }
-        if (perto > melhor) {
-          melhor = perto
-          giro0 = g
-        }
-      }
+        return giro
+      })
       for (let j = cfg.vaos; j < anel.quantidade; j++) {
         const ang0 = j * passo + giro0
         const forma = a.forma(j + k)

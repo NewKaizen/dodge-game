@@ -37,6 +37,12 @@ import { registrarZona, envelhecerZonas, limparZonas } from './zonas.js'
 //                             Normalmente não chame direto: use a opção `caixa` do ataque (attacks/definir.js)
 //   a.alvo()                  posição {x, y} de um coração (alterna entre os jogadores)
 //   a.pontoLonge(distancia)   ponto da caixa longe de todos os corações
+//   a.isolado(fn)             roda fn() com um sorteio só dela (gasta UM número da semente do
+//                             ataque, sempre): para escolhas que olham onde os corações estão.
+//                             Em rede (docs/rede-pvp.md) o coração do outro aparece um pouco
+//                             atrasado, então "quantas tentativas até achar um lugar bom" muda
+//                             de um PC para o outro; isolado, o resto do ataque continua igual
+//                             nos dois (só aquela escolha pode sair diferente)
 //   a.aleatorio(min, max)     número com semente fixa (padrões repetíveis)
 //   a.inteiro(min, max), a.escolher(lista)
 //   a.forma(i), a.cor(forma)  formas/cores de bala do tema do chefe
@@ -253,20 +259,33 @@ export default class ContextoAtaque {
   }
 
   pontoLonge(distancia, margem = 16) {
-    const ativos = this.coracoes.filter((c) => c.ativo)
-    let melhor = null
-    let melhorDist = -1
-    for (let tentativa = 0; tentativa < 12; tentativa++) {
-      const x = this.aleatorio(this.caixa.left + margem, this.caixa.right - margem)
-      const y = this.aleatorio(this.caixa.top + margem, this.caixa.bottom - margem)
-      const d = Math.min(Infinity, ...ativos.map((c) => Math.hypot(c.x - x, c.y - y)))
-      if (d >= distancia) return { x, y }
-      if (d > melhorDist) {
-        melhor = { x, y }
-        melhorDist = d
+    return this.isolado(() => {
+      const ativos = this.coracoes.filter((c) => c.ativo)
+      let melhor = null
+      let melhorDist = -1
+      for (let tentativa = 0; tentativa < 12; tentativa++) {
+        const x = this.aleatorio(this.caixa.left + margem, this.caixa.right - margem)
+        const y = this.aleatorio(this.caixa.top + margem, this.caixa.bottom - margem)
+        const d = Math.min(Infinity, ...ativos.map((c) => Math.hypot(c.x - x, c.y - y)))
+        if (d >= distancia) return { x, y }
+        if (d > melhorDist) {
+          melhor = { x, y }
+          melhorDist = d
+        }
       }
+      return melhor
+    })
+  }
+
+  // fn() com um RNG próprio, semeado por UM número do RNG do ataque (ver o topo)
+  isolado(fn) {
+    const principal = this.rng
+    this.rng = new Phaser.Math.RandomDataGenerator([String(principal.integer())])
+    try {
+      return fn()
+    } finally {
+      this.rng = principal
     }
-    return melhor
   }
 
   // ---------- fuga correndo (FUGA em constants.js) ----------
