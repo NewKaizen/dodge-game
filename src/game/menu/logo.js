@@ -6,7 +6,8 @@ import { GLIFOS, QUADRO, COLUNAS, MIOLO_O } from './sprites/logo.js'
 // O título do menu, no canto de cima à esquerda: logo neon com um disco
 // girando atrás e o subtítulo.
 //
-//   const logo = criarLogo(cena, area, { titulo, subtitulo })   area = LOGO de layout.js
+//   const logo = criarLogo(cena, area, { titulo, subtitulo, escala })   area = LOGO de layout.js
+//                                    escala: tamanho do logo (1 = o desenho; cresce a partir do canto da área)
 //   await logo.entrar({ rapido })    aparece (rapido: sem a animação, ao voltar de outra tela)
 //   logo.batida(n)                   pulso da música
 //   logo.sair()                      JOGAR: some
@@ -30,8 +31,9 @@ const VOLTA_VARREDURA = 6000
 
 const sorteio = (a, b) => a + Math.random() * (b - a)
 
-export function criarLogo(cena, area, { titulo, subtitulo }) {
+export function criarLogo(cena, area, { titulo, subtitulo, escala = 1 }) {
   const topo = area.y + 30 // y do quadro das letras (o desenho começa 14 px abaixo)
+  const antes = new Set(cena.children.list) // o que já existia (para achar as peças do logo e escalar)
 
   // ---------- letras ----------
   const letras = []
@@ -106,6 +108,13 @@ export function criarLogo(cena, area, { titulo, subtitulo }) {
       pontos.fillStyle(CIANO, 1 - i * 0.14)
       pontos.fillRect(x0 - i * 6, topo + 102, 2, 2)
     }
+  }
+
+  // escala: as peças vão para um container que cresce a partir do canto da área
+  // (as coordenadas delas continuam valendo; a ordem de desenho segue a profundidade)
+  if (escala !== 1) {
+    const pecas = cena.children.list.filter((o) => !antes.has(o)).sort((a, b) => a.depth - b.depth)
+    cena.add.container(area.x * (1 - escala), area.y * (1 - escala), pecas).setScale(escala).setDepth(PROF.disco)
   }
 
   // ---------- estado ----------

@@ -71,6 +71,11 @@ const opcaoPref = (chave) => ({
 const NOMES_TREMOR = { normal: 'NORMAL', reduzido: 'REDUZIDO', desligado: 'DESLIGADO' }
 const NOMES_DALTONISMO = { nenhum: 'NENHUM', protanopia: 'PROTANOPIA', deuteranopia: 'DEUTERANOPIA', tritanopia: 'TRITANOPIA' }
 const NOMES_GRAFICOS = { minimo: 'MÍNIMO', medio: 'MÉDIO', maximo: 'MÁXIMO' }
+const NOMES_MENU = { sala: 'SALA DE TV', mesa: 'MESA DE CARTAS' }
+const TEXTO_MENU = {
+  sala: 'A turma sentada no tapete, de costas, assistindo a luta no telão da sala.',
+  mesa: 'A turma jogando cartas na mesa, com a luta passando no telão ao fundo.',
+}
 
 // o que muda em cada qualidade (painel da aba GRÁFICOS): 1 a 3 quadradinhos
 const RECURSOS_GRAFICOS = [
@@ -269,11 +274,19 @@ const ABAS = [
         descricao: (v) => TEXTO_GRAFICOS[v],
       },
       {
+        id: 'menu',
+        rotulo: 'MENU INICIAL',
+        titulo: 'MENU INICIAL',
+        ...opcaoPref('menu'),
+        nomes: (v) => NOMES_MENU[v],
+        descricao: (v) => `${TEXTO_MENU[v]} Vale ao voltar para o menu.`,
+      },
+      {
         id: 'restaurar',
         rotulo: 'RESTAURAR PADRÃO',
         tipo: 'acao',
-        fazer: () => definirPref('graficos', PREFERENCIAS_PADRAO.graficos),
-        descricao: `Volta a qualidade para ${NOMES_GRAFICOS[PREFERENCIAS_PADRAO.graficos]}.`,
+        fazer: () => ['graficos', 'menu'].forEach((k) => definirPref(k, PREFERENCIAS_PADRAO[k])),
+        descricao: `Volta a qualidade para ${NOMES_GRAFICOS[PREFERENCIAS_PADRAO.graficos]} e o menu inicial para a ${NOMES_MENU[PREFERENCIAS_PADRAO.menu]}.`,
       },
     ],
   },

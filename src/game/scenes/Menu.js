@@ -3,15 +3,18 @@ import Controles from '../controles.js'
 import { tocar, musica } from '../audio.js'
 import { ASSETS } from '../assets.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
-import { BATIDA, TELA, LOGO, OPCOES as POS } from '../menu/layout.js'
+import { BATIDA, TELA, LOGO, OPCOES as POS_SALA, LOGO_MESA, OPCOES_MESA } from '../menu/layout.js'
 import { criarSala } from '../menu/sala.js'
 import { criarTelao } from '../menu/telao.js'
 import { criarLogo } from '../menu/logo.js'
+import { criarMesa } from '../menu/mesa.js'
+import { pref } from '../preferencias.js'
 import { souHost } from '../../lib/lan/rede.js'
 
-// Tela inicial: um quarto escuro e calmo, com o caos preso no telão da parede
-// (uma luta de balas rolando) e a luz dele iluminando a sala e as silhuetas
-// dos lutadores. Logo no canto de cima à esquerda, opções alinhadas à
+// Tela inicial: uma sala aconchegante, com o caos preso no telão da parede
+// (uma luta de balas rolando) e a luz dele iluminando a sala e a turma
+// assistindo. Ou, com MENU INICIAL = MESA DE CARTAS (Config > Gráficos), a
+// turma jogando cartas na mesa com o telão ao fundo (menu/mesa.js). Logo no canto de cima à esquerda, opções alinhadas à
 // esquerda. CO-OP (-> EscolhaParty) e PVP (-> PvpEscolha): a luz do telão engole
 // a sala. ONLINE (-> Lan: lobby para jogar com amigos, pela internet ou pela rede), GUIA (-> Grimorio:
 // todas as cartas com a prévia do ataque e as rodadas bônus de cada arena) e
@@ -57,9 +60,18 @@ export default class Menu extends Phaser.Scene {
     const rapido = Boolean(this.registry.get('menuVisto'))
     this.registry.set('menuVisto', true)
 
-    this.sala = criarSala(this, { tela: TELA })
-    this.telao = criarTelao(this, TELA)
-    this.logo = criarLogo(this, LOGO, { titulo: TITULO, subtitulo: SUBTITULO })
+    // o cenário: a SALA DE TV (padrão) ou a MESA DE CARTAS (Config > Gráficos > MENU INICIAL)
+    const mesa = pref('menu') === 'mesa'
+    this.pos = mesa ? OPCOES_MESA : POS_SALA
+    if (mesa) {
+      this.sala = criarMesa(this)
+      this.telao = this.sala.telao
+    } else {
+      this.sala = criarSala(this, { tela: TELA })
+      this.telao = criarTelao(this, TELA)
+    }
+    const area = mesa ? LOGO_MESA : LOGO
+    this.logo = criarLogo(this, area, { titulo: TITULO, subtitulo: SUBTITULO, escala: area.escala ?? 1 })
     this.montarOpcoes()
     this.montarCantos()
 
@@ -104,9 +116,9 @@ export default class Menu extends Phaser.Scene {
   montarOpcoes() {
     this.painel = this.add.container(-40, 0).setDepth(30).setAlpha(0)
     const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 5 })
-    this.linhas = OPCOES.map((o, i) => this.add.text(POS.x, POS.y + i * POS.passo, o.rotulo, estilo(26, o.cor)).setOrigin(0, 0.5))
+    this.linhas = OPCOES.map((o, i) => this.add.text(this.pos.x, this.pos.y + i * this.pos.passo, o.rotulo, estilo(26, o.cor)).setOrigin(0, 0.5))
     this.seta = this.add.text(0, 0, '◀', estilo(22, '#ffffff')).setOrigin(0, 0.5)
-    this.aviso = this.add.text(POS.x, POS.y + OPCOES.length * POS.passo - 6, '', { ...estilo(12, TEXTO.desabilitado), lineSpacing: 4 }).setOrigin(0, 0)
+    this.aviso = this.add.text(this.pos.x, this.pos.y + OPCOES.length * this.pos.passo - 6, '', { ...estilo(12, TEXTO.desabilitado), lineSpacing: 4 }).setOrigin(0, 0)
     this.painel.add([...this.linhas, this.seta, this.aviso])
   }
 
@@ -119,10 +131,10 @@ export default class Menu extends Phaser.Scene {
     this.linhas.forEach((l, i) => {
       const sel = i === this.indice
       l.setColor(ativo ? OPCOES[i].cor : '#5a5a6a').setAlpha(ativo ? (sel ? 1 : 0.55) : 0.8)
-      l.setX(POS.x + (sel && ativo ? 8 : 0))
+      l.setX(this.pos.x + (sel && ativo ? 8 : 0))
     })
     const l = this.linhas[this.indice]
-    this.seta.setVisible(ativo).setColor(OPCOES[this.indice].cor).setPosition(POS.x + 8 + l.width + 12, l.y)
+    this.seta.setVisible(ativo).setColor(OPCOES[this.indice].cor).setPosition(this.pos.x + 8 + l.width + 12, l.y)
     this.aviso
       .setText(ativo ? OPCOES[this.indice].dica : 'conecte o joystick ou use o\nSIMULADOR (TECLADO) aí em cima ↑')
       .setColor(ativo ? '#9a9ab0' : TEXTO.desabilitado)
@@ -188,6 +200,6 @@ export default class Menu extends Phaser.Scene {
     this.sala.atualizar(delta)
     this.telao.atualizar(delta)
     this.logo.atualizar(delta)
-    if (this.pronto && !this.saindo && this.seta.visible) this.seta.setX(POS.x + 8 + this.linhas[this.indice].width + 12 + Math.sin(time / 160) * 3)
+    if (this.pronto && !this.saindo && this.seta.visible) this.seta.setX(this.pos.x + 8 + this.linhas[this.indice].width + 12 + Math.sin(time / 160) * 3)
   }
 }
