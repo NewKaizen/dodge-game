@@ -1,6 +1,6 @@
-# PVP em rede (cada um joga no próprio PC)
+# Partida em rede (cada um joga no próprio PC)
 
-Numa sala (LAN ou ONLINE) com o modo **PVP**, o jogo roda **nos dois PCs**. Cada um desvia na própria caixa sem atraso nenhum; pela rede vão só as decisões (carta escolhida, dano levado, resultado da rodada) e a posição do coração para desenhar a caixa do outro. O **CO-OP** numa sala continua no "Remote Play" ([lan.md](lan.md)): o jogo no host e a imagem para o convidado.
+Numa sala (LAN ou ONLINE), nos dois modos (**PVP** e **CO-OP**), o jogo roda **nos dois PCs**. Cada um desvia na própria caixa sem atraso nenhum; pela rede vão só as decisões (carta escolhida, dano levado, resultado da rodada) e a posição do coração para desenhar a caixa do outro. A maior parte deste documento é do PVP; as regras de autoridade valem para os dois modos, e as telas do CO-OP em volta da arena estão em [Telas do CO-OP](#telas-do-co-op-em-volta-da-arena). (O CO-OP numa sala usava o "Remote Play": o jogo só no host e a imagem para o convidado. Não é mais usado, [lan.md](lan.md).)
 
 ## Peças
 
@@ -37,11 +37,11 @@ Numa sala (LAN ou ONLINE) com o modo **PVP**, o jogo roda **nos dois PCs**. Cada
 
 Como cada tela usa essas mensagens:
 
-- **Lobby** (`Lan.js`): com o modo PVP, o **COMEÇAR PARTIDA** do host marca a partida (`iniciarPartida()`) e, depois do "VALENDO!", faz `irParaCena(this, 'PvpEscolha')`. O convidado vê o "VALENDO!" quando a sala aparece marcada e espera a cena chegar; no PVP ele nunca fica na tela ASSISTINDO (ela é do CO-OP). Se o convidado sai nesse meio-tempo, o host fica no lobby.
+- **Lobby** (`Lan.js`): o **COMEÇAR PARTIDA** do host marca a partida (`iniciarPartida()`) e, depois do "VALENDO!", faz `irParaCena(this, 'PvpEscolha')` (no CO-OP, `'EscolhaParty'`). O convidado vê o "VALENDO!" quando a sala aparece marcada e espera a cena chegar (a tela ASSISTINDO do "Remote Play" não existe mais). Se o convidado sai nesse meio-tempo, o host fica no lobby.
 - **PvpEscolha**: `cursor` com `{ tela: 'escolha', indice }` (índice na grade) a cada movimento e de novo a cada 300 ms (quem abriu a tela depois do outro, ou perdeu uma rápida, acerta em seguida). Confirmar manda `personagem` e é definitivo. **B antes de alguém confirmar** volta os dois ao lobby: no host é `irParaCena(this, 'Lan')`; no convidado vai `voltarLobby` e o host faz o mesmo (com alguém confirmado, B só faz o som de erro). Com os dois confirmados, cada PC passa o "P1 VS P2" e o host faz `irParaCena(this, 'PvpVoto', { p1, p2 })` (p1 = o do host, p2 = o do convidado).
 - **PvpVoto**: `cursor` com `{ tela: 'voto', indice }` (índice nos cartões, o "?" é o último) e `voto` com `{ arena }` (definitivo). O fundo e o painel seguem o **meu** cursor. Só o host conta o tempo e apura: `apuracao` = `{ votos, arena, contagem, empatadas, sorteios }` (os votos que valeram + o resultado de `apurarVotos`); o convidado troca os votos dele por esses (um voto que chegou no host depois do tempo fica de fora) e passa a mesma animação. No fim o host faz `irParaCena(this, 'PvpArena', { p1, p2, arena, semente })`, com uma semente nova (`rede:<hora>`).
 - **PvpResultado**: em rede (e em qualquer partida ONLINE) só tem **A: VOLTAR AO LOBBY**. O A do host faz `irParaCena(this, 'Lan')`; o A do convidado manda `voltarLobby` e o host faz o mesmo, mesmo que ainda esteja na animação. A cena Lan do host desmarca a partida (`encerrarPartida()`), e a sala continua aberta para outra partida (o convidado marca **ESTOU PRONTO!** de novo).
-- **Imagem parada**: com a sala no modo PVP o host não manda vídeo nem som pelo WebRTC (`transmissao.js` tira as faixas com `replaceTrack(null)` e solta a captura do canvas; a imagem reserva também para). A conexão continua: o canal de dados direto é o da partida e o ping vem dela. Quando o modo vira CO-OP, a imagem volta sem negociar de novo. A barra de cima mostra "partida em rede" no lugar do estado da imagem.
+- **Imagem parada**: o host não manda vídeo nem som pelo WebRTC, em nenhum modo (`transmissao.js` tira as faixas com `replaceTrack(null)` e solta a captura do canvas; a imagem reserva também para). A conexão continua: o canal de dados direto é o da partida e o ping vem dela. A barra de cima mostra "partida em rede".
 
 ### Arena (parte B)
 
@@ -120,9 +120,26 @@ Uma rodada em rede:
 
 Estado divergiu? O convidado avisa no console (`[rede] estado divergiu`, com os caminhos que mudaram) e segue com o do host. Esperas de sincronia param quando a cena sai (`this.saindo`: o outro saiu e `rede.js` tirou os dois da cena) e avisam no console a cada 30 s parados.
 
+## Telas do CO-OP em volta da arena
+
+Lobby → `EscolhaParty` → `Selecao` (chefe) → `Dificuldade` (nível) → `CoopArena` → `Vitoria` / `GameOver` → lobby. As mesmas regras de autoridade: o host troca as cenas (`irParaCena`), o convidado pede. Fora da sala tudo é como antes (1 jogador + CPU, 2 jogadores no mesmo PC).
+
+| Tipo | De → para | Dados |
+| --- | --- | --- |
+| `cursor` (rápida) | os dois (`party`) / host → conv. (`chefe`, `nivel`) | `{ tela, indice }`: `tela` = `'party'` (índice na grade de personagens), `'chefe'` (em `ORDEM_CHEFES`) ou `'nivel'` (em `ORDEM_NIVEIS`) |
+| `personagem` | os dois | `{ id }`: confirmei este personagem da party |
+| `confirmou` | host → conv. | `{ tela, indice }`: o host confirmou o chefe (`'chefe'`) ou o nível (`'nivel'`) neste índice |
+| `voltarLobby` | conv. → host | `{}` (como no PVP: B na EscolhaParty antes de alguém confirmar, A na Vitoria/GameOver) |
+
+- **EscolhaParty**: cada PC escolhe o personagem do **próprio** lado (`meuLado()`). O cursor vai como `cursor` `{ tela: 'party' }` a cada movimento e de novo a cada 300 ms; confirmar manda `personagem` e é definitivo. Na party não pode repetir: se os dois confirmam o **mesmo** ao mesmo tempo, **vale o do host** (a regra é a mesma nos dois PCs: o host ignora o `personagem` do convidado igual ao dele; o convidado, quando chega o do host igual ao seu, perde o dele e vê "o P1 pegou ... primeiro: escolha outro"). B antes de alguém confirmar volta os dois ao lobby (no convidado, `voltarLobby`). Com os dois confirmados, cada PC grava a party no registry e o host faz `irParaCena(this, 'Selecao', { party: [p1, p2], chefe })` (`chefe`: o da última luta no host, para os dois cursores começarem no mesmo lugar).
+- **Selecao** e **Dificuldade**: quem escolhe é o **host**. O cursor dele vai como `cursor` (`'chefe'` / `'nivel'`, a cada movimento e a cada 300 ms) e o A como `confirmou`, para o convidado passar a mesma confirmação (na Dificuldade, a mesma entrada na batalha). A/B do convidado só fazem o som de erro (o texto da tela diz que o host está escolhendo). B do host volta uma tela nos dois: Selecao → `irParaCena(this, 'EscolhaParty')`; Dificuldade → `irParaCena(this, 'Selecao', { chefe, party })`. A do host: Selecao → `irParaCena(this, 'Dificuldade', { chefe, party, nivel })`; Dificuldade, no fim da entrada → `irParaCena(this, 'CoopArena', { chefe, nivel, party: [p1, p2], semente: 'rede:<hora>' })` e a cena `Entrada` por cima. No convidado a `Entrada` abre quando a `cena` da arena chega (a Dificuldade escuta a `cena` e põe a `Entrada` na fila do gerenciador de cenas, que roda depois da troca).
+- **A party vai nos dados da cena** (o registry é de cada PC): `Selecao`, `Dificuldade` e `CoopArena` recebem `party`. A `Selecao` e a `Dificuldade` também gravam a party que chegou no registry `'party'` (a `Vitoria` desenha a party do registry). Fora da rede a party também vai nos dados (sempre: sem dados o Phaser repete os da última vez que a cena abriu).
+- **Vitoria** e **GameOver**: em rede (e em qualquer partida ONLINE) só tem **A: VOLTAR AO LOBBY**, como na `PvpResultado`. Quem abre as duas nos dois PCs é a arena, com `irParaCena` e os dados de sempre (`{ chefe, estatisticas }`; o GameOver também `hpChefe`, `hpMaxChefe`). O A do host faz `irParaCena(this, 'Lan')`; o do convidado manda `voltarLobby` e o host faz o mesmo, mesmo no meio da animação.
+
 ## Testando
 
 - `ONLINE=1 npx vite --port <porta> --strictPort` liga o jogo com o lobby online.
+- CO-OP: com a sala no CO-OP, `debugRede.iniciar('EscolhaParty')` (ou `'CoopArena', { chefe, nivel, party: [p1, p2] }`) no host abre a tela nos dois; `debugJogo.dadosCena('CoopArena')` nas duas abas mostra os dados que chegaram.
 - Duas abas (dois contextos do Playwright) entram na mesma sala pelo código. No host, `debugRede.iniciar('PvpArena', { p1: 'kris', p2: 'susie' })` abre a arena em rede nos dois, pulando as telas antes.
 - `debugRede.atraso(150, 50)` nas duas abas simula internet ruim (150 ms + até 50 de variação em cada sentido). **Todo o PVP precisa funcionar assim**: o coração de cada um responde na hora, e só o que vem do outro chega atrasado.
 - `window.pvpArena` (dev) tem `estadoDebug()` (com `rede: { meuLado, souHost, espelhos }`), `forcarMao`, `setHp`, `setEnergia`, `forcarBonus(id)`. Em rede, chamados num PC valem nos dois (o `forcarBonus` vale na próxima rodada, decidida pelo host).

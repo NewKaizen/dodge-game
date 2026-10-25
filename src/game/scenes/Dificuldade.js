@@ -8,6 +8,8 @@ import { rachadura, estilhacos, faixasDiagonais, corNumero } from '../effects/en
 import { CORES, DIFICULDADES, NIVEIS, ORDEM_NIVEIS, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 import { tremerCamera } from '../effects/shake.js'
 import { claraoCamera, alphaClarao } from '../effects/flash.js'
+import { partyDe } from '../data/batalha.js'
+import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
 
 const OPCAO = { x: 440, largura: 330, altura: 100, y: 128, passo: 112 }
 const CHEFE = { x: 138, y: 200 }
@@ -15,10 +17,19 @@ const CHEFE = { x: 138, y: 200 }
 // Transição de entrada na batalha (ms desde o A). Cada nível soma `porNivel`
 // ao clímax: DIFÍCIL segura a tensão um pouco mais e explode mais forte.
 const ENTRADA = { climax: 900, porNivel: 100, depois: 360 }
+const CURSOR_MS = 300 // em rede: de quanto em quanto o host manda o cursor de novo
 
 // Tela do nível da luta, depois de escolher o chefe (Selecao -> Dificuldade -> CoopArena).
 // FÁCIL é o chefe como ele é; MÉDIO e DIFÍCIL só apertam (números em NIVEIS).
 // A: lutar · B: voltar para a escolha do chefe
+// Dados: { chefe, party?, nivel? } (party: os ids, na ordem, e vai para a
+// CoopArena; sem ela, a do registry 'party'; nivel: onde o cursor começa)
+// EM REDE (sala CO-OP, game/rede.js, docs/rede-pvp.md): como na Selecao, quem
+// escolhe é o HOST: o cursor dele vai para o convidado ('cursor') e o A também
+// ('confirmou'), e os dois passam a mesma entrada na batalha. No fim o host
+// abre a CoopArena nos dois (irParaCena, com a party e uma semente nova); no
+// convidado a cena Entrada abre quando a arena chega. O B do host volta os
+// dois para a Selecao; o do convidado só lembra quem escolhe.
 export default class Dificuldade extends Phaser.Scene {
   constructor() {
     super('Dificuldade')
@@ -26,12 +37,17 @@ export default class Dificuldade extends Phaser.Scene {
 
   init(dados) {
     this.idChefe = dados?.chefe ?? this.registry.get('chefe') ?? 'king'
+    this.party = Array.isArray(dados?.party) ? dados.party : null
+    this.nivelInicial = dados?.nivel ?? null
   }
 
   create() {
     this.registry.set('chefe', this.idChefe)
+    if (this.party) this.registry.set('party', this.party) // (a Vitoria mostra a party do registry)
     this.controles = new Controles(this)
     this.controles.onBotao((_, botao) => (botao === 'A' ? this.confirmar() : this.voltar()))
+    this.rede = emRede()
+    this.host = !this.rede || souHostDaRede() // quem escolhe
     this.saindo = false
     this.entrada = null // transição para a batalha em andamento
     this.congelado = false
@@ -77,12 +93,37 @@ export default class Dificuldade extends Phaser.Scene {
     })
 
     this.cursor = this.add.image(0, 0, 'coracao').setTint(CORES.almas[0]).setScale(1.8)
-    texto(LARGURA / 2, ALTURA - 30, '↑ ↓ escolher     A: lutar     B: voltar', 14, TEXTO.desabilitado, { strokeThickness: 0 })
+    const dica = this.host ? '↑ ↓ escolher     A: lutar     B: voltar' : 'o host (P1) está escolhendo o nível...'
+    this.dica = texto(LARGURA / 2, ALTURA - 30, dica, 14, TEXTO.desabilitado, { strokeThickness: 0 })
 
-    const ultimo = ORDEM_NIVEIS.indexOf(this.registry.get('nivel'))
+    const ultimo = ORDEM_NIVEIS.indexOf(this.nivelInicial ?? this.registry.get('nivel'))
     this.selecionar(Math.max(0, ultimo), false)
+    if (this.rede) this.ligarRede()
     musica('selecao')
     this.cameras.main.fadeIn(250)
+  }
+
+  // ---------- em rede ----------
+
+  ligarRede() {
+    if (this.host) {
+      this.mandarCursor()
+      this.time.addEvent({ delay: CURSOR_MS, loop: true, callback: () => this.mandarCursor() })
+      return
+    }
+    const desligar = [
+      canal.ao('cursor', (d) => d?.tela === 'nivel' && !this.saindo && ORDEM_NIVEIS[d.indice] && d.indice !== this.indice && this.selecionar(d.indice)),
+      canal.ao('confirmou', (d) => d?.tela === 'nivel' && ORDEM_NIVEIS[d.indice] && this.confirmar(d.indice)),
+      // a arena chegou (game/rede.js troca de cena): a Entrada abre por cima
+      // dela, como no host. Na fila do gerenciador: roda depois da troca, que
+      // para todas as cenas abertas
+      canal.ao('cena', (d) => d?.chave === 'CoopArena' && this.entrada && this.game.scene.queueOp('start', 'Entrada', { nivel: d.dados?.nivel })),
+    ]
+    this.events.once('shutdown', () => desligar.forEach((fn) => fn()))
+  }
+
+  mandarCursor() {
+    if (!this.saindo) canal.enviarRapido('cursor', { tela: 'nivel', indice: this.indice })
   }
 
   // Linhas do que o nível muda para este chefe (HP do modo cartas)
@@ -109,12 +150,24 @@ export default class Dificuldade extends Phaser.Scene {
     this.tweens.add({ targets: this.sprite, scale: ESCALA.chefe * (0.9 + this.indice * 0.06), duration: 150 })
   }
 
-  confirmar() {
+  // doHost: em rede, no convidado, o índice que o host confirmou
+  confirmar(doHost = null) {
     if (this.saindo) return
+    if (!this.host && doHost == null) return this.soHost()
+    if (doHost != null) this.selecionar(doHost, false)
     this.saindo = true
     const nivel = ORDEM_NIVEIS[this.indice]
     this.registry.set('nivel', nivel)
+    if (this.rede && this.host) canal.enviar('confirmou', null, { tela: 'nivel', indice: this.indice })
     this.entrar(nivel)
+  }
+
+  // em rede, o convidado apertou A/B: quem escolhe é o host
+  soHost() {
+    tocar(this, 'erro')
+    this.tweens.killTweensOf(this.dica)
+    this.dica.setScale(1)
+    this.tweens.add({ targets: this.dica, scale: 1.12, duration: 90, yoyo: true })
   }
 
   // "Agora é pra valer": a música corta, a tela congela, o chefe avança
@@ -205,28 +258,37 @@ export default class Dificuldade extends Phaser.Scene {
       faixas.objeto.setVisible(false)
     })
 
+    // a party vai sempre nos dados: em rede o registry do convidado não é o do
+    // host. Em rede o host abre a arena nos dois, com uma semente nova (o
+    // convidado fica no fim da entrada esperando a cena chegar)
     this.time.delayedCall(climax + ENTRADA.depois, () => {
-      this.scene.start('CoopArena', { chefe: this.idChefe, nivel })
+      if (!this.host) return
+      const party = this.party ?? partyDe(this.registry)
+      if (this.rede) irParaCena(this, 'CoopArena', { chefe: this.idChefe, nivel, party, semente: `rede:${Date.now()}` })
+      else this.scene.start('CoopArena', { chefe: this.idChefe, nivel, party })
       this.scene.launch('Entrada', { nivel })
     })
   }
 
   voltar() {
     if (this.saindo) return
+    if (!this.host) return this.soHost()
     this.saindo = true
     tocar(this, 'mover')
     this.cameras.main.fadeOut(200, 0, 0, 0)
-    this.time.delayedCall(220, () => this.scene.start('Selecao'))
+    const dados = { chefe: this.idChefe, party: this.party ?? partyDe(this.registry) } // o cursor volta no chefe de agora
+    this.time.delayedCall(220, () => (this.rede ? irParaCena(this, 'Selecao', dados) : this.scene.start('Selecao', dados)))
   }
 
   update(time, delta) {
     this.controles.atualizar()
-    if (!this.saindo) {
+    if (!this.saindo && this.host) {
       const n = this.controles.numJogadores
       for (let j = 0; j < n; j++) {
         const direcao = this.controles.toque(j)
         if (direcao === 'esquerda' || direcao === 'cima') this.selecionar(this.indice - 1)
         if (direcao === 'direita' || direcao === 'baixo') this.selecionar(this.indice + 1)
+        if (this.rede && direcao) this.mandarCursor()
       }
     }
     if (!this.congelado) this.fundo.atualizar(delta)

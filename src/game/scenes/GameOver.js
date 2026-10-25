@@ -7,6 +7,8 @@ import { formatarTempo } from '../coop/nota.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, NIVEIS } from '../constants.js'
 import { tremerCamera } from '../effects/shake.js'
 import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
+import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
+import { partyDe } from '../data/batalha.js'
 
 // Tela de game over (os dois caíram na CoopArena).
 // Em etapas: ronco grave no escuro -> letras de GAME OVER despencando uma a
@@ -14,6 +16,10 @@ import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
 // do chefe -> dica -> opções. Cinzas caem e brasas sobem o tempo todo.
 // A ou B durante a animação pula para o fim. Depois:
 //   A: tentar de novo (mesmo chefe e nível) · B: escolher outro chefe
+// Numa sala (ONLINE, ou a partida em rede da LAN também) só tem A: VOLTAR AO
+// LOBBY. Em rede (game/rede.js) os dois veem esta tela, cada um no seu PC (a
+// CoopArena abre nos dois com irParaCena): o A do host leva os dois de volta ao
+// lobby da sala; o A do convidado pede ao host ('voltarLobby') e ele faz o mesmo.
 
 
 const TEMPO = {
@@ -105,6 +111,13 @@ export default class GameOver extends Phaser.Scene {
 
     this.controles = new Controles(this)
     this.controles.onBotao((_, botao) => this.aoBotao(botao))
+    this.rede = emRede()
+    this.naSala = this.rede || partidaOnline() // sem revanche: só voltar ao lobby
+    // em rede, o host volta com os dois quando o convidado pede (mesmo no meio da animação)
+    if (this.rede && souHostDaRede()) {
+      const parar = canal.ao('voltarLobby', () => this.voltarAoLobby())
+      this.events.once('shutdown', parar)
+    }
     this.cameras.main.fadeIn(500)
   }
 
@@ -191,15 +204,25 @@ export default class GameOver extends Phaser.Scene {
   aoBotao(botao) {
     if (this.saindo) return
     if (!this.liberado) return this.pular()
+    if (this.naSala) return this.voltarAoLobby() // na sala os dois voltam ao lobby
     this.saindo = true
     tocar(this, 'confirmar')
     this.cameras.main.fadeOut(300, 0, 0, 0)
-    const online = partidaOnline() // online: os dois voltam ao lobby da sala
+    const party = partyDe(this.registry)
     this.time.delayedCall(320, () => {
-      if (online) voltarAoLobbyOnline(this)
-      else if (botao === 'A') this.scene.start('CoopArena', { chefe: this.idChefe, nivel: this.nivel })
-      else this.scene.start('Selecao', { chefe: this.idChefe })
+      if (botao === 'A') this.scene.start('CoopArena', { chefe: this.idChefe, nivel: this.nivel, party })
+      else this.scene.start('Selecao', { chefe: this.idChefe, party })
     })
+  }
+
+  voltarAoLobby() {
+    if (this.saindo) return
+    this.saindo = true
+    tocar(this, 'confirmar')
+    this.cameras.main.fadeOut(300, 0, 0, 0)
+    // convidado em rede: pede ao host, que traz os dois (a cena Lan chega pelo canal)
+    if (this.rede && !souHostDaRede()) return canal.enviar('voltarLobby', null, {})
+    this.time.delayedCall(320, () => (this.rede ? irParaCena(this, 'Lan') : voltarAoLobbyOnline(this)))
   }
 
   // ---------- título ----------
@@ -386,7 +409,7 @@ export default class GameOver extends Phaser.Scene {
       const t = this.add.text(x - 78, y, `${botao}  ${rotulo}`, estilo(18, TEXTO.normal)).setOrigin(0, 0.5).setDepth(10)
       return [icone, t]
     }
-    const itens = partidaOnline()
+    const itens = this.naSala
       ? opcao(LARGURA / 2 + 30, 'A', 'VOLTAR AO LOBBY', CORES.almas[0])
       : [...opcao(LARGURA / 2 - 120, 'A', 'TENTAR DE NOVO', CORES.almas[0]), ...opcao(LARGURA / 2 + 160, 'B', 'ESCOLHER CHEFE', 0xb0b0b0)]
     for (const o of itens) {

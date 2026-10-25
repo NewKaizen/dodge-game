@@ -3,10 +3,17 @@ import { lan, aoParceiro, enviarAoParceiro, enviarQuadro, aoQuadro, parceiro } f
 import { faixaDeAudio } from './audioTap.js'
 import { contextoAudio } from '../../game/audio.js'
 
-// Transmissão do modo LAN (docs/lan.md): o host roda o jogo e manda a imagem
-// do canvas + o som (audioTap.js) por WebRTC direto para o convidado, que só
-// assiste e manda os controles (controleRemoto.js). Os sinais do WebRTC
-// passam pelo servidor (rede.js), que troca os nomes .local pelo IP.
+// Conexão direta do modo LAN/ONLINE (docs/lan.md): um WebRTC entre os dois
+// PCs da sala, com um canal de dados (o da partida em rede, game/rede.js) e o
+// ping da ligação. Os sinais do WebRTC passam pelo servidor (rede.js), que
+// troca os nomes .local pelo IP.
+//
+// NÃO USADO HOJE: a imagem. Este arquivo nasceu para o "Remote Play" (o host
+// rodava o jogo e mandava a imagem do canvas + o som, audioTap.js, para o
+// convidado, que só assistia). Agora a partida numa sala, PVP e CO-OP, roda
+// no PC de cada um, e a imagem fica sempre parada (semImagem). O código do
+// vídeo e da imagem reserva continua aqui (as faixas entram na negociação e
+// são pausadas na hora, como já era no PVP); ninguém mostra o que chega.
 //
 // Se o WebRTC não conectar em alguns segundos (firewall, rede estranha), cai
 // na RESERVA: JPEGs pelo WebSocket do servidor, sem som.
@@ -16,24 +23,23 @@ import { contextoAudio } from '../../game/audio.js'
 // manda menos quadros (eles passam pelo servidor).
 //
 // Junto com a imagem vai um canal de dados (RTCDataChannel) direto entre os
-// dois PCs: os controles do convidado vão por ele, sem dar a volta pelo
-// servidor (que pode estar em outro país). Sem ele (reserva), vão pelo servidor.
+// dois PCs: as mensagens da partida (game/rede.js) vão por ele, sem dar a
+// volta pelo servidor (que pode estar em outro país). Sem ele, vão pelo servidor.
 // A cada segundo lê o ping da ligação direta, por onde ela passa e os quadros
 // por segundo da imagem (store `ligacao`).
 //
-// PVP numa sala é partida em rede (game/rede.js): cada PC roda o próprio jogo
-// e a imagem não serve para nada. A conexão continua (o canal de dados direto
-// é o da partida e o ping vem dela), mas enquanto o modo da sala é PVP o host
-// não manda imagem nem som: tira as faixas dos remetentes (replaceTrack(null))
-// e solta a captura do canvas; a reserva também não manda quadros. Quando o
-// modo vira CO-OP, captura de novo e põe as faixas de volta.
+// A partida numa sala é em rede (game/rede.js): cada PC roda o próprio jogo e
+// a imagem não serve para nada. A conexão continua (o canal de dados direto é
+// o da partida e o ping vem dela), mas o host não manda imagem nem som: tira
+// as faixas dos remetentes (replaceTrack(null)) e solta a captura do canvas; a
+// reserva também não manda quadros.
 //
 //   ligarJogo(game)            host: o Phaser.Game de onde sai a imagem
-//   ligarTela(video, canvas)   convidado: onde a imagem aparece
+//   ligarTela(video, canvas)   convidado: onde a imagem aparece (não usado hoje)
 //   tela                       store { modo: null | 'video' | 'reserva', estado, fps }
 //   ligacao                    store { ping, rota, fps }: ping (ms) da ligação direta,
 //                              rota 'direta' | 'turn' | null, fps da imagem
-//   enviarRapido(dados) · aoRapido(fn)   controles: pelo canal direto (ou pelo servidor)
+//   enviarRapido(dados) · aoRapido(fn)   mensagens da partida: pelo canal direto (ou pelo servidor)
 export const tela = writable({ modo: null, estado: 'parada' }) // estado: parada | conectando | ao-vivo | reserva
 export const ligacao = writable({ ping: null, rota: null, fps: null })
 
@@ -88,10 +94,11 @@ export function ligarTela(elVideo, elCanvas) {
 
 const mudar = (parcial) => tela.update((s) => ({ ...s, ...parcial }))
 
-// sala PVP: partida em rede, sem imagem (veja no topo)
-const semImagem = () => get(lan).sala?.modo === 'pvp'
+// partida em rede nos dois modos: nunca tem imagem (veja no topo). Era
+// `sala.modo === 'pvp'` quando o CO-OP usava o Remote Play
+const semImagem = () => true
 
-// ---------- canal direto (controles) ----------
+// ---------- canal direto (mensagens da partida) ----------
 
 export function enviarRapido(dados) {
   if (canal?.readyState === 'open') {
@@ -191,8 +198,7 @@ async function comecarHost() {
   const remetente = pc.addTrack(faixaVideo, stream)
   const remetenteSom = som ? pc.addTrack(som, stream) : null
   preferirH264(pc)
-  // as faixas entram na negociação mesmo no PVP (para o CO-OP poder voltar sem
-  // negociar de novo); aí já pausa
+  // as faixas entram na negociação (como era no Remote Play) e já pausam
   midia = { remetenteVideo: remetente, remetenteSom, faixaVideo, som, pausada: false }
   atualizarImagem()
 
@@ -224,7 +230,7 @@ function capturarCanvas() {
   return faixa
 }
 
-// host: pausa / retoma a imagem e o som conforme o modo da sala
+// host: pausa / retoma a imagem e o som (hoje: sempre pausados)
 function atualizarImagem() {
   if (papelAtual !== 'host' || !midia) return
   const pausar = semImagem()
@@ -455,5 +461,5 @@ lan.subscribe((s) => {
     timerPedido = setInterval(pedir, 5000)
   }
   if (s.papel === 'host' && parceiroAtual && parceiroAtual !== outro.id) pararTudo() // trocou o convidado: ele pede de novo
-  atualizarImagem() // o host mudou o modo (PVP sem imagem, CO-OP com)
+  atualizarImagem() // (sempre sem imagem: game/rede.js)
 })

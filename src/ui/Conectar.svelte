@@ -5,14 +5,11 @@
   import { iniciarSimulador, pararSimulador } from '../lib/simulador.js'
   import { alternarTelaCheia } from '../lib/telaCheia.js'
   import { lan, sairSala } from '../lib/lan/rede.js'
-  import { tela, pingPartida, ROTAS, corDoPing } from '../lib/lan/transmissao.js'
+  import { pingPartida, ROTAS, corDoPing } from '../lib/lan/transmissao.js'
 
   // modo LAN/ONLINE: na sala o número de jogadores é o da sala (sempre 2)
   let naSala = $derived($lan.fase === 'sala')
   let outro = $derived($lan.sala?.membros.find((m) => m.id !== $lan.eu.id))
-  const ESTADOS = { parada: 'sem imagem', conectando: 'ligando a imagem…', 'ao-vivo': 'imagem ao vivo', reserva: 'imagem reserva (sem som)' }
-  // PVP na sala roda no PC de cada um (game/rede.js): não tem imagem para mostrar o estado
-  let pvpEmRede = $derived($lan.sala?.modo === 'pvp')
 
   let erro = $state('')
 
@@ -43,11 +40,8 @@
   <div class="conectar lan">
     <span>{$lan.online ? `ONLINE · sala ${$lan.sala.codigo}` : `LAN · ${$lan.sala.nome}`} · você é {$lan.papel === 'host' ? 'o HOST (P1)' : 'o CONVIDADO (P2)'}</span>
     {#if outro}
-      {#if pvpEmRede}
-        <span class="dica">com {outro.nome} · partida em rede (cada um joga no seu PC)</span>
-      {:else}
-        <span class="dica">com {outro.nome} · {ESTADOS[$tela.estado]}{$pingPartida.fps != null ? ` · ${$pingPartida.fps} fps` : ''}</span>
-      {/if}
+      <!-- PVP e CO-OP na sala rodam no PC de cada um (game/rede.js): não tem imagem -->
+      <span class="dica">com {outro.nome} · partida em rede (cada um joga no seu PC)</span>
       <span class="ping" style:color={corDoPing($pingPartida.ms)}>ping {$pingPartida.ms ?? '…'} ms{$pingPartida.rota ? ` (${ROTAS[$pingPartida.rota]})` : ''}</span>
       <span class="dica">servidor: você {$lan.ping ?? '…'} ms · {outro.nome} {outro.ping ?? '…'} ms</span>
     {:else}

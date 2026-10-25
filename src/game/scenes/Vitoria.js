@@ -11,12 +11,17 @@ import { shake } from '../effects/shake.js'
 import { flashTela, claraoCamera } from '../effects/flash.js'
 import { FONTE, LARGURA, ALTURA, TEXTO, NIVEIS } from '../constants.js'
 import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
+import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
 
 // Tela de vitória, em etapas com ritmo:
 //   silêncio + luz crescendo -> ESTOURO (flash, confete, fogos) -> "VITÓRIA!"
 //   batendo na tela -> party comemorando -> estatísticas rolando -> NOTA carimbada
 // A ou B durante a animação pula para o fim. Depois:
 //   A: lutar de novo com o mesmo chefe · B: escolher outro chefe
+// Numa sala (ONLINE, ou a partida em rede da LAN também) só tem A: VOLTAR AO
+// LOBBY. Em rede (game/rede.js) os dois veem esta tela, cada um no seu PC (a
+// CoopArena abre nos dois com irParaCena): o A do host leva os dois de volta ao
+// lobby da sala; o A do convidado pede ao host ('voltarLobby') e ele faz o mesmo.
 
 // Momentos da animação (ms desde o início da cena)
 const TEMPO = {
@@ -69,6 +74,13 @@ export default class Vitoria extends Phaser.Scene {
 
     this.controles = new Controles(this)
     this.controles.onBotao((_, botao) => this.aoBotao(botao))
+    this.rede = emRede()
+    this.naSala = this.rede || partidaOnline() // sem revanche: só voltar ao lobby
+    // em rede, o host volta com os dois quando o convidado pede (mesmo no meio da animação)
+    if (this.rede && souHostDaRede()) {
+      const parar = canal.ao('voltarLobby', () => this.voltarAoLobby())
+      this.events.once('shutdown', parar)
+    }
     this.cameras.main.fadeIn(300)
   }
 
@@ -120,11 +132,21 @@ export default class Vitoria extends Phaser.Scene {
       if (this.etapas.length) this.pular()
       return
     }
+    if (this.naSala) return this.voltarAoLobby() // na sala os dois voltam ao lobby
     this.saindo = true
     tocar(this, 'confirmar')
     this.cameras.main.fadeOut(250, 0, 0, 0)
-    const online = partidaOnline() // online: os dois voltam ao lobby da sala
-    this.time.delayedCall(260, () => (online ? voltarAoLobbyOnline(this) : this.scene.start(botao === 'A' ? 'CoopArena' : 'Selecao', { chefe: this.idChefe })))
+    this.time.delayedCall(260, () => this.scene.start(botao === 'A' ? 'CoopArena' : 'Selecao', { chefe: this.idChefe, party: partyDe(this.registry) }))
+  }
+
+  voltarAoLobby() {
+    if (this.saindo) return
+    this.saindo = true
+    tocar(this, 'confirmar')
+    this.cameras.main.fadeOut(250, 0, 0, 0)
+    // convidado em rede: pede ao host, que traz os dois (a cena Lan chega pelo canal)
+    if (this.rede && !souHostDaRede()) return canal.enviar('voltarLobby', null, {})
+    this.time.delayedCall(260, () => (this.rede ? irParaCena(this, 'Lan') : voltarAoLobbyOnline(this)))
   }
 
   // ---------- etapas ----------
@@ -448,7 +470,7 @@ export default class Vitoria extends Phaser.Scene {
   liberar(rapido) {
     if (rapido) this.time.delayedCall(400, () => (this.liberado = true))
     else this.liberado = true
-    const opcoes = this.add.text(LARGURA / 2, ALTURA - 26, partidaOnline() ? 'A: voltar ao lobby' : 'A: lutar de novo     B: escolher chefe', estilo(16)).setOrigin(0.5).setDepth(10).setAlpha(0)
+    const opcoes = this.add.text(LARGURA / 2, ALTURA - 26, this.naSala ? 'A: voltar ao lobby' : 'A: lutar de novo     B: escolher chefe', estilo(16)).setOrigin(0.5).setDepth(10).setAlpha(0)
     this.tweens.add({
       targets: opcoes,
       alpha: 1,
