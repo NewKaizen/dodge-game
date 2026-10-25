@@ -14,6 +14,9 @@
 //   const contas = await iniciarContas(process.env)
 //   contas.tratar(req, res)   true se a rota é daqui (já respondeu ou vai responder)
 //   contas.autenticar(token)  { id, perfil } | null  (o lobby usa no "ola")
+//   contas.relacoes(userId)   { amigos, bloqueios, pedidos } | null  (server/amigos.js; o lobby filtra presença e convites)
+
+import { criarRelacoes } from './amigos.js'
 
 export const BUCKET_AVATARES = 'avatares'
 export const MAX_BYTES_AVATAR = 2 * 1024 * 1024
@@ -232,6 +235,7 @@ export function criarContas({ config = { disponivel: false }, supabase = null, a
   return {
     disponivel: ativo,
     autenticar: ativo || autenticar ? auth : null,
+    relacoes: ativo ? criarRelacoes(supabase) : null,
     // devolve true se a rota é daqui; a resposta sai depois (promise em .pronto)
     tratar(req, res) {
       const caminho = new URL(req.url, 'http://x').pathname

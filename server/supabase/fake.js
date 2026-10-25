@@ -66,7 +66,7 @@ function consulta(sb, tabela) {
 
 export function criarSupabaseFalso({ usuarios = {}, perfis = [], url = 'https://falso.supabase.co' } = {}) {
   const sb = {
-    tabelas: { perfis: perfis.map((p) => ({ ...p })) },
+    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [] },
     arquivos: new Map(),
     chamadas: [],
     falhar: {},

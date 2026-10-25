@@ -13,17 +13,28 @@
 // convidado. Mensagens em JSON, { t: 'tipo', ... }; binário = quadro da
 // transmissão reserva (JPEG), repassado ao outro membro da sala.
 //
-//   anexarLan(httpServer, { online, ice, autenticar })   liga o /lan num servidor http; devolve { fechar() }
+//   anexarLan(httpServer, { online, ice, autenticar, relacoes })   liga o /lan num servidor http; devolve { fechar() }
 //
 // CONTAS (server/contas.js): o "ola" pode trazer o token (JWT do Supabase).
 // Com token, o servidor valida (autenticar) ANTES de dar as boas-vindas; token
 // inválido ou sem resposta = entra como convidado, sem derrubar ninguém.
+//
+// AMIGOS (server/amigos.js, Fase 1B): quem está logado ganha presença
+// (disponivel | em_partida | offline) visível SÓ para os amigos (amizade mútua
+// e sem bloqueio) e pode convidar um amigo online para a sua sala:
+//   cliente -> servidor  convidar {para: userId} · responderConvite {id, aceitar}
+//                        amigosMudaram {com?: userId}   (depois de um RPC de amizade)
+//   servidor -> cliente  presencas {mapa} · presenca {id, status} · convite {...}
+//                        conviteEnviado · conviteResposta · conviteFim · conviteNegado
+//                        amigosAtualizar
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
 import crypto from 'node:crypto'
+import { criarLimite } from './contas.js'
+import { CONVITE_MS, CONVITES_POR_MINUTO, MAX_CONVITES_RECEBIDOS } from './amigos.js'
 
-export const PROTOCOLO = 2
+export const PROTOCOLO = 3
 export const PORTA_DESCOBERTA = 47777
 export const MAX_MEMBROS = 2
 const ANUNCIO_MS = 1500
@@ -109,10 +120,15 @@ export const trocarMdns = (texto, ip) => (typeof texto === 'string' ? texto.repl
 // para o WebRTC dos navegadores; agora(): relógio (os testes trocam)
 // autenticar(token): { id, perfil } | null (server/contas.js; sem ele, todo
 // mundo é convidado)
-export function criarLobby({ locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null } = {}) {
+// relacoes(userId): { amigos, bloqueios, pedidos } | null (server/amigos.js;
+// sem ele não há presença nem convites)
+export function criarLobby({ locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null, relacoes = null } = {}) {
   const clientes = new Map() // id -> cliente
   const salas = new Map() // id -> sala
   const codigos = new Map() // código -> id da sala
+  const presenca = new Map() // id do usuário (conta) -> cliente
+  const convites = new Map() // id do convite -> { id, de, deUsuario, para, salaId, expira, timer }
+  const limiteConvites = criarLimite({ max: CONVITES_POR_MINUTO, agora })
 
   const novoCodigo = () => {
     for (;;) {
@@ -125,6 +141,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   const fecharSala = (sala) => {
     salas.delete(sala.id)
     codigos.delete(sala.codigo)
+    for (const conv of [...convites.values()]) if (conv.salaId === sala.id) encerrarConvite(conv, 'cancelado', 'a sala foi fechada')
   }
 
   // balde de fichas: false = mensagem demais, joga fora
@@ -175,6 +192,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     cliente.pronto = false
     if (!sala) return
     sala.membros.delete(cliente.id)
+    atualizarStatus(cliente)
     if (cliente.id === sala.host) {
       fecharSala(sala)
       for (const id of sala.membros) {
@@ -182,10 +200,100 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
         outro.sala = null
         outro.pronto = false
         enviar(outro, { t: 'fechada', motivo })
+        atualizarStatus(outro)
       }
       return
     }
     avisarSala(sala)
+  }
+
+  // ---------- presença (só para amigos) ----------
+
+  const statusDe = (c) => (!c.usuario ? 'offline' : salas.get(c.sala)?.emPartida ? 'em_partida' : 'disponivel')
+  // amizade mútua no que o servidor sabe e nenhum bloqueio em nenhuma direção
+  const ehAmigoMutuo = (a, b) => Boolean(a.usuario && b.usuario && a.usuario !== b.usuario && a.amigos.has(b.usuario) && b.amigos.has(a.usuario) && !a.bloqueios.has(b.usuario) && !b.bloqueios.has(a.usuario))
+  const amigosOnline = (c) => [...c.amigos].map((id) => presenca.get(id)).filter((o) => o && o !== c && ehAmigoMutuo(c, o))
+
+  // o que `c` vê: o status de cada amigo online (quem não aparece está offline)
+  const enviarPresencas = (c) => {
+    const mapa = {}
+    for (const o of amigosOnline(c)) mapa[o.usuario] = statusDe(o)
+    enviar(c, { t: 'presencas', mapa })
+  }
+  const anunciar = (c, status, usuario = c.usuario) => {
+    c.statusPub = status
+    for (const o of amigosOnline(c)) enviar(o, { t: 'presenca', id: usuario, status })
+  }
+  function atualizarStatus(c) {
+    if (!c.usuario || presenca.get(c.usuario) !== c) return
+    const status = statusDe(c)
+    if (status !== c.statusPub) anunciar(c, status)
+  }
+
+  // entrou na conta (ou conectou já logado): carrega os amigos e se anuncia
+  async function registrar(c) {
+    const usuario = c.usuario
+    presenca.set(usuario, c)
+    c.amigos = new Set()
+    c.bloqueios = new Set()
+    c.pedidos = new Set()
+    c.statusPub = 'offline'
+    const rel = relacoes ? await Promise.resolve().then(() => relacoes(usuario)).catch(() => null) : null
+    if (c.usuario !== usuario || presenca.get(usuario) !== c || !clientes.has(c.id)) return
+    if (rel) Object.assign(c, { amigos: rel.amigos, bloqueios: rel.bloqueios, pedidos: rel.pedidos })
+    enviarPresencas(c)
+    anunciar(c, statusDe(c))
+  }
+
+  // saiu da conta, trocou de conta ou desconectou
+  function desregistrar(c, usuario) {
+    if (!usuario || presenca.get(usuario) !== c) return
+    anunciar(c, 'offline', usuario)
+    presenca.delete(usuario)
+    for (const conv of [...convites.values()]) if (conv.de === c.id || conv.para === usuario) encerrarConvite(conv, 'cancelado', 'o convite foi cancelado')
+  }
+
+  // a lista de amigos/bloqueios mudou (RPC no navegador): relê e reajusta quem vê quem
+  async function recarregar(c, avisar = null) {
+    const usuario = c.usuario
+    if (!usuario || !relacoes || presenca.get(usuario) !== c) return
+    const rel = await Promise.resolve().then(() => relacoes(usuario)).catch(() => null)
+    if (!rel || c.usuario !== usuario || presenca.get(usuario) !== c || !clientes.has(c.id)) return
+    const envolvidos = new Set([...c.amigos, ...c.bloqueios, ...c.pedidos, ...rel.amigos, ...rel.bloqueios, ...rel.pedidos])
+    Object.assign(c, { amigos: rel.amigos, bloqueios: rel.bloqueios, pedidos: rel.pedidos })
+    enviarPresencas(c)
+    for (const id of envolvidos) {
+      const o = presenca.get(id)
+      if (!o || o === c) continue
+      if (ehAmigoMutuo(c, o)) enviar(o, { t: 'presenca', id: usuario, status: statusDe(c) })
+      else {
+        enviar(o, { t: 'presenca', id: usuario, status: 'offline' })
+        for (const conv of [...convites.values()]) if ((conv.de === c.id && conv.para === o.usuario) || (conv.de === o.id && conv.para === usuario)) encerrarConvite(conv, 'cancelado', 'o convite foi cancelado')
+      }
+      // só avisa (e relê) quem tem relação com a conta: não dá para mandar ping a estranhos
+      if (id === avisar) {
+        enviar(o, { t: 'amigosAtualizar' })
+        recarregar(o)
+      }
+    }
+  }
+
+  // ---------- convites ----------
+
+  // para: o convite acabou (aceito, recusado, expirado ou cancelado)
+  function encerrarConvite(conv, resultado, motivo = '') {
+    if (!convites.delete(conv.id)) return
+    clearTimeout(conv.timer)
+    const alvo = presenca.get(conv.para)
+    const remetente = clientes.get(conv.de)
+    if (resultado === 'expirado' || resultado === 'cancelado') {
+      if (alvo) enviar(alvo, { t: 'conviteFim', id: conv.id, motivo: motivo || 'o convite expirou' })
+      if (remetente && resultado === 'expirado') enviar(remetente, { t: 'conviteResposta', id: conv.id, para: conv.para, resultado })
+    }
+  }
+  function expirarConvites() {
+    const t = agora()
+    for (const conv of [...convites.values()]) if (conv.expira <= t) encerrarConvite(conv, 'expirado')
   }
 
   // IP de `de` como `para` enxerga (para os candidatos do WebRTC)
@@ -207,6 +315,31 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       conta: c.perfil,
       ...(tentouConta && !c.usuario && { contaInvalida: true }),
     })
+    if (c.usuario) registrar(c)
+  }
+
+  // cria a sala de `c` (saindo da atual); null se o servidor está lotado
+  function criarSalaDe(c, nome) {
+    sair(c)
+    if (salas.size >= maxSalas) {
+      enviar(c, { t: 'erro', msg: 'o servidor está lotado: tente de novo daqui a pouco' })
+      return null
+    }
+    const sala = { id: novoId(), codigo: novoCodigo(), nome: limpar(nome, 24) || `SALA DE ${c.nome}`, host: c.id, membros: new Set([c.id]), modo: 'pvp', emPartida: false }
+    salas.set(sala.id, sala)
+    codigos.set(sala.codigo, sala.id)
+    c.sala = sala.id
+    c.pronto = true
+    avisarSala(sala)
+    return sala
+  }
+
+  function entrarNaSala(c, sala) {
+    sair(c)
+    sala.membros.add(c.id)
+    c.sala = sala.id
+    c.pronto = false
+    avisarSala(sala)
   }
 
   const acoes = {
@@ -240,12 +373,19 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       c.ultimaConta = agora()
       const token = typeof m.token === 'string' && m.token.length <= 4096 ? m.token : null
       const aplicar = (conta) => {
-        c.usuario = conta?.id ?? null
+        const antes = c.usuario
+        const depois = conta?.id ?? null
+        if (antes && antes !== depois) {
+          desregistrar(c, antes)
+          Object.assign(c, { amigos: new Set(), bloqueios: new Set(), pedidos: new Set(), statusPub: 'offline' })
+        }
+        c.usuario = depois
         c.perfil = conta?.id ? resumoPerfil(conta.perfil) : null
         if (c.perfil?.nome) c.nome = c.perfil.nome
         enviar(c, { t: 'conta', conta: c.perfil, ...(token && autenticar && !c.usuario && { contaInvalida: true }) })
         const sala = salas.get(c.sala)
         if (sala) avisarSala(sala)
+        if (depois && depois !== antes) registrar(c)
       }
       if (!token || !autenticar) return aplicar(null)
       c.validando = true
@@ -263,14 +403,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       enviar(c, { t: 'salas', salas: [...salas.values()].map(resumo), rede: salasRede() })
     },
     criar(c, m) {
-      sair(c)
-      if (salas.size >= maxSalas) return enviar(c, { t: 'erro', msg: 'o servidor está lotado: tente de novo daqui a pouco' })
-      const sala = { id: novoId(), codigo: novoCodigo(), nome: limpar(m.nome, 24) || `SALA DE ${c.nome}`, host: c.id, membros: new Set([c.id]), modo: 'pvp', emPartida: false }
-      salas.set(sala.id, sala)
-      codigos.set(sala.codigo, sala.id)
-      c.sala = sala.id
-      c.pronto = true
-      avisarSala(sala)
+      criarSalaDe(c, m.nome)
     },
     // pela lista (m.sala, só na LAN) ou pelo código (m.codigo)
     entrar(c, m) {
@@ -280,11 +413,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       if (sala.membros.has(c.id)) return avisarSala(sala)
       if (sala.membros.size >= MAX_MEMBROS) return enviar(c, { t: 'erro', msg: 'a sala está cheia' })
       if (sala.emPartida) return enviar(c, { t: 'erro', msg: 'a sala está no meio de uma partida' })
-      sair(c)
-      sala.membros.add(c.id)
-      c.sala = sala.id
-      c.pronto = false
-      avisarSala(sala)
+      entrarNaSala(c, sala)
     },
     sair(c) {
       sair(c, 'o host fechou a sala')
@@ -306,7 +435,12 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       const sala = salas.get(c.sala)
       if (!sala || sala.host !== c.id) return
       sala.emPartida = Boolean(m.valor)
-      if (!sala.emPartida) for (const id of sala.membros) if (id !== sala.host) clientes.get(id).pronto = false
+      if (!sala.emPartida) {
+        for (const id of sala.membros) if (id !== sala.host) clientes.get(id).pronto = false
+      } else {
+        for (const conv of [...convites.values()]) if (conv.salaId === sala.id) encerrarConvite(conv, 'cancelado', 'a partida começou')
+      }
+      for (const id of sala.membros) atualizarStatus(clientes.get(id))
       avisarSala(sala)
     },
     expulsar(c, m) {
@@ -321,6 +455,57 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       const texto = limpar(m.texto, MAX_CHAT)
       if (!sala || !texto) return
       for (const id of sala.membros) enviar(clientes.get(id), { t: 'chat', de: c.id, nome: c.nome, texto })
+    },
+    // o navegador mexeu na lista de amigos (RPC): relê e, se `com` (id do outro) tem relação, avisa
+    amigosMudaram(c, m) {
+      if (!c.usuario || !relacoes || agora() - (c.ultimoAmigos ?? -Infinity) < 1000) return
+      c.ultimoAmigos = agora()
+      recarregar(c, typeof m.com === 'string' ? presenca.get(m.com)?.usuario : null)
+    },
+    convidar(c, m) {
+      expirarConvites()
+      const negar = (msg) => enviar(c, { t: 'conviteNegado', para: typeof m.para === 'string' ? m.para : null, msg })
+      if (!c.usuario || !c.perfil || !relacoes) return negar('entre com sua conta para convidar amigos')
+      const alvo = typeof m.para === 'string' ? presenca.get(m.para) : null
+      // não diz se é offline, não-amigo ou bloqueado
+      if (!alvo || !ehAmigoMutuo(c, alvo)) return negar('esse amigo não está disponível')
+      if (statusDe(alvo) === 'em_partida') return negar(`${alvo.nome} está numa partida`)
+      let sala = salas.get(c.sala)
+      if (sala && sala.host !== c.id) return negar('só o host da sala pode convidar')
+      if (sala?.emPartida) return negar('a sala está no meio de uma partida')
+      if (sala?.membros.has(alvo.id)) return negar(`${alvo.nome} já está na sua sala`)
+      if (sala && sala.membros.size >= MAX_MEMBROS) return negar('a sala está cheia')
+      const doPar = [...convites.values()].filter((v) => v.para === alvo.usuario)
+      if (doPar.some((v) => v.deUsuario === c.usuario)) return negar(`você já convidou ${alvo.nome}: espere a resposta`)
+      if (doPar.length >= MAX_CONVITES_RECEBIDOS) return negar(`${alvo.nome} está com convites demais: tente daqui a pouco`)
+      if (!limiteConvites.usar(c.usuario)) return negar(`convites demais: espere um minuto (máximo ${CONVITES_POR_MINUTO} por minuto)`)
+      // sem sala, cria a do convite (o host escolhe PVP ou CO-OP depois)
+      sala ??= criarSalaDe(c, '')
+      if (!sala) return
+      const conv = { id: crypto.randomBytes(8).toString('hex'), de: c.id, deUsuario: c.usuario, para: alvo.usuario, salaId: sala.id, expira: agora() + CONVITE_MS, timer: null }
+      conv.timer = setTimeout(expirarConvites, CONVITE_MS + 50)
+      conv.timer.unref?.()
+      convites.set(conv.id, conv)
+      enviar(alvo, { t: 'convite', id: conv.id, de: { id: c.usuario, tag: c.perfil.tag, nome: c.nome, avatar: c.perfil.avatar }, modo: sala.modo, expiraEm: conv.expira, restanteMs: CONVITE_MS })
+      enviar(c, { t: 'conviteEnviado', id: conv.id, para: alvo.usuario, expiraEm: conv.expira })
+    },
+    responderConvite(c, m) {
+      expirarConvites()
+      const conv = convites.get(String(m.id))
+      if (!conv || !c.usuario || conv.para !== c.usuario) return enviar(c, { t: 'conviteFim', id: String(m.id), motivo: 'o convite expirou' })
+      convites.delete(conv.id)
+      clearTimeout(conv.timer)
+      const remetente = clientes.get(conv.de)
+      if (m.aceitar !== true) return remetente && enviar(remetente, { t: 'conviteResposta', id: conv.id, para: conv.para, resultado: 'recusado' })
+      const sala = salas.get(conv.salaId)
+      const vale = sala && remetente && remetente.usuario === conv.deUsuario && remetente.sala === sala.id && sala.host === remetente.id && ehAmigoMutuo(remetente, c) && !sala.emPartida && statusDe(c) !== 'em_partida' && sala.membros.size < MAX_MEMBROS
+      if (!vale) {
+        enviar(c, { t: 'conviteFim', id: conv.id, motivo: 'a sala não está mais disponível' })
+        if (remetente) enviar(remetente, { t: 'conviteResposta', id: conv.id, para: conv.para, resultado: 'falhou' })
+        return
+      }
+      entrarNaSala(c, sala)
+      enviar(remetente, { t: 'conviteResposta', id: conv.id, para: conv.para, resultado: 'aceito' })
     },
     ping(c, m) {
       enviar(c, { t: 'pong', n: m.n })
@@ -356,7 +541,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     salas,
     resumos: () => [...salas.values()].map(resumo),
     conectar(ws, ip) {
-      const cliente = { id: novoId(), ws, ip: semPrefixo(ip), nome: 'JOGADOR', sala: null, pronto: false, ping: null, ok: false, validando: false, usuario: null, perfil: null, fichas: MAX_FICHAS, recarga: agora() }
+      const cliente = { id: novoId(), ws, ip: semPrefixo(ip), nome: 'JOGADOR', sala: null, pronto: false, ping: null, ok: false, validando: false, usuario: null, perfil: null, amigos: new Set(), bloqueios: new Set(), pedidos: new Set(), statusPub: 'offline', fichas: MAX_FICHAS, recarga: agora() }
       clientes.set(cliente.id, cliente)
       return cliente
     },
@@ -382,7 +567,10 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       if (!cliente.ok && m.t !== 'ola') return
       acoes[m.t](cliente, m)
     },
+    // convites pendentes (os testes conferem a expiração)
+    expirarConvites,
     desconectar(cliente) {
+      desregistrar(cliente, cliente.usuario)
       sair(cliente, 'o host desconectou')
       clientes.delete(cliente.id)
     },
@@ -449,10 +637,10 @@ function criarDescoberta(lobby, porta, log) {
 
 // online: servidor na internet (sem descoberta UDP, salas por código)
 // ice: [{ urls, username?, credential? }] para o WebRTC dos navegadores
-export function anexarLan(httpServer, { log = console.log, descoberta = true, online = false, ice = [], maxClientes = MAX_CLIENTES, autenticar = null } = {}) {
+export function anexarLan(httpServer, { log = console.log, descoberta = true, online = false, ice = [], maxClientes = MAX_CLIENTES, autenticar = null, relacoes = null } = {}) {
   let rede = null
   const porta = () => httpServer.address()?.port
-  const lobby = criarLobby({ online, ice, autenticar, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
+  const lobby = criarLobby({ online, ice, autenticar, relacoes, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 * 1024 })
   if (descoberta && !online) rede = criarDescoberta(lobby, porta, log)
 
