@@ -258,7 +258,9 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     c.bloqueios = new Set()
     c.pedidos = new Set()
     c.statusPub = 'offline'
+    c.carregando = usuario // a fila espera os bloqueios desta conta chegarem
     const rel = relacoes ? await Promise.resolve().then(() => relacoes(usuario)).catch(() => null) : null
+    if (c.carregando === usuario) c.carregando = null
     if (c.usuario !== usuario || presenca.get(usuario) !== c || !clientes.has(c.id)) return
     if (rel) Object.assign(c, { amigos: rel.amigos, bloqueios: rel.bloqueios, pedidos: rel.pedidos })
     enviarPresencas(c)
@@ -370,6 +372,11 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     return { host: primeiro, outro: segundo, regra: 'confirmou primeiro' }
   }
   function criarCasual(ordem) {
+    // alguém bloqueou o outro enquanto confirmavam: não junta
+    if (bloqueados(ordem[0], ordem[1])) {
+      for (const c of ordem) enviar(c, { t: 'fila', estado: 'fora', motivo: 'a partida não pôde começar: tente de novo' })
+      return
+    }
     const { host, outro, regra } = escolherHost(ordem)
     const sala = criarSalaDe(host, 'PARTIDA RÁPIDA')
     if (!sala) {
@@ -628,7 +635,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       const estado = fila.estado(c)
       if (estado === 'procurando') return enviar(c, { t: 'fila', estado, desde: fila.desde(c), esperaMs: agora() - fila.desde(c), convidado: !c.usuario })
       if (estado === 'pareado') return // a confirmação já está na tela dele
-      if (c.validando) return negar('espere a conta carregar')
+      if (c.validando || (c.carregando && c.carregando === c.usuario)) return negar('espere a conta carregar')
       if (c.sala) return negar('saia da sala para entrar na fila')
       if (c.usuario && [...clientes.values()].some((o) => o !== c && o.usuario === c.usuario && fila.estado(o) !== 'fora')) return negar('sua conta já está na fila em outra aba')
       fila.entrar(c)

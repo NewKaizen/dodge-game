@@ -342,6 +342,29 @@ test('quem se bloqueou não pareia (FIFO pula para o próximo)', async () => {
   assert.equal(beto.estado(), 'procurando')
 })
 
+test('bloqueou enquanto confirmavam: a sala não nasce', async () => {
+  const { lobby, entrar } = await montar({ contas: { ana: {}, beto: {} } })
+  const ana = await entrar('ana')
+  const beto = await entrar('beto')
+  naFila(ana)
+  naFila(beto)
+  ana.c.bloqueios.add('u-beto') // o que o recarregar faria depois de um bloqueio
+  confirmar(ana)
+  confirmar(beto)
+  assert.equal(lobby.salas.size, 0)
+  for (const p of [ana, beto]) assert.equal(p.ultima('fila').estado, 'fora')
+  assert.equal(lobby.fila.tamanho() + lobby.fila.pares(), 0)
+})
+
+test('conta ainda carregando os bloqueios espera para entrar na fila', async () => {
+  const { lobby, entrar } = await montar({ contas: { ana: {} } })
+  const ana = await entrar('ana')
+  ana.c.carregando = ana.c.usuario
+  naFila(ana)
+  assert.match(ana.ultima('filaNegada').msg, /espere a conta/)
+  assert.equal(lobby.fila.tamanho(), 0)
+})
+
 test('trocar de conta tira da fila', async () => {
   const { lobby, entrar } = await montar({ contas: { ana: {} } })
   const ana = await entrar('ana')
