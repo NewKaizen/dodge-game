@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { get } from 'svelte/store'
 import Controles from '../controles.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { criarFundo } from '../backgrounds/index.js'
@@ -10,8 +11,9 @@ import { TEXTO_JOGADOR } from '../pvp/perfil.js'
 import { CORES, FONTE, LARGURA, ALTURA, CENTRO_X, TEXTO, corTexto } from '../constants.js'
 import { claraoCamera } from '../effects/flash.js'
 import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
-import { canal, emRede, souHostDaRede, irParaCena, encerrarRede } from '../rede.js'
-import { lan, salaCasual, pedirRevanche, limparRevanche, sairSala, entrarFila, fecharLobby } from '../../lib/lan/rede.js'
+import { canal, emRede, souHostDaRede, irParaCena, encerrarRede, meuLado } from '../rede.js'
+import { lan, salaCasual, pedirRevanche, limparRevanche, sairSala, entrarFila, fecharLobby, enviarResultado } from '../../lib/lan/rede.js'
+import { progressoDoXp, proximaRecompensa, itemDoCatalogo, textoMotivo, NOME_TIPO } from '../../lib/progresso.js'
 
 // Tela de fim da partida PvP, em etapas (como a Vitoria):
 //   ENTRADA DO VENCEDOR (não tem no empate; ver entradaVencedor: faixa na cor
@@ -33,6 +35,11 @@ import { lan, salaCasual, pedirRevanche, limparRevanche, sairSala, entrarFila, f
 //   VOLTAR            sai da sala e vai para o menu
 // O oponente saindo fecha a sala: game/rede.js leva quem ficou para a tela
 // ONLINE com o aviso (dali dá para entrar na fila de novo ou voltar).
+// XP (Fase 1D; docs/online.md): em rede, a tela manda o resultado ao servidor
+// UMA vez por partida (enviarResultado guarda o partidaId) e, antes das opções,
+// mostra o painel de XP por cima das estatísticas: XP ganho, a barra enchendo,
+// subiu de nível, itens novos e a próxima recompensa (A/B pula). Sem resposta
+// em XP_ESPERA_MS, o motivo (convidado, CPU, …) e as opções.
 //
 // Recebe de PvpArena:
 //   { vencedor: 1 | 2 | 0 (empate), p1, p2, rodadas,
@@ -57,6 +64,10 @@ const PAINEL = { x: CENTRO_X - 230, y: 118, largura: 460, altura: 290, linhaY: 1
 const COLUNA = [PAINEL.x + 76, PAINEL.x + PAINEL.largura - 76] // centro dos valores do P1 e do P2
 const LUTADOR = { x: [100, LARGURA - 100], chao: 318, escala: 4 }
 const COR_EMPATE = '#c8c8d8'
+
+const XP_ESPERA_MS = 5000 // esperando a recompensa do servidor
+const XP_BARRA_MS = 1100
+const COR_XP = '#6dffb0'
 
 const OPCOES_CASUAL = [
   { id: 'revanche', rotulo: 'REVANCHE' },
@@ -105,6 +116,11 @@ export default class PvpResultado extends Phaser.Scene {
 
     this.saindo = false
     this.liberado = false
+    this.liberou = false
+    this.painelXp = null
+    this.xpAnimacao = null
+    this.xpEsperaAte = null
+    this.xpNivelVisto = null
     this.relogio = 0
     this.contadores = []
     this.ultimoTic = 0
@@ -130,7 +146,158 @@ export default class PvpResultado extends Phaser.Scene {
       const parar = canal.ao('voltarLobby', () => this.voltarAoLobby())
       this.events.once('shutdown', parar)
     }
+    this.xp = this.prepararXp(dados)
     this.cameras.main.fadeIn(300)
+  }
+
+  // ---------- XP (Fase 1D) ----------
+
+  // manda o resultado (uma vez por partida) e fica ouvindo a recompensa.
+  // null = sem painel (PVP local de dois no mesmo PC)
+  prepararXp(dados) {
+    if (this.contraCpu) return { motivo: 'cpu', recompensa: null }
+    if (!this.rede) return null
+    const s = get(lan)
+    const partidaId = s.sala?.partidaId ?? null
+    if (!partidaId) return { motivo: 'nao_registrada', recompensa: null }
+    enviarResultado({ partidaId, vencedorLado: this.empate ? null : this.vencedor - 1, rodadas: this.rodadas, duracao: dados.duracao, personagem: meuLado() === 0 ? this.p1 : this.p2 })
+    const xp = { partidaId, motivo: s.eu.conta ? null : 'convidado', recompensa: null }
+    const parar = lan.subscribe((estado) => {
+      const r = estado.recompensa
+      if (r?.partidaId !== partidaId || r === xp.recompensa) return
+      xp.recompensa = r
+      if (this.painelXp) this.mostrarRecompensa(false)
+    })
+    this.events.once('shutdown', parar)
+    return xp
+  }
+
+  // a etapa antes das opções
+  etapaXp(rapido) {
+    if (!this.xp) return this.liberar(rapido)
+    this.montarPainelXp(rapido)
+    if (this.xp.recompensa) return this.mostrarRecompensa(rapido)
+    if (this.xp.motivo) {
+      this.textoMotivoXp(this.xp.motivo)
+      return this.liberar(rapido)
+    }
+    this.xpTitulo.setText('contando o XP…')
+    // pulando, não espera: a recompensa ainda entra no painel quando chegar
+    if (rapido) return this.liberar(true)
+    this.xpEsperaAte = this.relogio + XP_ESPERA_MS
+  }
+
+  montarPainelXp(rapido) {
+    const { x, y, largura, altura } = PAINEL
+    const P = 20
+    const g = this.add.graphics().setDepth(P)
+    g.fillStyle(0x0b0914, 0.97).fillRoundedRect(x, y, largura, altura, 8)
+    g.lineStyle(3, 0xffffff, 1).strokeRoundedRect(x, y, largura, altura, 8)
+    g.lineStyle(1, 0x6dffb0, 0.6).strokeRoundedRect(x + 5, y + 5, largura - 10, altura - 10, 6)
+    const cx = x + largura / 2
+    const t = (yy, tamanho, cor) => this.add.text(cx, y + yy, '', estilo(tamanho, cor)).setOrigin(0.5).setDepth(P + 1)
+    this.barraXp = { x: x + 112, y: y + 140, largura: 300, altura: 14 }
+    const fundoBarra = this.add.graphics().setDepth(P + 1)
+    fundoBarra.fillStyle(0x16182a, 1).fillRect(this.barraXp.x, this.barraXp.y - 7, this.barraXp.largura, this.barraXp.altura)
+    fundoBarra.lineStyle(1, 0x6dffb0, 1).strokeRect(this.barraXp.x, this.barraXp.y - 7, this.barraXp.largura, this.barraXp.altura)
+    this.painelXp = [
+      g,
+      fundoBarra,
+      this.add.text(cx, y + 24, 'PROGRESSO', estilo(16, TEXTO.selecionado)).setOrigin(0.5).setDepth(P + 1),
+      (this.xpTitulo = t(70, 34, COR_XP)),
+      (this.xpMotivo = t(104, 12, '#b0b0c8').setWordWrapWidth(largura - 40).setAlign('center')),
+      (this.xpNivel = this.add.text(x + 30, y + 140, '', estilo(16, TEXTO.selecionado)).setOrigin(0, 0.5).setDepth(P + 1)),
+      (this.xpCheio = this.add.graphics().setDepth(P + 2)),
+      (this.xpNumeros = this.add.text(this.barraXp.x + this.barraXp.largura, y + 162, '', estilo(11, '#9a9aae')).setOrigin(1, 0.5).setDepth(P + 1)),
+      (this.xpSubiu = t(192, 22, TEXTO.selecionado)),
+      (this.xpItens = t(228, 14, '#c9a2ff').setAlign('center')),
+      (this.xpProxima = t(268, 12, '#9a9aae')),
+    ]
+    const perfil = get(lan).eu.conta
+    if (perfil) this.desenharBarraXp(Number(perfil.xp) || 0)
+    if (rapido) return
+    this.painelXp.forEach((o) => {
+      o.setAlpha(0)
+      this.tweens.add({ targets: o, alpha: 1, duration: 220 })
+    })
+    tocar(this, 'voo')
+  }
+
+  desenharBarraXp(total) {
+    const { nivel, noNivel, paraProximo } = progressoDoXp(total)
+    const b = this.barraXp
+    this.xpCheio.clear().fillStyle(0x6dffb0, 1).fillRect(b.x + 1, b.y - 6, Math.round((b.largura - 2) * Math.min(1, noNivel / paraProximo)), b.altura - 2)
+    this.xpNivel.setText(`NÍVEL ${nivel}`)
+    this.xpNumeros.setText(`${noNivel} / ${paraProximo} XP`)
+    if (this.xpNivelVisto != null && nivel > this.xpNivelVisto) this.subiuDeNivel(nivel)
+    this.xpNivelVisto = nivel
+  }
+
+  subiuDeNivel(nivel) {
+    this.xpSubiu.setText(`SUBIU PARA O NÍVEL ${nivel}!`).setScale(1.4)
+    this.tweens.add({ targets: this.xpSubiu, scale: 1, duration: 260, ease: 'Back.easeOut' })
+    if (!this.pulandoXp) tocar(this, 'superAtivar')
+  }
+
+  textoMotivoXp(codigo) {
+    this.xpTitulo.setText(codigo === 'convidado' ? 'SEM XP' : '+0 XP').setColor('#9a9aae')
+    this.xpMotivo.setText(textoMotivo(codigo))
+  }
+
+  mostrarRecompensa(rapido) {
+    const r = this.xp.recompensa
+    this.xpEsperaAte = null
+    this.xpAnimacao?.complete()
+    const parcial = ['repeticao_metade', 'contestada', 'participacao'].includes(r.motivo)
+    if (!r.xpGanho || r.xpTotal == null) {
+      this.textoMotivoXp(r.motivo || 'sem_relato')
+      if (r.xpTotal != null) this.desenharBarraXp(r.xpTotal)
+      return this.fimXp(rapido)
+    }
+    this.xpTitulo.setText(`+${r.xpGanho} XP`).setColor(COR_XP)
+    this.xpMotivo.setText(parcial ? textoMotivo(r.motivo) : r.motivo === 'vitoria' ? 'participação + bônus de vitória' : 'participação')
+    const antes = Math.max(0, r.xpTotal - r.xpGanho)
+    this.xpNivelVisto = null
+    this.desenharBarraXp(antes)
+    const fim = () => {
+      this.xpAnimacao = null
+      this.desenharBarraXp(r.xpTotal)
+      const itens = r.itensNovos.map(itemDoCatalogo).filter(Boolean)
+      this.xpItens.setText(itens.slice(0, 3).map((i) => `NOVO: ${i.nome} (${NOME_TIPO[i.tipo]})`).join('\n'))
+      const prox = proximaRecompensa(r.nivelDepois ?? progressoDoXp(r.xpTotal).nivel)
+      this.xpProxima.setText(prox ? `próxima recompensa no nível ${prox.nivel}: ${prox.nome} (${NOME_TIPO[prox.tipo]})` : 'você já tem toda a trilha!')
+      this.fimXp(rapido)
+    }
+    if (rapido) {
+      this.pulandoXp = true
+      fim()
+      this.pulandoXp = false
+      return
+    }
+    tocar(this, 'energia')
+    this.xpAnimacao = this.tweens.addCounter({
+      from: antes,
+      to: r.xpTotal,
+      duration: XP_BARRA_MS,
+      ease: 'Quad.easeOut',
+      onUpdate: (tw) => this.desenharBarraXp(Math.round(tw.getValue())),
+      onComplete: fim,
+    })
+  }
+
+  fimXp(rapido) {
+    if (!this.liberou) this.liberar(rapido)
+  }
+
+  // A/B no meio da barra: vai para o fim
+  pularXp() {
+    this.pulandoXp = true
+    if (this.xpAnimacao) this.xpAnimacao.complete()
+    else if (this.xpEsperaAte != null) {
+      this.xpEsperaAte = null
+      this.liberar(true)
+    }
+    this.pulandoXp = false
   }
 
   // ---------- cenário fixo ----------
@@ -162,7 +329,7 @@ export default class PvpResultado extends Phaser.Scene {
     em(TEMPO.lutadores, (r) => this.entrarLutadores(r))
     em(TEMPO.painel, (r) => this.abrirPainel(r))
     LINHAS.forEach((linha, i) => em(TEMPO.painel + 300 + i * TEMPO.linha, (r) => this.mostrarLinha(linha, i, r)))
-    em(TEMPO.painel + 300 + LINHAS.length * TEMPO.linha + TEMPO.rolar + TEMPO.opcoes, (r) => this.liberar(r))
+    em(TEMPO.painel + 300 + LINHAS.length * TEMPO.linha + TEMPO.rolar + TEMPO.opcoes, (r) => this.etapaXp(r))
     return e.sort((a, b) => a.t - b.t)
   }
 
@@ -177,6 +344,7 @@ export default class PvpResultado extends Phaser.Scene {
     if (this.saindo) return
     if (!this.liberado) {
       if (this.etapas.length) this.pular()
+      else if (this.painelXp) this.pularXp()
       return
     }
     if (this.casual) return botao === 'B' ? this.escolherCasual('voltar') : this.escolherCasual(OPCOES_CASUAL[this.opcao].id)
@@ -688,6 +856,8 @@ export default class PvpResultado extends Phaser.Scene {
   }
 
   liberar(rapido) {
+    if (this.liberou) return
+    this.liberou = true
     if (rapido) this.time.delayedCall(400, () => (this.liberado = true))
     else this.liberado = true
     this.dicaPular?.destroy()
@@ -712,6 +882,13 @@ export default class PvpResultado extends Phaser.Scene {
 
     this.relogio += delta
     while (this.etapas.length && this.relogio >= this.etapas[0].t) this.etapas.shift().f(false)
+    // a recompensa não veio a tempo: o motivo e as opções (ela ainda entra se chegar)
+    if (this.xpEsperaAte != null && this.relogio >= this.xpEsperaAte) {
+      this.xpEsperaAte = null
+      this.textoMotivoXp('espera')
+      this.xpTitulo.setText('XP a caminho')
+      this.liberar(false)
+    }
 
     // partida rápida: escolher entre as três opções (e a contagem da revanche)
     if (this.linhasCasual && !this.saindo) {

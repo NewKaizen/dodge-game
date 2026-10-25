@@ -4,13 +4,18 @@
 //   validarNome(texto)  -> { ok: true, nome } | { ok: false, erro }
 //   AVATARES_JOGO       avatares prontos (os personagens jogáveis)
 //   avatarDoPerfil(p)   -> { tipo: 'padrao'|'jogo'|'enviado', id, url }
+//   (o XP e os níveis estão em lib/progresso.js)
 
 export const NOME_MIN = 3
 export const NOME_MAX = 16
 // letras (com acento), números, espaço, _ . -  (o [[:alnum:] _.-] do banco)
 const PERMITIDO = /^[\p{L}\p{N} _.-]+$/u
 
+import { AVATARES_TRILHA } from './progresso.js'
+
 export const AVATARES_JOGO = ['kris', 'susie', 'ralsei', 'noelle', 'berdly', 'dess', 'asriel']
+// os da trilha de níveis (Coleção): só aparecem para quem ganhou
+const AVATARES_VALIDOS = [...AVATARES_JOGO, ...AVATARES_TRILHA]
 export const TIPOS_AVATAR = ['padrao', 'jogo', 'enviado']
 
 export function validarNome(texto) {
@@ -26,9 +31,6 @@ export function validarNome(texto) {
 
 export function avatarDoPerfil(perfil) {
   if (perfil?.avatar_tipo === 'enviado' && perfil.avatar_url) return { tipo: 'enviado', id: null, url: perfil.avatar_url }
-  if (perfil?.avatar_tipo === 'jogo' && AVATARES_JOGO.includes(perfil.avatar_id)) return { tipo: 'jogo', id: perfil.avatar_id, url: null }
+  if (perfil?.avatar_tipo === 'jogo' && AVATARES_VALIDOS.includes(perfil.avatar_id)) return { tipo: 'jogo', id: perfil.avatar_id, url: null }
   return { tipo: 'padrao', id: null, url: null }
 }
-
-// XP para passar do nível: PROVISÓRIO (a curva de verdade chega na 1D)
-export const xpDoNivel = (nivel) => 100 * Math.max(1, Math.floor(Number(nivel) || 1))
