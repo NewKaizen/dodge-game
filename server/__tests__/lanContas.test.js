@@ -8,8 +8,9 @@ const ID_ANA = '11111111-1111-4111-8111-111111111111'
 const PERFIL_ANA = { id: ID_ANA, tag: 'ana#0042', nome_exibicao: 'Ana Clara', avatar_tipo: 'jogo', avatar_id: 'kris', avatar_url: null, titulo_equipado: null, nivel: 3, xp: 120 }
 const LOCAIS = [{ ip: '192.168.0.10', mascara: '255.255.255.0' }]
 
+let relogio = 0
 function montar(autenticar) {
-  const lobby = criarLobby({ locais: () => LOCAIS, autenticar })
+  const lobby = criarLobby({ locais: () => LOCAIS, autenticar, agora: () => relogio })
   const conectar = (ip = '192.168.0.2') => {
     const recebidas = []
     const ws = { readyState: 1, bufferedAmount: 0, send: (m) => recebidas.push(JSON.parse(m)) }
@@ -139,12 +140,19 @@ test('"conta" troca a conta sem reconectar (entrou / saiu)', async () => {
   await esperar()
   assert.equal(p.ultima('conta').conta.tag, 'ana#0042')
   assert.equal(p.c.nome, 'Ana Clara')
+  relogio += 1000
   p.mandar({ t: 'conta', token: null })
   assert.equal(p.ultima('conta').conta, null)
   assert.equal(p.c.usuario, null)
+  relogio += 1000
   p.mandar({ t: 'conta', token: 'ruim' })
   await esperar()
   assert.equal(p.ultima('conta').contaInvalida, true)
+  // martelando: só um por segundo
+  const antes = p.recebidas.filter((m) => m.t === 'conta').length
+  p.mandar({ t: 'conta', token: 'token-ana' })
+  await esperar()
+  assert.equal(p.recebidas.filter((m) => m.t === 'conta').length, antes)
 })
 
 test('token gigante não vai para o Supabase', async () => {

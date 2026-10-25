@@ -235,7 +235,9 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     },
     // entrou, saiu ou mudou o perfil sem reconectar: { token } (null = saiu da conta)
     conta(c, m) {
-      if (c.validando) return
+      // cada pedido vai ao Supabase: um por segundo basta
+      if (c.validando || agora() - (c.ultimaConta ?? -Infinity) < 1000) return
+      c.ultimaConta = agora()
       const token = typeof m.token === 'string' && m.token.length <= 4096 ? m.token : null
       const aplicar = (conta) => {
         c.usuario = conta?.id ?? null
