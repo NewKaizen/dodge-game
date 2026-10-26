@@ -216,7 +216,7 @@ export default class Lan extends Phaser.Scene {
       return [
         { id: 'nome', tipo: 'nome', acao: () => this.digitar('nome') },
         { id: 'rapido', rotulo: 'JOGAR RÁPIDO', ativo: s.fase === 'navegando', acao: () => entrarFila() },
-        { id: 'criar', rotulo: '+ CRIAR SALA', ativo: s.fase === 'navegando', acao: () => criarSala() },
+        { id: 'criar', rotulo: 'JOGAR COM AMIGOS', ativo: s.fase === 'navegando', acao: () => criarSala() },
         { id: 'codigo', rotulo: 'ENTRAR COM CÓDIGO…', ativo: s.fase === 'navegando', acao: () => this.digitar('codigo') },
       ]
     if (this.modoTela === 'salas') {
@@ -384,7 +384,7 @@ export default class Lan extends Phaser.Scene {
     t(LARGURA - 36, topo + 8, s.fase === 'conectando' ? 'conectando…' : s.fase === 'navegando' ? 'conectado' : '', 11, '#9a9ab0').setOrigin(1, 0.5)
     const explica = {
       rapido: s.eu.conta ? 'PVP 1x1 contra alguém da fila' : 'PVP 1x1 contra alguém da fila · como convidado, sem XP',
-      criar: 'jogar com um amigo: você vira o host e recebe um código para passar',
+      criar: 'cria a sala e dá um código (ou convide pela lista AMIGOS, acima do jogo)',
       codigo: 'digite o código que o seu amigo passou',
     }
     itens.slice(1).forEach((it, k) => {
@@ -405,7 +405,7 @@ export default class Lan extends Phaser.Scene {
     if (s.filaAviso && !s.erro) t(LARGURA / 2, yInfo, s.filaAviso, 13, '#ffb040', { wordWrap: { width: LARGURA - 60 }, align: 'center' }).setOrigin(0.5)
     if (s.erro) t(LARGURA / 2, yInfo, s.erro, 13, '#ff6070', { wordWrap: { width: LARGURA - 60 }, align: 'center' }).setOrigin(0.5)
     t(LARGURA / 2, yInfo + 34, `o amigo abre  ${location.host}  no Chrome/Edge`, 12, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0.5)
-    t(LARGURA / 2, yInfo + 54, 'PVP e CO-OP: cada um joga no próprio PC', 10, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
+    t(LARGURA / 2, yInfo + 54, 'PVP e CO-OP: cada um joga no próprio PC  ·  PERFIL, AMIGOS e COLEÇÃO: botões acima do jogo', 10, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
     this.rodape(this.digitando ? 'digite  ·  Enter: confirmar  ·  Esc: cancelar' : '↑↓ escolher     A: confirmar     B: voltar ao menu')
   }
 

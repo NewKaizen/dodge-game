@@ -150,9 +150,10 @@ alter table public.denuncias enable row level security;
 revoke all on table public.denuncias from anon, authenticated;
 -- sem nenhuma política: só o service_role (CLI de moderação) lê e revisa
 
--- Denuncia o nome ou a foto de outro jogador. Devolve o id da denúncia.
+-- Denuncia o nome ou a foto de outro jogador, achado pela tag (ex.: joao#4821:
+-- é o que o navegador conhece de quem está na sala). Devolve o id da denúncia.
 create or replace function public.denunciar(
-  p_denunciado uuid,
+  p_tag text,
   p_tipo text,
   p_motivo text
 )
@@ -164,14 +165,15 @@ as $$
 declare
   v_uid uuid := auth.uid();
   v_motivo text := regexp_replace(btrim(coalesce(p_motivo, '')), '\s+', ' ', 'g');
+  v_tag text := lower(btrim(coalesce(p_tag, '')));
   v_alvo public.perfis;
   v_id uuid;
 begin
   if v_uid is null then
     raise exception 'precisa estar logado' using errcode = '28000';
   end if;
-  if p_denunciado is null or p_denunciado = v_uid then
-    raise exception 'não dá para denunciar a si mesmo' using errcode = '22023';
+  if v_tag !~ '^[a-z0-9]{3,12}#[0-9]{4,6}$' then
+    raise exception 'tag inválida: use o formato nome#1234' using errcode = '22023';
   end if;
   if p_tipo is null or p_tipo not in ('nome', 'foto') then
     raise exception 'tipo de denúncia inválido' using errcode = '22023';
@@ -183,9 +185,12 @@ begin
     raise exception 'o motivo tem caracteres inválidos' using errcode = '22023';
   end if;
 
-  select * into v_alvo from public.perfis where id = p_denunciado;
+  select * into v_alvo from public.perfis where tag = v_tag;
   if not found then
     raise exception 'jogador não encontrado' using errcode = 'P0002';
+  end if;
+  if v_alvo.id = v_uid then
+    raise exception 'não dá para denunciar a si mesmo' using errcode = '22023';
   end if;
   if p_tipo = 'foto' and v_alvo.avatar_url is null then
     raise exception 'essa pessoa não tem foto enviada' using errcode = '22023';
@@ -201,7 +206,7 @@ begin
 
   begin
     insert into public.denuncias (denunciante, denunciado, tipo, motivo)
-    values (v_uid, p_denunciado, p_tipo, v_motivo)
+    values (v_uid, v_alvo.id, p_tipo, v_motivo)
     returning id into v_id;
   exception when unique_violation then
     raise exception 'você já denunciou isso: a equipe vai analisar' using errcode = '23505';
@@ -212,8 +217,8 @@ $$;
 
 -- ---------- permissões ----------
 
-revoke all on function public.denunciar(uuid, text, text) from public, anon;
-grant execute on function public.denunciar(uuid, text, text) to authenticated;
+revoke all on function public.denunciar(text, text, text) from public, anon;
+grant execute on function public.denunciar(text, text, text) to authenticated;
 revoke all on function public.limite_denuncias_dia() from public, anon, authenticated;
 revoke all on function public.motivo_denuncia_max() from public, anon, authenticated;
 revoke all on function public.atualizar_perfil(text, text, text) from public, anon;

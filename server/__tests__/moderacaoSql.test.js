@@ -42,7 +42,8 @@ grant usage on schema public, auth to anon, authenticated, service_role;
 const uid = (n) => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
 const comoNavegador = (sql, quem) => `begin; set local role authenticated; set local "request.jwt.claim.sub" = '${uid(quem)}'; ${sql}; commit;`
 const comoAnonimo = (sql) => `begin; set local role anon; ${sql}; commit;`
-const denunciar = (de, para, tipo = 'nome', motivo = 'nome ofensivo') => comoNavegador(`select public.denunciar('${uid(para)}', '${tipo}', '${motivo}')`, de)
+const tagDe = (n) => `(select tag from public.perfis where id = '${uid(n)}')`
+const denunciar = (de, para, tipo = 'nome', motivo = 'nome ofensivo') => comoNavegador(`select public.denunciar(${para === 99 ? `'zzz#0000'` : tagDe(para)}, '${tipo}', '${motivo}')`, de)
 
 test('as listas do banco e do JS são as mesmas', () => {
   const sql = execFileSync('cat', [migration('0004_moderacao')], { encoding: 'utf8' })
@@ -106,9 +107,10 @@ test('0004 no Postgres (duas vezes): denunciar, RLS e filtro de nomes', { skip: 
     assert.match(falha(comoNavegador(`select * from public.denuncias`, 2)), /permission denied/)
     assert.match(falha(comoNavegador(`insert into public.denuncias (denunciante, denunciado, tipo, motivo) values ('${uid(1)}', '${uid(2)}', 'nome', 'abc')`, 1)), /permission denied/)
     assert.match(falha(comoNavegador(`update public.denuncias set estado = 'aceita'`, 1)), /permission denied/)
-    assert.match(falha(comoAnonimo(`select public.denunciar('${uid(2)}', 'nome', 'abc')`)), /permission denied/)
+    assert.match(falha(comoAnonimo(`select public.denunciar('x#1234', 'nome', 'abc')`)), /permission denied/)
     // quem não está logado (sem jwt) não denuncia
-    assert.match(falha(`begin; set local role authenticated; select public.denunciar('${uid(2)}', 'nome', 'abc'); commit;`), /precisa estar logado/)
+    assert.match(falha(`begin; set local role authenticated; select public.denunciar('abc#1234', 'nome', 'abc'); commit;`), /precisa estar logado/)
+    assert.match(falha(comoNavegador(`select public.denunciar('lixo', 'nome', 'abc')`, 1)), /tag inválida/)
     // o servidor (service_role) lê e revisa (no Supabase de verdade o service_role já tem tudo por padrão)
     psql('grant all on all tables in schema public to service_role')
     assert.equal(psql(`begin; set local role service_role; select count(*) from public.denuncias where estado = 'aberta'; commit;`).split('\n').pop(), String(Number(psql(`select count(*) from public.denuncias where estado = 'aberta'`))))

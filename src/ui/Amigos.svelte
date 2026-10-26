@@ -8,6 +8,7 @@
   import { linkDaSala } from '../lib/salaLink.js'
   import { podeEntrarEmSala } from '../game/rede.js'
   import Avatar from './Avatar.svelte'
+  import Denunciar from './Denunciar.svelte'
 
   const STATUS = { disponivel: 'disponível', em_partida: 'em partida', offline: 'offline' }
   const MODOS = { pvp: 'PVP', coop: 'CO-OP' }
@@ -179,6 +180,7 @@
             {:else}
               <button onclick={() => executar(() => pedirAmizade(m.tag), (r) => (r.resultado === 'amigos' ? `agora você e ${m.nome} são amigos` : `pedido enviado para ${m.nome}`))} disabled={ocupado}>Adicionar amigo</button>
             {/if}
+            <Denunciar tag={m.tag} nome={m.nome} temFoto={m.avatar?.tipo === 'enviado'} />
           </div>
         {/each}
       {/if}
@@ -192,6 +194,7 @@
             <button onclick={() => executar(() => responderPedido(p.id, true), `${p.nome} agora é seu amigo`)} disabled={ocupado}>Aceitar</button>
             <button onclick={() => executar(() => responderPedido(p.id, false), 'pedido recusado')} disabled={ocupado}>Recusar</button>
             <button onclick={() => duploClique(`bloquear:${p.id}`, () => bloquearJogador(p.id), `${p.nome} foi bloqueado`)} disabled={ocupado}>{confirmar === `bloquear:${p.id}` ? 'Confirmar?' : 'Bloquear'}</button>
+            <Denunciar tag={p.tag} nome={p.nome} temFoto={p.avatar?.tipo === 'enviado'} />
           </div>
         {/each}
       {/if}
@@ -220,6 +223,7 @@
           </button>
           <button onclick={() => duploClique(`remover:${a.id}`, () => removerAmigo(a.id), `${a.nome} saiu dos seus amigos`)} disabled={ocupado}>{confirmar === `remover:${a.id}` ? 'Confirmar?' : 'Remover'}</button>
           <button onclick={() => duploClique(`bloquear:${a.id}`, () => bloquearJogador(a.id), `${a.nome} foi bloqueado`)} disabled={ocupado}>{confirmar === `bloquear:${a.id}` ? 'Confirmar?' : 'Bloquear'}</button>
+          <Denunciar tag={a.tag} nome={a.nome} temFoto={a.avatar?.tipo === 'enviado'} />
         </div>
       {:else}
         <p class="dica">{$amigos.carregando ? 'carregando…' : 'nenhum amigo ainda: mande um pedido pela tag, ou adicione quem estiver na sua sala'}</p>
