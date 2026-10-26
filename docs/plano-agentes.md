@@ -101,6 +101,7 @@ Decisão do usuário: primeiro as features, depois organizar tudo. Itens anotado
 - Rever o limite que conta todos os convidados como um único oponente.
 - XP no CO-OP.
 - Filtro de nomes também no nome inicial vindo do Google (hoje só ao trocar o nome).
+- (2E) Auditar cenas reaproveitadas pelo Phaser que guardam estado da partida anterior (o mesmo vício que travava o PvpResultado).
 
 ### Controle de custo
 
