@@ -60,7 +60,7 @@ import { CONVITE_MS, CONVITES_POR_MINUTO, MAX_CONVITES_RECEBIDOS } from './amigo
 import { criarFila, agendarPadrao, ACOES_FILA_POR_MINUTO, REVANCHE_MS, FOLGA_PING_MS, CASUAL_INICIO_MS, EVITAR_PAR_MS } from './fila.js'
 import { criarPartidas } from './partidas.js'
 import { METRICAS_NULA } from './metricas.js'
-import { nomeOfensivo } from '../src/lib/palavrasBloqueadas.js'
+import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
 
 export const PROTOCOLO = 6
 export const PORTA_DESCOBERTA = 47777
@@ -688,7 +688,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     },
     chat(c, m) {
       const sala = salas.get(c.sala)
-      const texto = limpar(m.texto, MAX_CHAT)
+      const texto = censurarTexto(limpar(m.texto, MAX_CHAT))
       if (!sala || !texto) return
       for (const id of sala.membros) enviar(clientes.get(id), { t: 'chat', de: c.id, nome: c.nome, texto })
     },
