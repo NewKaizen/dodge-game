@@ -95,6 +95,7 @@ TURN_SENHA=...
 - **"a conexão caiu e você saiu da fila / da sala"**: o servidor tira quem perde a conexão (ninguém fica preso); quando reconectar, procure de novo ou entre pelo código.
 - **"não achei a sala …"**: código errado, ou o host já fechou a sala (ela some quando o host sai).
 - **Ping alto**: olhe a barra de cima. Se diz **pelo servidor**, a ligação direta não passou e tudo está dando a volta pelo servidor: configure um TURN (acima). Se diz **direto** com ping alto, é a internet de um dos dois (Wi-Fi fraco, download rolando); cabo ajuda muito.
+- **Brave**: com os escudos ligados o canal direto (WebRTC) pode abrir sem entregar nada. O jogo percebe em ~3 s e passa tudo pelo servidor (ping maior, mas joga); se mesmo assim travar, desligue os escudos para este site.
 - **A partida parou esperando o outro**: a aba do outro precisa ficar visível (o navegador para o jogo numa aba escondida).
 
 
@@ -160,6 +161,11 @@ conta e para convidado (convidado joga, mas a partida não dá XP: aviso na tela
   conhecidos e a diferença é de pelo menos **30 ms** (o cliente manda o ping
   também enquanto está na fila); senão, quem **confirmou primeiro**. O servidor
   escreve a escolha no log (`[fila] partida rápida ...`).
+- **O host não começou** em **15 s** depois da sala casual nascer (aba dele
+  escondida, PC travado): a sala fecha, os dois veem "a partida não começou (o
+  host não respondeu): procurando outra" e voltam para a fila (o convidado na
+  frente). Não conta abandono, e os dois não pareiam um com o outro por 60 s
+  (`CASUAL_INICIO_MS`, `EVITAR_PAR_MS` em `server/fila.js`).
 - Desconectar procurando ou com partida achada tira da fila e libera o outro.
   Confirmação atrasada (depois dos 10 s) não vale: "essa partida não vale mais".
 - Limite: **30 ações por minuto** (fila, confirmar, revanche) por conexão, além
