@@ -12,6 +12,7 @@ export const NOME_MAX = 16
 const PERMITIDO = /^[\p{L}\p{N} _.-]+$/u
 
 import { AVATARES_TRILHA } from './progresso.js'
+import { nomeOfensivo } from './palavrasBloqueadas.js'
 
 export const AVATARES_JOGO = ['kris', 'susie', 'ralsei', 'noelle', 'berdly', 'dess', 'asriel']
 // os da trilha de níveis (Coleção): só aparecem para quem ganhou
@@ -26,6 +27,7 @@ export function validarNome(texto) {
   if (tamanho < NOME_MIN) return { ok: false, erro: `o nome precisa de pelo menos ${NOME_MIN} letras` }
   if (tamanho > NOME_MAX) return { ok: false, erro: `o nome pode ter no máximo ${NOME_MAX} letras` }
   if (!PERMITIDO.test(nome)) return { ok: false, erro: 'use só letras, números, espaço, _ . -' }
+  if (nomeOfensivo(nome)) return { ok: false, erro: 'esse nome não é permitido: escolha outro' }
   return { ok: true, nome }
 }
 
