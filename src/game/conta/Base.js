@@ -134,6 +134,7 @@ export default class CenaConta extends Phaser.Scene {
   }
 
   digitar({ inicial = '', max = 16, permitido, aoConfirmar, aoCancelar }) {
+    inicial = String(inicial).slice(0, max)
     this.digitando = { texto: inicial }
     this.sujo = true
     const fim = () => {
