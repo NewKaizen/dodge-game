@@ -14,6 +14,7 @@
   let erro = $state('')
   let entrada = $state()
   let botaoEscolher = $state()
+  let painel = $state()
   let aberto = $derived(Boolean($fotoModal))
 
   // abriu: zera e tenta abrir o seletor logo (o navegador só deixa se o clique veio de um gesto; senão é o botão)
@@ -42,6 +43,9 @@
     arquivo = f
   }
 
+  // o foco não pode escapar do modal (senão o Esc e as teclas iriam para o jogo)
+  const manterFoco = (e) => !e.relatedTarget && aberto && queueMicrotask(() => painel?.focus())
+
   async function subir(blob) {
     ocupado = true
     erro = ''
@@ -62,7 +66,7 @@
 {#if aberto}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div class="fundo" role="presentation" onclick={(e) => e.target === e.currentTarget && cancelar()} onkeydown={isolarTeclas} onkeyup={(e) => e.stopPropagation()}>
-    <div class="painel" role="dialog" aria-modal="true" aria-label="foto do perfil">
+    <div class="painel" role="dialog" aria-modal="true" aria-label="foto do perfil" tabindex="-1" bind:this={painel} onfocusout={manterFoco}>
       <header>
         <span class="titulo">FOTO DO PERFIL</span>
         <button onclick={cancelar} disabled={ocupado} aria-label="fechar">✕</button>
@@ -95,6 +99,7 @@
   }
 
   .painel {
+    outline: none;
     width: min(460px, 100%);
     max-height: calc(100vh - 32px);
     overflow: auto;
