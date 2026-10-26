@@ -24,17 +24,38 @@
 //                                   Devolve o desligar.
 //   limpar()                        esvazia a caixa de correio (partida nova)
 //
+// Confiáveis de verdade: cada uma vai com a SESSÃO de quem manda (e) e o
+// número dela na sessão (s, de 0). Quem recebe responde com o recibo
+// ('_ok', a = próximo número que espera); o que fica sem recibo é mandado de
+// novo a cada REENVIO_MS (uma que se perdeu no WebRTC fechando, ou no
+// servidor com a conexão caindo, não trava a partida). Parceiro novo (ou o
+// mesmo que saiu e voltou): reiniciar() começa outra sessão, do 0; quem
+// recebe vê a sessão nova e começa a contar dela (as mensagens de uma sessão
+// velha que ainda chegarem são jogadas fora).
+//   reiniciar()                     sessão nova (game/rede.js chama quando o parceiro muda)
+//
 // Teste: testar({ atrasoMs, variacaoMs }) atrasa a ENTREGA do que chega
 // (simula internet ruim; as confiáveis continuam em ordem).
 //
 //   const canal = criarCanal({ enviarBruto: (msg) => ..., meuId: () => 'abc' })
 //   transporte.aoChegar((msg) => canal.entregar(msg))
 export const TIPO_FIO = 'rede' // msg.tipo no fio (os outros tipos são do resto do LAN)
+export const REENVIO_MS = 1000 // confiável sem recibo há tanto tempo: manda de novo
+const RECIBO = '_ok'
+const MAX_SEM_RECIBO = 2000 // guardadas para reenviar (passou disso, a mais velha sai)
 
-export function criarCanal({ enviarBruto, meuId = () => 'eu', agora = () => Date.now(), agendar = (fn, ms) => setTimeout(fn, ms) } = {}) {
+const novaSessao = () => Math.random().toString(36).slice(2, 10)
+
+export function criarCanal({ enviarBruto, meuId = () => 'eu', agora = () => Date.now(), agendar = (fn, ms) => setTimeout(fn, ms), sessao = novaSessao } = {}) {
   let seq = 0
-  const esperado = new Map() // de -> próximo seq esperado
-  const foraDeOrdem = new Map() // de -> Map(seq -> msg)
+  let minhaSessao = sessao()
+  const semRecibo = new Map() // seq -> { msg, em } (as minhas confiáveis que o outro ainda não confirmou)
+  let vigiando = false
+  // quem recebe conta por `${de}|${sessão}`; de cada parceiro só a sessão mais nova vale
+  const esperado = new Map() // `${de}|${e}` -> próximo seq esperado
+  const foraDeOrdem = new Map() // `${de}|${e}` -> Map(seq -> msg)
+  const sessaoDe = new Map() // de -> sessão atual dele
+  const velhas = new Set() // `${de}|${e}` de sessões que já passaram
   const ultimoRapido = new Map() // `${de}:${tipo}` -> t da última rápida entregue
   const ouvintes = new Map() // tipo -> Set(fn)
   const correio = new Map() // `${tipo}|${chave}` -> [dados]
@@ -63,6 +84,7 @@ export function criarCanal({ enviarBruto, meuId = () => 'eu', agora = () => Date
   function processar(msg) {
     if (!msg || msg.tipo !== TIPO_FIO || typeof msg.k !== 'string') return
     const de = msg.de ?? '?'
+    if (msg.k === RECIBO) return aoRecibo(msg)
     if (msg.s == null) {
       // rápida: só a mais nova vale
       const chave = `${de}:${msg.k}`
@@ -71,23 +93,63 @@ export function criarCanal({ enviarBruto, meuId = () => 'eu', agora = () => Date
       despachar(msg.k, msg.c, msg.d)
       return
     }
-    if (!esperado.has(de)) esperado.set(de, 0)
-    if (msg.s < esperado.get(de)) return // repetida
-    if (!foraDeOrdem.has(de)) foraDeOrdem.set(de, new Map())
-    const fila = foraDeOrdem.get(de)
-    fila.set(msg.s, msg)
-    // entrega tudo o que já está na sequência
-    while (fila.has(esperado.get(de))) {
-      const m = fila.get(esperado.get(de))
-      fila.delete(m.s)
-      esperado.set(de, m.s + 1)
-      despachar(m.k, m.c, m.d)
+    const id = `${de}|${msg.e ?? ''}`
+    if (velhas.has(id)) return // de uma sessão que já passou
+    const atual = sessaoDe.get(de)
+    if (atual !== undefined && atual !== (msg.e ?? '')) {
+      // o outro começou uma sessão nova (parceiro novo, ou saiu e voltou)
+      const antiga = `${de}|${atual}`
+      velhas.add(antiga)
+      esperado.delete(antiga)
+      foraDeOrdem.delete(antiga)
     }
+    sessaoDe.set(de, msg.e ?? '')
+    if (!esperado.has(id)) esperado.set(id, 0)
+    if (msg.s >= esperado.get(id)) {
+      if (!foraDeOrdem.has(id)) foraDeOrdem.set(id, new Map())
+      const fila = foraDeOrdem.get(id)
+      fila.set(msg.s, msg)
+      // entrega tudo o que já está na sequência
+      while (fila.has(esperado.get(id))) {
+        const m = fila.get(esperado.get(id))
+        fila.delete(m.s)
+        esperado.set(id, m.s + 1)
+        despachar(m.k, m.c, m.d)
+      }
+    }
+    // recibo (também da repetida: o recibo de antes pode ter se perdido)
+    enviarBruto({ tipo: TIPO_FIO, de: meuId(), k: RECIBO, e: msg.e ?? '', a: esperado.get(id) })
+  }
+
+  function aoRecibo(msg) {
+    if (msg.e !== minhaSessao) return
+    for (const s of [...semRecibo.keys()]) if (s < msg.a) semRecibo.delete(s)
+  }
+
+  // reenvia o que ficou sem recibo (enquanto houver)
+  function vigiar() {
+    if (vigiando || !semRecibo.size) return
+    vigiando = true
+    const h = agendar(() => {
+      vigiando = false
+      const t = agora()
+      for (const p of semRecibo.values()) {
+        if (t - p.em < REENVIO_MS) continue
+        p.em = t
+        enviarBruto(p.msg)
+      }
+      vigiar()
+    }, REENVIO_MS)
+    h?.unref?.() // Node (testes): não segura o processo
   }
 
   return {
     enviar(tipo, chave, dados) {
-      enviarBruto({ tipo: TIPO_FIO, de: meuId(), s: seq++, t: agora(), k: tipo, c: chave ?? null, d: dados ?? null })
+      const msg = { tipo: TIPO_FIO, de: meuId(), e: minhaSessao, s: seq++, t: agora(), k: tipo, c: chave ?? null, d: dados ?? null }
+      semRecibo.set(msg.s, { msg, em: agora() })
+      if (semRecibo.size > MAX_SEM_RECIBO) semRecibo.delete(semRecibo.keys().next().value)
+      enviarBruto(msg)
+      vigiar()
     },
     enviarRapido(tipo, dados) {
       enviarBruto({ tipo: TIPO_FIO, de: meuId(), s: null, t: agora(), k: tipo, c: null, d: dados ?? null })
@@ -136,16 +198,22 @@ export function criarCanal({ enviarBruto, meuId = () => 'eu', agora = () => Date
     limpar() {
       correio.clear()
     },
-    // outro parceiro (ou o mesmo reconectado): a numeração dele começa de novo
+    // parceiro novo (ou o mesmo que saiu e voltou): as minhas confiáveis começam
+    // outra sessão, do 0, e as da sessão velha não são mais reenviadas
+    reiniciar() {
+      minhaSessao = sessao()
+      seq = 0
+      semRecibo.clear()
+    },
+    // outro parceiro (ou o mesmo reconectado): as rápidas dele começam de novo
+    // (as confiáveis se acertam sozinhas pela sessão)
     esquecer(de) {
-      esperado.delete(de)
-      foraDeOrdem.delete(de)
       for (const chave of [...ultimoRapido.keys()]) if (chave.startsWith(`${de}:`)) ultimoRapido.delete(chave)
     },
     testar(opcoes = {}) {
       atraso = { atrasoMs: Math.max(0, Number(opcoes.atrasoMs) || 0), variacaoMs: Math.max(0, Number(opcoes.variacaoMs) || 0) }
       return atraso
     },
-    estadoDebug: () => ({ seq, esperado: Object.fromEntries(esperado), correio: [...correio.keys()], pedidos: [...pedidos.keys()], atraso }),
+    estadoDebug: () => ({ seq, semRecibo: semRecibo.size, esperado: Object.fromEntries(esperado), correio: [...correio.keys()], pedidos: [...pedidos.keys()], atraso }),
   }
 }

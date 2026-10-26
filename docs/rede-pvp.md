@@ -6,8 +6,8 @@ Numa sala (LAN ou ONLINE), nos dois modos (**PVP** e **CO-OP**), o jogo roda **n
 
 | Peça | O quê |
 | --- | --- |
-| `src/lib/lan/canal.js` | O canal da partida (lógica pura, testada): mensagens **confiáveis em ordem** (`enviar`/`receber`/`ao`) e **rápidas** (`enviarRapido`, a última vale). |
-| `src/game/rede.js` | Liga o canal no transporte (WebRTC direto, ou o servidor quando ele falha), diz se a partida é em rede (`emRede()`), qual é o meu lado (`meuLado()`: host 0, convidado 1) e faz o host mandar nas trocas de cena (`irParaCena`). Vigia a sala: se o outro sai no meio, cada um volta ao lobby (ou ao menu, se a sala caiu). |
+| `src/lib/lan/canal.js` | O canal da partida (lógica pura, testada): mensagens **confiáveis em ordem** (`enviar`/`receber`/`ao`) e **rápidas** (`enviarRapido`, a última vale). As confiáveis vão numeradas dentro de uma **sessão** de quem manda e ganham **recibo** (`_ok`); sem recibo em 1 s vão de novo (uma que se perdeu no WebRTC fechando ou no servidor não trava a partida). Parceiro novo, ou o mesmo que saiu e voltou: `reiniciar()` abre outra sessão, do 0 (antes a numeração continuava e o outro esperava a mensagem 0 para sempre: tela preta no convidado). |
+| `src/game/rede.js` | Liga o canal no transporte (WebRTC direto, ou o servidor quando ele falha), diz se a partida é em rede (`emRede()`), qual é o meu lado (`meuLado()`: host 0, convidado 1) e faz o host mandar nas trocas de cena (`irParaCena`). Vigia a sala: se o outro sai no meio, cada um volta ao lobby (ou ao menu, se a sala caiu); quando o parceiro muda, reinicia a sessão do canal. O convidado parado 20 s na tela preta (a cena do host não chegou) sai da sala com o aviso "não deu para sincronizar com o host: voltando ao lobby". |
 | `src/game/controles.js` | Em rede: 2 jogadores, todos os controles daqui comandam o **meu** lado, o outro lado não tem controle aqui, e o C (pausa) não existe. |
 
 ## Regras de autoridade (valem para todo o PVP em rede)

@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { irCarregando } from '../carregando.js'
 import Controles from '../controles.js'
 import { CHEFES } from '../coop/chefes/index.js'
 import { ESCALA } from '../arte/texturas.js'
@@ -210,7 +211,7 @@ export default class GameOver extends Phaser.Scene {
     this.cameras.main.fadeOut(300, 0, 0, 0)
     const party = partyDe(this.registry)
     this.time.delayedCall(320, () => {
-      if (botao === 'A') this.scene.start('CoopArena', { chefe: this.idChefe, nivel: this.nivel, party })
+      if (botao === 'A') irCarregando(this, 'CoopArena', { chefe: this.idChefe, nivel: this.nivel, party })
       else this.scene.start('Selecao', { chefe: this.idChefe, party })
     })
   }

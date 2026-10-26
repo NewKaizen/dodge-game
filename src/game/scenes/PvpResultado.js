@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { irCarregando } from '../carregando.js'
 import { get } from 'svelte/store'
 import Controles from '../controles.js'
 import { PERSONAGENS } from '../data/personagens.js'
@@ -353,7 +354,7 @@ export default class PvpResultado extends Phaser.Scene {
     tocar(this, botao === 'A' ? 'confirmar' : 'cancelar')
     this.cameras.main.fadeOut(250, 0, 0, 0)
     const { p1, p2, arena } = this
-    this.time.delayedCall(260, () => (botao === 'A' ? this.scene.start('PvpArena', { p1, p2, arena }) : this.scene.start('PvpEscolha')))
+    this.time.delayedCall(260, () => (botao === 'A' ? irCarregando(this, 'PvpArena', { p1, p2, arena }) : this.scene.start('PvpEscolha')))
   }
 
   // ---------- partida rápida (sala casual) ----------

@@ -76,7 +76,7 @@ const confirmar = (p, aceitar = true) => p.mandar({ t: 'confirmar', id: p.ultima
 test('protocolo igual nos dois lados (servidor e cliente)', async () => {
   const fs = await import('node:fs')
   const rede = fs.readFileSync(new URL('../../src/lib/lan/rede.js', import.meta.url), 'utf8')
-  assert.equal(PROTOCOLO, 5)
+  assert.ok(PROTOCOLO >= 5)
   assert.match(rede, new RegExp(`export const PROTOCOLO = ${PROTOCOLO}\\b`))
 })
 

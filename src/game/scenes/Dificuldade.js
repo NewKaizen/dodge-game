@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { irCarregando } from '../carregando.js'
 import Controles from '../controles.js'
 import { CHEFES, nivelDoChefe } from '../coop/chefes/index.js'
 import { criarFundo } from '../backgrounds/index.js'
@@ -266,8 +267,8 @@ export default class Dificuldade extends Phaser.Scene {
       if (!this.host) return
       const party = this.party ?? partyDe(this.registry)
       if (this.rede) irParaCena(this, 'CoopArena', { chefe: this.idChefe, nivel, party, semente: `rede:${Date.now()}` })
-      else this.scene.start('CoopArena', { chefe: this.idChefe, nivel, party })
-      this.scene.launch('Entrada', { nivel })
+      else irCarregando(this, 'CoopArena', { chefe: this.idChefe, nivel, party }, () => this.scene.launch('Entrada', { nivel }))
+      if (this.rede) this.scene.launch('Entrada', { nivel })
     })
   }
 

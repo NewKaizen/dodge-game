@@ -37,7 +37,7 @@ import { codigoDaBusca, limparSalaDaUrl } from '../salaLink.js'
 // Conta (lib/conta.js): logado, o "ola" leva o JWT e o servidor responde com o
 // resumo do perfil (eu.conta). O token só vai para o servidor que serviu a
 // página (casa), nunca para o de outro PC da LAN.
-export const PROTOCOLO = 5
+export const PROTOCOLO = 6
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas

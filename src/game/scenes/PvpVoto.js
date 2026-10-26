@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { irCarregando } from '../carregando.js'
 import Controles from '../controles.js'
 import { ARENAS, ARENA, ALEATORIA, apurarVotos, eventosDaArena } from '../pvp/arenas.js'
 import { criarRng } from '../pvp/baralho.js'
@@ -339,7 +340,7 @@ export default class PvpVoto extends Phaser.Scene {
     this.cameras.main.fadeOut(300, 0, 0, 0)
     await esperar(320)
     // em rede o host abre a arena nos dois, com uma semente nova (o convidado espera)
-    if (!this.rede) this.scene.start('PvpArena', { p1: this.p1, p2: this.p2, arena: id })
+    if (!this.rede) irCarregando(this, 'PvpArena', { p1: this.p1, p2: this.p2, arena: id })
     else if (souHostDaRede()) irParaCena(this, 'PvpArena', { p1: this.p1, p2: this.p2, arena: id, semente: `rede:${Date.now()}` })
   }
 

@@ -36,8 +36,8 @@ import { encerrarRede, irParaCena } from '../rede.js'
 // internet (`npm start`) é ONLINE. Três telas, conforme o estado da rede
 // (lib/lan/rede.js):
 //   SALAS       seu nome, criar sala, as salas achadas na rede, conectar por IP
-//               (ONLINE: seu nome, criar sala e entrar com o código do amigo;
-//               na primeira vez o jogo já pede o nome)
+//               (ONLINE: o nome vem da conta, ou o sorteado para o convidado;
+//               jogar rápido, criar sala e entrar com o código do amigo)
 //   SALA        os dois jogadores (nome, ping, pronto), o modo (PVP/CO-OP),
 //               o chat e as ações; o host começa quando o convidado está pronto
 //   FILA        (ONLINE: JOGAR RÁPIDO, docs/online.md) procurando com o tempo de
@@ -66,7 +66,7 @@ export default class Lan extends Phaser.Scene {
   create() {
     this.controles = new Controles(this)
     this.controles.onBotao((_, botao) => this.aoBotao(botao))
-    this.controles.onPausa(() => {}) // no lobby o C não faz nada
+    this.controles.onPausa(() => this.aoBotao('B')) // no lobby o C (Esc) também volta
     this.selId = null
     this.digitando = null // { campo: 'nome' | 'ip' | 'chat', texto }
     this.cancelarTexto = null
@@ -74,7 +74,6 @@ export default class Lan extends Phaser.Scene {
     this.saindo = false
     this.comecando = false
     this.musicaTocando = false
-    this.pediuNome = false // online: já abriu o campo do nome sozinho
     this.flash = null // "VALENDO!" do começo da partida
     this.view = this.add.container(0, 0).setDepth(10)
     this.dinamicos = [] // objetos animados no update() (cursor, pontinhos)
@@ -214,7 +213,6 @@ export default class Lan extends Phaser.Scene {
     }
     if (this.modoTela === 'salas' && s.online)
       return [
-        { id: 'nome', tipo: 'nome', acao: () => this.digitar('nome') },
         { id: 'rapido', rotulo: 'JOGAR RÁPIDO', ativo: s.fase === 'navegando', acao: () => entrarFila() },
         { id: 'criar', rotulo: 'JOGAR COM AMIGOS', ativo: s.fase === 'navegando', acao: () => criarSala() },
         { id: 'codigo', rotulo: 'ENTRAR COM CÓDIGO…', ativo: s.fase === 'navegando', acao: () => this.digitar('codigo') },
@@ -364,17 +362,13 @@ export default class Lan extends Phaser.Scene {
   telaOnline(itens, sel) {
     const s = this.s
     const t = (...a) => this.add2(this.texto(...a))
-    const escolhendo = this.digitando?.campo === 'nome'
 
-    // nome de usuário
+    // nome de usuário: o da conta (muda no PERFIL); convidado usa o sorteado
     const yNome = 92
-    this.add2(this.add.rectangle(20, yNome - 26, LARGURA - 40, 52, COR.painel, 0.82).setOrigin(0).setStrokeStyle(2, escolhendo ? COR.okNum : COR.temaNum, 0.6))
-    t(40, yNome, escolhendo && !s.eu.escolheuNome ? 'ESCOLHA SEU NOME:' : 'SEU NOME:', 14, escolhendo ? COR.ok : '#9a9ab0').setOrigin(0, 0.5)
-    const xNome = escolhendo && !s.eu.escolheuNome ? 196 : 130
-    const nome = t(xNome, yNome, this.campoTexto('nome', s.eu.nome), 16, escolhendo ? TEXTO.selecionado : TEXTO.normal).setOrigin(0, 0.5)
-    if (escolhendo) this.dinamicos.push({ tipo: 'campo', obj: nome, campo: 'nome' })
-    else t(nome.x + nome.width + 10, yNome, sel === 0 ? '(A: mudar)' : '', 11, COR.apagado).setOrigin(0, 0.5)
-    if (sel === 0) this.cursor(24, yNome)
+    this.add2(this.add.rectangle(20, yNome - 26, LARGURA - 40, 52, COR.painel, 0.82).setOrigin(0).setStrokeStyle(2, COR.temaNum, 0.6))
+    t(40, yNome, s.eu.conta ? 'VOCÊ:' : 'CONVIDADO:', 14, '#9a9ab0').setOrigin(0, 0.5)
+    const nome = t(s.eu.conta ? 100 : 140, yNome, s.eu.conta?.tag ? `${s.eu.nome}  ·  ${s.eu.conta.tag}` : s.eu.nome, 16, TEXTO.normal).setOrigin(0, 0.5)
+    t(nome.x + nome.width + 12, yNome, s.eu.conta ? '(muda no PERFIL)' : '(entre com o Google para usar o seu nome)', 11, COR.apagado, { strokeThickness: 0 }).setOrigin(0, 0.5)
 
     // jogar rápido / criar / entrar com código
     const topo = 136
@@ -387,7 +381,7 @@ export default class Lan extends Phaser.Scene {
       criar: 'cria a sala e dá um código (ou convide pela lista AMIGOS, acima do jogo)',
       codigo: 'digite o código que o seu amigo passou',
     }
-    itens.slice(1).forEach((it, k) => {
+    itens.forEach((it, k) => {
       const y = topo + 44 + k * passo
       const ativo = it.ativo !== false
       if (it.id === this.selId) {
@@ -724,13 +718,6 @@ export default class Lan extends Phaser.Scene {
       this.cancelarTexto?.()
       this.cancelarTexto = null
       this.comecar()
-    }
-
-    // online, na primeira vez: o jogo já pede o nome de usuário
-    if (this.s.online && !this.s.eu.escolheuNome && !this.pediuNome && this.s.fase === 'navegando' && !this.digitando && !this.saindo) {
-      this.pediuNome = true
-      this.selId = 'nome'
-      this.digitar('nome')
     }
 
     this.redesenhar()

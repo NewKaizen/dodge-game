@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { irCarregando } from '../carregando.js'
 import Controles from '../controles.js'
 import { tocar, musica } from '../audio.js'
 import { ASSETS } from '../assets.js'
@@ -176,7 +177,7 @@ export default class Menu extends Phaser.Scene {
     if (opcao.id === 'config' || opcao.id === 'cartas' || opcao.id === 'lan') {
       tocar(this, 'confirmar')
       this.cameras.main.fadeOut(220, 0, 0, 0)
-      this.time.delayedCall(240, () => this.scene.start(opcao.cena, { voltar: 'Menu' }))
+      this.time.delayedCall(240, () => irCarregando(this, opcao.cena, { voltar: 'Menu' }))
       return
     }
     // CO-OP/PVP: o logo e as opções somem e a luz do telão engole a sala
@@ -184,7 +185,7 @@ export default class Menu extends Phaser.Scene {
     tocar(this, 'superAtivar')
     this.logo.sair()
     this.tweens.add({ targets: this.painel, x: -60, alpha: 0, duration: 220, ease: 'Cubic.easeIn' })
-    this.telao.explodir().then(() => this.scene.isActive() && this.scene.start(opcao.cena))
+    this.telao.explodir().then(() => this.scene.isActive() && irCarregando(this, opcao.cena))
   }
 
   update(time, delta) {
