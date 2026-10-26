@@ -10,6 +10,7 @@ import { tocar, pararMusica } from '../audio.js'
 //   recomecar   dados para reiniciar essa cena
 //   sair        cena de destino do "SAIR"
 //   subtitulo   texto embaixo de PAUSA (padrão "contra <nome>")
+//   motivo      só quando o jogo pausou sozinho (janela sem foco, controle desconectado): vai no pé da caixa
 //
 //   C ou B     continuar
 //   CONFIGURAÇÕES abre a cena Config por cima (esta fica pausada até ela fechar)
@@ -32,6 +33,7 @@ export default class Pausa extends Phaser.Scene {
     this.dadosRecomecar = dados.recomecar
     this.destinoSair = dados.sair
     this.subtitulo = dados.subtitulo ?? (this.nomeChefe ? `contra ${this.nomeChefe}` : '')
+    this.motivo = typeof dados.motivo === 'string' ? dados.motivo : ''
   }
 
   create() {
@@ -53,6 +55,7 @@ export default class Pausa extends Phaser.Scene {
     this.cursor = this.add.image(0, 0, 'coracao').setTint(CORES.almas[0]).setScale(1.3)
     this.aviso = texto(0, 104, 'C / B: continuar     A: escolher', 12, TEXTO.desabilitado)
     painel.add([caixa, titulo, sub, ...this.linhas, this.cursor, this.aviso])
+    if (this.motivo) painel.add(texto(0, -45, `pausado: ${this.motivo}`, 11, TEXTO.selecionado))
 
     // entra com um "soco" rápido
     painel.setScale(0.85).setAlpha(0)

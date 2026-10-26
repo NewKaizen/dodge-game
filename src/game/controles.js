@@ -36,6 +36,7 @@ export default class Controles {
     this.numJogadores = emRede() ? 2 : scene.registry.get('numJogadores') ?? 1
     this.ouvintes = []
     this.ouvintesPausa = []
+    this.ouvintesPerda = []
     this.anterior = []
     this.toques = []
 
@@ -48,8 +49,18 @@ export default class Controles {
       if (j >= this.numJogadores) return
       this.ouvintes.forEach((fn) => fn(j, botao))
     }
+    // a janela perdeu o foco ou um controle sumiu (game/entrada.js): as arenas pausam.
+    // Partida em rede não pausa (o outro lado continuaria jogando).
+    const aoPerder = (motivo) => {
+      if (partidaOnline() || emRede()) return
+      this.ouvintesPerda.forEach((fn) => fn(motivo))
+    }
     scene.game.events.on('botao', aoBotao)
-    scene.events.once('shutdown', () => scene.game.events.off('botao', aoBotao))
+    scene.game.events.on('entrada-perdida', aoPerder)
+    scene.events.once('shutdown', () => {
+      scene.game.events.off('botao', aoBotao)
+      scene.game.events.off('entrada-perdida', aoPerder)
+    })
   }
 
   // fn(jogador, 'A' | 'B')
@@ -60,6 +71,12 @@ export default class Controles {
   // fn(jogador): botão de pause (C no teclado / BTN C no joystick)
   onPausa(fn) {
     this.ouvintesPausa.push(fn)
+  }
+
+  // fn(motivo): a janela perdeu o foco ou o controle foi desconectado no meio da partida
+  // (só partida local: online não tem pausa)
+  onPerdaDeFoco(fn) {
+    this.ouvintesPerda.push(fn)
   }
 
   // Direção analógica do jogador, -100..100 em cada eixo
