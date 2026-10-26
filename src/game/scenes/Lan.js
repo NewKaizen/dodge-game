@@ -66,7 +66,7 @@ export default class Lan extends Phaser.Scene {
   create() {
     this.controles = new Controles(this)
     this.controles.onBotao((_, botao) => this.aoBotao(botao))
-    this.controles.onPausa(() => {}) // no lobby o C não faz nada
+    this.controles.onPausa(() => this.aoBotao('B')) // no lobby o C (Esc) também volta
     this.selId = null
     this.digitando = null // { campo: 'nome' | 'ip' | 'chat', texto }
     this.cancelarTexto = null
