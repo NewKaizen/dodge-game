@@ -59,7 +59,7 @@ import { criarPartidas } from './partidas.js'
 import { METRICAS_NULA } from './metricas.js'
 import { nomeOfensivo } from '../src/lib/palavrasBloqueadas.js'
 
-export const PROTOCOLO = 5
+export const PROTOCOLO = 6
 export const PORTA_DESCOBERTA = 47777
 export const MAX_MEMBROS = 2
 const ANUNCIO_MS = 1500
