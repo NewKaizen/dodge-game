@@ -232,3 +232,17 @@ test('limita quem manda mensagem demais', () => {
   conv.mandar({ t: 'para', dados: { tipo: 'joy', x: 1, y: 0 } })
   assert.deepEqual(host.ultima('de').dados, { tipo: 'joy', x: 1, y: 0 })
 })
+
+test('nome de convidado com palavrão não aparece para os outros (convidado não tem denúncia)', () => {
+  const { entrar } = montar()
+  const host = entrar('127.0.0.1', 'C4R4LH0')
+  const conv = entrar('192.168.0.33', 'BETO')
+  host.mandar({ t: 'criar' })
+  conv.mandar({ t: 'entrar', sala: host.ultima('sala').sala.id })
+  assert.deepEqual(conv.ultima('sala').sala.membros.map((m) => m.nome), ['JOGADOR', 'BETO'])
+  conv.mandar({ t: 'nome', nome: 'filho da puta' })
+  assert.match(conv.ultima('erro').msg, /não é permitido/)
+  assert.equal(host.ultima('sala').sala.membros[1].nome, 'BETO')
+  conv.mandar({ t: 'nome', nome: 'Computador' }) // palavra inocente que contém outra
+  assert.equal(host.ultima('sala').sala.membros[1].nome, 'Computador')
+})

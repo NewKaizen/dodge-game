@@ -57,6 +57,7 @@ import { CONVITE_MS, CONVITES_POR_MINUTO, MAX_CONVITES_RECEBIDOS } from './amigo
 import { criarFila, agendarPadrao, ACOES_FILA_POR_MINUTO, REVANCHE_MS, FOLGA_PING_MS } from './fila.js'
 import { criarPartidas } from './partidas.js'
 import { METRICAS_NULA } from './metricas.js'
+import { nomeOfensivo } from '../src/lib/palavrasBloqueadas.js'
 
 export const PROTOCOLO = 5
 export const PORTA_DESCOBERTA = 47777
@@ -101,6 +102,12 @@ const limpar = (texto, max) =>
     .replace(/[\u0000-\u001f\u007f]/g, '')
     .trim()
     .slice(0, max)
+// nome de convidado (quem tem conta usa o do perfil, que o banco já filtrou):
+// a mesma lista de palavras do perfil; '' = não serve
+const nomeConvidado = (texto) => {
+  const nome = limpar(texto, MAX_NOME)
+  return nome && !nomeOfensivo(nome) ? nome : ''
+}
 
 // ---------- endereços ----------
 
@@ -232,12 +239,13 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     for (const id of sala.membros) enviar(clientes.get(id), msg)
   }
 
-  function sair(cliente, motivo = 'o host saiu: a sala foi fechada') {
+  // tirado: o host expulsou (não foi ele que saiu: não conta como abandono)
+  function sair(cliente, motivo = 'o host saiu: a sala foi fechada', { tirado = false } = {}) {
     const sala = salas.get(cliente.sala)
     cliente.sala = null
     cliente.pronto = false
     if (!sala) return
-    partidas.saiu(cliente, sala) // no meio da partida = abandono (server/partidas.js)
+    if (!tirado) partidas.saiu(cliente, sala) // no meio da partida = abandono (server/partidas.js)
     sala.membros.delete(cliente.id)
     atualizarStatus(cliente)
     // sala casual (JOGAR RÁPIDO): sem o oponente não tem o que fazer nela
@@ -451,7 +459,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   const boasVindas = (c, m, conta, tentouConta) => {
     c.usuario = conta?.id ?? null
     c.perfil = conta?.id ? resumoPerfil(conta.perfil) : null
-    c.nome = (c.perfil?.nome ?? limpar(m.nome, MAX_NOME)) || 'JOGADOR'
+    c.nome = (c.perfil?.nome ?? nomeConvidado(m.nome)) || 'JOGADOR'
     c.ok = true
     enviar(c, {
       t: 'bemvindo',
@@ -484,6 +492,60 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     return sala
   }
 
+  // "conta": o resultado da validação de `token` (conta = { id, perfil } | null)
+  function aplicarConta(c, conta, token) {
+    const antes = c.usuario
+    const depois = conta?.id ?? null
+    if (antes !== depois) removerDaFila(c, 'conta') // a fila olha a conta (mesma conta, bloqueios)
+    if (antes && antes !== depois) {
+      desregistrar(c, antes)
+      Object.assign(c, { amigos: new Set(), bloqueios: new Set(), pedidos: new Set(), statusPub: 'offline' })
+    }
+    c.usuario = depois
+    c.perfil = conta?.id ? resumoPerfil(conta.perfil) : null
+    if (c.perfil?.nome) c.nome = c.perfil.nome
+    enviar(c, { t: 'conta', conta: c.perfil, ...(token && autenticar && !c.usuario && { contaInvalida: true }) })
+    const sala = salas.get(c.sala)
+    if (sala) avisarSala(sala)
+    if (depois && depois !== antes) registrar(c)
+  }
+
+  function processarConta(c) {
+    const pedido = c.contaPendente
+    if (!pedido) return
+    c.vezConta = c.vezConta ?? 0
+    // sair da conta: na hora (sem Supabase), e a validação em andamento não vale mais
+    if (!pedido.token || !autenticar) {
+      c.contaPendente = null
+      c.vezConta++
+      return aplicarConta(c, null, pedido.token)
+    }
+    if (c.validando) return // volta aqui quando a validação acabar
+    // cada pedido vai ao Supabase: um por segundo basta (o mais novo espera)
+    const espera = (c.ultimaConta ?? -Infinity) + 1000 - agora()
+    if (espera > 0) {
+      c.cancelarConta ??= agendar(() => {
+        c.cancelarConta = null
+        if (clientes.has(c.id)) processarConta(c)
+      }, espera)
+      return
+    }
+    c.contaPendente = null
+    c.ultimaConta = agora()
+    c.validando = true
+    const vez = ++c.vezConta
+    Promise.resolve()
+      .then(() => autenticar(pedido.token))
+      .catch(() => null)
+      .then((conta) => {
+        c.validando = false
+        if (!clientes.has(c.id)) return
+        // chegou um pedido mais novo (ou saiu da conta) no meio: este não vale
+        if (vez === c.vezConta && !c.contaPendente) aplicarConta(c, conta, pedido.token)
+        processarConta(c)
+      })
+  }
+
   function entrarNaSala(c, sala) {
     removerDaFila(c, 'sala')
     sair(c)
@@ -513,41 +575,18 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     nome(c, m) {
       // com conta, o nome é o do perfil (muda pelo perfil e chega pelo "conta")
       if (c.perfil) return
-      c.nome = limpar(m.nome, MAX_NOME) || c.nome
+      const nome = nomeConvidado(m.nome)
+      if (!nome && limpar(m.nome, MAX_NOME)) return enviar(c, { t: 'erro', msg: 'esse nome não é permitido: escolha outro' })
+      c.nome = nome || c.nome
       const sala = salas.get(c.sala)
       if (sala) avisarSala(sala)
     },
     // entrou, saiu ou mudou o perfil sem reconectar: { token } (null = saiu da conta)
+    // (o último pedido sempre vale: sair da conta é na hora; um token que chega
+    // dentro do mesmo segundo ou durante uma validação fica para depois)
     conta(c, m) {
-      // cada pedido vai ao Supabase: um por segundo basta
-      if (c.validando || agora() - (c.ultimaConta ?? -Infinity) < 1000) return
-      c.ultimaConta = agora()
-      const token = typeof m.token === 'string' && m.token.length <= 4096 ? m.token : null
-      const aplicar = (conta) => {
-        const antes = c.usuario
-        const depois = conta?.id ?? null
-        if (antes !== depois) removerDaFila(c, 'conta') // a fila olha a conta (mesma conta, bloqueios)
-        if (antes && antes !== depois) {
-          desregistrar(c, antes)
-          Object.assign(c, { amigos: new Set(), bloqueios: new Set(), pedidos: new Set(), statusPub: 'offline' })
-        }
-        c.usuario = depois
-        c.perfil = conta?.id ? resumoPerfil(conta.perfil) : null
-        if (c.perfil?.nome) c.nome = c.perfil.nome
-        enviar(c, { t: 'conta', conta: c.perfil, ...(token && autenticar && !c.usuario && { contaInvalida: true }) })
-        const sala = salas.get(c.sala)
-        if (sala) avisarSala(sala)
-        if (depois && depois !== antes) registrar(c)
-      }
-      if (!token || !autenticar) return aplicar(null)
-      c.validando = true
-      Promise.resolve()
-        .then(() => autenticar(token))
-        .catch(() => null)
-        .then((conta) => {
-          c.validando = false
-          if (clientes.has(c.id)) aplicar(conta)
-        })
+      c.contaPendente = { token: typeof m.token === 'string' && m.token.length <= 4096 ? m.token : null }
+      processarConta(c)
     },
     listar(c) {
       // online as salas são privadas: só entra quem tem o código
@@ -604,7 +643,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       const alvo = clientes.get(m.id)
       // no meio da partida não: tirar o oponente não pode virar "vitória por abandono"
       if (!sala || sala.host !== c.id || !alvo || alvo.sala !== sala.id || alvo === c || sala.casual || sala.emPartida) return
-      sair(alvo)
+      sair(alvo, undefined, { tirado: true }) // o relato dele da partida que acabou ainda vale
       enviar(alvo, { t: 'fechada', motivo: 'o host tirou você da sala' })
     },
     chat(c, m) {
@@ -790,6 +829,8 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     // registro das partidas (os testes conferem a política)
     partidas,
     desconectar(cliente) {
+      cliente.cancelarConta?.()
+      cliente.cancelarConta = null
       if (cliente.usuario) {
         const t = agora()
         for (const [id, quando] of saiuDaConta) if (t - quando >= RECONEXAO_MS) saiuDaConta.delete(id)

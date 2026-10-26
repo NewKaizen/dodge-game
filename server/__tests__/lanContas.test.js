@@ -155,6 +155,52 @@ test('"conta" troca a conta sem reconectar (entrou / saiu)', async () => {
   assert.equal(p.recebidas.filter((m) => m.t === 'conta').length, antes)
 })
 
+test('"conta": sair da conta logo depois de entrar (ou no meio da validação) nunca se perde', async () => {
+  const { conectar } = montar(autenticadorFalso().autenticar)
+  // dentro do mesmo segundo
+  const p = conectar()
+  p.mandar({ t: 'ola', protocolo: PROTOCOLO, nome: 'GIL' })
+  relogio += 5000
+  p.mandar({ t: 'conta', token: 'token-ana' })
+  await esperar()
+  assert.equal(p.c.usuario, ID_ANA)
+  p.mandar({ t: 'conta', token: null })
+  assert.equal(p.c.usuario, null, 'saiu: o servidor não pode continuar com a conta')
+  assert.equal(p.ultima('conta').conta, null)
+  // enquanto o servidor ainda valida o token de entrar
+  const q = conectar()
+  q.mandar({ t: 'ola', protocolo: PROTOCOLO, nome: 'GIL' })
+  relogio += 5000
+  q.mandar({ t: 'conta', token: 'token-ana' })
+  q.mandar({ t: 'conta', token: null })
+  await esperar()
+  await esperar()
+  assert.equal(q.c.usuario, null)
+  assert.equal(q.ultima('conta').conta, null)
+})
+
+test('"conta": mudança dentro do mesmo segundo fica para depois (a última vale), não some', async () => {
+  const timers = []
+  const lobby = criarLobby({ locais: () => LOCAIS, autenticar: autenticadorFalso().autenticar, agora: () => relogio, agendar: (fn) => (timers.push(fn), () => timers.splice(timers.indexOf(fn), 1)) })
+  const recebidas = []
+  const c = lobby.conectar({ readyState: 1, bufferedAmount: 0, send: (m) => recebidas.push(JSON.parse(m)) }, '192.168.0.2')
+  const mandar = (m) => lobby.receber(c, JSON.stringify(m))
+  mandar({ t: 'ola', protocolo: PROTOCOLO, nome: 'GIL' })
+  relogio += 5000
+  mandar({ t: 'conta', token: 'ruim' })
+  await esperar()
+  mandar({ t: 'conta', token: 'token-ana' }) // perfil mudou de novo logo em seguida
+  mandar({ t: 'conta', token: 'token-ana' })
+  await esperar()
+  assert.equal(c.usuario, null, 'ainda espera o segundo')
+  assert.equal(timers.length, 1, 'um timer só, por mais que martele')
+  relogio += 1000
+  timers.shift()()
+  await esperar()
+  assert.equal(c.usuario, ID_ANA)
+  assert.equal(recebidas.filter((m) => m.t === 'conta').at(-1).conta.tag, 'ana#0042')
+})
+
 test('token gigante não vai para o Supabase', async () => {
   const { sb, autenticar } = autenticadorFalso()
   const { conectar } = montar(autenticar)

@@ -83,6 +83,11 @@ no meio). A função `nome_ofensivo()` da migration 0004 tem **as mesmas listas*
 falha se as duas divergirem. Para mudar a lista: edite o JS **e** o SQL (um novo
 `create or replace function` numa migration nova) juntos.
 
+O nome de **convidado** (sem conta, sem tag: não dá para denunciar) passa pela
+mesma lista no servidor do lobby (`server/lan.js`): o que cai nela aparece como
+`JOGADOR` para os outros (na sala e no Jogar Rápido), e trocar para um nome assim
+é recusado.
+
 Limites conhecidos: o filtro só roda quando a pessoa **muda** o nome; o nome
 inicial vem do Google e não passa por ele (a denúncia cobre). Não pega
 "f d p" com espaços, nem variações criativas.

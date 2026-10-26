@@ -80,8 +80,9 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 | 1B Amigos e convites | concluído (NewKaizen/dodge-game#39); falta validar com duas contas em produção |
 | 1C Jogar Rápido | concluído (NewKaizen/dodge-game#40); falta testar no navegador |
 | 1D XP e recompensas | concluído (NewKaizen/dodge-game#41); falta rodar a 0003 e testar com duas contas |
-| 1E Integração e lançamento | concluído, PR aberto; falta rodar a 0004 |
-| R3 Revisão final + P2 plano 2–6 | próximo (R3 Opus, P2 Sonnet) |
+| 1E Integração e lançamento | concluído (NewKaizen/dodge-game#42); falta rodar 0003 e 0004 |
+| R3 Revisão final + P2 plano 2–6 | concluído: 5 defeitos corrigidos, plano em `docs/plano-fases-2-6.md` |
+| Fase 2 | próxima — aguardando decisões do usuário (ver plano-fases-2-6.md) |
 
 ### Consolidação (depois das features da Fase 1)
 

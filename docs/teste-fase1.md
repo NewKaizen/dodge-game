@@ -28,13 +28,26 @@ Variáveis no Render: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`,
 | # | Critério | Como verificar |
 | --- | --- | --- |
 | 1 | Criar conta, entrar novamente e acessar de outro navegador preserva perfil e progresso. | auto: "token válido: valida antes das boas-vindas e usa o nome do perfil" · pg: 0001–0003 duas vezes · **real**: entrar com o Google, mudar nome/avatar, jogar uma partida, sair, entrar de novo **e** entrar em outro navegador: mesmo perfil, nível e XP |
-| 2 | Foto pode ser enviada, recortada, trocada e removida; arquivos inválidos são rejeitados. | auto: "sucesso: WebP 256x256 sem metadados…", "bytes mágicos que não batem com o Content-Type: 415", "grande demais: 413", "limite: 5 envios por minuto…" · **manual**: enviar, recortar, trocar e remover a foto (volta ao avatar padrão); tentar um `.gif` e um arquivo renomeado |
-| 3 | Uma conta não edita dados ou equipamentos de outra. | pg: `progressoSql`/`moderacaoSql` (update/insert direto negado, `equipar` só itens próprios, `conceder_recompensa` negada ao navegador) · auto: `/api/avatar` sempre grava em `<uuid do token>.webp` · **manual**: no console do navegador, chamar `atualizar_perfil`/`equipar` — só muda a própria conta |
+| 2 | Foto pode ser enviada, recortada, trocada e removida; arquivos inválidos são rejeitados. | auto: "sucesso: WebP 256x256 sem metadados…", "DELETE /api/avatar apaga a foto e volta para o padrão", "bytes mágicos que não batem com o Content-Type: 415", "grande demais: 413…", "limite: 5 envios por minuto…" (o recorte é só no navegador: manual) · **manual**: enviar, recortar, trocar e remover a foto (volta ao avatar padrão); tentar um `.gif` e um arquivo renomeado |
+| 3 | Uma conta não edita dados ou equipamentos de outra. | pg: `progressoSql`/`moderacaoSql` (update/insert direto negado, `equipar` só itens próprios, `conceder_recompensa` negada ao navegador), `amigosSql` (tabelas de amigos fechadas; aceitar, cancelar, desfazer e bloquear só pela própria conta) · auto: `/api/avatar` sempre grava em `<uuid do token>.webp` · **manual**: no console do navegador, chamar `atualizar_perfil`/`equipar` — só muda a própria conta |
 | 4 | Dois amigos se adicionam, entram na mesma sala e completam PVP e CO-OP para dois. | auto: `amigos.test.js` (convite, presença, bloqueio), `salaLink.test.js` · **manual**: duas contas se adicionam pela tag, um convida pela lista AMIGOS, jogam **uma partida PVP e uma CO-OP** na mesma sala; repetir pelo código/link |
 | 5 | Jogar Rápido encontra um par ou oferece uma alternativa clara; cancelamento e falha liberam os dois jogadores. | auto: `fila.test.js` (pareia, um recusa, tempo esgotado, desconectar procurando ou pareado, revanche), `filaCliente.test.js` · **manual**: duas janelas (uma convidada) em JOGAR RÁPIDO; cancelar; fechar uma aba durante a confirmação; esperar 30 s sozinho e ver "JOGAR CONTRA A CPU" |
-| 6 | Concluir uma partida entrega XP, nível e recompensa corretos; reenvio e reconexão não duplicam nada. | auto: `partidas.test.js` (validada, contestada, abandono, relatos simultâneos, convidado, farm) · pg: `conceder_recompensa` duas vezes/em paralelo = uma concessão · **manual**: partida de 60 s+ (+60 / +40), recarregar a tela de resultado e reconectar — `concessoes` continua com uma linha por conta |
+| 6 | Concluir uma partida entrega XP, nível e recompensa corretos; reenvio e reconexão não duplicam nada. | auto: `partidas.test.js` (validada, contestada, abandono, relatos simultâneos, convidado, farm; "quem saiu no meio não relata depois…", "o host volta ao lobby e expulsa antes do relato do outro…", "host ligando e desligando a partida…") · pg: `conceder_recompensa` duas vezes/em paralelo = uma concessão · **manual**: partida de 60 s+ (+60 / +40), recarregar a tela de resultado e reconectar — `concessoes` continua com uma linha por conta |
 | 7 | Foto, equipamento, amizades e progresso permanecem na próxima sessão. | **real**: equipar título/moldura, ter um amigo e XP; fechar o navegador e voltar no dia seguinte — tudo igual |
 | 8 | Um grupo restrito consegue jogar várias partidas e voltar em outro dia sem intervenção do desenvolvedor. | **real**: o roteiro abaixo, em dois dias diferentes, sem você mexer no banco nem no servidor |
+
+### Quanto cada critério está coberto (revisão final R3)
+
+| # | Cobertura | O que falta além do `npm test` |
+| --- | --- | --- |
+| 1 | parcial | o login Google e a sessão no navegador só existem no Supabase real (o servidor validar o JWT e usar o perfil está coberto) |
+| 2 | parcial | o servidor (tipos, tamanho, limite, WebP sem metadados, apagar) está coberto; recortar e trocar na tela é manual |
+| 3 | coberto (pg) | rodar com `DODGE_PG`; no Supabase real, conferir que a 0001–0004 rodou inteira (os `revoke`) |
+| 4 | parcial | presença, convite, bloqueio e link estão cobertos; jogar PVP **e** CO-OP de verdade na mesma sala é manual |
+| 5 | coberto | a tela da fila (contagem, oferta da CPU) é conferida à mão |
+| 6 | coberto (+pg) | a animação do painel de XP é manual |
+| 7 | só real | — |
+| 8 | só real | — |
 
 ### Além dos critérios (base para lançar, 1E)
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { criarLobby, PROTOCOLO } from '../lan.js'
-import { criarPartidas, criarRegistro, decidir, lerRelato, RELATO_JANELA_MS, ABANDONO_GRACA_MS, GUARDAR_MS } from '../partidas.js'
+import { criarPartidas, criarRegistro, decidir, lerRelato, RELATO_JANELA_MS, ABANDONO_GRACA_MS, GUARDAR_MS, PARTIDAS_POR_MINUTO } from '../partidas.js'
 import { criarSupabaseFalso } from '../supabase/fake.js'
 import { XP_PARTICIPACAO, XP_VITORIA } from '../../src/lib/progresso.js'
 
@@ -227,6 +227,39 @@ test('o outro saiu antes do relato de quem ficou: vale o que quem ficou viu', as
   await esperar()
   assert.equal(recompensa(host).xpGanho, VITORIA)
   assert.equal(recompensa(conv).motivo, 'abandono')
+})
+
+test('quem saiu no meio não relata depois (nem pela mesma conexão nem por outra aba)', async () => {
+  for (const pelaOutraAba of [false, true]) {
+    const m = montar()
+    const { host, conv, partidaId } = await partida(m)
+    const outraAba = pelaOutraAba ? await m.entrar('beto') : null
+    m.relogio.andar(80_000)
+    conv.mandar({ t: 'sair' }) // abandonou perdendo...
+    relatar(outraAba ?? conv, partidaId, 1) // ...e diz que ganhou
+    m.relogio.andar(ABANDONO_GRACA_MS)
+    await esperar()
+    assert.equal(recompensa(host).xpGanho, VITORIA, 'quem ficou leva a vitória')
+    assert.equal(recompensa(host).motivo, 'vitoria')
+    assert.equal(m.sb.tabelas.perfis.find((p) => p.id === 'u-beto').xp, 0, 'quem saiu não ganha nada')
+  }
+})
+
+test('host ligando e desligando a partida sem parar não enche o banco de registros', async () => {
+  const m = montar({ contas: ['ana'] })
+  const { host } = await partida(m, 'ana', 'beto') // beto entra como convidado
+  for (let i = 0; i < 40; i++) {
+    host.mandar({ t: 'partida', valor: false })
+    host.mandar({ t: 'partida', valor: true })
+  }
+  await esperar()
+  assert.ok(m.sb.tabelas.partidas.length <= PARTIDAS_POR_MINUTO, `${m.sb.tabelas.partidas.length} registros num minuto`)
+  assert.equal(host.ultima('sala').sala.emPartida, true, 'a partida em si continua')
+  // passado o minuto, volta a registrar
+  m.relogio.andar(60_000)
+  host.mandar({ t: 'partida', valor: false })
+  host.mandar({ t: 'partida', valor: true })
+  assert.ok(host.ultima('sala').sala.partidaId)
 })
 
 test('relato repetido não muda nada nem concede de novo', async () => {
@@ -535,4 +568,20 @@ test('criarPartidas sem lobby: sala de CO-OP ou incompleta não registra', () =>
   assert.equal(partidas.iniciar({ id: 's', modo: 'pvp' }, [{ id: 'a' }]), null)
   assert.equal(partidas.iniciar({ id: 's', modo: 'coop' }, [{ id: 'a' }, { id: 'b' }]), null)
   partidas.fechar()
+})
+
+test('o host volta ao lobby e expulsa antes do relato do outro: não vira vitória por abandono', async () => {
+  const m = montar()
+  const { host, conv, partidaId } = await partida(m)
+  m.relogio.andar(120_000)
+  host.mandar({ t: 'partida', valor: false })
+  host.mandar({ t: 'expulsar', id: conv.c.id })
+  assert.equal(conv.c.sala, null)
+  m.relogio.andar(200)
+  relatar(conv, partidaId, 1) // o relato de quem foi tirado ainda vale
+  m.relogio.andar(RELATO_JANELA_MS)
+  await esperar()
+  assert.notEqual(recompensa(host).motivo, 'vitoria')
+  assert.equal(recompensa(host).xpGanho, 0)
+  assert.equal(recompensa(conv).motivo, 'participacao')
 })
