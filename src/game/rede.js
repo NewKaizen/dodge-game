@@ -33,7 +33,7 @@ aoRapido((dados) => canal.entregar(dados))
 let ativa = false
 let jogoAtual = null
 // cenas de menu: dali um convite aceito leva direto ao lobby da sala (Lan)
-const CENAS_DE_MENU = ['Menu', 'Config', 'Grimorio', 'GuiaBonus']
+const CENAS_DE_MENU = ['Menu', 'Config', 'Grimorio', 'GuiaBonus', 'Perfil', 'Amigos', 'Colecao']
 const cenasAtivas = () => jogoAtual?.scene.getScenes(true).map((c) => c.scene.key) ?? []
 export const podeEntrarEmSala = () => cenasAtivas().every((k) => k === 'Lan' || CENAS_DE_MENU.includes(k))
 
