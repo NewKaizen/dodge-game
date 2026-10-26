@@ -79,8 +79,8 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 | 1A Contas e perfil | concluído e validado em produção (NewKaizen/dodge-game#37, #38: chaves novas do Supabase) |
 | 1B Amigos e convites | concluído (NewKaizen/dodge-game#39); falta validar com duas contas em produção |
 | 1C Jogar Rápido | concluído (NewKaizen/dodge-game#40); falta testar no navegador |
-| 1D XP e recompensas | concluído, PR aberto; falta rodar a 0003 e testar com duas contas |
-| 1E Integração e lançamento | próximo (Sonnet; Opus só na revisão final R3) |
+| 1D XP e recompensas | concluído (NewKaizen/dodge-game#41); falta rodar a 0003 e testar com duas contas |
+| 1E Integração e lançamento | em andamento (Sonnet, branch `claude/practical-darwin-nc9pwz`) |
 
 ### Consolidação (depois das features da Fase 1)
 
