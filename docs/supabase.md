@@ -182,19 +182,22 @@ npm run online          # compila e sobe em http://localhost:5180
 # ou: npm run dev       # http://localhost:5173 (o Vite também liga /api/*)
 ```
 
-1. Abra a página: embaixo dos botões do joystick aparece **Entrar com Google**.
-2. Entre: volta para o jogo com o seu avatar e nome. Clique nele para abrir o
-   **PERFIL** (nome, `#tag`, nível, XP, título, estatísticas, **Coleção…**).
-3. Troque o nome, escolha um personagem como avatar, envie uma foto (recorte
-   quadrado com prévia) e remova a foto.
+1. Abra a página, aperte uma tecla (o teclado liga sozinho) e vá em **PERFIL** no menu
+   inicial: **ENTRAR COM GOOGLE**.
+2. Entre: volta para o jogo; o **PERFIL** mostra o seu avatar, nome, `#tag`,
+   nível, XP, título e estatísticas (e leva à **COLEÇÃO** e aos **AMIGOS**).
+3. Troque o nome, escolha um personagem como avatar, envie uma foto (o
+   seletor e o recorte quadrado com prévia abrem por cima do jogo) e remova a foto.
 4. No **Table Editor → perfis** confira as mudanças; em **Storage → avatares**
    aparece `<seu id>.webp`.
 5. Abra o modo ONLINE/LAN e crie uma sala: o nome no lobby é o do perfil.
 6. Amigos (precisa da migration 0002): entre com **duas contas Google** em dois
-   navegadores/perfis. Numa, botão **AMIGOS** → digite a tag da outra
-   (`nome#1234`, no perfil) → **Enviar pedido**. Na outra, **Aceitar**. Os dois
-   aparecem com bolinha verde; **Convidar** cria uma sala e a outra conta
-   recebe a notificação com **Aceitar**.
+   navegadores/perfis. Numa, ONLINE → **AMIGOS** (ou PERFIL → AMIGOS) →
+   **+ ADICIONAR PELA TAG** → digite a tag da outra (`nome#1234`, no perfil) e
+   Enter. A outra recebe o aviso "quer ser seu amigo" e responde em
+   **PEDIDOS** (A → **ACEITAR**). Os dois aparecem com bolinha verde;
+   **CONVIDAR** (A na linha do amigo) cria uma sala e a outra conta recebe o
+   aviso com **A aceitar / B recusar**.
 7. XP (precisa da migration 0003): com as duas contas, joguem uma partida PVP
    online inteira (Jogar Rápido ou sala de amigos, mais de 60 s). O painel de
    XP aparece no fim; no **Table Editor** confira `partidas` (`recompensada`),

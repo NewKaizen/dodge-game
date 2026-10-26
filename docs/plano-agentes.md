@@ -82,23 +82,26 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 | 1D XP e recompensas | concluído (NewKaizen/dodge-game#41); falta rodar a 0003 e testar com duas contas |
 | 1E Integração e lançamento | concluído (NewKaizen/dodge-game#42); falta rodar 0003 e 0004 |
 | R3 Revisão final + P2 plano 2–6 | concluído: 5 defeitos corrigidos, plano em `docs/plano-fases-2-6.md` |
-| Fase 2 | próxima — aguardando decisões do usuário (ver plano-fases-2-6.md) |
+| Correções pós-Fase 1 | concluído (NewKaizen/dodge-game#44: tela preta do convidado, CARREGANDO…, nome da conta) |
+| 2A Consolidação das telas | concluído (Perfil, Amigos e Coleção como cenas; avisos no jogo; JOGAR RÁPIDO e PERFIL no menu); falta o teste restrito (`docs/teste-fase1.md`) e ver no navegador com contas reais |
+| Fase 2 | em andamento: 2B em diante. 2A feita (Sonnet). Decisões: consolidação = 2A; controle padrão Xbox/PS remapeável; religação 20 s; host cai = sem XP e sem derrota; retomada no começo da rodada (recomendadas; podem mudar antes da 2B/2D) |
 
 ### Consolidação (depois das features da Fase 1)
 
 Decisão do usuário: primeiro as features, depois organizar tudo. Itens anotados:
 
-- Trazer perfil, amigos e conta **para dentro do jogo** (cenas/visual da Mesa de Cartas), em vez das barras/overlays Svelte "fora do jogo".
-- Toast de aviso quando chega pedido de amizade (hoje só selo no botão).
+- ~~Trazer perfil, amigos e conta **para dentro do jogo** (cenas/visual da Mesa de Cartas), em vez das barras/overlays Svelte "fora do jogo".~~ Feito na 2A (a foto continua em Svelte: seletor de arquivo e recorte).
+- ~~Toast de aviso quando chega pedido de amizade (hoje só selo no botão).~~ Feito na 2A (`src/game/conta/avisos.js`).
 - Decidir se bloquear tira o bloqueado da sala atual (hoje não tira).
-- JOGAR RÁPIDO no menu principal (hoje só na tela ONLINE; a arte da Mesa tem 5 vagas).
-- Avisar quando convidar um amigo tira você da fila (hoje é silencioso).
+- ~~JOGAR RÁPIDO no menu principal (hoje só na tela ONLINE; a arte da Mesa tem 5 vagas).~~ Feito na 2A (7 linhas no espaço escuro da Mesa, sem mexer na arte).
+- ~~Avisar quando convidar um amigo tira você da fila (hoje é silencioso).~~ Feito na 2A (aviso ao aceitar um convite estando na fila).
 - Partida casual não começa se a aba do host estiver em segundo plano.
-- Aviso de XP para quem fica quando o oponente abandona (hoje só aparece no perfil).
+- ~~Aviso de XP para quem fica quando o oponente abandona (hoje só aparece no perfil).~~ Feito na 2A (toast "+XP").
 - Aplicar o verso de carta equipado nas partidas (hoje só na Coleção; precisa ir pela rede).
 - Rever o limite que conta todos os convidados como um único oponente.
 - XP no CO-OP.
 - Filtro de nomes também no nome inicial vindo do Google (hoje só ao trocar o nome).
+- (2E) Auditar cenas reaproveitadas pelo Phaser que guardam estado da partida anterior (o mesmo vício que travava o PvpResultado).
 
 ### Controle de custo
 

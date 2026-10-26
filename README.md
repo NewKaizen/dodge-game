@@ -7,7 +7,7 @@ Jogo de esquiva estilo Deltarune/Undertale com cartas, feito com Svelte + Phaser
 - **ONLINE**: os dois modos contra (ou com) um amigo pela internet: nome de usuário, sala com código, chat e pronto. Os dois modos rodam no PC de cada um ([docs/rede-pvp.md](docs/rede-pvp.md)). Como subir o servidor em [docs/online.md](docs/online.md).
 - **LAN**: o mesmo lobby com o outro jogador em outro PC da mesma rede (salas achadas sozinhas). Como ligar em [docs/lan.md](docs/lan.md).
 
-Controle: joystick pela porta serial ([docs/protocolo-serial.md](docs/protocolo-serial.md)) ou o simulador de teclado da página.
+Controle: teclado, controle físico (gamepad) ou joystick pela porta serial ([docs/protocolo-serial.md](docs/protocolo-serial.md)); o jogo liga o que você usar sozinho, sem botão para clicar ([docs/controles.md](docs/controles.md)).
 
 ```sh
 npm install

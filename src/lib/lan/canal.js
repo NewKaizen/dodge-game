@@ -46,7 +46,7 @@ const MAX_SEM_RECIBO = 2000 // guardadas para reenviar (passou disso, a mais vel
 
 const novaSessao = () => Math.random().toString(36).slice(2, 10)
 
-export function criarCanal({ enviarBruto, meuId = () => 'eu', agora = () => Date.now(), agendar = (fn, ms) => setTimeout(fn, ms), sessao = novaSessao } = {}) {
+export function criarCanal({ enviarBruto, enviarReserva = enviarBruto, meuId = () => 'eu', agora = () => Date.now(), agendar = (fn, ms) => setTimeout(fn, ms), sessao = novaSessao } = {}) {
   let seq = 0
   let minhaSessao = sessao()
   const semRecibo = new Map() // seq -> { msg, em } (as minhas confiáveis que o outro ainda não confirmou)
@@ -105,6 +105,7 @@ export function criarCanal({ enviarBruto, meuId = () => 'eu', agora = () => Date
     }
     sessaoDe.set(de, msg.e ?? '')
     if (!esperado.has(id)) esperado.set(id, 0)
+    const repetida = msg.s < esperado.get(id) || Boolean(foraDeOrdem.get(id)?.has(msg.s))
     if (msg.s >= esperado.get(id)) {
       if (!foraDeOrdem.has(id)) foraDeOrdem.set(id, new Map())
       const fila = foraDeOrdem.get(id)
@@ -117,8 +118,11 @@ export function criarCanal({ enviarBruto, meuId = () => 'eu', agora = () => Date
         despachar(m.k, m.c, m.d)
       }
     }
-    // recibo (também da repetida: o recibo de antes pode ter se perdido)
-    enviarBruto({ tipo: TIPO_FIO, de: meuId(), k: RECIBO, e: msg.e ?? '', a: esperado.get(id) })
+    // recibo (também da repetida: o recibo de antes pode ter se perdido, então
+    // o dela vai pelo caminho garantido)
+    const recibo = { tipo: TIPO_FIO, de: meuId(), k: RECIBO, e: msg.e ?? '', a: esperado.get(id) }
+    if (repetida) enviarReserva(recibo)
+    else enviarBruto(recibo)
   }
 
   function aoRecibo(msg) {
@@ -136,7 +140,7 @@ export function criarCanal({ enviarBruto, meuId = () => 'eu', agora = () => Date
       for (const p of semRecibo.values()) {
         if (t - p.em < REENVIO_MS) continue
         p.em = t
-        enviarBruto(p.msg)
+        enviarReserva(p.msg) // pelo caminho garantido (o direto pode estar mudo)
       }
       vigiar()
     }, REENVIO_MS)

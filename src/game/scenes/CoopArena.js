@@ -224,6 +224,7 @@ export default class CoopArena extends PvpArena {
       else this.apertarB(j)
     })
     this.controles.onPausa(() => this.pausar())
+    this.controles.onPerdaDeFoco((motivo) => this.pausar(motivo))
     this.events.on('postupdate', this.filtrarCaixas, this)
 
     if (import.meta.env.DEV) window.coopArena = this
@@ -1224,7 +1225,7 @@ export default class CoopArena extends PvpArena {
     return ['inicio', 'escolha', 'revelacao', 'arremesso', 'esquiva', 'contra'].includes(this.fase) && !this.saindo && !this.pausado && !this.rede
   }
 
-  pausar() {
+  pausar(motivo) {
     if (!this.podePausar() || this.time.now - this.retomadoEm < 200) return
     this.pausado = true
     this.scene.pause()
@@ -1235,6 +1236,7 @@ export default class CoopArena extends PvpArena {
       // a party vai junto: sem ela o Phaser repetiria os dados da última abertura da cena
       recomecar: { chefe: this.idChefe, nivel: this.idNivel, party: [...this.ids] },
       sair: 'Selecao',
+      motivo,
     })
     this.scene.bringToTop('Pausa')
   }

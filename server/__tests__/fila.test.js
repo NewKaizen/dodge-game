@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { criarLobby, PROTOCOLO } from '../lan.js'
-import { criarFila, CONFIRMAR_MS, REVANCHE_MS, ACOES_FILA_POR_MINUTO } from '../fila.js'
+import { criarFila, CONFIRMAR_MS, REVANCHE_MS, ACOES_FILA_POR_MINUTO, CASUAL_INICIO_MS, EVITAR_PAR_MS } from '../fila.js'
 
 // relógio e timers falsos: andar(ms) dispara o que venceu
 function relogioFalso() {
@@ -175,7 +175,7 @@ test('pareia, os dois confirmam e a sala casual nasce com o host de quem confirm
     assert.equal(p.estado(), 'fora')
   }
   assert.equal(ana.ultima('sala').sala.membros.find((m) => m.id === ana.c.id).pronto, true)
-  assert.equal(relogio.ativos(), 0, 'o timer do par foi cancelado')
+  assert.equal(relogio.ativos(), 1, 'o timer do par foi cancelado; fica só o prazo para o host começar')
   assert.match(logs.at(-1), /regra: confirmou primeiro/)
   // a casual é PVP, sem expulsar
   beto.mandar({ t: 'modo', modo: 'coop' })
@@ -465,4 +465,75 @@ test('revanche só vale na sala casual', async () => {
   // sala normal: o convidado sair não fecha a sala
   beto.mandar({ t: 'sair' })
   assert.equal(ana.tipo('fechada').length, 0)
+})
+
+// a casual nasceu, os dois confirmaram (o primeiro vira host)
+async function casualNova(montado) {
+  const { entrar } = montado
+  const ana = await entrar('ana')
+  const beto = await entrar('beto')
+  naFila(ana)
+  naFila(beto)
+  confirmar(ana)
+  confirmar(beto)
+  const sala = [...montado.lobby.salas.values()][0]
+  assert.equal(sala.host, ana.c.id)
+  return { ana, beto, sala }
+}
+
+test('casual: o host não começou a tempo (aba escondida): os dois voltam para a fila com aviso, sem abandono', async () => {
+  const montado = await montar()
+  const { lobby, relogio, entrar, logs } = montado
+  const { ana, beto, sala } = await casualNova(montado)
+  relogio.andar(CASUAL_INICIO_MS - 1)
+  assert.equal(lobby.salas.size, 1, 'ainda no prazo')
+  relogio.andar(1)
+  assert.equal(lobby.salas.size, 0, 'a sala fechou')
+  assert.ok(!lobby.salas.get(sala.id))
+  for (const p of [ana, beto]) {
+    const f = p.ultima('fechada')
+    assert.equal(f.casual, true)
+    assert.match(f.motivo, /não começou/)
+    assert.equal(p.c.sala, null)
+    assert.equal(p.estado(), 'procurando', 'voltou para a fila')
+    assert.equal(p.ultima('fila').estado, 'procurando')
+    assert.equal(p.tipo('recompensa').length, 0)
+  }
+  assert.equal(sala.partidaId ?? null, null, 'nenhuma partida registrada (nem abandono)')
+  assert.match(logs.at(-1), /não começou/)
+  // os dois sozinhos na fila não se pareiam de novo logo
+  assert.equal(lobby.fila.pares(), 0)
+  // chega outro: pareia com quem esperava (o convidado da casual, que voltou primeiro)
+  const caio = await entrar('caio')
+  naFila(caio)
+  assert.equal(caio.ultima('pareado').oponente.nome, 'BETO')
+  // depois do tempo de evitar, a ana pode parear com o beto de novo (se ele estiver livre)
+  confirmar(caio, false)
+  relogio.andar(EVITAR_PAR_MS + 100)
+  assert.equal(ana.ultima('pareado').oponente.nome, 'BETO')
+})
+
+test('casual: o host começou a tempo: o prazo some e nada fecha', async () => {
+  const montado = await montar()
+  const { lobby, relogio } = montado
+  const { ana, beto, sala } = await casualNova(montado)
+  relogio.andar(2000)
+  ana.mandar({ t: 'partida', valor: true })
+  assert.equal(sala.emPartida, true)
+  relogio.andar(CASUAL_INICIO_MS * 3)
+  assert.equal(lobby.salas.get(sala.id), sala)
+  assert.equal(beto.tipo('fechada').length, 0)
+  assert.equal(beto.c.sala, sala.id)
+})
+
+test('casual: o convidado saiu antes do prazo: o prazo não faz nada depois', async () => {
+  const montado = await montar()
+  const { lobby, relogio } = montado
+  const { ana, beto } = await casualNova(montado)
+  beto.mandar({ t: 'sair' })
+  assert.equal(lobby.salas.size, 0)
+  const antes = ana.recebidas.length
+  relogio.andar(CASUAL_INICIO_MS * 2)
+  assert.equal(ana.recebidas.length, antes, 'nenhuma mensagem do prazo')
+  assert.equal(ana.estado(), 'fora')
 })

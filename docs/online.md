@@ -95,6 +95,7 @@ TURN_SENHA=...
 - **"a conexão caiu e você saiu da fila / da sala"**: o servidor tira quem perde a conexão (ninguém fica preso); quando reconectar, procure de novo ou entre pelo código.
 - **"não achei a sala …"**: código errado, ou o host já fechou a sala (ela some quando o host sai).
 - **Ping alto**: olhe a barra de cima. Se diz **pelo servidor**, a ligação direta não passou e tudo está dando a volta pelo servidor: configure um TURN (acima). Se diz **direto** com ping alto, é a internet de um dos dois (Wi-Fi fraco, download rolando); cabo ajuda muito.
+- **Brave**: com os escudos ligados o canal direto (WebRTC) pode abrir sem entregar nada. O jogo percebe em ~3 s e passa tudo pelo servidor (ping maior, mas joga); se mesmo assim travar, desligue os escudos para este site.
 - **A partida parou esperando o outro**: a aba do outro precisa ficar visível (o navegador para o jogo numa aba escondida).
 
 
@@ -160,6 +161,11 @@ conta e para convidado (convidado joga, mas a partida não dá XP: aviso na tela
   conhecidos e a diferença é de pelo menos **30 ms** (o cliente manda o ping
   também enquanto está na fila); senão, quem **confirmou primeiro**. O servidor
   escreve a escolha no log (`[fila] partida rápida ...`).
+- **O host não começou** em **15 s** depois da sala casual nascer (aba dele
+  escondida, PC travado): a sala fecha, os dois veem "a partida não começou (o
+  host não respondeu): procurando outra" e voltam para a fila (o convidado na
+  frente). Não conta abandono, e os dois não pareiam um com o outro por 60 s
+  (`CASUAL_INICIO_MS`, `EVITAR_PAR_MS` em `server/fila.js`).
 - Desconectar procurando ou com partida achada tira da fila e libera o outro.
   Confirmação atrasada (depois dos 10 s) não vale: "essa partida não vale mais".
 - Limite: **30 ações por minuto** (fila, confirmar, revanche) por conexão, além
@@ -182,8 +188,7 @@ A sala ganhou `casual` no `sala {...}` e o `fechada` da sala casual vem com
 ### Testar com duas janelas
 
 `ONLINE=1 npm run dev` (ou `npm run online`), abra o jogo em duas janelas (uma
-anônima serve de convidado; a outra pode estar logada), use o **SIMULADOR
-(TECLADO)** nas duas, ONLINE → JOGAR RÁPIDO nas duas e aceite com A. Para ver a
+anônima serve de convidado; a outra pode estar logada), aperte uma tecla do jogo nas duas (o teclado liga sozinho), ONLINE → JOGAR RÁPIDO nas duas e aceite com A. Para ver a
 oferta da CPU, entre só com uma e espere 30 s.
 
 ## XP, níveis e Coleção (Fase 1D)
@@ -318,15 +323,36 @@ uma: os itens até o nível chegam no inventário.
 
 ## Hub e mensagens (Fase 1E)
 
-Onde cada coisa fica, até a consolidação trazer tudo para dentro do jogo:
+Conta, amigos e coleção são **cenas do jogo** (Fase 2A; antes eram painéis
+Svelte por cima dele): `Perfil`, `Amigos` e `Colecao` em `src/game/scenes/`,
+no visual da tela de Configurações e navegáveis só com ↑↓←→ + A/B (C e Esc
+voltam). Onde cada coisa fica:
 
 | Quero | Onde |
 | --- | --- |
-| **Jogar rápido** | menu → ONLINE → **JOGAR RÁPIDO** (1ª opção) |
-| **Jogar com amigos** | ONLINE → **JOGAR COM AMIGOS** (cria a sala e dá o código; 2ª opção), **ENTRAR COM CÓDIGO…** (3ª), ou o botão **AMIGOS** → Convidar |
-| **Perfil** | botão **PERFIL** na barra acima do jogo |
-| **Coleção** | botão **COLEÇÃO** na barra acima do jogo |
-| **Denunciar** | **AMIGOS** → **Denunciar…** no cartão da pessoa (docs/moderacao.md) |
+| **Jogar rápido** | menu inicial → **JOGAR RÁPIDO** (1ª opção; entra direto na fila), ou ONLINE → JOGAR RÁPIDO |
+| **Jogar com amigos** | ONLINE → **JOGAR COM AMIGOS** (cria a sala e dá o código), **ENTRAR COM CÓDIGO…**, ou **AMIGOS** → A no amigo → **CONVIDAR** |
+| **Perfil** | menu inicial → **PERFIL** (ou ONLINE → PERFIL): nome, avatar, foto, **ENTRAR COM GOOGLE**, sair |
+| **Amigos** | ONLINE → **AMIGOS** (ou PERFIL → AMIGOS): abas AMIGOS / PEDIDOS / BLOQUEADOS (←→) |
+| **Coleção** | ONLINE → **COLEÇÃO** (ou PERFIL → COLEÇÃO): abas por tipo, A equipa |
+| **Link da sala** | na sala ONLINE: **COPIAR LINK DA SALA** (também em AMIGOS enquanto há sala) |
+| **Denunciar** | **AMIGOS** → A na pessoa → **DENUNCIAR…** (docs/moderacao.md) |
+
+JOGAR RÁPIDO e PERFIL só aparecem no menu inicial onde há conta ou o site está
+na internet (`siteNaInternet()` ou contas não `indisponivel`); a LAN sem
+internet fica com as cinco opções de antes.
+
+### Avisos dentro do jogo
+
+Por cima de qualquer menu (não nas arenas: esperam na fila e saem quando voltar
+a um menu): convite de amigo (**A aceita, B recusa**, com a contagem de 60 s),
+pedido de amizade recebido, "o convite tirou você da fila", **+XP** de quem
+ficou quando o oponente saiu no meio, e erro da conta (login cancelado). A fila
+é `src/game/conta/fila.js` (pura, testada); o desenho e as ligações com as
+lojas são `src/game/conta/avisos.js`; `Controles.interceptarBotao` deixa o aviso
+pegar A/B antes da cena. A foto do perfil continua em Svelte
+(`src/ui/FotoModal.svelte` + `RecorteFoto.svelte`, `src/lib/fotoModal.js`):
+seletor de arquivo e recorte precisam de DOM.
 
 Os avisos de conexão (servidor ligando ou lotado, conta não confirmada, queda
 na fila ou na sala, oponente que saiu) estão em `src/lib/lan/rede.js` (`MSG_*`) e

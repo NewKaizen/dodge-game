@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { get } from 'svelte/store'
 import { irCarregando } from '../carregando.js'
 import Controles from '../controles.js'
 import { tocar, musica } from '../audio.js'
@@ -10,7 +11,12 @@ import { criarTelao } from '../menu/telao.js'
 import { criarLogo } from '../menu/logo.js'
 import { criarMesa } from '../menu/mesa.js'
 import { pref } from '../preferencias.js'
-import { souHost, salaDoLink } from '../../lib/lan/rede.js'
+import { souHost, salaDoLink, siteNaInternet } from '../../lib/lan/rede.js'
+import { conta } from '../../lib/conta.js'
+import { avatarDoPerfil } from '../../lib/contaRegras.js'
+import { corDaMoldura, progressoDoXp } from '../../lib/progresso.js'
+import { criarAvatar } from '../conta/ui.js'
+import { montarAvisos } from '../conta/avisos.js'
 
 // Tela inicial: a turma jogando cartas na mesa, com o caos preso no telão ao
 // fundo (uma luta de balas rolando) (menu/mesa.js). Ou, com MENU INICIAL = SALA
@@ -19,10 +25,12 @@ import { souHost, salaDoLink } from '../../lib/lan/rede.js'
 // esquerda. CO-OP (-> EscolhaParty) e PVP (-> PvpEscolha): a luz do telão engole
 // a sala. ONLINE (-> Lan: lobby para jogar com amigos, pela internet ou pela rede), GUIA (-> Grimorio:
 // todas as cartas com a prévia do ataque e as rodadas bônus de cada arena) e
-// CONFIGURAÇÕES (-> Config) só escurecem a tela. O host de uma sala LAN que
+// CONFIGURAÇÕES (-> Config), JOGAR RÁPIDO (-> Lan, já entrando na fila) e PERFIL (-> Perfil, a conta
+// dentro do jogo) só escurecem a tela. JOGAR RÁPIDO e PERFIL só existem onde há conta ou internet
+// (LAN sem internet não tem nenhum dos dois). O host de uma sala LAN que
 // volta ao menu (fim da partida, SAIR da pausa) cai direto no lobby. Embaixo da lista, uma linha diz o que a
-// opção escolhida faz; sem joystick conectado, as opções ficam apagadas e a
-// linha vira um aviso pedindo para conectar.
+// opção escolhida faz; até alguém apertar uma tecla ou um botão do controle (ou o
+// joystick serial já autorizado abrir), as opções ficam apagadas e a linha pede isso.
 //
 // Música: public/assets/musicas/menu.mid; sem o arquivo, toca a do Jevil. O
 // nome no canto de cima vem de ASSETS.tituloMusicaMenu.
@@ -33,13 +41,19 @@ const TITULO = 'DODGE'
 const SUBTITULO = 'DESVIE OU CAIA'
 // Para onde vai o PVP: a escolha de personagem (PvpEscolha -> PvpArena -> PvpResultado)
 const CENA_PVP = 'PvpEscolha'
-const OPCOES = [
-  { id: 'coop', rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty', dica: 'cartas juntos contra um chefe' },
-  { id: 'pvp', rotulo: 'PVP', cor: '#ff3d6e', cena: CENA_PVP, dica: 'duelo de cartas: quem desvia, vence' },
-  { id: 'lan', rotulo: 'ONLINE', cor: '#3fd6c8', cena: 'Lan', dica: 'jogar rápido ou com seus amigos (internet ou rede local)' },
-  { id: 'cartas', rotulo: 'GUIA', cor: '#b48cff', cena: 'Grimorio', dica: 'todas as cartas e as rodadas bônus das arenas' },
-  { id: 'config', rotulo: 'CONFIGURAÇÕES', cor: '#f2c14e', cena: 'Config', dica: 'som, controles, acessibilidade e gráficos' },
-]
+const CO_OP = { id: 'coop', rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty', dica: 'cartas juntos contra um chefe' }
+const PVP = { id: 'pvp', rotulo: 'PVP', cor: '#ff3d6e', cena: CENA_PVP, dica: 'duelo de cartas: quem desvia, vence' }
+const ONLINE = { id: 'lan', rotulo: 'ONLINE', cor: '#3fd6c8', cena: 'Lan', dica: 'jogar com amigos (internet ou rede local)' }
+const GUIA = { id: 'cartas', rotulo: 'GUIA', cor: '#b48cff', cena: 'Grimorio', dica: 'todas as cartas e as rodadas bônus das arenas' }
+const CONFIG = { id: 'config', rotulo: 'CONFIGURAÇÕES', cor: '#f2c14e', cena: 'Config', dica: 'som, controles, acessibilidade e gráficos' }
+const RAPIDO = { id: 'rapido', rotulo: 'JOGAR RÁPIDO', cor: '#ffd23a', cena: 'Lan', dados: { rapido: true }, dica: 'PVP 1x1 contra alguém da fila, já!' }
+const PERFIL = { id: 'perfil', rotulo: 'PERFIL', cor: '#6dffb0', cena: 'Perfil', dica: '' }
+// cenas que não explodem a sala: só escurecem a tela e abrem
+const SO_ESCURECEM = ['config', 'cartas', 'lan', 'rapido', 'perfil']
+
+// JOGAR RÁPIDO e PERFIL: onde há conta (ou o site está na internet, mesmo que as contas estejam fora do ar)
+const comConta = () => siteNaInternet() || get(conta).estado !== 'indisponivel'
+const montarLista = (comContas) => (comContas ? [RAPIDO, CO_OP, PVP, ONLINE, GUIA, PERFIL, CONFIG] : [CO_OP, PVP, ONLINE, GUIA, CONFIG])
 
 export default class Menu extends Phaser.Scene {
   constructor() {
@@ -58,7 +72,9 @@ export default class Menu extends Phaser.Scene {
     this.saindo = false
     this.pronto = false
     this.batidas = 0
-    this.indice = Math.min(this.registry.get('menuIndice') ?? 0, OPCOES.length - 1) // volta na opção de onde saiu
+    this.comContas = comConta()
+    this.opcoes = montarLista(this.comContas)
+    this.indice = Math.max(0, this.opcoes.findIndex((o) => o.id === this.registry.get('menuOpcao'))) // volta na opção de onde saiu
     const rapido = Boolean(this.registry.get('menuVisto'))
     this.registry.set('menuVisto', true)
 
@@ -76,17 +92,25 @@ export default class Menu extends Phaser.Scene {
     this.logo = criarLogo(this, area, { titulo: TITULO, subtitulo: SUBTITULO, escala: area.escala ?? 1 })
     this.montarOpcoes()
     this.montarCantos()
+    montarAvisos(this)
 
     musica('menu', 'jevil')
     this.cameras.main.fadeIn(rapido ? 220 : 500)
     this.abrir(rapido)
 
+    // a conta chegou (ou saiu): o PERFIL muda de cara; se o menu ganha ou perde JOGAR RÁPIDO e PERFIL, refaz
+    const pararConta = conta.subscribe(() => {
+      if (!this.pronto) return
+      if (comConta() !== this.comContas && !this.saindo) return this.scene.restart()
+      this.atualizarOpcoes()
+    })
     const aoConectar = () => this.atualizarOpcoes()
     this.registry.events.on('changedata-conectado', aoConectar)
     // o painel de cima pode mudar o número de jogadores: os controles mudam junto
     const aoMudar = (_, valor, anterior) => valor !== anterior && this.scene.restart()
     this.registry.events.on('changedata-numJogadores', aoMudar)
     this.events.once('shutdown', () => {
+      pararConta()
       this.registry.events.off('changedata-conectado', aoConectar)
       this.registry.events.off('changedata-numJogadores', aoMudar)
     })
@@ -100,6 +124,7 @@ export default class Menu extends Phaser.Scene {
     await this.logo.entrar({ rapido })
     if (!this.scene.isActive()) return
     this.pronto = true
+    if (comConta() !== this.comContas) return this.scene.restart() // a conta chegou enquanto o menu abria
     this.atualizarOpcoes()
     this.tweens.add({ targets: this.painel, x: 0, alpha: 1, duration: rapido ? 120 : 320, ease: 'Cubic.easeOut' })
   }
@@ -118,10 +143,34 @@ export default class Menu extends Phaser.Scene {
   montarOpcoes() {
     this.painel = this.add.container(-40, 0).setDepth(30).setAlpha(0)
     const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 5 })
-    this.linhas = OPCOES.map((o, i) => this.add.text(this.pos.x, this.pos.y + i * this.pos.passo, o.rotulo, estilo(26, o.cor)).setOrigin(0, 0.5))
+    const tamanho = this.opcoes.length > 5 ? 24 : 26 // com JOGAR RÁPIDO e PERFIL são 7 linhas na mesma tinta da mesa
+    this.linhas = this.opcoes.map((o, i) => this.add.text(this.pos.x, this.pos.y + i * this.pos.passo, o.rotulo, estilo(tamanho, o.cor)).setOrigin(0, 0.5))
     this.seta = this.add.text(0, 0, '◀', estilo(22, '#ffffff')).setOrigin(0, 0.5)
-    this.aviso = this.add.text(this.pos.x, this.pos.y + OPCOES.length * this.pos.passo - 6, '', { ...estilo(12, TEXTO.desabilitado), lineSpacing: 4 }).setOrigin(0, 0)
+    this.aviso = this.add.text(this.pos.x, this.pos.y + this.opcoes.length * this.pos.passo - 6, '', { ...estilo(12, TEXTO.desabilitado), lineSpacing: 4 }).setOrigin(0, 0)
+    this.miniatura = null // o avatar de quem está logado, ao lado do PERFIL
     this.painel.add([...this.linhas, this.seta, this.aviso])
+  }
+
+  // o texto de baixo da lista: o que a opção faz (o PERFIL diz quem é você)
+  dicaDe(opcao) {
+    if (opcao.id !== 'perfil') return opcao.dica
+    const c = get(conta)
+    if (c.estado === 'logado' && c.perfil) return `${c.perfil.nome_exibicao} · nível ${progressoDoXp(c.perfil.xp).nivel}`
+    if (c.estado === 'deslogado') return 'entre com o Google: XP, amigos e coleção'
+    if (c.estado === 'indisponivel') return 'contas fora do ar: você joga como convidado'
+    return 'carregando a conta…'
+  }
+
+  // o avatar com a moldura fica na margem esquerda da linha do PERFIL
+  atualizarMiniatura() {
+    const i = this.opcoes.findIndex((o) => o.id === 'perfil')
+    this.miniatura?.destroy()
+    this.miniatura = null
+    const c = get(conta)
+    if (i < 0 || c.estado !== 'logado' || !c.perfil) return
+    const sel = i === this.indice && this.conectado
+    this.miniatura = criarAvatar(this, this.pos.x - 16 + (sel ? 8 : 0), this.linhas[i].y, avatarDoPerfil(c.perfil), 20, corDaMoldura(c.perfil.moldura_equipada))
+    this.painel.add(this.miniatura)
   }
 
   get conectado() {
@@ -132,18 +181,19 @@ export default class Menu extends Phaser.Scene {
     const ativo = this.conectado
     this.linhas.forEach((l, i) => {
       const sel = i === this.indice
-      l.setColor(ativo ? OPCOES[i].cor : '#5a5a6a').setAlpha(ativo ? (sel ? 1 : 0.55) : 0.8)
+      l.setColor(ativo ? this.opcoes[i].cor : '#5a5a6a').setAlpha(ativo ? (sel ? 1 : 0.55) : 0.8)
       l.setX(this.pos.x + (sel && ativo ? 8 : 0))
     })
     const l = this.linhas[this.indice]
-    this.seta.setVisible(ativo).setColor(OPCOES[this.indice].cor).setPosition(this.pos.x + 8 + l.width + 12, l.y)
+    this.seta.setVisible(ativo).setColor(this.opcoes[this.indice].cor).setPosition(this.pos.x + 8 + l.width + 12, l.y)
     this.aviso
-      .setText(ativo ? OPCOES[this.indice].dica : 'conecte o joystick ou use o\nSIMULADOR (TECLADO) aí em cima ↑')
+      .setText(ativo ? this.dicaDe(this.opcoes[this.indice]) : 'aperte uma tecla ou um botão do\ncontrole para começar')
       .setColor(ativo ? '#9a9ab0' : TEXTO.desabilitado)
+    this.atualizarMiniatura()
   }
 
   selecionar(indice) {
-    this.indice = (indice + OPCOES.length) % OPCOES.length
+    this.indice = (indice + this.opcoes.length) % this.opcoes.length
     tocar(this, 'mover')
     this.atualizarOpcoes()
   }
@@ -172,12 +222,12 @@ export default class Menu extends Phaser.Scene {
   confirmar() {
     if (this.saindo || !this.pronto || !this.conectado) return
     this.saindo = true
-    const opcao = OPCOES[this.indice]
-    this.registry.set('menuIndice', this.indice)
-    if (opcao.id === 'config' || opcao.id === 'cartas' || opcao.id === 'lan') {
+    const opcao = this.opcoes[this.indice]
+    this.registry.set('menuOpcao', opcao.id)
+    if (SO_ESCURECEM.includes(opcao.id)) {
       tocar(this, 'confirmar')
       this.cameras.main.fadeOut(220, 0, 0, 0)
-      this.time.delayedCall(240, () => irCarregando(this, opcao.cena, { voltar: 'Menu' }))
+      this.time.delayedCall(240, () => irCarregando(this, opcao.cena, { voltar: 'Menu', pilha: [{ cena: 'Menu' }], ...opcao.dados }))
       return
     }
     // CO-OP/PVP: o logo e as opções somem e a luz do telão engole a sala

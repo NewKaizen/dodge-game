@@ -37,6 +37,8 @@ export const REVANCHE_MS = 15_000 // para os dois aceitarem a revanche
 export const CPU_APOS_MS = 30_000 // o cliente oferece a CPU depois disso procurando
 export const ACOES_FILA_POR_MINUTO = 30 // fila, confirmar e revanche, por conexão
 export const FOLGA_PING_MS = 30 // diferença de ping que decide o host (veja lan.js)
+export const CASUAL_INICIO_MS = 15_000 // a sala casual nasceu e o host não começou: os dois voltam para a fila
+export const EVITAR_PAR_MS = 60_000 // ...e não pareiam um com o outro de novo por esse tempo
 
 export const agendarPadrao = (fn, ms) => {
   const t = setTimeout(fn, ms)

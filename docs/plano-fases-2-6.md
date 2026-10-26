@@ -10,7 +10,7 @@ Camadas: **Haiku** = mecânico (textos, checklists, docs); **Sonnet** = padrão;
 - Sala online: `MAX_MEMBROS = 2` em `server/lan.js` (l.63; usado em ~6 pontos: criar, entrar, convite, revanche). Host saindo fecha a sala; queda de conexão hoje só avisa e devolve ao menu/lobby (`rede.js` l.200–214), **sem retomada**.
 - PVP e CO-OP são P2P (WebRTC com fallback pelo servidor, `transmissao.js`); o host decide o resultado; o servidor só compara relatos (`server/partidas.js`).
 - Acessibilidade: `acessibilidade.js` (fatores), `daltonismo.js`, `preferencias.js` (`reduzirMovimento` etc.). Já existem Grimório (`Grimorio.js`, 795 linhas), Guia (`GuiaBonus.js`, com prévias jogáveis) e `Config.js` (1047 linhas).
-- Contas/amigos/perfil ainda são Svelte fora do Phaser (ver Consolidação).
+- Contas/amigos/perfil/coleção são cenas Phaser desde a 2A (`Perfil`, `Amigos`, `Colecao`, base em `src/game/conta/`); só a foto do perfil segue em Svelte (`FotoModal`).
 
 ## Consolidação x Fase 2
 
@@ -25,8 +25,8 @@ Camadas: **Haiku** = mecânico (textos, checklists, docs); **Sonnet** = padrão;
 
 | Sub | Escopo | Arquivos prováveis | Modelo | Tokens |
 | --- | --- | --- | --- | --- |
-| **2A** Consolidação das telas | Perfil, Amigos, Coleção, conta e login como cenas Phaser (Mesa de Cartas); toast de pedido de amizade; JOGAR RÁPIDO no menu inicial; abas FILA/AMIGOS/PERFIL na `Lan`; aviso "convite tirou você da fila"; aviso de XP ao ficar após abandono; checar recorte/fonte em 854×480 | `scenes/Menu.js`, `menu/layout.js`, `scenes/Lan.js`, novas cenas, `src/ui/Conta.svelte`, `src/lib/conta.js` | Sonnet | 350–400k |
-| **2B** Controle físico | Gamepad API (`navigator.getGamepads`) entrando na mesma `bridge`/`aoBotao`; vínculo jogador→controle, zona morta, remapeamento de botões em `Config`, pausa do jogo ao perder foco, reconexão do controle; teclado e joystick serial intactos | `controles.js`, `teclas.js`, `bridge.js`, `scenes/Config.js`, `preferencias.js` | Sonnet | 250–350k |
+| **2A** Consolidação das telas (**feita**: Perfil, Amigos e Coleção viraram cenas, avisos no jogo, JOGAR RÁPIDO e PERFIL no menu, atalhos AMIGOS/PERFIL/COLEÇÃO na `Lan`; no lugar de abas FILA/AMIGOS/PERFIL, atalhos na tela ONLINE) | Perfil, Amigos, Coleção, conta e login como cenas Phaser (Mesa de Cartas); toast de pedido de amizade; JOGAR RÁPIDO no menu inicial; abas FILA/AMIGOS/PERFIL na `Lan`; aviso "convite tirou você da fila"; aviso de XP ao ficar após abandono; checar recorte/fonte em 854×480 | `scenes/Menu.js`, `menu/layout.js`, `scenes/Lan.js`, novas cenas, `src/ui/Conta.svelte`, `src/lib/conta.js` | Sonnet | 350–400k |
+| **2B** Controle físico (**feita**: tudo liga sozinho, sem botão; ver [controles.md](controles.md)) | Gamepad API (`navigator.getGamepads`) entrando na mesma `bridge`/`aoBotao`; vínculo jogador→controle, zona morta, remapeamento de botões em `Config`, pausa do jogo ao perder foco, reconexão do controle; teclado e joystick serial intactos | `controles.js`, `teclas.js`, `bridge.js`, `scenes/Config.js`, `preferencias.js` | Sonnet | 250–350k |
 | **2C** Cartas e acessibilidade | Custo e "por que está bloqueada" visíveis nas cartas; revisão de volume, daltonismo e reduzir flashes/tremor (separar "flashes" de "movimento" se hoje forem um só); teste de contraste | `pvp/HudPvp.js`, `pvp/cartas.js`, `acessibilidade.js`, `daltonismo.js`, `Config.js` | Sonnet | 200–300k |
 | **2D** Recuperação de conexão | Sessão e estado da sala guardados; janela de religação de **20 s** (proposta); ponto de retomada seguro (início da rodada); regra de queda do host | `server/lan.js`, `server/partidas.js`, `lan/rede.js`, `lan/transmissao.js`, `pvp/rede/ArenaRede.js`, `sincronia.js` | **Opus** | 350–450k |
 | **2E** Revanche, troca de personagem, mensagens | Corrigir o que o teste restrito apontou; troca de personagem entre rodadas; textos `MSG_*` | `PvpResultado.js`, `PvpEscolha.js`, `rede.js` (`MSG_*`) | Sonnet (Haiku nos textos) | 200–250k |

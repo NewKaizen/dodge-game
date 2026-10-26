@@ -8,7 +8,7 @@ uma foto ofensivos. Este documento diz **como a denúncia chega**, **quem revisa
 
 | Peça | Onde | O que faz |
 | --- | --- | --- |
-| Botão **Denunciar…** | cartões do painel AMIGOS (amigos, pedidos recebidos, gente na sua sala) | escolhe nome ou foto + o motivo (lista fixa) |
+| **DENUNCIAR…** | A numa linha da cena AMIGOS (amigos, pedidos recebidos, gente na sua sala) | escolhe nome ou foto + o motivo (lista fixa) |
 | `denunciar(tag, tipo, motivo)` | `supabase/migrations/0004_moderacao.sql` | grava a denúncia; só o navegador logado chama |
 | Tabela `denuncias` | mesma migration | `id, denunciante, denunciado, tipo ('nome'\|'foto'), motivo, estado ('aberta'\|'aceita'\|'rejeitada'), criada_em, revisada_em, revisor` |
 | `scripts/moderar.js` | `npm run moderar -- <comando>` | lista as abertas, aceita ou rejeita (usa a chave secreta) |

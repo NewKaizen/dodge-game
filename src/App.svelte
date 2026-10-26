@@ -1,7 +1,6 @@
 <script>
   import Conectar from './ui/Conectar.svelte'
-  import Conta from './ui/Conta.svelte'
-  import Amigos from './ui/Amigos.svelte'
+  import FotoModal from './ui/FotoModal.svelte'
   import Game from './ui/Game.svelte'
   import { iniciarConta } from './lib/conta.js'
   import { iniciarAmigos } from './lib/amigos.js'
@@ -14,9 +13,8 @@
 
 <main>
   <Conectar />
-  <Conta />
-  <Amigos />
   <Game />
+  <FotoModal />
 </main>
 
 <style>

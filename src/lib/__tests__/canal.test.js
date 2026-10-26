@@ -165,3 +165,32 @@ test('reenvio repetido não entrega duas vezes e ganha recibo de novo', () => {
   a.entregar(fioBA.shift())
   assert.equal(a.estadoDebug().semRecibo, 0)
 })
+
+test('canal direto mudo (aberto, mas não entrega): o reenvio e o recibo da repetida vão pelo servidor', () => {
+  let t = 0
+  const timers = []
+  const rodarTimers = () => timers.splice(0).forEach((fn) => fn())
+  const direto = { AB: [], BA: [] } // some tudo (o Brave com os escudos)
+  const servidor = { AB: [], BA: [] }
+  const a = criarCanal({ enviarBruto: (m) => direto.AB.push(m), enviarReserva: (m) => servidor.AB.push(m), meuId: () => 'A', agora: () => t, agendar: (fn) => timers.push(fn) })
+  const b = criarCanal({ enviarBruto: (m) => direto.BA.push(m), enviarReserva: (m) => servidor.BA.push(m), meuId: () => 'B', agora: () => t })
+  const cenas = []
+  b.ao('cena', (d) => cenas.push(d))
+  a.enviar('cena', null, 'PvpEscolha')
+  assert.equal(direto.AB.length, 1, 'a primeira vai pelo direto (rápido quando ele funciona)')
+  direto.AB.splice(0)
+  t = 1000
+  rodarTimers()
+  assert.equal(servidor.AB.length, 1, 'o reenvio vai pelo servidor')
+  b.entregar(servidor.AB.shift())
+  assert.deepEqual(cenas, ['PvpEscolha'])
+  // o recibo da primeira vez vai pelo direto (e some); a repetida ganha recibo pelo servidor
+  direto.BA.splice(0)
+  t = 2000
+  rodarTimers()
+  b.entregar(servidor.AB.shift())
+  assert.deepEqual(cenas, ['PvpEscolha'], 'não entrega duas vezes')
+  assert.equal(servidor.BA.length, 1)
+  a.entregar(servidor.BA.shift())
+  assert.equal(a.estadoDebug().semRecibo, 0)
+})

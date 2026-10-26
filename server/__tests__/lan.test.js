@@ -140,6 +140,16 @@ test('expulsar e chat', () => {
   assert.equal(host.ultima('sala').sala.membros.length, 1)
 })
 
+test('chat da sala passa pelo filtro de palavras (os dois veem ***)', () => {
+  const { entrar } = montar()
+  const host = entrar('127.0.0.1', 'ANA')
+  const conv = entrar('192.168.0.33', 'BETO')
+  host.mandar({ t: 'criar' })
+  conv.mandar({ t: 'entrar', sala: host.ultima('sala').sala.id })
+  conv.mandar({ t: 'chat', texto: 'vai fdp' })
+  for (const p of [host, conv]) assert.equal(p.ultima('chat').texto, 'vai ***')
+})
+
 // ---------- ONLINE ----------
 
 function montarOnline(extra = {}) {

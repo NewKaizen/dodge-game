@@ -261,6 +261,7 @@ export default class PvpArena extends Phaser.Scene {
       else this.apertarB(j)
     })
     this.controles.onPausa(() => this.pausar())
+    this.controles.onPerdaDeFoco((motivo) => this.pausar(motivo))
 
     // objetos de fora das caixas não aparecem nas câmeras de recorte (ver filtrarCaixas)
     this.events.on('postupdate', this.filtrarCaixas, this)
@@ -1755,14 +1756,14 @@ export default class PvpArena extends Phaser.Scene {
     return ['inicio', 'escolha', 'revelacao', 'arremesso', 'esquiva', 'duelo'].includes(this.fase) && !this.saindo && !this.pausado
   }
 
-  pausar() {
+  pausar(motivo) {
     // o mesmo C que fechou o menu chega aqui logo depois: ignora
     if (!this.podePausar() || this.time.now - this.retomadoEm < 200) return
     this.pausado = true
     pausarMusica()
     this.scene.pause()
     const nomes = this.ids.map((id) => PERSONAGENS[id]?.nome ?? id)
-    this.scene.launch('Pausa', { cena: 'PvpArena', recomecar: { p1: this.ids[0], p2: this.ids[1], arena: this.arena.id }, sair: 'Menu', subtitulo: `${nomes[0]} x ${nomes[1]}` })
+    this.scene.launch('Pausa', { cena: 'PvpArena', recomecar: { p1: this.ids[0], p2: this.ids[1], arena: this.arena.id }, sair: 'Menu', subtitulo: `${nomes[0]} x ${nomes[1]}`, motivo })
     this.scene.bringToTop('Pausa') // a Pausa vem antes da arena na lista de cenas: sem isso, ela ficaria por baixo
   }
 

@@ -1,6 +1,6 @@
 import { get } from 'svelte/store'
 import { lan, iniciarPartida, sairSala } from '../lib/lan/rede.js'
-import { enviarRapido as enviarTransporte, aoRapido } from '../lib/lan/transmissao.js'
+import { enviarRapido as enviarTransporte, enviarPeloServidor, aoRapido } from '../lib/lan/transmissao.js'
 import { criarCanal } from '../lib/lan/canal.js'
 
 // Partida EM REDE (docs/rede-pvp.md): numa sala (LAN ou ONLINE) o PVP e o
@@ -27,18 +27,22 @@ import { criarCanal } from '../lib/lan/canal.js'
 //   debugRede.atraso(150, 50)   simula internet ruim (chame nas duas abas)
 //   debugRede.iniciar('PvpArena', { p1: 'kris', p2: 'susie' })   (host, com o convidado na sala)
 
-export const canal = criarCanal({ enviarBruto: (msg) => enviarTransporte(msg), meuId: () => get(lan).eu.id ?? '?' })
+// o reenvio (sem recibo) vai pelo servidor: um canal direto mudo não trava a partida
+export const canal = criarCanal({ enviarBruto: (msg) => enviarTransporte(msg), enviarReserva: (msg) => enviarPeloServidor(msg), meuId: () => get(lan).eu.id ?? '?' })
 aoRapido((dados) => canal.entregar(dados))
 
 let ativa = false
 let jogoAtual = null
 // cenas de menu: dali um convite aceito leva direto ao lobby da sala (Lan)
-const CENAS_DE_MENU = ['Menu', 'Config', 'Grimorio', 'GuiaBonus']
+const CENAS_DE_MENU = ['Menu', 'Config', 'Grimorio', 'GuiaBonus', 'Perfil', 'Amigos', 'Colecao']
 const cenasAtivas = () => jogoAtual?.scene.getScenes(true).map((c) => c.scene.key) ?? []
 export const podeEntrarEmSala = () => cenasAtivas().every((k) => k === 'Lan' || CENAS_DE_MENU.includes(k))
 
 // convidado com a tela preta (fadeOut completo) esperando a cena do host há tanto tempo: desiste
 export const PRESO_MS = 20000
+// o Brave com os escudos ligados já travou o canal direto (lib/lan/vigiaDireto.js): a dica vai junto
+const ehBrave = () => typeof navigator !== 'undefined' && Boolean(navigator.brave)
+export const DICA_BRAVE = 'no Brave, se travar: escudos desligados para este site'
 export const MSG_PRESO = 'não deu para sincronizar com o host: voltando ao lobby'
 
 const naSalaComParceiro = (s) => s.fase === 'sala' && (s.sala?.membros.length ?? 0) > 1
@@ -124,7 +128,7 @@ export function instalarRede(game) {
     console.warn('[rede] a cena do host não chegou: saindo da sala', canal.estadoDebug())
     ativar(false)
     sairSala()
-    lan.update((x) => ({ ...x, erro: MSG_PRESO }))
+    lan.update((x) => ({ ...x, erro: ehBrave() ? `${MSG_PRESO} (${DICA_BRAVE})` : MSG_PRESO }))
     trocarCena(game, 'Lan')
   }, 1000)
 

@@ -40,6 +40,9 @@
 //                        revanche {estado: 'pedida'|'aceita'|'recusada'|'expirada'|'indisponivel', ...}
 // HOST da sala casual: quem tem o menor ping até o servidor, se os dois são
 // conhecidos e a diferença passa de FOLGA_PING_MS; senão, quem confirmou primeiro.
+// O host não começou em CASUAL_INICIO_MS (aba escondida, PC travado): a sala
+// fecha ('fechada' casual com o motivo) e os dois voltam para a fila, sem
+// contar abandono, e não pareiam um com o outro por EVITAR_PAR_MS.
 //
 // PARTIDAS E XP (server/partidas.js, Fase 1D): cada partida PVP de uma sala
 // (casual ou de amigos) ganha um registro quando o host começa (ou na
@@ -54,10 +57,10 @@ import os from 'node:os'
 import crypto from 'node:crypto'
 import { criarLimite } from './contas.js'
 import { CONVITE_MS, CONVITES_POR_MINUTO, MAX_CONVITES_RECEBIDOS } from './amigos.js'
-import { criarFila, agendarPadrao, ACOES_FILA_POR_MINUTO, REVANCHE_MS, FOLGA_PING_MS } from './fila.js'
+import { criarFila, agendarPadrao, ACOES_FILA_POR_MINUTO, REVANCHE_MS, FOLGA_PING_MS, CASUAL_INICIO_MS, EVITAR_PAR_MS } from './fila.js'
 import { criarPartidas } from './partidas.js'
 import { METRICAS_NULA } from './metricas.js'
-import { nomeOfensivo } from '../src/lib/palavrasBloqueadas.js'
+import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
 
 export const PROTOCOLO = 6
 export const PORTA_DESCOBERTA = 47777
@@ -187,6 +190,8 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
 
   const fecharSala = (sala) => {
     encerrarRevanche(sala)
+    sala.esperaInicio?.()
+    sala.esperaInicio = null
     salas.delete(sala.id)
     codigos.delete(sala.codigo)
     for (const conv of [...convites.values()]) if (conv.salaId === sala.id) encerrarConvite(conv, 'cancelado', 'a sala foi fechada')
@@ -362,7 +367,11 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
 
   const bloqueados = (a, b) => Boolean(a.usuario && b.usuario && (a.bloqueios.has(b.usuario) || b.bloqueios.has(a.usuario)))
   // nunca a mesma conta (duas abas) nem quem se bloqueou; os dois fora de sala
-  const podeParear = (a, b) => a !== b && clientes.has(a.id) && clientes.has(b.id) && !a.sala && !b.sala && !(a.usuario && a.usuario === b.usuario) && !bloqueados(a, b)
+  // pares que acabaram de falhar (a casual não começou): não juntam de novo logo
+  const evitar = new Map() // `${id}|${id}` -> até quando
+  const chavePar = (a, b) => [a.id, b.id].sort().join('|')
+  const evitando = (a, b) => (evitar.get(chavePar(a, b)) ?? 0) > agora()
+  const podeParear = (a, b) => a !== b && clientes.has(a.id) && clientes.has(b.id) && !a.sala && !b.sala && !(a.usuario && a.usuario === b.usuario) && !bloqueados(a, b) && !evitando(a, b)
   const oponente = (c) => ({ nome: c.nome, ...(c.perfil && { tag: c.perfil.tag, avatar: c.perfil.avatar, nivel: c.perfil.nivel }) })
   const MOTIVO_FORA = { tempo: 'você não confirmou a tempo', recusou: 'você recusou a partida' }
   const MOTIVO_VOLTA = { tempo: 'o oponente não confirmou a tempo', recusou: 'o oponente recusou a partida' }
@@ -437,6 +446,33 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     avisarSala(sala)
     for (const c of [host, outro]) enviar(c, { t: 'partidaCasual', salaId: sala.id, host: host.id })
     log(`[fila] partida rápida ${sala.codigo}: host ${host.nome} (${host.ping ?? '?'} ms) x ${outro.nome} (${outro.ping ?? '?'} ms), regra: ${regra}`)
+    sala.esperaInicio = agendar(() => casualNaoComecou(sala), CASUAL_INICIO_MS)
+  }
+
+  // o host da casual não começou a tempo: ninguém fica parado na sala sem
+  // saber o que houve. Fecha, avisa e os dois voltam para a fila (sem abandono:
+  // a partida nem começou)
+  function casualNaoComecou(sala) {
+    sala.esperaInicio = null
+    if (salas.get(sala.id) !== sala || sala.emPartida) return
+    const membros = membrosDaSala(sala)
+    fecharSala(sala)
+    log(`[fila] partida rápida ${sala.codigo}: o host não começou em ${CASUAL_INICIO_MS / 1000} s, os dois voltam para a fila`)
+    if (membros.length === 2) {
+      evitar.set(chavePar(membros[0], membros[1]), agora() + EVITAR_PAR_MS)
+      agendar(() => {
+        for (const [k, ate] of evitar) if (ate <= agora()) evitar.delete(k)
+        fila.parear()
+      }, EVITAR_PAR_MS + 50)
+    }
+    for (const c of membros) {
+      c.sala = null
+      c.pronto = false
+      enviar(c, { t: 'fechada', casual: true, motivo: 'a partida não começou (o host não respondeu): procurando outra' })
+      atualizarStatus(c)
+    }
+    // o convidado primeiro (ele não teve culpa)
+    for (const c of [...membros].reverse()) if (clientes.has(c.id) && fila.entrar(c)) metricas.contar('fila_entradas')
   }
 
   // revanche na sala casual: os dois aceitam em REVANCHE_MS
@@ -628,6 +664,10 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       const antes = sala.emPartida
       sala.emPartida = Boolean(m.valor)
       // o registro da partida (XP): nasce quando começa e não renasce num "partida" repetido
+      if (sala.emPartida) {
+        sala.esperaInicio?.() // a casual começou: o prazo para começar acabou
+        sala.esperaInicio = null
+      }
       if (sala.emPartida && !antes) partidas.iniciar(sala, membrosDaSala(sala))
       else if (!sala.emPartida && antes) partidas.encerrou(sala)
       if (!sala.emPartida) {
@@ -648,7 +688,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     },
     chat(c, m) {
       const sala = salas.get(c.sala)
-      const texto = limpar(m.texto, MAX_CHAT)
+      const texto = censurarTexto(limpar(m.texto, MAX_CHAT))
       if (!sala || !texto) return
       for (const id of sala.membros) enviar(clientes.get(id), { t: 'chat', de: c.id, nome: c.nome, texto })
     },

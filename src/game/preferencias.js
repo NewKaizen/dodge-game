@@ -18,6 +18,11 @@
 //   menu              'mesa' | 'sala'  o menu inicial: a MESA DE CARTAS (padrão) ou a SALA DE TV
 //   teclas            null (padrão) ou { p1: { cima: [...], baixo, esquerda, direita, A, B, C },
 //                     p2: {...} } com códigos de KeyboardEvent.code (ver lib/simulador.js)
+//   botoesPad         null (padrão) ou { A: [...], B: [...], C: [...] } com índices de botão do controle
+//                     físico (Gamepad API, ver game/gamepad.js)
+//   zonaMorta         0.1 a 0.8: quanto o analógico do controle precisa inclinar para contar (padrão 0.35)
+import { problemasDosBotoes, zonaMortaValida, ZONA_MORTA_PADRAO } from './gamepad.js'
+
 const CHAVE = 'dodge-preferencias'
 
 export const PREFERENCIAS_PADRAO = {
@@ -28,6 +33,8 @@ export const PREFERENCIAS_PADRAO = {
   daltonismo: 'nenhum',
   menu: 'mesa',
   teclas: null,
+  botoesPad: null,
+  zonaMorta: ZONA_MORTA_PADRAO,
 }
 
 export const OPCOES = {
@@ -41,6 +48,8 @@ function valido(chave, valor) {
   if (!(chave in PREFERENCIAS_PADRAO)) return false
   if (OPCOES[chave]) return OPCOES[chave].includes(valor)
   if (chave === 'teclas') return valor === null || typeof valor === 'object'
+  if (chave === 'botoesPad') return valor === null || problemasDosBotoes(valor).length === 0
+  if (chave === 'zonaMorta') return zonaMortaValida(valor)
   return typeof valor === typeof PREFERENCIAS_PADRAO[chave]
 }
 

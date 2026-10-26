@@ -9,6 +9,10 @@ import { ACOES, ROTULO_ACAO, atribuirTecla, ehSeta, nomeTecla, normalizarTeclas,
 import { jogo, CONFIG_PADRAO } from '../../lib/estado.js'
 import { alternarTelaCheia } from '../../lib/telaCheia.js'
 import { capturarTecla } from '../../lib/simulador.js'
+import { ACOES_PAD, ROTULO_PAD, ZONA_MORTA_LIMITES, ZONA_MORTA_PADRAO, atribuirBotao, nomeBotao, normalizarBotoes, resumoBotoes } from '../gamepad.js'
+import { capturarBotaoPad, controlesLigados } from '../../lib/gamepad.js'
+import { conectarSerial, desconectarSerial, serialAberto, serialSuportado } from '../../lib/serial.js'
+import { despedir } from '../../lib/saida.js'
 
 // Configurações, no jeito dos menus de console (abas em cima, lista de opções
 // à esquerda com o valor alinhado à direita "◀ VALOR ▶", painel à direita
@@ -19,7 +23,9 @@ import { capturarTecla } from '../../lib/simulador.js'
 //                                               (no fim ela é retomada)
 //
 // Abas: ÁUDIO e JOGO (volumes, som e velocidade ficam em lib/estado.js),
-// CONTROLES (teclas do simulador, game/teclas.js), ACESSIBILIDADE e GRÁFICOS
+// CONTROLES (teclas do teclado, game/teclas.js), GAMEPAD (botões do controle físico,
+// zona morta do analógico e o pareamento do joystick serial; game/gamepad.js),
+// ACESSIBILIDADE e GRÁFICOS
 // (game/preferencias.js; quem aplica cada uma são os efeitos/fundos do jogo,
 // aqui só se escolhe). Cada aba termina com "RESTAURAR PADRÃO".
 //
@@ -27,6 +33,7 @@ import { capturarTecla } from '../../lib/simulador.js'
 //   na lista: ↑/↓ escolhe (do topo, ↑ volta às abas) · ←/→ muda o valor
 //   (segure nas barras) · A alterna / confirma · B volta às abas · C sai
 //   CONTROLES: A numa ação espera a nova tecla (Esc, ou B/C do joystick, cancela)
+//   GAMEPAD: A num botão espera o novo botão do controle (qualquer tecla, ou B/C do joystick, cancela)
 //
 // A paleta de daltonismo do painel vem de game/daltonismo.js (paletaDaltonismo),
 // se o arquivo existir; sem ele o painel só descreve o modo.
@@ -93,6 +100,24 @@ const TEXTO_DALTONISMO = {
   protanopia: 'Para quem quase não enxerga o vermelho: os avisos de perigo e o coração do P1 trocam para cores que continuam se destacando do fundo e do coração do P2.',
   deuteranopia: 'Para quem confunde verde e vermelho (o tipo mais comum): os avisos e os corações ganham cores que não se misturam.',
   tritanopia: 'Para quem confunde azul e amarelo: o coração do P2 e os avisos trocam para cores fáceis de separar.',
+}
+
+// CONECTAR JOYSTICK SERIAL: pareia (precisa de gesto: o A do teclado vale) ou, se já está
+// conectado, desconecta. Devolve a mensagem para o painel
+async function alternarSerial() {
+  if (serialAberto()) {
+    await despedir() // DISCONNECT antes de fechar a porta
+    await desconectarSerial({ esquecer: true })
+    return 'Joystick serial desconectado.'
+  }
+  try {
+    await conectarSerial()
+    return 'Joystick serial conectado. Ele reconecta sozinho da próxima vez.'
+  } catch (e) {
+    if (e?.name === 'NotFoundError' || e?.name === 'AbortError') return { texto: 'Nenhum joystick escolhido.', cor: COR.apagado }
+    if (e?.name === 'SecurityError') return { texto: 'O navegador exige um clique ou tecla: use Espaço/Enter do teclado.', cor: COR.erro }
+    return { texto: `Não abriu: ${e?.message ?? e}`, cor: COR.erro }
+  }
 }
 
 const restaurarJogo = (campos) => () => mudarJogo(() => structuredClone(campos))
@@ -204,7 +229,7 @@ const ABAS = [
         escrever: (v, cena) => (cena.jogadorTeclas = v),
         semSalvar: true,
         descricao:
-          'De quem são as teclas da lista. Com 1 jogador, os dois conjuntos de teclas controlam o mesmo coração.\n\nO joystick (porta serial) não muda aqui: só o teclado do simulador.',
+          'De quem são as teclas da lista. Com 1 jogador, os dois conjuntos de teclas controlam o mesmo coração.\n\nO controle físico tem a aba GAMEPAD; o joystick (porta serial) não é remapeável.',
       },
       ...ACOES.map((acao) => ({
         id: `tecla-${acao}`,
@@ -219,6 +244,58 @@ const ABAS = [
         tipo: 'acao',
         fazer: () => definirPref('teclas', null),
         descricao: 'Volta as teclas dos dois jogadores para as de fábrica:\nP1: WASD · A Espaço/Z/E · B Q/X/Shift esq. · pausa C/Esc\nP2: setas · A Enter · B Shift dir./Backspace · pausa P',
+      },
+    ],
+  },
+  {
+    id: 'gamepad',
+    rotulo: 'GAMEPAD',
+    itens: [
+      ...ACOES_PAD.map((acao) => ({
+        id: `pad-${acao}`,
+        rotulo: ROTULO_PAD[acao],
+        tipo: 'botaoPad',
+        acao,
+        descricao:
+          'A: escolher o novo botão do controle (aperte o botão que quiser; qualquer tecla cancela). Se ele já for de outra ação, sai de lá; se aquela ficar sem nenhum, fica com os antigos desta. O D-pad e o analógico esquerdo sempre movem.',
+      })),
+      {
+        id: 'zonaMorta',
+        rotulo: 'ZONA MORTA',
+        titulo: 'ZONA MORTA DO ANALÓGICO',
+        tipo: 'barra',
+        min: Math.round(ZONA_MORTA_LIMITES.min * 100),
+        max: Math.round(ZONA_MORTA_LIMITES.max * 100),
+        passo: 5,
+        aVoltaAoPadrao: true,
+        ler: () => Math.round(pref('zonaMorta') * 100),
+        escrever: (v) => definirPref('zonaMorta', v / 100),
+        padrao: () => Math.round(ZONA_MORTA_PADRAO * 100),
+        formato: (v) => `${v}%`,
+        descricao: `Quanto o analógico precisa inclinar antes de contar. Mais alto ignora o "tremor" de um analógico gasto; mais baixo responde ao menor toque. A volta para o padrão (${Math.round(ZONA_MORTA_PADRAO * 100)}%).`,
+      },
+      // Web Serial só existe no Chrome/Edge: sem ele a opção nem aparece
+      ...(serialSuportado()
+        ? [
+            {
+              id: 'serial',
+              rotulo: 'CONECTAR JOYSTICK SERIAL',
+              tipo: 'acao',
+              ler: () => serialAberto(),
+              descricao: (aberto) =>
+                aberto
+                  ? 'O joystick serial (Arduino) está conectado. A desconecta (ele não reconecta sozinho até você parear de novo).'
+                  : 'Pareia um joystick com cabo (Arduino). A abre a janela do navegador para escolher a porta; só dá para fazer a primeira vez (depois ele reconecta sozinho ao abrir o jogo e ao plugar o cabo). Se o navegador reclamar de "gesto", aperte Espaço ou Enter no teclado nesta opção.',
+              fazer: alternarSerial,
+            },
+          ]
+        : []),
+      {
+        id: 'restaurar',
+        rotulo: 'RESTAURAR PADRÃO',
+        tipo: 'acao',
+        fazer: () => ['botoesPad', 'zonaMorta'].forEach((k) => definirPref(k, PREFERENCIAS_PADRAO[k])),
+        descricao: 'Volta os botões do controle (A: A/X · B: B/Y · pausa: Start) e a zona morta (35%) para os de fábrica.',
       },
     ],
   },
@@ -567,12 +644,19 @@ export default class Config extends Phaser.Scene {
       return this.mexeu()
     }
     if (item.tipo === 'tecla') return this.esperarTecla(item.acao)
+    if (item.tipo === 'botaoPad') return this.esperarBotaoPad(item.acao)
     if (item.tipo === 'acao') {
-      item.fazer(this)
+      const r = item.fazer(this)
       tocar(this, 'confirmar')
-      this.mexeu()
-      this.aviso = { texto: 'Pronto: padrão restaurado.', cor: COR.ok }
-      this.desenhar()
+      // fazer() pode devolver (ou prometer) o texto do aviso: string ou { texto, cor }
+      const fim = (msg) => {
+        if (!this.scene.isActive()) return
+        this.mexeu()
+        this.aviso = msg?.texto ? msg : { texto: typeof msg === 'string' ? msg : 'Pronto: padrão restaurado.', cor: COR.ok }
+        this.desenhar()
+      }
+      if (typeof r?.then === 'function') r.then(fim)
+      else fim(r)
     }
   }
 
@@ -607,10 +691,60 @@ export default class Config extends Phaser.Scene {
     this.desenhar()
   }
 
-  cancelarEspera() {
-    this.esperando?.cancelar()
+  // remapear um botão do controle: o próximo botão de qualquer controle vira o da ação;
+  // qualquer tecla do teclado cancela (o controle não pode cancelar: seus botões são os que se escolhe)
+  esperarBotaoPad(acao) {
+    tocar(this, 'confirmar')
+    const cancelarPad = capturarBotaoPad((i) => this.time.delayedCall(0, () => this.recebeuBotaoPad(acao, i)))
+    const cancelarTecla = capturarTecla(() => this.time.delayedCall(0, () => this.cancelarEspera()))
+    this.esperando = {
+      acao,
+      pad: true,
+      cancelar: () => {
+        cancelarPad()
+        cancelarTecla()
+      },
+    }
+    this.aviso = null
+    this.desenhar()
+  }
+
+  recebeuBotaoPad(acao, indice) {
+    if (!this.esperando?.pad || this.saindo) return
+    const r = atribuirBotao(normalizarBotoes(pref('botoesPad')), acao, indice)
+    if (r.erro) {
+      // continua esperando outro botão
+      tocar(this, 'erro')
+      const cancelarPad = capturarBotaoPad((i) => this.time.delayedCall(0, () => this.recebeuBotaoPad(acao, i)))
+      const antes = this.esperando.cancelar
+      this.esperando.cancelar = () => {
+        antes()
+        cancelarPad()
+      }
+      this.aviso = { texto: `${r.erro[0].toUpperCase()}${r.erro.slice(1)}. Aperte outro.`, cor: COR.erro }
+      return this.desenhar()
+    }
+    this.esperando.cancelar()
     this.esperando = null
-    this.aviso = { texto: 'Cancelado: a tecla não mudou.', cor: COR.apagado }
+    definirPref('botoesPad', r.mapa)
+    let texto = `${ROTULO_PAD[acao]}: ${nomeBotao(indice)}.`
+    if (r.tirada) {
+      texto += r.tirada.trocou
+        ? ` Trocou: ${ROTULO_PAD[r.tirada.acao]} ficou com ${resumoBotoes(r.mapa[r.tirada.acao]).join(' / ')}.`
+        : ` Ele saiu de ${ROTULO_PAD[r.tirada.acao]}.`
+    }
+    tocar(this, 'confirmar')
+    this.mexeu()
+    this.aviso = { texto, cor: r.tirada ? TEXTO.selecionado : COR.ok }
+    this.desenhar()
+  }
+
+  cancelarEspera() {
+    if (!this.esperando) return
+    const pad = this.esperando.pad
+    this.esperando.cancelar()
+    this.esperando = null
+    this.aviso = { texto: `Cancelado: ${pad ? 'o botão' : 'a tecla'} não mudou.`, cor: COR.apagado }
     tocar(this, 'cancelar')
     this.desenhar()
   }
@@ -753,6 +887,15 @@ export default class Config extends Phaser.Scene {
       } else {
         esquerdaDoValor = this.desenharTeclas(l, this.teclasDe(item.acao), ativo)
       }
+    } else if (item.tipo === 'botaoPad') {
+      l.valor.setOrigin(1, 0.5)
+      if (this.esperando?.pad && this.esperando.acao === item.acao) {
+        const piscando = Math.floor(this.time.now / 380) % 2 === 0
+        l.valor.setText('aperte um botão…').setColor(piscando ? TEXTO.selecionado : COR.texto)
+        esquerdaDoValor = LINHA.direita - l.valor.width - 8
+      } else {
+        esquerdaDoValor = this.desenharTeclas(l, resumoBotoes(normalizarBotoes(pref('botoesPad'))[item.acao]), ativo, true)
+      }
     }
     if (item.tipo !== 'opcoes') l.valor.setOrigin(1, 0.5)
     // o rótulo nunca encosta no valor
@@ -760,13 +903,13 @@ export default class Config extends Phaser.Scene {
   }
 
   // teclas como "teclinhas" alinhadas à direita; as que não cabem viram "+N"
-  desenharTeclas(l, codes, ativo) {
+  desenharTeclas(l, codes, ativo, jaNomeadas = false) {
     const g = l.g
     const maximo = 230
     const caps = []
     let total = 0
     for (const code of codes) {
-      const t = ehSeta(code) ? null : this.texto(0, l.y, nomeTecla(code, this.layout), 11).setOrigin(0.5, 0.5)
+      const t = !jaNomeadas && ehSeta(code) ? null : this.texto(0, l.y, jaNomeadas ? code : nomeTecla(code, this.layout), 11).setOrigin(0.5, 0.5)
       const largura = t ? Math.max(18, Math.ceil(t.width) + 10) : 18
       if (total + largura + (caps.length ? 4 : 0) > maximo - (code === codes[codes.length - 1] ? 0 : 22)) {
         t?.destroy()
@@ -810,7 +953,10 @@ export default class Config extends Phaser.Scene {
     let titulo
     let corpo
     let padrao = ''
-    if (this.esperando) {
+    if (this.esperando?.pad) {
+      titulo = 'AGUARDANDO BOTÃO'
+      corpo = `Aperte o novo botão do controle para ${ROTULO_PAD[this.esperando.acao]}.\n\nQualquer tecla do teclado (ou B / C no joystick serial) cancela.\nO D-pad não serve: ele só move.`
+    } else if (this.esperando) {
       titulo = 'AGUARDANDO TECLA'
       corpo = `Aperte a nova tecla de ${this.esperando.jogador.toUpperCase()} · ${ROTULO_ACAO[this.esperando.acao]}.\n\nEsc (ou B / C no joystick) cancela.\nF, Tab, F5, F11 e F12 não servem.`
     } else if (!item) {
@@ -819,7 +965,8 @@ export default class Config extends Phaser.Scene {
       corpo = {
         audio: 'Volume da música e dos efeitos, e o som ligado ou desligado.',
         jogo: 'Velocidade do coração e tela cheia.',
-        controles: 'Troque as teclas do teclado (simulador) de cada jogador. O joystick não muda.',
+        controles: 'Troque as teclas do teclado de cada jogador. O controle físico tem a aba GAMEPAD; o joystick serial não muda.',
+        gamepad: 'Botões do controle físico, zona morta do analógico e o pareamento do joystick serial.',
         acessibilidade: 'Menos tremores, clarões e animações, e cores para daltonismo.',
         graficos: 'Qualidade dos gráficos: partículas, fundos animados e filtros.',
       }[aba.id]
@@ -861,6 +1008,12 @@ export default class Config extends Phaser.Scene {
       add(t, u)
       if (item.mudo?.()) add(this.texto(u.x + u.width + 10, y + 12, '(som desligado)', 11, COR.desligado))
       else if (v === item.padrao()) add(this.texto(u.x + u.width + 10, y + 12, 'PADRÃO', 11, COR.ligado))
+    } else if (item.tipo === 'botaoPad' || item.id === 'zonaMorta') {
+      const ligados = controlesLigados()
+      const status = ligados.length
+        ? `CONTROLES EM USO\n${ligados.map((c) => `jogador ${c.vaga + 1}: controle ${c.pad + 1}`).join('\n')}`
+        : 'NENHUM CONTROLE EM USO\naperte um botão do controle'
+      if (cabe(40)) add(this.texto(x, y, status, 11, ligados.length ? COR.ligado : COR.apagado, { lineSpacing: 3 }))
     } else if (item.id === 'daltonismo') {
       this.desenharAmostraDaltonismo(item.ler(this), x, y, limite)
     } else if (item.id === 'graficos') {
@@ -891,7 +1044,7 @@ export default class Config extends Phaser.Scene {
       add(t)
       const notas = []
       notas.push('Esquerda/direita troca o jogador. O joystick (porta serial) não é remapeável.')
-      if (estado().fonte !== 'simulador') notas.push('Simulador desligado: as teclas valem quando ele estiver ligado (botão lá em cima).')
+      if (!estado().fontes.teclado) notas.push('O teclado liga sozinho na primeira tecla do jogo que você apertar.')
       const n = this.texto(x, y + t.height + 8, notas.join('\n'), 11, COR.apagado, { wordWrap: { width: p.largura }, lineSpacing: 3 })
       if (n.y + n.height <= limite) add(n)
       else n.destroy()
@@ -933,13 +1086,15 @@ export default class Config extends Phaser.Scene {
     this.rodape.removeAll(true)
     const item = this.item
     let dicas
-    if (this.esperando) dicas = [['Esc', 'Cancelar'], ['B', 'Cancelar (joystick)']]
+    if (this.esperando?.pad) dicas = [['Esc', 'Cancelar (teclado)']]
+    else if (this.esperando) dicas = [['Esc', 'Cancelar'], ['B', 'Cancelar (joystick)']]
     else if (!item) dicas = [['esqDir', 'Aba'], ['baixo', 'Entrar'], ['A', 'Entrar'], ['B', 'Sair']]
     else {
       dicas = [['cimaBaixo', 'Escolher']]
       if (item.tipo === 'barra') dicas.push(['esqDir', 'Ajustar'], ...(item.aVoltaAoPadrao ? [['A', 'Padrão']] : []))
       if (item.tipo === 'opcoes') dicas.push(['esqDir', 'Mudar'], ['A', 'Alternar'])
       if (item.tipo === 'tecla') dicas.push(['esqDir', 'Jogador'], ['A', 'Mudar tecla'])
+      if (item.tipo === 'botaoPad') dicas.push(['A', 'Mudar botão'])
       if (item.tipo === 'acao') dicas.push(['A', 'Confirmar'])
       dicas.push(['B', 'Abas'], ['C', 'Sair'])
     }

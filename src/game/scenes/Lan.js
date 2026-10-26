@@ -5,6 +5,10 @@ import { tocar, musica } from '../audio.js'
 import { ASSETS } from '../assets.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 import { capturarTexto } from '../../lib/simulador.js'
+import { montarAvisos } from '../conta/avisos.js'
+import { conta } from '../../lib/conta.js'
+import { amigos, copiarTexto } from '../../lib/amigos.js'
+import { linkDaSala } from '../../lib/salaLink.js'
 import {
   lan,
   abrirLobby,
@@ -53,6 +57,15 @@ import { encerrarRede, irParaCena } from '../rede.js'
 // Música: public/assets/musicas/lobby.mid (sem ele, a do menu). O nome no
 // canto vem de ASSETS.tituloMusicaLobby.
 //   cima/baixo escolher · esquerda/direita mudar o modo · A confirmar · B voltar
+// ONLINE, fora de sala: JOGAR RÁPIDO, criar sala, entrar com código e, embaixo, os atalhos
+// AMIGOS · PERFIL · COLEÇÃO (cenas Amigos, Perfil e Colecao; B volta para cá). Vindo do
+// JOGAR RÁPIDO do menu inicial (init { rapido: true }), entra direto na fila ao conectar.
+const ATALHOS = [
+  { id: 'amigos', rotulo: 'AMIGOS', cena: 'Amigos', dica: 'amigos, pedidos e convites' },
+  { id: 'perfil', rotulo: 'PERFIL', cena: 'Perfil', dica: 'nome, avatar, foto, XP e nível' },
+  { id: 'colecao', rotulo: 'COLEÇÃO', cena: 'Colecao', dica: 'títulos, molduras, versos e avatares' },
+]
+const ESPERA_CONTA_MS = 6000 // JOGAR RÁPIDO espera o servidor confirmar a conta antes de entrar na fila
 const COR = { tema: '#3fd6c8', temaNum: 0x3fd6c8, ok: '#6dffb0', okNum: 0x6dffb0, painel: 0x0b0914, apagado: '#5a5a6a', rapido: '#ffd23a', rapidoNum: 0xffd23a }
 const MODOS = { pvp: { rotulo: 'PVP', cor: '#ff3d6e', cena: 'PvpEscolha' }, coop: { rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty' } }
 const LINHAS_SALAS = 5 // salas visíveis na lista
@@ -63,10 +76,17 @@ export default class Lan extends Phaser.Scene {
     super('Lan')
   }
 
+  // { rapido: true }: veio do JOGAR RÁPIDO do menu inicial, entra na fila assim que conectar
+  init(dados) {
+    this.rapidoPendente = Boolean(dados?.rapido)
+  }
+
   create() {
     this.controles = new Controles(this)
     this.controles.onBotao((_, botao) => this.aoBotao(botao))
     this.controles.onPausa(() => this.aoBotao('B')) // no lobby o C (Esc) também volta
+    this.rapidoDesde = Date.now()
+    this.info = null // { texto } verde por uns segundos (link copiado)
     this.selId = null
     this.digitando = null // { campo: 'nome' | 'ip' | 'chat', texto }
     this.cancelarTexto = null
@@ -80,6 +100,7 @@ export default class Lan extends Phaser.Scene {
 
     this.montarFundo()
     this.montarCabecalho()
+    montarAvisos(this)
 
     abrirLobby()
     encerrarRede() // no lobby não tem partida em rede
@@ -216,6 +237,7 @@ export default class Lan extends Phaser.Scene {
         { id: 'rapido', rotulo: 'JOGAR RÁPIDO', ativo: s.fase === 'navegando', acao: () => entrarFila() },
         { id: 'criar', rotulo: 'JOGAR COM AMIGOS', ativo: s.fase === 'navegando', acao: () => criarSala() },
         { id: 'codigo', rotulo: 'ENTRAR COM CÓDIGO…', ativo: s.fase === 'navegando', acao: () => this.digitar('codigo') },
+        ...ATALHOS.map((a) => ({ id: a.id, tipo: 'atalho', rotulo: a.rotulo, dica: a.dica, acao: () => this.abrirConta(a.cena) })),
       ]
     if (this.modoTela === 'salas') {
       const lista = [
@@ -239,12 +261,14 @@ export default class Lan extends Phaser.Scene {
           ...(casual ? [] : [{ id: 'modo', tipo: 'modo', acao: () => this.trocarModo(1) }]),
           { id: 'comecar', rotulo: 'COMEÇAR PARTIDA', ativo: Boolean(outro?.pronto), acao: () => this.comecar() },
           { id: 'chat', rotulo: 'CONVERSAR', acao: () => this.digitar('chat') },
+          ...(s.online && s.sala.codigo ? [{ id: 'link', rotulo: 'COPIAR LINK DA SALA', acao: () => this.copiarLink() }] : []),
           ...(outro && !casual ? [{ id: 'expulsar', rotulo: `TIRAR ${outro.nome}`, acao: () => expulsar() }] : []),
           { id: 'sair', rotulo: 'FECHAR SALA', acao: () => this.sairDaSala() },
         ]
       return [
         { id: 'pronto', rotulo: eu?.pronto ? 'NÃO ESTOU PRONTO' : 'ESTOU PRONTO!', acao: () => alternarPronto() },
         { id: 'chat', rotulo: 'CONVERSAR', acao: () => this.digitar('chat') },
+        ...(s.online && s.sala.codigo ? [{ id: 'link', rotulo: 'COPIAR LINK DA SALA', acao: () => this.copiarLink() }] : []),
         { id: 'sair', rotulo: 'SAIR DA SALA', acao: () => this.sairDaSala() },
       ]
     }
@@ -268,7 +292,7 @@ export default class Lan extends Phaser.Scene {
     const i = this.indiceSelecionado(itens)
     // na fila, o relógio (espera / contagem) também muda a tela
     const relogioFila = s.fila ? Math.floor((s.fila.estado === 'pareado' ? s.fila.expira - Date.now() : Date.now() - s.fila.inicio) / 1000) : null
-    const assinatura = JSON.stringify([this.modoTela, s.fase, s.online, s.eu.nome, s.eu.conta?.tag, s.salas, s.sala, s.chat.length, s.erro, s.enderecos, this.selId, this.digitando, s.ping, this.pingPartida, s.fila, s.filaAviso, relogioFila])
+    const assinatura = JSON.stringify([this.modoTela, s.fase, s.online, s.eu.nome, s.eu.conta?.tag, s.salas, s.sala, s.chat.length, s.erro, s.enderecos, this.selId, this.digitando, s.ping, this.pingPartida, s.fila, s.filaAviso, relogioFila, this.info, get(conta).estado, get(amigos).recebidos.length])
     if (assinatura === this.assinatura) return
     this.assinatura = assinatura
     this.view.removeAll(true)
@@ -378,28 +402,51 @@ export default class Lan extends Phaser.Scene {
     t(LARGURA - 36, topo + 8, s.fase === 'conectando' ? 'conectando…' : s.fase === 'navegando' ? 'conectado' : '', 11, '#9a9ab0').setOrigin(1, 0.5)
     const explica = {
       rapido: s.eu.conta ? 'PVP 1x1 contra alguém da fila' : 'PVP 1x1 contra alguém da fila · como convidado, sem XP',
-      criar: 'cria a sala e dá um código (ou convide pela lista AMIGOS, acima do jogo)',
+      criar: 'cria a sala e dá um código (ou convide quem está em AMIGOS, logo abaixo)',
       codigo: 'digite o código que o seu amigo passou',
     }
-    itens.forEach((it, k) => {
-      const y = topo + 44 + k * passo
-      const ativo = it.ativo !== false
-      if (it.id === this.selId) {
-        this.add2(this.add.rectangle(30, y - passo / 2 + 4, LARGURA - 60, passo - 8, COR.temaNum, 0.12).setOrigin(0))
-        this.cursor(44, y)
-      }
-      if (it.id === 'codigo' && this.digitando?.campo === 'codigo') {
-        const campo = t(60, y - 6, `CÓDIGO: ${this.campoTexto('codigo', '')}`, 16, TEXTO.selecionado).setOrigin(0, 0.5)
-        this.dinamicos.push({ tipo: 'campo', obj: campo, campo: 'codigo', prefixo: 'CÓDIGO: ' })
-      } else t(60, y - 6, it.rotulo, it.id === 'rapido' ? 18 : 16, ativo ? (it.id === 'rapido' ? COR.rapido : it.id === 'criar' ? COR.ok : TEXTO.normal) : COR.apagado).setOrigin(0, 0.5)
-      t(60, y + 11, explica[it.id], 10, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
-    })
+    itens
+      .filter((it) => it.tipo !== 'atalho')
+      .forEach((it, k) => {
+        const y = topo + 44 + k * passo
+        const ativo = it.ativo !== false
+        if (it.id === this.selId) {
+          this.add2(this.add.rectangle(30, y - passo / 2 + 4, LARGURA - 60, passo - 8, COR.temaNum, 0.12).setOrigin(0))
+          this.cursor(44, y)
+        }
+        if (it.id === 'codigo' && this.digitando?.campo === 'codigo') {
+          const campo = t(60, y - 6, `CÓDIGO: ${this.campoTexto('codigo', '')}`, 16, TEXTO.selecionado).setOrigin(0, 0.5)
+          this.dinamicos.push({ tipo: 'campo', obj: campo, campo: 'codigo', prefixo: 'CÓDIGO: ' })
+        } else t(60, y - 6, it.rotulo, it.id === 'rapido' ? 18 : 16, ativo ? (it.id === 'rapido' ? COR.rapido : it.id === 'criar' ? COR.ok : TEXTO.normal) : COR.apagado).setOrigin(0, 0.5)
+        t(60, y + 11, explica[it.id], 10, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
+      })
 
-    const yInfo = topo + passo * 3 + 62
+    // os atalhos da conta: AMIGOS · PERFIL · COLEÇÃO
+    const yAtalhos = topo + passo * 3 + 54
+    this.add2(this.add.rectangle(20, yAtalhos, LARGURA - 40, 58, COR.painel, 0.82).setOrigin(0).setStrokeStyle(2, COR.temaNum, 0.6))
+    const logado = get(conta).estado === 'logado'
+    const pedidos = get(amigos).recebidos.length
+    const largura = (LARGURA - 60) / ATALHOS.length
+    let dica = ''
+    ATALHOS.forEach((a, k) => {
+      const x = 30 + k * largura
+      const sel = a.id === this.selId
+      if (sel) {
+        this.add2(this.add.rectangle(x, yAtalhos + 6, largura - 4, 28, COR.temaNum, 0.14).setOrigin(0))
+        this.cursor(x + 14, yAtalhos + 20)
+        dica = logado || a.id === 'perfil' ? a.dica : 'entre com o Google em PERFIL para usar'
+      }
+      const apagado = !logado && a.id !== 'perfil'
+      const rotulo = t(x + largura / 2, yAtalhos + 20, a.rotulo, 15, apagado ? COR.apagado : TEXTO.normal).setOrigin(0.5)
+      if (a.id === 'amigos' && pedidos) t(rotulo.x + rotulo.width / 2 + 12, yAtalhos + 20, `${pedidos}`, 12, '#ffb040').setOrigin(0, 0.5)
+    })
+    t(LARGURA / 2, yAtalhos + 46, dica || 'a sua conta: amigos, perfil e coleção', 10, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0.5)
+
+    const yInfo = yAtalhos + 76
     if (s.filaAviso && !s.erro) t(LARGURA / 2, yInfo, s.filaAviso, 13, '#ffb040', { wordWrap: { width: LARGURA - 60 }, align: 'center' }).setOrigin(0.5)
     if (s.erro) t(LARGURA / 2, yInfo, s.erro, 13, '#ff6070', { wordWrap: { width: LARGURA - 60 }, align: 'center' }).setOrigin(0.5)
-    t(LARGURA / 2, yInfo + 34, `o amigo abre  ${location.host}  no Chrome/Edge`, 12, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0.5)
-    t(LARGURA / 2, yInfo + 54, 'PVP e CO-OP: cada um joga no próprio PC  ·  PERFIL, AMIGOS e COLEÇÃO: botões acima do jogo', 10, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
+    t(LARGURA / 2, yInfo + 24, `o amigo abre  ${location.host}  no Chrome/Edge`, 12, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0.5)
+    t(LARGURA / 2, yInfo + 42, 'PVP e CO-OP: cada um joga no próprio PC', 10, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
     this.rodape(this.digitando ? 'digite  ·  Enter: confirmar  ·  Esc: cancelar' : '↑↓ escolher     A: confirmar     B: voltar ao menu')
   }
 
@@ -450,7 +497,7 @@ export default class Lan extends Phaser.Scene {
     const yInfo = topo + 280
     if (s.erro) t(cx, yInfo, s.erro, 13, '#ff6070', { wordWrap: { width: LARGURA - 60 }, align: 'center' }).setOrigin(0.5)
     else if (s.filaAviso) t(cx, yInfo, s.filaAviso, 13, '#ffb040', { wordWrap: { width: LARGURA - 60 }, align: 'center' }).setOrigin(0.5)
-    if (f.convidado) t(cx, yInfo + 34, 'crie uma conta (botão CONTA) para salvar seu progresso', 11, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
+    if (f.convidado) t(cx, yInfo + 34, 'crie uma conta em PERFIL (menu inicial) para salvar seu progresso', 11, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
     const b = f.estado === 'pareado' && !f.eu ? 'B: recusar' : 'B: sair da fila'
     this.rodape(itens.length > 1 ? `←→ escolher     A: confirmar     ${b}` : `A: confirmar     ${b}`)
   }
@@ -504,8 +551,9 @@ export default class Lan extends Phaser.Scene {
     // ações (esquerda)
     const xOp = 40
     const yOp = 236
+    const passoOp = itens.length > 5 ? 26 : 30 // com o COPIAR LINK a lista do host tem 6
     itens.forEach((it, k) => {
-      const y = yOp + k * 30
+      const y = yOp + k * passoOp
       const ativo = it.ativo !== false
       if (k === sel) this.cursor(xOp - 14, y)
       if (it.tipo === 'modo') {
@@ -521,9 +569,9 @@ export default class Lan extends Phaser.Scene {
       const cor = it.id === 'comecar' || it.id === 'pronto' ? (ativo ? COR.ok : COR.apagado) : ativo ? TEXTO.normal : COR.apagado
       t(xOp + 6, y, it.rotulo, 15, cor).setOrigin(0, 0.5)
     })
-    if (!host) t(xOp + 6, yOp + itens.length * 30 + 4, `MODO: ${modo.rotulo}  (o host escolhe)`, 12, modo.cor).setOrigin(0, 0.5)
+    if (!host) t(xOp + 6, yOp + itens.length * passoOp + 4, `MODO: ${modo.rotulo}  (o host escolhe)`, 12, modo.cor).setOrigin(0, 0.5)
     else if (!itens.find((it) => it.id === 'comecar').ativo)
-      t(xOp + 6, yOp + itens.length * 30 + 4, sala.membros.length < 2 ? 'falta o convidado' : 'esperando o convidado ficar pronto', 11, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
+      t(xOp + 6, yOp + itens.length * passoOp + 4, sala.membros.length < 2 ? 'falta o convidado' : 'esperando o convidado ficar pronto', 11, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
 
     // chat (direita)
     const xc = 300
@@ -540,6 +588,7 @@ export default class Lan extends Phaser.Scene {
     })
 
     if (s.erro) t(LARGURA / 2, 432, s.erro, 12, '#ff6070').setOrigin(0.5)
+    else if (this.info) t(LARGURA / 2, 432, this.info.texto, 12, COR.ok).setOrigin(0.5)
     this.rodape(this.digitando ? 'digite  ·  Enter: mandar  ·  Esc: cancelar' : host ? '↑↓ escolher   ←→ modo   A: confirmar   B: fechar sala' : '↑↓ escolher     A: confirmar     B: sair da sala')
   }
 
@@ -579,8 +628,37 @@ export default class Lan extends Phaser.Scene {
     const itens = this.itens()
     if (!itens.length) return
     const i = this.indiceSelecionado(itens)
-    this.selId = itens[(i + passo + itens.length) % itens.length].id
+    const atalho = (it) => it?.tipo === 'atalho'
+    let alvo = itens[(i + passo + itens.length) % itens.length]
+    // os atalhos (←→) são uma parada só: de dentro deles, ↑↓ saem para a lista de cima
+    if (atalho(itens[i])) {
+      const fora = itens.filter((it) => !atalho(it))
+      alvo = passo > 0 ? fora[0] : fora.at(-1)
+    }
+    this.selId = alvo.id
     tocar(this, 'mover')
+  }
+
+  // ←→ entre AMIGOS · PERFIL · COLEÇÃO
+  moverAtalho(passo) {
+    const ids = ATALHOS.map((a) => a.id)
+    const i = ids.indexOf(this.selId)
+    if (i < 0) return
+    this.selId = ids[(i + passo + ids.length) % ids.length]
+    tocar(this, 'mover')
+  }
+
+  // abre AMIGOS / PERFIL / COLEÇÃO e volta para cá no B
+  abrirConta(cena) {
+    this.saindo = true
+    this.cameras.main.fadeOut(220, 0, 0, 0)
+    this.time.delayedCall(240, () => this.scene.start(cena, { pilha: [{ cena: 'Lan' }] }))
+  }
+
+  async copiarLink() {
+    const ok = await copiarTexto(linkDaSala(this.s.sala.codigo, location.origin))
+    this.info = { texto: ok ? 'link da sala copiado: mande para o seu amigo' : 'não deu para copiar: passe o código da sala' }
+    this.time.delayedCall(2800, () => (this.info = null))
   }
 
   trocarModo(passo) {
@@ -690,6 +768,20 @@ export default class Lan extends Phaser.Scene {
     this.convidadoComecou = agora
   }
 
+  // veio do JOGAR RÁPIDO do menu inicial: entra na fila assim que conectar (e o servidor conferir a conta)
+  entrarNaFilaDoMenu() {
+    if (!this.rapidoPendente || this.saindo || this.comecando) return
+    const s = this.s
+    if (s.fila || s.fase === 'sala') return (this.rapidoPendente = false)
+    if (s.fase !== 'navegando') return
+    const c = get(conta).estado
+    const confirmando = (c === 'logado' || c === 'carregando') && !s.eu.conta && Date.now() - this.rapidoDesde < ESPERA_CONTA_MS
+    if (confirmando) return
+    this.rapidoPendente = false
+    if (s.online) return entrarFila()
+    lan.update((x) => ({ ...x, erro: 'JOGAR RÁPIDO só existe no servidor online (internet): aqui você joga em rede local' }))
+  }
+
   // ---------- quadro a quadro ----------
 
   update(time, delta) {
@@ -705,10 +797,12 @@ export default class Lan extends Phaser.Scene {
         if (d === 'cima' || (fila && d === 'esquerda')) this.mover(-1)
         if (d === 'baixo' || (fila && d === 'direita')) this.mover(1)
         if ((d === 'esquerda' || d === 'direita') && this.selId === 'modo') this.trocarModo(d === 'direita' ? 1 : -1)
+        if ((d === 'esquerda' || d === 'direita') && ATALHOS.some((a) => a.id === this.selId)) this.moverAtalho(d === 'direita' ? 1 : -1)
       }
     }
 
     this.acompanharComeco()
+    this.entrarNaFilaDoMenu()
 
     // JOGAR RÁPIDO: a sala casual nasceu com os dois; o host começa sozinho
     const s = this.s
