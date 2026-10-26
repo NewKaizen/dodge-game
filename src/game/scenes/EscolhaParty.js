@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { irCarregando } from '../carregando.js'
 import Controles from '../controles.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { criarFundo } from '../backgrounds/index.js'
@@ -308,7 +309,7 @@ export default class EscolhaParty extends Phaser.Scene {
     // que a cena abriu). Em rede o host leva os dois, com o chefe da última
     // luta, para os dois cursores começarem no mesmo lugar; o convidado espera
     this.time.delayedCall(740, () => {
-      if (!this.rede) this.scene.start('Selecao', { party })
+      if (!this.rede) irCarregando(this, 'Selecao', { party })
       else if (souHostDaRede()) irParaCena(this, 'Selecao', { party, chefe: this.registry.get('chefe') })
     })
   }
