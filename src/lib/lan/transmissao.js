@@ -1,6 +1,7 @@
 import { writable, derived, get } from 'svelte/store'
 import { lan, aoParceiro, enviarAoParceiro, enviarQuadro, aoQuadro, parceiro } from './rede.js'
 import { faixaDeAudio } from './audioTap.js'
+import { criarVigiaDireto, VIVO_MS } from './vigiaDireto.js'
 import { contextoAudio } from '../../game/audio.js'
 import { LARGURA, ALTURA } from '../../game/constants.js'
 
@@ -41,6 +42,12 @@ import { LARGURA, ALTURA } from '../../game/constants.js'
 //   ligacao                    store { ping, rota, fps }: ping (ms) da ligação direta,
 //                              rota 'direta' | 'turn' | null, fps da imagem
 //   enviarRapido(dados) · aoRapido(fn)   mensagens da partida: pelo canal direto (ou pelo servidor)
+//   enviarPeloServidor(dados)  sempre pelo servidor (o caminho garantido: reenvios do canal)
+//
+// Canal direto MUDO (lib/lan/vigiaDireto.js): aberto, mas o outro não recebe
+// (o Brave com os escudos ligados). Cada lado manda um '_vivo' pelo direto a
+// cada VIVO_MS e o outro responde '_vivoOk' pelo servidor; sem resposta,
+// enviarRapido manda tudo pelo servidor até ela voltar.
 export const tela = writable({ modo: null, estado: 'parada' }) // estado: parada | conectando | ao-vivo | reserva
 export const ligacao = writable({ ping: null, rota: null, fps: null })
 
@@ -84,6 +91,8 @@ let timerStats = null
 let ultimosQuadros = null // { quadros, t } para calcular os fps
 let midia = null // host: { remetenteVideo, remetenteSom, faixaVideo, som, pausada } da conexão atual
 const ouvintesRapido = new Set()
+const vigia = criarVigiaDireto()
+let avisouMudo = false
 
 export const ligarJogo = (g) => (game = g)
 export function ligarTela(elVideo, elCanvas) {
@@ -101,8 +110,10 @@ const semImagem = () => true
 
 // ---------- canal direto (mensagens da partida) ----------
 
+export const enviarPeloServidor = (dados) => enviarAoParceiro(dados)
+
 export function enviarRapido(dados) {
-  if (canal?.readyState === 'open') {
+  if (canal?.readyState === 'open' && !vigia.mudo()) {
     try {
       canal.send(JSON.stringify(dados))
       return
@@ -121,9 +132,19 @@ export function aoRapido(fn) {
   }
 }
 
+function abrirCanal(c) {
+  canal = c
+  vigia.abriu()
+  avisouMudo = false
+}
+
 function usarCanal(c) {
-  c.onopen = () => (canal = c)
-  c.onclose = () => canal === c && (canal = null)
+  c.onopen = () => abrirCanal(c)
+  c.onclose = () => {
+    if (canal !== c) return
+    canal = null
+    vigia.fechou()
+  }
   c.onmessage = (e) => {
     let dados
     try {
@@ -131,10 +152,23 @@ function usarCanal(c) {
     } catch {
       return
     }
+    // o outro quer saber se o direto entrega: responde pelo servidor
+    if (dados?.tipo === '_vivo') return enviarAoParceiro({ tipo: '_vivoOk', n: dados.n })
     ouvintesRapido.forEach((fn) => fn(dados))
   }
-  if (c.readyState === 'open') canal = c
+  if (c.readyState === 'open') abrirCanal(c)
 }
+
+// com o direto aberto: o '_vivo' de cada VIVO_MS (e o aviso no console quando ele emudece)
+setInterval(() => {
+  if (canal?.readyState !== 'open') return
+  const mudo = vigia.mudo()
+  if (mudo !== avisouMudo) console.warn(mudo ? '[lan] o canal direto não está entregando: tudo pelo servidor' : '[lan] o canal direto voltou')
+  avisouMudo = mudo
+  try {
+    canal.send(JSON.stringify({ tipo: '_vivo', n: vigia.vivo() }))
+  } catch {}
+}, VIVO_MS)
 
 // ping e rota da ligação direta, fps da imagem (os dois lados)
 function comecarStats(conexao) {
@@ -396,6 +430,7 @@ function pararTudo() {
   clearInterval(timerEscala)
   clearInterval(timerStats)
   canal = null
+  vigia.fechou()
   ligacao.set({ ping: null, rota: null, fps: null })
   pararReservaHost()
   candidatosPendentes = []
@@ -414,6 +449,9 @@ function pararTudo() {
 
 aoParceiro(async (dados) => {
   switch (dados?.tipo) {
+    case '_vivoOk':
+      vigia.ok(dados.n)
+      break
     case 'oferta':
       if (get(lan).papel === 'convidado') receberOferta(dados.sdp).catch((e) => console.warn('[lan] oferta', e))
       break
