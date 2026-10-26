@@ -5,6 +5,7 @@
   import { prepararResolucao, instalarResolucao } from '../game/resolucao.js'
   import { ligarBridge } from '../game/bridge.js'
   import { registrarDebug } from '../game/debug.js'
+  import { vigiarContextoWebgl } from '../game/contextoPerdido.js'
   import { instalarRede } from '../game/rede.js'
   import { instalarTelaCheia } from '../lib/telaCheia.js'
   import { lan } from '../lib/lan/rede.js'
@@ -23,10 +24,16 @@
     const desligarResolucao = instalarResolucao(game)
     const desligarTelaCheia = instalarTelaCheia(container)
     registrarDebug(game)
+    // canvas preto por perda do contexto WebGL (comum no Firefox em PCs fracos): avisa e deixa recarregar
+    let desligarContexto = () => {}
+    const vigiar = () => (desligarContexto = vigiarContextoWebgl(game.canvas, container))
+    if (game.canvas) vigiar()
+    else game.events.once('ready', vigiar)
     const desligarRede = instalarRede(game)
     ligarJogo(game)
 
     return () => {
+      desligarContexto()
       desligarRede()
       desligarTelaCheia()
       desligarResolucao()
