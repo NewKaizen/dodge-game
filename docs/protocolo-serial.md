@@ -24,7 +24,7 @@ Jogo (navegador) ──USB 9600──▶ Arduino principal (P1) ──serial 960
 
 ## Jogo → joystick (comandos)
 
-Formato `<jogador> <comando> [argumentos]`; o principal executa os `1 ...` e repassa os `2 ...` ao secundário. Quem decide o que mandar é [src/lib/saida.js](../src/lib/saida.js) (só com o joystick serial conectado; o simulador não manda nada).
+Formato `<jogador> <comando> [argumentos]`; o principal executa os `1 ...` e repassa os `2 ...` ao secundário. Quem decide o que mandar é [src/lib/saida.js](../src/lib/saida.js) (só com o joystick serial conectado; teclado e controle não mandam nada).
 
 | Quando                         | Linhas enviadas                                  |
 |--------------------------------|--------------------------------------------------|
@@ -42,6 +42,10 @@ Formato `<jogador> <comando> [argumentos]`; o principal executa os `1 ...` e rep
 - O jogo não manda `1 LED ...`: o firmware do principal pinta o RGB sozinho pelo estado (vermelho sem conexão, verde no menu, azul piscando na luta) e sobrescreveria a cor.
 - "Recomeçar a luta" (saída e entrada seguidas) não manda `MENU`/`GAME` de novo, só o HP cheio.
 
-## Simulador
+## Teclado e controle físico
 
-O simulador de teclado ([src/lib/simulador.js](../src/lib/simulador.js)) gera as mesmas linhas `JOY`/`BTN`. As teclas dele podem ser trocadas em CONFIGURAÇÕES → CONTROLES, por jogador; ficam salvas no navegador (preferência `teclas`, ver [src/game/teclas.js](../src/game/teclas.js)). O joystick serial não é remapeável.
+O teclado ([src/lib/simulador.js](../src/lib/simulador.js)) e o controle físico ([src/lib/gamepad.js](../src/lib/gamepad.js)) geram as mesmas linhas `JOY`/`BTN` e ligam sozinhos (primeira tecla / primeiro botão), ver [controles.md](controles.md). As teclas podem ser trocadas em CONFIGURAÇÕES → CONTROLES, por jogador (preferência `teclas`, [src/game/teclas.js](../src/game/teclas.js)), e os botões do controle em GAMEPAD. O joystick serial não é remapeável.
+
+## Conexão do joystick serial
+
+O primeiro pareamento precisa de um gesto do jogador (CONFIGURAÇÕES → GAMEPAD → CONECTAR JOYSTICK SERIAL). Depois o jogo reabre sozinho a porta autorizada ao carregar a página e quando o cabo é plugado de novo.

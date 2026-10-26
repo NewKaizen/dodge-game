@@ -24,7 +24,7 @@ Números de linha são aproximados e valem para o commit `6f00aee`.
 
 ## UI
 - Menu: `src/game/scenes/Menu.js`, `OPCOES` l.~32; `confirmar()` l.~172; layout em `src/game/menu/layout.js` (5 itens já lotam). Opção barata: abas dentro da cena Lan (FILA / AMIGOS / PERFIL).
-- Menus funcionam só com cima/baixo/A (joystick/simulador).
+- Menus funcionam só com cima/baixo/A (joystick, controle físico ou teclado).
 - Login Google/perfil/amigos/coleção (Fase 2A): cenas `Perfil`, `Amigos` e `Colecao` (base em `src/game/conta/`), stores em `src/lib/conta.js` e `src/lib/amigos.js` lidos com `get(store)`. Só a foto continua em Svelte (`src/ui/FotoModal.svelte`). Foto remota no Phaser: `Image` com crossOrigin virando textura (`conta/ui.js`); se falhar, o avatar padrão.
 - Preferências: `src/game/preferencias.js` (não guardar sessão aqui).
 

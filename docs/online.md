@@ -188,8 +188,7 @@ A sala ganhou `casual` no `sala {...}` e o `fechada` da sala casual vem com
 ### Testar com duas janelas
 
 `ONLINE=1 npm run dev` (ou `npm run online`), abra o jogo em duas janelas (uma
-anônima serve de convidado; a outra pode estar logada), use o **SIMULADOR
-(TECLADO)** nas duas, ONLINE → JOGAR RÁPIDO nas duas e aceite com A. Para ver a
+anônima serve de convidado; a outra pode estar logada), aperte uma tecla do jogo nas duas (o teclado liga sozinho), ONLINE → JOGAR RÁPIDO nas duas e aceite com A. Para ver a
 oferta da CPU, entre só com uma e espere 30 s.
 
 ## XP, níveis e Coleção (Fase 1D)

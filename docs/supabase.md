@@ -182,7 +182,7 @@ npm run online          # compila e sobe em http://localhost:5180
 # ou: npm run dev       # http://localhost:5173 (o Vite também liga /api/*)
 ```
 
-1. Abra a página, ligue o **Simulador (teclado)** e vá em **PERFIL** no menu
+1. Abra a página, aperte uma tecla (o teclado liga sozinho) e vá em **PERFIL** no menu
    inicial: **ENTRAR COM GOOGLE**.
 2. Entre: volta para o jogo; o **PERFIL** mostra o seu avatar, nome, `#tag`,
    nível, XP, título e estatísticas (e leva à **COLEÇÃO** e aos **AMIGOS**).
