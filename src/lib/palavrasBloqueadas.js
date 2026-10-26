@@ -31,3 +31,17 @@ export function nomeOfensivo(texto) {
   const colado = n.replace(/[^a-z]/g, '')
   return PALAVRAS_CONTIDAS.some((p) => colado.includes(p))
 }
+
+// Chat da sala: troca cada palavra da lista por asteriscos do mesmo tamanho
+// (o resto da mensagem passa igual). Mesma comparação do nome, só que palavra
+// por palavra: "c.a.r.a.l.h.o" junto vira uma palavra só e é pega; espalhado
+// por espaços ("c a r a l h o") passa, e aí fica com a denúncia.
+export function censurarTexto(texto) {
+  return String(texto ?? '').replace(/\S+/g, (pedaco) => {
+    const n = normalizarParaFiltro(pedaco)
+    const palavras = n.split(/[^a-z]+/).filter(Boolean)
+    const colado = n.replace(/[^a-z]/g, '')
+    const ruim = palavras.some((p) => PALAVRAS_EXATAS.includes(p)) || PALAVRAS_CONTIDAS.some((p) => colado.includes(p))
+    return ruim ? '*'.repeat([...pedaco].length) : pedaco
+  })
+}
