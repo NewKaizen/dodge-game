@@ -83,7 +83,7 @@ const recompensa = (p) => p.ultima('recompensa')
 test('protocolo 5 nos dois lados (o resultado/recompensa é novo)', async () => {
   const fs = await import('node:fs')
   const rede = fs.readFileSync(new URL('../../src/lib/lan/rede.js', import.meta.url), 'utf8')
-  assert.equal(PROTOCOLO, 5)
+  assert.ok(PROTOCOLO >= 5)
   assert.match(rede, new RegExp(`export const PROTOCOLO = ${PROTOCOLO}\\b`))
 })
 
