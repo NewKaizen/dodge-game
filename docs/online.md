@@ -324,15 +324,36 @@ uma: os itens até o nível chegam no inventário.
 
 ## Hub e mensagens (Fase 1E)
 
-Onde cada coisa fica, até a consolidação trazer tudo para dentro do jogo:
+Conta, amigos e coleção são **cenas do jogo** (Fase 2A; antes eram painéis
+Svelte por cima dele): `Perfil`, `Amigos` e `Colecao` em `src/game/scenes/`,
+no visual da tela de Configurações e navegáveis só com ↑↓←→ + A/B (C e Esc
+voltam). Onde cada coisa fica:
 
 | Quero | Onde |
 | --- | --- |
-| **Jogar rápido** | menu → ONLINE → **JOGAR RÁPIDO** (1ª opção) |
-| **Jogar com amigos** | ONLINE → **JOGAR COM AMIGOS** (cria a sala e dá o código; 2ª opção), **ENTRAR COM CÓDIGO…** (3ª), ou o botão **AMIGOS** → Convidar |
-| **Perfil** | botão **PERFIL** na barra acima do jogo |
-| **Coleção** | botão **COLEÇÃO** na barra acima do jogo |
-| **Denunciar** | **AMIGOS** → **Denunciar…** no cartão da pessoa (docs/moderacao.md) |
+| **Jogar rápido** | menu inicial → **JOGAR RÁPIDO** (1ª opção; entra direto na fila), ou ONLINE → JOGAR RÁPIDO |
+| **Jogar com amigos** | ONLINE → **JOGAR COM AMIGOS** (cria a sala e dá o código), **ENTRAR COM CÓDIGO…**, ou **AMIGOS** → A no amigo → **CONVIDAR** |
+| **Perfil** | menu inicial → **PERFIL** (ou ONLINE → PERFIL): nome, avatar, foto, **ENTRAR COM GOOGLE**, sair |
+| **Amigos** | ONLINE → **AMIGOS** (ou PERFIL → AMIGOS): abas AMIGOS / PEDIDOS / BLOQUEADOS (←→) |
+| **Coleção** | ONLINE → **COLEÇÃO** (ou PERFIL → COLEÇÃO): abas por tipo, A equipa |
+| **Link da sala** | na sala ONLINE: **COPIAR LINK DA SALA** (também em AMIGOS enquanto há sala) |
+| **Denunciar** | **AMIGOS** → A na pessoa → **DENUNCIAR…** (docs/moderacao.md) |
+
+JOGAR RÁPIDO e PERFIL só aparecem no menu inicial onde há conta ou o site está
+na internet (`siteNaInternet()` ou contas não `indisponivel`); a LAN sem
+internet fica com as cinco opções de antes.
+
+### Avisos dentro do jogo
+
+Por cima de qualquer menu (não nas arenas: esperam na fila e saem quando voltar
+a um menu): convite de amigo (**A aceita, B recusa**, com a contagem de 60 s),
+pedido de amizade recebido, "o convite tirou você da fila", **+XP** de quem
+ficou quando o oponente saiu no meio, e erro da conta (login cancelado). A fila
+é `src/game/conta/fila.js` (pura, testada); o desenho e as ligações com as
+lojas são `src/game/conta/avisos.js`; `Controles.interceptarBotao` deixa o aviso
+pegar A/B antes da cena. A foto do perfil continua em Svelte
+(`src/ui/FotoModal.svelte` + `RecorteFoto.svelte`, `src/lib/fotoModal.js`):
+seletor de arquivo e recorte precisam de DOM.
 
 Os avisos de conexão (servidor ligando ou lotado, conta não confirmada, queda
 na fila ou na sala, oponente que saiu) estão em `src/lib/lan/rede.js` (`MSG_*`) e
