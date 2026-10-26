@@ -80,7 +80,7 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 | 1B Amigos e convites | concluído (NewKaizen/dodge-game#39); falta validar com duas contas em produção |
 | 1C Jogar Rápido | concluído (NewKaizen/dodge-game#40); falta testar no navegador |
 | 1D XP e recompensas | concluído (NewKaizen/dodge-game#41); falta rodar a 0003 e testar com duas contas |
-| 1E Integração e lançamento | em andamento (Sonnet, branch `claude/practical-darwin-nc9pwz`) |
+| 1E Integração e lançamento | implementada na branch `claude/practical-darwin-nc9pwz`; falta rodar a 0004 no Supabase, o teste restrito (`docs/teste-fase1.md`) e a revisão R3 |
 
 ### Consolidação (depois das features da Fase 1)
 

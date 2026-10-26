@@ -73,6 +73,8 @@ A porta vem de `PORT` (as hospedagens já põem) ou `PORTA`.
 | `ONLINE=1` | o mesmo que `--online` |
 | `STUN_URLS` | STUN separados por vírgula (padrão: os do Google) |
 | `TURN_URL`, `TURN_USUARIO`, `TURN_SENHA` | servidor **TURN** (veja abaixo) |
+| `METRICAS_MIN` | a cada quantos minutos o servidor escreve a linha `[metricas]` no log (padrão 15 online; `0` desliga). Veja "Métricas" no fim |
+| `CONFIAR_PROXY` | `1` (padrão no modo online): o limite por endereço do `/api/avatar` usa o `X-Forwarded-For` do proxy (Render). Fora de proxy, deixe desligado |
 
 ### TURN: quando a ligação direta não passa
 
@@ -88,7 +90,9 @@ TURN_SENHA=...
 
 ## Problemas comuns
 
-- **"sem conexão com o servidor"**: o servidor caiu ou está acordando (Render grátis). O jogo tenta de novo sozinho.
+- **"não deu para falar com o servidor: ele pode estar ligando…"**: o servidor caiu ou está acordando (Render grátis, até ~1 minuto) ou a sua internet caiu. O jogo tenta de novo sozinho.
+- **"não deu para confirmar a sua conta: você está jogando como convidado"**: a sessão expirou ou o serviço de contas (Supabase) não respondeu. Saia e entre de novo com o Google; sem isso não há XP.
+- **"a conexão caiu e você saiu da fila / da sala"**: o servidor tira quem perde a conexão (ninguém fica preso); quando reconectar, procure de novo ou entre pelo código.
 - **"não achei a sala …"**: código errado, ou o host já fechou a sala (ela some quando o host sai).
 - **Ping alto**: olhe a barra de cima. Se diz **pelo servidor**, a ligação direta não passou e tudo está dando a volta pelo servidor: configure um TURN (acima). Se diz **direto** com ping alto, é a internet de um dos dois (Wi-Fi fraco, download rolando); cabo ajuda muito.
 - **A partida parou esperando o outro**: a aba do outro precisa ficar visível (o navegador para o jogo numa aba escondida).
@@ -306,3 +310,48 @@ Conferir no Supabase: **Table Editor → partidas** (estado `recompensada`),
 `concessoes` (uma linha por conta) e `perfis.xp`. Para ver a Coleção, suba o XP
 de uma conta à mão no Table Editor só para testar (ex.: `xp = 600`) e jogue mais
 uma: os itens até o nível chegam no inventário.
+
+## Hub e mensagens (Fase 1E)
+
+Onde cada coisa fica, até a consolidação trazer tudo para dentro do jogo:
+
+| Quero | Onde |
+| --- | --- |
+| **Jogar rápido** | menu → ONLINE → **JOGAR RÁPIDO** (1ª opção) |
+| **Jogar com amigos** | ONLINE → **JOGAR COM AMIGOS** (cria a sala e dá o código; 2ª opção), **ENTRAR COM CÓDIGO…** (3ª), ou o botão **AMIGOS** → Convidar |
+| **Perfil** | botão **PERFIL** na barra acima do jogo |
+| **Coleção** | botão **COLEÇÃO** na barra acima do jogo |
+| **Denunciar** | **AMIGOS** → **Denunciar…** no cartão da pessoa (docs/moderacao.md) |
+
+Os avisos de conexão (servidor ligando ou lotado, conta não confirmada, queda
+na fila ou na sala, oponente que saiu) estão em `src/lib/lan/rede.js` (`MSG_*`) e
+nos `motivo` de `server/lan.js`; cada um diz o que fazer em seguida.
+
+## Métricas (Fase 1E)
+
+O servidor guarda **só contadores e tempos agregados, na memória**, e escreve
+**uma linha JSON no log** a cada `METRICAS_MIN` minutos (padrão 15) e ao receber
+o aviso de desligamento (SIGTERM/SIGINT). Janela sem nada não escreve.
+
+```
+[metricas] {"motivo":"periodico","de":"...","ate":"...","contadores":{"logins":7,"fila_pares":3,...},"amostras":{"fila_espera_ms":{"n":6,"p50":4200,"p90":31000,"max":31000}}}
+```
+
+| Campo | O que conta |
+| --- | --- |
+| `conexoes`, `logins` | conexões abertas; contas que entraram (ao conectar ou com o lobby aberto) |
+| `reconexoes` | a **mesma conta** voltando em até 2 min depois de cair (a memória do "quando caiu" some em 2 min) |
+| `fila_entradas`, `fila_pares`, `fila_pares_desfeitos` | entradas na fila, pares formados, pares que não fecharam |
+| `fila_espera_ms` | n, p50, p90 e máximo do tempo esperado até achar par (uma amostra por jogador pareado) |
+| `partidas_iniciadas`, `partidas_finalizadas`, `partidas_abandonadas`, `partidas_contestadas` | PVP online registradas (revanche abre outra); abandonada = alguém saiu no meio |
+| `revanches_pedidas`, `revanches_aceitas` | pedidos e aceites duplos |
+| `avatar_envios_ok`, `avatar_envios_falha`, `avatar_bloqueios_ip` | fotos que subiram, falharam (imagem ruim, Storage) e pedidos barrados pelo limite por endereço |
+
+**O que NÃO é coletado:** nome, tag, conta, e-mail, endereço IP, código ou id de
+sala, conteúdo do chat, resultado de cada partida, qualquer coisa por jogador. Os
+nomes aceitos estão numa lista fechada em `server/metricas.js` (qualquer outro é
+ignorado) e um teste confere que a linha não carrega token, chat nem IP. As
+métricas **não vão para o Supabase nem para terceiros**: ficam no log do Render.
+O endereço usado no limite do `/api/avatar` fica só na memória, para contar, e
+não é gravado.
+

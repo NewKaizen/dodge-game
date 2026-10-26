@@ -27,3 +27,6 @@ services:
         sync: false
       - key: SUPABASE_SECRET_KEY
         sync: false
+      # Métricas agregadas no log (docs/online.md): minutos entre as linhas; 0 desliga
+      - key: METRICAS_MIN
+        value: 15
