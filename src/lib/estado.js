@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store'
 import { CORACAO } from '../game/constants.js'
+import { resumirFontes } from '../game/fontes.js'
 
 export const MAX_JOGADORES = 2
 
@@ -25,8 +26,9 @@ export const CONFIG_PADRAO = PADRAO // "restaurar padrão" da tela Config
 
 // Estado compartilhado entre a UI (Svelte) e o jogo (Phaser, via bridge.js)
 export const jogo = writable({
-  conectado: false,
-  fonte: null, // 'serial' | 'simulador'
+  conectado: false, // alguma fonte de controle ligada (teclado, controle ou serial)
+  fonte: null, // a principal: 'serial' | 'gamepad' | 'teclado' (game/fontes.js)
+  fontes: { teclado: false, gamepad: false, serial: false }, // todas as ligadas
   numJogadores: 1, // as telas de escolha recomeçam quando muda
   jogadores: Array.from({ length: MAX_JOGADORES }, () => ({ joy: { x: 0, y: 0 } })),
   botao: null, // último botão apertado: { jogador, botao: 'A' | 'B' | 'C', id } (C = pause)
@@ -34,6 +36,16 @@ export const jogo = writable({
   som: salvo.som,
   volume: salvo.volume, // { musica, efeitos } em %
 })
+
+// Liga/desliga uma fonte de controle: 'teclado' (lib/simulador.js), 'gamepad'
+// (lib/gamepad.js) ou 'serial' (lib/serial.js). Várias podem estar ligadas.
+export function definirFonte(nome, ativa) {
+  jogo.update((s) => {
+    if (Boolean(s.fontes[nome]) === Boolean(ativa)) return s
+    const fontes = { ...s.fontes, [nome]: Boolean(ativa) }
+    return { ...s, fontes, ...resumirFontes(fontes) }
+  })
+}
 
 let configSalva = null
 jogo.subscribe((s) => {

@@ -29,8 +29,8 @@ import { montarAvisos } from '../conta/avisos.js'
 // dentro do jogo) só escurecem a tela. JOGAR RÁPIDO e PERFIL só existem onde há conta ou internet
 // (LAN sem internet não tem nenhum dos dois). O host de uma sala LAN que
 // volta ao menu (fim da partida, SAIR da pausa) cai direto no lobby. Embaixo da lista, uma linha diz o que a
-// opção escolhida faz; sem joystick conectado, as opções ficam apagadas e a
-// linha vira um aviso pedindo para conectar.
+// opção escolhida faz; até alguém apertar uma tecla ou um botão do controle (ou o
+// joystick serial já autorizado abrir), as opções ficam apagadas e a linha pede isso.
 //
 // Música: public/assets/musicas/menu.mid; sem o arquivo, toca a do Jevil. O
 // nome no canto de cima vem de ASSETS.tituloMusicaMenu.
@@ -187,7 +187,7 @@ export default class Menu extends Phaser.Scene {
     const l = this.linhas[this.indice]
     this.seta.setVisible(ativo).setColor(this.opcoes[this.indice].cor).setPosition(this.pos.x + 8 + l.width + 12, l.y)
     this.aviso
-      .setText(ativo ? this.dicaDe(this.opcoes[this.indice]) : 'conecte o joystick ou use o\nSIMULADOR (TECLADO) aí em cima ↑')
+      .setText(ativo ? this.dicaDe(this.opcoes[this.indice]) : 'aperte uma tecla ou um botão do\ncontrole para começar')
       .setColor(ativo ? '#9a9ab0' : TEXTO.desabilitado)
     this.atualizarMiniatura()
   }

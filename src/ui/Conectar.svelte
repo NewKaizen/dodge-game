@@ -1,8 +1,5 @@
 <script>
   import { jogo, MAX_JOGADORES } from '../lib/estado.js'
-  import { conectarSerial, desconectarSerial } from '../lib/serial.js'
-  import { despedir } from '../lib/saida.js'
-  import { iniciarSimulador, pararSimulador } from '../lib/simulador.js'
   import { alternarTelaCheia } from '../lib/telaCheia.js'
   import { lan, sairSala } from '../lib/lan/rede.js'
   import { pingPartida, ROTAS, corDoPing } from '../lib/lan/transmissao.js'
@@ -11,21 +8,10 @@
   let naSala = $derived($lan.fase === 'sala')
   let outro = $derived($lan.sala?.membros.find((m) => m.id !== $lan.eu.id))
 
-  let erro = $state('')
-
-  async function conectar() {
-    erro = ''
-    try {
-      await conectarSerial()
-    } catch (e) {
-      erro = e.message
-    }
-  }
-
-  async function desconectar() {
-    await despedir() // DISCONNECT antes de fechar a porta
-    await desconectarSerial()
-  }
+  // os controles se ligam sozinhos (game/entrada.js): a primeira tecla, o primeiro botão do
+  // controle ou o joystick serial já autorizado. Aqui só um resumo discreto.
+  const NOMES = { teclado: 'teclado', gamepad: 'controle', serial: 'joystick serial' }
+  let ligados = $derived(Object.keys(NOMES).filter((f) => $jogo.fontes[f]).map((f) => NOMES[f]))
 </script>
 
 <div class="conectar">
@@ -52,19 +38,8 @@
 {/if}
 
 <div class="conectar">
-  {#if $jogo.conectado}
-    <span>Conectado ({$jogo.fonte})</span>
-    {#if $jogo.fonte === 'simulador'}
-      <button onclick={pararSimulador}>Parar simulador</button>
-    {:else if $jogo.fonte === 'serial'}
-      <button onclick={desconectar}>Desconectar joystick</button>
-    {/if}
-  {:else}
-    <button onclick={conectar}>Conectar joystick</button>
-    <button onclick={() => iniciarSimulador()}>Simulador (teclado)</button>
-  {/if}
+  <span class="dica">{ligados.length ? `controles: ${ligados.join(' · ')}` : 'aperte uma tecla ou um botão do controle para jogar'}</span>
   <button onclick={alternarTelaCheia}>⛶ Tela cheia (F)</button>
-  {#if erro}<span class="erro">{erro}</span>{/if}
 </div>
 
 <style>
@@ -81,10 +56,6 @@
   .dica {
     color: #888;
     font-size: 12px;
-  }
-
-  .erro {
-    color: #f55;
   }
 
   .lan {

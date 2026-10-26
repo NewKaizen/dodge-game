@@ -1,7 +1,8 @@
-import { jogo } from './estado.js'
+import { definirFonte } from './estado.js'
 import { processarLinha } from './protocolo.js'
 import { pref, aoMudarPref } from '../game/preferencias.js'
 import { normalizarTeclas, JOGADORES } from '../game/teclas.js'
+import { teclaAtiva } from '../game/fontes.js'
 
 // Teclas de cada jogador (e.code, independe do layout do teclado): as
 // remapeadas na tela Config (preferência 'teclas'), ou as de fábrica
@@ -44,12 +45,19 @@ function mapear(code) {
   return null
 }
 
+// digitando num campo de texto da página (nome da foto...): as teclas são dele
+const emCampoDeTexto = (e) => {
+  const t = e.target
+  return Boolean(t?.isContentEditable || (t?.tagName && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))
+}
+
 function enviarJoy(jogador) {
   // as teclas de todos os conjuntos que comandam este jogador
   const conjuntos = TECLADO.filter((_, j) => dono(j) === jogador)
   const algum = (d) => conjuntos.some((teclas) => teclas[d].some((c) => pressionadas.has(c)))
   const x = (algum('direita') ? 100 : 0) - (algum('esquerda') ? 100 : 0)
   const y = (algum('baixo') ? 100 : 0) - (algum('cima') ? 100 : 0)
+  if (ultimoJoy[jogador] === undefined && !x && !y) return // nunca mexeu: não zera o joystick serial / controle
   const linha = `JOY ${jogador + 1} ${x} ${y}`
   if (linha === ultimoJoy[jogador]) return
   ultimoJoy[jogador] = linha
@@ -57,6 +65,7 @@ function enviarJoy(jogador) {
 }
 
 function aoPressionar(e) {
+  if (emCampoDeTexto(e)) return
   const tecla = mapear(e.code)
   if (!tecla) return
   e.preventDefault()
@@ -69,6 +78,7 @@ function aoPressionar(e) {
 }
 
 function aoSoltar(e) {
+  if (emCampoDeTexto(e)) return
   const tecla = mapear(e.code)
   if (!tecla) return
   e.preventDefault()
@@ -81,11 +91,14 @@ function soltarTudo() {
   new Set(TECLADO.map((_, j) => dono(j))).forEach(enviarJoy)
 }
 
-// Emite linhas do protocolo a partir do teclado, para jogar sem o hardware
+// Liga o teclado: emite linhas do protocolo (JOY/BTN) a partir das teclas, como se
+// fosse um joystick. Quem liga é a primeira tecla do jogo apertada na página
+// (armarTeclado), sem nenhum botão para clicar.
 export function iniciarSimulador() {
   pararSimulador()
   ativo = true
-  jogo.update((s) => ({ ...s, conectado: true, fonte: 'simulador' }))
+  desarmar()
+  definirFonte('teclado', true)
 
   window.addEventListener('keydown', aoPressionar)
   window.addEventListener('keyup', aoSoltar)
@@ -99,7 +112,35 @@ export function pararSimulador() {
   if (ativo) soltarTudo()
   ativo = false
   ultimoJoy.length = 0
-  jogo.update((s) => ({ ...s, conectado: false, fonte: null }))
+  definirFonte('teclado', false)
+  if (armado) window.addEventListener('keydown', aoPrimeiraTecla)
+}
+
+// Auto-detecção: enquanto o teclado não está ligado, a primeira tecla do jogo
+// (as do mapa atual: WASD, setas, Espaço...) liga o teclado e já vale como aquele
+// aperto. Digitar em campo de texto ou usar Ctrl/Alt/Cmd não conta.
+let armado = false
+function aoPrimeiraTecla(e) {
+  if (ativo || emCampoDeTexto(e) || e.ctrlKey || e.metaKey || e.altKey) return
+  if (!teclaAtiva(e.code, normalizarTeclas(pref('teclas')))) return
+  iniciarSimulador()
+  // o ouvinte novo só pega a próxima tecla: este aperto é tratado aqui. As direções já
+  // valem; A/B/C da primeira vez só "acordam" o teclado (senão o primeiro Espaço da
+  // página já escolheria a primeira opção do menu sem ninguém ter visto a tela)
+  if (mapear(e.code)?.botao) e.preventDefault()
+  else aoPressionar(e)
+}
+function desarmar() {
+  window.removeEventListener('keydown', aoPrimeiraTecla)
+}
+export function armarTeclado() {
+  if (typeof window === 'undefined') return () => {}
+  armado = true
+  if (!ativo) window.addEventListener('keydown', aoPrimeiraTecla)
+  return () => {
+    armado = false
+    desarmar()
+  }
 }
 
 // Espera a próxima tecla (tela Config, remapear): fn(code) com o e.code dela.
