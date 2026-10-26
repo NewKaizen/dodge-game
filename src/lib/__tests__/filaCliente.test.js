@@ -92,7 +92,7 @@ test('fila no cliente: procurar, achar, aceitar, sala casual, revanche e o opone
   caio.mandar({ t: 'sair' })
   await esperar()
   assert.equal(s().fase, 'navegando')
-  assert.equal(s().erro, 'o oponente saiu da partida')
+  assert.equal(s().erro, 'o oponente saiu da partida: escolha jogar de novo ou volte ao menu')
   assert.equal(s().ultimaCasual, true)
   assert.equal(s().revanche, null)
 

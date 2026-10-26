@@ -232,7 +232,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     for (const id of sala.membros) enviar(clientes.get(id), msg)
   }
 
-  function sair(cliente, motivo = 'o host saiu') {
+  function sair(cliente, motivo = 'o host saiu: a sala foi fechada') {
     const sala = salas.get(cliente.sala)
     cliente.sala = null
     cliente.pronto = false
@@ -247,7 +247,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
         const outro = clientes.get(id)
         outro.sala = null
         outro.pronto = false
-        enviar(outro, { t: 'fechada', motivo: sala.casual ? 'o oponente saiu da partida' : motivo, ...(sala.casual && { casual: true }) })
+        enviar(outro, { t: 'fechada', motivo: sala.casual ? 'o oponente saiu da partida: escolha jogar de novo ou volte ao menu' : motivo, ...(sala.casual && { casual: true }) })
         atualizarStatus(outro)
       }
       return
@@ -496,7 +496,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   const acoes = {
     ola(c, m) {
       if (c.ok || c.validando) return
-      if (m.protocolo !== PROTOCOLO) return enviar(c, { t: 'erro', msg: `versão diferente do jogo (protocolo ${m.protocolo} x ${PROTOCOLO}): atualize os dois PCs` })
+      if (m.protocolo !== PROTOCOLO) return enviar(c, { t: 'erro', msg: `o jogo foi atualizado (versão ${m.protocolo} aqui, ${PROTOCOLO} no servidor): recarregue a página com Ctrl+F5 e, na LAN, atualize os dois PCs` })
       const token = typeof m.token === 'string' && m.token.length <= 4096 ? m.token : null
       if (!token || !autenticar) return boasVindas(c, m, null, Boolean(m.token && autenticar))
       // o resto das mensagens espera (c.ok só depois de validar)
@@ -563,8 +563,8 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       const sala = codigo ? salas.get(codigos.get(codigo)) : online ? null : salas.get(m.sala)
       if (!sala) return enviar(c, { t: 'erro', msg: codigo ? `não achei a sala ${codigo}: confira o código` : 'essa sala não existe mais' })
       if (sala.membros.has(c.id)) return avisarSala(sala)
-      if (sala.membros.size >= MAX_MEMBROS) return enviar(c, { t: 'erro', msg: 'a sala está cheia' })
-      if (sala.emPartida) return enviar(c, { t: 'erro', msg: 'a sala está no meio de uma partida' })
+      if (sala.membros.size >= MAX_MEMBROS) return enviar(c, { t: 'erro', msg: 'a sala está cheia: peça outro código ao seu amigo' })
+      if (sala.emPartida) return enviar(c, { t: 'erro', msg: 'a sala está no meio de uma partida: espere acabar e tente de novo' })
       entrarNaSala(c, sala)
     },
     sair(c) {
@@ -692,7 +692,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       if (!limiteFila.usar(c.id)) return negarFila(c, 'calma: ações demais, espere um pouco')
       const sala = salas.get(c.sala)
       if (!sala?.casual) return
-      if (sala.membros.size < MAX_MEMBROS) return enviar(c, { t: 'revanche', estado: 'indisponivel', motivo: 'o oponente já saiu' })
+      if (sala.membros.size < MAX_MEMBROS) return enviar(c, { t: 'revanche', estado: 'indisponivel', motivo: 'o oponente já saiu: escolha fila ou menu' })
       verificarRevanche(sala)
       if (m.aceitar !== true) {
         encerrarRevanche(sala)
@@ -797,7 +797,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       }
       removerDaFila(cliente, 'saiu')
       desregistrar(cliente, cliente.usuario)
-      sair(cliente, 'o host desconectou')
+      sair(cliente, 'o host perdeu a conexão: a sala foi fechada')
       clientes.delete(cliente.id)
     },
   }

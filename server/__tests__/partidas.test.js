@@ -197,7 +197,7 @@ test('abandono: o host desconecta, a sala fecha e o convidado leva', async () =>
   const { host, conv } = await partida(m)
   m.relogio.andar(80_000)
   host.sair()
-  assert.equal(conv.ultima('fechada').motivo, 'o host desconectou')
+  assert.equal(conv.ultima('fechada').motivo, 'o host perdeu a conexão: a sala foi fechada')
   // quem ficou foi tirado da sala: desconectar agora não conta como abandono dele
   m.relogio.andar(1000)
   m.relogio.andar(ABANDONO_GRACA_MS)

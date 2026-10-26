@@ -75,7 +75,7 @@ test('criar, entrar, pronto, modo e partida', () => {
   // terceiro não entra
   const terceiro = entrar('192.168.0.44', 'CAIO')
   terceiro.mandar({ t: 'entrar', sala: sala.id })
-  assert.equal(terceiro.ultima('erro').msg, 'a sala está cheia')
+  assert.equal(terceiro.ultima('erro').msg, 'a sala está cheia: peça outro código ao seu amigo')
   assert.equal(lobby.salas.get(sala.id).membros.size, 2)
 })
 
@@ -122,7 +122,7 @@ test('host saindo fecha a sala; convidado saindo libera a vaga', () => {
   assert.equal(host.ultima('sala').sala.membros.length, 1)
   conv.mandar({ t: 'entrar', sala: id })
   lobby.desconectar(host.c)
-  assert.equal(conv.ultima('fechada').motivo, 'o host desconectou')
+  assert.equal(conv.ultima('fechada').motivo, 'o host perdeu a conexão: a sala foi fechada')
   assert.equal(lobby.salas.size, 0)
   assert.equal(conv.c.sala, null)
 })
