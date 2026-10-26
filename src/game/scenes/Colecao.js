@@ -199,7 +199,7 @@ export default class Colecao extends CenaConta {
     if (item.tipo === 'avatar') this.view.add(criarAvatar(this, x, y, { tipo: 'jogo', id: item.id.split('.')[1] }, 36 * escala, moldura))
     else if (item.tipo === 'moldura') this.view.add(criarAvatar(this, x, y, avatarDoPerfil(p), 36 * escala, item.cor))
     else if (item.tipo === 'verso') verso(this.grafico(), x - 14 * escala, y - 20 * escala, 28 * escala, 40 * escala, item.cor)
-    else caber(this.t(x, y, item.nome, escala > 1 ? 18 : 13, COR.titulo).setOrigin(0.5), item.nome, escala > 1 ? 250 : GRADE.cel.l - 12)
+    else this.t(x, y, item.nome, escala > 1 ? 20 : 13, COR.titulo, { wordWrap: { width: escala > 1 ? 250 : GRADE.cel.l - 18 }, align: 'center' }).setOrigin(0.5)
   }
 
   desenharGrade(p) {
@@ -224,9 +224,10 @@ export default class Colecao extends CenaConta {
       if (!tem) {
         // bloqueado: véu e o nível que libera
         g.fillStyle(0x000000, 0.62).fillRect(x - cel.l / 2 + 4, y - cel.a / 2 + 2, cel.l - 8, cel.a - 6)
-        // o cadeado
-        g.fillStyle(0x9a9ab0, 1).fillRect(x - 8, y - 14, 16, 12)
-        g.lineStyle(3, 0x9a9ab0, 1).strokeRect(x - 5, y - 24, 10, 10)
+        // o cadeado (nos títulos, no canto de baixo: o meio é o texto)
+        const [lx, ly] = item.tipo === 'titulo' ? [x + cel.l / 2 - 20, y + 14] : [x, y - 14]
+        g.fillStyle(0x9a9ab0, 1).fillRect(lx - 8, ly, 16, 12)
+        g.lineStyle(3, 0x9a9ab0, 1).strokeRect(lx - 5, ly - 10, 10, 10)
       }
       if (item.tipo !== 'titulo') caber(this.t(x, y + 22, item.nome, 12, tem ? COR.texto : COR.apagado).setOrigin(0.5), item.nome, cel.l - 14)
       const estado = tem ? (this.equipado(item) ? 'EQUIPADO' : item.padrao ? 'padrão' : 'seu') : `nível ${item.nivel}`
@@ -248,8 +249,8 @@ export default class Colecao extends CenaConta {
       return
     }
     const tem = this.possui(item)
-    this.amostra(item, p, cx, d.y + 96, 2.2)
-    caber(this.t(cx, d.y + 176, item.nome, 20, COR.texto, { strokeThickness: 4 }).setOrigin(0.5), item.nome, d.largura - 24)
+    this.amostra(item, p, cx, d.y + (item.tipo === 'titulo' ? 140 : 96), 2.2)
+    if (item.tipo !== 'titulo') caber(this.t(cx, d.y + 176, item.nome, 20, COR.texto, { strokeThickness: 4 }).setOrigin(0.5), item.nome, d.largura - 24)
     const tipo = { avatar: 'AVATAR', titulo: 'TÍTULO', moldura: 'MOLDURA', verso: 'VERSO DE CARTA' }[item.tipo]
     this.t(cx, d.y + 200, tipo, 11, COR.dica).setOrigin(0.5)
     let estado
