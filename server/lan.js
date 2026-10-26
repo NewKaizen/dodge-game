@@ -57,6 +57,7 @@ import { CONVITE_MS, CONVITES_POR_MINUTO, MAX_CONVITES_RECEBIDOS } from './amigo
 import { criarFila, agendarPadrao, ACOES_FILA_POR_MINUTO, REVANCHE_MS, FOLGA_PING_MS } from './fila.js'
 import { criarPartidas } from './partidas.js'
 import { METRICAS_NULA } from './metricas.js'
+import { nomeOfensivo } from '../src/lib/palavrasBloqueadas.js'
 
 export const PROTOCOLO = 5
 export const PORTA_DESCOBERTA = 47777
@@ -101,6 +102,12 @@ const limpar = (texto, max) =>
     .replace(/[\u0000-\u001f\u007f]/g, '')
     .trim()
     .slice(0, max)
+// nome de convidado (quem tem conta usa o do perfil, que o banco já filtrou):
+// a mesma lista de palavras do perfil; '' = não serve
+const nomeConvidado = (texto) => {
+  const nome = limpar(texto, MAX_NOME)
+  return nome && !nomeOfensivo(nome) ? nome : ''
+}
 
 // ---------- endereços ----------
 
@@ -451,7 +458,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   const boasVindas = (c, m, conta, tentouConta) => {
     c.usuario = conta?.id ?? null
     c.perfil = conta?.id ? resumoPerfil(conta.perfil) : null
-    c.nome = (c.perfil?.nome ?? limpar(m.nome, MAX_NOME)) || 'JOGADOR'
+    c.nome = (c.perfil?.nome ?? nomeConvidado(m.nome)) || 'JOGADOR'
     c.ok = true
     enviar(c, {
       t: 'bemvindo',
@@ -567,7 +574,9 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     nome(c, m) {
       // com conta, o nome é o do perfil (muda pelo perfil e chega pelo "conta")
       if (c.perfil) return
-      c.nome = limpar(m.nome, MAX_NOME) || c.nome
+      const nome = nomeConvidado(m.nome)
+      if (!nome && limpar(m.nome, MAX_NOME)) return enviar(c, { t: 'erro', msg: 'esse nome não é permitido: escolha outro' })
+      c.nome = nome || c.nome
       const sala = salas.get(c.sala)
       if (sala) avisarSala(sala)
     },
