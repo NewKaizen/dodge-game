@@ -5,6 +5,7 @@
 //   sb.auth.getUser(token)
 //   sb.from('perfis').select('...').eq('id', x).maybeSingle() | .single()
 //   sb.from('perfis').update({...}).eq('id', x).select('...').single()
+//   (também .in(coluna, lista), .order(coluna, { ascending }) e .limit(n); tabela denuncias para a moderação)
 //   sb.storage.from('avatares').upload(caminho, buf, opcoes) · remove([caminho]) · getPublicUrl(caminho)
 //
 //   sb.rpc('registrar_partida' | 'encerrar_partida' | 'conceder_recompensa', args)
@@ -21,10 +22,17 @@ const erro = (message) => ({ message })
 
 function consulta(sb, tabela) {
   const filtros = []
+  const listas = []
+  let ordem = null
+  let maximo = Infinity
   let mudanca = null
   let colunas = null
 
-  const linhas = () => (sb.tabelas[tabela] ?? []).filter((l) => filtros.every(([c, v]) => l[c] === v))
+  const linhas = () => {
+    const achadas = (sb.tabelas[tabela] ?? []).filter((l) => filtros.every(([c, v]) => l[c] === v) && listas.every(([c, vs]) => vs.includes(l[c])))
+    if (ordem) achadas.sort((a, b) => (a[ordem.coluna] < b[ordem.coluna] ? -1 : a[ordem.coluna] > b[ordem.coluna] ? 1 : 0) * (ordem.subindo ? 1 : -1))
+    return achadas.slice(0, maximo)
+  }
   const projetar = (l) => {
     if (!colunas || colunas === '*') return { ...l }
     return Object.fromEntries(colunas.split(',').map((c) => c.trim()).filter(Boolean).map((c) => [c, l[c] ?? null]))
@@ -50,6 +58,18 @@ function consulta(sb, tabela) {
     },
     eq(coluna, valor) {
       filtros.push([coluna, valor])
+      return q
+    },
+    in(coluna, valores) {
+      listas.push([coluna, valores])
+      return q
+    },
+    order(coluna, { ascending = true } = {}) {
+      ordem = { coluna, subindo: ascending }
+      return q
+    },
+    limit(n) {
+      maximo = n
       return q
     },
     async maybeSingle() {
@@ -141,7 +161,7 @@ function rpcs(sb) {
 
 export function criarSupabaseFalso({ usuarios = {}, perfis = [], url = 'https://falso.supabase.co', agora = Date.now } = {}) {
   const sb = {
-    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [] },
+    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [], denuncias: [] },
     agora,
     diaDe: (ms) => Math.floor((ms - 3 * 3600_000) / 86_400_000), // dia em São Paulo (UTC−3)
     concederChamadas: 0,

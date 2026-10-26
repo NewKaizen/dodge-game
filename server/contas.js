@@ -19,6 +19,7 @@
 
 import { criarRelacoes } from './amigos.js'
 import { criarRegistro } from './partidas.js'
+import { METRICAS_NULA } from './metricas.js'
 
 export const BUCKET_AVATARES = 'avatares'
 export const MAX_BYTES_AVATAR = 2 * 1024 * 1024
@@ -26,6 +27,8 @@ export const LADO_AVATAR = 256
 export const MIN_LADO_ENTRADA = 64
 export const MAX_LADO_ENTRADA = 4096
 export const ENVIOS_POR_MINUTO = 5
+// pedidos a /api/avatar por endereço, ANTES de falar com o Supabase Auth (token falso também custa uma chamada)
+export const AVATAR_POR_IP_POR_MINUTO = 40
 const MAX_TOKEN = 4096
 const TIPOS_ACEITOS = { 'image/png': 'png', 'image/jpeg': 'jpeg', 'image/webp': 'webp' }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -144,6 +147,18 @@ export function criarLimite({ max = ENVIOS_POR_MINUTO, janelaMs = 60_000, agora 
 
 // ---------- HTTP ----------
 
+// Endereço de quem fez o pedido. Atrás de um proxy (Render) o socket é o do
+// proxy: com confiarProxy vale a ÚLTIMA entrada do X-Forwarded-For (a que o
+// nosso proxy acrescentou; as de antes quem manda é o cliente). Fica só na
+// memória, para o limite; nunca é gravado.
+export function enderecoDoPedido(req, { confiarProxy = false } = {}) {
+  if (confiarProxy) {
+    const lista = String(req.headers?.['x-forwarded-for'] ?? '').split(',').map((x) => x.trim()).filter(Boolean)
+    if (lista.length) return lista[lista.length - 1].slice(0, 64)
+  }
+  return String(req.socket?.remoteAddress ?? 'desconhecido')
+}
+
 function responder(res, status, corpo) {
   if (res.headersSent) return
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' })
@@ -176,16 +191,25 @@ function lerCorpo(req, max) {
 // supabase: cliente com a service_role (ou o falso dos testes)
 // autenticar: token -> { id, perfil } | null (padrão: o do supabase)
 // processarImagem: (buf, tipo) -> WebP (padrão: sharp)
-export function criarContas({ config = { disponivel: false }, supabase = null, autenticar, processarImagem = processarAvatar, agora = Date.now, limite } = {}) {
+export function criarContas({ config = { disponivel: false }, supabase = null, autenticar, processarImagem = processarAvatar, agora = Date.now, limite, limiteIp, confiarProxy = false, metricas = METRICAS_NULA } = {}) {
   const ativo = Boolean(config.disponivel && supabase)
   const auth = autenticar ?? (ativo ? criarAutenticador(supabase) : async () => null)
   const limiteEnvios = limite ?? criarLimite({ agora })
+  const limitePorIp = limiteIp ?? criarLimite({ max: AVATAR_POR_IP_POR_MINUTO, agora })
   const caminhoDe = (id) => {
     if (!UUID.test(id)) throw new ErroHttp(401, 'sessão inválida')
     return `${id.toLowerCase()}.webp`
   }
 
+  // antes de qualquer coisa que gaste o Supabase: pedidos demais do mesmo endereço (com token falso ou sem token)
+  function limitarEndereco(req) {
+    if (limitePorIp.usar(enderecoDoPedido(req, { confiarProxy }))) return
+    metricas.contar('avatar_bloqueios_ip')
+    throw new ErroHttp(429, 'muitos pedidos deste endereço: espere um minuto e tente de novo')
+  }
+
   async function quem(req) {
+    limitarEndereco(req)
     const token = tokenDoCabecalho(req)
     if (!token) throw new ErroHttp(401, 'precisa estar logado')
     const conta = await auth(token)
@@ -230,7 +254,17 @@ export function criarContas({ config = { disponivel: false }, supabase = null, a
 
   const rotas = {
     'GET /api/config': async () => configPublica(ativo ? config : { disponivel: false }),
-    'POST /api/avatar': enviarAvatar,
+    'POST /api/avatar': async (req) => {
+      try {
+        const r = await enviarAvatar(req)
+        metricas.contar('avatar_envios_ok')
+        return r
+      } catch (e) {
+        // só conta falha de quem chegou a enviar (login e limite de uso não são "envio que falhou")
+        if (!(e instanceof ErroHttp) || ![401, 429].includes(e.status)) metricas.contar('avatar_envios_falha')
+        throw e
+      }
+    },
     'DELETE /api/avatar': apagarAvatar,
   }
 
@@ -267,7 +301,7 @@ export function criarContas({ config = { disponivel: false }, supabase = null, a
 
 // Liga com as variáveis de ambiente. Sem elas (ou sem o pacote), contas
 // desligadas e o jogo segue normal.
-export async function iniciarContas(env = process.env, { log = console.log } = {}) {
+export async function iniciarContas(env = process.env, { log = console.log, confiarProxy = false, metricas = METRICAS_NULA } = {}) {
   const config = lerConfig(env)
   if (!config.disponivel) {
     if (Object.keys(env).some((k) => k.startsWith('SUPABASE_') && env[k])) log('[contas] faltam variáveis SUPABASE_*: contas desligadas (docs/supabase.md)')
@@ -276,7 +310,7 @@ export async function iniciarContas(env = process.env, { log = console.log } = {
   try {
     const { createClient } = await import('@supabase/supabase-js')
     const supabase = createClient(config.url, config.serviceKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } })
-    return criarContas({ config, supabase })
+    return criarContas({ config, supabase, confiarProxy, metricas })
   } catch (e) {
     log(`[contas] não deu para ligar o Supabase (${e.message}): contas desligadas`)
     return criarContas()

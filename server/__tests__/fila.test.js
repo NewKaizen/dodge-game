@@ -403,7 +403,7 @@ test('sala casual: quem sai fecha a sala para o outro', async () => {
   const { lobby, ana, beto } = await casual()
   beto.mandar({ t: 'sair' })
   assert.equal(lobby.salas.size, 0)
-  assert.equal(ana.ultima('fechada').motivo, 'o oponente saiu da partida')
+  assert.equal(ana.ultima('fechada').motivo, 'o oponente saiu da partida: escolha jogar de novo ou volte ao menu')
   assert.equal(ana.c.sala, null)
   // "jogar novamente": sair da sala e entrar na fila
   beto.mandar({ t: 'fila', acao: 'entrar' })
@@ -447,7 +447,7 @@ test('revanche: recusada, expirada ou com o oponente saindo', async () => {
     ana.mandar({ t: 'revanche', aceitar: true })
     beto.sair()
     assert.equal(lobby.salas.size, 0)
-    assert.equal(ana.ultima('fechada').motivo, 'o oponente saiu da partida')
+    assert.equal(ana.ultima('fechada').motivo, 'o oponente saiu da partida: escolha jogar de novo ou volte ao menu')
     assert.equal(relogio.ativos(), lobby.partidas.timers(), 'o timer da revanche foi junto (sobra só o do registro da partida)')
     relogio.andar(REVANCHE_MS * 2)
     assert.equal(ana.tipo('revanche').at(-1).estado, 'pedida', 'nada expira depois')

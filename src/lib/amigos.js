@@ -61,7 +61,7 @@ export async function recarregar() {
   mudar({ carregando: true })
   const [a, b] = await Promise.all([sb.rpc('listar_amigos'), sb.rpc('listar_bloqueados')])
   if (rodada !== carregamento) return // chegou uma leitura mais nova
-  if (a.error || b.error) return mudar({ carregando: false, erro: 'não deu para carregar os amigos: tente de novo' })
+  if (a.error || b.error) return mudar({ carregando: false, erro: 'não deu para carregar os amigos: o serviço de contas não respondeu. Tente de novo daqui a pouco' })
   mudar({ carregando: false, erro: '', ...agrupar(a.data), bloqueados: (b.data ?? []).map(perfilDaLinha) })
 }
 
@@ -75,7 +75,12 @@ function agendarRecarregar() {
 
 // as funções do banco falam português (errcodes nossos); o resto é erro de rede etc.
 const CODIGOS_NOSSOS = new Set(['28000', '22023', 'P0002', '23505', '54000', '42501'])
-const textoDoErro = (error) => (CODIGOS_NOSSOS.has(error?.code) && error.message ? error.message : 'não deu para fazer isso: tente de novo')
+const REDE = /fetch|network|timeout|timed out|failed to|50[234]/i
+export const textoDoErro = (error) => {
+  if (CODIGOS_NOSSOS.has(error?.code) && error.message) return error.message
+  if (REDE.test(String(error?.message ?? ''))) return 'o serviço de contas não respondeu: confira a sua internet ou tente de novo daqui a pouco'
+  return 'não deu para fazer isso agora: tente de novo'
+}
 
 async function chamar(funcao, parametros, { outro = null } = {}) {
   const sb = clienteSupabase()

@@ -108,7 +108,7 @@ async function carregarPerfil() {
     supabase.from('estatisticas_basicas').select('partidas, vitorias, personagem_favorito').eq('usuario_id', id).maybeSingle(),
   ])
   if (p.error || !p.data) {
-    mudar({ estado: 'logado', perfil: null, estatisticas: null, erro: 'não deu para carregar o perfil: tente de novo mais tarde' })
+    mudar({ estado: 'logado', perfil: null, estatisticas: null, erro: 'não deu para carregar o perfil: o serviço de contas não respondeu. Recarregue a página daqui a pouco' })
     return
   }
   mudar({ estado: 'logado', perfil: p.data, estatisticas: e.data ?? ESTATISTICAS_ZERO, erro: '' })
@@ -141,7 +141,7 @@ export async function entrarComGoogle() {
   if (!supabase) return
   mudar({ erro: '' })
   const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname } })
-  if (error) mudar({ erro: `não deu para abrir o login: ${error.message}` })
+  if (error) mudar({ erro: 'não deu para abrir o login do Google: confira a sua internet e tente de novo' })
 }
 
 export async function sairDaConta() {
@@ -159,7 +159,7 @@ const mensagem = (error, padrao) => {
 async function atualizar(parametros) {
   if (!supabase || !sessao) return { ok: false, erro: 'entre na conta primeiro' }
   const { data, error } = await supabase.rpc('atualizar_perfil', parametros)
-  if (error) return { ok: false, erro: mensagem(error, 'não deu para salvar: tente de novo') }
+  if (error) return { ok: false, erro: mensagem(error, 'não deu para salvar: confira a sua internet e tente de novo') }
   const perfil = Array.isArray(data) ? data[0] : data
   if (perfil) mudar({ perfil: { ...get(conta).perfil, ...perfil } })
   avisar()
@@ -192,7 +192,7 @@ async function chamarAvatar(metodo, corpo) {
     avisar()
     return { ok: true }
   } catch {
-    return { ok: false, erro: 'sem conexão com o servidor' }
+    return { ok: false, erro: 'sem conexão com o servidor: confira a sua internet e tente de novo' }
   }
 }
 

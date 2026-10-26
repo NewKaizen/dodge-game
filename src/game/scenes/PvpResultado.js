@@ -401,7 +401,7 @@ export default class PvpResultado extends Phaser.Scene {
     if (r.estado === 'aceita') return 'REVANCHE! escolham os lutadores…'
     if (r.estado === 'recusada') return r.minha ? 'você recusou a revanche' : 'o oponente recusou a revanche: fila ou menu?'
     if (r.estado === 'expirada') return 'a revanche expirou: fila ou menu?'
-    return 'o oponente já saiu'
+    return 'o oponente já saiu: escolha fila ou menu'
   }
 
   montarCasual() {

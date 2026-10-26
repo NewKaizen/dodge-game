@@ -127,6 +127,17 @@ function avisoChat(texto) {
 
 // ---------- conexão ----------
 
+// textos que o jogador vê quando a conexão ou a conta falham (cada um diz o que fazer)
+export const MSG_SEM_SERVIDOR = 'não deu para falar com o servidor: ele pode estar ligando (leva até 1 minuto) ou a sua internet caiu. Tentando de novo…'
+// antes da primeira conexão ainda não se sabe se o servidor é o online: a página
+// servida de um endereço público (não localhost nem rede local) já diz
+export const siteNaInternet = () => {
+  const host = String(globalThis.location?.host ?? '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '')
+  return Boolean(host) && !/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|::1$)/i.test(host) && !/\.local$/i.test(host)
+}
+export const MSG_LOTADO = 'o servidor está lotado agora: tente de novo daqui a pouco'
+export const MSG_CONTA_INVALIDA = 'não deu para confirmar a sua conta: você está jogando como convidado (sem XP). Saia e entre de novo com o Google; se continuar, o serviço de contas pode estar fora do ar'
+
 // Abre (ou troca) a conexão; resolve com true quando o servidor dá as boas-vindas
 function conectar(url) {
   fecharConexao()
@@ -167,6 +178,7 @@ function conectar(url) {
           online: Boolean(m.online),
           ice: Array.isArray(m.ice) ? m.ice : [],
         }))
+        if (m.contaInvalida) mudar({ erro: MSG_CONTA_INVALIDA })
         comecarTimers()
         entrarNaSalaDoLink()
         resolve(true)
@@ -179,25 +191,27 @@ function conectar(url) {
       const token = url === casa ? tokenConta() : null
       socket.send(JSON.stringify({ t: 'ola', protocolo: PROTOCOLO, nome: estado().eu.nome, ...(token && { token }) }))
     }
-    socket.onclose = () => {
+    socket.onclose = (ev) => {
       clearTimeout(tempo)
       if (ws !== socket) return
       ws = null
       pararTimers()
       ouvintesServidor.forEach((fn) => fn({ t: '_fechou' }))
-      if (estado().fila) mudar({ fila: null, filaAviso: 'a conexão caiu: você saiu da fila' })
+      if (estado().fila) mudar({ fila: null, filaAviso: 'a conexão caiu e você saiu da fila: quando reconectar, é só procurar de novo' })
       const s = estado()
       if (!aberto) {
-        const semCasa = s.online ? 'sem conexão com o servidor: tentando de novo…' : 'servidor LAN não encontrado: rode "npm run lan" neste PC'
-        mudar({ fase: 'navegando', sala: null, papel: null, salas: [], erro: url === casa ? semCasa : `não deu para conectar em ${url.replace(/^wss?:\/\//, '').replace(/\/lan$/, '')}` })
+        const semCasa = ev?.code === 1013 ? MSG_LOTADO : s.online || siteNaInternet() ? MSG_SEM_SERVIDOR : 'servidor LAN não encontrado: rode "npm run lan" neste PC'
+        mudar({ fase: 'navegando', sala: null, papel: null, salas: [], erro: url === casa ? semCasa : `não deu para conectar em ${url.replace(/^wss?:\/\//, '').replace(/\/lan$/, '')}: confira o endereço e se o jogo está aberto lá` })
         resolve(false)
         // tenta de novo o servidor daqui (pode ser que ele ainda vá ser ligado)
         if (s.fase !== 'fora') setTimeout(() => estado().fase === 'navegando' && !ws && conectar(casa), url === casa ? 3000 : 2500)
         return
       }
       if (s.fase === 'fora') return
-      sairDaSalaLocal(s.fase === 'sala' ? 'a conexão com a sala caiu' : '')
-      mudar({ fase: 'navegando', erro: 'conexão caiu: tentando de novo…' })
+      const estavaNaSala = s.fase === 'sala'
+      sairDaSalaLocal(estavaNaSala ? 'a conexão com a sala caiu' : '')
+      // o aviso da sala fica (filaAviso) depois que reconectar; o "reconectando" some sozinho
+      mudar({ fase: 'navegando', erro: 'a conexão caiu: reconectando…', ...(estavaNaSala && { filaAviso: 'a conexão caiu e você saiu da sala: entre de novo (com o código ou pelo convite do amigo)' }) })
       setTimeout(() => estado().fase === 'navegando' && !ws && conectar(casa), 1500)
     }
   })
@@ -245,7 +259,7 @@ aoMudarConta((token) => {
 function receber(m) {
   switch (m.t) {
     case 'conta':
-      lan.update((s) => ({ ...s, eu: comConta(s.eu, m.conta) }))
+      lan.update((s) => ({ ...s, eu: comConta(s.eu, m.conta), ...(m.contaInvalida && { erro: MSG_CONTA_INVALIDA }) }))
       break
     case 'salas': {
       // as do servidor desta conexão (sem endereço) e as que ele achou na rede
@@ -258,6 +272,7 @@ function receber(m) {
     }
     case 'sala': {
       const s = estado()
+      let saiuNoMeio = ''
       const eu = m.sala.membros.find((x) => x.id === s.eu.id)
       if (!eu) return
       const antes = s.sala
@@ -266,8 +281,9 @@ function receber(m) {
       if (antes) {
         for (const x of m.sala.membros) if (!antes.membros.some((a) => a.id === x.id)) avisoChat(`${x.nome} entrou na sala`)
         for (const a of antes.membros) if (!m.sala.membros.some((x) => x.id === a.id)) avisoChat(`${a.nome} saiu da sala`)
+        saiuNoMeio = antes.emPartida ? antes.membros.find((a) => a.id !== s.eu.id && !m.sala.membros.some((x) => x.id === a.id))?.nome ?? '' : ''
       } else avisoChat(papel === 'host' ? 'sala criada: esperando alguém entrar' : `você entrou na sala de ${m.sala.membros.find((x) => x.papel === 'host')?.nome ?? '?'}`)
-      mudar({ fase: 'sala', sala: m.sala, papel, erro: '', ultimaCasual: Boolean(m.sala.casual) })
+      mudar({ fase: 'sala', sala: m.sala, papel, erro: saiuNoMeio ? `${saiuNoMeio} saiu no meio da partida: a sala continua aberta, é só chamar outro` : '', ultimaCasual: Boolean(m.sala.casual) })
       break
     }
     case 'fechada':

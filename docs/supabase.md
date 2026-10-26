@@ -14,6 +14,7 @@ Como as peças se juntam:
 | Servidor Node (`server/contas.js`) | entrega a URL + chave anon em `GET /api/config`, valida o JWT no lobby e recebe as fotos (`/api/avatar`) |
 | Postgres (`amizades`, `pedidos_amizade`, `bloqueios`) | amigos (migration 0002); o navegador só usa as funções, o servidor lê para filtrar presença e convites |
 | Postgres (`partidas`, `concessoes`, `inventario`, `catalogo_itens`) | XP, níveis e Coleção (migration 0003); só o servidor concede (`conceder_recompensa`), o navegador lê o catálogo e o próprio inventário e equipa |
+| Postgres (`denuncias`) | denúncias de nome e foto (migration 0004); o navegador só chama `denunciar()`, a revisão é pelo `scripts/moderar.js` (`docs/moderacao.md`) |
 
 A chave `service_role` fica **só no servidor**. O navegador recebe a URL e a
 chave `anon` pelo `/api/config` (nada de `VITE_*` no build).
@@ -82,7 +83,24 @@ Regras do XP, da validação dos resultados e a curva: `docs/online.md`.
 Para testar o SQL num Postgres local (descartável):
 `DODGE_PG="-h /caminho/do/socket -p 5432 -U postgres" npm test` roda as três
 migrations duas vezes num banco temporário e confere a `conceder_recompensa`
-(idempotente, duas sessões ao mesmo tempo, permissões do navegador).
+(idempotente, duas sessões ao mesmo tempo, permissões do navegador). O
+`moderacaoSql.test.js` roda as quatro e confere `denunciar` (limites, RLS fechada)
+e o filtro de nomes.
+
+### 2.3 Migration 0004: moderação (Fase 1E)
+
+Depois da 0003, rode `supabase/migrations/0004_moderacao.sql`. Ela cria:
+
+- a tabela `denuncias` (RLS ligado, **sem nenhuma política**: o navegador não
+  lê nem escreve; quem lê é o servidor com a chave secret);
+- a função do navegador `denunciar(tag, tipo, motivo)`: precisa de login, não
+  aceita denunciar a si mesmo, uma denúncia aberta por par e tipo, no máximo 10
+  por dia por conta;
+- `nome_ofensivo()` e uma nova `atualizar_perfil` que barra nomes da lista de
+  palavras (a mesma lista de `src/lib/palavrasBloqueadas.js`).
+
+Quem revisa e como: `docs/moderacao.md`. Pode rodar de novo sem problema.
+Conferir: em **Table Editor** aparece `denuncias` com o cadeado de RLS.
 
 ## 3. Conferir o bucket
 
@@ -190,7 +208,7 @@ falso (`server/supabase/fake.js`).
 ## Regras que valem (e onde estão)
 
 - **Nome de exibição**: 3 a 16 caracteres, letras (com acento), números,
-  espaço, `_ . -`. Conferido no navegador (`src/lib/contaRegras.js`), na função
+  espaço, `_ . -`, e sem palavras da lista bloqueada (`docs/moderacao.md`). Conferido no navegador (`src/lib/contaRegras.js`), na função
   `atualizar_perfil` e nos `CHECK` da tabela.
 - **Tag** (`joao#4821`): gerada pelo banco quando a conta é criada; única e
   fixa (não muda com o nome). É por ela que os amigos vão achar você (1B).
@@ -201,7 +219,8 @@ falso (`server/supabase/fake.js`).
 - **Foto**: PNG/JPEG/WebP de até 2 MB e entre 64 e 4096 px de lado. O servidor
   confere os bytes do arquivo (não a extensão), recodifica em WebP 256×256 sem
   metadados (sai EXIF/GPS) e grava em `avatares/<id>.webp`. Máximo de 5
-  envios por minuto por conta.
+  envios por minuto por conta e 40 pedidos por minuto por endereço (barrado
+  antes de falar com o Supabase Auth, para token falso não custar nada).
 - **Amigos**: a tag (`joao#4821`) é como se acha alguém. Presença e convites
   vivem no servidor do lobby e só valem entre amigos (amizade dos dois lados e
   sem bloqueio). Veja `docs/online.md`.

@@ -82,11 +82,14 @@
     <button onclick={entrarComGoogle}>Entrar com Google</button>
     <span class="dica">convidado: crie conta para salvar progresso</span>
   {:else}
-    <button class="eu" onclick={abrir} title="abrir o perfil">
+    <span class="eu" title="você">
       <Avatar {avatar} tamanho={22} {moldura} />
       <span>{perfil?.nome_exibicao ?? 'perfil'}</span>
       {#if perfil}<span class="dica">#{perfil.tag.split('#')[1]} · nv {perfil.nivel}</span>{/if}
-    </button>
+    </span>
+    <!-- o PERFIL, a COLEÇÃO e os AMIGOS (Amigos.svelte) ficam juntos aqui; JOGAR fica na tela ONLINE do jogo -->
+    <button onclick={abrir} disabled={!perfil} title="seu perfil: nome, foto e estatísticas">PERFIL</button>
+    <button onclick={() => (colecao = true)} disabled={!perfil} title="títulos, molduras, versos e avatares que você ganhou">COLEÇÃO</button>
   {/if}
   {#if $conta.erro && !aberto}<span class="erro">{$conta.erro}</span>{/if}
 </div>

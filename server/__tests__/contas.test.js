@@ -2,7 +2,8 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import http from 'node:http'
 import sharp from 'sharp'
-import { criarContas, lerConfig, configPublica, detectarTipo, criarLimite, tokenDoCabecalho, MAX_BYTES_AVATAR } from '../contas.js'
+import { criarContas, lerConfig, configPublica, detectarTipo, criarLimite, tokenDoCabecalho, enderecoDoPedido, MAX_BYTES_AVATAR } from '../contas.js'
+import { criarMetricas } from '../metricas.js'
 import { criarSupabaseFalso } from '../supabase/fake.js'
 
 const ID_ANA = '11111111-1111-4111-8111-111111111111'
@@ -225,4 +226,56 @@ test('rota desconhecida e método errado', async () => {
   assert.equal((await fetch(`${base}/api/nada`)).status, 404)
   assert.equal((await fetch(`${base}/api/avatar`)).status, 405)
   assert.equal((await fetch(`${base}/api/config`, { method: 'POST' })).status, 405)
+})
+
+test('limite por endereço: token falso não passa de N pedidos por minuto e nem chega no Supabase Auth', async () => {
+  const falso = criarSupabaseFalso({ usuarios: {}, perfis: [] })
+  let t = 5_000_000
+  const metricas = criarMetricas({ agora: () => t, escrever: () => {} })
+  const s = await ligar(criarContas({ config: CONFIG, supabase: falso, agora: () => t, limiteIp: criarLimite({ max: 3, agora: () => t }), metricas }))
+  const url = `http://127.0.0.1:${s.address().port}/api/avatar`
+  const pedir = (token) => fetch(url, { method: 'DELETE', headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  try {
+    assert.equal((await pedir('falso-1')).status, 401)
+    assert.equal((await pedir(null)).status, 401) // sem token também conta
+    assert.equal((await pedir('falso-2')).status, 401)
+    const chamadasAntes = falso.chamadas.filter((c) => c.op === 'getUser').length
+    const r = await pedir('falso-3')
+    assert.equal(r.status, 429)
+    assert.match((await r.json()).erro, /muitos pedidos deste endereço/)
+    assert.equal(falso.chamadas.filter((c) => c.op === 'getUser').length, chamadasAntes, 'barrado antes do Supabase Auth')
+    assert.equal(metricas.resumo().contadores.avatar_bloqueios_ip, 1)
+    // passou o minuto: libera
+    t += 61_000
+    assert.equal((await pedir('falso-4')).status, 401)
+    // GET /api/config não entra na conta
+    for (let i = 0; i < 6; i++) assert.equal((await fetch(`http://127.0.0.1:${s.address().port}/api/config`)).status, 200)
+  } finally {
+    s.close()
+  }
+})
+
+test('enderecoDoPedido: sem proxy o socket; com proxy a última entrada do X-Forwarded-For (a do nosso proxy)', () => {
+  const req = (xff) => ({ headers: xff ? { 'x-forwarded-for': xff } : {}, socket: { remoteAddress: '10.0.0.9' } })
+  assert.equal(enderecoDoPedido(req('1.1.1.1, 2.2.2.2')), '10.0.0.9') // header de cliente não vale sem proxy confiável
+  assert.equal(enderecoDoPedido(req('6.6.6.6, 2.2.2.2'), { confiarProxy: true }), '2.2.2.2') // 6.6.6.6 pode ser forjado
+  assert.equal(enderecoDoPedido(req(null), { confiarProxy: true }), '10.0.0.9')
+})
+
+test('métricas do avatar: envio ok e envio que falhou (login e limite não contam como falha)', async () => {
+  const falso = criarSupabaseFalso({ usuarios: { 'token-ana': { id: ID_ANA } }, perfis: [perfil(ID_ANA, 'ana#0001')] })
+  const metricas = criarMetricas({ escrever: () => {} })
+  const s = await ligar(criarContas({ config: CONFIG, supabase: falso, metricas }))
+  const url = `http://127.0.0.1:${s.address().port}/api/avatar`
+  const enviarPng = (token) => png().then((corpo) => fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'image/png' }, body: corpo }))
+  try {
+    assert.equal((await enviarPng('token-ana')).status, 200)
+    assert.equal((await enviarPng('token-nenhum')).status, 401)
+    falso.falhar.upload = true
+    assert.equal((await enviarPng('token-ana')).status, 502)
+    const c = metricas.resumo().contadores
+    assert.deepEqual([c.avatar_envios_ok, c.avatar_envios_falha], [1, 1])
+  } finally {
+    s.close()
+  }
 })

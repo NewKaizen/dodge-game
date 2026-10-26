@@ -32,3 +32,16 @@ test('avatar do perfil cai no padrão quando não serve', () => {
 test('avatares da trilha de níveis valem no perfil', () => {
   assert.deepEqual(avatarDoPerfil({ avatar_tipo: 'jogo', avatar_id: 'king' }), { tipo: 'jogo', id: 'king', url: null })
 })
+
+test('nome ofensivo: a lista barra o óbvio (e as tentativas de disfarce) mas deixa palavras comuns', async () => {
+  const { nomeOfensivo } = await import('../palavrasBloqueadas.js')
+  for (const ruim of ['Caralho', 'c.a.r.a.l.h.o', 'xxCaralhoxx', 'Put4', 'puta_boy', 'Hitl3r', 'cuzão', 'N1gger']) {
+    assert.equal(nomeOfensivo(ruim), true, ruim)
+    assert.equal(validarNome(ruim).ok, false, ruim)
+  }
+  for (const bom of ['Computador', 'Disputa', 'Ana Maria', 'João', 'Shiitake', 'Dickens', 'Analista', 'Kris', 'Susie 2000']) {
+    assert.equal(nomeOfensivo(bom), false, bom)
+    assert.equal(validarNome(bom).ok, true, bom)
+  }
+  assert.match(validarNome('Caralho').erro, /não é permitido/)
+})

@@ -37,6 +37,7 @@
 // quem ganha o XP (null: convidado ou a mesma conta dos dois lados)
 import crypto from 'node:crypto'
 import { agendarPadrao } from './fila.js'
+import { METRICAS_NULA } from './metricas.js'
 
 export const RELATO_JANELA_MS = 20_000
 export const ABANDONO_GRACA_MS = 3_000
@@ -143,7 +144,7 @@ export function lerRelato(m) {
 
 // ---------- o registro no lobby ----------
 
-export function criarPartidas({ registro = null, agora = Date.now, agendar = agendarPadrao, entregar = () => {}, log = () => {}, versao = 1 } = {}) {
+export function criarPartidas({ registro = null, agora = Date.now, agendar = agendarPadrao, entregar = () => {}, log = () => {}, versao = 1, metricas = METRICAS_NULA } = {}) {
   const partidas = new Map() // id -> partida (em andamento e as guardadas)
   const doCliente = new Map() // id do cliente -> Set de partidas em andamento
   // os timers daqui (prazo dos relatos, esquecer a decisão): fechar() cancela todos
@@ -215,6 +216,7 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
       doCliente.get(x.cliente).add(p)
     }
     sala.partidaId = p.id
+    metricas.contar('partidas_iniciadas')
     // só vale gravar se alguém tem conta
     p.gravada = registro && p.participantes.some((x) => x.usuario) ? Promise.resolve().then(() => registro.registrar(p)) : null
     p.gravada?.catch((e) => log(`[partidas] não deu para registrar ${p.id}: ${e.message}`))
@@ -284,6 +286,8 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
     p.cancelar?.()
     p.cancelar = null
     const d = (p.decisao = decidir(p, agora()))
+    metricas.contar(d.motivo === 'abandono' ? 'partidas_abandonadas' : 'partidas_finalizadas')
+    if (d.validacao === 'contestada') metricas.contar('partidas_contestadas')
     desligar(p)
     p.esquecer = programar(() => partidas.get(p.id) === p && partidas.delete(p.id), GUARDAR_MS)
     const nomes = p.participantes.map((x) => x.nome).join(' x ')
