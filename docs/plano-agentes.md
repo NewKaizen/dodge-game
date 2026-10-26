@@ -82,7 +82,8 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 | 1D XP e recompensas | concluído (NewKaizen/dodge-game#41); falta rodar a 0003 e testar com duas contas |
 | 1E Integração e lançamento | concluído (NewKaizen/dodge-game#42); falta rodar 0003 e 0004 |
 | R3 Revisão final + P2 plano 2–6 | concluído: 5 defeitos corrigidos, plano em `docs/plano-fases-2-6.md` |
-| Fase 2 | próxima — aguardando decisões do usuário (ver plano-fases-2-6.md) |
+| Correções pós-Fase 1 | concluído (NewKaizen/dodge-game#44: tela preta do convidado, CARREGANDO…, nome da conta) |
+| Fase 2 | em andamento: 2A (consolidação das telas, Sonnet). Decisões: consolidação = 2A; controle padrão Xbox/PS remapeável; religação 20 s; host cai = sem XP e sem derrota; retomada no começo da rodada (recomendadas; podem mudar antes da 2B/2D) |
 
 ### Consolidação (depois das features da Fase 1)
 
