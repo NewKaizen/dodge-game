@@ -43,6 +43,9 @@ export const RELATO_JANELA_MS = 20_000
 export const ABANDONO_GRACA_MS = 3_000
 export const GUARDAR_MS = 10 * 60_000 // a decisão fica na memória (relato repetido/atrasado)
 export const MAX_PARTIDAS = 5000 // em andamento + guardadas
+// registros por host (conta, ou conexão do convidado) por minuto: ligar e desligar a
+// partida sem parar não vira uma chuva de linhas no banco (a partida em si segue, sem XP)
+export const PARTIDAS_POR_MINUTO = 10
 const PERSONAGEM = /^[a-z0-9_]{1,16}$/
 
 // ---------- banco ----------
@@ -163,6 +166,21 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
     return t.cancelar
   }
 
+  const inicios = new Map() // host -> [instantes] (PARTIDAS_POR_MINUTO)
+  function podeIniciar(host) {
+    const t = agora()
+    const chave = host.usuario ?? `cliente:${host.id}`
+    const lista = (inicios.get(chave) ?? []).filter((x) => t - x < 60_000)
+    if (inicios.size > 10_000) for (const [k, v] of inicios) if (!v.some((x) => t - x < 60_000)) inicios.delete(k)
+    if (lista.length >= PARTIDAS_POR_MINUTO) {
+      inicios.set(chave, lista)
+      return false
+    }
+    lista.push(t)
+    inicios.set(chave, lista)
+    return true
+  }
+
   const msgSemXp = (p, motivo) => ({ t: 'recompensa', partidaId: p.id, xpGanho: 0, motivo })
 
   const avisar = (p, x, msg) => {
@@ -193,6 +211,10 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
   function iniciar(sala, membros) {
     encerrou(sala)
     if (membros.length !== 2 || sala.modo !== 'pvp') return null
+    if (!podeIniciar(membros[0])) {
+      log(`[partidas] sala ${sala.id}: partidas demais em um minuto, esta não é registrada`)
+      return null
+    }
     limparVelhas()
     const p = {
       id: crypto.randomUUID(),

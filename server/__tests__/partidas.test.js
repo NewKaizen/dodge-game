@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { criarLobby, PROTOCOLO } from '../lan.js'
-import { criarPartidas, criarRegistro, decidir, lerRelato, RELATO_JANELA_MS, ABANDONO_GRACA_MS, GUARDAR_MS } from '../partidas.js'
+import { criarPartidas, criarRegistro, decidir, lerRelato, RELATO_JANELA_MS, ABANDONO_GRACA_MS, GUARDAR_MS, PARTIDAS_POR_MINUTO } from '../partidas.js'
 import { criarSupabaseFalso } from '../supabase/fake.js'
 import { XP_PARTICIPACAO, XP_VITORIA } from '../../src/lib/progresso.js'
 
@@ -243,6 +243,23 @@ test('quem saiu no meio não relata depois (nem pela mesma conexão nem por outr
     assert.equal(recompensa(host).motivo, 'vitoria')
     assert.equal(m.sb.tabelas.perfis.find((p) => p.id === 'u-beto').xp, 0, 'quem saiu não ganha nada')
   }
+})
+
+test('host ligando e desligando a partida sem parar não enche o banco de registros', async () => {
+  const m = montar({ contas: ['ana'] })
+  const { host } = await partida(m, 'ana', 'beto') // beto entra como convidado
+  for (let i = 0; i < 40; i++) {
+    host.mandar({ t: 'partida', valor: false })
+    host.mandar({ t: 'partida', valor: true })
+  }
+  await esperar()
+  assert.ok(m.sb.tabelas.partidas.length <= PARTIDAS_POR_MINUTO, `${m.sb.tabelas.partidas.length} registros num minuto`)
+  assert.equal(host.ultima('sala').sala.emPartida, true, 'a partida em si continua')
+  // passado o minuto, volta a registrar
+  m.relogio.andar(60_000)
+  host.mandar({ t: 'partida', valor: false })
+  host.mandar({ t: 'partida', valor: true })
+  assert.ok(host.ultima('sala').sala.partidaId)
 })
 
 test('relato repetido não muda nada nem concede de novo', async () => {
