@@ -230,6 +230,8 @@ pelo **relógio do servidor** (do começo até esse fim), nunca a do cliente.
   a sala fechou (o host caiu, o oponente da casual saiu) não conta como abandono.
 - Abandono na casual não tira XP de ninguém: quem saiu só não ganha nada naquela partida.
 - O host não pode expulsar no meio da partida (não vira "vitória por abandono").
+- Quem saiu da sala sem ter relatado não relata mais depois (nem pela mesma
+  conexão nem por outra aba da conta): conta como abandono.
 - Relato repetido não muda nada; relato atrasado (depois da decisão) recebe a
   resposta que já existe. Reconectar com a mesma conta recebe a recompensa no
   cliente novo. Nada disso concede duas vezes: o banco tem `UNIQUE (partida_id,

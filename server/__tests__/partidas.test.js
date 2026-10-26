@@ -229,6 +229,22 @@ test('o outro saiu antes do relato de quem ficou: vale o que quem ficou viu', as
   assert.equal(recompensa(conv).motivo, 'abandono')
 })
 
+test('quem saiu no meio não relata depois (nem pela mesma conexão nem por outra aba)', async () => {
+  for (const pelaOutraAba of [false, true]) {
+    const m = montar()
+    const { host, conv, partidaId } = await partida(m)
+    const outraAba = pelaOutraAba ? await m.entrar('beto') : null
+    m.relogio.andar(80_000)
+    conv.mandar({ t: 'sair' }) // abandonou perdendo...
+    relatar(outraAba ?? conv, partidaId, 1) // ...e diz que ganhou
+    m.relogio.andar(ABANDONO_GRACA_MS)
+    await esperar()
+    assert.equal(recompensa(host).xpGanho, VITORIA, 'quem ficou leva a vitória')
+    assert.equal(recompensa(host).motivo, 'vitoria')
+    assert.equal(m.sb.tabelas.perfis.find((p) => p.id === 'u-beto').xp, 0, 'quem saiu não ganha nada')
+  }
+})
+
 test('relato repetido não muda nada nem concede de novo', async () => {
   const m = montar()
   const { host, conv, partidaId } = await partida(m)

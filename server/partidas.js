@@ -252,6 +252,9 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
       return
     }
     if (x.relato) return // repetido: o primeiro é o que vale
+    // saiu da sala antes de relatar = abandono: um relato depois (pela mesma
+    // conexão ou por outra aba da conta) não tira a vitória de quem ficou
+    if (x.saiuEm != null) return
     x.relato = relato
     x.relatadoEm = agora()
     if (!x.usuario) avisar(p, x, msgSemXp(p, x.semConta))
