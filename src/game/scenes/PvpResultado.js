@@ -15,6 +15,7 @@ import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
 import { canal, emRede, souHostDaRede, irParaCena, encerrarRede, meuLado } from '../rede.js'
 import { lan, salaCasual, pedirRevanche, limparRevanche, sairSala, entrarFila, fecharLobby, enviarResultado } from '../../lib/lan/rede.js'
 import { progressoDoXp, proximaRecompensa, itemDoCatalogo, textoMotivo, NOME_TIPO } from '../../lib/progresso.js'
+import { estadoInicialDaTela, deveDestravar } from '../pvp/telaResultado.js'
 
 // Tela de fim da partida PvP, em etapas (como a Vitoria):
 //   ENTRADA DO VENCEDOR (não tem no empate; ver entradaVencedor: faixa na cor
@@ -41,6 +42,9 @@ import { progressoDoXp, proximaRecompensa, itemDoCatalogo, textoMotivo, NOME_TIP
 // mostra o painel de XP por cima das estatísticas: XP ganho, a barra enchendo,
 // subiu de nível, itens novos e a próxima recompensa (A/B pula). Sem resposta
 // em XP_ESPERA_MS, o motivo (convidado, CPU, …) e as opções.
+// Rede de segurança (pvp/telaResultado.js): sem as opções em LIMITE_MS, a tela
+// libera os botões com um aviso. A instância da cena é reaproveitada: o create
+// zera tudo da partida anterior (estadoInicialDaTela).
 //
 // Recebe de PvpArena:
 //   { vencedor: 1 | 2 | 0 (empate), p1, p2, rodadas,
@@ -115,16 +119,8 @@ export default class PvpResultado extends Phaser.Scene {
     this.corTitulo = this.empate ? COR_EMPATE : TEXTO_JOGADOR[this.vencedor - 1]
     this.corNumero = this.empate ? 0xc8c8d8 : CORES.almas[this.vencedor - 1]
 
-    this.saindo = false
-    this.liberado = false
-    this.liberou = false
-    this.painelXp = null
-    this.xpAnimacao = null
-    this.xpEsperaAte = null
-    this.xpNivelVisto = null
-    this.relogio = 0
-    this.contadores = []
-    this.ultimoTic = 0
+    // a instância da cena é a mesma da partida anterior: tudo daquela vez sai daqui
+    Object.assign(this, estadoInicialDaTela())
 
     this.criarCenario()
     this.etapas = this.montarEtapas()
@@ -345,7 +341,8 @@ export default class PvpResultado extends Phaser.Scene {
     if (this.saindo) return
     if (!this.liberado) {
       if (this.etapas.length) this.pular()
-      else if (this.painelXp) this.pularXp()
+      else if (this.painelXp && !this.liberou) this.pularXp()
+      else if (!this.liberou) this.liberar(true) // nada mais para pular: as opções
       return
     }
     if (this.casual) return botao === 'B' ? this.escolherCasual('voltar') : this.escolherCasual(OPCOES_CASUAL[this.opcao].id)
@@ -889,6 +886,14 @@ export default class PvpResultado extends Phaser.Scene {
       this.textoMotivoXp('espera')
       this.xpTitulo.setText('XP a caminho')
       this.liberar(false)
+    }
+    // rede de segurança: as opções não vieram (alguma etapa estourou): libera com um aviso
+    if (deveDestravar(this)) {
+      console.warn('[res] opções não apareceram a tempo: liberando', { etapas: this.etapas.length, xp: this.xp })
+      this.etapas = []
+      this.xpEsperaAte = null
+      this.liberar(false)
+      this.add.text(LARGURA / 2, ALTURA - 76, 'a tela demorou: escolha uma opção', estilo(12, '#9a9aae')).setOrigin(0.5).setDepth(10)
     }
 
     // partida rápida: escolher entre as três opções (e a contagem da revanche)
