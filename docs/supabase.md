@@ -85,7 +85,8 @@ Para testar o SQL num Postgres local (descartável):
 migrations duas vezes num banco temporário e confere a `conceder_recompensa`
 (idempotente, duas sessões ao mesmo tempo, permissões do navegador). O
 `moderacaoSql.test.js` roda as quatro e confere `denunciar` (limites, RLS fechada)
-e o filtro de nomes.
+e o filtro de nomes; o `amigosSql.test.js` roda a 0001–0002 e confere que cada
+função de amigos só age sobre a conta do JWT.
 
 ### 2.3 Migration 0004: moderação (Fase 1E)
 
