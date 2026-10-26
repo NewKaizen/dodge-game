@@ -51,6 +51,20 @@
 // banco concede o XP (registro = criarRegistro(supabase); sem ele, sem XP).
 //   cliente -> servidor  resultado {partidaId, vencedorLado: 0|1|null, rodadas, duracao, personagem}
 //   servidor -> cliente  recompensa {partidaId, xpGanho, xpTotal?, nivelAntes?, nivelDepois?, itensNovos?, motivo}
+//
+// RECUPERAÇÃO DE CONEXÃO (Fase 2D, docs/rede-pvp.md): o `bemvindo` traz uma
+// chave de retomada (`retomada`, aleatória, uma por conexão, trocada a cada
+// retomada). Quem cai NO MEIO DE UMA PARTIDA (sala.emPartida) não sai da sala
+// na hora: a vaga (sala, papel, partida, casual) fica guardada RETOMADA_MS e a
+// sala mostra o membro com `caiu` (ms que faltam). Uma conexão nova com
+// `ola {retomar: chave}` (com a MESMA conta, ou convidado nos dois) ocupa a vaga:
+// o cliente é o mesmo (mesmo id, mesmo lado no relato do resultado). Passou o
+// prazo: sai como antes; o host que não voltou fecha a sala e a partida acaba
+// sem XP e sem derrota (motivo 'host_caiu', server/partidas.js). Fora da
+// partida (lobby, fila) cair continua tirando na hora.
+//   cliente -> servidor  ola {..., retomar?: chave}
+//   servidor -> cliente  bemvindo {..., retomada: chave nova, retomado?: true, retomadaNegada?: motivo}
+//                        sala {... membros: [{..., caiu: ms | null}]}
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
@@ -62,12 +76,14 @@ import { criarPartidas } from './partidas.js'
 import { METRICAS_NULA } from './metricas.js'
 import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
 
-export const PROTOCOLO = 6
+export const PROTOCOLO = 7
 export const PORTA_DESCOBERTA = 47777
 export const MAX_MEMBROS = 2
 const ANUNCIO_MS = 1500
 const VALIDADE_ANUNCIO_MS = 5000
 const BATIMENTO_MS = 5000
+export const RETOMADA_MS = 20_000 // caiu no meio da partida: a vaga espera isto pela volta
+export const RETOMADAS_POR_MINUTO = 20 // tentativas de retomada por endereço
 const RECONEXAO_MS = 120_000 // voltar em até 2 min depois de cair conta como reconexão (métricas)
 const MAX_NOME = 16
 const MAX_CHAT = 120
@@ -173,12 +189,25 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   // cliente atual da MESMA conta (nunca para outra conta)
   const entregar = (x, msg) => {
     const c = clientes.get(x.cliente)
-    if (c && (c.usuario ?? null) === (x.conta ?? null)) return enviar(c, msg)
+    if (c && !c.caido && (c.usuario ?? null) === (x.conta ?? null)) return enviar(c, msg)
     const outro = x.conta ? presenca.get(x.conta) : null
     if (outro) enviar(outro, msg)
   }
   const partidas = criarPartidas({ registro, agora, agendar, entregar, log, versao: PROTOCOLO, metricas })
   const saiuDaConta = new Map() // conta -> quando caiu (só para contar reconexões; nada por jogador sai daqui)
+  const retomadas = new Map() // chave de retomada -> cliente
+  const limiteRetomada = criarLimite({ max: RETOMADAS_POR_MINUTO, agora })
+  // o cliente que vale hoje (a conexão nova que retomou aponta para a vaga velha)
+  const atual = (c) => {
+    while (c.retomou) c = c.retomou
+    return c
+  }
+  const darChave = (c) => {
+    if (c.retomada) retomadas.delete(c.retomada)
+    c.retomada = crypto.randomBytes(24).toString('base64url')
+    retomadas.set(c.retomada, c)
+    return c.retomada
+  }
 
   const novoCodigo = () => {
     for (;;) {
@@ -222,7 +251,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     max: MAX_MEMBROS,
     membros: [...sala.membros].map((id) => {
       const c = clientes.get(id)
-      return { id, nome: c.nome, papel: id === sala.host ? 'host' : 'convidado', pronto: c.pronto, ping: c.ping, conta: contaPublica(c) }
+      return { id, nome: c.nome, papel: id === sala.host ? 'host' : 'convidado', pronto: c.pronto, ping: c.ping, conta: contaPublica(c), caiu: c.caido ? Math.max(0, c.caido.desde + RETOMADA_MS - agora()) : null }
     }),
   })
 
@@ -245,12 +274,13 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   }
 
   // tirado: o host expulsou (não foi ele que saiu: não conta como abandono)
-  function sair(cliente, motivo = 'o host saiu: a sala foi fechada', { tirado = false } = {}) {
+  // saiuEm: quando saiu de verdade (a vaga guardada que expirou saiu quando caiu)
+  function sair(cliente, motivo = 'o host saiu: a sala foi fechada', { tirado = false, saiuEm } = {}) {
     const sala = salas.get(cliente.sala)
     cliente.sala = null
     cliente.pronto = false
     if (!sala) return
-    if (!tirado) partidas.saiu(cliente, sala) // no meio da partida = abandono (server/partidas.js)
+    if (!tirado) partidas.saiu(cliente, sala, saiuEm) // no meio da partida = abandono (server/partidas.js)
     sala.membros.delete(cliente.id)
     atualizarStatus(cliente)
     // sala casual (JOGAR RÁPIDO): sem o oponente não tem o que fazer nela
@@ -262,6 +292,8 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
         outro.pronto = false
         enviar(outro, { t: 'fechada', motivo: sala.casual ? 'o oponente saiu da partida: escolha jogar de novo ou volte ao menu' : motivo, ...(sala.casual && { casual: true }) })
         atualizarStatus(outro)
+        // estava caído esperando voltar: sem sala não tem para onde voltar
+        if (outro.caido) soltar(outro)
       }
       return
     }
@@ -493,6 +525,14 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   const ipVisto = (de, para) => (ehLoopback(de.ip) ? ipParaAlcancar(para.ip, locais()) : de.ip)
 
   const boasVindas = (c, m, conta, tentouConta) => {
+    // voltando para a partida (caiu no meio): ocupa a vaga guardada
+    const chave = typeof m.retomar === 'string' && m.retomar.length <= 64 ? m.retomar : null
+    let negada = null
+    if (chave) {
+      const r = retomar(c, chave, conta)
+      if (typeof r !== 'string') return
+      negada = r
+    }
     c.usuario = conta?.id ?? null
     c.perfil = conta?.id ? resumoPerfil(conta.perfil) : null
     c.nome = (c.perfil?.nome ?? nomeConvidado(m.nome)) || 'JOGADOR'
@@ -506,9 +546,94 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       online,
       ice,
       conta: c.perfil,
+      retomada: darChave(c),
+      ...(negada && { retomadaNegada: negada }),
       ...(tentouConta && !c.usuario && { contaInvalida: true }),
     })
     if (c.usuario) registrar(c)
+  }
+
+  // ---------- recuperação de conexão (Fase 2D) ----------
+
+  // caiu no meio da partida: a vaga fica guardada RETOMADA_MS
+  function segurar(c, sala) {
+    metricas.contar('partidas_quedas')
+    c.caido = { desde: agora(), cancelar: agendar(() => expirar(c), RETOMADA_MS) }
+    removerDaFila(c, 'saiu')
+    log(`[lan] ${c.nome} caiu no meio da partida (sala ${sala.codigo}): esperando ${RETOMADA_MS / 1000} s`)
+    avisarSala(sala)
+  }
+
+  // não voltou a tempo: sai como sairia na hora (saiuEm = quando caiu)
+  function expirar(c) {
+    if (!c.caido || !clientes.has(c.id)) return
+    const desde = c.caido.desde
+    c.caido = null
+    const sala = salas.get(c.sala)
+    const host = sala?.host === c.id
+    // o host que não volta: sem XP e sem derrota para ninguém (server/partidas.js)
+    if (host && sala.emPartida) partidas.hostCaiu(sala)
+    log(`[lan] ${c.nome} não voltou em ${RETOMADA_MS / 1000} s${sala ? ` (sala ${sala.codigo})` : ''}`)
+    soltar(c, { saiuEm: desde, motivo: 'o host não voltou a tempo: a partida acabou sem XP e sem derrota para ninguém' })
+  }
+
+  // tira o cliente do servidor de vez (desconectou fora da partida ou o prazo acabou)
+  function soltar(c, { saiuEm, motivo = 'o host perdeu a conexão: a sala foi fechada' } = {}) {
+    c.caido?.cancelar?.()
+    c.caido = null
+    if (retomadas.get(c.retomada) === c) retomadas.delete(c.retomada)
+    c.cancelarConta?.()
+    c.cancelarConta = null
+    if (c.usuario) {
+      const t = agora()
+      for (const [id, quando] of saiuDaConta) if (t - quando >= RECONEXAO_MS) saiuDaConta.delete(id)
+      saiuDaConta.set(c.usuario, saiuEm ?? t)
+    }
+    removerDaFila(c, 'saiu')
+    desregistrar(c, c.usuario)
+    sair(c, motivo, { saiuEm })
+    clientes.delete(c.id)
+  }
+
+  // `novo` (conexão nova) quer a vaga da chave: devolve a vaga ou o motivo (texto) da recusa
+  function retomar(novo, chave, conta) {
+    if (!limiteRetomada.usar(novo.ip)) return 'tentativas demais de voltar: espere um pouco'
+    const velho = retomadas.get(chave)
+    const sala = velho && salas.get(velho.sala)
+    if (!velho || velho === novo || !clientes.has(velho.id) || !sala || !(velho.caido || sala.emPartida)) return 'a partida não está mais esperando você'
+    // a vaga é da conta (ou do convidado) que caiu: a chave sozinha não basta
+    if ((velho.usuario ?? null) !== (conta?.id ?? null)) return 'essa partida é de outra conta'
+    // nunca dois sockets na mesma vaga: o velho (que o servidor ainda não viu cair) sai
+    const wsVelho = velho.ws
+    if (!velho.caido && wsVelho !== novo.ws) {
+      try {
+        wsVelho.terminate?.() ?? wsVelho.close?.()
+      } catch {}
+    }
+    velho.caido?.cancelar?.()
+    velho.caido = null
+    retomadas.delete(chave)
+    velho.ws = novo.ws
+    velho.ip = novo.ip
+    velho.ok = true
+    novo.retomou = velho
+    clientes.delete(novo.id)
+    metricas.contar('partidas_retomadas')
+    log(`[lan] ${velho.nome} voltou para a partida (sala ${sala.codigo})`)
+    enviar(velho, {
+      t: 'bemvindo',
+      id: velho.id,
+      ip: velho.ip,
+      protocolo: PROTOCOLO,
+      enderecos: online ? [] : enderecos(),
+      online,
+      ice,
+      conta: velho.perfil,
+      retomada: darChave(velho),
+      retomado: true,
+    })
+    avisarSala(sala)
+    return velho
   }
 
   // cria a sala de `c` (saindo da atual); null se o servidor está lotado
@@ -840,7 +965,10 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       metricas.contar('conexoes')
       return cliente
     },
-    receber(cliente, texto, binario) {
+    // ws: de qual conexão veio (a velha de uma vaga retomada não manda mais nada)
+    receber(c, texto, binario, ws = c.ws) {
+      const cliente = atual(c)
+      if (ws !== cliente.ws) return
       if (!temFicha(cliente)) return
       if (binario) {
         const sala = salas.get(cliente.sala)
@@ -868,19 +996,17 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     fila,
     // registro das partidas (os testes conferem a política)
     partidas,
-    desconectar(cliente) {
-      cliente.cancelarConta?.()
-      cliente.cancelarConta = null
-      if (cliente.usuario) {
-        const t = agora()
-        for (const [id, quando] of saiuDaConta) if (t - quando >= RECONEXAO_MS) saiuDaConta.delete(id)
-        saiuDaConta.set(cliente.usuario, t)
-      }
-      removerDaFila(cliente, 'saiu')
-      desregistrar(cliente, cliente.usuario)
-      sair(cliente, 'o host perdeu a conexão: a sala foi fechada')
-      clientes.delete(cliente.id)
+    // ws: a conexão que fechou (a velha de uma vaga já retomada não derruba a nova)
+    desconectar(c, ws = c.ws) {
+      const cliente = atual(c)
+      if (ws !== cliente.ws || cliente.caido || !clientes.has(cliente.id)) return
+      const sala = salas.get(cliente.sala)
+      // no meio da partida: a vaga espera a volta (RETOMADA_MS)
+      if (cliente.ok && sala?.emPartida) return segurar(cliente, sala)
+      soltar(cliente)
     },
+    // vagas guardadas (os testes conferem)
+    retomadas: () => retomadas.size,
   }
 }
 
@@ -965,8 +1091,8 @@ export function anexarLan(httpServer, { log = console.log, descoberta = true, on
     const cliente = lobby.conectar(ws, req.socket.remoteAddress)
     ws.vivo = true
     ws.on('pong', () => (ws.vivo = true))
-    ws.on('message', (dados, binario) => lobby.receber(cliente, binario ? dados : dados.toString(), binario))
-    ws.on('close', () => lobby.desconectar(cliente))
+    ws.on('message', (dados, binario) => lobby.receber(cliente, binario ? dados : dados.toString(), binario, ws))
+    ws.on('close', () => lobby.desconectar(cliente, ws))
     ws.on('error', () => {})
   })
 

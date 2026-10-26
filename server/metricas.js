@@ -26,6 +26,8 @@ export const CONTADORES = [
   'partidas_finalizadas', // decididas sem abandono (inclui as contestadas)
   'partidas_abandonadas',
   'partidas_contestadas',
+  'partidas_quedas', // alguém caiu no meio da partida (a vaga fica guardada RETOMADA_MS)
+  'partidas_retomadas', // ...e voltou a tempo
   'revanches_pedidas',
   'revanches_aceitas',
   'avatar_envios_ok',

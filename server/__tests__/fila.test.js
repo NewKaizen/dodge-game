@@ -445,7 +445,7 @@ test('revanche: recusada, expirada ou com o oponente saindo', async () => {
   {
     const { lobby, ana, beto, relogio } = await casual()
     ana.mandar({ t: 'revanche', aceitar: true })
-    beto.sair()
+    beto.mandar({ t: 'sair' }) // saiu da sala (cair no meio guardaria a vaga por RETOMADA_MS)
     assert.equal(lobby.salas.size, 0)
     assert.equal(ana.ultima('fechada').motivo, 'o oponente saiu da partida: escolha jogar de novo ou volte ao menu')
     assert.equal(relogio.ativos(), lobby.partidas.timers(), 'o timer da revanche foi junto (sobra só o do registro da partida)')

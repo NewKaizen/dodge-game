@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { criarLobby, PROTOCOLO } from '../lan.js'
+import { criarLobby, PROTOCOLO, RETOMADA_MS } from '../lan.js'
 import { criarPartidas, criarRegistro, decidir, lerRelato, RELATO_JANELA_MS, ABANDONO_GRACA_MS, GUARDAR_MS, PARTIDAS_POR_MINUTO } from '../partidas.js'
 import { criarSupabaseFalso } from '../supabase/fake.js'
 import { XP_PARTICIPACAO, XP_VITORIA } from '../../src/lib/progresso.js'
@@ -192,17 +192,23 @@ test('abandono no meio: quem ficou leva a vitória; quem saiu, nada', async () =
   assert.equal(linha.vencedor_lado, 0)
 })
 
-test('abandono: o host desconecta, a sala fecha e o convidado leva', async () => {
+test('o host cai no meio e não volta: a sala fecha, sem XP e sem derrota para ninguém (2D)', async () => {
   const m = montar()
   const { host, conv } = await partida(m)
   m.relogio.andar(80_000)
   host.sair()
-  assert.equal(conv.ultima('fechada').motivo, 'o host perdeu a conexão: a sala foi fechada')
-  // quem ficou foi tirado da sala: desconectar agora não conta como abandono dele
-  m.relogio.andar(1000)
+  assert.equal(conv.ultima('fechada'), undefined, 'a vaga do host espera a volta')
+  m.relogio.andar(RETOMADA_MS)
+  assert.equal(conv.ultima('fechada').motivo, 'o host não voltou a tempo: a partida acabou sem XP e sem derrota para ninguém')
   m.relogio.andar(ABANDONO_GRACA_MS)
   await esperar()
-  assert.equal(recompensa(conv).xpGanho, VITORIA)
+  assert.equal(recompensa(conv).xpGanho, 0)
+  assert.equal(recompensa(conv).motivo, 'host_caiu')
+  const linha = m.sb.tabelas.partidas[0]
+  assert.equal(linha.estado, 'encerrada')
+  assert.equal(linha.motivo_termino, 'host_caiu')
+  assert.equal(linha.duracao_s, 80, 'a duração vai até a queda')
+  assert.equal(m.sb.tabelas.perfis.find((p) => p.id === 'u-beto').xp, 0)
 })
 
 test('saiu depois de o outro relatar (a partida já tinha acabado): só participação', async () => {

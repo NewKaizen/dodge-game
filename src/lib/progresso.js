@@ -84,6 +84,7 @@ const MOTIVOS = {
   participacao: 'o oponente não confirmou o resultado: só o XP de participação',
   abandono: 'você saiu no meio: sem XP nesta partida',
   sem_relato: 'o resultado não chegou a tempo: sem XP',
+  host_caiu: 'o host caiu e não voltou: partida sem XP e sem derrota',
   nao_registrada: 'essa partida não foi registrada no servidor',
   indisponivel: 'progresso indisponível neste servidor',
   erro: 'não deu para salvar o progresso agora',

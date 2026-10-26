@@ -9,7 +9,9 @@
 //   const partidas = criarPartidas({ registro, agora, agendar, entregar, log, versao })
 //   partidas.iniciar(sala, [host, convidado])   o host começou uma partida PVP (ou revanche)
 //   partidas.relatar(cliente, m)                 { partidaId, vencedorLado, rodadas, duracao, personagem }
-//   partidas.saiu(cliente, sala)                 saiu da sala (ou desconectou) por conta própria
+//   partidas.saiu(cliente, sala, quando?)        saiu da sala (ou desconectou) por conta própria
+//                                                (quando: a vaga guardada que expirou saiu quando caiu)
+//   partidas.hostCaiu(sala)                      o host caiu e não voltou a tempo (Fase 2D)
 //   partidas.encerrou(sala)                      o host voltou ao lobby (partida false)
 //   partidas.fechar()                            cancela os timers (servidor desligando)
 //
@@ -22,6 +24,8 @@
 //                                                     -> contestada: quem relatou ganha só a
 //                                                        participação; o outro, nada
 //   * ninguém relatou e um saiu (no meio da partida)  -> validada: vitória de quem ficou
+//   * ninguém relatou e o HOST caiu sem voltar a tempo -> encerrada ('host_caiu'): sem XP
+//                                                       e sem derrota para ninguém (Fase 2D)
 //   * ninguém relatou e os dois saíram / acabou o prazo -> encerrada, sem XP
 // O prazo para o segundo relato é RELATO_JANELA_MS; quando alguém sai sem ter
 // relatado, ABANDONO_GRACA_MS (para o relato do outro que estava a caminho).
@@ -123,6 +127,8 @@ export function decidir(p, agora) {
     return d('contestada', null, 'relato_unico', ...res('participacao', 'sem_relato'), r.relato.rodadas)
   }
 
+  // o host caiu e não voltou: a sala morreu com ele, ninguém ganha nem perde
+  if (p.hostCaiu) return d('encerrada', null, 'host_caiu', 'sem_relato', 'sem_relato')
   const sairam = p.participantes.filter((x) => x.saiuEm != null)
   if (sairam.length === 1) {
     const ficou = sairam[0] === a ? b : a
@@ -286,17 +292,23 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
 
   // só quem SAIU da sala da partida (quem ficou e foi tirado porque a sala
   // fechou não conta como abandono, nem se desconectar depois)
-  function saiu(c, sala) {
+  function saiu(c, sala, quando = agora()) {
     const lista = doCliente.get(c.id)
     if (!lista || !sala) return
     for (const p of [...lista]) {
       if (p.decisao || p.salaId !== sala.id) continue
       const x = p.participantes.find((y) => y.cliente === c.id)
       if (!x || x.relato || x.saiuEm != null) continue
-      x.saiuEm = agora()
+      x.saiuEm = quando
       if (completa(p)) decidirAgora(p)
       else prazo(p, ABANDONO_GRACA_MS)
     }
+  }
+
+  // o host caiu no meio e não voltou a tempo (a sala vai fechar logo depois)
+  function hostCaiu(sala) {
+    const p = sala.partidaId ? partidas.get(sala.partidaId) : null
+    if (p && !p.decisao) p.hostCaiu = true
   }
 
   // o host voltou ao lobby (ou começou outra): os relatos ainda podem chegar
@@ -339,7 +351,7 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
     await p.gravada
     await registro.encerrar(p, d)
     if (d.validacao === 'encerrada') {
-      for (const x of comConta) avisar(p, x, msgSemXp(p, 'sem_relato'))
+      for (const x of comConta) avisar(p, x, msgSemXp(p, d.motivo === 'host_caiu' ? 'host_caiu' : 'sem_relato'))
       return
     }
     // idempotente: se a primeira chamada falhou no meio do caminho, a segunda não soma de novo
@@ -372,6 +384,7 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
     iniciar,
     relatar,
     saiu,
+    hostCaiu,
     encerrou,
     // para os testes
     partida: (id) => partidas.get(id) ?? null,
