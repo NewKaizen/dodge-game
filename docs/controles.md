@@ -49,3 +49,24 @@ Ficam no navegador, em `dodge-preferencias`: `botoesPad` (`null` ou `{ A: [...],
 - [src/lib/simulador.js](../src/lib/simulador.js) (`armarTeclado`) e [src/lib/serial.js](../src/lib/serial.js) (`vigiarSerial`).
 - [src/game/entrada.js](../src/game/entrada.js): liga tudo no início e emite `entrada-perdida` (as arenas locais pausam, `Controles.onPerdaDeFoco`).
 - Testes: `src/game/__tests__/{gamepad,fontes}.test.js`, `src/lib/__tests__/{gamepad,simulador}.test.js`.
+
+## Cartas legíveis (fase 2C)
+
+- **Custo sempre à vista**: além da gema do canto de cima (coberta pela carta vizinha na mão), toda carta tem uma gema pequena com o custo no canto de baixo à esquerda, que fica à vista mesmo com a mão sobreposta.
+- **Bloqueada** (custo maior que a energia): a carta escurece, a gema fica vermelha e ganha um selo **×** (forma, não só cor). A carta sob o cursor mostra o motivo no texto de status acima dela, em vermelho: `falta energia (3/5)` (energia que você tem / custo). Apertar A nela mostra o mesmo texto.
+- No **CO-OP** vale o mesmo, mais `caído: não joga carta` para quem caiu. No **duelo** (rodada bônus) nada custa, então nada é bloqueado.
+- Os motivos vêm de `motivoBloqueio` ([src/game/pvp/regras.js](../src/game/pvp/regras.js); `motivoBloqueioCoop` no [coop/regras.js](../src/game/coop/regras.js)), a mesma função que `podeJogar` usa para aceitar ou recusar a jogada: tela e regra não divergem. Hoje só existem dois motivos nas regras (`sem-energia`, `fora-da-mao`) mais `caido` no CO-OP; "só no turno de ataque" ou "já usada" não são regras do jogo (a carta escolhida aparece como PRONTO!).
+
+## Acessibilidade (CONFIGURAÇÕES → ACESSIBILIDADE)
+
+Três preferências **separadas** (`dodge-preferencias`, validadas em [preferencias.js](../src/game/preferencias.js); valor inválido volta ao padrão), todas lidas por [acessibilidade.js](../src/game/acessibilidade.js):
+
+| Preferência | Valores | O que muda |
+| --- | --- | --- |
+| `flashes` (CLARÕES) | ligado/desligado | desligado: nenhum clarão de tela (câmera, retângulos, fade para branco na saída do menu vira preto); os avisos de ataque piscam 3x mais devagar (~1,8/s, abaixo do limite de 3/s da WCAG) e duram o mesmo tempo |
+| `tremor` (TREMORES) | normal / reduzido (40%) / desligado | tremor de tela, da caixa e do HUD |
+| `reduzirMovimento` (REDUZIR ANIMAÇÕES) | ligado/desligado | amansa tudo: tremor no máximo 30%, clarões 25%, zooms, câmeras lentas, piscadas e fundos mais calmos (não liga o que foi desligado) |
+
+`daltonismo` (nenhum, protanopia, deuteranopia, tritanopia) troca avisos e cores dos jogadores. Volumes de música e efeitos ficam em ÁUDIO. A jogabilidade (balas, avisos, hitbox, tempo do aviso) nunca depende dessas preferências.
+
+**Contraste**: [contraste.js](../src/game/contraste.js) calcula a razão WCAG; [contraste.test.js](../src/game/__tests__/contraste.test.js) exige 4,5:1 (3:1 para texto grande e elementos gráficos) nos pares principais: textos do HUD no preto e no painel, cores de jogador em todos os modos de daltonismo, nome na faixa da carta e custo. Ao mudar uma cor do HUD, rode `npm test`.

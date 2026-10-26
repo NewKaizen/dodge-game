@@ -44,6 +44,7 @@ import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
 import { entrarNoJogo, voltarAoMenu, levouGolpe } from '../../lib/saida.js'
+import { fatores } from '../acessibilidade.js'
 
 // CO-OP de cartas: os dois jogadores (ou 1 + CPU aliada) contra um chefe que
 // também joga cartas. Regras em coop/regras.js (docs/coop-cartas.md).
@@ -886,7 +887,7 @@ export default class CoopArena extends PvpArena {
         inv.avisado = true
         tocar(this, 'inverter')
       }
-      const pisca = Math.floor(this.time.now / 180) % 2 ? 'CONTROLES\nINVERTIDOS!' : ''
+      const pisca = fatores().pulso > 1 || Math.floor(this.time.now / 180) % 2 ? 'CONTROLES\nINVERTIDOS!' : ''
       for (const j of [0, 1]) if (this.noQuadro(j) && !this.ko[j]) this.avisoPista[j].setText(pisca).setColor('#ff9a3a')
     } else if (inv?.avisado) {
       this.invertido[0] = 0

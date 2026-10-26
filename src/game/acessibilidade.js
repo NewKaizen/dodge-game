@@ -20,6 +20,9 @@ import { pref, aoMudarPref, OPCOES, PREFERENCIAS_PADRAO } from './preferencias.j
 //   zoom         multiplica a amplitude dos zooms/trancos de câmera decorativos
 //   lenta        multiplica a duração das câmeras lentas decorativas (K.O.)
 //   piscar       piscadas rápidas decorativas (chiado do telão, placar piscando)
+//   pulso        multiplica a DURAÇÃO das piscadas dos avisos de ataque (borda da caixa, áreas, marcas):
+//                1 normal; 3 com "clarões" desligados ou "reduzir animações" (~1,8 piscadas por segundo,
+//                abaixo do limite de 3 por segundo da WCAG). O aviso continua aparecendo pelo mesmo tempo
 //   balasTelao   quantas balas a mini-luta do telão do menu pode ter vivas
 const TREMOR = { normal: 1, reduzido: 0.4, desligado: 0 }
 //                     mínimo médio máximo
@@ -50,6 +53,7 @@ export function fatoresDe(prefs = {}) {
     zoom: calmo ? 0.3 : 1,
     lenta: calmo ? 0.5 : 1,
     piscar: !calmo,
+    pulso: calmo || p.flashes === false ? 3 : 1,
     balasTelao: BALAS_TELAO[nivel],
   }
 }
@@ -64,6 +68,9 @@ export function fatores() {
 aoMudarPref((chave) => {
   if (CHAVES.includes(chave)) atual = null
 })
+
+// duração (ms) de uma piscada de aviso, já com a preferência (nunca muda QUANTO o aviso dura)
+export const duracaoPulso = (ms) => ms * fatores().pulso
 
 // quantas partículas de `n` (sorteio no arredondamento: 10 x 0.15 dá 1 ou 2)
 export function quantas(n, fracao, sorte = Math.random) {

@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { ATAQUE, CORES, CORACAO, LARGURA, tetoDeFuga } from '../constants.js'
 import { LACUNA_MINIMA, avisar, validarParede, validarLacuna } from './validacao.js'
 import { registrarZona, envelhecerZonas, limparZonas } from './zonas.js'
+import { duracaoPulso } from '../acessibilidade.js'
 
 // O que um ataque pode usar (o parâmetro `a` em iniciar(a, cfg)):
 //
@@ -131,7 +132,7 @@ export default class ContextoAtaque {
       g.strokeCircle(forma.x, forma.y, forma.raio)
     }
     this.decoracao(g)
-    this.cena.tweens.add({ targets: g, alpha: 0.35, duration: 90, yoyo: true, repeat: -1 })
+    this.cena.tweens.add({ targets: g, alpha: 0.35, duration: duracaoPulso(90), yoyo: true, repeat: -1 })
     this.depois(ms, () => {
       this.cena.tweens.killTweensOf(g)
       g.destroy()

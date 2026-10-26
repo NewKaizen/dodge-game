@@ -2,6 +2,7 @@ import { definirAtaque } from '../definir.js'
 import { ATAQUE } from '../../constants.js'
 import { tocar } from '../../audio.js'
 import { particulas } from '../../effects/particulas.js'
+import { duracaoPulso } from '../../acessibilidade.js'
 
 // SUPER de Ralsei: ÚLTIMO CAPÍTULO. A caixa vira o livro de histórias que ele
 // mesmo escreveu -- cada página que vira é mais séria que a anterior -- em
@@ -192,7 +193,7 @@ function desenharLeque(a, x, y, angCentro, meiaAngulo, raio) {
   g.lineStyle(2, 0xc8ffd8, 0.85)
   g.fillPoints(pontos, true)
   g.strokePoints(pontos, true)
-  a.cena.tweens.add({ targets: g, alpha: 0.42, duration: 110, yoyo: true, repeat: -1 })
+  a.cena.tweens.add({ targets: g, alpha: 0.42, duration: duracaoPulso(110), yoyo: true, repeat: -1 })
   return g
 }
 

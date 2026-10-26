@@ -21,8 +21,8 @@
 //                (rouba) energia do outro (quantiaCopiada, copiarEnergia)
 
 import { CARTAS, PERSONAGENS_PVP, forca, ehSuper } from './cartas.js'
-import { cartaNaMao, descartar, inteiro } from './baralho.js'
-import { ENERGIA } from './regras.js'
+import { descartar, inteiro } from './baralho.js'
+import { ENERGIA, motivoBloqueio } from './regras.js'
 
 export const BONUS = { aCadaRodadas: 3 }
 
@@ -174,9 +174,12 @@ export function armaDaCarta(carta, rng) {
 export function podeJogarDuelo(estado, j, jogada) {
   const id = jogada == null ? null : typeof jogada === 'string' ? jogada : jogada.carta ?? null
   if (id === null) return { ok: true, motivo: null }
-  if (!cartaNaMao(estado.jogadores[j].baralho, id)) return { ok: false, motivo: 'carta não está na mão' }
-  return { ok: true, motivo: null }
+  const bloqueio = motivoBloqueioDuelo(estado, j, id)
+  return bloqueio ? { ok: false, motivo: bloqueio.motivo, bloqueio } : { ok: true, motivo: null }
 }
+
+// no duelo nada custa energia: só importa a carta estar na mão
+export const motivoBloqueioDuelo = (estado, j, carta) => motivoBloqueio(estado, j, carta, { energia: Infinity })
 
 // Duelo e CTRL+C CTRL+V: a carta só precisa estar na mão (lança o erro)
 function validarSemCusto(estado, jogadas) {

@@ -2,6 +2,7 @@ import { definirAtaque } from '../definir.js'
 import { lacunasLivres } from '../validacao.js'
 import { tocar } from '../../audio.js'
 import { particulas } from '../../effects/particulas.js'
+import { duracaoPulso } from '../../acessibilidade.js'
 
 // SUPER de Susie: DEMOLIÇÃO TOTAL. O chão da caixa vira um piso de lajotas e
 // a Susie põe tudo abaixo, em dois atos:
@@ -196,7 +197,7 @@ function rachar(a, M, chao, c, r, som) {
   const x = chao.x + (c + 0.5) * chao.tw
   const y = chao.y + (r + 0.5) * chao.th
   const racha = a.decoracao(a.cena.add.image(x, y, T('racha')).setDepth(2).setDisplaySize(chao.tw, chao.th))
-  a.cena.tweens.add({ targets: racha, alpha: 0.35, duration: 90, yoyo: true, repeat: -1 })
+  a.cena.tweens.add({ targets: racha, alpha: 0.35, duration: duracaoPulso(90), yoyo: true, repeat: -1 })
   a.aviso({ tipo: 'area', x: x - chao.tw / 2 + 3, y: y - chao.th / 2 + 3, largura: chao.tw - 6, altura: chao.th - 6, ms: M.avisoBuraco }, () => {
     if (!som.tocou) {
       som.tocou = true
@@ -257,7 +258,7 @@ function rudeBuster(a, B, i, final, estado) {
     const img = meiaLua(a, s, vertical, sentido).setAlpha(0.25)
     if (vertical) img.setPosition(pos, borda - 6 * s)
     else img.setPosition(borda - sentido * 6 * s, pos)
-    a.cena.tweens.add({ targets: img, alpha: 0.8, duration: 80, yoyo: true, repeat: -1 })
+    a.cena.tweens.add({ targets: img, alpha: 0.8, duration: duracaoPulso(80), yoyo: true, repeat: -1 })
     cargas.push(img)
   }
   a.cena.tweens.add({ targets: cargas, scale: '*=1.06', duration: aviso, ease: 'Sine.easeIn' })

@@ -203,7 +203,13 @@ export default class Carta extends Phaser.GameObjects.Container {
     this.verso = scene.add.container(0, 0)
     this.veu = scene.add.graphics().setAlpha(0) // escurece (indisponível)
     this.clarao = scene.add.graphics().setAlpha(0).setBlendMode(Phaser.BlendModes.ADD) // flash da revelação
-    this.corpo.add([this.brilho, this.sombra, this.frente, this.verso, this.veu, this.clarao])
+    // marca de custo no canto de baixo à esquerda: fica POR CIMA do véu e na parte da
+    // carta que continua à vista quando a mão se sobrepõe (a gema do canto de cima, à
+    // direita, fica coberta pela carta vizinha). Bloqueada: leva um "×" (não só a cor)
+    this.marcaCusto = scene.add.graphics()
+    this.marcaTexto = this.texto(0, 0, String(dados.custo ?? 0), 9 * this.u, '#ffffff', { stroke: '#06283e', strokeThickness: 2 * this.u }).setOrigin(0.5, 0.52)
+    this.marcas = scene.add.container(0, 0, [this.marcaCusto, this.marcaTexto])
+    this.corpo.add([this.brilho, this.sombra, this.frente, this.verso, this.veu, this.marcas, this.clarao])
 
     this.desenharSombra()
     this.desenharFrente()
@@ -215,6 +221,7 @@ export default class Carta extends Phaser.GameObjects.Container {
     }
     this.legenda = this.criarLegenda()
 
+    this.desenharMarcaCusto()
     this.setVirada(opcoes.virada ?? false)
     if (this.especial) this.iniciarBrilhos()
     this.atualizarBrilho()
@@ -724,6 +731,7 @@ export default class Carta extends Phaser.GameObjects.Container {
     this.virada = virada
     this.frente.setVisible(!virada)
     this.verso.setVisible(virada)
+    this.marcas?.setVisible(!virada)
     this.atualizarBrilho()
     return this
   }
@@ -757,8 +765,37 @@ export default class Carta extends Phaser.GameObjects.Container {
     this.indisponivel = valor
     this.scene.tweens.add({ targets: this.veu, alpha: valor ? 0.55 : 0, duration: 160 })
     this.desenharGema(valor)
+    this.desenharMarcaCusto()
     this.atualizarBrilho()
     return this
+  }
+
+  // gema pequena com o custo (e o "×" quando a carta está bloqueada) no canto de baixo à esquerda
+  desenharMarcaCusto() {
+    const { u, indisponivel: bloqueada } = this
+    const g = this.marcaCusto
+    const x = -this.largura / 2 + 9 * u
+    const y = this.altura / 2 - 10 * u
+    const r = 6.8 * u
+    const losango = (k) => [{ x, y: y - k }, { x: x + k * 0.86, y }, { x, y: y + k }, { x: x - k * 0.86, y }]
+    g.clear()
+    g.fillStyle(bloqueada ? 0x3a0a14 : CORES_CARTA.gemaEscura, 1)
+    g.fillPoints(losango(r + 1.2 * u), true)
+    g.fillStyle(bloqueada ? CORES_CARTA.gemaSem : CORES_CARTA.gema, 1)
+    g.fillPoints(losango(r), true)
+    this.marcaTexto.setPosition(x, y).setStroke(bloqueada ? '#3a0a14' : '#06283e', 2 * u)
+    if (bloqueada) {
+      // selo "×" (branco sobre vermelho) no canto de cima da gema
+      const bx = x + 5.5 * u
+      const by = y - 5.5 * u
+      g.fillStyle(0xffffff, 1)
+      g.fillCircle(bx, by, 3.6 * u)
+      g.fillStyle(0xc81e3c, 1)
+      g.fillCircle(bx, by, 2.9 * u)
+      g.lineStyle(1 * u, 0xffffff, 1)
+      g.lineBetween(bx - 1.3 * u, by - 1.3 * u, bx + 1.3 * u, by + 1.3 * u)
+      g.lineBetween(bx - 1.3 * u, by + 1.3 * u, bx + 1.3 * u, by - 1.3 * u)
+    }
   }
 
   // tentou escolher sem poder (indisponível): treme e pisca vermelho

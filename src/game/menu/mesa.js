@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { LARGURA, ALTURA } from '../constants.js'
 import { RES } from '../resolucao.js'
 import { fatores } from '../acessibilidade.js'
+import { fadeParaBranco } from '../effects/flash.js'
 import { tremerCamera } from '../effects/shake.js'
 import { criarTelao } from './telao.js'
 import { DADOS_MESA as D } from './sprites/mesa.js'
@@ -177,7 +178,7 @@ export function criarMesa(cena) {
       cena.tweens.add({ targets: branco, alpha: 1, duration: 130, ease: 'Quad.easeOut' })
       cena.tweens.add({ targets: luz, scaleX: luz.scaleX * s, scaleY: luz.scaleY * s, alpha: 1, duration: 560, ease: 'Cubic.easeIn' })
       tremerCamera(cena.cameras.main, 260, 0.004)
-      cena.time.delayedCall(480, () => cena.cameras.main.fadeOut(200, 255, 255, 255))
+      cena.time.delayedCall(480, () => fadeParaBranco(cena.cameras.main, 200))
       cena.time.delayedCall(700, resolver)
     })
 

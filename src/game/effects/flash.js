@@ -28,6 +28,15 @@ export function claraoCamera(camera, duracao = 160, r = 255, g = 255, b = 255) {
   camera.flash(duracao, r, g, b)
 }
 
+// Fade da câmera para BRANCO (a saída do menu para a luta): é um clarão de tela
+// inteira, então segue "clarões": com eles desligados (ou "reduzir animações") sai
+// para o PRETO, como as outras transições.
+export function fadeParaBranco(camera, duracao = 200) {
+  if (!camera) return
+  if (fatores().clarao >= 1) camera.fadeOut(duracao, 255, 255, 255)
+  else camera.fadeOut(Math.max(duracao, 260), 0, 0, 0)
+}
+
 // Fator de alpha dos clarões feitos à mão (retângulos/imagens que piscam branco)
 export const alphaClarao = (alpha) => alpha * fatores().clarao
 

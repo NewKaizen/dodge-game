@@ -31,6 +31,7 @@ import FimDePartida from '../pvp/fimDePartida/index.js'
 import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe } from '../../lib/saida.js'
 import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
 import ArenaRede from '../pvp/rede/ArenaRede.js'
+import { fatores } from '../acessibilidade.js'
 
 // Partida PvP de cartas. Junta as peças de pvp/ (regras, baralho, cartas,
 // Pista) com o visual das cartas (Carta, Mao). Regras em docs/pvp-regras.md.
@@ -941,7 +942,10 @@ export default class PvpArena extends Phaser.Scene {
         if (this.escolhas[j] !== undefined) texto = 'PRONTO!'
         else texto = j === this.cpu ? 'CPU pensando...' : this.rede && j !== this.rede.meuLado ? 'escolhendo...' : 'escolha uma carta'
       }
-      this.status[j].setText(texto)
+      // carta sob o cursor que não dá para jogar: diz POR QUÊ (texto + vermelho; pvp/regras.js motivoBloqueio)
+      const bloqueio = livre && naMao && j !== this.cpu && !(this.rede && j !== this.rede.meuLado) ? this.podeJogarAgora(j, this.maos[j].selecionada?.dados.id).bloqueio : null
+      if (bloqueio) texto = bloqueio.curto
+      this.status[j].setText(texto).setColor(bloqueio ? TEXTO.caido : corTexto(CORES.almas[j]))
       this.atualizarPrevia(j)
     }
     this.rede?.enviarCursor() // o meu cursor mudou? o outro PC mostra
@@ -1013,8 +1017,7 @@ export default class PvpArena extends Phaser.Scene {
     if (!v.ok) {
       carta.negar()
       this.previas[m]?.negar?.()
-      const custo = carta.dados.custo
-      this.status[m].setText(`energia insuficiente (custa ${custo})`).setColor(TEXTO.caido)
+      this.status[m].setText(v.bloqueio?.curto ?? v.motivo).setColor(TEXTO.caido)
       this.time.delayedCall(900, () => {
         this.status[m].setColor(corTexto(CORES.almas[m]))
         this.atualizarEscolha()
@@ -1826,7 +1829,7 @@ export default class PvpArena extends Phaser.Scene {
           tocar(this, 'inverter')
         }
         joy = { x: -joy.x, y: -joy.y }
-        this.avisoPista[j].setText(Math.floor(this.time.now / 180) % 2 ? 'CONTROLES INVERTIDOS!' : '').setColor('#ff9a3a')
+        this.avisoPista[j].setText(fatores().pulso > 1 || Math.floor(this.time.now / 180) % 2 ? 'CONTROLES INVERTIDOS!' : '').setColor('#ff9a3a')
       } else if (inv?.avisado) {
         this.invertido[j] = 0
         if (!this.ko[dono]) this.avisoPista[j].setText('')

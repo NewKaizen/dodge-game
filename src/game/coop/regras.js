@@ -16,6 +16,7 @@
 //   const estado = criarPartidaCoop({ party: ['kris', 'susie'], chefe: 'king', nivel: 'facil', semente })
 //   iniciarRodadaCoop(estado)          energia, mãos, quem caiu volta, o chefe mostra a intenção
 //   podeJogarCoop(estado, j, id)       { ok, motivo }
+//   motivoBloqueioCoop(estado, j, id)  null ou { codigo, motivo, curto } (por que não pode; usado pela tela)
 //   const r = resolverRodadaCoop(estado, jogadaP1, jogadaP2)
 //     r.destino     o que aconteceu com a carta do chefe: 'quadro' | 'varrida' |
 //                   'refletida' | 'anulada' | 'roubada' (null: o chefe não jogou)
@@ -36,7 +37,7 @@
 
 import { NIVEIS } from '../constants.js'
 import { criarBaralho, completarMao, comprar, descartar, cartaNaMao, criarRng, embaralhar, MAO } from '../pvp/baralho.js'
-import { ENERGIA, hpInicial, aplicarDano, curar } from '../pvp/regras.js'
+import { ENERGIA, hpInicial, aplicarDano, curar, motivoBloqueio } from '../pvp/regras.js'
 
 // o combo de perfeitos é o mesmo do PvP (mesmo formato de jogadores)
 export { COMBO_PERFEITO, multiplicadorPerfeito, registrarPerfeitoCombo, quebrarSequencia } from '../pvp/regras.js'
@@ -274,15 +275,17 @@ export function iniciarRodadaCoop(estado) {
 
 const idDaJogada = (jogada) => (jogada == null ? null : typeof jogada === 'string' ? jogada : jogada.carta ?? null)
 
+// Mesmo contrato de pvp/regras.js motivoBloqueio, com o "caído" do CO-OP na frente
+export function motivoBloqueioCoop(estado, j, carta) {
+  if (estado.jogadores[j].caido) return { codigo: 'caido', motivo: 'caído', curto: 'caído: não joga carta' }
+  return motivoBloqueio(estado, j, carta)
+}
+
 export function podeJogarCoop(estado, j, jogada) {
   const id = idDaJogada(jogada)
   if (id === null) return { ok: true, motivo: null }
-  const jog = estado.jogadores[j]
-  if (jog.caido) return { ok: false, motivo: 'caído' }
-  const carta = cartaNaMao(jog.baralho, id)
-  if (!carta) return { ok: false, motivo: 'carta não está na mão' }
-  if (carta.custo > jog.energia) return { ok: false, motivo: `energia insuficiente (custa ${carta.custo}, tem ${jog.energia})` }
-  return { ok: true, motivo: null }
+  const bloqueio = motivoBloqueioCoop(estado, j, id)
+  return bloqueio ? { ok: false, motivo: bloqueio.motivo, bloqueio } : { ok: true, motivo: null }
 }
 
 function novoEfeito() {
