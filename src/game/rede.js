@@ -83,6 +83,10 @@ export function instalarRede(game) {
     }
     const outro = s.fase === 'sala' ? s.sala?.membros.find((m) => m.id !== s.eu.id)?.id ?? null : null
     if (parceiro && outro !== parceiro) canal.esquecer(parceiro)
+    // parceiro novo (ou o mesmo que saiu e voltou): as minhas confiáveis
+    // começam outra sessão, do 0 (lib/lan/canal.js). Sem isso o número de
+    // antes continuava e o outro ficava esperando a mensagem 0 para sempre
+    if (outro !== parceiro) canal.reiniciar()
     parceiro = outro
     if (!ativa || naSalaComParceiro(s)) return
     ativar(false)

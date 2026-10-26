@@ -97,3 +97,71 @@ test('atraso de teste mantém a ordem das confiáveis', () => {
   agendados.sort((p, q) => q.ms - p.ms).forEach(({ fn }) => fn()) // a pior ordem possível
   assert.deepEqual(vistos, [0, 1, 2, 3, 4])
 })
+
+test('parceiro novo: reiniciar() começa outra sessão e o outro não fica esperando a 0', () => {
+  // o host já mandou mensagens para outro convidado (ou para este, antes de ele sair e voltar)
+  const fio = []
+  const host = criarCanal({ enviarBruto: (m) => fio.push(m), meuId: () => 'H' })
+  for (let i = 0; i < 5; i++) host.enviar('personagem', null, i)
+  const conv = criarCanal({ enviarBruto: () => {}, meuId: () => 'C' })
+  fio.splice(0, 3).forEach((m) => conv.entregar(m)) // o convidado viu as 3 primeiras e saiu
+  const cenas = []
+  conv.ao('cena', (d) => cenas.push(d))
+  const velhas = fio.splice(0) // ainda no caminho
+  host.reiniciar() // o convidado voltou
+  host.enviar('cena', null, 'PvpEscolha')
+  conv.entregar(fio.shift())
+  assert.deepEqual(cenas, ['PvpEscolha'])
+  // as da sessão velha que chegam atrasadas não valem mais
+  const vistos = []
+  conv.ao('personagem', (d) => vistos.push(d))
+  velhas.forEach((m) => conv.entregar(m))
+  assert.deepEqual(vistos, [])
+  host.enviar('cena', null, 'PvpVoto')
+  conv.entregar(fio.shift())
+  assert.deepEqual(cenas, ['PvpEscolha', 'PvpVoto'])
+})
+
+test('confiável perdida no caminho é mandada de novo até chegar o recibo', () => {
+  let t = 0
+  const timers = []
+  const rodarTimers = () => timers.splice(0).forEach((fn) => fn())
+  const fioAB = []
+  const fioBA = []
+  const a = criarCanal({ enviarBruto: (m) => fioAB.push(m), meuId: () => 'A', agora: () => t, agendar: (fn) => timers.push(fn) })
+  const b = criarCanal({ enviarBruto: (m) => fioBA.push(m), meuId: () => 'B', agora: () => t })
+  const cenas = []
+  b.ao('cena', (d) => cenas.push(d))
+  a.enviar('cena', null, 'PvpArena')
+  fioAB.splice(0) // perdeu (o WebRTC fechou no meio)
+  t = 500
+  rodarTimers()
+  assert.equal(fioAB.length, 0, 'ainda não deu o tempo do reenvio')
+  t = 1000
+  rodarTimers()
+  assert.equal(fioAB.length, 1)
+  b.entregar(fioAB.shift())
+  assert.deepEqual(cenas, ['PvpArena'])
+  // o recibo chega: não manda mais
+  fioBA.splice(0).forEach((m) => a.entregar(m))
+  assert.equal(a.estadoDebug().semRecibo, 0)
+  t = 5000
+  rodarTimers()
+  assert.equal(fioAB.length, 0)
+  assert.equal(timers.length, 0, 'sem nada pendente o vigia para')
+})
+
+test('reenvio repetido não entrega duas vezes e ganha recibo de novo', () => {
+  const { a, b, fioAB, fioBA } = par()
+  const vistos = []
+  b.ao('dano', (d) => vistos.push(d))
+  a.enviar('dano', null, 7)
+  const m = fioAB.shift()
+  b.entregar(m)
+  fioBA.splice(0) // o recibo se perdeu
+  b.entregar(m) // o reenvio
+  assert.deepEqual(vistos, [7])
+  assert.equal(fioBA.length, 1)
+  a.entregar(fioBA.shift())
+  assert.equal(a.estadoDebug().semRecibo, 0)
+})
