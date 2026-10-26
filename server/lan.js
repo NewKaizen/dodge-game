@@ -239,12 +239,13 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     for (const id of sala.membros) enviar(clientes.get(id), msg)
   }
 
-  function sair(cliente, motivo = 'o host saiu: a sala foi fechada') {
+  // tirado: o host expulsou (não foi ele que saiu: não conta como abandono)
+  function sair(cliente, motivo = 'o host saiu: a sala foi fechada', { tirado = false } = {}) {
     const sala = salas.get(cliente.sala)
     cliente.sala = null
     cliente.pronto = false
     if (!sala) return
-    partidas.saiu(cliente, sala) // no meio da partida = abandono (server/partidas.js)
+    if (!tirado) partidas.saiu(cliente, sala) // no meio da partida = abandono (server/partidas.js)
     sala.membros.delete(cliente.id)
     atualizarStatus(cliente)
     // sala casual (JOGAR RÁPIDO): sem o oponente não tem o que fazer nela
@@ -642,7 +643,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       const alvo = clientes.get(m.id)
       // no meio da partida não: tirar o oponente não pode virar "vitória por abandono"
       if (!sala || sala.host !== c.id || !alvo || alvo.sala !== sala.id || alvo === c || sala.casual || sala.emPartida) return
-      sair(alvo)
+      sair(alvo, undefined, { tirado: true }) // o relato dele da partida que acabou ainda vale
       enviar(alvo, { t: 'fechada', motivo: 'o host tirou você da sala' })
     },
     chat(c, m) {

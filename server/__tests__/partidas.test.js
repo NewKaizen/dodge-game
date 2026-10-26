@@ -569,3 +569,19 @@ test('criarPartidas sem lobby: sala de CO-OP ou incompleta não registra', () =>
   assert.equal(partidas.iniciar({ id: 's', modo: 'coop' }, [{ id: 'a' }, { id: 'b' }]), null)
   partidas.fechar()
 })
+
+test('o host volta ao lobby e expulsa antes do relato do outro: não vira vitória por abandono', async () => {
+  const m = montar()
+  const { host, conv, partidaId } = await partida(m)
+  m.relogio.andar(120_000)
+  host.mandar({ t: 'partida', valor: false })
+  host.mandar({ t: 'expulsar', id: conv.c.id })
+  assert.equal(conv.c.sala, null)
+  m.relogio.andar(200)
+  relatar(conv, partidaId, 1) // o relato de quem foi tirado ainda vale
+  m.relogio.andar(RELATO_JANELA_MS)
+  await esperar()
+  assert.notEqual(recompensa(host).motivo, 'vitoria')
+  assert.equal(recompensa(host).xpGanho, 0)
+  assert.equal(recompensa(conv).motivo, 'participacao')
+})

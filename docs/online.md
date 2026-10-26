@@ -227,7 +227,8 @@ pelo **relógio do servidor** (do começo até esse fim), nunca a do cliente.
 - Prazo para o segundo relato: **20 s** depois do primeiro. Quem sai da sala sem
   ter relatado dá **3 s** para o relato do outro que podia estar a caminho.
 - "Saiu" = saiu da sala ou desconectou por conta própria. Quem foi tirado porque
-  a sala fechou (o host caiu, o oponente da casual saiu) não conta como abandono.
+  a sala fechou (o host caiu, o oponente da casual saiu) ou porque o host o
+  expulsou depois da partida não conta como abandono (o relato dele ainda vale).
 - Abandono na casual não tira XP de ninguém: quem saiu só não ganha nada naquela partida.
 - O host não pode expulsar no meio da partida (não vira "vitória por abandono").
 - No máximo **10 partidas registradas por minuto** por host (conta ou convidado):
