@@ -197,6 +197,7 @@ export default class PvpArena extends Phaser.Scene {
   }
 
   create() {
+    this.comecouEm = Date.now() // a duração vai no resultado (o servidor mede a dele)
     // partida EM REDE (docs/rede-pvp.md): cada PC roda esta cena; pvp/rede/ArenaRede.js
     // faz a ponte (quem decide é o host, cada um é dono do próprio coração)
     this.rede = emRede() ? new ArenaRede(this, { canal, meuLado: meuLado(), souHost: souHostDaRede() }) : null
@@ -1739,6 +1740,7 @@ export default class PvpArena extends Phaser.Scene {
       p2: this.ids[1],
       arena: this.arena.id,
       rodadas: this.estado.rodada,
+      duracao: Math.round((Date.now() - this.comecouEm) / 1000),
       cpu: this.cpu !== null,
       // em rede o host recebeu o dano/graze dos dois: as estatísticas dele valem
       estatisticas: { p1: { ...this.estatisticas[0] }, p2: { ...this.estatisticas[1] } },

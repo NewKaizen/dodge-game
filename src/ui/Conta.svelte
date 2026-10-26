@@ -3,8 +3,10 @@
   // painel do perfil por cima do jogo. Estado em lib/conta.js; sem contas no
   // servidor mostra "contas indisponíveis" e o jogo segue como convidado.
   import { conta, entrarComGoogle, sairDaConta, mudarNomeExibicao, escolherAvatar, enviarFoto, removerFoto } from '../lib/conta.js'
-  import { AVATARES_JOGO, avatarDoPerfil, xpDoNivel, NOME_MAX } from '../lib/contaRegras.js'
+  import { AVATARES_JOGO, avatarDoPerfil, NOME_MAX } from '../lib/contaRegras.js'
+  import { progressoDoXp, nomeDoItem, corDaMoldura } from '../lib/progresso.js'
   import Avatar from './Avatar.svelte'
+  import Colecao from './Colecao.svelte'
   import RecorteFoto from './RecorteFoto.svelte'
 
   const TIPOS_FOTO = ['image/png', 'image/jpeg', 'image/webp']
@@ -22,7 +24,10 @@
 
   let perfil = $derived($conta.perfil)
   let avatar = $derived(avatarDoPerfil(perfil))
-  let xpMax = $derived(xpDoNivel(perfil?.nivel))
+  // perfil.xp é o total acumulado; a barra é a do nível atual (lib/progresso.js)
+  let prog = $derived(progressoDoXp(perfil?.xp))
+  let moldura = $derived(corDaMoldura(perfil?.moldura_equipada))
+  let colecao = $state(false)
   let est = $derived($conta.estatisticas ?? { partidas: 0, vitorias: 0, personagem_favorito: null })
 
   function abrir() {
@@ -78,7 +83,7 @@
     <span class="dica">convidado: crie conta para salvar progresso</span>
   {:else}
     <button class="eu" onclick={abrir} title="abrir o perfil">
-      <Avatar {avatar} tamanho={22} />
+      <Avatar {avatar} tamanho={22} {moldura} />
       <span>{perfil?.nome_exibicao ?? 'perfil'}</span>
       {#if perfil}<span class="dica">#{perfil.tag.split('#')[1]} · nv {perfil.nivel}</span>{/if}
     </button>
@@ -86,7 +91,9 @@
   {#if $conta.erro && !aberto}<span class="erro">{$conta.erro}</span>{/if}
 </div>
 
-{#if aberto && perfil}
+{#if colecao && perfil}
+  <Colecao aoFechar={() => (colecao = false)} />
+{:else if aberto && perfil}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div class="fundo" role="presentation" onclick={(e) => e.target === e.currentTarget && fechar()} onkeydown={isolarTeclas} onkeyup={(e) => e.stopPropagation()}>
     <div class="painel" role="dialog" aria-modal="true" aria-label="perfil">
@@ -97,15 +104,16 @@
 
       <div class="colunas">
         <section class="cartao">
-          <Avatar {avatar} tamanho={96} />
+          <Avatar {avatar} tamanho={96} {moldura} />
           <div class="nome">{perfil.nome_exibicao}</div>
           <div class="dica" title="seu identificador (os amigos acham você por ele)">{perfil.tag}</div>
-          <div class="titulo-eq">{perfil.titulo_equipado ?? 'sem título'}</div>
+          <div class="titulo-eq">{nomeDoItem(perfil.titulo_equipado) ?? 'sem título'}</div>
           <div class="nivel">NÍVEL {perfil.nivel}</div>
-          <div class="xp" title="{perfil.xp} / {xpMax} XP">
-            <div class="xp-cheio" style:width="{Math.min(100, (perfil.xp / xpMax) * 100)}%"></div>
+          <div class="xp" title="{prog.noNivel} / {prog.paraProximo} XP ({perfil.xp} no total)">
+            <div class="xp-cheio" style:width="{Math.min(100, (prog.noNivel / prog.paraProximo) * 100)}%"></div>
           </div>
-          <div class="dica">{perfil.xp} / {xpMax} XP</div>
+          <div class="dica">{prog.noNivel} / {prog.paraProximo} XP</div>
+          <button onclick={() => (colecao = true)} disabled={ocupado}>Coleção…</button>
           <dl class="stats">
             <dt>partidas</dt><dd>{est.partidas}</dd>
             <dt>vitórias</dt><dd>{est.vitorias}</dd>

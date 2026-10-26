@@ -1,6 +1,6 @@
 import { writable, get } from 'svelte/store'
 import { jogo } from '../estado.js'
-import { tokenConta, aoMudarConta } from '../conta.js'
+import { tokenConta, aoMudarConta, recarregarPerfil } from '../conta.js'
 import { codigoDaBusca, limparSalaDaUrl } from '../salaLink.js'
 
 // Conexão do modo LAN/ONLINE com o servidor (server/lan.js, docs/lan.md,
@@ -26,13 +26,18 @@ import { codigoDaBusca, limparSalaDaUrl } from '../salaLink.js'
 //   pedirRevanche(aceitar) · limparRevanche() · salaCasual()   (PvpResultado) revanche com aceite duplo
 //   estado: fila (procurando/pareado), filaAviso, casual, revanche, ultimaCasual
 //
+// XP (server/partidas.js, Fase 1D): cada partida PVP da sala tem um
+// sala.partidaId; no fim, enviarResultado({...}) manda o que este PC viu UMA
+// vez por partida (revanche e cena reiniciando não reenviam). O servidor
+// responde com `recompensa` (estado.recompensa) e o perfil é relido.
+//
 // Link de convite (?sala=CODIGO, lib/salaLink.js): salaDoLink() diz se há uma
 // sala esperando; ao conectar, o lobby entra nela sozinho.
 //
 // Conta (lib/conta.js): logado, o "ola" leva o JWT e o servidor responde com o
 // resumo do perfil (eu.conta). O token só vai para o servidor que serviu a
 // página (casa), nunca para o de outro PC da LAN.
-export const PROTOCOLO = 4
+export const PROTOCOLO = 5
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
@@ -68,6 +73,8 @@ const INICIAL = {
   casual: null, // id da sala casual que o host começa sozinho (partidaCasual)
   revanche: null, // null | { estado: 'pedida' | 'aceita' | 'recusada' | 'expirada' | 'indisponivel', minha, expira? }
   ultimaCasual: false, // a última sala era casual: quem fica sem ela volta para a tela ONLINE
+  // XP: a última resposta do servidor { partidaId, xpGanho, xpTotal?, nivelAntes?, nivelDepois?, itensNovos?, motivo }
+  recompensa: null,
 }
 export const lan = writable({ ...INICIAL })
 
@@ -81,6 +88,7 @@ let numJogadoresAntes = null
 let aoListar = null // conectarIp esperando a primeira lista
 let manter = false // logado: não fecha a conexão ao sair da tela ONLINE
 let telaAberta = false // a tela ONLINE (cena Lan) está aberta: só então lista as salas
+const relatadas = new Set() // partidaIds cujo resultado já foi mandado
 let salaPendente = typeof location === 'undefined' ? '' : codigoDaBusca(location.search) // do link ?sala=
 const ouvintesServidor = new Set()
 const ouvintesParceiro = new Set()
@@ -313,6 +321,21 @@ function receber(m) {
     case 'partidaCasual':
       mudar({ casual: m.salaId, fila: null, filaAviso: '' })
       break
+    case 'recompensa': {
+      const r = {
+        partidaId: String(m.partidaId ?? ''),
+        xpGanho: Math.max(0, Number(m.xpGanho) || 0),
+        xpTotal: Number.isFinite(m.xpTotal) ? m.xpTotal : null,
+        nivelAntes: Number.isFinite(m.nivelAntes) ? m.nivelAntes : null,
+        nivelDepois: Number.isFinite(m.nivelDepois) ? m.nivelDepois : null,
+        itensNovos: Array.isArray(m.itensNovos) ? m.itensNovos.filter((i) => typeof i === 'string') : [],
+        motivo: typeof m.motivo === 'string' ? m.motivo : '',
+      }
+      mudar({ recompensa: r })
+      // o nível, o XP, o inventário e as estatísticas mudaram no banco
+      if (r.xpTotal != null) recarregarPerfil()
+      break
+    }
     case 'revanche': {
       const minha = m.de === estado().eu.id
       mudar({ revanche: { estado: m.estado, minha, ...(m.estado === 'pedida' && { expira: Date.now() + (Number(m.restanteMs) || 0) }) } })
@@ -525,6 +548,19 @@ export function consumirCasual() {
 export const salaCasual = () => estado().fase === 'sala' && Boolean(estado().sala?.casual)
 export const pedirRevanche = (aceitar) => salaCasual() && enviar({ t: 'revanche', aceitar: Boolean(aceitar) })
 export const limparRevanche = () => mudar({ revanche: null })
+
+// ---------- XP ----------
+
+// fim da partida PVP: o que este PC viu; true se mandou agora (uma vez por partidaId)
+export function enviarResultado({ partidaId, vencedorLado, rodadas, duracao, personagem }) {
+  if (typeof partidaId !== 'string' || !partidaId || relatadas.has(partidaId)) return false
+  if (ws?.readyState !== WebSocket.OPEN) return false
+  relatadas.add(partidaId)
+  if (relatadas.size > 200) relatadas.delete(relatadas.values().next().value)
+  enviar({ t: 'resultado', partidaId, vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null, rodadas, duracao, personagem })
+  return true
+}
+export const jaRelatou = (partidaId) => relatadas.has(partidaId)
 
 // ---------- canal com o outro PC (pelo servidor) ----------
 

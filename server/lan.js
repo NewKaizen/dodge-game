@@ -40,6 +40,14 @@
 //                        revanche {estado: 'pedida'|'aceita'|'recusada'|'expirada'|'indisponivel', ...}
 // HOST da sala casual: quem tem o menor ping até o servidor, se os dois são
 // conhecidos e a diferença passa de FOLGA_PING_MS; senão, quem confirmou primeiro.
+//
+// PARTIDAS E XP (server/partidas.js, Fase 1D): cada partida PVP de uma sala
+// (casual ou de amigos) ganha um registro quando o host começa (ou na
+// revanche); o id vai no `sala.partidaId`. No fim, CADA cliente manda o
+// resultado uma vez; o servidor compara os relatos e quem saiu da sala, e o
+// banco concede o XP (registro = criarRegistro(supabase); sem ele, sem XP).
+//   cliente -> servidor  resultado {partidaId, vencedorLado: 0|1|null, rodadas, duracao, personagem}
+//   servidor -> cliente  recompensa {partidaId, xpGanho, xpTotal?, nivelAntes?, nivelDepois?, itensNovos?, motivo}
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
@@ -47,8 +55,9 @@ import crypto from 'node:crypto'
 import { criarLimite } from './contas.js'
 import { CONVITE_MS, CONVITES_POR_MINUTO, MAX_CONVITES_RECEBIDOS } from './amigos.js'
 import { criarFila, agendarPadrao, ACOES_FILA_POR_MINUTO, REVANCHE_MS, FOLGA_PING_MS } from './fila.js'
+import { criarPartidas } from './partidas.js'
 
-export const PROTOCOLO = 4
+export const PROTOCOLO = 5
 export const PORTA_DESCOBERTA = 47777
 export const MAX_MEMBROS = 2
 const ANUNCIO_MS = 1500
@@ -138,7 +147,9 @@ export const trocarMdns = (texto, ip) => (typeof texto === 'string' ? texto.repl
 // sem ele não há presença nem convites)
 // agendar(fn, ms) -> cancelar: timers da fila e da revanche (os testes trocam);
 // log: linhas para o console do servidor (host escolhido na fila)
-export function criarLobby({ locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null, relacoes = null, agendar = agendarPadrao, log = () => {} } = {}) {
+// registro: o banco das partidas e do XP (server/partidas.js, criarRegistro;
+// sem ele as partidas não dão XP)
+export function criarLobby({ locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null, relacoes = null, registro = null, agendar = agendarPadrao, log = () => {} } = {}) {
   const clientes = new Map() // id -> cliente
   const salas = new Map() // id -> sala
   const codigos = new Map() // código -> id da sala
@@ -146,6 +157,15 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   const convites = new Map() // id do convite -> { id, de, deUsuario, para, salaId, expira, timer }
   const limiteConvites = criarLimite({ max: CONVITES_POR_MINUTO, agora })
   const limiteFila = criarLimite({ max: ACOES_FILA_POR_MINUTO, agora })
+  // a recompensa vai para o cliente da partida ou, se ele reconectou, para o
+  // cliente atual da MESMA conta (nunca para outra conta)
+  const entregar = (x, msg) => {
+    const c = clientes.get(x.cliente)
+    if (c && (c.usuario ?? null) === (x.conta ?? null)) return enviar(c, msg)
+    const outro = x.conta ? presenca.get(x.conta) : null
+    if (outro) enviar(outro, msg)
+  }
+  const partidas = criarPartidas({ registro, agora, agendar, entregar, log, versao: PROTOCOLO })
 
   const novoCodigo = () => {
     for (;;) {
@@ -183,6 +203,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     modo: sala.modo,
     emPartida: sala.emPartida,
     casual: Boolean(sala.casual),
+    partidaId: sala.partidaId ?? null,
     max: MAX_MEMBROS,
     membros: [...sala.membros].map((id) => {
       const c = clientes.get(id)
@@ -200,6 +221,9 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     emPartida: sala.emPartida,
   })
 
+  // host primeiro (lado 0 = P1), depois o convidado
+  const membrosDaSala = (sala) => [sala.host, ...[...sala.membros].filter((id) => id !== sala.host)].map((id) => clientes.get(id)).filter(Boolean)
+
   const avisarSala = (sala) => {
     const msg = { t: 'sala', sala: publica(sala) }
     for (const id of sala.membros) enviar(clientes.get(id), msg)
@@ -210,6 +234,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     cliente.sala = null
     cliente.pronto = false
     if (!sala) return
+    partidas.saiu(cliente, sala) // no meio da partida = abandono (server/partidas.js)
     sala.membros.delete(cliente.id)
     atualizarStatus(cliente)
     // sala casual (JOGAR RÁPIDO): sem o oponente não tem o que fazer nela
@@ -550,7 +575,11 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     partida(c, m) {
       const sala = salas.get(c.sala)
       if (!sala || sala.host !== c.id) return
+      const antes = sala.emPartida
       sala.emPartida = Boolean(m.valor)
+      // o registro da partida (XP): nasce quando começa e não renasce num "partida" repetido
+      if (sala.emPartida && !antes) partidas.iniciar(sala, membrosDaSala(sala))
+      else if (!sala.emPartida && antes) partidas.encerrou(sala)
       if (!sala.emPartida) {
         for (const id of sala.membros) if (id !== sala.host) clientes.get(id).pronto = false
       } else {
@@ -562,7 +591,8 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     expulsar(c, m) {
       const sala = salas.get(c.sala)
       const alvo = clientes.get(m.id)
-      if (!sala || sala.host !== c.id || !alvo || alvo.sala !== sala.id || alvo === c || sala.casual) return
+      // no meio da partida não: tirar o oponente não pode virar "vitória por abandono"
+      if (!sala || sala.host !== c.id || !alvo || alvo.sala !== sala.id || alvo === c || sala.casual || sala.emPartida) return
       sair(alvo)
       enviar(alvo, { t: 'fechada', motivo: 'o host tirou você da sala' })
     },
@@ -666,9 +696,18 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       if ([...sala.membros].every((id) => r.votos.has(id))) {
         encerrarRevanche(sala)
         sala.revanches = (sala.revanches ?? 0) + 1
+        // a revanche é outra partida: registro novo (o partidaId chega antes do "aceita")
+        if (sala.emPartida) {
+          partidas.iniciar(sala, membrosDaSala(sala))
+          avisarSala(sala)
+        }
         return avisarMembros(sala, { t: 'revanche', estado: 'aceita', host: sala.host })
       }
       avisarMembros(sala, { t: 'revanche', estado: 'pedida', de: c.id, expiraEm: r.expira, restanteMs: Math.max(0, r.expira - agora()) })
+    },
+    // fim da partida: o que este cliente viu (uma vez por partida; server/partidas.js decide)
+    resultado(c, m) {
+      partidas.relatar(c, m)
     },
     ping(c, m) {
       enviar(c, { t: 'pong', n: m.n })
@@ -734,6 +773,8 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     expirarConvites,
     // fila casual (os testes conferem os estados e vencem os prazos)
     fila,
+    // registro das partidas (os testes conferem a política)
+    partidas,
     desconectar(cliente) {
       removerDaFila(cliente, 'saiu')
       desregistrar(cliente, cliente.usuario)
@@ -803,10 +844,10 @@ function criarDescoberta(lobby, porta, log) {
 
 // online: servidor na internet (sem descoberta UDP, salas por código)
 // ice: [{ urls, username?, credential? }] para o WebRTC dos navegadores
-export function anexarLan(httpServer, { log = console.log, descoberta = true, online = false, ice = [], maxClientes = MAX_CLIENTES, autenticar = null, relacoes = null } = {}) {
+export function anexarLan(httpServer, { log = console.log, descoberta = true, online = false, ice = [], maxClientes = MAX_CLIENTES, autenticar = null, relacoes = null, registro = null } = {}) {
   let rede = null
   const porta = () => httpServer.address()?.port
-  const lobby = criarLobby({ online, ice, autenticar, relacoes, log, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
+  const lobby = criarLobby({ online, ice, autenticar, relacoes, registro, log, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 * 1024 })
   if (descoberta && !online) rede = criarDescoberta(lobby, porta, log)
 
@@ -845,6 +886,7 @@ export function anexarLan(httpServer, { log = console.log, descoberta = true, on
     lobby,
     fechar() {
       clearInterval(batimento)
+      lobby.partidas.fechar()
       rede?.fechar()
       httpServer.off('upgrade', aoUpgrade)
       for (const ws of wss.clients) ws.terminate()
