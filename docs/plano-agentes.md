@@ -80,7 +80,8 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 | 1B Amigos e convites | concluído (NewKaizen/dodge-game#39); falta validar com duas contas em produção |
 | 1C Jogar Rápido | concluído (NewKaizen/dodge-game#40); falta testar no navegador |
 | 1D XP e recompensas | concluído (NewKaizen/dodge-game#41); falta rodar a 0003 e testar com duas contas |
-| 1E Integração e lançamento | implementada na branch `claude/practical-darwin-nc9pwz`; falta rodar a 0004 no Supabase, o teste restrito (`docs/teste-fase1.md`) e a revisão R3 |
+| 1E Integração e lançamento | concluído, PR aberto; falta rodar a 0004 |
+| R3 Revisão final + P2 plano 2–6 | próximo (R3 Opus, P2 Sonnet) |
 
 ### Consolidação (depois das features da Fase 1)
 
@@ -96,6 +97,7 @@ Decisão do usuário: primeiro as features, depois organizar tudo. Itens anotado
 - Aplicar o verso de carta equipado nas partidas (hoje só na Coleção; precisa ir pela rede).
 - Rever o limite que conta todos os convidados como um único oponente.
 - XP no CO-OP.
+- Filtro de nomes também no nome inicial vindo do Google (hoje só ao trocar o nome).
 
 ### Controle de custo
 
