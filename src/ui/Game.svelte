@@ -7,6 +7,7 @@
   import { registrarDebug } from '../game/debug.js'
   import { vigiarContextoWebgl } from '../game/contextoPerdido.js'
   import { instalarRede } from '../game/rede.js'
+  import { instalarAvisos } from '../game/conta/avisos.js'
   import { instalarTelaCheia } from '../lib/telaCheia.js'
   import { lan } from '../lib/lan/rede.js'
   import { ligarJogo, pingPartida, ROTAS, corDoPing } from '../lib/lan/transmissao.js'
@@ -30,11 +31,13 @@
     if (game.canvas) vigiar()
     else game.events.once('ready', vigiar)
     const desligarRede = instalarRede(game)
+    const desligarAvisos = instalarAvisos()
     ligarJogo(game)
 
     return () => {
       desligarContexto()
       desligarRede()
+      desligarAvisos()
       desligarTelaCheia()
       desligarResolucao()
       desligar()
