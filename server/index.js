@@ -17,12 +17,19 @@
 //                                (contas com login Google; opcionais: sem elas
 //                                o jogo roda igual, só sem contas. docs/supabase.md.
 //                                A service_role fica só aqui no servidor)
+//   METRICAS_MIN=15              (online; padrão 15) a cada quantos minutos o servidor escreve
+//                                UMA linha "[metricas] {...}" no log, com contadores agregados
+//                                (sem nomes, sem IP, sem chat; docs/online.md). 0 desliga.
+//                                Ao desligar (SIGTERM/SIGINT) escreve a última.
+//   CONFIAR_PROXY=1              (padrão: ligado no modo online) o endereço de quem chama
+//                                /api/avatar vem do X-Forwarded-For do proxy (Render)
 import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { anexarLan, enderecosDoJogo } from './lan.js'
 import { iniciarContas } from './contas.js'
+import { criarMetricas, METRICAS_NULA, INTERVALO_PADRAO_MS } from './metricas.js'
 
 const PORTA = Number(process.env.PORTA ?? process.env.PORT ?? 5180)
 const ONLINE = process.argv.includes('--online') || ['1', 'true', 'sim'].includes(String(process.env.ONLINE ?? '').toLowerCase())
@@ -68,7 +75,18 @@ if (!fs.existsSync(path.join(PASTA, 'index.html'))) {
   process.exit(1)
 }
 
-const contas = await iniciarContas(process.env)
+const intervaloMetricasMin = Number(process.env.METRICAS_MIN ?? (ONLINE ? INTERVALO_PADRAO_MS / 60_000 : 0))
+const metricas = intervaloMetricasMin > 0 ? criarMetricas({ intervaloMs: intervaloMetricasMin * 60_000 }) : METRICAS_NULA
+metricas.iniciar()
+// Render avisa com SIGTERM antes de trocar a versão: escreve a última janela
+for (const sinal of ['SIGTERM', 'SIGINT']) {
+  process.once(sinal, () => {
+    metricas.parar()
+    process.exit(0)
+  })
+}
+const confiarProxy = ['1', 'true', 'sim'].includes(String(process.env.CONFIAR_PROXY ?? (ONLINE ? '1' : '')).toLowerCase())
+const contas = await iniciarContas(process.env, { confiarProxy, metricas })
 
 const servidor = http.createServer((req, res) => {
   // /api/config, /api/avatar (server/contas.js)
@@ -97,7 +115,7 @@ const servidor = http.createServer((req, res) => {
 })
 
 const ice = servidoresIce()
-anexarLan(servidor, { online: ONLINE, ice, autenticar: contas.autenticar, relacoes: contas.relacoes, registro: contas.registro })
+anexarLan(servidor, { online: ONLINE, ice, autenticar: contas.autenticar, relacoes: contas.relacoes, registro: contas.registro, metricas })
 servidor.on('error', (erro) => {
   console.error(erro.code === 'EADDRINUSE' ? `A porta ${PORTA} já está em uso. Tente: PORTA=5181 npm run ${ONLINE ? 'start' : 'lan'}` : erro)
   process.exit(1)
