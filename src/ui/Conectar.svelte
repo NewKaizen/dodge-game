@@ -1,5 +1,5 @@
 <script>
-  import { jogo, MAX_JOGADORES } from '../lib/estado.js'
+  import { jogo } from '../lib/estado.js'
   import { alternarTelaCheia } from '../lib/telaCheia.js'
   import { lan, sairSala } from '../lib/lan/rede.js'
   import { pingPartida, ROTAS, corDoPing } from '../lib/lan/transmissao.js'
@@ -13,14 +13,6 @@
   const NOMES = { teclado: 'teclado', gamepad: 'controle', serial: 'joystick serial' }
   let ligados = $derived(Object.keys(NOMES).filter((f) => $jogo.fontes[f]).map((f) => NOMES[f]))
 </script>
-
-<div class="conectar">
-  <span>Jogadores:</span>
-  {#each Array.from({ length: MAX_JOGADORES }, (_, i) => i + 1) as n}
-    <button class:ativo={$jogo.numJogadores === n} disabled={naSala} onclick={() => ($jogo.numJogadores = n)}>{n}</button>
-  {/each}
-  <span class="dica">(vale a partir da próxima partida)</span>
-</div>
 
 {#if naSala}
   <div class="conectar lan">
@@ -38,7 +30,7 @@
 {/if}
 
 <div class="conectar">
-  <span class="dica">{ligados.length ? `controles: ${ligados.join(' · ')}` : 'aperte uma tecla ou um botão do controle para jogar'}</span>
+  <span class="dica">{ligados.length ? `controles: ${ligados.join(' · ')}${$jogo.numJogadores > 1 && !naSala ? ' · 2 jogadores' : ''}` : 'aperte uma tecla ou um botão do controle para jogar'}</span>
   <button onclick={alternarTelaCheia}>⛶ Tela cheia (F)</button>
 </div>
 
@@ -47,10 +39,6 @@
     display: flex;
     gap: 8px;
     align-items: center;
-  }
-
-  .ativo {
-    outline: 2px solid #ff0;
   }
 
   .dica {

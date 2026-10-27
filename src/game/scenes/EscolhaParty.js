@@ -9,6 +9,8 @@ import { perfilPvp, rotuloCarta } from '../pvp/perfil.js'
 import { SIMBOLOS } from '../pvp/cartas.js'
 import { claraoCamera } from '../effects/flash.js'
 import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
+import { montarAvisos } from '../conta/avisos.js'
+import { pedirP2, dicaDoP2 } from '../jogadoresLocais.js'
 
 // Área da grade de personagens e dos painéis de detalhes (px)
 const GRADE = { topo: 72, base: 282, esquerda: 40, direita: LARGURA - 40, espaco: 10, larguraMax: 188, alturaMax: 200 }
@@ -43,7 +45,11 @@ export default class EscolhaParty extends Phaser.Scene {
   create() {
     this.ids = Object.keys(PERSONAGENS)
     this.controles = new Controles(this)
-    this.controles.onBotao((jogador, botao) => (botao === 'A' ? this.confirmar(jogador) : this.desfazer(jogador)))
+    // `origem` = de qual conjunto o botão veio: o A do jogador 2 (Enter) entra, o B dele sai (game/jogadores.js)
+    this.controles.onBotao((jogador, botao, origem) => {
+      if (pedirP2(botao, origem, this.algoConfirmado(), this.rede)) return
+      botao === 'A' ? this.confirmar(jogador) : this.desfazer(jogador)
+    })
     this.numJogadores = this.controles.numJogadores
     this.rede = emRede() // em rede são sempre 2 jogadores (Controles)
     this.eu = this.rede ? meuLado() : null // em rede: o lado que este PC controla
@@ -74,12 +80,15 @@ export default class EscolhaParty extends Phaser.Scene {
 
     this.montarDetalhes()
     const dica = this.rede ? '← → ↑ ↓ escolher     A: confirmar     B: voltar ao lobby' : '← → ↑ ↓ escolher     A: confirmar     B: desfazer / voltar'
-    this.texto(LARGURA / 2, ALTURA - 18, dica, 13, TEXTO.desabilitado, { strokeThickness: 0 })
+    this.texto(LARGURA / 2, ALTURA - 9, dica, 13, TEXTO.desabilitado, { strokeThickness: 0 })
+    // JOGADOR 2 entra aqui (dois no mesmo teclado): a dica some quando alguém confirma
+    this.dicaP2 = this.texto(LARGURA / 2, ALTURA - 26, '', 13, TEXTO.selecionado, { strokeThickness: 0 })
+    montarAvisos(this, { selecao: true })
 
     this.cursores.forEach((_, j) => this.mover(j, 0, false))
     this.atualizarTela()
 
-    // o painel Svelte pode mudar o número de jogadores a qualquer momento
+    // o número de jogadores pode mudar sozinho (2º controle, JOGADOR 2 entrando): recomeça a escolha
     const aoMudar = (_, valor, anterior) => valor !== anterior && !this.rede && this.scene.restart()
     this.registry.events.on('changedata-numJogadores', aoMudar)
     this.events.once('shutdown', () => this.registry.events.off('changedata-numJogadores', aoMudar))
@@ -112,6 +121,11 @@ export default class EscolhaParty extends Phaser.Scene {
   mandarCursor() {
     if (this.confirmados[this.eu] || this.saindo) return
     canal.enviarRapido('cursor', { tela: 'party', indice: this.cursores[this.eu].indice })
+  }
+
+  // alguém já escolheu (ou a cena está saindo): o JOGADOR 2 não entra nem sai mais
+  algoConfirmado() {
+    return Boolean(this.saindo || this.escolhidos?.length || this.confirmados?.some(Boolean))
   }
 
   ultimaParty() {
@@ -392,6 +406,7 @@ export default class EscolhaParty extends Phaser.Scene {
       this.status.setText(faltam ? 'cada jogador escolhe 1 personagem' : '')
     }
 
+    this.dicaP2.setText(dicaDoP2(this.algoConfirmado(), this.rede) ?? '')
     this.paineis.forEach((p, j) => this.desenharDetalhe(p, j))
   }
 
