@@ -54,6 +54,18 @@ const estilo = (tamanho, cor = TEXTO.normal, extra = {}) => ({
 })
 
 
+// campos de cada abertura: o Phaser reaproveita a cena (cenasReaproveitadas.test.js)
+const estadoInicial = () => ({
+  fundo: null,
+  veu: null,
+  raios: null,
+  halo: null,
+  pulando: null,
+  tituloBrilho: null,
+  titulo: null,
+  dicaPular: null,
+})
+
 export default class Vitoria extends Phaser.Scene {
   constructor() {
     super('Vitoria')
@@ -61,6 +73,7 @@ export default class Vitoria extends Phaser.Scene {
 
   // estatisticas: CoopArena.resumo()
   create({ chefe, estatisticas }) {
+    Object.assign(this, estadoInicial())
     this.idChefe = chefe
     this.def = CHEFES[chefe]
     this.saindo = false

@@ -87,6 +87,24 @@ const estilo = (tamanho, cor = TEXTO.normal, extra = {}) => ({
   ...extra,
 })
 
+// campos de cada abertura: o Phaser reaproveita a cena (cenasReaproveitadas.test.js)
+const estadoInicial = () => ({
+  fundo: null,
+  veu: null,
+  raios: null,
+  halo: null,
+  pulando: null,
+  tituloBrilho: null,
+  titulo: null,
+  dicaPular: null,
+  chao: null,
+  vinheta: null,
+  digitando: null,
+  mensagemCompleta: null,
+  textoMensagem: null,
+  barraHp: null,
+})
+
 export default class GameOver extends Phaser.Scene {
   constructor() {
     super('GameOver')
@@ -94,6 +112,7 @@ export default class GameOver extends Phaser.Scene {
 
   // estatisticas: CoopArena.resumo(); hpChefe/hpMaxChefe: quanto faltava do chefe
   create({ chefe, estatisticas, hpChefe, hpMaxChefe }) {
+    Object.assign(this, estadoInicial())
     this.idChefe = chefe
     this.def = CHEFES[chefe]
     this.stats = estatisticas

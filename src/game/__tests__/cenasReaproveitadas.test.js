@@ -39,7 +39,7 @@ const PERSISTENTES = {
 
 // Vitoria e GameOver são da sub-fase 2F (XP no CO-OP): ainda sem estadoInicial. Pendência
 // registrada em docs/plano-agentes.md; o teste só avisa, para a 2F fechar e remover daqui.
-const PENDENTE_2F = new Set(['Vitoria', 'GameOver'])
+const PENDENTE_2F = new Set()
 
 test('config.js: a varredura achou as cenas', () => {
   assert.ok(arquivos.length >= 20, `achou só ${arquivos.length}`)
