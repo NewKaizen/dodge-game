@@ -27,7 +27,7 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 //   pedirRevanche(aceitar) · limparRevanche() · salaCasual()   (PvpResultado) revanche com aceite duplo
 //   estado: fila (procurando/pareado), filaAviso, casual, revanche, ultimaCasual
 //
-// XP (server/partidas.js, Fase 1D): cada partida PVP da sala tem um
+// XP (server/partidas.js, Fase 1D; CO-OP na 2F): cada partida (PVP ou CO-OP de 2) da sala tem um
 // sala.partidaId; no fim, enviarResultado({...}) manda o que este PC viu UMA
 // vez por partida (revanche e cena reiniciando não reenviam). O servidor
 // responde com `recompensa` (estado.recompensa) e o perfil é relido.
@@ -302,8 +302,26 @@ function fecharConexao() {
   ouvintesServidor.forEach((fn) => fn({ t: '_fechou' }))
 }
 
+// aba do jogo em segundo plano (Fase 2F): o servidor avisa a sala se passar de uns segundos
+// (o convidado vê "o host está com o jogo em segundo plano"; o host ganha o aviso de volta, conta/avisos.js)
+let visivelEnviado = null
+function anunciarVisibilidade() {
+  if (typeof document === 'undefined') return
+  const valor = document.visibilityState !== 'hidden'
+  if (valor === visivelEnviado) return
+  visivelEnviado = valor
+  enviar({ t: 'visivel', valor })
+}
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', anunciarVisibilidade)
+// conexão nova: o servidor não sabe de nada; só precisa saber se já abriu escondida
+const visibilidadeInicial = () => {
+  visivelEnviado = true
+  anunciarVisibilidade()
+}
+
 function comecarTimers() {
   pararTimers()
+  visibilidadeInicial()
   const listar = () => telaAberta && estado().fase === 'navegando' && enviar({ t: 'listar' })
   listar()
   timerListar = setInterval(listar, LISTAR_MS)
@@ -654,19 +672,23 @@ export const limparRevanche = () => mudar({ revanche: null })
 
 // ---------- XP ----------
 
-// fim da partida PVP: o que este PC viu; true se mandou agora (uma vez por partidaId)
-export function enviarResultado({ partidaId, vencedorLado, rodadas, duracao, personagem }) {
+// fim da partida: o que este PC viu; true se mandou agora (uma vez por partidaId).
+//   PVP:    { partidaId, vencedorLado: 0 | 1 | null, rodadas, duracao, personagem }
+//   CO-OP:  { partidaId, vitoria: true | false (o time venceu o chefe), rodadas, duracao, personagem }
+export function enviarResultado({ partidaId, vencedorLado, vitoria, rodadas, duracao, personagem }) {
   if (typeof partidaId !== 'string' || !partidaId || relatadas.has(partidaId)) return false
+  const resultado = typeof vitoria === 'boolean' ? { vitoria } : { vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null }
+  const relato = { partidaId, ...resultado, rodadas, duracao, personagem }
   if (ws?.readyState !== WebSocket.OPEN) {
     // caiu e está voltando (2D): o relato sai na volta, uma vez só
     if (!estado().religando) return false
     relatadas.add(partidaId)
-    relatoPendente = { partidaId, vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null, rodadas, duracao, personagem }
+    relatoPendente = relato
     return true
   }
   relatadas.add(partidaId)
   if (relatadas.size > 200) relatadas.delete(relatadas.values().next().value)
-  enviar({ t: 'resultado', partidaId, vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null, rodadas, duracao, personagem })
+  enviar({ t: 'resultado', ...relato })
   return true
 }
 export const jaRelatou = (partidaId) => relatadas.has(partidaId)

@@ -118,6 +118,18 @@ Convidado joga normalmente, só não tem amigos.
   contagem e vale **60 s**; ao aceitar, entra na sala e o host escolhe PVP ou
   CO-OP para dois. Limites: 5 convites por minuto por pessoa e 1 pendente por
   amigo. Só dá para aceitar num menu ou no lobby, nunca no meio de uma partida.
+- **Bloquear quem está na sua sala** (Fase 2F): na sala, **fora de partida**, quem
+  não é o host sai: bloqueou o convidado, ele é tirado; o convidado bloqueou o
+  host, é ele quem sai. Os dois recebem o mesmo aviso ("há um bloqueio entre os
+  jogadores"), sem dizer quem bloqueou. **No meio da partida** nada muda: vale
+  quando o host volta ao lobby. Também não dá para entrar (pelo código) numa sala
+  com alguém bloqueado em qualquer direção, e a revanche da casual fecha a sala.
+- **Host com a aba escondida** (Fase 2F): a casual já desiste em 15 s se o host não
+  começa. Na sala de amigos, o cliente avisa o servidor (`visivel`) quando a aba
+  vai para segundo plano; depois de ~4 s o convidado que já está pronto vê "o
+  host está com o jogo em segundo plano" no lobby. Se o convidado ficou pronto
+  enquanto o host estava fora, ao voltar o host ganha o aviso "TODOS ESTÃO
+  PRONTOS" (a partida nunca começa sozinha numa sala de amigos).
 - **Link**: **copiar link da sala** gera `https://<site>/?sala=CODIGO`. Quem
   abre (mesmo sem conta) vai direto para a tela ONLINE e entra na sala; o
   código de 5 letras continua valendo.
@@ -196,10 +208,10 @@ oferta da CPU, entre só com uma e espere 30 s.
 ## XP, níveis e Coleção (Fase 1D)
 
 Quem joga **PVP online com conta** (Jogar Rápido ou sala de amigos) ganha XP no
-fim da partida, sobe de nível e libera cosméticos. Convidado joga igual, mas não
-ganha nada ("convidado: crie uma conta para ganhar XP"). CPU e PVP local (dois
-no mesmo PC) não dão XP. CO-OP ainda não dá XP (fica para depois, com as mesmas
-regras).
+fim da partida, sobe de nível e libera cosméticos. O **CO-OP de 2 jogadores em
+sala** também dá XP (Fase 2F, seção abaixo). Convidado joga igual, mas não
+ganha nada ("convidado: crie uma conta para ganhar XP"). CPU e PVP/CO-OP local
+(dois no mesmo PC) não dão XP.
 
 **O navegador nunca grava XP, nível nem itens.** O caminho é sempre:
 
@@ -255,12 +267,41 @@ pelo **relógio do servidor** (do começo até esse fim), nunca a do cliente.
 | bônus de vitória (só com resultado confirmado) | **+20 XP** |
 | duração mínima (relógio do servidor) | **60 s**, e pelo menos **2 rodadas** quando o resultado diz |
 | contra o mesmo oponente no mesmo dia (fuso de São Paulo) | as **3** primeiras valem tudo, a 4ª e a 5ª valem **metade**, depois **0** até o dia seguinte |
-| convidado do outro lado | todos os convidados contam como **um só** oponente para esse limite |
+| convidado do outro lado | cada **conexão** de convidado é um oponente diferente no limite (Fase 2F); os convidados do **mesmo endereço (IP) da conta** (a aba anônima dela, ou a mesma casa/escola) continuam contando como um só. Teto de **10** partidas com XP por dia contra convidados, todos somados |
 | a mesma conta dos dois lados (duas abas) | **0** |
 
 Salas de amigos contam como a casual, com os mesmos limites. Os números moram
-nas funções de constante de `supabase/migrations/0003_progresso.sql`;
+nas funções de constante de `supabase/migrations/0003_progresso.sql` (e
+`convidados_limite_dia()` na `0005_pendencias.sql`);
 `src/lib/progresso.js` é o espelho em JS (um teste confere os dois e esta tabela).
+
+### XP no CO-OP online (Fase 2F)
+
+O CO-OP de **2 jogadores numa sala** (amigos ou LAN) segue o mesmo caminho do PVP
+(`server/partidas.js`): o servidor registra a partida quando o host começa (`modo:
+'coop'`), os dois PCs mandam `resultado {partidaId, vitoria, rodadas, duracao,
+personagem}` **uma vez** (`vitoria` = o time derrotou o chefe; `rodadas` = turnos
+da luta) e o banco concede. As telas **Vitoria** e **GameOver** mandam o resultado
+e mostram uma faixa de XP (barra, subiu de nível, item novo) com o mesmo prazo de
+~5 s do PVP (depois, "XP a caminho": aparece no perfil). Sem sala (CO-OP local ou
+com a CPU) não manda nada e não dá XP.
+
+| Situação | Resultado |
+| --- | --- |
+| os dois relatam e concordam | **validada**: vitória do time = participação + bônus **para os dois**; derrota do time = participação para os dois |
+| os dois relatam e discordam | **contestada**: só participação para os dois |
+| só um relata e o parceiro continua na sala | **contestada**: quem relatou fica com a participação; o outro, nada |
+| só um relata e o parceiro saiu **antes** do relato | **validada** pelo relato de quem ficou; quem saiu, nada |
+| ninguém relatou e um saiu / o host caiu / o prazo acabou | **encerrada**, sem XP (diferente do PVP: no CO-OP quem ficou não "vence" ninguém, a luta não acabou) |
+| mesma conta nos dois lados · convidado de parceiro | 0 (a conta ganha normalmente com um convidado de parceiro) |
+
+**Números:** os mesmos do PVP, sem constante nova: **40** de participação +
+**20** se o time venceu (a derrota paga só os 40), duração mínima **60 s** e pelo
+menos **2** rodadas, medidas pelo servidor. O **parceiro** faz o papel do
+"oponente" no limite diário (3 partidas cheias, 2 pela metade, depois 0 com o
+**mesmo** parceiro no dia), e a contagem é **separada por modo**: CO-OP com a Ana
+não gasta o limite do PVP com a Ana (`conceder_recompensa`, migration 0005; o
+PVP continua exatamente como antes).
 
 ### Curva de níveis
 
@@ -296,25 +337,31 @@ verso Dourado (12), avatar Jevil (13), título Cartomante (14), moldura Arco-ír
 No perfil: **Coleção…** lista tudo (o que tem e o que falta, com o nível) e
 equipa título, moldura, verso e avatar (`equipar(tipo, item)`: o banco confere
 se a conta tem o item). O título aparece no perfil e a moldura em volta do
-avatar. O verso por enquanto só aparece na Coleção (aplicar nas cartas da
-partida precisa mandar o verso do oponente pela rede: fica para a consolidação).
-Cosmético nunca muda nada no jogo.
+avatar. O **verso equipado aparece nas cartas das partidas** (Fase 2F): o
+servidor manda o id do verso de cada jogador no membro da sala
+(`conta.verso`) e o cliente o troca pela cor do catálogo (`src/game/pvp/versos.js`,
+opção `corVerso` da `Carta`/`Mao`): em rede cada um vê o seu verso nas cartas
+do seu lado e o do outro nas dele; id desconhecido ou o verso Clássico ficam
+com o verso de sempre (a cor do personagem). Em partida local o P1 usa o de quem
+está logado. Cosmético nunca muda nada no jogo.
 
 ### Protocolo (versão 5)
 
 | Sentido | Mensagem |
 | --- | --- |
-| cliente → servidor | `resultado {partidaId, vencedorLado: 0\|1\|null, rodadas, duracao, personagem}` |
+| cliente → servidor | `resultado {partidaId, vencedorLado: 0\|1\|null, rodadas, duracao, personagem}` (PVP) · `resultado {partidaId, vitoria: true\|false, rodadas, duracao, personagem}` (CO-OP) |
+| cliente → servidor | `visivel {valor: false\|true}` (a aba foi para segundo plano / voltou; Fase 2F) |
 | servidor → cliente | `recompensa {partidaId, xpGanho, xpTotal?, nivelAntes?, nivelDepois?, itensNovos?, motivo}` |
 
-`sala {...}` ganhou `partidaId`. `motivo` é um código (`vitoria`, `derrota`,
+`sala {...}` ganhou `partidaId`; cada membro ganhou `conta.verso` (id do verso equipado ou `null`) e
+`segundoPlano` (a aba dele está escondida há mais de ~4 s). `motivo` é um código (`vitoria`, `derrota`,
 `empate`, `contestada`, `participacao`, `abandono`, `sem_relato`, `curta`,
 `repeticao`, `repeticao_metade`, `convidado`, `mesma_conta`, `host_caiu`, `nao_registrada`,
 `indisponivel`, `erro`); o texto para o jogador está em `src/lib/progresso.js`.
 
 ### Testar com duas contas
 
-Precisa da migration 0003 (docs/supabase.md). `npm run online` (ou `ONLINE=1
+Precisa das migrations 0003 e 0005 (docs/supabase.md). `npm run online` (ou `ONLINE=1
 npm run dev`), duas janelas com **contas Google diferentes** (uma normal, outra
 anônima ou outro navegador), ONLINE → JOGAR RÁPIDO nas duas e joguem uma partida
 inteira (mais de 60 s). No fim, o painel mostra +60 (quem venceu) e +40.
@@ -376,7 +423,7 @@ o aviso de desligamento (SIGTERM/SIGINT). Janela sem nada não escreve.
 | `reconexoes` | a **mesma conta** voltando em até 2 min depois de cair (a memória do "quando caiu" some em 2 min) |
 | `fila_entradas`, `fila_pares`, `fila_pares_desfeitos` | entradas na fila, pares formados, pares que não fecharam |
 | `fila_espera_ms` | n, p50, p90 e máximo do tempo esperado até achar par (uma amostra por jogador pareado) |
-| `partidas_iniciadas`, `partidas_finalizadas`, `partidas_abandonadas`, `partidas_contestadas` | PVP online registradas (revanche abre outra); abandonada = alguém saiu no meio |
+| `partidas_iniciadas`, `partidas_finalizadas`, `partidas_abandonadas`, `partidas_contestadas` | PVP e CO-OP online registradas (revanche abre outra); abandonada = alguém saiu no meio |
 | `partidas_quedas`, `partidas_retomadas` | alguém caiu no meio da partida (a vaga ficou guardada) e voltou a tempo (Fase 2D) |
 | `revanches_pedidas`, `revanches_aceitas` | pedidos e aceites duplos |
 | `avatar_envios_ok`, `avatar_envios_falha`, `avatar_bloqueios_ip` | fotos que subiram, falharam (imagem ruim, Storage) e pedidos barrados pelo limite por endereço |

@@ -29,7 +29,7 @@ import { fogoArtificio, canhoesConfete, chuvaConfete } from '../effects/festa.js
 import { anunciarSuper } from '../pvp/super/anuncio.js'
 import FimDePartida from '../pvp/fimDePartida/index.js'
 import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe } from '../../lib/saida.js'
-import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
+import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos } from '../rede.js'
 import ArenaRede from '../pvp/rede/ArenaRede.js'
 import { fatores } from '../acessibilidade.js'
 
@@ -272,9 +272,10 @@ export default class PvpArena extends Phaser.Scene {
     this.criarPistas()
     this.huds = [0, 1].map((j) => new HudPvp(this, { jogador: j, personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, rotulo: this.rotulo(j) }))
     this.criarTopo()
+    this.versos = coresDosVersos() // verso de carta equipado de cada lado (Fase 2F; em rede o de cada jogador)
     this.montes = [0, 1].map((j) => this.criarMonte(j))
     this.maos = [0, 1].map(
-      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: LARGURA_MAO, espacamento: 40, profundidade: 20 }),
+      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: LARGURA_MAO, espacamento: 40, profundidade: 20, corVerso: this.versos[j] }),
     )
     this.botoesPassar = [0, 1].map((j) => this.criarBotaoPassar(j))
     this.criarTextos()
@@ -394,7 +395,7 @@ export default class PvpArena extends Phaser.Scene {
   criarMonte(j) {
     const { x, y } = MAOS[j].monte
     const cartas = [0, 1, 2].map((k) =>
-      new Carta(this, x - k * 1.2, y - k * 1.8, { personagem: this.ids[j], naipe: 'espadas', valor: 2 }, { virada: true, largura: 46 }).setDepth(5 + k).setRotation(j ? 0.08 : -0.08),
+      new Carta(this, x - k * 1.2, y - k * 1.8, { personagem: this.ids[j], naipe: 'espadas', valor: 2 }, { virada: true, largura: 46, corVerso: this.versos[j] }).setDepth(5 + k).setRotation(j ? 0.08 : -0.08),
     )
     const texto = this.add
       .text(x, y + 40, '', { fontFamily: FONTE, fontSize: '10px', color: TEXTO.desabilitado, stroke: '#000000', strokeThickness: 3 })

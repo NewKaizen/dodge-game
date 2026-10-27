@@ -88,9 +88,15 @@ mesma lista no servidor do lobby (`server/lan.js`): o que cai nela aparece como
 `JOGADOR` para os outros (na sala e no Jogar Rápido), e trocar para um nome assim
 é recusado.
 
-Limites conhecidos: o filtro só roda quando a pessoa **muda** o nome; o nome
-inicial vem do Google e não passa por ele (a denúncia cobre). Não pega
-"f d p" com espaços, nem variações criativas.
+O **nome inicial vindo do Google** também passa pelo filtro (Fase 2F, migration
+0005): `criar_perfil` troca um nome da lista por `JOGADOR` (e a tag nasce do nome
+já filtrado, nunca da palavra); os perfis que já existiam com nome da lista foram
+trocados por `JOGADOR` ao rodar a 0005. O servidor repete o filtro no nome que lê
+do perfil (`nomeSeguro`, `src/lib/contaRegras.js`), e `nomeInicialDoGoogle` é o
+espelho em JS do SQL (conferido em `pendenciasSql.test.js`).
+
+Limites conhecidos: não pega "f d p" com espaços, nem variações criativas (a
+denúncia cobre).
 
 ## O que a revisão NÃO faz (Fase 1)
 

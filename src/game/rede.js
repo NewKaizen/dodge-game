@@ -3,6 +3,8 @@ import { lan, iniciarPartida, sairSala } from '../lib/lan/rede.js'
 import { enviarRapido as enviarTransporte, enviarPeloServidor, aoRapido } from '../lib/lan/transmissao.js'
 import { criarCanal } from '../lib/lan/canal.js'
 import { interceptarBotao } from './controles.js'
+import { conta } from '../lib/conta.js'
+import { coresDosVersosDaPartida } from './pvp/versos.js'
 
 // Partida EM REDE (docs/rede-pvp.md): numa sala (LAN ou ONLINE) o PVP e o
 // CO-OP rodam no PC de cada um; só as decisões viajam, pelo canal
@@ -15,6 +17,7 @@ import { interceptarBotao } from './controles.js'
 //   emRede()                    true com a partida em rede rodando (os dois na sala)
 //   meuLado()                   0 (host = P1) ou 1 (convidado = P2)
 //   souHostDaRede()             o host é quem decide (sorteios, resultado da rodada)
+//   coresDosVersos()            [cor do verso de carta do lado 0, do lado 1] (null = verso padrão)
 //   irParaCena(cena, chave, dados)  (host) troca de cena aqui e no convidado;
 //                               'Lan' encerra a partida em rede (os dois voltam ao lobby)
 //   podeEntrarEmSala()          true se o jogador está num menu (não no meio de uma
@@ -68,6 +71,8 @@ const naSalaComParceiro = (s) => s.fase === 'sala' && (s.sala?.membros.length ??
 export const emRede = () => ativa && naSalaComParceiro(get(lan))
 export const meuLado = () => (get(lan).papel === 'host' ? 0 : 1)
 export const souHostDaRede = () => get(lan).papel === 'host'
+// verso equipado de cada lado (0 = host/P1): em rede o de cada jogador, fora dela o de quem está logado (pvp/versos.js)
+export const coresDosVersos = () => coresDosVersosDaPartida({ sala: emRede() ? get(lan).sala : null, perfil: get(conta).perfil })
 
 function ativar(sim) {
   ativa = sim

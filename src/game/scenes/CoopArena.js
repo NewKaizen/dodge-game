@@ -38,7 +38,7 @@ import { QUADRO, inicioDoCoracao } from '../coop/quadro.js'
 import { escolherJogadaCoop } from '../coop/bot.js'
 import { superNoChefe } from '../coop/superNoChefe.js'
 import ArenaRedeCoop from '../coop/ArenaRedeCoop.js'
-import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
+import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos } from '../rede.js'
 import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
@@ -231,7 +231,7 @@ export default class CoopArena extends PvpArena {
     else if (!this.rede) this.textoTreino.setText('')
     this.montes = [0, 1].map((j) => this.criarMonte(j))
     this.maos = [0, 1].map(
-      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: 150, espacamento: 40, profundidade: 20 }),
+      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: 150, espacamento: 40, profundidade: 20, corVerso: coresDosVersos()[j] }),
     )
     this.botoesPassar = [0, 1].map((j) => this.criarBotaoPassar(j))
     this.criarTextos()

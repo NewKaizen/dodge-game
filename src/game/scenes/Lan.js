@@ -558,9 +558,13 @@ export default class Lan extends Phaser.Scene {
       t(x + largura - 14, y + 84, m.papel === 'host' ? 'ESCOLHE O MODO' : pronto ? 'PRONTO!' : 'ESPERANDO…', 12, pronto ? COR.ok : '#ffb040').setOrigin(1, 0.5)
     })
 
+    // o host largou a aba do jogo (em segundo plano há uns segundos) com o convidado esperando
+    const hostSumido = !host && vagas[0]?.segundoPlano && vagas[1]?.pronto && !sala.emPartida
+    if (hostSumido) t(LARGURA / 2, 216, 'o host está com o jogo em segundo plano', 12, '#ffb040', { strokeThickness: 0 }).setOrigin(0.5)
+
     // a ligação entre os dois PCs (a que vale na partida)
     const p = this.pingPartida
-    if (vagas[1] && p?.ms != null)
+    if (vagas[1] && p?.ms != null && !hostSumido)
       t(LARGURA / 2, 216, `ping entre vocês: ${p.ms} ms (${ROTAS[p.rota]})`, 12, corDoPing(p.ms), { strokeThickness: 0 }).setOrigin(0.5)
 
     // ações (esquerda)

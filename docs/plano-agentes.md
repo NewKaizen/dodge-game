@@ -93,15 +93,15 @@ Decisão do usuário: primeiro as features, depois organizar tudo. Itens anotado
 
 - ~~Trazer perfil, amigos e conta **para dentro do jogo** (cenas/visual da Mesa de Cartas), em vez das barras/overlays Svelte "fora do jogo".~~ Feito na 2A (a foto continua em Svelte: seletor de arquivo e recorte).
 - ~~Toast de aviso quando chega pedido de amizade (hoje só selo no botão).~~ Feito na 2A (`src/game/conta/avisos.js`).
-- Decidir se bloquear tira o bloqueado da sala atual (hoje não tira).
+- ~~Decidir se bloquear tira o bloqueado da sala atual (hoje não tira).~~ Feito na 2F (fora de partida, quem não é o host sai; no meio da partida vale depois).
 - ~~JOGAR RÁPIDO no menu principal (hoje só na tela ONLINE; a arte da Mesa tem 5 vagas).~~ Feito na 2A (7 linhas no espaço escuro da Mesa, sem mexer na arte).
 - ~~Avisar quando convidar um amigo tira você da fila (hoje é silencioso).~~ Feito na 2A (aviso ao aceitar um convite estando na fila).
-- Partida casual não começa se a aba do host estiver em segundo plano.
+- ~~Partida casual não começa se a aba do host estiver em segundo plano.~~ Casual já desiste em 15 s; salas de amigos: feito na 2F (aviso ao convidado e ao host).
 - ~~Aviso de XP para quem fica quando o oponente abandona (hoje só aparece no perfil).~~ Feito na 2A (toast "+XP").
-- Aplicar o verso de carta equipado nas partidas (hoje só na Coleção; precisa ir pela rede).
-- Rever o limite que conta todos os convidados como um único oponente.
-- XP no CO-OP.
-- Filtro de nomes também no nome inicial vindo do Google (hoje só ao trocar o nome).
+- ~~Aplicar o verso de carta equipado nas partidas (hoje só na Coleção; precisa ir pela rede).~~ Feito na 2F.
+- ~~Rever o limite que conta todos os convidados como um único oponente.~~ Feito na 2F (por conexão; mesmo IP da conta = um só).
+- ~~XP no CO-OP.~~ Feito na 2F (migration 0005).
+- ~~Filtro de nomes também no nome inicial vindo do Google (hoje só ao trocar o nome).~~ Feito na 2F (migration 0005).
 - (2E) Auditar cenas reaproveitadas pelo Phaser que guardam estado da partida anterior (o mesmo vício que travava o PvpResultado).
 
 ### Controle de custo
