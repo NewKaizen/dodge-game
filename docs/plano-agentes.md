@@ -103,6 +103,7 @@ Decisão do usuário: primeiro as features, depois organizar tudo. Itens anotado
 - ~~XP no CO-OP.~~ Feito na 2F (migration 0005).
 - ~~Filtro de nomes também no nome inicial vindo do Google (hoje só ao trocar o nome).~~ Feito na 2F (migration 0005).
 - ~~(2E) Auditar cenas reaproveitadas pelo Phaser que guardam estado da partida anterior (o mesmo vício que travava o PvpResultado).~~ Feito na 2E: 13 cenas ganharam `estadoInicial()` + `Object.assign` no começo do `init`/`create`, a Pausa remove o ouvinte de `resume`, e `src/game/__tests__/cenasReaproveitadas.test.js` varre todas as cenas de `config.js` (campos e ouvintes). Pendente da 2F: `Vitoria` e `GameOver` (o teste só avisa).
+- **Decisão (27/10):** no PVP 1x1 e no CO-OP de 2, quem cai da conexão faz a rodada recomeçar do início (2D) — dá para "rebobinar" uma rodada ruim derrubando a conexão. O usuário decidiu **deixar como está** por enquanto; as quedas já entram nas métricas (`reconexoes`) e na eleição do host. Rever se virar abuso (opções: quem caiu perde a rodada / volta caído). No CO-OP 3–4 quem cai **volta caído** (5B).
 
 ### Controle de custo
 
