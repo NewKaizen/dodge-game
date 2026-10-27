@@ -533,36 +533,40 @@ export default class PvpArena extends Phaser.Scene {
   }
 
   async partida() {
+    // a cena aberta de novo (retomada da 2D: o Phaser reaproveita o `this`) zera o
+    // saindo; a partida da abertura anterior para aqui, e não na rodada nova
+    const vez = (this.vezPartida = (this.vezPartida ?? 0) + 1)
+    const fora = () => this.saindo || this.vezPartida !== vez
     if (!this.retomada) await this.abertura()
-    while (!this.saindo) {
+    while (!fora()) {
       await this.inicioDaRodada()
-      if (this.saindo) return
+      if (fora()) return
       const jogadas = await this.escolha()
-      if (this.saindo) return
+      if (fora()) return
       // bonus round: o evento só é sorteado agora, com as cartas já escolhidas
       // (em rede o host decide tudo e o convidado recebe)
       const decisao = await this.decidirRodada(jogadas)
-      if (this.saindo || !decisao) return
+      if (fora() || !decisao) return
       await this.anunciarBonusDaRodada(decisao)
-      if (this.saindo) return
+      if (fora()) return
       const resultado = decisao.resultado
       this.contarJogadas(resultado)
       if (resultado.duelo || resultado.copia) {
         await this.revelacaoDuelo(resultado)
-        if (this.saindo) return
+        if (fora()) return
         await this.rodarDuelo(resultado)
       } else {
         await this.revelacao(resultado)
-        if (this.saindo) return
+        if (fora()) return
         await this.anunciarSupers(resultado)
-        if (this.saindo) return
+        if (fora()) return
         await this.arremesso(resultado)
-        if (this.saindo) return
+        if (fora()) return
         await this.esquiva(resultado)
       }
-      if (this.saindo) return
+      if (fora()) return
       const vencedor = await this.terminarRodada()
-      if (this.saindo) return
+      if (fora()) return
       if (vencedor) return this.resultado(vencedor)
     }
   }

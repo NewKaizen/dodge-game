@@ -419,29 +419,33 @@ export default class CoopArena extends PvpArena {
   }
 
   async partida() {
+    // a cena aberta de novo (retomada da 2D: o Phaser reaproveita o `this`) zera o
+    // saindo; a partida da abertura anterior para aqui, e não na rodada nova
+    const vez = (this.vezPartida = (this.vezPartida ?? 0) + 1)
+    const fora = () => this.saindo || this.vezPartida !== vez
     if (this.retomada) this.mostrarFaseRetomada()
     else await this.abertura()
-    while (!this.saindo) {
+    while (!fora()) {
       await this.inicioDaRodada()
-      if (this.saindo) return
+      if (fora()) return
       const jogadas = await this.escolha()
-      if (this.saindo) return
+      if (fora()) return
       const r = await this.decidirRodadaCoop(jogadas)
-      if (this.saindo || !r) return
+      if (fora() || !r) return
       this.rodadaAtual = r
       this.contarJogadas(r)
       await this.revelacao(r)
-      if (this.saindo) return
+      if (fora()) return
       await this.anunciarSupers(r)
-      if (this.saindo) return
+      if (fora()) return
       await this.arremesso(r)
-      if (this.saindo) return
+      if (fora()) return
       await this.esquiva(r)
-      if (this.saindo) return
+      if (fora()) return
       await this.contraAtaque(r)
-      if (this.saindo) return
+      if (fora()) return
       const vencedor = await this.terminarRodada()
-      if (this.saindo) return
+      if (fora()) return
       if (vencedor) return this.resultado(vencedor)
     }
   }

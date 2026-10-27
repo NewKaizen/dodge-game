@@ -80,6 +80,7 @@ export default class ArenaRede {
   }
 
   destruir() {
+    this.destruido = true // as esperas desta ponte param (a cena aberta de novo tem outra)
     this.desligar.forEach((fn) => fn())
     this.desligar = []
     this.pendentes = []
@@ -95,7 +96,7 @@ export default class ArenaRede {
   async esperar(tipo, chave) {
     const inicio = Date.now()
     let aviso = inicio + ESPERA_AVISO_MS
-    while (!this.arena.saindo) {
+    while (!this.arena.saindo && !this.destruido) {
       const dados = await this.canal.receber(tipo, chave, { timeoutMs: ESPERA_PEDACO_MS })
       if (dados) return dados
       if (Date.now() >= aviso) {
@@ -405,10 +406,10 @@ export default class ArenaRede {
       return false
     }
     const fim = Date.now() + ESPERA_RESULTADO_MS
-    while (!this.arena.saindo && Date.now() < fim) {
+    while (!this.arena.saindo && !this.destruido && Date.now() < fim) {
       if (await this.canal.receber('resultadoPronto', rodada, { timeoutMs: ESPERA_PEDACO_MS })) break
     }
-    return !this.arena.saindo
+    return !this.arena.saindo && !this.destruido
   }
 
   // opções do Duelo/Copia (contrato com a parte C em docs/rede-pvp.md)
