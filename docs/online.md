@@ -133,7 +133,7 @@ Convidado joga normalmente, só não tem amigos.
 - **Link**: **copiar link da sala** gera `https://<site>/?sala=CODIGO`. Quem
   abre (mesmo sem conta) vai direto para a tela ONLINE e entra na sala; o
   código de 5 letras continua valendo.
-- **Protocolo**: o lobby subiu para a versão 3 (hoje 7: a fila do Jogar Rápido, o XP e a recuperação de conexão da 2D) (`PROTOCOLO` em `server/lan.js`
+- **Protocolo**: o lobby subiu para a versão 3 (hoje 8: a fila do Jogar Rápido, o XP, a recuperação de conexão da 2D e as salas de N da 5A) (`PROTOCOLO` em `server/lan.js`
   e `src/lib/lan/rede.js`): atualize os dois PCs. Mensagens novas: `convidar`,
   `responderConvite`, `amigosMudaram` (cliente) e `presencas`, `presenca`,
   `convite`, `conviteEnviado`, `conviteResposta`, `conviteFim`, `conviteNegado`,
@@ -198,7 +198,7 @@ conta e para convidado (convidado joga, mas a partida não dá XP: aviso na tela
 
 A sala ganhou `casual` no `sala {...}` e o `fechada` da sala casual vem com
 `casual: true`. `PROTOCOLO` subiu para **4** (`server/lan.js` e
-`src/lib/lan/rede.js`; hoje **7**, com o XP e a recuperação de conexão): atualize os dois PCs.
+`src/lib/lan/rede.js`; hoje **8**, com o XP, a recuperação de conexão e as salas de N): atualize os dois PCs.
 
 ### Testar com duas janelas
 
@@ -255,6 +255,7 @@ pelo **relógio do servidor** (do começo até esse fim), nunca a do cliente.
   ligar e desligar a partida sem parar não enche o banco (a partida segue, sem XP).
 - Quem saiu da sala sem ter relatado não relata mais depois (nem pela mesma
   conexão nem por outra aba da conta): conta como abandono.
+- Partidas de 3 e 4 (Fase 5A): ver [Partidas de N](#partidas-de-n-fase-5a), abaixo.
 - Relato repetido não muda nada; relato atrasado (depois da decisão) recebe a
   resposta que já existe. Reconectar com a mesma conta recebe a recompensa no
   cliente novo. Nada disso concede duas vezes: o banco tem `UNIQUE (partida_id,
@@ -345,6 +346,28 @@ opção `corVerso` da `Carta`/`Mao`): em rede cada um vê o seu verso nas cartas
 do seu lado e o do outro nas dele; id desconhecido ou o verso Clássico ficam
 com o verso de sempre (a cor do personagem). Em partida local o P1 usa o de quem
 está logado. Cosmético nunca muda nada no jogo.
+
+### Partidas de N (Fase 5A)
+
+A base dos modos de 3–4 (`server/partidas.js`; ainda **sem XP**: só `pvp` e `coop`
+estão em `MODOS_COM_XP`, cada sub-fase liga o seu modo quando ele existir). O lado de
+cada um é a **vaga** da sala (0..3); o host da partida pode ser qualquer vaga
+(`hostLado`). Cada cliente relata o desfecho inteiro:
+
+| Modo | Relato | Resultado de cada lado |
+| --- | --- | --- |
+| `coop4` | `{ vitoria }` | o time inteiro: vitória ou derrota |
+| `ffa` | `{ colocacoes: [lado, ...] }` (do 1º ao último, todos os lados, sem repetir) | 1º = vitória, o resto derrota; a colocação vai para o banco |
+| `2x2` | `{ vencedorTime: 0 \| 1 \| null }` (time = vaga % 2: 0 e 2 contra 1 e 3) | o time vencedor vitória, o outro derrota; `null` = empate |
+
+**Política (o host decide, conferido pela maioria):** vale o desfecho do **host da
+partida** se pelo menos **metade** de quem relatou concorda com ele (o host desempata);
+sem relato do host, vale o que **mais da metade** relatou. Nos dois casos são precisos
+**2 relatos iguais**; senão, **contestada** (quem relatou: só participação). Um relato
+só vale se todos os outros já tinham saído antes dele. Quem saiu antes do primeiro
+relato: abandono (nada); quem ficou e não relatou: `sem_relato`. Ninguém relatou:
+encerrada (`host_caiu` se o host caiu; com 3 ou mais não há "vitória por abandono").
+O XP é o de sempre (participação + bônus de vitória, migration 0006).
 
 ### Protocolo (versão 5)
 
