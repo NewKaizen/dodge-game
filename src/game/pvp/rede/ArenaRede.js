@@ -90,6 +90,18 @@ export default class ArenaRede {
     this.pendentes = []
   }
 
+  // tudo que esta ponte manda passa por aqui: a ponte destruída (a cena reabriu
+  // na retomada da 2D) não manda mais nada. Sem isso a esquiva da abertura velha,
+  // solta quando o quadro dela foi destruído, mandava um fimEsquiva na sessão
+  // nova e a rodada nova do outro acabava antes da hora
+  enviar(tipo, chave, dados) {
+    if (!this.destruido) this.canal.enviar(tipo, chave, dados)
+  }
+
+  enviarRapido(tipo, dados) {
+    if (!this.destruido) this.canal.enviarRapido(tipo, dados)
+  }
+
   get rodada() {
     return this.arena.estado.rodada
   }
@@ -156,7 +168,7 @@ export default class ArenaRede {
     if (this.souHost) {
       this.guardarPonto()
       a.comecarRodada()
-      this.canal.enviar('inicio', a.estado.rodada, { estado: copiar(a.estado), bonusPendente: a.bonusPendente })
+      this.enviar('inicio', a.estado.rodada, { estado: copiar(a.estado), bonusPendente: a.bonusPendente })
       return true
     }
     const rodada = a.estado.rodada + 1
@@ -197,7 +209,7 @@ export default class ArenaRede {
   }
 
   enviarJogada(id) {
-    this.canal.enviar('jogada', this.rodada, { jogada: id ?? null })
+    this.enviar('jogada', this.rodada, { jogada: id ?? null })
   }
 
   // cursor da MINHA mão (só manda quando muda)
@@ -210,7 +222,7 @@ export default class ArenaRede {
     const ultimo = this.ultimoCursor
     if (ultimo && ultimo.indice === indice && ultimo.passar === passar && ultimo.r === this.rodada) return
     this.ultimoCursor = { indice, passar, r: this.rodada }
-    this.canal.enviarRapido('cursor', { tela: 'arena', indice, passar, r: this.rodada })
+    this.enviarRapido('cursor', { tela: 'arena', indice, passar, r: this.rodada })
   }
 
   aoCursor(d) {
@@ -235,7 +247,7 @@ export default class ArenaRede {
 
   enviarResolucao(jogadas, decisao) {
     const { bonus, adiado, resultado } = decisao
-    this.canal.enviar('resolucao', this.rodada, { jogadas, bonus, adiado, resultado, estado: copiar(this.arena.estado) })
+    this.enviar('resolucao', this.rodada, { jogadas, bonus, adiado, resultado, estado: copiar(this.arena.estado) })
   }
 
   // Convidado: o que o host resolveu (evento, malucas, resultado) e o estado depois
@@ -270,11 +282,11 @@ export default class ArenaRede {
   }
 
   enviarDano(j, dano) {
-    this.canal.enviar('dano', null, { lado: j, dano, r: this.rodada })
+    this.enviar('dano', null, { lado: j, dano, r: this.rodada })
   }
 
   enviarGraze(j) {
-    this.canal.enviar('graze', null, { lado: j, n: 1, r: this.rodada })
+    this.enviar('graze', null, { lado: j, n: 1, r: this.rodada })
   }
 
   aoEventoDoOutro(tipo, dados) {
@@ -320,9 +332,10 @@ export default class ArenaRede {
   }
 
   async avisarFim(rodada) {
+    if (this.destruido) return PARADA
     const a = this.arena
     this.fimEnviado = true
-    this.canal.enviar('fimEsquiva', rodada, { acertos: a.acertosRodada[this.meuLado], ko: Boolean(a.ko[this.meuLado]) })
+    this.enviar('fimEsquiva', rodada, { acertos: a.acertosRodada[this.meuLado], ko: Boolean(a.ko[this.meuLado]) })
     const dele = await this.esperar('fimEsquiva', rodada)
     if (dele && (dele.acertos !== a.acertosRodada[this.outroLado] || Boolean(dele.ko) !== Boolean(a.ko[this.outroLado])))
       console.warn('[rede] acertos do outro divergiram', { rodada, dele, aqui: { acertos: a.acertosRodada[this.outroLado], ko: a.ko[this.outroLado] } })
@@ -354,7 +367,7 @@ export default class ArenaRede {
     const meu = a.coracaoDoLado(this.meuLado)
     if (this.envioCoracao < ENVIO_CORACAO_MS || !a.pistas[k]?.aberta || !meu?.ativo) return
     this.envioCoracao = 0
-    this.canal.enviarRapido('coracao', { x: Math.round(meu.x * 10) / 10, y: Math.round(meu.y * 10) / 10, k, r: rodada })
+    this.enviarRapido('coracao', { x: Math.round(meu.x * 10) / 10, y: Math.round(meu.y * 10) / 10, k, r: rodada })
   }
 
   // a pista k tem o coração do outro? (no PvP: a caixa do outro; com CORAÇÃO TROCADO, a minha)
@@ -393,7 +406,7 @@ export default class ArenaRede {
     const rodada = this.rodada
     if (this.souHost) {
       const vencedor = fimDaRodada(a.estado)
-      this.canal.enviar('fimRodada', rodada, { estado: copiar(a.estado), vencedor })
+      this.enviar('fimRodada', rodada, { estado: copiar(a.estado), vencedor })
       return vencedor
     }
     fimDaRodada(a.estado)
@@ -408,7 +421,7 @@ export default class ArenaRede {
   async prontoParaResultado() {
     const rodada = this.rodada
     if (!this.souHost) {
-      this.canal.enviar('resultadoPronto', rodada, {})
+      this.enviar('resultadoPronto', rodada, {})
       return false
     }
     const fim = Date.now() + ESPERA_RESULTADO_MS
@@ -430,7 +443,7 @@ export default class ArenaRede {
   // forcarBonus vale no host (quem decide o bônus)
   espalhar(acao, args) {
     if (this.aplicandoDebug || !this.debugPermitido.has(acao)) return
-    this.canal.enviar('debug', null, { acao, args })
+    this.enviar('debug', null, { acao, args })
   }
 
   aoDebug({ acao, args } = {}) {

@@ -71,3 +71,20 @@ test('sem retomada nos dados: aplicarRetomada não mexe na arena', () => {
   assert.equal(r.aplicarRetomada(undefined), false)
   assert.equal(a.estado, antes)
 })
+
+test('a ponte destruída (cena reaberta) não manda nada e quem esperava nela fica parado', async () => {
+  const fio = []
+  const c = criarCanal({ enviarBruto: (m) => fio.push(m), meuId: () => 'H' })
+  const a = arenaFalsa(criarPartida({ p1: 'kris', p2: 'susie', semente: 'x' }))
+  a.acertosRodada = [0, 0]
+  a.ko = [false, false]
+  const r = new ArenaRede(a, { canal: c, meuLado: 0, souHost: true })
+  r.destruir()
+  let soltou = false
+  r.avisarFim(1).then(() => (soltou = true))
+  r.esperar('jogada', 1).then(() => (soltou = true))
+  r.enviarDano(0, 3)
+  await new Promise((ok) => setTimeout(ok, 20))
+  assert.deepEqual(fio, [], 'nem fimEsquiva nem dano da abertura velha')
+  assert.equal(soltou, false)
+})
