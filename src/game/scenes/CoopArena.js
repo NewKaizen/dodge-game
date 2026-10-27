@@ -231,9 +231,11 @@ export default class CoopArena extends PvpArena {
     this.criarTopo()
     if (this.cpu !== null) this.textoTreino.setText('COM CPU ALIADA')
     else if (!this.rede) this.textoTreino.setText('')
+    // o monte (criarMonte, da PvpArena) também usa o verso de cada lado: sem isto o CO-OP quebrava ao abrir
+    this.versos = coresDosVersos()
     this.montes = [0, 1].map((j) => this.criarMonte(j))
     this.maos = [0, 1].map(
-      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: 150, espacamento: 40, profundidade: 20, corVerso: coresDosVersos()[j] }),
+      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: 150, espacamento: 40, profundidade: 20, corVerso: this.versos[j] }),
     )
     this.botoesPassar = [0, 1].map((j) => this.criarBotaoPassar(j))
     this.criarTextos()

@@ -298,7 +298,7 @@ test('a partida começando cancela os convites; só o host convida; amigo em par
   beto.mandar({ t: 'responderConvite', id, aceitar: true })
   // o beto (convidado) não convida
   beto.mandar({ t: 'convidar', para: ID.caio })
-  assert.equal(beto.ultima('conviteNegado').msg, 'só o host da sala pode convidar')
+  assert.equal(beto.ultima('conviteNegado').msg, 'só o dono da sala pode convidar')
   // sala cheia
   ana.mandar({ t: 'convidar', para: ID.caio })
   assert.equal(ana.ultima('conviteNegado').msg, 'a sala está cheia')

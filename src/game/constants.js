@@ -21,6 +21,7 @@ export const CORES = {
   painel: 0x0b0914,
   bala: 0xffffff,
   almas: [0xff2030, 0xffd23a], // cor do coração de cada jogador
+  vagasExtra: [0x4da6ff, 0x6dffb0], // P3 e P4 das salas de N (Fase 5A, game/vagas.js)
   hpFundo: 0x5a0a14,
   hpChefe: 0x3cff6a,
   aviso: 0xff3048,

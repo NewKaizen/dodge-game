@@ -140,7 +140,7 @@ export default class Amigos extends CenaConta {
         pendenteAte: a.pendentes[p.id]?.ate ?? 0,
         agora: this.agora,
         sala: s.sala,
-        souHost: s.fase === 'sala' && s.papel === 'host',
+        souHost: s.fase === 'sala' && Boolean(s.sala?.membros.find((m) => m.id === s.eu.id)?.dono), // quem convida é o dono da sala (5A)
       })
       const convidado = (a.pendentes[p.id]?.ate ?? 0) > this.agora
       return [

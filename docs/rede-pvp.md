@@ -153,6 +153,129 @@ Vale para PVP e CO-OP, LAN e ONLINE, enquanto a sala está **em partida** (da es
 
 Testando: `node --test server/__tests__/retomada.test.js` (a máquina de estados do servidor, com relógio falso), `src/lib/__tests__/religar.test.js`, `canal.test.js` (descartar) e `src/game/pvp/__tests__/retomadaArena.test.js` (o ponto e a mesma mão). Com duas abas: no dev, fechar o WebSocket do lobby de uma delas no meio da rodada (ou deixar o navegador offline por uns segundos) mostra o aviso nas duas e, na volta, a rodada recomeça; fora mais de 20 s, a regra do host/convidado acima.
 
+## Salas de N e host da partida (Fase 5A)
+
+A base para os modos de 3 e 4 (CO-OP 3–4, todos contra todos, 2x2). Nenhum modo novo
+ainda: os de 2 (PVP 1x1 e CO-OP de 2) continuam iguais, só passam pelo caminho novo.
+
+**Sala** (`server/lan.js`): o tamanho vem do modo (`MODOS_SALA`: `pvp`/`coop` = 2,
+`coop4` e `ffa` 3–4, `2x2` = 4; os três últimos "em breve": a sala aceita, a partida
+não abre). Cada membro tem uma **vaga** 0..N-1 (o dono é a 0; quem entra pega a menor
+livre). Na partida a vaga não muda (a retomada da 2D volta para a mesma); no lobby, quem
+sai faz as outras descerem (0..n-1 sem buracos: num modo de 2 o convidado é sempre a 1).
+Pronto é por membro; o dono tira qualquer um (←→ no TIRAR); convites e o link enchem as
+vagas livres. O dono não troca para um modo menor que a sala. A fila do JOGAR RÁPIDO
+continua 1x1.
+
+**Dono x host da partida.** O **dono** (quem criou) cuida do lobby: modo, tirar,
+convidar, COMEÇAR, fechar. O **host da partida** (`papel: 'host'`) é a autoridade e o
+centro da estrela. No COMEÇAR o servidor faz a **eleição** (`server/eleicao.js`): manda
+`eleicao {id, ms}` a todos, cada um responde `medicao {id, diretos}` (o RTT das ligações
+diretas abertas e entregando, `transmissao.medidas()`), e em até 1,5 s (ou quando todos
+responderam) decide pelo placar:
+
+- ligação(h, o) = o RTT direto entre os dois (o menor relato) ou, sem direto, o caminho
+  pelo servidor: ping(h) + ping(o) + 15 ms;
+- atraso de cada par na estrela de h (só ida): h–o = ligação/2; a–b = (ligação(h,a) +
+  ligação(h,b))/2 (a → h → b);
+- **pontos(h) = (pior par + média dos pares)/2 + 40 ms × quedas de h nesta sala**.
+
+Fica o dono se faltam medidas para ele, se a sala tem menos de 2 ou se o melhor não ganha
+dele por mais de **30 ms** (trocar o centro custa religar a estrela); empate entre outros,
+a menor vaga. Com 2 jogadores a ligação é a mesma nos dois sentidos: decide a
+estabilidade e, no empate, fica o dono. Quem não tem nenhuma medida (sem ping, sem
+direto) não concorre. Eleito: o servidor marca a partida, a sala mostra
+`eleito {id, nome, motivo}` ("HOST DA PARTIDA: nome" no lobby, "HOST" no cartão) e manda
+`comecar {salaId}` só para ele; o Lan dele faz o "VALENDO!" e `irParaCena` como sempre
+(os outros veem a sala marcada e esperam a cena). O host **não muda** no meio da partida
+nem na revanche (`partida` sem `eleicao` marca na hora, como antes); a próxima partida
+saindo do lobby elege de novo. O host eleito saindo no lobby devolve o centro ao dono;
+saindo (ou não voltando em 20 s) no meio da partida, a sala fecha como na 2D. A casual
+não elege (o host vem da regra do ping da fila).
+
+**Lado e vaga** (`game/rede.js`): `meuIndice()` é a vaga (estável). `meuLado()` continua
+o lado dos modos de 2: 0 no host da partida (P1), 1 no convidado. Com a eleição os dois
+podem ser diferentes (o eleito pode ser a vaga 1): os modos de 2 usam `meuLado`/
+`souHostDaRede`, os de N vão usar `meuIndice` e `participantesDaPartida()` (`{ indice, id,
+nome, conta, cor, host, dono, caiu }`, com a cor da vaga de `game/vagas.js`).
+
+**Transporte em estrela** (`lib/lan/transmissao.js`): o host tem um `RTCPeerConnection`
+por convidado (canal de dados, vigia do canal mudo e ping de cada um); o convidado só tem
+o do host. Sem direto (ou direto mudo) com alguém, as mensagens dele vão pelo servidor,
+que repassa em estrela: do convidado só para o host; do host para todos ou para um
+(`para {dados, a}`). **Um convidado nunca fala com outro**: o host repassa o que for
+preciso. A imagem do antigo "Remote Play" saiu (ninguém mostrava mais nada).
+
+**Canal** (`lib/lan/canal.js`, com `destinos`): uma sessão, numeração e recibos **por
+parceiro**; `enviar` = para todos (uma cópia numerada para cada um), `enviarPara(id, ...)`
+para um, `receber(tipo, chave, { de })`, `ao(tipo, fn(dados, chave, de))`. A rápida igual
+para todos sai uma vez só (`enviarTodos`: o direto de cada um, ou uma mensagem só pelo
+servidor). Um convidado lento ou caído não segura os outros: o reenvio é por parceiro.
+
+**Troca de cena** (`lib/lan/sincCena.js`): `irParaCena` manda `cena {chave, dados, n}`;
+cada convidado responde `cenaOk {n, chave}` ao abrir. O host sabe quem está na cena e quem
+atrasou (`sincCena.estado()`, `debugRede.sinc()`). A tela preta de 20 s continua por
+convidado (cada um sai sozinho se a cena não chega).
+
+**Queda numa sala de 3 ou 4**: caiu um **convidado**: a partida dos outros não para
+(Religando só aparece para ele); só a vaga dele espera os 20 s e depois sai (abandono,
+como sempre). Voltou: o host manda a cena atual **só para ele** (`dadosRetomadaPara(id)`
+da ponte da arena, quando o modo tiver; senão os dados com que a cena abriu) e recomeça a
+sessão do canal dele. Caiu o **host** (ou fui eu que caí): todos param, como na 2D. Salas
+de 2: tudo como antes.
+
+| Mensagem | Sentido | Dados |
+| --- | --- | --- |
+| `partida` | dono → servidor | `{ valor: true, eleicao: true }` (o COMEÇAR da sala de amigos) |
+| `eleicao` | servidor → todos | `{ id, ms }`: mande as medidas |
+| `medicao` | todos → servidor | `{ id, diretos: { idDoMembro: rtt } }` |
+| `comecar` | servidor → host eleito | `{ salaId }` |
+| `sala` | servidor → todos | `{ ..., max, dono, eleicao, eleito, membros: [{ ..., vaga, papel, dono }] }` |
+| `cena` (canal) | host → conv. | `{ chave, dados, n, retomada? }` |
+| `cenaOk` (canal) | conv. → host | `{ n, chave }` |
+
+Testando: `node --test server/__tests__/salaN.test.js server/__tests__/eleicao.test.js
+src/lib/__tests__/estrela.test.js server/__tests__/partidasN.test.js`. No navegador (dev),
+com 4 abas: o dono escolhe `CO-OP 3–4` (no dev os modos "em breve" podem ser escolhidos),
+os outros entram pelo código; `pedirPartida()` (de `lib/lan/rede.js`) faz a eleição sem
+abrir cena; no host, `irParaCena(cena, 'Config')` e `debugRede.sinc()` mostram as
+confirmações; `debugRede.carga({ segundos, hz })` nas 4 abas mede o tráfego (abaixo).
+
+## Orçamento de performance (Fase 5A)
+
+Medido com 4 abas do Chromium (Playwright, `--use-gl=swiftshader`) numa sala de 4 no
+mesmo PC, servidor de dev local (`ONLINE=1 vite`), com `debugRede.carga({ segundos: 10,
+hz: 30 })` nas quatro ao mesmo tempo: cada convidado manda o coração 30 vezes por segundo
+(rápida) e um `dano` confiável a cada 2 s; o host junta os quatro corações e manda **um
+pacote** por tick para todos (a rápida igual para todos) e repassa cada `dano` para cada
+convidado (confiável, com recibo). É o tráfego de uma rodada de esquiva do CO-OP 3–4 com
+o host como centro (o PVP de 2 de hoje manda ~30 corações/s de cada lado). Script:
+`quatro.cjs` (no scratchpad da sessão; cria a sala, faz a eleição, troca de cena com
+confirmação, mede e derruba um convidado).
+
+| | Direto (WebRTC com os 3) | Só pelo servidor (sem WebRTC) |
+| --- | --- | --- |
+| Host: mensagens/s mandadas · recebidas | 97 · 103 | 36 · 97 |
+| Host: banda mandada | 25,8 KB/s (pelos 3 diretos) | 9,1 KB/s (o pacote sai **uma vez** e o servidor repassa) |
+| Convidado: mandadas · recebidas | 32 · 34 por s (3,8 KB/s · 8,6 KB/s) | igual, pelo servidor |
+| Servidor (relé) por sala de 4 | ~1 KB/s (sinais, `_vivoOk`) | entra ~20 KB/s (host 9 + 3 × 3,8), sai ~37 KB/s (3 × 8,6 + recibos/danos ao host 11) ≈ **0,5 Mbit/s** |
+| CPU do host (thread principal) | +1,3 pontos (4,0% → 5,3% com o jogo dormindo) | +2,7 pontos (3,0% → 5,7%) |
+| Eleição (do COMEÇAR à sala marcada) | 0,4–1,2 s | 0,9 s |
+
+- A CPU da rede é pequena perto do desenho: com o jogo desenhando o lobby, a thread
+  principal já fica em ~98% no swiftshader (GL por software). Num PC fraco o gargalo é o
+  desenho, não a estrela. A conta de 4 corações na tela e 3 caixas espelho é da 5B.
+- Sem o pacote junto, o host mandaria 4 corações × 3 convidados = 360 msg/s; juntando, são
+  90/s (30/s por convidado). **Regra para a 5B: o host junta o estado rápido de todos num
+  pacote por tick.**
+- Pelo servidor, o custo de uma sala de 4 é ~0,5 Mbit/s e ~130 msg/s no servidor: o plano
+  grátis do Render aguenta algumas salas dessas, não centenas. A rota direta tira quase
+  tudo do servidor; por isso o vigia de cada ligação continua valendo.
+- TURN: hoje o relé do servidor é o caminho garantido (funciona sempre, com +1 ida e volta
+  ao servidor). Um TURN só vale a pena quando houver muitas salas de 4 pelo relé (custo de
+  banda do servidor) ou quando o atraso pelo servidor (ping do host + ping do convidado)
+  passar de ~150 ms para muita gente; dá para ligar sem mudar código (`TURN_URL`, `TURN_USUARIO`, `TURN_SENHA`, docs/online.md).
+
 ## Telas do CO-OP em volta da arena
 
 Lobby → `EscolhaParty` → `Selecao` (chefe) → `Dificuldade` (nível) → `CoopArena` → `Vitoria` / `GameOver` → lobby. As mesmas regras de autoridade: o host troca as cenas (`irParaCena`), o convidado pede. Fora da sala tudo é como antes (1 jogador + CPU, 2 jogadores no mesmo PC).

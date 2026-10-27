@@ -90,7 +90,9 @@ export function instalarAvisos() {
   // host com a aba escondida quando o convidado ficou pronto (Fase 2F): o servidor não
   // começa sozinho numa sala de amigos, então o aviso é "todos prontos" ao voltar
   let prontoEscondido = false
-  const todosProntos = (s) => s.fase === 'sala' && s.papel === 'host' && !s.sala?.emPartida && !s.sala?.casual && s.sala?.membros.length > 1 && s.sala.membros.filter((m) => m.papel !== 'host').every((m) => m.pronto)
+  // (5A: quem começa é o DONO da sala; o host da partida é eleito depois)
+  const eDono = (s) => Boolean(s.sala?.membros.find((m) => m.id === s.eu.id)?.dono)
+  const todosProntos = (s) => s.fase === 'sala' && eDono(s) && !s.sala?.emPartida && !s.sala?.casual && s.sala?.membros.length > 1 && s.sala.membros.filter((m) => !m.dono).every((m) => m.pronto)
   const aoVoltar = () => {
     if (typeof document === 'undefined' || document.visibilityState !== 'visible' || !prontoEscondido) return
     prontoEscondido = false

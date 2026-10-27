@@ -124,6 +124,24 @@ decidido, mas o limite diário conta modos e convidados juntos como antes, e o n
 do Google só passa pelo filtro do servidor (o `JOGADOR` que os outros veem), não no banco.
 O `pendenciasSql.test.js` roda a 0001–0005 duas vezes e confere tudo isso.
 
+### 2.5 Migration 0006: base para 3 e 4 jogadores (Fase 5A)
+
+Depois da 0005, rode `supabase/migrations/0006_n_jogadores.sql` (depende da 0003 e
+da 0005; roda de novo sem estragar). Ela:
+
+- aceita os modos `coop4` (CO-OP de 3–4), `ffa` (todos contra todos) e `2x2` e
+  lados de 0 a 3 (`partidas.vencedor_lado` também);
+- cria `partida_participantes.time` (0/1, só no 2x2) e `.colocacao` (1º a 4º, só no
+  todos contra todos), gravados por `registrar_partida` e `encerrar_partida` (as
+  chaves são opcionais no JSON: os modos de 2 não mandam);
+- faz `conceder_recompensa` ler **uma linha por conta** (com N lados o "outro lado"
+  são vários): o "oponente" do limite diário é o primeiro outro lado com conta.
+
+Os modos de 2 dão exatamente o mesmo XP de antes. O servidor ainda **não registra**
+partidas dos modos novos (`MODOS_COM_XP` em `server/partidas.js`): rodar a 0006 antes
+da 5B é seguro e não muda nada para quem joga. `nJogadoresSql.test.js` roda a
+0001–0006 duas vezes e confere os modos de 2, uma partida de 4 lados e o 2x2.
+
 ## 3. Conferir o bucket
 
 Em **Storage** deve aparecer o bucket `avatares`, marcado como **Public**.

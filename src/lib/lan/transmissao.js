@@ -1,149 +1,187 @@
 import { writable, derived, get } from 'svelte/store'
-import { lan, aoParceiro, enviarAoParceiro, enviarQuadro, aoQuadro, parceiro } from './rede.js'
-import { faixaDeAudio } from './audioTap.js'
+import { lan, aoParceiro, enviarAoParceiro, definirMedidor } from './rede.js'
 import { criarVigiaDireto, VIVO_MS } from './vigiaDireto.js'
-import { contextoAudio } from '../../game/audio.js'
-import { LARGURA, ALTURA } from '../../game/constants.js'
 
-// Conexão direta do modo LAN/ONLINE (docs/lan.md): um WebRTC entre os dois
-// PCs da sala, com um canal de dados (o da partida em rede, game/rede.js) e o
-// ping da ligação. Os sinais do WebRTC passam pelo servidor (rede.js), que
-// troca os nomes .local pelo IP.
+// Conexão direta do modo LAN/ONLINE (docs/lan.md, docs/rede-pvp.md): WebRTC só com o
+// canal de dados (RTCDataChannel) da partida em rede (game/rede.js) e o ping da
+// ligação. Os sinais do WebRTC passam pelo servidor (rede.js), que troca os nomes
+// .local pelo IP.
 //
-// NÃO USADO HOJE: a imagem. Este arquivo nasceu para o "Remote Play" (o host
-// rodava o jogo e mandava a imagem do canvas + o som, audioTap.js, para o
-// convidado, que só assistia). Agora a partida numa sala, PVP e CO-OP, roda
-// no PC de cada um, e a imagem fica sempre parada (semImagem). O código do
-// vídeo e da imagem reserva continua aqui (as faixas entram na negociação e
-// são pausadas na hora, como já era no PVP); ninguém mostra o que chega.
+// ESTRELA PELO HOST (Fase 5A): o host da partida tem uma ligação com CADA convidado
+// (um RTCPeerConnection por convidado, com o canal, o vigia e o ping dela); cada
+// convidado tem só a ligação com o host. Convidados nunca se ligam entre si: o que um
+// manda para o outro passa pelo host (game/rede.js). Quando a ligação direta com um
+// convidado não abre (firewall, NAT, o Brave com escudos), as mensagens dele vão pelo
+// servidor (o caminho garantido): `enviarPeloServidor(dados, para)`.
 //
-// Se o WebRTC não conectar em alguns segundos (firewall, rede estranha), cai
-// na RESERVA: JPEGs pelo WebSocket do servidor, sem som.
+// (Até a 5A este arquivo também tinha a imagem do "Remote Play": vídeo do canvas e
+// JPEGs pela reserva. Ninguém mostrava mais nada disso desde que a partida roda no PC
+// de cada um; saiu junto com a ligação única.)
 //
-// ONLINE (docs/online.md): o WebRTC usa os STUN/TURN que o servidor mandou, a
-// imagem vai com menos banda (a internet de casa não é a LAN) e a reserva
-// manda menos quadros (eles passam pelo servidor).
+//   ligarJogo(game)            (compatibilidade; não faz nada)
+//   ligacao                    store { ping, rota }: a ligação com o host (convidado) ou a
+//                              PIOR das ligações do host com os convidados
+//   ligacoes                   store { [idDoMembro]: { ping, rota, aberto, mudo } }
+//   pingPartida                { ms, rota, fps } (a barra de cima e o lobby)
+//   enviarRapido(dados, para?) · aoRapido(fn(dados, de))   pelo direto (ou pelo servidor)
+//   enviarPeloServidor(dados, para?)  sempre pelo servidor (os reenvios do canal)
+//   medidas()                  { [idDoMembro]: rtt } das ligações diretas abertas e entregando
+//                              (a eleição do host, server/eleicao.js)
 //
-// Junto com a imagem vai um canal de dados (RTCDataChannel) direto entre os
-// dois PCs: as mensagens da partida (game/rede.js) vão por ele, sem dar a
-// volta pelo servidor (que pode estar em outro país). Sem ele, vão pelo servidor.
-// A cada segundo lê o ping da ligação direta, por onde ela passa e os quadros
-// por segundo da imagem (store `ligacao`).
+// Canal direto MUDO (lib/lan/vigiaDireto.js): aberto, mas o outro não recebe. Cada
+// lado manda um '_vivo' pelo direto a cada VIVO_MS e o outro responde '_vivoOk' pelo
+// servidor; sem resposta, aquela ligação manda tudo pelo servidor até ela voltar.
 //
-// A partida numa sala é em rede (game/rede.js): cada PC roda o próprio jogo e
-// a imagem não serve para nada. A conexão continua (o canal de dados direto é
-// o da partida e o ping vem dela), mas o host não manda imagem nem som: tira
-// as faixas dos remetentes (replaceTrack(null)) e solta a captura do canvas; a
-// reserva também não manda quadros.
-//
-//   ligarJogo(game)            host: o Phaser.Game de onde sai a imagem
-//   ligarTela(video, canvas)   convidado: onde a imagem aparece (não usado hoje)
-//   tela                       store { modo: null | 'video' | 'reserva', estado, fps }
-//   ligacao                    store { ping, rota, fps }: ping (ms) da ligação direta,
-//                              rota 'direta' | 'turn' | null, fps da imagem
-//   enviarRapido(dados) · aoRapido(fn)   mensagens da partida: pelo canal direto (ou pelo servidor)
-//   enviarPeloServidor(dados)  sempre pelo servidor (o caminho garantido: reenvios do canal)
-//
-// Canal direto MUDO (lib/lan/vigiaDireto.js): aberto, mas o outro não recebe
-// (o Brave com os escudos ligados). Cada lado manda um '_vivo' pelo direto a
-// cada VIVO_MS e o outro responde '_vivoOk' pelo servidor; sem resposta,
-// enviarRapido manda tudo pelo servidor até ela voltar.
-export const tela = writable({ modo: null, estado: 'parada' }) // estado: parada | conectando | ao-vivo | reserva
+// Contagem (orçamento de performance, docs/rede-pvp.md): `contagem` soma o que saiu e
+// chegou por cada caminho (mensagens e bytes do JSON); `zerarContagem()` recomeça.
 export const ligacao = writable({ ping: null, rota: null, fps: null })
+export const ligacoes = writable({})
 
-// O ping que importa na partida: o da ligação direta entre os dois PCs (por
-// onde vão a imagem e os controles). Sem ela, a volta pelo servidor: o meu
-// ping até ele mais o do outro. { ms, rota: 'direta' | 'turn' | 'servidor' | null, fps }
+// O ping que importa na partida: o da ligação direta (no host, a pior delas). Sem ela,
+// a volta pelo servidor: o meu ping até ele mais o do outro. { ms, rota: 'direta' | 'turn' | 'servidor' | null }
 export const pingPartida = derived([lan, ligacao], ([s, l]) => {
-  const outro = s.fase === 'sala' ? s.sala?.membros.find((m) => m.id !== s.eu.id) : null
-  if (!outro) return { ms: null, rota: null, fps: null }
-  if (l.ping != null) return { ms: l.ping, rota: l.rota, fps: l.fps }
-  const ms = s.ping != null && outro.ping != null ? s.ping + outro.ping : null
-  return { ms, rota: ms == null ? null : 'servidor', fps: l.fps }
+  const outros = s.fase === 'sala' ? (s.sala?.membros ?? []).filter((m) => m.id !== s.eu.id) : []
+  if (!outros.length) return { ms: null, rota: null, fps: null }
+  if (l.ping != null) return { ms: l.ping, rota: l.rota, fps: null }
+  const pior = Math.max(...outros.map((o) => (o.ping == null ? Infinity : o.ping)))
+  const ms = s.ping != null && Number.isFinite(pior) ? s.ping + pior : null
+  return { ms, rota: ms == null ? null : 'servidor', fps: null }
 })
 export const ROTAS = { direta: 'direto', turn: 'por TURN', servidor: 'pelo servidor' }
 // verde / amarelo / vermelho
 export const corDoPing = (ms) => (ms == null ? '#9a9ab0' : ms <= 80 ? '#6dffb0' : ms <= 150 ? '#ffd23a' : '#ff6070')
 
-const ALTURA_MAX = 720 // linhas mandadas no vídeo (o resto vira escala)
-// LAN x ONLINE
-const AJUSTES = {
-  lan: { esperaReserva: 7000, quadrosReserva: 30, qualidadeReserva: 0.72, bitrate: 12_000_000 },
-  online: { esperaReserva: 12000, quadrosReserva: 15, qualidadeReserva: 0.6, bitrate: 4_000_000 },
-}
-const ajustes = () => (get(lan).online ? AJUSTES.online : AJUSTES.lan)
+const ESPERA_DIRETO_MS = { lan: 7000, online: 12000 } // depois disso o convidado pede de novo
 const configRtc = () => ({ iceServers: get(lan).ice ?? [] })
 
-let game = null
-let video = null
-let canvasReserva = null
-let pc = null
-let papelAtual = null // 'host' | 'convidado' da conexão atual
-let parceiroAtual = null
-let timerReserva = null
-let timerEscala = null
-let reserva = null // host: { parar() }
-let candidatosPendentes = []
-let inicioHost = 0 // quando o host começou a conexão atual
-let timerPedido = null // convidado: pede a imagem de novo enquanto ela não chega
-let canal = null // RTCDataChannel aberto com o outro PC
-let timerStats = null
-let ultimosQuadros = null // { quadros, t } para calcular os fps
-let midia = null // host: { remetenteVideo, remetenteSom, faixaVideo, som, pausada } da conexão atual
+export const ligarJogo = () => {}
+
+// ---------- as ligações (uma por parceiro) ----------
+
+// id do parceiro -> { pc, canal, vigia, papel, inicio, candidatos, stats, avisouMudo, ping, rota }
+const links = new Map()
 const ouvintesRapido = new Set()
-const vigia = criarVigiaDireto()
-let avisouMudo = false
 
-export const ligarJogo = (g) => (game = g)
-export function ligarTela(elVideo, elCanvas) {
-  video = elVideo
-  canvasReserva = elCanvas
-  const s = get(tela)
-  if (s.stream && video) mostrarStream(s.stream)
+export const contagem = { direto: { env: 0, rec: 0, bytesEnv: 0, bytesRec: 0 }, servidor: { env: 0, rec: 0, bytesEnv: 0, bytesRec: 0 } }
+export function zerarContagem() {
+  for (const c of Object.values(contagem)) Object.assign(c, { env: 0, rec: 0, bytesEnv: 0, bytesRec: 0 })
+}
+const contar = (rota, sentido, texto) => {
+  const c = contagem[rota]
+  c[sentido] += 1
+  c[sentido === 'env' ? 'bytesEnv' : 'bytesRec'] += texto.length
 }
 
-const mudar = (parcial) => tela.update((s) => ({ ...s, ...parcial }))
+function publicar() {
+  const mapa = {}
+  for (const [id, l] of links) mapa[id] = { ping: l.ping, rota: l.rota, aberto: l.canal?.readyState === 'open', mudo: l.vigia.mudo() }
+  ligacoes.set(mapa)
+  // a pior ligação direta (no convidado é a única)
+  const medidas = [...links.values()].filter((l) => l.ping != null)
+  if (!medidas.length || medidas.length < links.size) return ligacao.set({ ping: null, rota: null, fps: null })
+  const pior = medidas.reduce((a, b) => (b.ping > a.ping ? b : a))
+  ligacao.set({ ping: pior.ping, rota: pior.rota, fps: null })
+}
 
-// partida em rede nos dois modos: nunca tem imagem (veja no topo). Era
-// `sala.modo === 'pvp'` quando o CO-OP usava o Remote Play
-const semImagem = () => true
+export const enviarPeloServidor = (dados, para) => {
+  const texto = JSON.stringify(dados)
+  contar('servidor', 'env', texto)
+  enviarAoParceiro(dados, para)
+}
 
-// ---------- canal direto (mensagens da partida) ----------
-
-export const enviarPeloServidor = (dados) => enviarAoParceiro(dados)
-
-export function enviarRapido(dados) {
-  if (canal?.readyState === 'open' && !vigia.mudo()) {
-    try {
-      canal.send(JSON.stringify(dados))
-      return
-    } catch {}
+// pelo direto daquele parceiro, se ele está aberto e entregando
+function peloDireto(l, dados) {
+  if (l?.canal?.readyState !== 'open' || l.vigia.mudo()) return false
+  try {
+    const texto = JSON.stringify(dados)
+    l.canal.send(texto)
+    contar('direto', 'env', texto)
+    return true
+  } catch {
+    return false
   }
-  enviarAoParceiro(dados)
 }
 
-// fn(dados) recebe tanto o que vem pelo canal direto quanto pelo servidor
+// para: id do parceiro (sem: todos os parceiros; no convidado é só o host)
+export function enviarRapido(dados, para) {
+  if (para !== undefined) {
+    if (!peloDireto(links.get(para), dados)) enviarPeloServidor(dados, souHostAgora() ? para : undefined)
+    return
+  }
+  const alvos = parceirosAgora()
+  const semDireto = alvos.filter((id) => !peloDireto(links.get(id), dados))
+  if (!semDireto.length) return
+  // ninguém com direto: uma mensagem só pelo servidor (ele repassa a todos)
+  if (semDireto.length === alvos.length) enviarPeloServidor(dados)
+  else for (const id of semDireto) enviarPeloServidor(dados, id)
+}
+
+// fn(dados, de) recebe tanto o que vem pelo canal direto quanto pelo servidor
 export function aoRapido(fn) {
   ouvintesRapido.add(fn)
-  const parar = aoParceiro(fn)
+  const parar = aoParceiro((dados, de) => {
+    if (dados && typeof dados === 'object') contar('servidor', 'rec', JSON.stringify(dados))
+    fn(dados, de)
+  })
   return () => {
     ouvintesRapido.delete(fn)
     parar()
   }
 }
 
-function abrirCanal(c) {
-  canal = c
-  vigia.abriu()
-  avisouMudo = false
+// as medidas da eleição do host: o RTT das ligações diretas abertas e entregando
+export function medidas() {
+  const saida = {}
+  for (const [id, l] of links) if (l.canal?.readyState === 'open' && !l.vigia.mudo() && l.ping != null) saida[id] = l.ping
+  return saida
+}
+definirMedidor(medidas)
+
+const souHostAgora = () => get(lan).fase === 'sala' && get(lan).papel === 'host'
+// com quem tenho ligação (host: os convidados; convidado: o host)
+function parceirosAgora() {
+  const s = get(lan)
+  if (s.fase !== 'sala') return []
+  const outros = (s.sala?.membros ?? []).filter((m) => m.id !== s.eu.id)
+  if (s.papel === 'host') return outros.map((m) => m.id)
+  const host = outros.find((m) => m.papel === 'host')
+  return host ? [host.id] : []
 }
 
-function usarCanal(c) {
-  c.onopen = () => abrirCanal(c)
+function novoLink(id, papel) {
+  fecharLink(id)
+  const l = { pc: new RTCPeerConnection(configRtc()), canal: null, vigia: criarVigiaDireto(), papel, inicio: performance.now(), candidatos: [], stats: null, avisouMudo: false, ping: null, rota: null }
+  links.set(id, l)
+  l.pc.onicecandidate = (e) => e.candidate && enviarAoParceiro({ tipo: 'ice', candidato: e.candidate.toJSON() }, papel === 'host' ? id : undefined)
+  comecarStats(id, l)
+  return l
+}
+
+function fecharLink(id) {
+  const l = links.get(id)
+  if (!l) return
+  links.delete(id)
+  clearInterval(l.stats)
+  l.vigia.fechou()
+  try {
+    l.pc.close()
+  } catch {}
+  publicar()
+}
+
+function usarCanal(id, l, c) {
+  const abrir = () => {
+    l.canal = c
+    l.vigia.abriu()
+    l.avisouMudo = false
+    publicar()
+  }
+  c.onopen = abrir
   c.onclose = () => {
-    if (canal !== c) return
-    canal = null
-    vigia.fechou()
+    if (l.canal !== c) return
+    l.canal = null
+    l.vigia.fechou()
+    publicar()
   }
   c.onmessage = (e) => {
     let dados
@@ -152,33 +190,37 @@ function usarCanal(c) {
     } catch {
       return
     }
+    contar('direto', 'rec', e.data)
     // o outro quer saber se o direto entrega: responde pelo servidor
-    if (dados?.tipo === '_vivo') return enviarAoParceiro({ tipo: '_vivoOk', n: dados.n })
-    ouvintesRapido.forEach((fn) => fn(dados))
+    if (dados?.tipo === '_vivo') return enviarAoParceiro({ tipo: '_vivoOk', n: dados.n }, l.papel === 'host' ? id : undefined)
+    ouvintesRapido.forEach((fn) => fn(dados, id))
   }
-  if (c.readyState === 'open') abrirCanal(c)
+  if (c.readyState === 'open') abrir()
 }
 
-// com o direto aberto: o '_vivo' de cada VIVO_MS (e o aviso no console quando ele emudece)
+// com o direto aberto: o '_vivo' de cada VIVO_MS em cada ligação (e o aviso quando emudece)
 setInterval(() => {
-  if (canal?.readyState !== 'open') return
-  const mudo = vigia.mudo()
-  if (mudo !== avisouMudo) console.warn(mudo ? '[lan] o canal direto não está entregando: tudo pelo servidor' : '[lan] o canal direto voltou')
-  avisouMudo = mudo
-  try {
-    canal.send(JSON.stringify({ tipo: '_vivo', n: vigia.vivo() }))
-  } catch {}
+  for (const [id, l] of links) {
+    if (l.canal?.readyState !== 'open') continue
+    const mudo = l.vigia.mudo()
+    if (mudo !== l.avisouMudo) {
+      console.warn(mudo ? `[lan] o canal direto com ${id} não está entregando: pelo servidor` : `[lan] o canal direto com ${id} voltou`)
+      publicar()
+    }
+    l.avisouMudo = mudo
+    try {
+      l.canal.send(JSON.stringify({ tipo: '_vivo', n: l.vigia.vivo() }))
+    } catch {}
+  }
 }, VIVO_MS)
 
-// ping e rota da ligação direta, fps da imagem (os dois lados)
-function comecarStats(conexao) {
-  clearInterval(timerStats)
-  ultimosQuadros = null
-  timerStats = setInterval(async () => {
-    if (conexao !== pc) return
+// ping e rota de cada ligação direta
+function comecarStats(id, l) {
+  l.stats = setInterval(async () => {
+    if (links.get(id) !== l) return
     let relatorio
     try {
-      relatorio = await conexao.getStats()
+      relatorio = await l.pc.getStats()
     } catch {
       return
     }
@@ -187,318 +229,95 @@ function comecarStats(conexao) {
     const par = transporte ? relatorio.get(transporte.selectedCandidatePairId) : itens.find((r) => r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded')
     const local = par && relatorio.get(par.localCandidateId)
     const remoto = par && relatorio.get(par.remoteCandidateId)
-    const ping = par?.currentRoundTripTime != null ? Math.round(par.currentRoundTripTime * 1000) : null
-    const rota = !par ? null : local?.candidateType === 'relay' || remoto?.candidateType === 'relay' ? 'turn' : 'direta'
-    const video = itens.find((r) => (r.type === 'inbound-rtp' || r.type === 'outbound-rtp') && r.kind === 'video')
-    let fps = video?.framesPerSecond ?? null
-    const quadros = video?.framesDecoded ?? video?.framesEncoded
-    if (fps == null && quadros != null) {
-      const agora = performance.now()
-      if (ultimosQuadros) fps = Math.round(((quadros - ultimosQuadros.quadros) * 1000) / (agora - ultimosQuadros.t))
-      ultimosQuadros = { quadros, t: agora }
-    }
-    ligacao.set({ ping, rota, fps: fps == null ? null : Math.round(fps) })
+    l.ping = par?.currentRoundTripTime != null ? Math.round(par.currentRoundTripTime * 1000) : null
+    l.rota = !par ? null : local?.candidateType === 'relay' || remoto?.candidateType === 'relay' ? 'turn' : 'direta'
+    publicar()
   }, 1000)
 }
 
-// ---------- host ----------
+// ---------- host: uma oferta por convidado ----------
 
-async function comecarHost() {
-  pararTudo()
-  papelAtual = 'host'
-  parceiroAtual = parceiro()?.id
-  inicioHost = performance.now()
-  mudar({ modo: null, estado: 'conectando', stream: null })
-  if (!game?.canvas) return
-  pc = new RTCPeerConnection(configRtc())
-  const meu = pc
-  usarCanal(pc.createDataChannel('controles', { ordered: true }))
-  comecarStats(pc)
-  pc.onicecandidate = (e) => e.candidate && enviarAoParceiro({ tipo: 'ice', candidato: e.candidate.toJSON() })
-  pc.onconnectionstatechange = () => {
-    if (meu !== pc) return
-    if (pc.connectionState === 'connected') {
-      clearTimeout(timerReserva)
-      pararReservaHost()
-      mudar({ estado: 'ao-vivo' })
-      enviarAoParceiro({ tipo: 'modoTela', modo: 'video' })
-    }
-    if (pc.connectionState === 'failed') ligarReservaHost()
-  }
-
-  const faixaVideo = capturarCanvas()
-  const stream = new MediaStream([faixaVideo])
-  const som = faixaDeAudio(contextoAudio())
-  if (som) stream.addTrack(som)
-  const remetente = pc.addTrack(faixaVideo, stream)
-  const remetenteSom = som ? pc.addTrack(som, stream) : null
-  preferirH264(pc)
-  // as faixas entram na negociação (como era no Remote Play) e já pausam
-  midia = { remetenteVideo: remetente, remetenteSom, faixaVideo, som, pausada: false }
-  atualizarImagem()
-
-  const ajustar = async () => {
-    if (meu !== pc) return
-    try {
-      const p = remetente.getParameters()
-      if (!p.encodings?.length) p.encodings = [{}]
-      p.encodings[0].maxBitrate = ajustes().bitrate
-      p.encodings[0].maxFramerate = 60
-      p.encodings[0].scaleResolutionDownBy = Math.max(1, (game.canvas.height || ALTURA_MAX) / ALTURA_MAX)
-      p.degradationPreference = 'balanced'
-      await remetente.setParameters(p)
-    } catch {}
-  }
-  timerEscala = setInterval(ajustar, 2000) // a janela muda de tamanho: o canvas também
-
-  const oferta = await pc.createOffer()
-  if (meu !== pc) return
-  await pc.setLocalDescription(oferta)
-  enviarAoParceiro({ tipo: 'oferta', sdp: pc.localDescription.sdp })
-  ajustar()
-  timerReserva = setTimeout(() => meu === pc && pc.connectionState !== 'connected' && ligarReservaHost(), ajustes().esperaReserva)
+async function oferecer(id) {
+  const l = novoLink(id, 'host')
+  usarCanal(id, l, l.pc.createDataChannel('partida', { ordered: true }))
+  const oferta = await l.pc.createOffer()
+  if (links.get(id) !== l) return
+  await l.pc.setLocalDescription(oferta)
+  enviarAoParceiro({ tipo: 'oferta', sdp: l.pc.localDescription.sdp }, id)
 }
 
-function capturarCanvas() {
-  const faixa = game.canvas.captureStream(60).getVideoTracks()[0]
-  if ('contentHint' in faixa) faixa.contentHint = 'motion'
-  return faixa
+// ---------- convidado: responde a oferta do host ----------
+
+async function responder(id, sdp) {
+  const l = novoLink(id, 'convidado')
+  l.pc.ondatachannel = (e) => links.get(id) === l && usarCanal(id, l, e.channel)
+  await l.pc.setRemoteDescription({ type: 'offer', sdp })
+  for (const c of l.candidatos) await l.pc.addIceCandidate(c).catch(() => {})
+  l.candidatos = []
+  const resposta = await l.pc.createAnswer()
+  if (links.get(id) !== l) return
+  await l.pc.setLocalDescription(resposta)
+  enviarAoParceiro({ tipo: 'resposta', sdp: l.pc.localDescription.sdp })
 }
 
-// host: pausa / retoma a imagem e o som (hoje: sempre pausados)
-function atualizarImagem() {
-  if (papelAtual !== 'host' || !midia) return
-  const pausar = semImagem()
-  if (pausar === midia.pausada) return
-  midia.pausada = pausar
-  const trocar = (remetente, faixa) => remetente?.replaceTrack(faixa).catch((e) => console.warn('[lan] replaceTrack', e))
-  if (pausar) {
-    trocar(midia.remetenteVideo, null)
-    trocar(midia.remetenteSom, null)
-    midia.faixaVideo?.stop() // a captura do canvas também custa: solta
-    midia.faixaVideo = null
-    return
-  }
-  midia.faixaVideo = capturarCanvas()
-  trocar(midia.remetenteVideo, midia.faixaVideo)
-  trocar(midia.remetenteSom, midia.som)
-}
-
-function preferirH264(conexao) {
-  // H.264 costuma ter codificador por hardware: menos peso no PC do host
-  try {
-    const caps = RTCRtpSender.getCapabilities?.('video')
-    if (!caps) return
-    const ordem = (c) => (/h264/i.test(c.mimeType) ? 0 : /vp8/i.test(c.mimeType) ? 1 : 2)
-    const codecs = [...caps.codecs].sort((a, b) => ordem(a) - ordem(b))
-    for (const t of conexao.getTransceivers()) if (t.sender.track?.kind === 'video') t.setCodecPreferences(codecs)
-  } catch {}
-}
-
-// Reserva do host: JPEG do canvas logo depois de cada desenho (o WebGL limpa a
-// imagem depois), no máximo ajustes().quadrosReserva por segundo
-function ligarReservaHost() {
-  if (reserva || papelAtual !== 'host' || !game) return
-  clearTimeout(timerReserva)
-  const tela2d = document.createElement('canvas')
-  tela2d.width = LARGURA
-  tela2d.height = ALTURA
-  const ctx = tela2d.getContext('2d')
-  let ultimo = 0
-  let ocupado = false
-  const { quadrosReserva, qualidadeReserva } = ajustes()
-  const aoDesenhar = () => {
-    const agora = performance.now()
-    if (ocupado || agora - ultimo < 1000 / quadrosReserva || semImagem()) return
-    ultimo = agora
-    ctx.drawImage(game.canvas, 0, 0, tela2d.width, tela2d.height)
-    ocupado = true
-    tela2d.toBlob(
-      (blob) => {
-        ocupado = false
-        if (blob) enviarQuadro(blob)
-      },
-      'image/jpeg',
-      qualidadeReserva,
-    )
-  }
-  game.events.on('postrender', aoDesenhar)
-  reserva = { parar: () => game?.events.off('postrender', aoDesenhar) }
-  mudar({ estado: 'reserva' })
-  enviarAoParceiro({ tipo: 'modoTela', modo: 'reserva' })
-}
-
-function pararReservaHost() {
-  reserva?.parar()
-  reserva = null
-}
-
-// ---------- convidado ----------
-
-async function receberOferta(sdp) {
-  pararTudo()
-  papelAtual = 'convidado'
-  parceiroAtual = parceiro()?.id
-  mudar({ estado: 'conectando' })
-  pc = new RTCPeerConnection(configRtc())
-  const meu = pc
-  pc.ondatachannel = (e) => meu === pc && usarCanal(e.channel)
-  comecarStats(pc)
-  pc.onicecandidate = (e) => e.candidate && enviarAoParceiro({ tipo: 'ice', candidato: e.candidate.toJSON() })
-  pc.ontrack = (e) => {
-    if (meu !== pc) return
-    const stream = e.streams[0] ?? new MediaStream([e.track])
-    mostrarStream(stream)
-  }
-  pc.onconnectionstatechange = () => meu === pc && pc.connectionState === 'connected' && mudar({ estado: 'ao-vivo', modo: 'video' })
-  await pc.setRemoteDescription({ type: 'offer', sdp })
-  for (const c of candidatosPendentes) await pc.addIceCandidate(c).catch(() => {})
-  candidatosPendentes = []
-  const resposta = await pc.createAnswer()
-  if (meu !== pc) return
-  await pc.setLocalDescription(resposta)
-  enviarAoParceiro({ tipo: 'resposta', sdp: bitrateDeLan(pc.localDescription.sdp) })
-}
-
-// Na LAN sobra banda: o Chrome do host já começa mandando a imagem com
-// qualidade boa em vez de subir aos poucos (x-google-*-bitrate, em kbps, nos
-// codecs de vídeo da resposta que o host recebe). Online, com o teto menor.
-function bitrateDeLan(sdp) {
-  const { bitrate } = ajustes()
-  const extra = `x-google-start-bitrate=${bitrate / 2000};x-google-min-bitrate=${bitrate / 6000};x-google-max-bitrate=${bitrate / 1000}`
-  const linhas = sdp.split('\r\n')
-  const video = new Set()
-  let emVideo = false
-  for (const l of linhas) {
-    if (l.startsWith('m=')) emVideo = l.startsWith('m=video')
-    const m = emVideo && l.match(/^a=rtpmap:(\d+) (H264|VP8|VP9|AV1)\//i)
-    if (m) video.add(m[1])
-  }
-  const comFmtp = new Set()
-  const saida = linhas.map((l) => {
-    const m = l.match(/^a=fmtp:(\d+) /)
-    if (!m || !video.has(m[1])) return l
-    comFmtp.add(m[1])
-    return `${l};${extra}`
-  })
-  // codec sem linha fmtp (ex.: VP8): ganha uma logo depois do rtpmap
-  return saida
-    .flatMap((l) => {
-      const m = l.match(/^a=rtpmap:(\d+) /)
-      return m && video.has(m[1]) && !comFmtp.has(m[1]) ? [l, `a=fmtp:${m[1]} ${extra}`] : [l]
-    })
-    .join('\r\n')
-}
-
-function mostrarStream(stream) {
-  mudar({ stream })
-  if (!video) return
-  if (video.srcObject !== stream) video.srcObject = stream
-  video.play?.().catch(() => {
-    // sem gesto do usuário o som pode ser barrado: toca mudo e tenta de novo no próximo toque
-    video.muted = true
-    video.play?.().catch(() => {})
-    const destravar = () => {
-      video.muted = false
-      window.removeEventListener('keydown', destravar)
-      window.removeEventListener('pointerdown', destravar)
-    }
-    window.addEventListener('keydown', destravar)
-    window.addEventListener('pointerdown', destravar)
-  })
-}
-
-let desenhandoQuadro = false
-function desenharQuadro(blob) {
-  if (!canvasReserva || desenhandoQuadro) return // atrasado: pula
-  desenhandoQuadro = true
-  createImageBitmap(blob)
-    .then((img) => {
-      canvasReserva.width = img.width
-      canvasReserva.height = img.height
-      canvasReserva.getContext('2d').drawImage(img, 0, 0)
-      img.close?.()
-    })
-    .catch(() => {})
-    .finally(() => (desenhandoQuadro = false))
-}
-
-// ---------- os dois ----------
-
-function pararTudo() {
-  clearTimeout(timerReserva)
-  clearInterval(timerEscala)
-  clearInterval(timerStats)
-  canal = null
-  vigia.fechou()
-  ligacao.set({ ping: null, rota: null, fps: null })
-  pararReservaHost()
-  candidatosPendentes = []
-  midia?.faixaVideo?.stop()
-  midia = null
-  if (pc) {
-    const velho = pc
-    pc = null
-    velho.close()
-  }
-  papelAtual = null
-  parceiroAtual = null
-  if (video) video.srcObject = null
-  mudar({ modo: null, estado: 'parada', stream: null })
-}
-
-aoParceiro(async (dados) => {
+aoParceiro(async (dados, de) => {
+  const s = get(lan)
   switch (dados?.tipo) {
     case '_vivoOk':
-      vigia.ok(dados.n)
+      links.get(de)?.vigia.ok(dados.n)
       break
     case 'oferta':
-      if (get(lan).papel === 'convidado') receberOferta(dados.sdp).catch((e) => console.warn('[lan] oferta', e))
+      // só a oferta do host da partida vale (o servidor só repassa a dele, mas na troca de host pode chegar uma velha)
+      if (s.papel !== 'host' && s.sala?.membros.find((m) => m.id === de)?.papel === 'host') responder(de, dados.sdp).catch((e) => console.warn('[lan] oferta', e))
       break
-    case 'resposta':
-      if (papelAtual === 'host' && pc) await pc.setRemoteDescription({ type: 'answer', sdp: dados.sdp }).catch((e) => console.warn('[lan] resposta', e))
+    case 'resposta': {
+      const l = links.get(de)
+      if (l?.papel === 'host') await l.pc.setRemoteDescription({ type: 'answer', sdp: dados.sdp }).catch((e) => console.warn('[lan] resposta', e))
       break
-    case 'ice':
-      if (!pc) return
-      if (!pc.remoteDescription) candidatosPendentes.push(dados.candidato)
-      else await pc.addIceCandidate(dados.candidato).catch(() => {})
+    }
+    case 'ice': {
+      const l = links.get(de)
+      if (!l) return
+      if (!l.pc.remoteDescription) l.candidatos.push(dados.candidato)
+      else await l.pc.addIceCandidate(dados.candidato).catch(() => {})
       break
-    case 'modoTela':
-      if (papelAtual === 'convidado' || get(lan).papel === 'convidado') mudar({ modo: dados.modo, estado: dados.modo === 'reserva' ? 'reserva' : get(tela).estado })
-      break
+    }
     case 'quero': {
-      // o convidado pediu (entrou agora, ou perdeu a imagem): começa de novo,
-      // a não ser que a conexão de agora ainda esteja tentando
-      if (get(lan).papel !== 'host') return
-      const tentando = pc && get(tela).estado === 'conectando' && performance.now() - inicioHost < ajustes().esperaReserva + 3000
-      if (!tentando) comecarHost().catch((e) => console.warn('[lan] transmissão', e))
+      // o convidado pediu (entrou agora, a ligação caiu ou o host mudou): começa de novo,
+      // a não ser que a ligação dele ainda esteja tentando
+      if (s.papel !== 'host') return
+      const l = links.get(de)
+      const espera = s.online ? ESPERA_DIRETO_MS.online : ESPERA_DIRETO_MS.lan
+      const tentando = l && l.canal?.readyState !== 'open' && performance.now() - l.inicio < espera + 3000
+      if (l?.canal?.readyState === 'open' || tentando) return
+      oferecer(de).catch((e) => console.warn('[lan] ligação', e))
       break
     }
   }
 })
-aoQuadro((blob) => get(lan).papel === 'convidado' && desenharQuadro(blob))
 
-// Liga / desliga conforme a sala: o host transmite enquanto tem convidado (já
-// no lobby, para a imagem estar pronta quando a partida começar)
-let pedidoPara = null // convidado: de quem já pediu a imagem
+// Liga / desliga conforme a sala: cada convidado pede a ligação ao host da partida
+// (já no lobby, para ela estar pronta quando a partida começar); o host fecha a de quem
+// saiu. Trocou o host (eleição): as ligações velhas fecham e as novas se pedem.
+let timerPedido = null
+let assinatura = ''
 lan.subscribe((s) => {
-  const outro = s.fase === 'sala' ? s.sala?.membros.find((m) => m.id !== s.eu.id) : null
-  if (!outro) {
-    clearInterval(timerPedido)
-    pedidoPara = null
-    if (papelAtual) pararTudo()
-    return
+  const naSala = s.fase === 'sala'
+  const meus = new Set(naSala ? parceirosAgora() : [])
+  const papel = naSala ? s.papel : null
+  // ligações que não valem mais (o parceiro saiu, ou eu mudei de papel)
+  for (const [id, l] of [...links]) if (!meus.has(id) || l.papel !== papel) fecharLink(id)
+  const nova = `${papel}|${[...meus].sort().join(',')}`
+  if (nova === assinatura) return
+  assinatura = nova
+  clearInterval(timerPedido)
+  timerPedido = null
+  if (papel !== 'convidado' || !meus.size) return
+  const [host] = meus
+  const pedir = () => {
+    const l = links.get(host)
+    if (l?.canal?.readyState !== 'open') enviarAoParceiro({ tipo: 'quero' })
   }
-  if (s.papel === 'convidado' && pedidoPara !== outro.id) {
-    pedidoPara = outro.id
-    const pedir = () => {
-      const e = get(tela).estado
-      if (e !== 'ao-vivo' && e !== 'reserva') enviarAoParceiro({ tipo: 'quero' })
-    }
-    pedir()
-    clearInterval(timerPedido)
-    timerPedido = setInterval(pedir, 5000)
-  }
-  if (s.papel === 'host' && parceiroAtual && parceiroAtual !== outro.id) pararTudo() // trocou o convidado: ele pede de novo
-  atualizarImagem() // (sempre sem imagem: game/rede.js)
+  pedir()
+  timerPedido = setInterval(pedir, 5000)
 })

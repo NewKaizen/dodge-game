@@ -29,11 +29,15 @@ import {
   sairFila,
   responderPartida,
   consumirCasual,
+  consumirComeco,
+  pedirPartida,
   CPU_APOS_MS,
 } from '../../lib/lan/rede.js'
 import { jogo } from '../../lib/estado.js'
-import { pingPartida, ROTAS, corDoPing } from '../../lib/lan/transmissao.js'
+import { pingPartida, ligacoes, ROTAS, corDoPing } from '../../lib/lan/transmissao.js'
 import { encerrarRede, irParaCena } from '../rede.js'
+import { criarAvatar } from '../conta/ui.js'
+import { corDaVaga, textoDaVaga } from '../vagas.js'
 
 // Lobby do modo LAN e do ONLINE (Menu -> ONLINE; docs/lan.md, docs/online.md).
 // Quem decide é o servidor que serviu a página: `npm run lan` é LAN, o site na
@@ -42,8 +46,13 @@ import { encerrarRede, irParaCena } from '../rede.js'
 //   SALAS       seu nome, criar sala, as salas achadas na rede, conectar por IP
 //               (ONLINE: o nome vem da conta, ou o sorteado para o convidado;
 //               jogar rápido, criar sala e entrar com o código do amigo)
-//   SALA        os dois jogadores (nome, ping, pronto), o modo (PVP/CO-OP),
-//               o chat e as ações; o host começa quando o convidado está pronto
+//   SALA        os jogadores (até 4 cartões: cor da vaga, avatar, nome/tag, pronto,
+//               ping), o modo, o chat e as ações; o DONO começa quando todos estão
+//               prontos. Na sala de amigos o COMEÇAR pede a eleição do HOST DA
+//               PARTIDA (o servidor mede as conexões; Fase 5A): o eleito recebe
+//               `comecar` e leva todos à primeira tela. O seletor de modo só mostra
+//               os modos que cabem na sala; os de 3–4 aparecem como "em breve"
+//               (no dev dá para escolher, para testar a sala de N; começar não)
 //   FILA        (ONLINE: JOGAR RÁPIDO, docs/online.md) procurando com o tempo de
 //               espera, o oponente achado (A aceita, B recusa, com contagem) e,
 //               depois de CPU_APOS_MS, a oferta de jogar contra a CPU. Os dois
@@ -67,7 +76,16 @@ const ATALHOS = [
 ]
 const ESPERA_CONTA_MS = 6000 // JOGAR RÁPIDO espera o servidor confirmar a conta antes de entrar na fila
 const COR = { tema: '#3fd6c8', temaNum: 0x3fd6c8, ok: '#6dffb0', okNum: 0x6dffb0, painel: 0x0b0914, apagado: '#5a5a6a', rapido: '#ffd23a', rapidoNum: 0xffd23a }
-const MODOS = { pvp: { rotulo: 'PVP', cor: '#ff3d6e', cena: 'PvpEscolha' }, coop: { rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty' } }
+// a ordem do seletor; min/max como no servidor (server/lan.js MODOS_SALA); emBreve: a partida ainda não existe
+const MODOS = {
+  pvp: { rotulo: 'PVP', cor: '#ff3d6e', cena: 'PvpEscolha', min: 2, max: 2 },
+  coop: { rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty', min: 2, max: 2 },
+  coop4: { rotulo: 'CO-OP 3–4', cor: '#6dd0ff', cena: null, min: 3, max: 4, emBreve: true },
+  ffa: { rotulo: 'TODOS CONTRA TODOS', cor: '#ff3d6e', cena: null, min: 3, max: 4, emBreve: true },
+  '2x2': { rotulo: '2x2', cor: '#ffd23a', cena: null, min: 4, max: 4, emBreve: true },
+}
+// no dev os modos "em breve" podem ser escolhidos (para testar a sala de N; a partida não começa)
+const ESCOLHE_EM_BREVE = Boolean(import.meta.env?.DEV)
 const LINHAS_SALAS = 5 // salas visíveis na lista
 const LINHAS_CHAT = 9
 
@@ -76,6 +94,9 @@ const LINHAS_CHAT = 9
 // Testado em src/game/__tests__/cenasReaproveitadas.test.js.
 const estadoInicial = () => ({
   pingPartida: null,
+  pingsDiretos: {},
+  alvoTirar: 0, // (dono) quem o TIRAR tira, entre os convidados (←→)
+  infoComeco: null, // (dono) "medindo as conexões…" até a eleição acabar
   nos: null,
   ligacoes: [],
   pacotes: null,
@@ -122,6 +143,7 @@ export default class Lan extends Phaser.Scene {
     this.s = null
     const pararLan = lan.subscribe((s) => (this.s = s))
     const pararPing = pingPartida.subscribe((p) => (this.pingPartida = p))
+    const pararLigacoes = ligacoes.subscribe((l) => (this.pingsDiretos = l))
     // voltou de uma partida (o Menu mandou para cá): avisa que acabou
     if (this.s.papel === 'host' && this.s.sala?.emPartida) encerrarPartida()
     // convidado: o host começar uma partida é avisado no update (só a
@@ -131,6 +153,7 @@ export default class Lan extends Phaser.Scene {
     this.events.once('shutdown', () => {
       pararLan()
       pararPing()
+      pararLigacoes()
       this.cancelarTexto?.()
     })
     this.cameras.main.fadeIn(300)
@@ -267,19 +290,21 @@ export default class Lan extends Phaser.Scene {
       return lista
     }
     if (this.modoTela === 'sala') {
-      const host = s.papel === 'host'
-      const outro = s.sala.membros.find((m) => m.id !== s.eu.id)
+      const dono = this.souDono()
       const eu = s.sala.membros.find((m) => m.id === s.eu.id)
+      const convidados = s.sala.membros.filter((m) => !m.dono)
       const casual = Boolean(s.sala.casual) // partida rápida: sempre PVP, sem tirar ninguém
-      if (host)
+      if (dono) {
+        const alvo = convidados[this.alvoTirar % Math.max(1, convidados.length)]
         return [
           ...(casual ? [] : [{ id: 'modo', tipo: 'modo', acao: () => this.trocarModo(1) }]),
-          { id: 'comecar', rotulo: 'COMEÇAR PARTIDA', ativo: Boolean(outro?.pronto), acao: () => this.comecar() },
+          { id: 'comecar', rotulo: 'COMEÇAR PARTIDA', ativo: !this.motivoSemComeco(), acao: () => this.comecar() },
           { id: 'chat', rotulo: 'CONVERSAR', acao: () => this.digitar('chat') },
           ...(s.online && s.sala.codigo ? [{ id: 'link', rotulo: 'COPIAR LINK DA SALA', acao: () => this.copiarLink() }] : []),
-          ...(outro && !casual ? [{ id: 'expulsar', rotulo: `TIRAR ${outro.nome}`, acao: () => expulsar() }] : []),
+          ...(alvo && !casual ? [{ id: 'expulsar', tipo: convidados.length > 1 ? 'tirar' : undefined, rotulo: convidados.length > 1 ? `TIRAR ◀ ${alvo.nome} ▶` : `TIRAR ${alvo.nome}`, acao: () => expulsar(alvo.id) }] : []),
           { id: 'sair', rotulo: 'FECHAR SALA', acao: () => this.sairDaSala() },
         ]
+      }
       return [
         { id: 'pronto', rotulo: eu?.pronto ? 'NÃO ESTOU PRONTO' : 'ESTOU PRONTO!', acao: () => alternarPronto() },
         { id: 'chat', rotulo: 'CONVERSAR', acao: () => this.digitar('chat') },
@@ -300,6 +325,23 @@ export default class Lan extends Phaser.Scene {
     return i
   }
 
+  souDono() {
+    const s = this.s
+    return s.fase === 'sala' && Boolean(s.sala?.membros.find((m) => m.id === s.eu.id)?.dono)
+  }
+
+  // por que o COMEÇAR está apagado ('' = pode começar)
+  motivoSemComeco() {
+    const sala = this.s.sala
+    const modo = MODOS[sala.modo] ?? MODOS.pvp
+    const n = sala.membros.length
+    if (sala.eleicao || this.infoComeco) return 'escolhendo o host da partida…'
+    if (modo.emBreve) return `${modo.rotulo}: em breve`
+    if (n < modo.min) return n < 2 ? 'falta o convidado' : `${modo.rotulo} precisa de ${modo.min} jogadores`
+    if (sala.membros.some((m) => !m.dono && !m.pronto)) return n > 2 ? 'esperando todos ficarem prontos' : 'esperando o convidado ficar pronto'
+    return ''
+  }
+
   // Remonta a tela quando algo que aparece nela mudou
   redesenhar() {
     const s = this.s
@@ -307,7 +349,7 @@ export default class Lan extends Phaser.Scene {
     const i = this.indiceSelecionado(itens)
     // na fila, o relógio (espera / contagem) também muda a tela
     const relogioFila = s.fila ? Math.floor((s.fila.estado === 'pareado' ? s.fila.expira - Date.now() : Date.now() - s.fila.inicio) / 1000) : null
-    const assinatura = JSON.stringify([this.modoTela, s.fase, s.online, s.eu.nome, s.eu.conta?.tag, s.salas, s.sala, s.chat.length, s.erro, s.enderecos, this.selId, this.digitando, s.ping, this.pingPartida, s.fila, s.filaAviso, relogioFila, this.info, get(conta).estado, get(amigos).recebidos.length])
+    const assinatura = JSON.stringify([this.modoTela, s.fase, s.online, s.eu.nome, s.eu.conta?.tag, s.salas, s.sala, s.chat.length, s.erro, s.enderecos, this.selId, this.digitando, s.ping, this.pingPartida, this.pingsDiretos, this.alvoTirar, this.infoComeco, s.fila, s.filaAviso, relogioFila, this.info, get(conta).estado, get(amigos).recebidos.length])
     if (assinatura === this.assinatura) return
     this.assinatura = assinatura
     this.view.removeAll(true)
@@ -521,7 +563,7 @@ export default class Lan extends Phaser.Scene {
     const s = this.s
     const sala = s.sala
     const t = (...a) => this.add2(this.texto(...a))
-    const host = s.papel === 'host'
+    const dono = this.souDono()
     const modo = MODOS[sala.modo] ?? MODOS.pvp
 
     if (s.online && sala.codigo) {
@@ -529,43 +571,73 @@ export default class Lan extends Phaser.Scene {
       t(LARGURA / 2, 80, `CÓDIGO: ${sala.codigo}`, 14, COR.ok).setOrigin(0.5)
     } else t(LARGURA / 2, 70, sala.nome, 20, TEXTO.normal, { strokeThickness: 4 }).setOrigin(0.5)
 
-    // os dois jogadores
-    const vagas = [sala.membros.find((m) => m.papel === 'host'), sala.membros.find((m) => m.papel === 'convidado')]
+    // os jogadores: um cartão por vaga (até 4), na cor da vaga
+    const membros = [...sala.membros].sort((a, b) => (a.vaga ?? 0) - (b.vaga ?? 0))
+    const total = Math.max(2, sala.max ?? 2, membros.length)
+    const vagas = Array.from({ length: total }, (_, j) => membros.find((m) => (m.vaga ?? 0) === j) ?? null)
+    const margem = 24
+    const espaco = 8
+    const largura = (LARGURA - 2 * margem - (total - 1) * espaco) / total
+    const estreito = total > 2
+    const altura = 104
+    const y = 92
     vagas.forEach((m, j) => {
-      const x = j === 0 ? 40 : LARGURA / 2 + 10
-      const largura = LARGURA / 2 - 50
-      const y = 92
-      const cor = CORES.almas[j]
-      this.add2(this.add.rectangle(x, y, largura, 112, COR.painel, 0.88).setOrigin(0).setStrokeStyle(2, m ? cor : 0x3a3a4a))
-      const coracao = this.add2(this.add.image(x + 26, y + 30, 'coracao').setTint(m ? cor : 0x3a3a4a).setScale(1.6))
-      if (m) this.dinamicos.push({ tipo: 'pulso', obj: coracao, fase: j })
-      t(x + 46, y + 22, `P${j + 1} · ${j === 0 ? 'HOST' : 'CONVIDADO'}`, 11, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
+      const x = margem + j * (largura + espaco)
+      const cor = corDaVaga(j)
+      this.add2(this.add.rectangle(x, y, largura, altura, COR.painel, 0.88).setOrigin(0).setStrokeStyle(2, m ? cor : 0x3a3a4a))
+      const coracao = this.add2(this.add.image(x + 18, y + 18, 'coracao').setTint(m ? cor : 0x3a3a4a).setScale(1.2))
+      if (m) this.dinamicos.push({ tipo: 'pulso', obj: coracao, fase: j, escala: 1.2 })
+      const papel = !m ? '' : m.dono ? (estreito ? 'DONO' : 'DONO DA SALA') : 'CONVIDADO'
+      t(x + 32, y + 18, `P${j + 1}${papel ? ` · ${papel}` : ''}`, 11, m ? textoDaVaga(j) : '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
+      // o host da partida (eleito; fora da partida, o último eleito)
+      if (m?.papel === 'host' && sala.eleito) t(x + largura - 8, y + 18, 'HOST', 10, COR.rapido, { strokeThickness: 0 }).setOrigin(1, 0.5)
       if (!m) {
-        const espera = t(x + 46, y + 44, 'vaga livre', 16, COR.apagado).setOrigin(0, 0.5)
-        this.dinamicos.push({ tipo: 'pontos', obj: espera, base: 'esperando alguém' })
+        const espera = t(x + 14, y + 46, 'vaga livre', 14, COR.apagado).setOrigin(0, 0.5)
+        this.dinamicos.push({ tipo: 'pontos', obj: espera, base: estreito ? 'livre' : 'esperando alguém' })
         const endereco = s.online ? null : s.enderecos?.[0]
-        if (host && s.online) t(x + 14, y + 80, `passe o código ${sala.codigo}\npara o seu amigo`, 11, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
-        if (host && endereco) t(x + 14, y + 84, `outro PC: ${endereco}`, 11, '#9a9ab0', { strokeThickness: 0, wordWrap: { width: largura - 24 } }).setOrigin(0, 0.5)
+        if (dono && s.online && (!estreito || j === membros.length)) t(x + 14, y + 76, estreito ? `código ${sala.codigo}` : `passe o código ${sala.codigo}\npara o seu amigo`, 11, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
+        if (dono && endereco && !estreito) t(x + 14, y + 80, `outro PC: ${endereco}`, 11, '#9a9ab0', { strokeThickness: 0, wordWrap: { width: largura - 24 } }).setOrigin(0, 0.5)
         return
       }
-      const voce = m.id === s.eu.id ? '  (você)' : ''
-      t(x + 46, y + 44, `${m.nome}${voce}`, 16, TEXTO.normal).setOrigin(0, 0.5)
-      // ping de cada um até o servidor (o seu, medido aqui, é o mais fresco)
+      // avatar + nome (e a tag da conta)
+      const lado = 30
+      this.add2(criarAvatar(this, x + 14 + lado / 2, y + 50, m.conta?.avatar ?? null, lado))
+      const xNome = x + 14 + lado + 8
+      const larguraNome = largura - (xNome - x) - 8
+      const voce = m.id === s.eu.id ? (estreito ? ' (você)' : '  (você)') : ''
+      const nome = t(xNome, y + 44, `${m.nome}${voce}`, estreito ? 13 : 15, TEXTO.normal).setOrigin(0, 0.5)
+      if (nome.width > larguraNome) caber(nome, `${m.nome}${voce}`, larguraNome)
+      if (m.conta?.tag) {
+        const tag = t(xNome, y + 60, m.conta.tag, 10, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
+        if (tag.width > larguraNome) caber(tag, m.conta.tag, larguraNome)
+      }
+      // ping até o servidor (o seu, medido aqui, é o mais fresco) e o direto com o host, se houver
       const ms = m.id === s.eu.id ? s.ping ?? m.ping : m.ping
       const pingAlto = s.online ? 150 : 60
-      t(x + 14, y + 84, ms != null ? `servidor ${ms} ms` : 'servidor …', 11, ms != null && ms > pingAlto ? '#ffb040' : '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
-      const pronto = m.papel === 'host' || m.pronto
-      t(x + largura - 14, y + 84, m.papel === 'host' ? 'ESCOLHE O MODO' : pronto ? 'PRONTO!' : 'ESPERANDO…', 12, pronto ? COR.ok : '#ffb040').setOrigin(1, 0.5)
+      const direto = this.pingsDiretos?.[m.id]?.ping
+      const textoPing = `${estreito ? '' : 'servidor '}${ms != null ? `${ms} ms` : '…'}${direto != null ? ` · direto ${direto}` : ''}`
+      t(x + 10, y + 88, textoPing, 10, ms != null && ms > pingAlto ? '#ffb040' : '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
+      const pronto = m.dono || m.pronto
+      const estado = m.caiu != null ? 'CAIU…' : m.dono ? (estreito ? 'ESCOLHE' : 'ESCOLHE O MODO') : pronto ? 'PRONTO!' : 'ESPERANDO…'
+      t(x + largura - 8, y + 88, estado, estreito ? 10 : 12, m.caiu != null ? '#ff6070' : pronto ? COR.ok : '#ffb040').setOrigin(1, 0.5)
     })
 
-    // o host largou a aba do jogo (em segundo plano há uns segundos) com o convidado esperando
-    const hostSumido = !host && vagas[0]?.segundoPlano && vagas[1]?.pronto && !sala.emPartida
-    if (hostSumido) t(LARGURA / 2, 216, 'o host está com o jogo em segundo plano', 12, '#ffb040', { strokeThickness: 0 }).setOrigin(0.5)
-
-    // a ligação entre os dois PCs (a que vale na partida)
-    const p = this.pingPartida
-    if (vagas[1] && p?.ms != null && !hostSumido)
-      t(LARGURA / 2, 216, `ping entre vocês: ${p.ms} ms (${ROTAS[p.rota]})`, 12, corDoPing(p.ms), { strokeThickness: 0 }).setOrigin(0.5)
+    // o dono largou a aba do jogo (em segundo plano há uns segundos) com os outros esperando
+    const donoM = membros.find((m) => m.dono)
+    const hostSumido = !dono && donoM?.segundoPlano && membros.some((m) => !m.dono && m.pronto) && !sala.emPartida
+    const yStatus = 210
+    if (hostSumido) t(LARGURA / 2, yStatus, 'o dono da sala está com o jogo em segundo plano', 12, '#ffb040', { strokeThickness: 0 }).setOrigin(0.5)
+    else if (sala.eleicao || this.infoComeco) {
+      const medindo = t(LARGURA / 2, yStatus, 'medindo as conexões para escolher o host da partida', 12, COR.rapido, { strokeThickness: 0 }).setOrigin(0.5)
+      this.dinamicos.push({ tipo: 'pontos', obj: medindo, base: 'medindo as conexões para escolher o host da partida' })
+    } else {
+      // o host da partida eleito e a ligação que vale na partida
+      const p = this.pingPartida
+      const partes = []
+      if (sala.eleito) partes.push(`HOST DA PARTIDA: ${sala.eleito.nome}`)
+      if (membros.length > 1 && p?.ms != null) partes.push(`ping ${membros.length > 2 ? 'pior ' : 'entre vocês'}${membros.length > 2 ? '' : ':'} ${p.ms} ms (${ROTAS[p.rota]})`)
+      if (partes.length) t(LARGURA / 2, yStatus, partes.join('   ·   '), 12, sala.eleito && p?.ms == null ? COR.rapido : corDoPing(p?.ms), { strokeThickness: 0 }).setOrigin(0.5)
+    }
 
     // ações (esquerda)
     const xOp = 40
@@ -577,7 +649,8 @@ export default class Lan extends Phaser.Scene {
       if (k === sel) this.cursor(xOp - 14, y)
       if (it.tipo === 'modo') {
         t(xOp + 6, y, 'MODO', 15, ativo ? TEXTO.normal : COR.apagado).setOrigin(0, 0.5)
-        t(xOp + 140, y, `◀ ${modo.rotulo} ▶`, 15, modo.cor).setOrigin(0.5)
+        const rotulo = t(xOp + 62, y, `◀ ${modo.rotulo}${modo.emBreve ? ' (em breve)' : ''} ▶`, modo.rotulo.length > 10 || modo.emBreve ? 12 : 15, modo.emBreve ? COR.apagado : modo.cor).setOrigin(0, 0.5)
+        if (rotulo.width > 230) rotulo.setFontSize(10)
         return
       }
       if (it.id === 'chat' && this.digitando?.campo === 'chat') {
@@ -588,9 +661,17 @@ export default class Lan extends Phaser.Scene {
       const cor = it.id === 'comecar' || it.id === 'pronto' ? (ativo ? COR.ok : COR.apagado) : ativo ? TEXTO.normal : COR.apagado
       t(xOp + 6, y, it.rotulo, 15, cor).setOrigin(0, 0.5)
     })
-    if (!host) t(xOp + 6, yOp + itens.length * passoOp + 4, `MODO: ${modo.rotulo}  (o host escolhe)`, 12, modo.cor).setOrigin(0, 0.5)
-    else if (!itens.find((it) => it.id === 'comecar').ativo)
-      t(xOp + 6, yOp + itens.length * passoOp + 4, sala.membros.length < 2 ? 'falta o convidado' : 'esperando o convidado ficar pronto', 11, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
+    const yNota = yOp + itens.length * passoOp + 4
+    if (!dono) t(xOp + 6, yNota, `MODO: ${modo.rotulo}${modo.emBreve ? ' (em breve)' : ''}  (o dono escolhe)`, 12, modo.emBreve ? COR.apagado : modo.cor).setOrigin(0, 0.5)
+    else if (!itens.find((it) => it.id === 'comecar').ativo) t(xOp + 6, yNota, this.motivoSemComeco(), 11, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
+    // os modos maiores ainda não existem: aparecem como "em breve"
+    if (dono && !sala.casual) {
+      const breve = Object.values(MODOS)
+        .filter((x) => x.emBreve)
+        .map((x) => x.rotulo)
+        .join(' · ')
+      t(xOp + 6, yNota + 18, `em breve: ${breve}`, 10, COR.apagado, { strokeThickness: 0 }).setOrigin(0, 0.5)
+    }
 
     // chat (direita)
     const xc = 300
@@ -608,7 +689,7 @@ export default class Lan extends Phaser.Scene {
 
     if (s.erro) t(LARGURA / 2, 432, s.erro, 12, '#ff6070').setOrigin(0.5)
     else if (this.info) t(LARGURA / 2, 432, this.info.texto, 12, COR.ok).setOrigin(0.5)
-    this.rodape(this.digitando ? 'digite  ·  Enter: mandar  ·  Esc: cancelar' : host ? '↑↓ escolher   ←→ modo   A: confirmar   B: fechar sala' : '↑↓ escolher     A: confirmar     B: sair da sala')
+    this.rodape(this.digitando ? 'digite  ·  Enter: mandar  ·  Esc: cancelar' : dono ? '↑↓ escolher   ←→ modo / quem tirar   A: confirmar   B: fechar sala' : '↑↓ escolher     A: confirmar     B: sair da sala')
   }
 
   rodape(texto) {
@@ -680,11 +761,22 @@ export default class Lan extends Phaser.Scene {
     this.time.delayedCall(2800, () => (this.info = null))
   }
 
+  // só os modos que cabem na sala (e, fora do dev, sem os "em breve")
   trocarModo(passo) {
-    if (this.s.papel !== 'host') return
-    const ids = Object.keys(MODOS)
-    const i = ids.indexOf(this.s.sala.modo)
+    if (!this.souDono()) return
+    const n = this.s.sala.membros.length
+    const ids = Object.keys(MODOS).filter((id) => MODOS[id].max >= n && (ESCOLHE_EM_BREVE || !MODOS[id].emBreve || id === this.s.sala.modo))
+    if (ids.length < 2) return tocar(this, 'cancelar')
+    const i = Math.max(0, ids.indexOf(this.s.sala.modo))
     mudarModo(ids[(i + passo + ids.length) % ids.length])
+    tocar(this, 'mover')
+  }
+
+  // (dono) ←→ no TIRAR escolhe quem sai
+  trocarAlvo(passo) {
+    const n = this.s.sala.membros.filter((m) => !m.dono).length
+    if (n < 2) return
+    this.alvoTirar = (this.alvoTirar + passo + n) % n
     tocar(this, 'mover')
   }
 
@@ -743,8 +835,21 @@ export default class Lan extends Phaser.Scene {
     this.time.delayedCall(240, () => this.scene.start('PvpEscolha'))
   }
 
+  // (dono) COMEÇAR: na sala de amigos o servidor elege o host da partida pela conexão e
+  // manda `comecar` para ele (abrirPartida, no update); a casual começa na hora
   comecar() {
+    if (!this.s.sala) return
+    if (this.s.sala.casual) return this.abrirPartida()
+    if (this.motivoSemComeco()) return
+    pedirPartida()
+    this.infoComeco = { desde: Date.now() }
+  }
+
+  // (host da partida) marca a partida e leva todos à primeira tela do modo
+  abrirPartida() {
     const modo = MODOS[this.s.sala.modo] ?? MODOS.pvp
+    if (!modo.cena) return
+    this.infoComeco = null
     this.comecando = true
     iniciarPartida()
     this.registry.set('modo', this.s.sala.modo)
@@ -816,6 +921,7 @@ export default class Lan extends Phaser.Scene {
         if (d === 'cima' || (fila && d === 'esquerda')) this.mover(-1)
         if (d === 'baixo' || (fila && d === 'direita')) this.mover(1)
         if ((d === 'esquerda' || d === 'direita') && this.selId === 'modo') this.trocarModo(d === 'direita' ? 1 : -1)
+        if ((d === 'esquerda' || d === 'direita') && this.selId === 'expulsar') this.trocarAlvo(d === 'direita' ? 1 : -1)
         if ((d === 'esquerda' || d === 'direita') && ATALHOS.some((a) => a.id === this.selId)) this.moverAtalho(d === 'direita' ? 1 : -1)
       }
     }
@@ -830,13 +936,22 @@ export default class Lan extends Phaser.Scene {
       this.digitando = null
       this.cancelarTexto?.()
       this.cancelarTexto = null
-      this.comecar()
+      this.abrirPartida()
     }
+    // sala de amigos: o servidor elegeu ESTE PC como host da partida (5A)
+    if (s.fase === 'sala' && s.papel === 'host' && s.comecar && !this.comecando && !this.saindo && consumirComeco()) {
+      this.digitando = null
+      this.cancelarTexto?.()
+      this.cancelarTexto = null
+      this.abrirPartida()
+    }
+    // a eleição acabou (o host é outro, ou não começou): some o "medindo"
+    if (this.infoComeco && !s.sala?.eleicao && (s.sala?.emPartida || Date.now() - this.infoComeco.desde > 4000)) this.infoComeco = null
 
     this.redesenhar()
     for (const d of this.dinamicos) {
       if (d.tipo === 'cursor') d.obj.setX(d.x + Math.sin(time / 160) * 2)
-      if (d.tipo === 'pulso') d.obj.setScale(1.6 + 0.12 * Math.max(0, Math.sin(time / 260 + d.fase * 1.7)))
+      if (d.tipo === 'pulso') d.obj.setScale((d.escala ?? 1.6) + 0.12 * Math.max(0, Math.sin(time / 260 + d.fase * 1.7)))
       if (d.tipo === 'pontos') d.obj.setText(`${d.base}${'.'.repeat(Math.floor(time / 400) % 4)}`)
       if (d.tipo === 'campo') d.obj.setText(`${d.prefixo ?? ''}${this.campoTexto(d.campo, '')}`)
     }

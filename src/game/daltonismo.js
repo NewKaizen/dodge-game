@@ -18,6 +18,8 @@ import { TEXTO_JOGADOR } from './pvp/perfil.js'
 //   acerto      a borda da caixa piscando quando o coração leva um golpe
 //   almas       o coração (e a cor) de cada jogador: P1 e P2
 //   textoAlmas  as mesmas, claras, para texto em fundo escuro (TEXTO_JOGADOR)
+//   vagasExtra  a cor do P3 e do P4 nas salas de N (Fase 5A; o lobby usa, game/vagas.js).
+//               A forma e o nome do coração de cada um ficam para a 5B
 //
 // Como as paletas foram escolhidas: a partir das cores de Okabe & Ito (seguras
 // para daltônicos), clareadas para aparecer no fundo preto, e conferidas com a
@@ -30,15 +32,15 @@ import { TEXTO_JOGADOR } from './pvp/perfil.js'
 export const MODOS = ['nenhum', 'protanopia', 'deuteranopia', 'tritanopia']
 
 const PALETAS = {
-  nenhum: { aviso: 0xff3048, acerto: 0xff3048, almas: [0xff2030, 0xffd23a], textoAlmas: ['#ff5a66', '#ffd23a'] },
-  protanopia: { aviso: 0xff8ae6, acerto: 0xff8ae6, almas: [0x3d9bff, 0xffc23a], textoAlmas: ['#6cb4ff', '#ffc23a'] },
-  deuteranopia: { aviso: 0xff8ae6, acerto: 0xff8ae6, almas: [0x3d9bff, 0xffc23a], textoAlmas: ['#6cb4ff', '#ffc23a'] },
-  tritanopia: { aviso: 0xe060ff, acerto: 0xe060ff, almas: [0xff3040, 0x30e0c0], textoAlmas: ['#ff6a74', '#4ee8cc'] },
+  nenhum: { aviso: 0xff3048, acerto: 0xff3048, almas: [0xff2030, 0xffd23a], textoAlmas: ['#ff5a66', '#ffd23a'], vagasExtra: [0x4da6ff, 0x6dffb0] },
+  protanopia: { aviso: 0xff8ae6, acerto: 0xff8ae6, almas: [0x3d9bff, 0xffc23a], textoAlmas: ['#6cb4ff', '#ffc23a'], vagasExtra: [0xf0f0f0, 0xb07cff] },
+  deuteranopia: { aviso: 0xff8ae6, acerto: 0xff8ae6, almas: [0x3d9bff, 0xffc23a], textoAlmas: ['#6cb4ff', '#ffc23a'], vagasExtra: [0xf0f0f0, 0xb07cff] },
+  tritanopia: { aviso: 0xe060ff, acerto: 0xe060ff, almas: [0xff3040, 0x30e0c0], textoAlmas: ['#ff6a74', '#4ee8cc'], vagasExtra: [0xffd0f0, 0x6a8cff] },
 }
 
 export function paletaDaltonismo(modo) {
   const p = PALETAS[modo] ?? PALETAS.nenhum
-  return { ...p, almas: [...p.almas], textoAlmas: [...p.textoAlmas] }
+  return { ...p, almas: [...p.almas], textoAlmas: [...p.textoAlmas], vagasExtra: [...p.vagasExtra] }
 }
 
 export function aplicarDaltonismo(modo) {
@@ -48,6 +50,7 @@ export function aplicarDaltonismo(modo) {
   CORES.acerto = depois.acerto
   depois.almas.forEach((c, i) => (CORES.almas[i] = c))
   depois.textoAlmas.forEach((c, i) => (TEXTO_JOGADOR[i] = c))
+  depois.vagasExtra.forEach((c, i) => (CORES.vagasExtra[i] = c))
   return { antes, depois }
 }
 
