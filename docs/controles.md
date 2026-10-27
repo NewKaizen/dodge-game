@@ -43,7 +43,7 @@ Controles fora do padrão usam os mesmos índices de botão; com 8 eixos ou mais
 | **Fonte que some** (controle desconectado) | Não derruba para 1 no meio do fluxo (escolha de lutador, party): o jogador 2 fica. O número só volta a **1 no menu principal**, e só se não restarem duas fontes. Quem entrou pelo teclado também volta a 1 ao passar pelo menu e entra de novo na próxima escolha. Controle parado ("ocioso") não conta como saída: só a desconexão |
 | **Sala LAN/online** | Não é mexida: a sala é sempre "o meu lado" (e a sala tem a sua regra, [src/lib/lan/rede.js](../src/lib/lan/rede.js)) |
 
-Efeito colateral: em 1 jogador, o **Enter** nas telas de escolha do PVP e da party deixou de confirmar e passou a chamar o jogador 2; quem joga sozinho no teclado confirma com Espaço, Z ou E (a dica no rodapé diz isso). O A do **1º** controle e o das teclas do P1 confirmam como sempre.
+Efeito colateral: em 1 jogador, o **Enter** nas telas de escolha do PVP e da party deixou de confirmar e passou a chamar o jogador 2; quem joga sozinho no teclado confirma com Espaço, Z ou E. O rodapé diz "ESPAÇO: confirmar     JOGADOR 2: ENTER (ou A no 2º controle) para entrar" e, no primeiro Enter, um aviso mostra "JOGADOR 2 ENTRANDO: aperte B (Backspace) para cancelar" (2E). O A do **1º** controle e o das teclas do P1 confirmam como sempre.
 
 As telas de escolha mostram os avisos do tipo "info" (controle conectado, jogador 2 entrou) no canto de cima à direita; convite de amigo e pedido de amizade continuam esperando o menu.
 - Ao desconectar e religar, o mesmo controle (mesmo id e índice) volta na mesma vaga ("CONTROLE RECONECTADO").

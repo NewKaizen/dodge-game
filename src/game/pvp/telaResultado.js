@@ -51,6 +51,9 @@ export const estadoInicialDaTela = () => ({
   linhasCasual: null,
   cursorCasual: null,
   avisoCasual: null,
+  aceite: null, // fim em rede: quem escolheu REVANCHE / TROCAR (pvp/fimDePartidaRede.js)
+  opcoesFim: [],
+  avisoExpirou: 0,
 })
 
 // a tela ficou sem as opções tempo demais: libera assim mesmo

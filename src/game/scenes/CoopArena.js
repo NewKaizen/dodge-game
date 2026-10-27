@@ -38,6 +38,7 @@ import { QUADRO, inicioDoCoracao } from '../coop/quadro.js'
 import { escolherJogadaCoop } from '../coop/bot.js'
 import { superNoChefe } from '../coop/superNoChefe.js'
 import ArenaRedeCoop from '../coop/ArenaRedeCoop.js'
+import { nomesDaPartida } from '../pvp/nomesDaPartida.js'
 import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos } from '../rede.js'
 import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
@@ -225,7 +226,8 @@ export default class CoopArena extends PvpArena {
     this.criarChefe()
     this.criarPersonagens()
     this.criarQuadro()
-    this.huds = [0, 1].map((j) => new HudPvp(this, { jogador: j, personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, rotulo: this.rotulo(j) }))
+    this.nomesJog = nomesDaPartida({ rede: Boolean(this.rede), cpu: this.cpu }) // o jogador identifica o lado, não o personagem
+    this.huds = [0, 1].map((j) => new HudPvp(this, { jogador: j, personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, rotulo: this.rotulo(j), nomeJogador: this.nomesJog[j] }))
     this.criarTopo()
     if (this.cpu !== null) this.textoTreino.setText('COM CPU ALIADA')
     else if (!this.rede) this.textoTreino.setText('')
@@ -480,7 +482,7 @@ export default class CoopArena extends PvpArena {
     this.fase = 'abertura'
     // a fenda da Entrada (lançada pela Dificuldade) abre primeiro
     for (let i = 0; i < 40 && this.scene.isActive('Entrada'); i++) await this.esperar(50)
-    const nomes = this.ids.map((id) => PERSONAGENS[id]?.nome?.toUpperCase() ?? id.toUpperCase())
+    const nomes = this.nomesJog // o nome de cada jogador (pvp/nomes.js), não o do personagem
     const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 5 })
     const dupla = this.add
       .text(-200, 214, `${nomes[0]} & ${nomes[1]}`, estilo(24, '#ffffff'))

@@ -12,7 +12,7 @@ As salas online são privadas: não aparecem em lista nenhuma, só entra quem te
 ### Regras da partida online
 
 - **Sem pausa**: o C (e o Esc) não fazem nada durante a partida (pausar travaria o amigo).
-- **Sem revanche** (fora do Jogar Rápido, abaixo): no fim, a única opção é **A: VOLTAR AO LOBBY** (do host ou do convidado): os dois voltam para o lobby da sala (que continua aberta), com o chat, e o host começa outra partida quando quiser.
+- **Fim da partida** (2E; lógica em `pvp/fimDePartidaRede.js`): menu com **REVANCHE** (mesmos personagens e arena), **TROCAR PERSONAGEM** (os dois voltam à escolha e votam a arena de novo) e **VOLTAR AO LOBBY**. Cada um escolhe e vê na hora quem escolheu o quê ("VOCÊ: …" / "OPONENTE: …") com a contagem de 15 s; com os dois de acordo o host leva os dois (`irParaCena`). Um REVANCHE e um TROCAR vira TROCAR. Sem resposta em 15 s a espera é cancelada e dá para escolher de novo. VOLTAR AO LOBBY vale na hora (o do host leva os dois; o do convidado pede ao host). O host abre uma partida nova no servidor (`encerrarPartida` + `iniciarPartida`) para o XP não repetir o `partidaId`.
 - Se o outro sai no meio, quem ficou volta para o lobby da sala (se a sala cai, volta ao menu); para sair no meio, use **Sair da sala** na barra de cima.
 - **Queda de conexão no meio da partida** (Fase 2D): a partida para nos dois com o aviso "o outro jogador caiu — esperando até 20 s…" (ou "reconectando…" em quem caiu) e o jogo tenta voltar sozinho. Voltou em até **20 s**: a partida recomeça **no começo da rodada** em que caiu. Não voltou: se foi o convidado, conta como abandono (regras abaixo); se foi o host, a sala fecha e a partida acaba **sem XP e sem derrota** para ninguém. Detalhes em [rede-pvp.md](rede-pvp.md#queda-de-conexão-no-meio-da-partida-fase-2d).
 
@@ -157,12 +157,13 @@ conta e para convidado (convidado joga, mas a partida não dá XP: aviso na tela
   — jogar contra a CPU?". Aceitar sai da fila e abre o PVP local contra a CPU
   (sempre dita como CPU, nunca como pessoa). Dá para continuar procurando.
 - **Fim da partida**: **REVANCHE** (os dois precisam aceitar em **15 s**; aí o
-  host leva os dois de novo para a escolha de personagem), **JOGAR NOVAMENTE**
+  host leva os dois direto para a arena, com os mesmos personagens), **TROCAR PERSONAGEM**
+  (como na sala de amigos, pelo canal), **JOGAR NOVAMENTE**
   (sai da sala e volta para a fila) ou **VOLTAR** (menu). Na sala casual, quem
   sai fecha a sala: o outro volta para a tela ONLINE com "o oponente saiu da
   partida" e pode procurar outra.
-- Salas de amigos (código, link, convite) continuam como antes: sem revanche,
-  só voltar ao lobby da sala.
+- Salas de amigos (código, link, convite): o mesmo menu do fim da partida
+  (REVANCHE, TROCAR PERSONAGEM, VOLTAR AO LOBBY), sem passar pela fila.
 
 ### Regras do servidor (`server/fila.js`, `server/lan.js`)
 

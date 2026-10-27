@@ -467,3 +467,9 @@ espaçada, 5 estilhaços por floco gigante, rajadas de 3–5, anéis de 5 flocos
 de 6) e cada golpe fere 75% do dano do SUPER (`fatorDano`). Medido (12 sementes, dano real por SUPER):
 imbatível 6,5 → 2,5, CPU difícil 20,6 → 11,7, bot normal 41,2 → 27,5 (era o SUPER mais forte; agora fica
 junto com o Último Bis, o mais fraco).
+
+## Nome de cada lado (2E)
+
+Na partida o lado é identificado pelo **nome do jogador**, não pelo do personagem (o personagem fica como linha pequena): HUD, abertura, replay do K.O., "… VENCE!" e tela de resultado. Online/LAN: o nome do membro da sala (conta ou convidado, já filtrado pelo servidor). Mesmo PC: P1 = nome da conta logada ou `JOGADOR 1`; P2 = `JOGADOR 2`; contra a CPU, `CPU`. Nomes passam pelo filtro de palavras (`nomeSeguro`) e são cortados em 12 letras com "…". Lógica pura em `src/game/pvp/nomes.js` (`nomeDoJogador(lado, contexto)`).
+
+O motivo de carta bloqueada aparece numa pílula vermelha com texto branco e "×" (a cor do P1 é parecida com o vermelho do bloqueio).

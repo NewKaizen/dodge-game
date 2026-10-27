@@ -29,6 +29,7 @@ import { fogoArtificio, canhoesConfete, chuvaConfete } from '../effects/festa.js
 import { anunciarSuper } from '../pvp/super/anuncio.js'
 import FimDePartida from '../pvp/fimDePartida/index.js'
 import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe } from '../../lib/saida.js'
+import { nomesDaPartida } from '../pvp/nomesDaPartida.js'
 import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos } from '../rede.js'
 import ArenaRede from '../pvp/rede/ArenaRede.js'
 import { fatores } from '../acessibilidade.js'
@@ -142,6 +143,9 @@ const TEMPO = { escolha: 15000 }
 const CPU = { pensarMin: 700, pensarMax: 1700, passoMin: 150, passoMax: 260 }
 // HP abaixo desta fração do máximo: alarme (uma vez, até curar acima de novo)
 const HP_BAIXO = 0.25
+// Motivo de carta bloqueada: pílula vermelha com texto branco e "×" na frente. O vermelho do
+// P1 também é a cor do "escolha uma carta", então a cor sozinha não distinguia os dois.
+const PILULA_BLOQUEIO = '#b3162d'
 
 const PISTA = { largura: 220, altura: 170, y: 198 }
 const CENTROS = [LARGURA / 4, (LARGURA * 3) / 4]
@@ -270,7 +274,8 @@ export default class PvpArena extends Phaser.Scene {
 
     this.desenharFundo()
     this.criarPistas()
-    this.huds = [0, 1].map((j) => new HudPvp(this, { jogador: j, personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, rotulo: this.rotulo(j) }))
+    this.nomesJog = nomesDaPartida({ rede: Boolean(this.rede), cpu: this.cpu }) // o jogador identifica o lado, não o personagem
+    this.huds = [0, 1].map((j) => new HudPvp(this, { jogador: j, personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, rotulo: this.rotulo(j), nomeJogador: this.nomesJog[j] }))
     this.criarTopo()
     this.versos = coresDosVersos() // verso de carta equipado de cada lado (Fase 2F; em rede o de cada jogador)
     this.montes = [0, 1].map((j) => this.criarMonte(j))
@@ -599,12 +604,21 @@ export default class PvpArena extends Phaser.Scene {
 
   async abertura() {
     this.fase = 'abertura'
-    const nomes = this.ids.map((id) => PERSONAGENS[id]?.nome?.toUpperCase() ?? id.toUpperCase())
+    // o NOME DO JOGADOR (pvp/nomes.js) é o grande; o personagem vai pequeno embaixo
+    const nomes = this.nomesJog
+    const personagens = this.ids.map((id) => PERSONAGENS[id]?.nome?.toUpperCase() ?? id.toUpperCase())
+    const apoio = [0, 1].map((j) =>
+      this.add
+        .text(CENTRO_X + (j ? 1 : -1) * 90, 250, personagens[j], { fontFamily: FONTE, fontSize: '12px', color: '#b8b8c8', stroke: '#000000', strokeThickness: 3 })
+        .setOrigin(0.5)
+        .setDepth(96)
+        .setAlpha(0),
+    )
     const textos = [0, 1].map((j) =>
       this.add
         .text(CENTRO_X + (j ? 1 : -1) * 90, 200, nomes[j], {
           fontFamily: FONTE,
-          fontSize: '30px',
+          fontSize: `${nomes[j].length > 9 ? 22 : 30}px`,
           color: corTexto(PERSONAGENS[this.ids[j]]?.cor ?? 0xffffff),
           stroke: '#000000',
           strokeThickness: 5,
@@ -625,11 +639,11 @@ export default class PvpArena extends Phaser.Scene {
     await Promise.all(textos.map((t, j) => this.tween({ targets: t, x: CENTRO_X + (j ? 1 : -1) * 110, duration: 380, ease: 'Back.easeOut' })))
     tocar(this, 'impacto')
     shake(this, 160, 0.01)
-    this.tweens.add({ targets: tags, alpha: 1, duration: 200 })
+    this.tweens.add({ targets: [...tags, ...apoio], alpha: 1, duration: 200 })
     await this.tween({ targets: vs, scale: 1, duration: 220, ease: 'Back.easeOut' })
     await this.esperar(900)
-    await this.tween({ targets: [...textos, vs, ...tags], alpha: 0, duration: 260 })
-    ;[...textos, vs, ...tags].forEach((t) => t.destroy())
+    await this.tween({ targets: [...textos, vs, ...tags, ...apoio], alpha: 0, duration: 260 })
+    ;[...textos, vs, ...tags, ...apoio].forEach((t) => t.destroy())
   }
 
   async inicioDaRodada() {
@@ -982,10 +996,17 @@ export default class PvpArena extends Phaser.Scene {
       // carta sob o cursor que não dá para jogar: diz POR QUÊ (texto + vermelho; pvp/regras.js motivoBloqueio)
       const bloqueio = livre && naMao && j !== this.cpu && !(this.rede && j !== this.rede.meuLado) ? this.podeJogarAgora(j, this.maos[j].selecionada?.dados.id).bloqueio : null
       if (bloqueio) texto = bloqueio.curto
-      this.status[j].setText(texto).setColor(bloqueio ? TEXTO.caido : corTexto(CORES.almas[j]))
+      this.mostrarStatus(j, texto, Boolean(bloqueio))
       this.atualizarPrevia(j)
     }
     this.rede?.enviarCursor() // o meu cursor mudou? o outro PC mostra
+  }
+
+  // o texto de status do jogador j: normal (na cor dele) ou bloqueio (pílula vermelha com "×")
+  mostrarStatus(j, texto, bloqueado) {
+    const t = this.status[j]
+    if (bloqueado && texto) return t.setText(`× ${texto}`).setColor('#ffffff').setBackgroundColor(PILULA_BLOQUEIO).setPadding(6, 2, 6, 2)
+    return t.setText(texto).setColor(corTexto(CORES.almas[j])).setBackgroundColor('').setPadding(0, 0, 0, 0)
   }
 
   // prévia ampliada da carta sob o cursor (ou a explicação do PASSAR)
@@ -1054,9 +1075,9 @@ export default class PvpArena extends Phaser.Scene {
     if (!v.ok) {
       carta.negar()
       this.previas[m]?.negar?.()
-      this.status[m].setText(v.bloqueio?.curto ?? v.motivo).setColor(TEXTO.caido)
+      this.mostrarStatus(m, v.bloqueio?.curto ?? v.motivo, true)
       this.time.delayedCall(900, () => {
-        this.status[m].setColor(corTexto(CORES.almas[m]))
+        this.mostrarStatus(m, this.status[m].text.replace(/^× /, ''), false)
         this.atualizarEscolha()
       })
       return
@@ -1757,7 +1778,7 @@ export default class PvpArena extends Phaser.Scene {
     const v = VENCEDOR[vencedor]
     if (v) {
       const cor = corTexto(PERSONAGENS[this.ids[v - 1]]?.cor ?? 0xffffff)
-      this.mostrarBanner(`${this.rotulo(v - 1)} VENCEU!`, cor, { y: 200, tamanho: 34 })
+      this.mostrarBanner(`${this.nomesJog[v - 1]} VENCEU!`, cor, { y: 200, tamanho: 34 })
       this.huds[outro(v - 1)].container.setAlpha(0.5)
       tocar(this, 'vitoria')
     } else {
@@ -1802,7 +1823,7 @@ export default class PvpArena extends Phaser.Scene {
     this.pausado = true
     pausarMusica()
     this.scene.pause()
-    const nomes = this.ids.map((id) => PERSONAGENS[id]?.nome ?? id)
+    const nomes = this.nomesJog
     this.scene.launch('Pausa', { cena: 'PvpArena', recomecar: { p1: this.ids[0], p2: this.ids[1], arena: this.arena.id }, sair: 'Menu', subtitulo: `${nomes[0]} x ${nomes[1]}`, motivo })
     this.scene.bringToTop('Pausa') // a Pausa vem antes da arena na lista de cenas: sem isso, ela ficaria por baixo
   }

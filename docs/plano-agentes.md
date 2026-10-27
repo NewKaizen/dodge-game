@@ -102,7 +102,7 @@ Decisão do usuário: primeiro as features, depois organizar tudo. Itens anotado
 - ~~Rever o limite que conta todos os convidados como um único oponente.~~ Feito na 2F (por conexão; mesmo IP da conta = um só).
 - ~~XP no CO-OP.~~ Feito na 2F (migration 0005).
 - ~~Filtro de nomes também no nome inicial vindo do Google (hoje só ao trocar o nome).~~ Feito na 2F (migration 0005).
-- (2E) Auditar cenas reaproveitadas pelo Phaser que guardam estado da partida anterior (o mesmo vício que travava o PvpResultado).
+- ~~(2E) Auditar cenas reaproveitadas pelo Phaser que guardam estado da partida anterior (o mesmo vício que travava o PvpResultado).~~ Feito na 2E: 13 cenas ganharam `estadoInicial()` + `Object.assign` no começo do `init`/`create`, a Pausa remove o ouvinte de `resume`, e `src/game/__tests__/cenasReaproveitadas.test.js` varre todas as cenas de `config.js` (campos e ouvintes). Pendente da 2F: `Vitoria` e `GameOver` (o teste só avisa).
 
 ### Controle de custo
 

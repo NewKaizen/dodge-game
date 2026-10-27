@@ -60,7 +60,7 @@ export const PRESO_MS = 20000
 // o Brave com os escudos ligados já travou o canal direto (lib/lan/vigiaDireto.js): a dica vai junto
 const ehBrave = () => typeof navigator !== 'undefined' && Boolean(navigator.brave)
 export const DICA_BRAVE = 'no Brave, se travar: escudos desligados para este site'
-export const MSG_PRESO = 'não deu para sincronizar com o host: voltando ao lobby'
+export const MSG_PRESO = 'não deu para sincronizar com o host: voltando ao lobby (comecem de novo)'
 // 2D: cenas que, na volta, só continuam (não voltam a rodada) e cenas por cima das outras
 const SO_CONTINUAM = ['Lan', 'PvpResultado', 'Vitoria', 'GameOver']
 const POR_CIMA = ['Religando', 'Carregando', 'Pausa', 'Entrada']

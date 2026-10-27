@@ -1,7 +1,7 @@
 // node --test src/game/__tests__/jogadores.test.js
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { contarFontes, fonteNova, decidirJogadores, reagirAoBotaoP2, dicaP2, criarDetector, CENAS_LIVRES, DICA_ENTRAR_P2 } from '../jogadores.js'
+import { contarFontes, fonteNova, decidirJogadores, reagirAoBotaoP2, dicaP2, criarDetector, CENAS_LIVRES, DICA_ENTRAR_P2, AVISO_P2_ENTRANDO } from '../jogadores.js'
 
 const MENU = ['Menu']
 const ESCOLHA = ['PvpEscolha']
@@ -99,7 +99,10 @@ test('teclado: ciclo completo entrar -> confirmar -> desfazer -> sair', () => {
 test('dica do rodapé: convida em 1 jogador, avisa como sair, some depois de confirmar', () => {
   assert.equal(dicaP2({ numero: 1 }), DICA_ENTRAR_P2)
   assert.match(DICA_ENTRAR_P2, /ENTER.*2º controle/)
-  assert.match(dicaP2({ numero: 2, p2Teclado: true, fontes: 1 }), /B para sair/)
+  assert.match(dicaP2({ numero: 2, p2Teclado: true, fontes: 1 }), /B \(Backspace\) para sair/)
+  assert.match(DICA_ENTRAR_P2, /ESPAÇO: confirmar/) // sozinho no teclado, quem confirma é o Espaço
+  assert.match(AVISO_P2_ENTRANDO.titulo, /JOGADOR 2 ENTRANDO/)
+  assert.match(AVISO_P2_ENTRANDO.texto, /B .*cancelar/)
   assert.equal(dicaP2({ numero: 2, p2Teclado: false, fontes: 2 }), null)
   assert.equal(dicaP2({ numero: 1, algoConfirmado: true }), null)
   assert.equal(dicaP2({ numero: 1, emRede: true }), null)

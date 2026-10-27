@@ -276,7 +276,7 @@ export default class FimDePartida {
     const a = this.arena
     const jogadores = [0, 1].map((j) => {
       const p = PERSONAGENS[a.ids?.[j]]
-      return { rotulo: a.rotulo(j), nome: p?.nome ?? `P${j + 1}`, cor: p?.cor ?? CORES.almas[j], hp: Math.max(0, Math.round(a.estado?.jogadores[j]?.hp ?? 0)) }
+      return { rotulo: a.rotulo(j), nome: a.nomesJog?.[j] ?? p?.nome ?? `P${j + 1}`, cor: p?.cor ?? CORES.almas[j], hp: Math.max(0, Math.round(a.estado?.jogadores[j]?.hp ?? 0)) }
     })
     this.estado = 'replay'
     this.tv = new Transmissao(a, {

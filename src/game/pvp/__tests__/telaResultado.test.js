@@ -7,7 +7,7 @@ import { estadoInicialDaTela, deveDestravar, LIMITE_MS } from '../telaResultado.
 const fonte = readFileSync(new URL('../../scenes/PvpResultado.js', import.meta.url), 'utf8')
 
 // o que o create() define de novo a cada abertura (não precisa estar no estado inicial)
-const DO_CREATE = new Set(['p1', 'p2', 'arena', 'vencedor', 'empate', 'rodadas', 'contraCpu', 'stats', 'corTitulo', 'corNumero', 'etapas', 'controles', 'rede', 'naSala', 'casual', 'xp', 'fundo', 'veu', 'raios', 'halo'])
+const DO_CREATE = new Set(['p1', 'p2', 'arena', 'vencedor', 'empate', 'rodadas', 'contraCpu', 'nomesJog', 'stats', 'corTitulo', 'corNumero', 'etapas', 'controles', 'rede', 'naSala', 'casual', 'xp', 'fundo', 'veu', 'raios', 'halo'])
 
 test('resultado: todo campo que a cena guarda volta ao estado inicial na próxima partida', () => {
   const campos = new Set([...fonte.matchAll(/this\.([a-zA-Z]\w*)\s*=(?!=)/g)].map((m) => m[1]))

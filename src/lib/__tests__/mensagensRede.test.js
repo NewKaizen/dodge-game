@@ -82,7 +82,7 @@ test('a conexão cai na sala e na fila: ninguém fica preso e o aviso fica depoi
   assert.equal(s().fila.estado, 'procurando')
   w.cair()
   assert.equal(s().fila, null, 'saiu da fila')
-  assert.match(s().filaAviso, /saiu da fila.*procurar de novo/)
+  assert.match(s().filaAviso, /saiu da fila.*procure de novo/)
   assert.match(s().erro, /reconectando/)
   // reconecta, entra numa sala e a conexão cai de novo
   await new Promise((r) => setTimeout(r, 1600))
@@ -115,7 +115,7 @@ test('o oponente sai no meio da partida de amigos: aviso claro e a sala continua
   w.receber({ t: 'sala', sala: { ...sala, membros: [membros[0]] } })
   assert.equal(s().fase, 'sala')
   assert.match(s().erro, /ANA saiu no meio da partida/)
-  assert.match(s().erro, /sala continua aberta/)
+  assert.match(s().erro, /sala segue aberta/)
   // o host fecha a sala: motivo claro vindo do servidor
   w.receber({ t: 'fechada', motivo: 'o host perdeu a conexão: a sala foi fechada' })
   assert.equal(s().erro, 'o host perdeu a conexão: a sala foi fechada')

@@ -27,7 +27,7 @@ const GEMA = { passo: 12, raio: 5 }
 const MARGEM = 14
 
 export default class HudPvp {
-  constructor(cena, { jogador, personagem, hpMax, rotulo }) {
+  constructor(cena, { jogador, personagem, hpMax, rotulo, nomeJogador }) {
     this.cena = cena
     this.jogador = jogador
     this.hpMax = hpMax
@@ -50,8 +50,11 @@ export default class HudPvp {
 
     const tag = texto(x0, 6, rotulo ?? `P${jogador + 1}`, 13, corTexto(CORES.almas[jogador])).setOrigin(origem, 0)
     const coracao = cena.add.image(x0 + s * (tag.width + 10), 13, 'coracao').setTint(CORES.almas[jogador]).setScale(0.9)
-    this.nome = texto(x0 + s * (tag.width + 20), 4, (def?.nome ?? personagem).toUpperCase(), 16, corTexto(corPersonagem)).setOrigin(origem, 0)
-    this.estado = texto(this.nome.x + s * (this.nome.width + 10), 8, '', 10, TEXTO.guarda).setOrigin(origem, 0)
+    // o NOME DO JOGADOR identifica o lado (pvp/nomes.js); o personagem fica pequeno ao lado
+    this.nome = texto(x0 + s * (tag.width + 20), 4, nomeJogador ?? (def?.nome ?? personagem).toUpperCase(), 16, corTexto(corPersonagem)).setOrigin(origem, 0)
+    this.personagemNome = nomeJogador ? texto(this.nome.x + s * (this.nome.width + 8), 10, (def?.nome ?? personagem).toUpperCase(), 9, '#9a9ab0', { strokeThickness: 2 }).setOrigin(origem, 0) : null
+    const ultimo = this.personagemNome ?? this.nome
+    this.estado = texto(ultimo.x + s * (ultimo.width + 10), 8, '', 10, TEXTO.guarda).setOrigin(origem, 0)
 
     // barra de HP (fundo, rastro do dano e a barra em si)
     const yb = 28
@@ -76,7 +79,7 @@ export default class HudPvp {
     this.sequencia = 0
     this.textoCombo = texto(x0, this.yCombo, '', 10, '#ffd23c', { strokeThickness: 2 }).setOrigin(origem, 0).setVisible(false)
 
-    this.container.add([fundo, vazio, this.rastro, this.barra, tag, coracao, this.nome, this.estado, this.textoHp, this.gemas, this.textoEnergia, this.textoCombo])
+    this.container.add([fundo, vazio, this.rastro, this.barra, tag, coracao, this.nome, ...(this.personagemNome ? [this.personagemNome] : []), this.estado, this.textoHp, this.gemas, this.textoEnergia, this.textoCombo])
     this.escudo = null
     this.protegido = false
     this.setHp(hpMax, false)
