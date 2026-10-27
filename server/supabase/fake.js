@@ -129,7 +129,9 @@ function rpcs(sb) {
           const perfil = t.perfis.find((x) => x.id === pp.user_id)
           if (!perfil) continue
           if (t.concessoes.some((c) => c.partida_id === p_partida && c.user_id === pp.user_id)) continue
-          const outro = lados.find((x) => x.lado !== pp.lado)
+          // como a 0006: o "oponente" do limite diário é o 1º outro lado COM conta (senão o 1º outro lado);
+          // com 2 lados só existe um. Nas partidas de 3 e 4 isso conta por par de contas
+          const outro = lados.filter((x) => x.lado !== pp.lado).sort((x, y) => Number(!x.user_id) - Number(!y.user_id) || x.lado - y.lado)[0]
           const oponente = outro?.user_id ?? null
           const oponenteRef = outro?.ref ?? null
           // só conta partidas do mesmo modo, hoje, contra o mesmo oponente (a conta ou a chave do convidado)

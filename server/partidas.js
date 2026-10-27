@@ -48,8 +48,8 @@
 //
 // N LADOS (Fase 5A, a base dos modos de 3–4; docs/online.md "Partidas de N"): o
 // registro, a leitura do relato e a decisão já aceitam N participantes (lado =
-// vaga da sala, 0 = host). Os modos novos ainda não dão XP (MODOS_COM_XP: cada
-// sub-fase acrescenta o seu quando a partida existir). O que cada um relata:
+// vaga da sala, 0 = host). Só dão XP os modos cuja partida
+// existe (MODOS_COM_XP: o coop4 entrou na 5B; ffa e 2x2 entram com a 5D e a 5E). O que cada um relata:
 //   coop4  { vitoria }                    o time inteiro vence ou perde
 //   ffa    { colocacoes: [lado, ...] }    do 1º ao último (todos os lados, sem repetir)
 //   2x2    { vencedorTime: 0 | 1 | null } time = timeDoLado(lado) (null = empate)
@@ -91,8 +91,8 @@ export const MODOS_PARTIDA = {
   ffa: { min: 3, max: 4, decide: 'colocacao' },
   '2x2': { min: 4, max: 4, decide: 'times' },
 }
-// os modos que registram partida e dão XP hoje (5B/5D/5E acrescentam os seus)
-export const MODOS_COM_XP = ['pvp', 'coop']
+// os modos que registram partida e dão XP hoje (5B ligou o coop4; 5D/5E acrescentam os seus)
+export const MODOS_COM_XP = ['pvp', 'coop', 'coop4']
 // 2x2: as vagas 0 e 2 (host e 2º convidado) contra 1 e 3
 export const timeDoLado = (lado) => lado % 2
 const ehModoN = (modo) => Boolean(MODOS_PARTIDA[modo]?.decide)
@@ -254,7 +254,9 @@ function resultadosN(p, r) {
 // p: { modo, criadaEm, hostLado?, hostCaiu?, participantes: [{ lado, time, relato, relatadoEm, saiuEm }] } (hostLado: 0 se faltar)
 export function decidirN(p, agora) {
   const relataram = p.participantes.filter((x) => x.relato)
-  const marcos = p.participantes.flatMap((x) => [x.relatadoEm, x.saiuEm]).filter((t) => t != null)
+  // a duração vai até o primeiro relato (a partida acabou). Com 3 ou 4 a saída de um NÃO acaba a
+  // partida: só conta se ninguém relatou (aí vai até a primeira saída)
+  const marcos = (relataram.length ? relataram.map((x) => x.relatadoEm) : p.participantes.map((x) => x.saiuEm)).filter((t) => t != null)
   const fim = marcos.length ? Math.min(...marcos) : agora
   const duracaoS = Math.max(0, Math.round((fim - p.criadaEm) / 1000))
   const primeiroRelato = relataram.length ? Math.min(...relataram.map((x) => x.relatadoEm)) : null
@@ -484,14 +486,20 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
       if (!x || x.relato || x.saiuEm != null) continue
       x.saiuEm = quando
       if (completa(p)) decidirAgora(p)
-      else prazo(p, ABANDONO_GRACA_MS)
+      // com 3 ou 4 a saída de um NÃO acaba a partida (os outros seguem jogando): sem relato ainda, não
+      // há o que esperar; o prazo dos relatos começa no primeiro relato (relatar) ou quando o host volta ao lobby
+      else if (!ehModoN(p.modo) || p.participantes.some((y) => y.relato)) prazo(p, ABANDONO_GRACA_MS)
     }
   }
 
   // o host caiu no meio e não voltou a tempo (a sala vai fechar logo depois)
   function hostCaiu(sala) {
     const p = sala.partidaId ? partidas.get(sala.partidaId) : null
-    if (p && !p.decisao) p.hostCaiu = true
+    if (!p || p.decisao) return
+    p.hostCaiu = true
+    // com 3 ou 4 a sala fecha sem que ninguém "saia" um a um: a decisão (encerrada, host_caiu, ou os
+    // relatos que já chegaram) não pode ficar esperando para sempre
+    if (ehModoN(p.modo)) prazo(p, ABANDONO_GRACA_MS)
   }
 
   // o host voltou ao lobby (ou começou outra): os relatos ainda podem chegar

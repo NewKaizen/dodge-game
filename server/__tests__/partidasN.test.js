@@ -19,7 +19,7 @@ test('os tamanhos de cada modo e os que dão XP hoje', () => {
   assert.deepEqual(MODOS_PARTIDA.pvp, { min: 2, max: 2 })
   assert.equal(MODOS_PARTIDA.coop4.max, 4)
   assert.equal(MODOS_PARTIDA['2x2'].min, 4)
-  assert.deepEqual(MODOS_COM_XP, ['pvp', 'coop'])
+  assert.deepEqual(MODOS_COM_XP, ['pvp', 'coop', 'coop4'])
   assert.deepEqual([0, 1, 2, 3].map(timeDoLado), [0, 1, 0, 1])
 })
 
@@ -98,7 +98,11 @@ test('N: quem saiu antes do primeiro relato é abandono; os outros jogam o resul
   assert.equal(d.validacao, 'validada')
   assert.equal(d.motivo, 'abandono')
   assert.deepEqual(res(d), ['derrota', 'derrota', 'abandono', 'derrota'])
-  assert.equal(d.duracaoS, 50, 'a duração vai até o primeiro marco (a saída)')
+  // com 3 ou 4 a saída de um não acaba a partida: a duração vai até o primeiro RELATO (5B; antes valia a
+  // saída, e quem ficasse jogando depois de um abandono cedo perdia o XP por "partida curta")
+  assert.equal(d.duracaoS, 199)
+  // ninguém relatou: vai até a primeira saída
+  assert.equal(decidirN(partida('coop4', [{}, { saiu: 50_000 }, {}]), T0 + 400_000).duracaoS, 50)
 })
 
 test('2x2: o time do vencedor ganha, o outro perde; null é empate', () => {
@@ -126,10 +130,14 @@ test('os modos de 2 não passam pela política de N', () => {
   assert.equal(d.colocacoes, undefined)
 })
 
-test('registro: modo novo (sem XP ainda) não registra; com 2 de sempre registra', () => {
+test('registro: coop4 registra com 3 ou 4; ffa e 2x2 (sem XP ainda) não; o tamanho tem que servir', () => {
   const partidas = criarPartidas({ agora: () => T0, agendar: () => () => {} })
   const membros = (n) => Array.from({ length: n }, (_, i) => ({ id: `c${i}`, nome: `J${i}`, usuario: null }))
-  assert.equal(partidas.iniciar({ id: 's1', modo: 'coop4' }, membros(4)), null)
+  assert.equal(partidas.iniciar({ id: 's1', modo: 'ffa' }, membros(4)), null)
+  assert.equal(partidas.iniciar({ id: 's1b', modo: '2x2' }, membros(4)), null)
+  assert.equal(partidas.iniciar({ id: 's1c', modo: 'coop4' }, membros(2)), null, 'coop4 precisa de 3')
+  assert.equal(partidas.iniciar({ id: 's1d', modo: 'coop4' }, membros(4)).participantes.length, 4)
+  assert.equal(partidas.iniciar({ id: 's1e', modo: 'coop4' }, membros(3)).participantes.length, 3)
   assert.equal(partidas.iniciar({ id: 's2', modo: 'pvp' }, membros(3)), null)
   const p = partidas.iniciar({ id: 's3', modo: 'pvp' }, membros(2))
   assert.equal(p.participantes.length, 2)
