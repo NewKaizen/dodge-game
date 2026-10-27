@@ -103,7 +103,7 @@ export default class Dificuldade extends Phaser.Scene {
     })
 
     this.cursor = this.add.image(0, 0, 'coracao').setTint(CORES.almas[0]).setScale(1.8)
-    const dica = this.host ? '↑ ↓ escolher     A: lutar     B: voltar' : 'o host (P1) está escolhendo o nível...'
+    const dica = this.host ? '↑ ↓ escolher     A: lutar     B: voltar' : 'o host da partida está escolhendo o nível...'
     this.dica = texto(LARGURA / 2, ALTURA - 30, dica, 14, TEXTO.desabilitado, { strokeThickness: 0 })
 
     const ultimo = ORDEM_NIVEIS.indexOf(this.nivelInicial ?? this.registry.get('nivel'))
@@ -274,7 +274,8 @@ export default class Dificuldade extends Phaser.Scene {
     this.time.delayedCall(climax + ENTRADA.depois, () => {
       if (!this.host) return
       const party = this.party ?? partyDe(this.registry)
-      if (this.rede) irParaCena(this, 'CoopArena', { chefe: this.idChefe, nivel, party, semente: `rede:${Date.now()}` })
+      // 3 ou 4 jogadores na sala: a arena do grupo (CoopArenaN); 2: a de sempre
+      if (this.rede) irParaCena(this, party.length > 2 ? 'CoopArenaN' : 'CoopArena', { chefe: this.idChefe, nivel, party, semente: `rede:${Date.now()}` })
       else irCarregando(this, 'CoopArena', { chefe: this.idChefe, nivel, party }, () => this.scene.launch('Entrada', { nivel }))
       if (this.rede) this.scene.launch('Entrada', { nivel })
     })

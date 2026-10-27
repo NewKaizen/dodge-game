@@ -3,10 +3,10 @@ import { LARGURA } from '../constants.js'
 import { lan, enviarResultado } from '../../lib/lan/rede.js'
 import { progressoDoXp, textoMotivo, itemDoCatalogo, NOME_TIPO } from '../../lib/progresso.js'
 import { partyDe } from '../data/batalha.js'
-import { emRede, meuLado } from '../rede.js'
+import { emRede, meuLado, meuIndice } from '../rede.js'
 import { barraXp, COR, texto } from './ui.js'
 
-// XP do CO-OP em rede (Fase 2F; server/partidas.js, docs/online.md): Vitoria e GameOver
+// XP do CO-OP em rede, de 2 (Fase 2F) e de 3 e 4 (Fase 5B; server/partidas.js, docs/online.md): Vitoria e GameOver
 // mandam o resultado do time UMA vez por partida e mostram uma faixa compacta com o XP
 // (o painel grande do PvpResultado é parte daquela cena e não dá para reaproveitar).
 //
@@ -29,7 +29,8 @@ export function prepararXpCoop(cena, { vitoria, estatisticas }) {
     vitoria: Boolean(vitoria),
     rodadas: estatisticas?.turnos ?? null,
     duracao: Math.round((estatisticas?.tempoMs ?? 0) / 1000),
-    personagem: partyDe(cena.registry)[meuLado()] ?? null,
+    // (3 ou 4 jogadores: o personagem da MINHA vaga; com 2, o lado de sempre)
+    personagem: partyDe(cena.registry)[partyDe(cena.registry).length > 2 ? meuIndice() : meuLado()] ?? null,
   })
   if (!s.eu.conta) xp.motivo = 'convidado'
   const parar = lan.subscribe((estado) => {

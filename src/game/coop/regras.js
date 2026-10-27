@@ -130,8 +130,8 @@ export const COOP = {
 //   miraPorRodada fração dos jogadores de pé que o chefe mira por rodada (rodízio)
 export const GRUPO = {
   2: { hpChefe: 1, densidade: 1, espaco: { largura: 1, altura: 1 }, apoioAliados: 1, miraPorRodada: 1 },
-  3: { hpChefe: 1.35, densidade: 1.15, espaco: { largura: 1.15, altura: 1.04 }, apoioAliados: 2, miraPorRodada: 0.5 },
-  4: { hpChefe: 1.7, densidade: 1.3, espaco: { largura: 1.3, altura: 1.08 }, apoioAliados: 2, miraPorRodada: 0.5 },
+  3: { hpChefe: 1.6, densidade: 1.15, espaco: { largura: 1.15, altura: 1.04 }, apoioAliados: 2, miraPorRodada: 0.5 },
+  4: { hpChefe: 2.2, densidade: 1.3, espaco: { largura: 1.3, altura: 1.08 }, apoioAliados: 2, miraPorRodada: 0.5 },
 }
 export const MAX_GRUPO = 4
 export const grupoDe = (n) => GRUPO[Math.min(MAX_GRUPO, Math.max(2, n))]

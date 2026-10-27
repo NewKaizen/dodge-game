@@ -80,7 +80,7 @@ const COR = { tema: '#3fd6c8', temaNum: 0x3fd6c8, ok: '#6dffb0', okNum: 0x6dffb0
 const MODOS = {
   pvp: { rotulo: 'PVP', cor: '#ff3d6e', cena: 'PvpEscolha', min: 2, max: 2 },
   coop: { rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty', min: 2, max: 2 },
-  coop4: { rotulo: 'CO-OP 3–4', cor: '#6dd0ff', cena: null, min: 3, max: 4, emBreve: true },
+  coop4: { rotulo: 'CO-OP 3–4', cor: '#6dd0ff', cena: 'EscolhaPartyN', min: 3, max: 4 },
   ffa: { rotulo: 'TODOS CONTRA TODOS', cor: '#ff3d6e', cena: null, min: 3, max: 4, emBreve: true },
   '2x2': { rotulo: '2x2', cor: '#ffd23a', cena: null, min: 4, max: 4, emBreve: true },
 }

@@ -141,7 +141,9 @@ export default class Selecao extends Phaser.Scene {
     this.escolhido = true
     tocar(this, 'cancelar')
     this.cameras.main.fadeOut(200, 0, 0, 0)
-    this.time.delayedCall(220, () => (this.rede ? irParaCena(this, 'EscolhaParty') : this.scene.start('EscolhaParty')))
+    // (o CO-OP de 3 e 4 tem a escolha de party própria, EscolhaPartyN)
+    const escolha = (this.party ?? partyDe(this.registry)).length > 2 ? 'EscolhaPartyN' : 'EscolhaParty'
+    this.time.delayedCall(220, () => (this.rede ? irParaCena(this, escolha) : this.scene.start(escolha)))
   }
 
   // em rede, o convidado apertou A/B: quem escolhe é o host
@@ -163,7 +165,7 @@ export default class Selecao extends Phaser.Scene {
     }
     this.fundo?.atualizar(delta)
     this.cursor.setY(this.cartas[this.indice].y - CARTA.altura / 2 - 18 + Math.sin(time / 200) * 3)
-    if (this.rede) this.info.setText(this.host ? 'você é o host (P1): você escolhe o chefe' : 'o host (P1) está escolhendo o chefe...')
+    if (this.rede) this.info.setText(this.host ? 'você é o host da partida: você escolhe o chefe' : 'o host da partida está escolhendo o chefe...')
     else {
       const jogadores = this.registry.get('numJogadores') ?? 1
       this.info.setText(`${jogadores} ${jogadores > 1 ? 'JOGADORES' : 'JOGADOR'}  (o 2º entra na escolha da party)`)

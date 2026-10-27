@@ -385,3 +385,37 @@ test('o texto das cartas de suporte do grupo fala de aliados', () => {
   assert.match(descricaoCoop(carta('kris-copas-1'), luta), /TODOS/)
   assert.match(descricaoCoop(carta('kris-copas-10')), /VOCÊ E NO PARCEIRO/)
 })
+
+test('queda e volta no meio da luta de 4: quem caiu da rede não é mirado nem entra no quadro; volta e é o primeiro a ser mirado; sai de vez e a luta segue', () => {
+  const e = nova(4)
+  const rng = criarRng('queda')
+  const historico = []
+  let fim = null
+  for (let r = 1; r <= 40 && !fim; r++) {
+    // o P2 (vaga 1) cai da rede nas rodadas 2 a 4, volta na 5 e sai de vez na 9
+    definirPresenca(e, { ausentes: r >= 2 && r <= 4 ? [1] : [], saiu: r >= 9 ? [1] : [] })
+    iniciarRodadaCoop(e)
+    // (o PC de quem caiu da rede não manda jogada: o host usa passar)
+    const jogadas = e.jogadores.map((jog, j) => (jog.ausente || jog.saiu ? null : escolherJogadaCoop(e, j, { rng })))
+    const res = resolverRodadaCoop(e, ...jogadas)
+    const q = res.quadro
+    historico.push({ r, mira: e.chefe.mira, noQuadro: q?.jogadores, passou1: res.jogadas[1].passou })
+    if (r >= 2 && r <= 4 || r >= 9) {
+      assert.ok(!e.chefe.mira.includes(1), `rodada ${r}: o P2 está fora e foi mirado`)
+      if (q) assert.equal(q.jogadores[1], false, `rodada ${r}: o P2 está no quadro`)
+      assert.ok(res.jogadas[1].passou, 'quem está fora não joga carta')
+    }
+    if (q) for (const j of q.mira ?? []) if (e.rodada % 3 === 0) aplicarDanoCoop(e, j, q.danos[j])
+    // (os golpes só começam a contar na 10ª rodada: a queda e a saída acontecem com a luta aberta)
+    if (r >= 10) calcularGolpes(e, res.golpes, e.jogadores.map(() => ({ grazes: 3 }))).forEach((g) => aplicarGolpe(e, g.dano))
+    fim = fimDaRodadaCoop(e, { quadro: q, acertos: e.jogadores.map(() => 0) }).vencedor
+  }
+  assert.ok(fim, 'a luta acabou mesmo sem o P2')
+  // a volta: na rodada 5 o P2 entra no quadro e (não tendo sido mirado há mais tempo) está na mira
+  const volta = historico.find((h) => h.r === 5)
+  assert.ok(volta.noQuadro?.[1] !== false && volta.mira.includes(1), `rodada 5: ${JSON.stringify(volta)}`)
+  // quem saiu de vez fica registrado e não volta, nem com a presença zerada
+  definirPresenca(e, { ausentes: [] })
+  assert.equal(e.jogadores[1].saiu, true)
+  for (const h of historico) if ((h.r >= 2 && h.r <= 4) || h.r >= 9) assert.ok(!h.mira.includes(1))
+})

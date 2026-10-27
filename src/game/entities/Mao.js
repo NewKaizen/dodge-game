@@ -16,6 +16,7 @@ import Carta from './Carta.js'
 //
 // Opções:
 //   jogador      0 ou 1: cor do cursor e do brilho (CORES.almas[jogador])
+//   cor          cor do cursor e do brilho (padrão: a do jogador; o CO-OP de 3 e 4 passa a da vaga)
 //   x, y         centro da base do leque (onde fica a carta do meio)
 //   angulo       rotação do leque inteiro (rad). 0 = embaixo abrindo para cima;
 //                Math.PI = em cima (cartas de cabeça para baixo, viradas para quem senta do outro lado)
@@ -33,7 +34,7 @@ export default class Mao {
   constructor(scene, opcoes = {}) {
     this.scene = scene
     this.jogador = opcoes.jogador ?? 0
-    this.cor = CORES.almas[this.jogador] ?? 0xffffff
+    this.cor = opcoes.cor ?? CORES.almas[this.jogador] ?? 0xffffff // (CO-OP 3–4: a cor da vaga, game/vagas.js)
     this.x = opcoes.x ?? CENTRO_X
     this.y = opcoes.y ?? 430
     this.angulo = opcoes.angulo ?? 0

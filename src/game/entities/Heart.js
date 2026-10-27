@@ -48,7 +48,7 @@ export default class Heart {
   // a mira do chefe: um anel tracejado com 4 pontas (branco e vermelho, para aparecer em qualquer fundo)
   desenharReticula() {
     const g = this.reticula
-    const r = 15
+    const r = 16
     g.clear()
     g.lineStyle(3, 0x000000, 1)
     g.strokeCircle(0, 0, r)
@@ -151,11 +151,11 @@ export default class Heart {
     if (!this.marcador) return
     // a forma e o nome em cima do coração; encostado no topo da caixa, embaixo dele
     const r = this.caixa.limites
-    const embaixo = this.y - 24 < r.top + 2
+    const embaixo = this.y - 28 < r.top + 2
     const lado = embaixo ? 1 : -1
     const tx = Phaser.Math.Clamp(this.x, r.left + this.tag.width / 2 + 2, r.right - this.tag.width / 2 - 2)
-    this.forma.setPosition(this.x, this.y + lado * 13)
-    this.tag.setPosition(tx, this.y + lado * 23)
+    this.forma.setPosition(this.x, this.y + lado * 19)
+    this.tag.setPosition(tx, this.y + lado * 29)
     this.reticula.setPosition(this.x, this.y)
   }
 
