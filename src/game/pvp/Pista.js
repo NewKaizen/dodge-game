@@ -14,7 +14,7 @@ import { tocar } from '../audio.js'
 // câmera de recorte (a da BattleBox) e as câmeras não desenham os objetos
 // umas das outras (recorte.js).
 //
-//   const pista = new Pista(cena, { x, y, largura, altura, jogador, cor, tema, velocidadeMax, velocidade, dinamica, faixa })
+//   const pista = new Pista(cena, { x, y, largura, altura, jogador, cor, tema, velocidadeMax, velocidade, dinamica, faixa, marcadores })
 //     x, y              centro da caixa padrão (mundo 640x480)
 //     largura, altura   tamanho padrão; as formas dos ataques escalam com ele
 //     jogador           dono do coração (número) ou lista de jogadores
@@ -26,13 +26,15 @@ import { tocar } from '../audio.js'
 //                       caixa pode crescer até 40px para cada lado da padrão.
 //                       Pistas vizinhas: passe dinamica.campo (região onde a
 //                       caixa pode ficar) sem cruzar o campo da outra
+//     marcadores        (CO-OP 3–4) { [jogador]: { forma, cor, rotulo } }: forma e nome em cima de cada
+//                       coração (coop/marcadores.js); sem isto os corações são só a cor, como sempre
 //     faixa             região onde a faixa de aproximação (as balas chegando de
 //                       fora, ver BattleBox.aproximar) pode aparecer; padrão: o
 //                       campo da caixa dinâmica
 //
 //   pista.mostrar()                      abre a caixa e põe o coração nela (Promise)
 //   pista.esconder()                     fecha a caixa (Promise)
-//   pista.rodar(ataque, { dano, ritmo, semente, aceleracao })
+//   pista.rodar(ataque, { dano, ritmo, semente, aceleracao, mira })
 //       Promise que resolve quando o ataque termina: preparo da caixa (se o
 //       ataque pede outra forma), respiros, o ataque e a volta da caixa ao
 //       padrão. Abre a caixa antes, se estiver fechada. Uma por vez: um
@@ -40,6 +42,8 @@ import { tocar } from '../audio.js'
 //       aceleracao (morte súbita, ACELERACAO em constants.js): multiplica a
 //       velocidade e a densidade do ritmo E o teto de velocidade das balas
 //       (senão o teto comeria o bônus das balas que já são rápidas)
+//       mira (CO-OP 3–4): lista de jogadores que o chefe mira nesta rodada; os tiros mirados
+//       (a.alvo()) só vão para os corações deles; os corações mirados ganham a mira (Heart.setMirado)
 //   pista.parar()                        interrompe o ataque em andamento (a Promise resolve)
 //   pista.atualizar(dt, joy)             todo frame; joy = {x, y} (-100..100) do dono,
 //                                        ou função (jogador) => {x, y} se a pista tem vários corações
@@ -63,7 +67,7 @@ import { tocar } from '../audio.js'
 //
 //   pista.caixa (BattleBox), pista.balas (Balas), pista.coracoes (Heart[]), pista.rodando
 export default class Pista {
-  constructor(cena, { x, y, largura, altura, jogador = 0, cor, tema = {}, velocidadeMax = Infinity, velocidade, dinamica, faixa } = {}) {
+  constructor(cena, { x, y, largura, altura, jogador = 0, cor, tema = {}, velocidadeMax = Infinity, velocidade, dinamica, faixa, marcadores = null } = {}) {
     this.cena = cena
     this.jogadores = [jogador].flat()
     this.tema = tema
@@ -93,7 +97,7 @@ export default class Pista {
     this.congelada = false
     this.espelho = false
     // com vários corações, cada um tem a cor do seu jogador (a `cor` vale para a borda)
-    this.coracoes = this.jogadores.map((j) => new Heart(cena, this.caixa, (this.jogadores.length > 1 ? null : cor) ?? CORES.almas[j] ?? CORES.almas[0], j))
+    this.coracoes = this.jogadores.map((j) => new Heart(cena, this.caixa, (this.jogadores.length > 1 ? null : cor) ?? marcadores?.[j]?.cor ?? CORES.almas[j] ?? CORES.almas[0], j, marcadores?.[j] ?? null))
     this.coracoes.forEach((c) => (c.espelho = false))
     this.caixa.aoMudar = () => this.coracoes.forEach((c) => c.ativo && c.ajustar()) // a caixa empurra os corações
 
@@ -167,7 +171,7 @@ export default class Pista {
 
   // ---------- ataque ----------
 
-  async rodar(ataque, { dano = 5, ritmo = {}, semente, aceleracao = 1 } = {}) {
+  async rodar(ataque, { dano = 5, ritmo = {}, semente, aceleracao = 1, mira = null } = {}) {
     if (this.ataque) this.parar()
     this.voltando?.() // a volta ao padrão do ataque anterior é cancelada pela mudança deste
     const geracao = ++this.geracao
@@ -190,6 +194,7 @@ export default class Pista {
       semente: semente ?? `${ATAQUE.semente}:${ataque.nome}`,
       nome: ataque.nome,
       velocidadeCoracao: () => this.velocidadeCoracao, // limite dos perseguidores (FUGA em constants.js)
+      mira,
     })
 
     // se o ataque pede outra caixa, o aviso

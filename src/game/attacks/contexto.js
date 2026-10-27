@@ -36,7 +36,8 @@ import { duracaoPulso } from '../acessibilidade.js'
 //                             é o mesmo objeto o turno todo, então leia a.caixa na hora de usar (ela pode ter mudado)
 //   a.caixaPara(forma)        muda a caixa ({ largura, altura, x?, y? }; null = padrão), com aviso antes.
 //                             Normalmente não chame direto: use a opção `caixa` do ataque (attacks/definir.js)
-//   a.alvo()                  posição {x, y} de um coração (alterna entre os jogadores)
+//   a.alvo()                  posição {x, y} de um coração (alterna entre os jogadores; no CO-OP 3–4 só
+//                             entre os que o chefe MIRA nesta rodada: opção `mira`, coop/regras.js escolherMira)
 //   a.pontoLonge(distancia)   ponto da caixa longe de todos os corações
 //   a.isolado(fn)             roda fn() com um sorteio só dela (gasta UM número da semente do
 //                             ataque, sempre): para escolhas que olham onde os corações estão.
@@ -62,7 +63,7 @@ import { duracaoPulso } from '../acessibilidade.js'
 // Tudo que foi agendado para automaticamente quando o ataque acaba.
 export default class ContextoAtaque {
   // velocidadeCoracao: px/s do coração (número ou função lida na hora; a Pista passa a dela)
-  constructor({ cena, balas, caixa, coracoes, tema = {}, dano = 5, ritmo = {}, semente, nome = 'ataque', velocidadeCoracao }) {
+  constructor({ cena, balas, caixa, coracoes, tema = {}, dano = 5, ritmo = {}, semente, nome = 'ataque', velocidadeCoracao, mira = null }) {
     this.cena = cena
     this.balas = balas
     this.caixaDeBatalha = caixa
@@ -79,6 +80,7 @@ export default class ContextoAtaque {
     this.tempo = 0
     this.fim = Infinity
     this.proximoAlvo = { i: 0 }
+    this.mira = Array.isArray(mira) && mira.length ? mira : null // jogadores mirados (null: todos)
     this.fonteVelocidadeCoracao = velocidadeCoracao
   }
 
@@ -253,7 +255,10 @@ export default class ContextoAtaque {
   // ---------- alvos e sorteios (com semente) ----------
 
   alvo() {
-    const ativos = this.coracoes.filter((c) => c.ativo)
+    const todos = this.coracoes.filter((c) => c.ativo)
+    // só os mirados (se algum deles ainda está no quadro; senão todos)
+    const mirados = this.mira ? todos.filter((c) => this.mira.includes(c.jogador)) : []
+    const ativos = mirados.length ? mirados : todos
     if (!ativos.length) return { x: this.caixa.centerX, y: this.caixa.bottom - 30 }
     const c = ativos[this.proximoAlvo.i++ % ativos.length]
     return { x: c.x, y: c.y }
