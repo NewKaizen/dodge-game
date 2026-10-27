@@ -55,12 +55,27 @@ const SO_ESCURECEM = ['config', 'cartas', 'lan', 'rapido', 'perfil']
 const comConta = () => siteNaInternet() || get(conta).estado !== 'indisponivel'
 const montarLista = (comContas) => (comContas ? [RAPIDO, CO_OP, PVP, ONLINE, GUIA, PERFIL, CONFIG] : [CO_OP, PVP, ONLINE, GUIA, CONFIG])
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
+// deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do create().
+// Testado em src/game/__tests__/cenasReaproveitadas.test.js.
+const estadoInicial = () => ({
+  sala: null,
+  telao: null,
+  painel: null,
+  linhas: null,
+  seta: null,
+  aviso: null,
+  miniatura: null,
+  barras: null,
+})
+
 export default class Menu extends Phaser.Scene {
   constructor() {
     super('Menu')
   }
 
   create() {
+    Object.assign(this, estadoInicial())
     // host de uma sala LAN: o "menu" dele é o lobby. Aberto por um link
     // ?sala=CODIGO: vai direto para a tela ONLINE, que entra na sala
     if (souHost() || salaDoLink()) {

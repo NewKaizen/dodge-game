@@ -22,12 +22,19 @@ const OPCOES = [
   { id: 'sair', rotulo: 'SAIR DA LUTA' },
 ]
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a abertura anterior deixou aqui
+// (a Config aberta por cima, por exemplo) volta ao inicial no começo do init().
+const estadoInicial = () => ({
+  emConfig: false,
+})
+
 export default class Pausa extends Phaser.Scene {
   constructor() {
     super('Pausa')
   }
 
   init(dados) {
+    Object.assign(this, estadoInicial())
     this.nomeChefe = dados.nome ?? ''
     this.cenaPausada = dados.cena
     this.dadosRecomecar = dados.recomecar
@@ -66,7 +73,9 @@ export default class Pausa extends Phaser.Scene {
     // com as configurações abertas por cima, quem ouve os botões é a Config
     this.controles.onBotao((_, botao) => !this.emConfig && (botao === 'A' ? this.escolher() : this.continuar()))
     this.controles.onPausa(() => !this.emConfig && this.continuar())
-    this.events.on('resume', () => (this.emConfig = false))
+    const aoVoltar = () => (this.emConfig = false)
+    this.events.on('resume', aoVoltar)
+    this.events.once('shutdown', () => this.events.off('resume', aoVoltar)) // a cena é reaproveitada: sem ouvinte acumulado
     this.marcar(false)
     tocar(this, 'confirmar')
   }

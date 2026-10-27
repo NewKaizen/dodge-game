@@ -382,12 +382,26 @@ function coresDaPaleta(paleta) {
   return Object.values(cores).some((c) => c !== null) ? cores : null
 }
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
+// deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do init().
+// Testado em src/game/__tests__/cenasReaproveitadas.test.js.
+const estadoInicial = () => ({
+  fundo: null,
+  gAbas: null,
+  abas: null,
+  camadaLista: null,
+  realce: null,
+  linhas: null,
+  painel: null,
+})
+
 export default class Config extends Phaser.Scene {
   constructor() {
     super('Config')
   }
 
   init(dados) {
+    Object.assign(this, estadoInicial())
     this.sobre = dados?.sobre ?? null
     this.voltarPara = dados?.voltar ?? 'Menu'
   }

@@ -180,6 +180,30 @@ const outro = (j) => 1 - j
 const ATAQUE_VAZIO = { nome: 'bonus', duracao: 5000, caixa: null, iniciar() {} }
 const VENCEDOR = { p1: 1, p2: 2, empate: 0 }
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
+// deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do init().
+// Testado em src/game/__tests__/cenasReaproveitadas.test.js.
+const estadoInicial = () => ({
+  fundoArena: null,
+  pistas: null,
+  textoRodada: null,
+  textoRelogio: null,
+  textoTreino: null,
+  textoBonus: null,
+  indicadorVelocidade: null,
+  banner: null,
+  status: null,
+  dica: null,
+  infoPista: null,
+  avisoPista: null,
+  ultimoSegundo: null,
+  tempoEsgotado: false,
+  fimDaEscolha: null,
+  etiquetasMesa: [],
+  grazesRodada: [0, 0],
+  paradaAgendada: false,
+})
+
 export default class PvpArena extends Phaser.Scene {
   // a CoopArena (CO-OP de cartas) estende esta cena com outra chave
   constructor(chave = 'PvpArena') {
@@ -187,6 +211,7 @@ export default class PvpArena extends Phaser.Scene {
   }
 
   init(dados) {
+    Object.assign(this, estadoInicial())
     const salvo = this.registry.get('pvp') ?? {}
     const valido = (id) => (CARTAS[id] ? id : null)
     this.ids = [valido(dados?.p1) ?? valido(salvo.p1) ?? 'kris', valido(dados?.p2) ?? valido(salvo.p2) ?? 'susie']

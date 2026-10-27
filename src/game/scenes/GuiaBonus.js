@@ -43,12 +43,29 @@ const PAUSA_ENTRE_VOLTAS = 550 // ms com as caixas fechadas entre uma volta e a 
 const ESPERA_TROCA = 420 // ms entre trocar de evento e a volta nova (o efeito anterior termina de sair)
 const CPU = 1 // a caixa da direita é sempre da CPU (os eventos ajudam a CPU nela)
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
+// deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do init().
+// Testado em src/game/__tests__/cenasReaproveitadas.test.js.
+const estadoInicial = () => ({
+  pistas: null,
+  contador: null,
+  nome: null,
+  descricao: null,
+  placarTextos: null,
+  painelDica: null,
+  tituloDica: null,
+  corpoDica: null,
+  aviso: null,
+  ajuda: null,
+})
+
 export default class GuiaBonus extends Phaser.Scene {
   constructor() {
     super('GuiaBonus')
   }
 
   init(dados) {
+    Object.assign(this, estadoInicial())
     this.arenaId = ARENA[dados?.arena] ? dados.arena : 'castelo'
     this.eventoInicial = dados?.evento ?? null
   }

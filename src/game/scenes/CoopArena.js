@@ -135,12 +135,28 @@ const FESTA = [
 const NOMES_ESPECIAIS = { espelho: 'ESPELHO!', anular: 'ANULAR!', roubo: 'ROUBO!', segundaChance: 'SEGUNDA CHANCE!' }
 const NOMES_GOLPE = { espadas: 'GOLPE', ouros: 'GOLPE + ATRASA', paus: 'ARMADILHA', super: 'SUPER', espelho: 'REFLEXO', eco: 'ECO' }
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
+// deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do init().
+// Testado em src/game/__tests__/cenasReaproveitadas.test.js.
+const estadoInicial = () => ({
+  fundo: null,
+  inimigo: null,
+  textoChefe: null,
+  balao: null,
+  personagens: null,
+  quadro: null,
+  pistas: null,
+  etiquetasMesa: [],
+  perfeitoCoop: [false, false],
+})
+
 export default class CoopArena extends PvpArena {
   constructor() {
     super('CoopArena')
   }
 
   init(dados) {
+    Object.assign(this, estadoInicial())
     this.idChefe = CHEFES[dados?.chefe] ? dados.chefe : this.registry.get('chefe') ?? 'king'
     const nivel = dados?.nivel ?? this.registry.get('nivel')
     this.idNivel = NIVEIS[nivel] ? nivel : 'facil'

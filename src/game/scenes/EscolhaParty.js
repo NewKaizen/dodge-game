@@ -19,6 +19,16 @@ const TAMANHO_PARTY = 2 // com 1 jogador ele escolhe todos; com 2, cada um escol
 const CHAVE_SALVA = 'dodge-party' // última party (também fica no registry)
 const CURSOR_MS = 300 // em rede: de quanto em quanto o meu cursor vai de novo para o outro PC
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
+// deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do create().
+// Testado em src/game/__tests__/cenasReaproveitadas.test.js.
+const estadoInicial = () => ({
+  colunas: null,
+  card: null,
+  cards: null,
+  paineis: null,
+})
+
 // Escolha da party do CO-OP (Menu -> EscolhaParty -> Selecao).
 // Lista TODOS os personagens de data/personagens.js, na ordem do arquivo.
 //   1 jogador:  escolhe o 1º e o 2º personagem (sem repetir); B desfaz o último
@@ -43,6 +53,7 @@ export default class EscolhaParty extends Phaser.Scene {
   }
 
   create() {
+    Object.assign(this, estadoInicial())
     this.ids = Object.keys(PERSONAGENS)
     this.controles = new Controles(this)
     // `origem` = de qual conjunto o botão veio: o A do jogador 2 (Enter) entra, o B dele sai (game/jogadores.js)

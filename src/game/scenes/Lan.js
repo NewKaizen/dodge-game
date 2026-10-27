@@ -71,6 +71,20 @@ const MODOS = { pvp: { rotulo: 'PVP', cor: '#ff3d6e', cena: 'PvpEscolha' }, coop
 const LINHAS_SALAS = 5 // salas visíveis na lista
 const LINHAS_CHAT = 9
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
+// deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do init().
+// Testado em src/game/__tests__/cenasReaproveitadas.test.js.
+const estadoInicial = () => ({
+  pingPartida: null,
+  nos: null,
+  ligacoes: [],
+  pacotes: null,
+  redeGfx: null,
+  titulo: null,
+  subtitulo: null,
+  barras: null,
+})
+
 export default class Lan extends Phaser.Scene {
   constructor() {
     super('Lan')
@@ -78,6 +92,7 @@ export default class Lan extends Phaser.Scene {
 
   // { rapido: true }: veio do JOGAR RÁPIDO do menu inicial, entra na fila assim que conectar
   init(dados) {
+    Object.assign(this, estadoInicial())
     this.rapidoPendente = Boolean(dados?.rapido)
   }
 

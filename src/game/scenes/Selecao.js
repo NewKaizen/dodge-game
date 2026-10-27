@@ -12,6 +12,13 @@ import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
 const CARTA = { largura: 176, altura: 270, y: 245, passo: 200 } // 4 cartas largas: usam o 16:9 inteiro
 const CURSOR_MS = 300 // em rede: de quanto em quanto o host manda o cursor de novo
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
+// deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do init().
+// Testado em src/game/__tests__/cenasReaproveitadas.test.js.
+const estadoInicial = () => ({
+  indice: null,
+})
+
 // Tela de seleção de chefe (com a dificuldade base); depois vem a tela do nível (Dificuldade)
 // B: volta para a escolha da party (EscolhaParty)
 // Dados (opcionais): { party, chefe } (party: os ids, na ordem; sem ela, a do
@@ -27,6 +34,7 @@ export default class Selecao extends Phaser.Scene {
   }
 
   init(dados) {
+    Object.assign(this, estadoInicial())
     this.party = Array.isArray(dados?.party) ? dados.party : null
     this.chefeInicial = dados?.chefe ?? null
   }
