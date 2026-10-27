@@ -33,6 +33,10 @@
 // recebe vê a sessão nova e começa a contar dela (as mensagens de uma sessão
 // velha que ainda chegarem são jogadas fora).
 //   reiniciar()                     sessão nova (game/rede.js chama quando o parceiro muda)
+//   descartar(de)                   a sessão ATUAL de `de` não vale mais: o que ainda chegar
+//                                   dela é jogado fora; só uma sessão nova dele vale (retomada
+//                                   da 2D: o host volta a rodada e as mensagens da rodada velha
+//                                   que estavam no caminho não podem cair na rodada nova)
 //
 // Teste: testar({ atrasoMs, variacaoMs }) atrasa a ENTREGA do que chega
 // (simula internet ruim; as confiáveis continuam em ordem).
@@ -208,6 +212,14 @@ export function criarCanal({ enviarBruto, enviarReserva = enviarBruto, meuId = (
       minhaSessao = sessao()
       seq = 0
       semRecibo.clear()
+    },
+    descartar(de) {
+      const atual = sessaoDe.get(de)
+      if (atual === undefined) return
+      const id = `${de}|${atual}`
+      velhas.add(id)
+      esperado.delete(id)
+      foraDeOrdem.delete(id)
     },
     // outro parceiro (ou o mesmo reconectado): as rápidas dele começam de novo
     // (as confiáveis se acertam sozinhas pela sessão)

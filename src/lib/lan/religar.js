@@ -119,3 +119,16 @@ export function apagarChave(armazenamento = armazenamentoPadrao()) {
     armazenamento?.removeItem(CHAVE_RETOMADA)
   } catch {}
 }
+
+// ---------- o aviso na tela (cena Religando, game/religando.js) ----------
+
+// queda: { eu: true } (a MINHA conexão caiu) | { eu: false, nome } (o outro caiu)
+//        | { retomando: true } (voltou: esperando o host voltar a rodada); ate: Date.now do fim
+// -> { titulo, texto, segundos }
+export function textoDaQueda(queda, agora = Date.now()) {
+  const segundos = queda?.ate ? Math.max(0, Math.ceil((queda.ate - agora) / 1000)) : null
+  if (queda?.retomando) return { titulo: 'CONEXÃO DE VOLTA', texto: 'voltando para o começo da rodada…', segundos: null }
+  if (queda?.eu) return { titulo: 'A CONEXÃO CAIU', texto: `reconectando… (${segundos ?? 0} s)`, segundos }
+  const quem = queda?.nome ? String(queda.nome) : 'o outro jogador'
+  return { titulo: 'O OUTRO JOGADOR CAIU', texto: `${quem} caiu: esperando até ${segundos ?? 0} s…`, segundos }
+}

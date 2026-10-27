@@ -194,3 +194,29 @@ test('canal direto mudo (aberto, mas não entrega): o reenvio e o recibo da repe
   a.entregar(servidor.BA.shift())
   assert.equal(a.estadoDebug().semRecibo, 0)
 })
+
+test('retomada (2D): o host descarta a sessão do convidado, as mensagens velhas no caminho não entram na rodada nova', async () => {
+  const { a: host, b: conv, fioAB, fioBA, entregarTudo } = par()
+  conv.enviar('jogada', 3, { jogada: 'velha' })
+  entregarTudo()
+  assert.deepEqual(await host.receber('jogada', 3), { jogada: 'velha' })
+  conv.enviar('fimEsquiva', 3, { acertos: 1 }) // a queda: esta ficou no caminho
+  const noCaminho = fioBA.splice(0)
+  // o host volta a rodada: descarta a sessão do convidado e abre a dele de novo
+  host.descartar('B')
+  host.reiniciar()
+  host.limpar()
+  host.enviar('cena', null, { chave: 'PvpArena', retomada: true })
+  noCaminho.forEach((m) => host.entregar(m))
+  assert.deepEqual(host.estadoDebug().correio, [], 'a mensagem velha não entrou')
+  // o convidado recebe a cena e abre a sessão dele de novo
+  const cenas = []
+  conv.ao('cena', (d) => cenas.push(d))
+  while (fioAB.length) conv.entregar(fioAB.shift())
+  assert.equal(cenas.length, 1)
+  conv.reiniciar()
+  conv.enviar('jogada', 3, { jogada: 'nova' })
+  entregarTudo()
+  assert.deepEqual(await host.receber('jogada', 3), { jogada: 'nova' })
+  host.descartar('ninguem') // parceiro desconhecido: nada
+})

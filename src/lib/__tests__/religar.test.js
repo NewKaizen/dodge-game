@@ -137,3 +137,11 @@ test('chave de retomada: guarda, lê e apaga (e não quebra sem armazenamento)',
   apagarChave(quebrado)
   assert.equal(lerChave(null), null)
 })
+
+test('texto do aviso: eu caí, o outro caiu, voltando', async () => {
+  const { textoDaQueda } = await import('../lan/religar.js')
+  assert.deepEqual(textoDaQueda({ eu: true, ate: 15_500 }, 1000), { titulo: 'A CONEXÃO CAIU', texto: 'reconectando… (15 s)', segundos: 15 })
+  assert.equal(textoDaQueda({ eu: false, nome: 'BETO', ate: 20_000 }, 0).texto, 'BETO caiu: esperando até 20 s…')
+  assert.equal(textoDaQueda({ eu: false, ate: 0 }, 5000).texto, 'o outro jogador caiu: esperando até 0 s…')
+  assert.equal(textoDaQueda({ retomando: true }).texto, 'voltando para o começo da rodada…')
+})
