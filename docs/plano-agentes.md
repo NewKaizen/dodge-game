@@ -84,7 +84,7 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 | R3 Revisão final + P2 plano 2–6 | concluído: 5 defeitos corrigidos, plano em `docs/plano-fases-2-6.md` |
 | Correções pós-Fase 1 | concluído (NewKaizen/dodge-game#44: tela preta do convidado, CARREGANDO…, nome da conta) |
 | 2A Consolidação das telas | concluído (Perfil, Amigos e Coleção como cenas; avisos no jogo; JOGAR RÁPIDO e PERFIL no menu); falta o teste restrito (`docs/teste-fase1.md`) e ver no navegador com contas reais |
-| Fase 2 | 2A e 2B concluídas (NewKaizen/dodge-game#45); 2D em andamento (Opus); depois 2C, 2E, 2F. Decisões: consolidação = 2A; controle padrão Xbox/PS remapeável; religação 20 s; host cai = sem XP e sem derrota; retomada no começo da rodada (recomendadas; podem mudar antes da 2B/2D) |
+| Fase 2 | 2A e 2B concluídas (NewKaizen/dodge-game#45); 2C e 2D concluídas (PR aberto); próximas: 2E (revanche, ajustes do teste com a turma, auditoria de cenas reaproveitadas, cor do P1 x bloqueio) e 2F (pendências do servidor). Decisões: consolidação = 2A; controle padrão Xbox/PS remapeável; religação 20 s; host cai = sem XP e sem derrota; retomada no começo da rodada (recomendadas; podem mudar antes da 2B/2D) |
 
 ### Consolidação (depois das features da Fase 1)
 
