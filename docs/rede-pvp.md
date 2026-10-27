@@ -333,6 +333,8 @@ Testando: no host, `debugRede.iniciar('CoopArena', { chefe: 'king', nivel: 'faci
 
 ## CO-OP de 3 e 4 em rede (Fase 5B)
 
+O `PROTOCOLO` subiu para **9** (`server/lan.js` e `lib/lan/rede.js`): o `coop4` deixou de ser "em breve" e passou a registrar XP; um cliente velho não entra mais na sala.
+
 A `CoopArenaN` (`scenes/CoopArenaN.js`) e a ponte dela (`coop/ArenaRedeCoopN.js`) são o CO-OP de 3 e 4 sobre a estrela da 5A. As
 regras de autoridade são as do CO-OP de 2 (o **host da partida decide toda regra**: a carta do chefe, a mira, a resolução, o
 contra-ataque, a fase e o fim; **cada PC é dono do PRÓPRIO coração**: anda e colide aqui e manda o que lhe aconteceu), mas

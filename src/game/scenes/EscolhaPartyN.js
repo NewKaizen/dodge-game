@@ -123,6 +123,7 @@ export default class EscolhaPartyN extends Phaser.Scene {
     if (this.saindo) return
     canal.enviarRapido('partyEstado', { c: [...this.party.confirmados], k: [...this.cursorDe] })
     this.atualizarTela()
+    this.verSeCompleta() // (quem não confirmou pode ter saído da sala: aí a party já está completa)
   }
 
   // convidado: o que o host diz (a party de verdade e onde estão os cursores dos outros)

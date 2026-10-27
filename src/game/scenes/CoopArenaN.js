@@ -541,7 +541,13 @@ export default class CoopArenaN extends Phaser.Scene {
     const fora = () => this.saindo || this.vezPartida !== vez
     if (this.retomada) this.mostrarFaseRetomada()
     else await this.abertura()
-    if (this.entrandoNaLuta) this.mostrarBanner('VOCÊ VOLTOU!\nentra na próxima rodada', TEXTO.cura, { y: 236, tamanho: 18, ms: 2400 })
+    if (this.entrandoNaLuta) {
+      // voltou da queda no meio da luta: vê a mão e o placar como estão e entra na rodada seguinte
+      this.mostrarBanner('VOCÊ VOLTOU!\nentra na próxima rodada', TEXTO.cura, { y: 236, tamanho: 18, ms: 2400 })
+      this.sincronizarMao()
+      this.atualizarMonte()
+      this.atualizarChefe()
+    }
     while (!fora()) {
       await this.inicioDaRodada()
       if (fora()) return

@@ -289,7 +289,7 @@ export default class Vitoria extends Phaser.Scene {
 
   mensagem(rapido) {
     const nome = this.def.nome
-    const texto = `${nome} caiu! Ninguém segura essa dupla!`
+    const texto = `${nome} caiu! Ninguém segura ${partyDe(this.registry).length > 2 ? 'essa turma' : 'essa dupla'}!`
     const t = this.add
       .text(LARGURA / 2, 114, texto, estilo(18, TEXTO.normal))
       .setOrigin(0.5)
