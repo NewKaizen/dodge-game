@@ -182,11 +182,13 @@ export function instalarRede(game) {
     if (outro !== parceiro) canal.reiniciar()
     parceiro = outro
     // 2D: alguém caiu no meio da partida em rede
-    const caiu = s.religando ? { eu: true, ate: s.religando.ate } : s.outroCaiu && naSalaComParceiro(s) ? { eu: false, nome: s.outroCaiu.nome, ate: s.outroCaiu.ate } : null
+    // (fora da sala com o parceiro não tem o que esperar: solta antes de trocar de cena)
+    const naSala = naSalaComParceiro(s)
+    const caiu = !naSala ? null : s.religando ? { eu: true, ate: s.religando.ate } : s.outroCaiu ? { eu: false, nome: s.outroCaiu.nome, ate: s.outroCaiu.ate } : null
     if (caiu && ativa && !retomadaRecente()) {
       queda = caiu
       congelar(game)
-    } else if (destravar && !caiu && !esperaCena) {
+    } else if (destravar && !caiu && (!esperaCena || !naSala)) {
       const chave = cenaDaPartida()
       if (!ativa || !naSalaComParceiro(s) || !chave || SO_CONTINUAM.includes(chave) || retomadaRecente()) descongelar(game)
       else if (souHostDaRede()) voltarRodada(game, chave, outro)

@@ -22,7 +22,7 @@
 //                                   (confiável ou rápida); com alguém escutando,
 //                                   o tipo não vai para a caixa de correio.
 //                                   Devolve o desligar.
-//   limpar()                        esvazia a caixa de correio (partida nova)
+//   limpar()                        esvazia a caixa de correio e solta as esperas (partida nova)
 //
 // Confiáveis de verdade: cada uma vai com a SESSÃO de quem manda (e) e o
 // número dela na sessão (s, de 0). Quem recebe responde com o recibo
@@ -203,8 +203,14 @@ export function criarCanal({ enviarBruto, enviarReserva = enviarBruto, meuId = (
       ouvintes.get(tipo).add(fn)
       return () => ouvintes.get(tipo)?.delete(fn)
     },
+    // partida nova (troca de cena em rede): esvazia o correio e solta quem
+    // ainda esperava (com null). Sem isso, uma espera da cena velha ainda
+    // pendurada pegava a mensagem da cena nova (retomada da 2D: o `inicio`)
     limpar() {
       correio.clear()
+      const esperando = [...pedidos.values()].flat()
+      pedidos.clear()
+      for (const pronto of esperando) pronto(null)
     },
     // parceiro novo (ou o mesmo que saiu e voltou): as minhas confiáveis começam
     // outra sessão, do 0, e as da sessão velha não são mais reenviadas

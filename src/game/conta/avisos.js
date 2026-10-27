@@ -32,6 +32,7 @@ export const avisar = (aviso) => avisos.empurrar(aviso)
 
 const MODOS = { pvp: 'PVP', coop: 'CO-OP' }
 const SAIU_NO_MEIO = /saiu (no meio da partida|da partida)/
+const QUEDA = /não voltou a tempo|não deu para voltar à partida/
 const JANELA_SAIDA_MS = 30_000
 const FILA_PENDENTE_MS = 10_000
 
@@ -97,6 +98,8 @@ export function instalarAvisos() {
       } else if (filaPendente && Date.now() - filaPendente > FILA_PENDENTE_MS) filaPendente = 0
 
       if (s.erro && s.erro !== erroLan && SAIU_NO_MEIO.test(s.erro)) saiuEm = Date.now()
+      // a partida acabou por uma queda de conexão (2D): o aviso espera a tela de menu
+      if (s.erro && s.erro !== erroLan && QUEDA.test(s.erro)) avisar({ id: `queda:${Date.now()}`, tipo: 'erro', titulo: 'CONEXÃO', texto: s.erro, ms: 9000 })
       erroLan = s.erro
 
       const r = s.recompensa

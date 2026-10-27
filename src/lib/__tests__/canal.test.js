@@ -220,3 +220,14 @@ test('retomada (2D): o host descarta a sessão do convidado, as mensagens velhas
   assert.deepEqual(await host.receber('jogada', 3), { jogada: 'nova' })
   host.descartar('ninguem') // parceiro desconhecido: nada
 })
+
+test('limpar() solta as esperas penduradas: a da cena velha não pega a mensagem da nova', async () => {
+  const { a, b, entregarTudo } = par()
+  const velha = b.receber('inicio', 1) // a cena velha esperava (sem timeout)
+  b.limpar() // a cena nova abriu
+  assert.equal(await velha, null)
+  const nova = b.receber('inicio', 1)
+  a.enviar('inicio', 1, { estado: 'novo' })
+  entregarTudo()
+  assert.deepEqual(await nova, { estado: 'novo' })
+})

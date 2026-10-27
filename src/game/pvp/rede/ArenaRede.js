@@ -51,6 +51,10 @@ const ESPERA_RESULTADO_MS = 20000 // o host espera o replay do convidado acabar 
 const DEBUG_PERMITIDO = new Set(['forcarMao', 'setHp', 'setEnergia', 'forcarBonus'])
 
 export const copiar = (estado) => structuredClone(estado)
+// a ponte foi destruída com a cena, mas a cena abriu de novo (retomada da 2D: o
+// Phaser reaproveita o `this` e o saindo volta a false): quem ainda esperava
+// nesta ponte fica parado para sempre em vez de seguir na rodada nova
+const PARADA = new Promise(() => {})
 
 export default class ArenaRede {
   constructor(arena, { canal, meuLado, souHost }) {
@@ -96,15 +100,17 @@ export default class ArenaRede {
   async esperar(tipo, chave) {
     const inicio = Date.now()
     let aviso = inicio + ESPERA_AVISO_MS
-    while (!this.arena.saindo && !this.destruido) {
+    while (!this.arena.saindo) {
+      if (this.destruido) return PARADA
       const dados = await this.canal.receber(tipo, chave, { timeoutMs: ESPERA_PEDACO_MS })
+      if (this.destruido) return PARADA
       if (dados) return dados
       if (Date.now() >= aviso) {
         aviso += ESPERA_AVISO_MS
         console.warn(`[rede] esperando '${tipo}' (rodada ${chave}) há ${Math.round((Date.now() - inicio) / 1000)} s`)
       }
     }
-    return null
+    return this.destruido ? PARADA : null
   }
 
   // Convidado: o estado do host vale. Confere com o daqui antes de trocar
@@ -409,7 +415,8 @@ export default class ArenaRede {
     while (!this.arena.saindo && !this.destruido && Date.now() < fim) {
       if (await this.canal.receber('resultadoPronto', rodada, { timeoutMs: ESPERA_PEDACO_MS })) break
     }
-    return !this.arena.saindo && !this.destruido
+    if (this.destruido) return PARADA
+    return !this.arena.saindo
   }
 
   // opções do Duelo/Copia (contrato com a parte C em docs/rede-pvp.md)
