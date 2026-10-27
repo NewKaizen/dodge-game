@@ -14,6 +14,7 @@ As salas online são privadas: não aparecem em lista nenhuma, só entra quem te
 - **Sem pausa**: o C (e o Esc) não fazem nada durante a partida (pausar travaria o amigo).
 - **Sem revanche** (fora do Jogar Rápido, abaixo): no fim, a única opção é **A: VOLTAR AO LOBBY** (do host ou do convidado): os dois voltam para o lobby da sala (que continua aberta), com o chat, e o host começa outra partida quando quiser.
 - Se o outro sai no meio, quem ficou volta para o lobby da sala (se a sala cai, volta ao menu); para sair no meio, use **Sair da sala** na barra de cima.
+- **Queda de conexão no meio da partida** (Fase 2D): a partida para nos dois com o aviso "o outro jogador caiu — esperando até 20 s…" (ou "reconectando…" em quem caiu) e o jogo tenta voltar sozinho. Voltou em até **20 s**: a partida recomeça **no começo da rodada** em que caiu. Não voltou: se foi o convidado, conta como abandono (regras abaixo); se foi o host, a sala fecha e a partida acaba **sem XP e sem derrota** para ninguém. Detalhes em [rede-pvp.md](rede-pvp.md#queda-de-conexão-no-meio-da-partida-fase-2d).
 
 ### Ping
 
@@ -92,7 +93,8 @@ TURN_SENHA=...
 
 - **"não deu para falar com o servidor: ele pode estar ligando…"**: o servidor caiu ou está acordando (Render grátis, até ~1 minuto) ou a sua internet caiu. O jogo tenta de novo sozinho.
 - **"não deu para confirmar a sua conta: você está jogando como convidado"**: a sessão expirou ou o serviço de contas (Supabase) não respondeu. Saia e entre de novo com o Google; sem isso não há XP.
-- **"a conexão caiu e você saiu da fila / da sala"**: o servidor tira quem perde a conexão (ninguém fica preso); quando reconectar, procure de novo ou entre pelo código.
+- **"a conexão caiu e você saiu da fila / da sala"**: no lobby e na fila o servidor tira quem perde a conexão (ninguém fica preso); quando reconectar, procure de novo ou entre pelo código. No meio de uma partida a vaga espera 20 s e o jogo volta sozinho (acima).
+- **"a conexão caiu e não voltou a tempo"** / **"não deu para voltar à partida: …"**: passaram os 20 s (ou a sala fechou nesse meio-tempo): a partida acabou para você.
 - **"não achei a sala …"**: código errado, ou o host já fechou a sala (ela some quando o host sai).
 - **Ping alto**: olhe a barra de cima. Se diz **pelo servidor**, a ligação direta não passou e tudo está dando a volta pelo servidor: configure um TURN (acima). Se diz **direto** com ping alto, é a internet de um dos dois (Wi-Fi fraco, download rolando); cabo ajuda muito.
 - **Brave**: com os escudos ligados o canal direto (WebRTC) pode abrir sem entregar nada. O jogo percebe em ~3 s e passa tudo pelo servidor (ping maior, mas joga); se mesmo assim travar, desligue os escudos para este site.
@@ -119,7 +121,7 @@ Convidado joga normalmente, só não tem amigos.
 - **Link**: **copiar link da sala** gera `https://<site>/?sala=CODIGO`. Quem
   abre (mesmo sem conta) vai direto para a tela ONLINE e entra na sala; o
   código de 5 letras continua valendo.
-- **Protocolo**: o lobby subiu para a versão 3 (hoje 5: a fila do Jogar Rápido e o XP, abaixo) (`PROTOCOLO` em `server/lan.js`
+- **Protocolo**: o lobby subiu para a versão 3 (hoje 7: a fila do Jogar Rápido, o XP e a recuperação de conexão da 2D) (`PROTOCOLO` em `server/lan.js`
   e `src/lib/lan/rede.js`): atualize os dois PCs. Mensagens novas: `convidar`,
   `responderConvite`, `amigosMudaram` (cliente) e `presencas`, `presenca`,
   `convite`, `conviteEnviado`, `conviteResposta`, `conviteFim`, `conviteNegado`,
@@ -183,7 +185,7 @@ conta e para convidado (convidado joga, mas a partida não dá XP: aviso na tela
 
 A sala ganhou `casual` no `sala {...}` e o `fechada` da sala casual vem com
 `casual: true`. `PROTOCOLO` subiu para **4** (`server/lan.js` e
-`src/lib/lan/rede.js`; hoje **5**, com o XP): atualize os dois PCs.
+`src/lib/lan/rede.js`; hoje **7**, com o XP e a recuperação de conexão): atualize os dois PCs.
 
 ### Testar com duas janelas
 
@@ -231,7 +233,7 @@ pelo **relógio do servidor** (do começo até esse fim), nunca a do cliente.
 
 - Prazo para o segundo relato: **20 s** depois do primeiro. Quem sai da sala sem
   ter relatado dá **3 s** para o relato do outro que podia estar a caminho.
-- "Saiu" = saiu da sala ou desconectou por conta própria. Quem foi tirado porque
+- "Saiu" = saiu da sala ou desconectou por conta própria. Quem **cai** no meio da partida tem 20 s para voltar (Fase 2D); só depois disso conta como saída, na hora da queda. O host que cai e não volta encerra a partida sem XP e sem derrota (`host_caiu`). Quem foi tirado porque
   a sala fechou (o host caiu, o oponente da casual saiu) ou porque o host o
   expulsou depois da partida não conta como abandono (o relato dele ainda vale).
 - Abandono na casual não tira XP de ninguém: quem saiu só não ganha nada naquela partida.
@@ -307,7 +309,7 @@ Cosmético nunca muda nada no jogo.
 
 `sala {...}` ganhou `partidaId`. `motivo` é um código (`vitoria`, `derrota`,
 `empate`, `contestada`, `participacao`, `abandono`, `sem_relato`, `curta`,
-`repeticao`, `repeticao_metade`, `convidado`, `mesma_conta`, `nao_registrada`,
+`repeticao`, `repeticao_metade`, `convidado`, `mesma_conta`, `host_caiu`, `nao_registrada`,
 `indisponivel`, `erro`); o texto para o jogador está em `src/lib/progresso.js`.
 
 ### Testar com duas contas
@@ -375,6 +377,7 @@ o aviso de desligamento (SIGTERM/SIGINT). Janela sem nada não escreve.
 | `fila_entradas`, `fila_pares`, `fila_pares_desfeitos` | entradas na fila, pares formados, pares que não fecharam |
 | `fila_espera_ms` | n, p50, p90 e máximo do tempo esperado até achar par (uma amostra por jogador pareado) |
 | `partidas_iniciadas`, `partidas_finalizadas`, `partidas_abandonadas`, `partidas_contestadas` | PVP online registradas (revanche abre outra); abandonada = alguém saiu no meio |
+| `partidas_quedas`, `partidas_retomadas` | alguém caiu no meio da partida (a vaga ficou guardada) e voltou a tempo (Fase 2D) |
 | `revanches_pedidas`, `revanches_aceitas` | pedidos e aceites duplos |
 | `avatar_envios_ok`, `avatar_envios_falha`, `avatar_bloqueios_ip` | fotos que subiram, falharam (imagem ruim, Storage) e pedidos barrados pelo limite por endereço |
 

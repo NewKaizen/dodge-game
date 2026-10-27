@@ -8,7 +8,9 @@ Numa sala (LAN ou ONLINE), nos dois modos (**PVP** e **CO-OP**), o jogo roda **n
 | --- | --- |
 | `src/lib/lan/canal.js` | O canal da partida (lógica pura, testada): mensagens **confiáveis em ordem** (`enviar`/`receber`/`ao`) e **rápidas** (`enviarRapido`, a última vale). As confiáveis vão numeradas dentro de uma **sessão** de quem manda e ganham **recibo** (`_ok`); sem recibo em 1 s vão de novo (uma que se perdeu no WebRTC fechando ou no servidor não trava a partida). Parceiro novo, ou o mesmo que saiu e voltou: `reiniciar()` abre outra sessão, do 0 (antes a numeração continuava e o outro esperava a mensagem 0 para sempre: tela preta no convidado). O **reenvio** (e o recibo de uma repetida) vai sempre **pelo servidor**, o caminho garantido: um canal direto aberto que não entrega nada não trava a troca de cena. |
 | `src/lib/lan/vigiaDireto.js` | O canal direto está entregando? (lógica pura, testada). Com o WebRTC aberto, cada lado manda um `_vivo` pelo direto a cada 1 s e o outro responde `_vivoOk` **pelo servidor**; sem resposta há 3,5 s o direto está **mudo** e `enviarRapido` (`lib/lan/transmissao.js`) manda tudo pelo servidor até ela voltar. Visto com o convidado no **Brave com os escudos ligados**: o canal abria, o host mandava a cena por ele e o convidado nunca recebia (tela parada). |
-| `src/game/rede.js` | Liga o canal no transporte (WebRTC direto, ou o servidor quando ele falha), diz se a partida é em rede (`emRede()`), qual é o meu lado (`meuLado()`: host 0, convidado 1) e faz o host mandar nas trocas de cena (`irParaCena`). Vigia a sala: se o outro sai no meio, cada um volta ao lobby (ou ao menu, se a sala caiu); quando o parceiro muda, reinicia a sessão do canal. O convidado parado 20 s na tela preta (a cena do host não chegou) sai da sala com o aviso "não deu para sincronizar com o host: voltando ao lobby". |
+| `src/game/rede.js` | Liga o canal no transporte (WebRTC direto, ou o servidor quando ele falha), diz se a partida é em rede (`emRede()`), qual é o meu lado (`meuLado()`: host 0, convidado 1) e faz o host mandar nas trocas de cena (`irParaCena`). Vigia a sala: se o outro sai no meio, cada um volta ao lobby (ou ao menu, se a sala caiu); quando o parceiro muda, reinicia a sessão do canal. Se alguém **cai** no meio, segura a partida e a retoma no começo da rodada ([Fase 2D](#queda-de-conexão-no-meio-da-partida-fase-2d)). O convidado parado 20 s na tela preta (a cena do host não chegou) sai da sala com o aviso "não deu para sincronizar com o host: voltando ao lobby". |
+| `src/lib/lan/religar.js` | Recuperação de conexão (Fase 2D, lógica pura, testada): as tentativas de voltar com espera crescente dentro da janela de 20 s, a chave de retomada no `sessionStorage` (por aba) e o texto do aviso. Ver [Queda de conexão no meio da partida](#queda-de-conexão-no-meio-da-partida-fase-2d). |
+| `src/game/religando.js` | A cena `Religando`: o aviso por cima da partida parada ("o outro jogador caiu — esperando até 20 s…" / "reconectando…", com a contagem). |
 | `src/game/controles.js` | Em rede: 2 jogadores, todos os controles daqui comandam o **meu** lado, o outro lado não tem controle aqui, e o C (pausa) não existe. |
 
 ## Regras de autoridade (valem para todo o PVP em rede)
@@ -120,6 +122,36 @@ Uma rodada em rede:
 6. **fim**: o host faz `fimDaRodada` e manda `fimRodada`; o convidado confere e troca. O K.O. (câmera lenta, replay) acontece nos dois quando o HP zera, venha o dano daqui ou de lá. Depois do "VENCEU!" o convidado manda `resultadoPronto` e fica esperando; o host espera por ele e abre a `PvpResultado` nos dois com os dados de sempre (as estatísticas do host valem: ele aplicou o dano e os grazes dos dois).
 
 Estado divergiu? O convidado avisa no console (`[rede] estado divergiu`, com os caminhos que mudaram) e segue com o do host. Esperas de sincronia param quando a cena sai (`this.saindo`: o outro saiu e `rede.js` tirou os dois da cena) e avisam no console a cada 30 s parados.
+
+## Queda de conexão no meio da partida (Fase 2D)
+
+Vale para PVP e CO-OP, LAN e ONLINE, enquanto a sala está **em partida** (da escolha de personagem ao resultado). No lobby e na fila, cair continua tirando na hora.
+
+**Servidor** (`server/lan.js`): o `bemvindo` traz uma **chave de retomada** (`retomada`: 24 bytes aleatórios, uma por conexão, trocada a cada volta). Quem cai fica na sala por **20 s** (`RETOMADA_MS`): o membro vem com `caiu` (ms que faltam) e a partida (o registro do XP) continua com ele. Uma conexão nova com `ola {retomar: chave}` e a **mesma conta** (ou convidado nos dois) ocupa a vaga: é o **mesmo cliente** (mesmo id, mesmo papel, a mesma partida, o mesmo lado no relato do resultado), e o `bemvindo` vem com `retomado: true`. Se o servidor ainda não tinha visto a conexão velha cair, a nova assume e a velha é fechada (nunca dois sockets na mesma vaga; o que a velha mandar depois é ignorado). Chave errada, de outra conta, já usada ou vencida: `retomadaNegada` com o motivo, e a conexão segue como uma nova (fora da sala). No máximo 20 tentativas por minuto por endereço.
+
+**Não voltou em 20 s**: sai como se tivesse saído na hora da queda.
+- **Convidado**: abandono, com as regras de sempre (`server/partidas.js`): quem ficou leva a vitória se ninguém relatou; a duração vai até a queda.
+- **Host**: sem migração. A sala fecha ("o host não voltou a tempo: a partida acabou sem XP e sem derrota para ninguém") e a partida acaba **encerrada**, `motivo_termino = 'host_caiu'`: ninguém ganha XP nem perde, e ninguém leva crédito de abandono.
+
+**Resultado e queda**: um relato mandado antes da queda vale uma vez (o repetido depois da volta não muda nada). Quem caiu e voltou ainda relata (só quem **saiu** de vez deixa de relatar). Um relato que o cliente tentou mandar com a conexão caída sai na volta, uma vez só.
+
+**Cliente** (`lib/lan/rede.js`): a conexão caiu no meio da partida: o lobby **não sai da sala** (`religando: { ate }`) e tenta voltar sozinho (250 ms, 750 ms, 1,5 s, 2,5 s e depois a cada 3 s) até a janela acabar. O outro caiu: `outroCaiu: { id, nome, ate }` (do `caiu` da sala). A janela acabou sem volta: sai da sala com o aviso "a conexão caiu e não voltou a tempo".
+
+**Jogo** (`game/rede.js`): durante a janela, nos **dois** PCs, as cenas da partida ficam paradas (`scene.pause`), os botões travados e a cena `Religando` mostra quem caiu e a contagem. A partida em rede continua sem pausa fora disso. Na volta:
+- **Arena (PVP e CO-OP)**: o **host** volta a partida para o **começo da rodada atual**. O host guarda o **ponto de retomada** no começo de cada rodada, antes de iniciá-la (`ArenaRede.guardarPonto`: o `estado` das regras, que tem HP, energia, mãos, baralhos, a fase do chefe e o RNG, e os extras da arena: estatísticas, último bônus). Ele descarta a sessão do canal do outro (`canal.descartar`: o que ainda estava no caminho era da rodada velha), abre a dele de novo (`reiniciar`) e abre a arena nos dois com `irParaCena` e os dados de sempre mais `retomada` (o ponto). O convidado recebe a `cena` com `retomada: true`, abre outra sessão do canal e os dois trocam o estado novo pelo do ponto (`aplicarRetomada`), pulam a abertura e começam a rodada: a mão sai igual (o RNG é o do ponto). Caiu antes da primeira rodada: a arena começa do zero.
+- **Escolha, voto, seleção, dificuldade**: a mesma cena abre de novo nos dois (com os dados com que abriu).
+- **Resultado, Vitória, Game Over, lobby**: só continuam de onde estavam (o canal segue a mesma sessão).
+- O convidado espera a cena da retomada no máximo 10 s (`ESPERA_CENA_MS`); sem ela, sai da sala com "não deu para sincronizar com o host".
+- A conexão direta (WebRTC) não é refeita: se ela não volta sozinha, as mensagens vão pelo servidor (o vigia do canal direto percebe em ~3 s).
+
+| Mensagem | Sentido | Dados |
+| --- | --- | --- |
+| `ola` | cliente → servidor | `{ ..., retomar?: chave }` |
+| `bemvindo` | servidor → cliente | `{ ..., retomada: chave nova, retomado?: true, retomadaNegada?: motivo }` |
+| `sala` | servidor → cliente | cada membro com `caiu: ms que faltam \| null` |
+| `cena` (canal) | host → conv. | `{ chave, dados: { ..., retomada: { estado, extra } }, retomada: true }` |
+
+Testando: `node --test server/__tests__/retomada.test.js` (a máquina de estados do servidor, com relógio falso), `src/lib/__tests__/religar.test.js`, `canal.test.js` (descartar) e `src/game/pvp/__tests__/retomadaArena.test.js` (o ponto e a mesma mão). Com duas abas: no dev, fechar o WebSocket do lobby de uma delas no meio da rodada (ou deixar o navegador offline por uns segundos) mostra o aviso nas duas e, na volta, a rodada recomeça; fora mais de 20 s, a regra do host/convidado acima.
 
 ## Telas do CO-OP em volta da arena
 
