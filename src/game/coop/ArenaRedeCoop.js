@@ -52,6 +52,7 @@ export default class ArenaRedeCoop extends ArenaRede {
   async iniciarRodada() {
     const a = this.arena
     if (this.souHost) {
+      this.guardarPonto()
       const eventos = iniciarRodadaCoop(a.estado)
       this.canal.enviar('inicio', a.estado.rodada, { estado: copiar(a.estado), eventos })
       return eventos

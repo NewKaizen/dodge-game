@@ -29,6 +29,14 @@ import { diferencasDeEstado, criarEspelhoCoracao } from './sincronia.js'
 // Esperas: esperar(tipo, chave) pede ao canal em pedaços curtos e desiste
 // quando a arena sai (o outro saiu: game/rede.js tira os dois da cena).
 //
+// Retomada (Fase 2D, game/rede.js): o HOST guarda o PONTO DE RETOMADA no
+// começo de cada rodada, antes de iniciá-la (`ponto`: o estado das regras, com
+// o RNG, HP, energia, mãos e baralhos como as regras guardam, e os extras da
+// arena: estatísticas, último bônus...). Alguém caiu e voltou: o host abre a
+// arena de novo nos dois com dadosRetomada() (os dados de sempre + `retomada`),
+// e cada PC troca o estado novo pelo do ponto (aplicarRetomada) e pula a
+// abertura: a rodada recomeça do zero, com a mesma mão (o RNG é o mesmo).
+//
 // A CoopArena (CO-OP de cartas) usa esta mesma ponte estendida
 // (coop/ArenaRedeCoop.js): as esperas, a escolha, o dano/graze e o coração do
 // outro são os mesmos; mudam as regras da rodada e ONDE está o coração do
@@ -60,6 +68,7 @@ export default class ArenaRede {
     this.rodadaEspelho = null
     this.aplicandoDebug = false
     this.debugPermitido = new Set(DEBUG_PERMITIDO) // ações de debug que valem nos dois PCs
+    this.ponto = null // host: o começo da rodada atual (retomada da 2D)
 
     this.desligar = [
       canal.ao('cursor', (d) => this.aoCursor(d)),
@@ -67,7 +76,7 @@ export default class ArenaRede {
       canal.ao('dano', (d) => this.aoEventoDoOutro('dano', d)),
       canal.ao('graze', (d) => this.aoEventoDoOutro('graze', d)),
     ]
-    if (import.meta.env.DEV) this.desligar.push(canal.ao('debug', (d) => this.aoDebug(d)))
+    if (import.meta.env?.DEV) this.desligar.push(canal.ao('debug', (d) => this.aoDebug(d)))
   }
 
   destruir() {
@@ -107,6 +116,30 @@ export default class ArenaRede {
     this.arena.estado = estado
   }
 
+  // ---------- retomada (2D) ----------
+
+  // host, no começo da rodada (antes de iniciá-la): o ponto de onde a partida volta
+  guardarPonto() {
+    const a = this.arena
+    this.ponto = { estado: copiar(a.estado), extra: copiar(a.extrasRetomada?.() ?? {}) }
+  }
+
+  // os dados para abrir a arena de novo nos dois (sem ponto ainda: a partida do começo)
+  dadosRetomada() {
+    const { retomada: _velha, ...base } = this.arena.sys.settings.data ?? {}
+    return this.ponto ? { ...base, retomada: copiar(this.ponto) } : base
+  }
+
+  // a arena abriu com `retomada`: o estado do começo da rodada no lugar do novo
+  aplicarRetomada(r) {
+    if (!r?.estado) return false
+    const a = this.arena
+    a.estado = copiar(r.estado)
+    Object.assign(a, copiar(r.extra ?? {}))
+    if (this.souHost) this.ponto = copiar(r)
+    return true
+  }
+
   // ---------- começo da rodada ----------
 
   // Host: inicia a rodada (energia, mãos, bônus) e manda o estado. Convidado:
@@ -114,6 +147,7 @@ export default class ArenaRede {
   async iniciarRodada() {
     const a = this.arena
     if (this.souHost) {
+      this.guardarPonto()
       a.comecarRodada()
       this.canal.enviar('inicio', a.estado.rodada, { estado: copiar(a.estado), bonusPendente: a.bonusPendente })
       return true

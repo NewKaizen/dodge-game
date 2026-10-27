@@ -240,6 +240,8 @@ export default class PvpArena extends Phaser.Scene {
     this.combosRodada = [null, null] // multiplicador do combo de perfeitos nesta rodada (null = não fez)
     velocidadeMusica(1) // começa no andamento normal (revanche/recomeçar também)
     this.estatisticas = [0, 1].map(() => ({ danoCausado: 0, danoRecebido: 0, cartasJogadas: 0, maiorCarta: null, grazes: 0, ases: 0, passes: 0, perfeitos: 0, maiorSequencia: 0, supers: 0 }))
+    // retomada (2D): alguém caiu e voltou; a partida volta ao começo da rodada (pvp/rede/ArenaRede.js)
+    this.retomada = this.rede?.aplicarRetomada(this.sys.settings.data?.retomada) ?? false
 
     this.desenharFundo()
     this.criarPistas()
@@ -525,8 +527,13 @@ export default class PvpArena extends Phaser.Scene {
 
   // ---------- partida ----------
 
+  // o que a retomada (2D) guarda além do estado das regras (ArenaRede.guardarPonto)
+  extrasRetomada() {
+    return { estatisticas: this.estatisticas, bonusAnterior: this.bonusAnterior, comecouEm: this.comecouEm }
+  }
+
   async partida() {
-    await this.abertura()
+    if (!this.retomada) await this.abertura()
     while (!this.saindo) {
       await this.inicioDaRodada()
       if (this.saindo) return

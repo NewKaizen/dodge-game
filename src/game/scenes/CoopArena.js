@@ -202,6 +202,8 @@ export default class CoopArena extends PvpArena {
     velocidadeMusica(1)
     this.estatisticas = [0, 1].map(() => ({ danoCausado: 0, danoRecebido: 0, cartasJogadas: 0, maiorCarta: null, grazes: 0, ases: 0, passes: 0, perfeitos: 0, maiorSequencia: 0, supers: 0, maiorGolpe: 0, golpes: 0, criticos: 0 }))
     this.combos = 0
+    // retomada (2D): alguém caiu e voltou; a luta volta ao começo da rodada (pvp/rede/ArenaRede.js)
+    this.retomada = this.rede?.aplicarRetomada(this.sys.settings.data?.retomada) ?? false
 
     this.desenharFundo()
     this.criarChefe()
@@ -411,8 +413,14 @@ export default class CoopArena extends PvpArena {
 
   // ---------- partida ----------
 
+  // o que a retomada (2D) guarda além do estado das regras (ArenaRede.guardarPonto)
+  extrasRetomada() {
+    return { estatisticas: this.estatisticas, combos: this.combos }
+  }
+
   async partida() {
-    await this.abertura()
+    if (this.retomada) this.mostrarFaseRetomada()
+    else await this.abertura()
     while (!this.saindo) {
       await this.inicioDaRodada()
       if (this.saindo) return
@@ -1144,6 +1152,14 @@ export default class CoopArena extends PvpArena {
     this.montes.forEach((m) => this.tweens.add({ targets: [...m.cartas, m.texto], alpha: 1, duration: 200 }))
     await this.esperar(300)
     return null
+  }
+
+  // retomada (2D) numa fase do chefe depois da primeira: o fundo já na velocidade dela
+  mostrarFaseRetomada() {
+    const f = this.estado.chefe?.fase ?? 0
+    if (!f) return
+    const fase = this.defChefe.fases[f] ?? {}
+    this.fundo?.setFase(f, fase.velocidadeFundo ?? 1 + f * 0.25)
   }
 
   // Fase nova: o chefe fica mais bravo, o fundo acelera e o baralho dele muda
