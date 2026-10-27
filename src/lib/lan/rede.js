@@ -46,7 +46,7 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 // lugar na sala (o host volta a rodada, game/rede.js). O outro caiu: o membro
 // dele vem com `caiu` e estado.outroCaiu = { id, nome, ate }. A janela acabou:
 // sai da sala com o aviso.
-export const PROTOCOLO = 7
+export const PROTOCOLO = 8
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas

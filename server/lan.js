@@ -65,6 +65,18 @@
 //   cliente -> servidor  ola {..., retomar?: chave}
 //   servidor -> cliente  bemvindo {..., retomada: chave nova, retomado?: true, retomadaNegada?: motivo}
 //                        sala {... membros: [{..., caiu: ms | null}]}
+//
+// SALAS DE N (Fase 5A, docs/rede-pvp.md "Salas de N"): o tamanho da sala vem do
+// modo (MODOS_SALA: PVP 1x1 e CO-OP de 2 = 2; 'coop4' 3–4, 'ffa' 3–4 e '2x2' = 4,
+// ainda "em breve": a sala existe, a partida desses modos ainda não). Cada membro
+// tem uma VAGA (0..N-1, o host é a 0): a menor livre quando entra, a mesma na
+// retomada e durante a partida; fora da partida as vagas são recompactadas quando
+// alguém sai (0..n-1 sem buracos: num modo de 2 o convidado é sempre a vaga 1).
+// O repasse ("para") é em ESTRELA pelo host: o que um convidado manda só chega ao
+// host; o host manda para todos ou para um (`a`: id do membro). Um convidado
+// nunca fala direto com outro.
+//   cliente -> servidor  para {dados, a?: id}   (a: só o host usa; o convidado vai sempre ao host)
+//   servidor -> cliente  sala {..., max, membros: [{..., vaga}]} (membros em ordem de vaga)
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
@@ -77,9 +89,19 @@ import { METRICAS_NULA } from './metricas.js'
 import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
 import { nomeSeguro } from '../src/lib/contaRegras.js'
 
-export const PROTOCOLO = 7
+export const PROTOCOLO = 8
 export const PORTA_DESCOBERTA = 47777
-export const MAX_MEMBROS = 2
+// Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
+// aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")
+export const MODOS_SALA = {
+  pvp: { min: 2, max: 2 },
+  coop: { min: 2, max: 2 },
+  coop4: { min: 3, max: 4, emBreve: true },
+  ffa: { min: 3, max: 4, emBreve: true },
+  '2x2': { min: 4, max: 4, emBreve: true },
+}
+export const MAX_MEMBROS = 4 // a maior sala de todas (o de cada sala: maxDoModo)
+export const maxDoModo = (modo) => (MODOS_SALA[modo] ?? MODOS_SALA.pvp).max
 const ANUNCIO_MS = 1500
 const VALIDADE_ANUNCIO_MS = 5000
 const BATIMENTO_MS = 5000
@@ -88,7 +110,7 @@ export const RETOMADAS_POR_MINUTO = 20 // tentativas de retomada por endereço
 const RECONEXAO_MS = 120_000 // voltar em até 2 min depois de cair conta como reconexão (métricas)
 const MAX_NOME = 16
 const MAX_CHAT = 120
-const MODOS = ['pvp', 'coop']
+const MODOS = Object.keys(MODOS_SALA)
 // a aba do jogo em segundo plano há tanto tempo: os outros da sala são avisados (Fase 2F)
 export const SEGUNDO_PLANO_MS = 4000
 const VERSO = /^verso\.[a-z0-9_]{2,24}$/
@@ -255,11 +277,8 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     emPartida: sala.emPartida,
     casual: Boolean(sala.casual),
     partidaId: sala.partidaId ?? null,
-    max: MAX_MEMBROS,
-    membros: [...sala.membros].map((id) => {
-      const c = clientes.get(id)
-      return { id, nome: c.nome, papel: id === sala.host ? 'host' : 'convidado', pronto: c.pronto, ping: c.ping, conta: contaPublica(c), segundoPlano: Boolean(c.segundoPlano), caiu: c.caido ? Math.max(0, c.caido.desde + RETOMADA_MS - agora()) : null }
-    }),
+    max: maxDoModo(sala.modo),
+    membros: membrosDaSala(sala).map((c) => ({ id: c.id, vaga: c.vaga, nome: c.nome, papel: c.id === sala.host ? 'host' : 'convidado', pronto: c.pronto, ping: c.ping, conta: contaPublica(c), segundoPlano: Boolean(c.segundoPlano), caiu: c.caido ? Math.max(0, c.caido.desde + RETOMADA_MS - agora()) : null })),
   })
 
   const resumo = (sala) => ({
@@ -267,13 +286,29 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     nome: sala.nome,
     host: clientes.get(sala.host)?.nome ?? '?',
     jogadores: sala.membros.size,
-    max: MAX_MEMBROS,
+    max: maxDoModo(sala.modo),
     modo: sala.modo,
     emPartida: sala.emPartida,
   })
 
-  // host primeiro (lado 0 = P1), depois o convidado
-  const membrosDaSala = (sala) => [sala.host, ...[...sala.membros].filter((id) => id !== sala.host)].map((id) => clientes.get(id)).filter(Boolean)
+  // em ordem de vaga: o host primeiro (vaga 0 = P1), depois os convidados (5A)
+  const membrosDaSala = (sala) =>
+    [...sala.membros]
+      .map((id) => clientes.get(id))
+      .filter(Boolean)
+      .sort((a, b) => (a.id === sala.host ? -1 : b.id === sala.host ? 1 : (a.vaga ?? 99) - (b.vaga ?? 99)))
+  const cheia = (sala) => sala.membros.size >= maxDoModo(sala.modo)
+  // a menor vaga livre (o host é sempre a 0)
+  const vagaLivre = (sala) => {
+    const usadas = new Set(membrosDaSala(sala).map((c) => c.vaga))
+    for (let v = 1; v < MAX_MEMBROS; v++) if (!usadas.has(v)) return v
+    return MAX_MEMBROS
+  }
+  // fora da partida: vagas 0..n-1 sem buracos (na partida, cada um fica com a sua)
+  const compactar = (sala) => {
+    if (sala.emPartida) return
+    membrosDaSala(sala).forEach((c, v) => (c.vaga = v))
+  }
 
   const avisarSala = (sala) => {
     const msg = { t: 'sala', sala: publica(sala) }
@@ -304,6 +339,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       }
       return
     }
+    compactar(sala)
     avisarSala(sala)
   }
 
@@ -414,15 +450,19 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   // mesmo para os dois (não diz quem bloqueou). No meio da partida nada muda: vale quando
   // o host volta ao lobby (ação "partida" false). Entrar numa sala com bloqueio é barrado.
   const MSG_BLOQUEIO = 'você não pode ficar nesta sala: há um bloqueio entre os jogadores'
+  // Sala de N (5A): cada convidado, em ordem de vaga, é comparado com quem fica antes dele
+  // (o host e os convidados que ficaram): com bloqueio, ele sai. Nunca o host.
   function removerBloqueados(sala) {
     if (!sala || salas.get(sala.id) !== sala || sala.emPartida) return false
-    const ms = membrosDaSala(sala)
-    if (ms.length < 2 || !bloqueados(ms[0], ms[1])) return false
-    const saindo = ms.find((c) => c.id !== sala.host)
-    if (!saindo) return false
-    sair(saindo, MSG_BLOQUEIO, { tirado: true }) // a partida (se houve) já acabou: não é abandono
-    enviar(saindo, { t: 'fechada', motivo: MSG_BLOQUEIO, ...(sala.casual && { casual: true }) })
-    return true
+    const ficam = []
+    const saem = []
+    for (const c of membrosDaSala(sala)) (c.id !== sala.host && ficam.some((o) => bloqueados(c, o)) ? saem : ficam).push(c)
+    for (const saindo of saem) {
+      if (salas.get(sala.id) !== sala) break // casual: o primeiro que sai fecha a sala
+      sair(saindo, MSG_BLOQUEIO, { tirado: true }) // a partida (se houve) já acabou: não é abandono
+      enviar(saindo, { t: 'fechada', motivo: MSG_BLOQUEIO, ...(sala.casual && { casual: true }) })
+    }
+    return saem.length > 0
   }
   // nunca a mesma conta (duas abas) nem quem se bloqueou; os dois fora de sala
   // pares que acabaram de falhar (a casual não começou): não juntam de novo logo
@@ -676,6 +716,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     salas.set(sala.id, sala)
     codigos.set(sala.codigo, sala.id)
     c.sala = sala.id
+    c.vaga = 0
     c.pronto = true
     avisarSala(sala)
     return sala
@@ -738,6 +779,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   function entrarNaSala(c, sala) {
     removerDaFila(c, 'sala')
     sair(c)
+    c.vaga = vagaLivre(sala)
     sala.membros.add(c.id)
     c.sala = sala.id
     c.pronto = false
@@ -791,7 +833,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       const sala = codigo ? salas.get(codigos.get(codigo)) : online ? null : salas.get(m.sala)
       if (!sala) return enviar(c, { t: 'erro', msg: codigo ? `não achei a sala ${codigo}: confira o código` : 'essa sala não existe mais' })
       if (sala.membros.has(c.id)) return avisarSala(sala)
-      if (sala.membros.size >= MAX_MEMBROS) return enviar(c, { t: 'erro', msg: 'a sala está cheia: peça outro código ao seu amigo' })
+      if (cheia(sala)) return enviar(c, { t: 'erro', msg: 'a sala está cheia: peça outro código ao seu amigo' })
       if (sala.emPartida) return enviar(c, { t: 'erro', msg: 'a sala está no meio de uma partida: espere acabar e tente de novo' })
       if ([...sala.membros].some((id) => bloqueados(c, clientes.get(id)))) return enviar(c, { t: 'erro', msg: 'não deu para entrar nessa sala' })
       entrarNaSala(c, sala)
@@ -807,7 +849,9 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     },
     modo(c, m) {
       const sala = salas.get(c.sala)
-      if (!sala || sala.host !== c.id || !MODOS.includes(m.modo) || sala.casual) return // a casual é PVP
+      if (!sala || sala.host !== c.id || !MODOS.includes(m.modo) || sala.casual || sala.emPartida) return // a casual é PVP
+      // a sala tem mais gente do que o modo comporta: tire alguém antes (5A)
+      if (sala.membros.size > maxDoModo(m.modo)) return enviar(c, { t: 'erro', msg: `esse modo é para até ${maxDoModo(m.modo)} jogadores: a sala tem ${sala.membros.size}` })
       sala.modo = m.modo
       for (const id of sala.membros) if (id !== sala.host) clientes.get(id).pronto = false // mudou o combinado: confirma de novo
       avisarSala(sala)
@@ -826,6 +870,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       else if (!sala.emPartida && antes) partidas.encerrou(sala)
       if (!sala.emPartida) {
         for (const id of sala.membros) if (id !== sala.host) clientes.get(id).pronto = false
+        compactar(sala) // alguém saiu no meio: as vagas voltam a ser 0..n-1
       } else {
         for (const conv of [...convites.values()]) if (conv.salaId === sala.id) encerrarConvite(conv, 'cancelado', 'a partida começou')
       }
@@ -865,7 +910,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       if (sala && sala.host !== c.id) return negar('só o host da sala pode convidar')
       if (sala?.emPartida) return negar('a sala está no meio de uma partida')
       if (sala?.membros.has(alvo.id)) return negar(`${alvo.nome} já está na sua sala`)
-      if (sala && sala.membros.size >= MAX_MEMBROS) return negar('a sala está cheia')
+      if (sala && cheia(sala)) return negar('a sala está cheia')
       const doPar = [...convites.values()].filter((v) => v.para === alvo.usuario)
       if (doPar.some((v) => v.deUsuario === c.usuario)) return negar(`você já convidou ${alvo.nome}: espere a resposta`)
       if (doPar.length >= MAX_CONVITES_RECEBIDOS) return negar(`${alvo.nome} está com convites demais: tente daqui a pouco`)
@@ -889,7 +934,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       const remetente = clientes.get(conv.de)
       if (m.aceitar !== true) return remetente && enviar(remetente, { t: 'conviteResposta', id: conv.id, para: conv.para, resultado: 'recusado' })
       const sala = salas.get(conv.salaId)
-      const vale = sala && remetente && remetente.usuario === conv.deUsuario && remetente.sala === sala.id && sala.host === remetente.id && ehAmigoMutuo(remetente, c) && !sala.emPartida && statusDe(c) !== 'em_partida' && sala.membros.size < MAX_MEMBROS
+      const vale = sala && remetente && remetente.usuario === conv.deUsuario && remetente.sala === sala.id && sala.host === remetente.id && ehAmigoMutuo(remetente, c) && !sala.emPartida && statusDe(c) !== 'em_partida' && !cheia(sala)
       if (!vale) {
         enviar(c, { t: 'conviteFim', id: conv.id, motivo: 'a sala não está mais disponível' })
         if (remetente) enviar(remetente, { t: 'conviteResposta', id: conv.id, para: conv.para, resultado: 'falhou' })
@@ -926,7 +971,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       if (!limiteFila.usar(c.id)) return negarFila(c, 'calma: ações demais, espere um pouco')
       const sala = salas.get(c.sala)
       if (!sala?.casual) return
-      if (sala.membros.size < MAX_MEMBROS) return enviar(c, { t: 'revanche', estado: 'indisponivel', motivo: 'o oponente já saiu: escolha fila ou menu' })
+      if (!cheia(sala)) return enviar(c, { t: 'revanche', estado: 'indisponivel', motivo: 'o oponente já saiu: escolha fila ou menu' })
       // bloqueou o oponente depois da partida: sem revanche, a sala casual fecha
       const ms = membrosDaSala(sala)
       if (ms.length === 2 && bloqueados(ms[0], ms[1])) {
@@ -996,13 +1041,16 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       const sala = salas.get(c.sala)
       if (sala) avisarSala(sala)
     },
-    // repassa para os outros da sala (sinais do WebRTC e controles)
+    // repassa na sala (sinais do WebRTC e o canal da partida), em ESTRELA pelo host (5A):
+    // do convidado, só para o host; do host, para todos ou só para `a`
     para(c, m) {
       const sala = salas.get(c.sala)
       if (!sala || !m.dados || typeof m.dados !== 'object') return
-      for (const id of sala.membros) {
+      const alvos = c.id !== sala.host ? [sala.host] : typeof m.a === 'string' ? (sala.membros.has(m.a) ? [m.a] : []) : [...sala.membros]
+      for (const id of alvos) {
         if (id === c.id) continue
         const outro = clientes.get(id)
+        if (!outro) continue
         let dados = m.dados
         if (online) {
           enviar(outro, { t: 'de', de: c.id, dados })
