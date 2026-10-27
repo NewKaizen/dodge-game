@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { criarLobby, PROTOCOLO, RETOMADA_MS, MODOS_SALA, maxDoModo } from '../lan.js'
+import { ELEICAO_MS } from '../eleicao.js'
 
 // Salas de N jogadores (Fase 5A): tamanho por modo, vagas estáveis, repasse em
 // estrela pelo host e a queda de um convidado numa sala de 4.
@@ -22,9 +23,9 @@ function relogioFalso() {
   }
 }
 
-function montar({ relacoes = null } = {}) {
+function montar({ relacoes = null, eleicaoMs = 0 } = {}) {
   const relogio = relogioFalso()
-  const lobby = criarLobby({ online: true, agora: relogio.agora, agendar: relogio.agendar, relacoes })
+  const lobby = criarLobby({ online: true, agora: relogio.agora, agendar: relogio.agendar, relacoes, eleicaoMs })
   const entrar = (nome, { retomar = null } = {}) => {
     const recebidas = []
     const ws = { readyState: 1, bufferedAmount: 0, send: (m) => recebidas.push(JSON.parse(m)) }
@@ -212,4 +213,183 @@ test('bloqueio entre dois convidados: o que entrou depois sai; o host fica', asy
   host.mandar({ t: 'partida', valor: false }) // ao voltar ao lobby o bloqueio vale
   assert.match(c.ultima('fechada').motivo, /há um bloqueio/)
   assert.deepEqual(vagas(host.sala()), [['ANA', 0], ['BETO', 1]])
+})
+
+// ---------- dono x host da partida (eleição pela conexão) ----------
+
+const ping = (p, ms) => p.mandar({ t: 'meuPing', ms })
+const papeis = (sala) => sala.membros.map((x) => [x.nome, x.papel, x.dono])
+
+test('eleição: o dono começa, o servidor mede e o melhor centro vira o host da partida', () => {
+  const m = montar({ eleicaoMs: ELEICAO_MS })
+  const { host: dono, convs, todos } = m.sala(4)
+  const [b, c, d] = convs
+  ping(dono, 200)
+  ping(b, 40)
+  ping(c, 20)
+  ping(d, 40)
+  // só o dono pede a eleição
+  b.mandar({ t: 'partida', valor: true, eleicao: true })
+  assert.equal(dono.sala().eleicao, false)
+  dono.mandar({ t: 'partida', valor: true, eleicao: true })
+  const pedido = b.ultima('eleicao')
+  assert.equal(pedido.ms, ELEICAO_MS)
+  assert.equal(dono.sala().eleicao, true)
+  assert.equal(dono.sala().emPartida, false)
+  // c tem direto com todos (rápido); quem manda medida de outra eleição não conta
+  c.mandar({ t: 'medicao', id: 'outra', diretos: {} })
+  for (const p of todos) p.mandar({ t: 'medicao', id: pedido.id, diretos: p === c ? { [dono.c.id]: 60, [b.c.id]: 10, [d.c.id]: 12 } : {} })
+  // todos responderam: não espera o prazo
+  const s = dono.sala()
+  assert.equal(s.emPartida, true)
+  assert.equal(s.eleito.nome, 'CAIO')
+  assert.equal(s.eleito.motivo, 'melhor_conexao')
+  assert.deepEqual(papeis(s), [['ANA', 'convidado', true], ['BETO', 'convidado', false], ['CAIO', 'host', false], ['DUDA', 'convidado', false]])
+  assert.equal(c.ultima('comecar').salaId, s.id)
+  assert.equal(dono.ultima('comecar'), undefined)
+  // as vagas não mudam: o host da partida é outra coisa
+  assert.deepEqual(vagas(s), [['ANA', 0], ['BETO', 1], ['CAIO', 2], ['DUDA', 3]])
+
+  // a estrela agora é em volta de CAIO: o que o dono manda só chega a ele
+  for (const p of todos) p.recebidas.length = 0
+  dono.mandar({ t: 'para', dados: { tipo: 'rede', n: 1 } })
+  assert.deepEqual(c.tipo('de').map((x) => x.de), [dono.c.id])
+  assert.equal(b.tipo('de').length, 0)
+  c.mandar({ t: 'para', a: b.c.id, dados: { tipo: 'rede', n: 2 } })
+  assert.equal(b.tipo('de').length, 1)
+
+  // revanche: o host marca de novo, sem eleição e sem trocar ninguém
+  c.mandar({ t: 'partida', valor: false })
+  c.mandar({ t: 'partida', valor: true })
+  assert.equal(dono.sala().eleito.nome, 'CAIO')
+  assert.equal(dono.sala().emPartida, true)
+})
+
+test('papéis separados: o dono continua tirando gente e escolhendo o modo com outro de host', () => {
+  const m = montar()
+  const { host: dono, convs } = m.sala(3)
+  const [b, c] = convs
+  ping(dono, 400)
+  ping(b, 10)
+  ping(c, 10)
+  dono.mandar({ t: 'partida', valor: true, eleicao: true }) // eleicaoMs 0: decide na hora
+  assert.equal(dono.sala().eleito.nome, 'BETO')
+  // o host da partida volta ao lobby (só ele desmarca)
+  dono.mandar({ t: 'partida', valor: false })
+  assert.equal(dono.sala().emPartida, true)
+  b.mandar({ t: 'partida', valor: false })
+  assert.equal(dono.sala().emPartida, false)
+  // no lobby: o host eleito não tira ninguém nem muda o modo; o dono sim
+  b.mandar({ t: 'expulsar', id: c.c.id })
+  b.mandar({ t: 'modo', modo: 'ffa' })
+  assert.equal(dono.sala().membros.length, 3)
+  assert.equal(dono.sala().modo, 'coop4')
+  dono.mandar({ t: 'modo', modo: 'ffa' })
+  assert.equal(dono.sala().modo, 'ffa')
+  // o host eleito marca pronto como convidado; o dono não precisa
+  b.mandar({ t: 'pronto', valor: true })
+  assert.deepEqual(dono.sala().membros.map((x) => x.pronto), [true, true, false])
+  dono.mandar({ t: 'expulsar', id: c.c.id })
+  assert.equal(dono.sala().membros.length, 2)
+  // o host eleito sai no lobby: o centro volta ao dono
+  b.mandar({ t: 'sair' })
+  assert.deepEqual(papeis(dono.sala()), [['ANA', 'host', true]])
+  assert.equal(dono.sala().eleito, null)
+})
+
+test('o host eleito sai no meio da partida: a sala fecha para todos (como o host de sempre)', () => {
+  const m = montar()
+  const { host: dono, convs } = m.sala(3)
+  ping(dono, 400)
+  ping(convs[0], 10)
+  ping(convs[1], 10)
+  dono.mandar({ t: 'partida', valor: true, eleicao: true })
+  assert.equal(dono.sala().eleito.nome, 'BETO')
+  convs[0].mandar({ t: 'sair' })
+  assert.ok(dono.ultima('fechada'))
+  assert.ok(convs[1].ultima('fechada'))
+})
+
+test('eleição com 2: sem medidas melhores fica o dono; o PVP 1x1 segue igual', () => {
+  const m = montar({ eleicaoMs: ELEICAO_MS })
+  const { host: dono, convs } = m.sala(2, 'pvp')
+  ping(dono, 300)
+  ping(convs[0], 10)
+  dono.mandar({ t: 'partida', valor: true, eleicao: true })
+  m.relogio.andar(ELEICAO_MS + 1) // ninguém mandou medida: o prazo decide
+  const s = dono.sala()
+  assert.equal(s.emPartida, true)
+  assert.equal(s.eleito.nome, 'ANA')
+  assert.equal(dono.ultima('comecar').salaId, s.id)
+})
+
+test('eleição x alguém saindo: quem saiu não conta; sem gente, não começa', () => {
+  const m = montar({ eleicaoMs: ELEICAO_MS })
+  const { host: dono, convs } = m.sala(3)
+  const [b, c] = convs
+  ping(dono, 300)
+  ping(b, 10)
+  ping(c, 10)
+  dono.mandar({ t: 'partida', valor: true, eleicao: true })
+  const id = b.ultima('eleicao').id
+  dono.mandar({ t: 'medicao', id, diretos: {} })
+  b.mandar({ t: 'medicao', id, diretos: {} })
+  // c (que faltava) sai: os que ficaram já responderam, decide agora sem ele
+  c.mandar({ t: 'sair' })
+  let s = dono.sala()
+  assert.equal(s.emPartida, true)
+  assert.equal(s.membros.length, 2)
+  assert.equal(s.eleito.nome, 'ANA', 'com 2 a ligação empata: fica o dono')
+
+  // outra sala: o único convidado sai no meio da eleição
+  const m2 = montar({ eleicaoMs: ELEICAO_MS })
+  const x = m2.sala(2, 'coop')
+  x.host.mandar({ t: 'partida', valor: true, eleicao: true })
+  x.convs[0].mandar({ t: 'sair' })
+  m2.relogio.andar(ELEICAO_MS + 1)
+  s = x.host.sala()
+  assert.equal(s.emPartida, false)
+  assert.equal(s.eleicao, false)
+  assert.equal(x.host.ultima('erro').msg, 'a partida não começou: falta gente na sala')
+
+  // o dono sai no meio da eleição: a sala fecha e o prazo não faz nada
+  const m3 = montar({ eleicaoMs: ELEICAO_MS })
+  const y = m3.sala(3)
+  y.host.mandar({ t: 'partida', valor: true, eleicao: true })
+  y.host.mandar({ t: 'sair' })
+  m3.relogio.andar(ELEICAO_MS + 1)
+  assert.equal(m3.lobby.salas.size, 0)
+  assert.equal(y.convs[0].ultima('comecar'), undefined)
+})
+
+test('eleição x retomada: quem está caído não concorre; quem volta no meio recebe o pedido', () => {
+  const m = montar({ eleicaoMs: ELEICAO_MS })
+  const { host: dono, convs } = m.sala(3)
+  const [b, c] = convs
+  ping(dono, 300)
+  ping(b, 10)
+  ping(c, 10)
+  // uma partida (sem eleição, como a revanche) em que c cai; o dono volta ao lobby
+  dono.mandar({ t: 'partida', valor: true })
+  const chave = c.chave()
+  c.cair()
+  dono.mandar({ t: 'partida', valor: false })
+  assert.ok(dono.sala().membros.find((x) => x.nome === 'CAIO').caiu > 0)
+  // eleição com c caído: ele não manda nada e mesmo assim não trava (todos os de pé responderam)
+  dono.mandar({ t: 'partida', valor: true, eleicao: true })
+  const id = b.ultima('eleicao').id
+  dono.mandar({ t: 'medicao', id, diretos: {} })
+  m.relogio.andar(200)
+  // c volta no meio: recebe o pedido de novo e ainda pode responder
+  const volta = m.entrar('CAIO', { retomar: chave })
+  assert.equal(volta.ultima('bemvindo').retomado, true)
+  assert.equal(volta.ultima('eleicao').id, id)
+  assert.ok(volta.ultima('eleicao').ms <= ELEICAO_MS - 200)
+  b.mandar({ t: 'medicao', id, diretos: {} })
+  assert.equal(dono.sala().emPartida, false, 'c voltou: espera a medida dele')
+  volta.mandar({ t: 'medicao', id, diretos: {} })
+  const s = dono.sala()
+  assert.equal(s.emPartida, true)
+  // c caiu nesta sala: pesa contra ele; b (ping 10, sem quedas) é o melhor
+  assert.equal(s.eleito.nome, 'BETO')
 })

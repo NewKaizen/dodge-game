@@ -77,6 +77,20 @@
 // nunca fala direto com outro.
 //   cliente -> servidor  para {dados, a?: id}   (a: só o host usa; o convidado vai sempre ao host)
 //   servidor -> cliente  sala {..., max, membros: [{..., vaga}]} (membros em ordem de vaga)
+//
+// DONO x HOST DA PARTIDA (5A, server/eleicao.js): o DONO é quem criou a sala (vaga 0):
+// tira gente, escolhe o modo, convida e começa. O HOST DA PARTIDA (sala.host, o
+// `papel: 'host'` dos membros) é a autoridade e o centro da estrela. No COMEÇAR do
+// dono (`partida {valor: true, eleicao: true}`) o servidor pede as medidas a todos
+// (`eleicao {id, ms}`), espera até ELEICAO_MS (ou todos responderem `medicao`), elege
+// pelo placar de eleicao.js, marca a partida e manda `comecar` para o eleito, que
+// leva todos à primeira tela. O host não muda no meio da partida (nem na revanche:
+// `partida` sem `eleicao`, do host, começa na hora como sempre). Saiu do lobby o host
+// que não é o dono: volta a ser o dono. A casual não elege (regra do ping da fila).
+//   cliente -> servidor  partida {valor, eleicao?} · medicao {id, diretos: {idDoMembro: rtt}}
+//   servidor -> cliente  eleicao {id, ms} · comecar {salaId}
+//                        sala {..., dono, eleicao: bool, eleito: {id, nome, motivo} | null,
+//                              membros: [{..., papel: 'host' | 'convidado', dono: bool}]}
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
@@ -85,6 +99,7 @@ import { criarLimite } from './contas.js'
 import { CONVITE_MS, CONVITES_POR_MINUTO, MAX_CONVITES_RECEBIDOS } from './amigos.js'
 import { criarFila, agendarPadrao, ACOES_FILA_POR_MINUTO, REVANCHE_MS, FOLGA_PING_MS, CASUAL_INICIO_MS, EVITAR_PAR_MS } from './fila.js'
 import { criarPartidas } from './partidas.js'
+import { elegerHost, lerDiretos, ELEICAO_MS } from './eleicao.js'
 import { METRICAS_NULA } from './metricas.js'
 import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
 import { nomeSeguro } from '../src/lib/contaRegras.js'
@@ -206,7 +221,9 @@ export const trocarMdns = (texto, ip) => (typeof texto === 'string' ? texto.repl
 // log: linhas para o console do servidor (host escolhido na fila)
 // registro: o banco das partidas e do XP (server/partidas.js, criarRegistro;
 // sem ele as partidas não dão XP)
-export function criarLobby({ locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null, relacoes = null, registro = null, agendar = agendarPadrao, log = () => {}, metricas = METRICAS_NULA } = {}) {
+// eleicaoMs: a janela de medição da eleição do host (anexarLan usa ELEICAO_MS; sem
+// ela, 0: decide na hora só com os pings que o servidor já tem)
+export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null, relacoes = null, registro = null, agendar = agendarPadrao, log = () => {}, metricas = METRICAS_NULA } = {}) {
   const clientes = new Map() // id -> cliente
   const salas = new Map() // id -> sala
   const codigos = new Map() // código -> id da sala
@@ -250,6 +267,8 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     encerrarRevanche(sala)
     sala.esperaInicio?.()
     sala.esperaInicio = null
+    sala.eleicao?.cancelar?.()
+    sala.eleicao = null
     salas.delete(sala.id)
     codigos.delete(sala.codigo)
     for (const conv of [...convites.values()]) if (conv.salaId === sala.id) encerrarConvite(conv, 'cancelado', 'a sala foi fechada')
@@ -278,7 +297,10 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     casual: Boolean(sala.casual),
     partidaId: sala.partidaId ?? null,
     max: maxDoModo(sala.modo),
-    membros: membrosDaSala(sala).map((c) => ({ id: c.id, vaga: c.vaga, nome: c.nome, papel: c.id === sala.host ? 'host' : 'convidado', pronto: c.pronto, ping: c.ping, conta: contaPublica(c), segundoPlano: Boolean(c.segundoPlano), caiu: c.caido ? Math.max(0, c.caido.desde + RETOMADA_MS - agora()) : null })),
+    dono: sala.dono,
+    eleicao: Boolean(sala.eleicao),
+    eleito: sala.eleito ?? null,
+    membros: membrosDaSala(sala).map((c) => ({ id: c.id, vaga: c.vaga, nome: c.nome, papel: c.id === sala.host ? 'host' : 'convidado', dono: c.id === sala.dono, pronto: c.pronto, ping: c.ping, conta: contaPublica(c), segundoPlano: Boolean(c.segundoPlano), caiu: c.caido ? Math.max(0, c.caido.desde + RETOMADA_MS - agora()) : null })),
   })
 
   const resumo = (sala) => ({
@@ -291,12 +313,19 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     emPartida: sala.emPartida,
   })
 
-  // em ordem de vaga: o host primeiro (vaga 0 = P1), depois os convidados (5A)
+  // em ordem de vaga (o dono é a 0) (5A)
   const membrosDaSala = (sala) =>
     [...sala.membros]
       .map((id) => clientes.get(id))
       .filter(Boolean)
-      .sort((a, b) => (a.id === sala.host ? -1 : b.id === sala.host ? 1 : (a.vaga ?? 99) - (b.vaga ?? 99)))
+      .sort((a, b) => (a.id === sala.dono ? -1 : b.id === sala.dono ? 1 : (a.vaga ?? 99) - (b.vaga ?? 99)))
+  // os lados do registro: nos modos de 2 o host da partida primeiro (lado 0 = P1, como o
+  // jogo conta); nos de N, a vaga (o host fica no lado dele: partidas.js hostLado)
+  const membrosDaPartida = (sala) => {
+    const ms = membrosDaSala(sala)
+    if (maxDoModo(sala.modo) > 2) return ms
+    return [...ms.filter((c) => c.id === sala.host), ...ms.filter((c) => c.id !== sala.host)]
+  }
   const cheia = (sala) => sala.membros.size >= maxDoModo(sala.modo)
   // a menor vaga livre (o host é sempre a 0)
   const vagaLivre = (sala) => {
@@ -325,8 +354,9 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     if (!tirado) partidas.saiu(cliente, sala, saiuEm) // no meio da partida = abandono (server/partidas.js)
     sala.membros.delete(cliente.id)
     atualizarStatus(cliente)
-    // sala casual (JOGAR RÁPIDO): sem o oponente não tem o que fazer nela
-    if (cliente.id === sala.host || sala.casual) {
+    // sala casual (JOGAR RÁPIDO): sem o oponente não tem o que fazer nela. O dono saindo
+    // fecha a sala; o host da partida saindo no meio dela também (a partida morre com ele)
+    if (cliente.id === sala.dono || sala.casual || (cliente.id === sala.host && sala.emPartida)) {
       fecharSala(sala)
       for (const id of sala.membros) {
         const outro = clientes.get(id)
@@ -339,8 +369,15 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       }
       return
     }
+    // o host eleito saiu no lobby: o centro volta a ser o dono
+    if (cliente.id === sala.host) {
+      sala.host = sala.dono
+      sala.eleito = null
+    }
     compactar(sala)
     avisarSala(sala)
+    // saiu no meio da eleição: talvez todo mundo que ficou já tenha mandado as medidas
+    if (sala.eleicao) conferirEleicao(sala)
   }
 
   // ---------- presença (só para amigos) ----------
@@ -456,7 +493,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     if (!sala || salas.get(sala.id) !== sala || sala.emPartida) return false
     const ficam = []
     const saem = []
-    for (const c of membrosDaSala(sala)) (c.id !== sala.host && ficam.some((o) => bloqueados(c, o)) ? saem : ficam).push(c)
+    for (const c of membrosDaSala(sala)) (c.id !== sala.dono && ficam.some((o) => bloqueados(c, o)) ? saem : ficam).push(c)
     for (const saindo of saem) {
       if (salas.get(sala.id) !== sala) break // casual: o primeiro que sai fecha a sala
       sair(saindo, MSG_BLOQUEIO, { tirado: true }) // a partida (se houve) já acabou: não é abandono
@@ -624,6 +661,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   // caiu no meio da partida: a vaga fica guardada RETOMADA_MS
   function segurar(c, sala) {
     metricas.contar('partidas_quedas')
+    c.quedas = (c.quedas ?? 0) + 1 // estabilidade na eleição do host (5A)
     c.caido = { desde: agora(), cancelar: agendar(() => expirar(c), RETOMADA_MS) }
     removerDaFila(c, 'saiu')
     log(`[lan] ${c.nome} caiu no meio da partida (sala ${sala.codigo}): esperando ${RETOMADA_MS / 1000} s`)
@@ -701,7 +739,72 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       retomado: true,
     })
     avisarSala(sala)
+    // voltou no meio de uma eleição: ainda dá para mandar as medidas
+    if (sala.eleicao) enviar(velho, { t: 'eleicao', id: sala.eleicao.id, ms: Math.max(0, sala.eleicao.ate - agora()) })
     return velho
+  }
+
+  // ---------- eleição do host da partida (5A, server/eleicao.js) ----------
+
+  function comecarEleicao(sala) {
+    const id = novoId()
+    const ate = agora() + eleicaoMs
+    sala.eleicao = { id, ate, medidas: new Map(), cancelar: null }
+    if (eleicaoMs > 0) {
+      sala.eleicao.cancelar = agendar(() => fecharEleicao(sala, id), eleicaoMs)
+      avisarMembros(sala, { t: 'eleicao', id, ms: eleicaoMs })
+      avisarSala(sala)
+      return
+    }
+    fecharEleicao(sala, id)
+  }
+
+  // todo mundo (de pé) já mandou as medidas: não precisa esperar o prazo
+  function conferirEleicao(sala) {
+    const e = sala.eleicao
+    if (e && membrosDaSala(sala).every((c) => c.caido || e.medidas.has(c.id))) fecharEleicao(sala, e.id)
+  }
+
+  function fecharEleicao(sala, id) {
+    const e = sala.eleicao
+    if (!e || e.id !== id || salas.get(sala.id) !== sala) return
+    e.cancelar?.()
+    sala.eleicao = null
+    const dono = clientes.get(sala.dono)
+    const membros = membrosDaSala(sala).filter((c) => !c.caido)
+    if (membros.length < 2 || sala.emPartida) {
+      avisarSala(sala)
+      if (dono && !sala.emPartida) enviar(dono, { t: 'erro', msg: 'a partida não começou: falta gente na sala' })
+      return
+    }
+    const r = elegerHost({ membros: membros.map((c) => ({ id: c.id, vaga: c.vaga, ping: c.ping, quedas: c.quedas ?? 0 })), diretos: Object.fromEntries(e.medidas), dono: sala.dono })
+    sala.host = r.host
+    const host = clientes.get(r.host)
+    sala.eleito = { id: r.host, nome: host?.nome ?? '?', motivo: r.motivo }
+    log(`[lan] sala ${sala.codigo}: host da partida ${sala.eleito.nome} (${r.motivo}; pontos ${JSON.stringify(Object.fromEntries(membros.map((c) => [c.nome, r.pontos[c.id]])))})`)
+    marcarPartida(sala, true)
+    if (host) enviar(host, { t: 'comecar', salaId: sala.id })
+  }
+
+  // a partida começa / volta ao lobby (o registro do XP nasce quando começa)
+  function marcarPartida(sala, valor) {
+    const antes = sala.emPartida
+    sala.emPartida = Boolean(valor)
+    if (sala.emPartida) {
+      sala.esperaInicio?.() // a casual começou: o prazo para começar acabou
+      sala.esperaInicio = null
+    }
+    if (sala.emPartida && !antes) partidas.iniciar(sala, membrosDaPartida(sala))
+    else if (!sala.emPartida && antes) partidas.encerrou(sala)
+    if (!sala.emPartida) {
+      for (const id of sala.membros) if (id !== sala.dono) clientes.get(id).pronto = false
+      compactar(sala) // alguém saiu no meio: as vagas voltam a ser 0..n-1
+    } else {
+      for (const conv of [...convites.values()]) if (conv.salaId === sala.id) encerrarConvite(conv, 'cancelado', 'a partida começou')
+    }
+    for (const id of sala.membros) atualizarStatus(clientes.get(id))
+    avisarSala(sala)
+    if (!sala.emPartida && antes) removerBloqueados(sala) // bloqueou no meio da partida: vale agora
   }
 
   // cria a sala de `c` (saindo da atual); null se o servidor está lotado
@@ -712,11 +815,12 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       enviar(c, { t: 'erro', msg: 'o servidor está lotado: tente de novo daqui a pouco' })
       return null
     }
-    const sala = { id: novoId(), codigo: novoCodigo(), nome: limpar(nome, 24) || `SALA DE ${c.nome}`, host: c.id, membros: new Set([c.id]), modo: 'pvp', emPartida: false }
+    const sala = { id: novoId(), codigo: novoCodigo(), nome: limpar(nome, 24) || `SALA DE ${c.nome}`, dono: c.id, host: c.id, eleito: null, eleicao: null, membros: new Set([c.id]), modo: 'pvp', emPartida: false }
     salas.set(sala.id, sala)
     codigos.set(sala.codigo, sala.id)
     c.sala = sala.id
     c.vaga = 0
+    c.quedas = 0
     c.pronto = true
     avisarSala(sala)
     return sala
@@ -780,6 +884,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     removerDaFila(c, 'sala')
     sair(c)
     c.vaga = vagaLivre(sala)
+    c.quedas = 0
     sala.membros.add(c.id)
     c.sala = sala.id
     c.pronto = false
@@ -843,46 +948,44 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     },
     pronto(c, m) {
       const sala = salas.get(c.sala)
-      if (!sala || sala.host === c.id) return
+      if (!sala || sala.dono === c.id) return
       c.pronto = Boolean(m.valor)
       avisarSala(sala)
     },
     modo(c, m) {
       const sala = salas.get(c.sala)
-      if (!sala || sala.host !== c.id || !MODOS.includes(m.modo) || sala.casual || sala.emPartida) return // a casual é PVP
+      if (!sala || sala.dono !== c.id || !MODOS.includes(m.modo) || sala.casual || sala.emPartida || sala.eleicao) return // a casual é PVP
       // a sala tem mais gente do que o modo comporta: tire alguém antes (5A)
       if (sala.membros.size > maxDoModo(m.modo)) return enviar(c, { t: 'erro', msg: `esse modo é para até ${maxDoModo(m.modo)} jogadores: a sala tem ${sala.membros.size}` })
       sala.modo = m.modo
-      for (const id of sala.membros) if (id !== sala.host) clientes.get(id).pronto = false // mudou o combinado: confirma de novo
+      for (const id of sala.membros) if (id !== sala.dono) clientes.get(id).pronto = false // mudou o combinado: confirma de novo
       avisarSala(sala)
     },
+    // { valor, eleicao? }: o COMEÇAR do dono pede a eleição do host (sala de amigos);
+    // sem `eleicao` é o host da partida marcando/desmarcando na hora (casual, revanche)
     partida(c, m) {
       const sala = salas.get(c.sala)
-      if (!sala || sala.host !== c.id) return
-      const antes = sala.emPartida
-      sala.emPartida = Boolean(m.valor)
-      // o registro da partida (XP): nasce quando começa e não renasce num "partida" repetido
-      if (sala.emPartida) {
-        sala.esperaInicio?.() // a casual começou: o prazo para começar acabou
-        sala.esperaInicio = null
+      if (!sala) return
+      if (m.valor && m.eleicao === true) {
+        if (sala.dono !== c.id || sala.casual || sala.emPartida || sala.eleicao) return
+        return comecarEleicao(sala)
       }
-      if (sala.emPartida && !antes) partidas.iniciar(sala, membrosDaSala(sala))
-      else if (!sala.emPartida && antes) partidas.encerrou(sala)
-      if (!sala.emPartida) {
-        for (const id of sala.membros) if (id !== sala.host) clientes.get(id).pronto = false
-        compactar(sala) // alguém saiu no meio: as vagas voltam a ser 0..n-1
-      } else {
-        for (const conv of [...convites.values()]) if (conv.salaId === sala.id) encerrarConvite(conv, 'cancelado', 'a partida começou')
-      }
-      for (const id of sala.membros) atualizarStatus(clientes.get(id))
-      avisarSala(sala)
-      if (!sala.emPartida && antes) removerBloqueados(sala) // bloqueou no meio da partida: vale agora
+      if (sala.host !== c.id || sala.eleicao) return
+      marcarPartida(sala, m.valor)
+    },
+    // as medidas para a eleição: { id, diretos: { idDoMembro: rtt em ms } }
+    medicao(c, m) {
+      const sala = salas.get(c.sala)
+      const e = sala?.eleicao
+      if (!e || m.id !== e.id || e.medidas.has(c.id)) return
+      e.medidas.set(c.id, lerDiretos(m.diretos, [...sala.membros].filter((id) => id !== c.id)))
+      conferirEleicao(sala)
     },
     expulsar(c, m) {
       const sala = salas.get(c.sala)
       const alvo = clientes.get(m.id)
       // no meio da partida não: tirar o oponente não pode virar "vitória por abandono"
-      if (!sala || sala.host !== c.id || !alvo || alvo.sala !== sala.id || alvo === c || sala.casual || sala.emPartida) return
+      if (!sala || sala.dono !== c.id || !alvo || alvo.sala !== sala.id || alvo === c || sala.casual || sala.emPartida) return
       sair(alvo, undefined, { tirado: true }) // o relato dele da partida que acabou ainda vale
       enviar(alvo, { t: 'fechada', motivo: 'o host tirou você da sala' })
     },
@@ -907,7 +1010,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       if (!alvo || !ehAmigoMutuo(c, alvo)) return negar('esse amigo não está disponível')
       if (statusDe(alvo) === 'em_partida') return negar(`${alvo.nome} está numa partida`)
       let sala = salas.get(c.sala)
-      if (sala && sala.host !== c.id) return negar('só o host da sala pode convidar')
+      if (sala && sala.dono !== c.id) return negar('só o dono da sala pode convidar')
       if (sala?.emPartida) return negar('a sala está no meio de uma partida')
       if (sala?.membros.has(alvo.id)) return negar(`${alvo.nome} já está na sua sala`)
       if (sala && cheia(sala)) return negar('a sala está cheia')
@@ -934,7 +1037,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       const remetente = clientes.get(conv.de)
       if (m.aceitar !== true) return remetente && enviar(remetente, { t: 'conviteResposta', id: conv.id, para: conv.para, resultado: 'recusado' })
       const sala = salas.get(conv.salaId)
-      const vale = sala && remetente && remetente.usuario === conv.deUsuario && remetente.sala === sala.id && sala.host === remetente.id && ehAmigoMutuo(remetente, c) && !sala.emPartida && statusDe(c) !== 'em_partida' && !cheia(sala)
+      const vale = sala && remetente && remetente.usuario === conv.deUsuario && remetente.sala === sala.id && sala.dono === remetente.id && ehAmigoMutuo(remetente, c) && !sala.emPartida && statusDe(c) !== 'em_partida' && !cheia(sala)
       if (!vale) {
         enviar(c, { t: 'conviteFim', id: conv.id, motivo: 'a sala não está mais disponível' })
         if (remetente) enviar(remetente, { t: 'conviteResposta', id: conv.id, para: conv.para, resultado: 'falhou' })
@@ -997,7 +1100,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
         sala.revanches = (sala.revanches ?? 0) + 1
         // a revanche é outra partida: registro novo (o partidaId chega antes do "aceita")
         if (sala.emPartida) {
-          partidas.iniciar(sala, membrosDaSala(sala))
+          partidas.iniciar(sala, membrosDaPartida(sala))
           avisarSala(sala)
         }
         return avisarMembros(sala, { t: 'revanche', estado: 'aceita', host: sala.host })
@@ -1181,7 +1284,7 @@ function criarDescoberta(lobby, porta, log) {
 export function anexarLan(httpServer, { log = console.log, descoberta = true, online = false, ice = [], maxClientes = MAX_CLIENTES, autenticar = null, relacoes = null, registro = null, metricas = METRICAS_NULA } = {}) {
   let rede = null
   const porta = () => httpServer.address()?.port
-  const lobby = criarLobby({ online, ice, autenticar, relacoes, registro, metricas, log, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
+  const lobby = criarLobby({ eleicaoMs: ELEICAO_MS, online, ice, autenticar, relacoes, registro, metricas, log, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 * 1024 })
   if (descoberta && !online) rede = criarDescoberta(lobby, porta, log)
 
