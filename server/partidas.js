@@ -45,6 +45,26 @@
 // é por conexão do convidado, a não ser que ele venha do MESMO endereço da
 // conta (aba anônima da própria conta): aí todos contam como um só ('convidado').
 //
+//
+// N LADOS (Fase 5A, a base dos modos de 3–4; docs/online.md "Partidas de N"): o
+// registro, a leitura do relato e a decisão já aceitam N participantes (lado =
+// vaga da sala, 0 = host). Os modos novos ainda não dão XP (MODOS_COM_XP: cada
+// sub-fase acrescenta o seu quando a partida existir). O que cada um relata:
+//   coop4  { vitoria }                    o time inteiro vence ou perde
+//   ffa    { colocacoes: [lado, ...] }    do 1º ao último (todos os lados, sem repetir)
+//   2x2    { vencedorTime: 0 | 1 | null } time = timeDoLado(lado) (null = empate)
+// POLÍTICA de N (decidirN): o host decide, conferido pela maioria. Vale o
+// resultado do HOST se pelo menos metade de quem relatou concorda com ele (o host
+// desempata); sem relato do host, vale o que mais da metade relatou. Nos dois casos
+// precisa de pelo menos 2 relatos iguais. Senão: contestada (quem relatou ganha só
+// a participação). Um relato só, com todos os outros já fora da sala antes dele:
+// vale (abandono dos outros). Quem saiu antes do primeiro relato: abandono (nada).
+// Quem ficou e não relatou: sem_relato. Ninguém relatou: encerrada (host_caiu se
+// o host caiu; sem vitória por abandono com 3 ou mais). Resultado por lado:
+// coop4 vitoria/derrota para todos; ffa 1º = vitoria, o resto derrota (e a
+// colocação de cada um); 2x2 o time vencedor vitoria, o outro derrota (null:
+// empate). O XP (participação + vitória) é o mesmo do banco (0006_n_jogadores.sql).
+//
 // registro: o banco (criarRegistro(supabase)) ou null (sem contas: ninguém ganha XP)
 // entregar(participante, msg): manda para o cliente dele (o lobby acha o cliente,
 // mesmo que tenha reconectado com a mesma conta). participante.conta = a conta
@@ -63,6 +83,20 @@ export const MAX_PARTIDAS = 5000 // em andamento + guardadas
 export const PARTIDAS_POR_MINUTO = 10
 const PERSONAGEM = /^[a-z0-9_]{1,16}$/
 
+// Fase 5A: quantos lados cada modo tem e como decide (os de 2 são os de sempre)
+export const MODOS_PARTIDA = {
+  pvp: { min: 2, max: 2 },
+  coop: { min: 2, max: 2 },
+  coop4: { min: 3, max: 4, decide: 'time' },
+  ffa: { min: 3, max: 4, decide: 'colocacao' },
+  '2x2': { min: 4, max: 4, decide: 'times' },
+}
+// os modos que registram partida e dão XP hoje (5B/5D/5E acrescentam os seus)
+export const MODOS_COM_XP = ['pvp', 'coop']
+// 2x2: as vagas 0 e 2 (host e 2º convidado) contra 1 e 3
+export const timeDoLado = (lado) => lado % 2
+const ehModoN = (modo) => Boolean(MODOS_PARTIDA[modo]?.decide)
+
 // ---------- banco ----------
 
 export function criarRegistro(supabase) {
@@ -79,7 +113,7 @@ export function criarRegistro(supabase) {
         p_modo: p.modo,
         p_versao: p.versao,
         p_sala_tipo: p.salaTipo,
-        p_participantes: p.participantes.map((x) => ({ lado: x.lado, user_id: x.usuario, ref: x.ref ?? null })),
+        p_participantes: p.participantes.map((x) => ({ lado: x.lado, user_id: x.usuario, ref: x.ref ?? null, ...(x.time != null && { time: x.time }) })),
       }),
     encerrar: (p, d) =>
       chamar('encerrar_partida', {
@@ -95,6 +129,7 @@ export function criarRegistro(supabase) {
           personagem: x.relato?.personagem ?? null,
           relato: x.relato ?? null,
           relatado_em: x.relatadoEm != null ? new Date(x.relatadoEm).toISOString() : null,
+          ...(d.colocacoes?.[x.lado] != null && { colocacao: d.colocacoes[x.lado] }),
         })),
       }),
     conceder: async (id) => (await chamar('conceder_recompensa', { p_partida: id })) ?? [],
@@ -122,6 +157,7 @@ const menor = (a, b) => (a == null ? b : b == null ? a : Math.min(a, b))
 // p: { criadaEm, participantes: [{ lado, relato, relatadoEm, saiuEm }] }, agora
 // -> { validacao, vencedorLado, motivo, resultados: { lado: resultado }, rodadas, duracaoS }
 export function decidir(p, agora) {
+  if (ehModoN(p.modo)) return decidirN(p, agora)
   if (p.modo === 'coop') return decidirCoop(p, agora)
   const [a, b] = p.participantes
   const relataram = p.participantes.filter((x) => x.relato)
@@ -195,8 +231,80 @@ function decidirCoop(p, agora) {
   return d('encerrada', p.participantes.some((x) => x.saiuEm != null) ? 'abandono' : 'sem_relato', 'sem_relato', 'sem_relato')
 }
 
-// o que o cliente mandou, limpo (null = não serve)
-export function lerRelato(m, modo = 'pvp') {
+// ---------- N lados (5A) ----------
+
+// o resultado de um relato de N, como texto (relatos iguais = mesmo texto)
+const desfecho = (modo, r) => JSON.stringify(modo === 'ffa' ? r.colocacoes : modo === '2x2' ? r.vencedorTime : r.vitoria)
+
+// resultado de cada lado pelo desfecho que valeu
+function resultadosN(p, r) {
+  const res = {}
+  const colocacoes = {}
+  for (const x of p.participantes) {
+    if (p.modo === 'ffa') {
+      const pos = r.colocacoes.indexOf(x.lado)
+      colocacoes[x.lado] = pos + 1
+      res[x.lado] = pos === 0 ? 'vitoria' : 'derrota'
+    } else if (p.modo === '2x2') res[x.lado] = r.vencedorTime == null ? 'empate' : r.vencedorTime === x.time ? 'vitoria' : 'derrota'
+    else res[x.lado] = r.vitoria ? 'vitoria' : 'derrota'
+  }
+  return { res, colocacoes: p.modo === 'ffa' ? colocacoes : null }
+}
+
+// p: { modo, criadaEm, hostLado?, hostCaiu?, participantes: [{ lado, time, relato, relatadoEm, saiuEm }] } (hostLado: 0 se faltar)
+export function decidirN(p, agora) {
+  const relataram = p.participantes.filter((x) => x.relato)
+  const marcos = p.participantes.flatMap((x) => [x.relatadoEm, x.saiuEm]).filter((t) => t != null)
+  const fim = marcos.length ? Math.min(...marcos) : agora
+  const duracaoS = Math.max(0, Math.round((fim - p.criadaEm) / 1000))
+  const primeiroRelato = relataram.length ? Math.min(...relataram.map((x) => x.relatadoEm)) : null
+  const saiuAntes = (x) => !x.relato && x.saiuEm != null && (primeiroRelato == null || x.saiuEm <= primeiroRelato)
+  const rodadas = relataram.reduce((a, x) => menor(a, x.relato.rodadas), null)
+  const todos = (fn) => Object.fromEntries(p.participantes.map((x) => [x.lado, fn(x)]))
+  const d = (validacao, motivo, resultados, extra = {}) => ({ validacao, vencedorLado: null, motivo, resultados, rodadas, duracaoS, colocacoes: null, vencedorTime: null, ...extra })
+
+  if (!relataram.length) {
+    if (p.hostCaiu) return d('encerrada', 'host_caiu', todos(() => 'sem_relato'))
+    return d('encerrada', p.participantes.some((x) => x.saiuEm != null) ? 'abandono' : 'sem_relato', todos(() => 'sem_relato'))
+  }
+
+  // quantos relatos dizem cada desfecho
+  const votos = new Map()
+  for (const x of relataram) {
+    const k = desfecho(p.modo, x.relato)
+    votos.set(k, [...(votos.get(k) ?? []), x])
+  }
+  // o host da partida (5A: eleito pela conexão, nem sempre a vaga 0)
+  const host = p.participantes.find((x) => x.lado === (p.hostLado ?? 0))
+  let vencedor = null // os relatos do desfecho que vale
+  if (host?.relato) {
+    const com = votos.get(desfecho(p.modo, host.relato))
+    if (com.length >= 2 && com.length * 2 >= relataram.length) vencedor = com
+  } else {
+    const [maior] = [...votos.values()].sort((a, b) => b.length - a.length)
+    if (maior.length >= 2 && maior.length * 2 > relataram.length) vencedor = maior
+  }
+  // um relato só e todos os outros já tinham saído antes dele: vale o de quem ficou
+  const sozinho = relataram.length === 1 && p.participantes.every((x) => x.relato || saiuAntes(x))
+  if (sozinho) vencedor = relataram
+
+  if (!vencedor) {
+    const unico = relataram.length === 1
+    return d('contestada', unico ? 'relato_unico' : 'divergente', todos((x) => (x.relato ? (unico ? 'participacao' : 'contestada') : saiuAntes(x) ? 'abandono' : 'sem_relato')))
+  }
+  const r = vencedor[0].relato
+  const { res, colocacoes } = resultadosN(p, r)
+  const resultados = todos((x) => (x.relato ? res[x.lado] : saiuAntes(x) ? 'abandono' : 'sem_relato'))
+  const motivo = sozinho || p.participantes.some(saiuAntes) ? 'abandono' : vencedor.length === relataram.length ? 'normal' : 'maioria'
+  return d('validada', motivo, resultados, {
+    vencedorLado: p.modo === 'ffa' ? r.colocacoes[0] : null,
+    vencedorTime: p.modo === '2x2' ? r.vencedorTime : null,
+    colocacoes,
+  })
+}
+
+// o que o cliente mandou, limpo (null = não serve). n: quantos lados a partida tem (modos de N)
+export function lerRelato(m, modo = 'pvp', n = 2) {
   if (!m || typeof m.partidaId !== 'string' || m.partidaId.length > 64) return null
   const inteiro = (x, max) => (Number.isInteger(x) && x >= 0 && x <= max ? x : null)
   const base = {
@@ -204,7 +312,16 @@ export function lerRelato(m, modo = 'pvp') {
     duracao: inteiro(Math.round(Number(m.duracao)), 86_400),
     personagem: typeof m.personagem === 'string' && PERSONAGEM.test(m.personagem) ? m.personagem : null,
   }
-  if (modo === 'coop') return typeof m.vitoria === 'boolean' ? { vitoria: m.vitoria, ...base } : null
+  if (modo === 'coop' || modo === 'coop4') return typeof m.vitoria === 'boolean' ? { vitoria: m.vitoria, ...base } : null
+  if (modo === 'ffa') {
+    const c = m.colocacoes
+    const ok = Array.isArray(c) && c.length === n && c.every((l) => Number.isInteger(l) && l >= 0 && l < n) && new Set(c).size === n
+    return ok ? { colocacoes: [...c], ...base } : null
+  }
+  if (modo === '2x2') {
+    const v = m.vencedorTime
+    return v === 0 || v === 1 || v === null ? { vencedorTime: v, ...base } : null
+  }
   const v = m.vencedorLado
   if (!(v === 0 || v === 1 || v === null)) return null
   return { vencedorLado: v, ...base }
@@ -275,7 +392,8 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
 
   function iniciar(sala, membros) {
     encerrou(sala)
-    if (membros.length !== 2 || !['pvp', 'coop'].includes(sala.modo)) return null
+    const tamanho = MODOS_PARTIDA[sala.modo]
+    if (!MODOS_COM_XP.includes(sala.modo) || !tamanho || membros.length < tamanho.min || membros.length > tamanho.max) return null
     if (!podeIniciar(membros[0])) {
       log(`[partidas] sala ${sala.id}: partidas demais em um minuto, esta não é registrada`)
       return null
@@ -286,20 +404,23 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
       salaId: sala.id,
       salaTipo: sala.casual ? 'casual' : 'amigos',
       modo: sala.modo,
+      // lado do host da partida (nos modos de 2 ele vem primeiro: sempre 0)
+      hostLado: Math.max(0, membros.findIndex((c) => c.id === sala.host)),
       versao,
       criadaEm: agora(),
-      participantes: membros.map((c, lado) => ({ lado, cliente: c.id, ip: c.ip ?? null, conta: c.usuario ?? null, usuario: c.usuario ?? null, nome: c.nome, semConta: c.usuario ? null : 'convidado', ref: null, relato: null, relatadoEm: null, saiuEm: null, resposta: null })),
+      // lado = a posição na lista (a vaga da sala: o host é o 0); time só no 2x2
+      participantes: membros.map((c, lado) => ({ lado, time: sala.modo === '2x2' ? timeDoLado(lado) : null, cliente: c.id, ip: c.ip ?? null, conta: c.usuario ?? null, usuario: c.usuario ?? null, nome: c.nome, semConta: c.usuario ? null : 'convidado', ref: null, relato: null, relatadoEm: null, saiuEm: null, resposta: null })),
       prazo: null,
       cancelar: null,
       decisao: null,
       gravada: null,
     }
-    // a mesma conta dos dois lados (duas abas): ninguém ganha nada
-    const [a, b] = p.participantes
-    // convidado do outro lado de uma conta: a chave do limite diário (refConvidado)
-    if (!a.conta && b.conta) a.ref = refConvidado(a, b)
-    if (!b.conta && a.conta) b.ref = refConvidado(b, a)
-    if (a.usuario && a.usuario === b.usuario) for (const x of p.participantes) Object.assign(x, { usuario: null, semConta: 'mesma_conta' })
+    // a mesma conta em dois lados (duas abas): ninguém ganha nada
+    // convidado numa partida com conta: a chave do limite diário (refConvidado, contra a 1ª conta)
+    const primeiraConta = p.participantes.find((x) => x.conta)
+    if (primeiraConta) for (const x of p.participantes) if (!x.conta) x.ref = refConvidado(x, primeiraConta)
+    const contas = p.participantes.map((x) => x.usuario).filter(Boolean)
+    if (new Set(contas).size < contas.length) for (const x of p.participantes) Object.assign(x, { usuario: null, semConta: 'mesma_conta' })
     partidas.set(p.id, p)
     for (const x of p.participantes) {
       if (!doCliente.has(x.cliente)) doCliente.set(x.cliente, new Set())
@@ -327,7 +448,7 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
 
   function relatar(c, m) {
     const p = typeof m?.partidaId === 'string' && m.partidaId.length <= 64 ? partidas.get(m.partidaId) : null
-    const relato = p && lerRelato(m, p.modo)
+    const relato = p && lerRelato(m, p.modo, p.participantes.length)
     if (!p || !relato) {
       if (typeof m?.partidaId === 'string' && m.partidaId.length <= 64) entregar({ cliente: c.id, conta: c.usuario ?? null }, { t: 'recompensa', partidaId: m.partidaId, xpGanho: 0, motivo: 'nao_registrada' })
       return
@@ -390,7 +511,7 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
     desligar(p)
     p.esquecer = programar(() => partidas.get(p.id) === p && partidas.delete(p.id), GUARDAR_MS)
     const nomes = p.participantes.map((x) => x.nome).join(' x ')
-    if (d.validacao === 'contestada') log(`[partidas] ${p.id} contestada (${d.motivo}): ${nomes}, relatos ${p.participantes.map((x) => JSON.stringify(x.relato ? (p.modo === 'coop' ? x.relato.vitoria : x.relato.vencedorLado) : '-')).join(' x ')}`)
+    if (d.validacao === 'contestada') log(`[partidas] ${p.id} contestada (${d.motivo}): ${nomes}, relatos ${p.participantes.map((x) => (x.relato ? (ehModoN(p.modo) ? desfecho(p.modo, x.relato) : JSON.stringify(p.modo === 'coop' ? x.relato.vitoria : x.relato.vencedorLado)) : '"-"')).join(' x ')}`)
     else log(`[partidas] ${p.id} ${d.validacao} (${d.motivo}): ${nomes}, ${d.duracaoS}s`)
     p.pendente = true
     recompensar(p, d)
