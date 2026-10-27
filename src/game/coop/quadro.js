@@ -28,8 +28,23 @@ export const QUADRO = {
   faixa: { esquerda: CENTRO_X - 248, direita: CENTRO_X + 248, topo: 244, base: 456 },
 }
 
-// Onde cada coração aparece quando o quadro abre (os dois lado a lado, embaixo):
-// k = 0 (P1, à esquerda) ou 1 (P2, à direita); limites = retângulo da caixa
-export function inicioDoCoracao(limites, k) {
-  return { x: limites.x + (limites.width * (k + 1)) / 3, y: limites.bottom - 30 }
+// Onde cada coração aparece quando o quadro abre (lado a lado, embaixo, em ordem de vaga):
+// k = 0 (P1, à esquerda) ... n-1; limites = retângulo da caixa. n = quantos corações dividem o
+// quadro (2 = P1 à esquerda e P2 à direita, como sempre; no grupo de 3 e 4, em 1/4 e 1/5 da largura)
+export function inicioDoCoracao(limites, k, n = 2) {
+  return { x: limites.x + (limites.width * (k + 1)) / (n + 1), y: limites.bottom - 30 }
+}
+
+// O quadro de um grupo de n jogadores (5B, GRUPO em coop/regras.js): mais largo e mais alto (até onde
+// o campo deixa) e com mais balas (densidade). 2 jogadores: o quadro de sempre
+export function quadroDoGrupo(grupo) {
+  const e = grupo?.espaco ?? { largura: 1, altura: 1 }
+  const larguraMax = QUADRO.campo.direita - QUADRO.campo.esquerda
+  const alturaMax = QUADRO.campo.base - QUADRO.campo.topo
+  return {
+    ...QUADRO,
+    largura: Math.min(larguraMax, Math.round(QUADRO.largura * e.largura)),
+    altura: Math.min(alturaMax, Math.round(QUADRO.altura * e.altura)),
+    ritmo: { ...QUADRO.ritmo, densidade: QUADRO.ritmo.densidade * (grupo?.densidade ?? 1) },
+  }
 }

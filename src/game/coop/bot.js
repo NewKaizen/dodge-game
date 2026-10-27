@@ -14,9 +14,17 @@ import { GOLPE } from './regras.js'
 
 const fracao = (jog) => (jog.caido ? 0 : jog.hp / jog.hpMax)
 
+// o "parceiro" que a nota olha: com 2 jogadores o outro; num grupo de 3+ o que mais precisa
+// (um caído primeiro, senão o de menor fração de HP)
+function parceiroDe(estado, j) {
+  if (estado.jogadores.length <= 2) return estado.jogadores[1 - j]
+  const outros = estado.jogadores.filter((_, k) => k !== j && !estado.jogadores[k].saiu)
+  return [...outros].sort((a, b) => (b.caido ? 1 : 0) - (a.caido ? 1 : 0) || fracao(a) - fracao(b))[0] ?? estado.jogadores[1 - j] ?? estado.jogadores[0]
+}
+
 function notaDaCartaCoop(estado, j, carta) {
   const jog = estado.jogadores[j]
-  const parceiro = estado.jogadores[1 - j]
+  const parceiro = parceiroDe(estado, j)
   const intencao = estado.chefe.intencao
   const superVindo = ehSuper(intencao)
   const apertado = fracao(jog) < 0.35 || (!parceiro.caido && fracao(parceiro) < 0.35)
