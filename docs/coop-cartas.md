@@ -310,7 +310,7 @@ que abriu (`cenaOk`). As regras são as mesmas deste documento, generalizadas pa
   atravessam. O meu coração anda pelo meu joystick e colide aqui; os dos outros são espelho (andam pelas posições que
   chegam, interpoladas) e não colidem aqui.
 - **HUD de 4** (854×480): um cartão de 190×62 por jogador no alto (vagas 0 e 1 à esquerda do relógio, 2 e 3 à direita):
-  forma + nome, **estado da mão** (ESCOLHENDO / PRONTO / CAÍDO volta em N / SEM CONEXÃO 12s / SAIU), barra e número de HP,
+  forma + nome, **estado da mão** (ESCOLHENDO / PRONTO / CAÍDO volta em N / SEM CONEXÃO (volta caído) 12s / SAIU), barra e número de HP,
   as 10 gemas de energia, o combo de perfeitos, escudo / 2ª chance e as cartas da mão. O cartão do jogador deste PC
   tem borda grossa e "VOCÊ". Só a MINHA mão aparece na tela (cursor, prévia e PASSAR são só meus): as cartas dos outros
   só viram na revelação, com o nome de cada um em cima.
@@ -376,14 +376,22 @@ acerto, cura do chefe, `retornoRodadas`) ficou como no CO-OP de 2.
 ### Queda e volta no meio da luta
 
 Sala de 3 ou 4 (5A): quem cai da rede fica **20 s** na vaga; os outros **não param**. Na hora o cartão dele diz
-"SEM CONEXÃO 12s", o personagem fica apagado e o coração some do quadro. A rodada que está rolando termina sem ele (o
+"SEM CONEXÃO (volta caído) 12s", o personagem fica apagado e o coração some do quadro. A rodada que está rolando termina sem ele (o
 host não espera a jogada nem o fim da esquiva dele; jogada = passar, sem energia). O host marca `ausente` no estado a
 cada rodada (`definirPresenca`): **fora do quadro, fora da mira, sem carta** (e quem está ausente não segura a
 derrota: perde quando todos os que ainda estão na luta caíram).
 
+- **Volta caído (regra anti-fuga)**: quem cai da rede durante a luta é **derrubado na hora** (HP 0, o mesmo estado de
+  quem foi nocauteado). Só o host marca (`derrubarAusentes`, a cada tick e no começo da rodada), então vale mesmo que o
+  convidado nunca volte e puxar o cabo no meio do SUPER do chefe (ou numa rodada ruim) não desvia o dano: ele não volta
+  com o HP de antes. O resgate é o de sempre: rodada limpa (o caído há mais tempo volta com 30%), ♥ e A♥; a volta
+  sozinha após `retornoRodadas` não corre enquanto ele está sem conexão. Dentro ou depois dos 20 s é igual (depois,
+  `saiu`). Quem já estava caído continua caído. Quem cai da rede não conta como de pé: se os que sobram estão todos
+  caídos, a derrota é a de sempre. O CO-OP de 2 e o PVP não mudam.
 - **Voltou em 20 s**: o host manda a cena só para ele (`dadosRetomadaPara`, 5A) com o **estado de agora**. Ele vê a luta
   como está (HP, energia, o monte dele) e **entra na próxima rodada** ("VOCÊ VOLTOU! entra na próxima rodada"); o
-  que sobrar da rodada atual ele ignora.
+  que sobrar da rodada atual ele ignora. Ele **continua caído**: na rodada em que entra, todos veem "voltou caído:
+  precisa de resgate" (evento `voltouCaido` do `inicio`).
 - **Não voltou**: sai da luta de vez (`saiu`: o cartão diz SAIU, o coração e a mira somem e ele não volta); a luta
   continua com os outros e o servidor registra o abandono dele (sem XP, [online.md](online.md)).
 - **Caiu o host**: como na 2D, todos param e a rodada volta ao começo (ponto de retomada); sem volta em 20 s a sala fecha.

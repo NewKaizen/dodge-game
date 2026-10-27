@@ -15,6 +15,7 @@ import {
   fimDaRodadaCoop,
   escolherMira,
   definirPresenca,
+  derrubarAusentes,
   resgatarPorRodadaLimpa,
   motivoBloqueioCoop,
   fracaoDoCombo,
@@ -144,6 +145,7 @@ test('a mira só olha quem está de pé e presente; com 2 ou menos de pé, todos
   assert.deepEqual(escolherMira(e), [0, 1])
   // 3 de pé: miram 2, e o ausente nunca entra
   definirPresenca(e, { ausentes: [] })
+  e.jogadores[2].caido = false // (quem cai da rede volta caído: aqui só interessa a mira)
   e.jogadores[3].saiu = false
   e.jogadores[0].ultimaMira = 9
   e.jogadores[1].ultimaMira = 9
@@ -418,4 +420,80 @@ test('queda e volta no meio da luta de 4: quem caiu da rede não é mirado nem e
   definirPresenca(e, { ausentes: [] })
   assert.equal(e.jogadores[1].saiu, true)
   for (const h of historico) if ((h.r >= 2 && h.r <= 4) || h.r >= 9) assert.ok(!h.mira.includes(1))
+})
+
+test('queda da rede: o jogador é derrubado na hora (HP 0) e volta caído, sem HP de antes', () => {
+  const e = nova(4)
+  iniciarRodadaCoop(e)
+  assert.ok(e.jogadores[1].hp > 0)
+  assert.deepEqual(derrubarAusentes(e, { ausentes: [1] }), [1])
+  assert.equal(e.jogadores[1].caido, true)
+  assert.equal(e.jogadores[1].hp, 0)
+  // repetir não muda nada
+  assert.deepEqual(derrubarAusentes(e, { ausentes: [1] }), [])
+  // volta (dentro dos 20 s): segue caído e o aviso de volta sai
+  const r = definirPresenca(e, { ausentes: [] })
+  assert.deepEqual(r.voltaram, [1])
+  assert.equal(e.jogadores[1].caido, true)
+  const e2 = nova(4)
+  iniciarRodadaCoop(e2)
+  definirPresenca(e2, { ausentes: [1] })
+  const volta = definirPresenca(e2, { ausentes: [] })
+  assert.deepEqual(volta.voltaram, [1])
+  assert.equal(e2.jogadores[1].caido, true)
+  assert.equal(e2.jogadores[1].hp, 0)
+  // sai de vez (depois dos 20 s): continua caído e fora
+  definirPresenca(e2, { saiu: [1] })
+  assert.equal(e2.jogadores[1].saiu, true)
+  assert.equal(e2.jogadores[1].caido, true)
+})
+
+test('queda da rede: ausente não volta sozinho pelo relógio; ao voltar o resgate de sempre o levanta com 30%', () => {
+  const e = nova(4)
+  iniciarRodadaCoop(e)
+  definirPresenca(e, { ausentes: [1] })
+  e.jogadores[1].voltaEm = e.rodada + 1
+  iniciarRodadaCoop(e)
+  iniciarRodadaCoop(e)
+  assert.equal(e.jogadores[1].caido, true, 'sem conexão não volta sozinho')
+  definirPresenca(e, { ausentes: [] })
+  const quadro = { jogadores: [true, false, true, true] }
+  const resgatados = resgatarPorRodadaLimpa(e, { quadro, acertos: [0, 0, 0, 0] })
+  assert.deepEqual(resgatados, [1])
+  assert.equal(e.jogadores[1].caido, false)
+  assert.equal(e.jogadores[1].hp, Math.round(e.jogadores[1].hpMax * COOP.retornoHp))
+})
+
+test('queda da rede durante o SUPER do chefe não evita o estado de caído', () => {
+  const e = nova(4)
+  e.chefe.carga = e.chefe.cargaMax - 1
+  const eventos = iniciarRodadaCoop(e)
+  assert.ok(eventos.some((x) => x.tipo === 'superChefe'))
+  // o jogador 2 puxa o cabo no meio da esquiva do SUPER (sem ter levado acerto algum)
+  derrubarAusentes(e, { ausentes: [2] })
+  assert.equal(e.jogadores[2].caido, true)
+  assert.equal(e.jogadores[2].hp, 0)
+  definirPresenca(e, { ausentes: [] })
+  assert.equal(e.jogadores[2].caido, true, 'volta caído')
+  assert.equal(e.jogadores[2].hp, 0)
+})
+
+test('derrota quando o único de pé cai da rede (os que sobram estão todos caídos)', () => {
+  const e = nova(3)
+  iniciarRodadaCoop(e)
+  e.jogadores[0].caido = true
+  e.jogadores[1].caido = true
+  assert.equal(fimDaRodadaCoop(e).vencedor, null, 'o P3 ainda está de pé')
+  e.vencedor = null
+  derrubarAusentes(e, { ausentes: [2] })
+  definirPresenca(e, { ausentes: [2] })
+  assert.equal(e.jogadores[2].caido, true)
+  assert.equal(fimDaRodadaCoop(e).vencedor, 'derrota')
+})
+
+test('CO-OP de 2 não muda: queda da rede não derruba', () => {
+  const e = nova(2)
+  iniciarRodadaCoop(e)
+  assert.deepEqual(derrubarAusentes(e, { ausentes: [1] }), [])
+  assert.equal(e.jogadores[1].caido, false)
 })

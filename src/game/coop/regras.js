@@ -288,13 +288,34 @@ const fora = (jog) => Boolean(jog.ausente || jog.saiu)
 const indices = (estado) => estado.jogadores.map((_, j) => j)
 const emPe = (estado) => indices(estado).filter((j) => !estado.jogadores[j].caido && !fora(estado.jogadores[j]))
 
-// Quem caiu da rede / saiu de vez (grupo de 3+, definido pelo host a cada rodada): fora do
-// quadro, sem mira, sem jogar carta; a luta segue com os outros. saiu não volta
-export function definirPresenca(estado, { ausentes = [], saiu = [] } = {}) {
+// Quem caiu da rede / saiu de vez (grupo de 3+, definido pelo host): fora do quadro, sem mira,
+// sem jogar carta; a luta segue com os outros. saiu não volta. REGRA ANTI-FUGA: quem cai da rede
+// durante a luta VOLTA CAÍDO (HP 0, igual a quem foi derrubado): puxar o cabo não desvia o SUPER
+// nem uma rodada ruim. Quem estava de pé é derrubado na hora; quem já estava caído continua caído
+// (e o relógio de volta não corre). derrubarAusentes devolve quem foi derrubado agora; definirPresenca
+// devolve também `voltaram`: quem estava fora e voltou (continua caído: precisa de resgate)
+export function derrubarAusentes(estado, { ausentes = [], saiu = [] } = {}) {
+  const derrubados = []
+  if (estado.n <= 2) return derrubados
   estado.jogadores.forEach((jog, j) => {
+    if (!ausentes.includes(j) && !saiu.includes(j)) return
+    if (ausentes.includes(j)) jog.ausente = true // (a volta é notada em definirPresenca)
+    if (jog.caido) return
+    derrubar(estado, j)
+    derrubados.push(j)
+  })
+  return derrubados
+}
+
+export function definirPresenca(estado, { ausentes = [], saiu = [] } = {}) {
+  const voltaram = []
+  estado.jogadores.forEach((jog, j) => {
+    if (jog.ausente && !ausentes.includes(j) && !saiu.includes(j) && jog.caido) voltaram.push(j)
     jog.ausente = ausentes.includes(j)
     if (saiu.includes(j)) jog.saiu = true
   })
+  const derrubados = derrubarAusentes(estado, { ausentes, saiu })
+  return { derrubados, voltaram }
 }
 
 // RODÍZIO DE MIRA (3+ de pé): o chefe mira em `miraPorRodada` dos que estão de pé (metade,
@@ -325,7 +346,7 @@ export function iniciarRodadaCoop(estado) {
   estado.rodada++
   const eventos = []
   estado.jogadores.forEach((jog, j) => {
-    if (jog.caido && !jog.saiu && estado.rodada >= jog.voltaEm) {
+    if (jog.caido && !fora(jog) && estado.rodada >= jog.voltaEm) {
       levantar(estado, j, jog.hpMax * COOP.retornoHp)
       eventos.push({ tipo: 'voltou', j })
     }
@@ -356,8 +377,8 @@ const idDaJogada = (jogada) => (jogada == null ? null : typeof jogada === 'strin
 
 // Mesmo contrato de pvp/regras.js motivoBloqueio, com o "caído" do CO-OP na frente
 export function motivoBloqueioCoop(estado, j, carta) {
-  if (estado.jogadores[j].caido) return { codigo: 'caido', motivo: 'caído', curto: 'caído: não joga carta' }
   if (fora(estado.jogadores[j])) return { codigo: 'ausente', motivo: 'fora da luta', curto: 'sem conexão: não joga carta' }
+  if (estado.jogadores[j].caido) return { codigo: 'caido', motivo: 'caído', curto: 'caído: não joga carta' }
   return motivoBloqueio(estado, j, carta)
 }
 

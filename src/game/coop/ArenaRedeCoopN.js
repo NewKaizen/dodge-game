@@ -1,4 +1,4 @@
-import { iniciarRodadaCoop, fimDaRodadaCoop, definirPresenca } from './regras.js'
+import { iniciarRodadaCoop, fimDaRodadaCoop, definirPresenca, derrubarAusentes } from './regras.js'
 import { diferencasDeEstado, criarEspelhoCoracao } from '../pvp/rede/sincronia.js'
 
 // A ponte da CoopArenaN (CO-OP de 3 e 4 jogadores, docs/rede-pvp.md "CO-OP de 3 e 4"): a mesma
@@ -23,6 +23,9 @@ import { diferencasDeEstado, criarEspelhoCoracao } from '../pvp/rede/sincronia.j
 // fimEsquiva dele (o canal é em ordem por parceiro). O host nunca espera quem não está: quem caiu da
 // rede (`caiu`, os 20 s) ou saiu não entra nas esperas (jogada = passar, fimEsquiva dispensado) e o
 // estado marca `ausente`/`saiu` a cada rodada (definirPresenca): fora do quadro, sem mira.
+//
+// Quem cai da rede VOLTA CAÍDO (HP 0, o mesmo estado de quem foi derrubado; só o host marca, no instante da
+// queda): puxar o cabo não desvia o SUPER nem uma rodada ruim. O resgate é o de sempre (rodada limpa, ♥, A♥).
 //
 // Volta de um convidado no meio da luta (5A: game/rede.js voltarVaga): o host manda a cena só para ele,
 // com `dadosRetomadaPara(id)` (o estado de agora do host); ele entra na PRÓXIMA rodada (espera o
@@ -206,8 +209,10 @@ export default class ArenaRedeCoopN {
     const a = this.arena
     if (this.souHost) {
       this.guardarPonto()
-      definirPresenca(a.estado, this.presenca())
+      const { voltaram } = definirPresenca(a.estado, this.presenca())
       const eventos = iniciarRodadaCoop(a.estado)
+      // voltou da queda e segue caído (ninguém o resgatou): avisa a todos, ele precisa de resgate
+      for (const j of voltaram) if (a.estado.jogadores[j].caido) eventos.push({ tipo: 'voltouCaido', j })
       this.enviar('inicio', a.estado.rodada, { estado: copiar(a.estado), eventos })
       return eventos
     }
@@ -445,6 +450,9 @@ export default class ArenaRedeCoopN {
 
   atualizar(delta) {
     const a = this.arena
+    // o host derruba na HORA quem cai da rede (o estado vale mesmo se o convidado nunca voltar; os outros
+    // recebem junto da próxima resolução / fim de rodada)
+    if (this.souHost) derrubarAusentes(a.estado, this.presenca())
     const agora = this.agora()
     const rodada = this.rodada
     if (this.rodadaEspelho !== rodada) {

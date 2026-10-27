@@ -58,7 +58,8 @@ import { fatores } from '../acessibilidade.js'
 //     daqui e colide aqui; os dos outros são espelho (anda pelas posições que o host junta num pacote só)
 //   - a MIRA do chefe (rodízio, coop/regras.js escolherMira): os mirados ganham a mira girando e o nome no
 //     alto do quadro; os tiros mirados só vão para eles
-//   - quem caiu da rede fica "SEM CONEXÃO" (fora do quadro e da mira) por 20 s; voltou, entra na próxima rodada;
+//   - quem caiu da rede fica "SEM CONEXÃO (volta caído)" (fora do quadro e da mira) por 20 s e é DERRUBADO na hora (HP 0);
+//     voltou, entra na próxima rodada ainda caído ("voltou caído: precisa de resgate");
 //     não voltou, SAIU e a luta segue sem ele
 //
 //   irParaCena(this, 'CoopArenaN', { chefe, nivel, party: [p1..pN] (por vaga), semente })
@@ -438,7 +439,7 @@ export default class CoopArenaN extends Phaser.Scene {
     const lista = participantesDaPartida()
     const p = lista.find((x) => x.indice === j)
     if (jog.saiu || !p) return ['SAIU', TEXTO.caido]
-    if (p.caiu != null) return [`SEM CONEXÃO ${Math.max(0, Math.ceil(p.caiu / 1000))}s`, '#ff9a3a']
+    if (p.caiu != null) return [`SEM CONEXÃO (volta caído) ${Math.max(0, Math.ceil(p.caiu / 1000))}s`, '#ff9a3a']
     if (jog.caido) return [`CAÍDO · volta em ${Math.max(1, (jog.voltaEm ?? 0) - this.estado.rodada)}`, TEXTO.caido]
     if (this.fase === 'escolha') return this.prontos[j] ? ['PRONTO', TEXTO.cura] : ['ESCOLHENDO', TEXTO.desabilitado]
     return ['', TEXTO.desabilitado]
@@ -619,6 +620,12 @@ export default class CoopArenaN extends Phaser.Scene {
     this.time.delayedCall(260, () => tocar(this, 'energia'))
     this.atualizarHuds()
     for (const ev of eventos) {
+      if (ev.tipo === 'voltouCaido') {
+        const q = this.personagens[ev.j]
+        this.etiquetaEm(q.x + (q.direita ? -20 : 20), q.y - 62, 'voltou caído: precisa de resgate', '#ff9a3a', { tamanho: 9, ms: 2400 })
+        this.mostrarBanner(`${this.nomeDe(ev.j)} voltou caído:\nprecisa de resgate`, '#ff9a3a', { y: 236, tamanho: 16, ms: 2000 })
+        continue
+      }
       if (ev.tipo !== 'voltou') continue
       const p = this.personagens[ev.j]
       this.etiquetaEm(p.x + (p.direita ? -20 : 20), p.y - 62, 'VOLTOU!', TEXTO.cura, { tamanho: 11, ms: 1200 })

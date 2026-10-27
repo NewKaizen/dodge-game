@@ -259,3 +259,23 @@ test('a mesma semente dá a mesma rodada em todos os PCs (a carta do chefe vem d
   const rb = resolverRodadaCoop(b, null, null, null, null)
   assert.deepEqual(ra.quadro.mira, rb.quadro.mira)
 })
+
+test('o host derruba na hora quem cai da rede (mesmo que nunca volte) e avisa "voltou caído" quando volta', async () => {
+  const m = montar()
+  await comecar(m) // rodada 1
+  assert.equal(m.nos.H.arena.estado.jogadores[1].caido, false)
+  m.cair('B')
+  m.nos.H.rede.atualizar(16) // o tick do host
+  const hp = m.nos.H.arena.estado.jogadores[1]
+  assert.equal(hp.caido, true)
+  assert.equal(hp.hp, 0)
+  // voltou: a próxima rodada o mantém caído e manda o evento a todos
+  m.voltar('B')
+  for (const id of ['A', 'B', 'H']) m.nos[id].arena.estado.fase = 'fim'
+  const eventos = await comecar(m)
+  assert.equal(m.nos.H.arena.estado.jogadores[1].caido, true)
+  assert.equal(m.nos.H.arena.estado.jogadores[1].hp, 0)
+  assert.ok(eventos.flat().some((e) => e?.tipo === 'voltouCaido' && e.j === 1))
+  assert.equal(m.nos.A.arena.estado.jogadores[1].caido, true)
+  m.fechar()
+})

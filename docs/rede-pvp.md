@@ -360,10 +360,10 @@ no máximo); o host só calcula os golpes depois (todo dano dos outros já chego
 `cursor` (rápida, ao host), `personagem {id}` (o pedido), `partyEstado {c, k}` (rápida, do host a cada 250 ms: a party de
 verdade e os cursores) e `voltarLobby`.
 
-**Queda de um convidado na luta** (5A: `dadosRetomadaPara`): a sala segue; o host marca `ausente` e ninguém espera por ele.
+**Queda de um convidado na luta** (5A: `dadosRetomadaPara`): a sala segue; o host marca `ausente`, **derruba o jogador na hora** (HP 0: volta caído, sem escapar do dano do chefe) e ninguém espera por ele.
 Quando ele volta, o `game/rede.js` manda a cena só para ele, com `retomada: { estado (o de agora do host), entrando: true }`: a
 arena dele troca o estado, mostra a luta como está e **só entra na rodada seguinte** (espera o `inicio` depois do estado que
-recebeu e ignora `dano`/`graze`/`fimEsquiva` das rodadas até ali). Quem esgota os 20 s sai (`saiu`).
+recebeu e ignora `dano`/`graze`/`fimEsquiva` das rodadas até ali) ainda **caído**, com o aviso "voltou caído: precisa de resgate" (evento `voltouCaido`). Quem esgota os 20 s sai (`saiu`).
 
 **Orçamento (5A) na prática**: o pacote `coracoes` sai uma vez por tick para todos (~30/s), cada convidado manda ~30
 `coracao`/s ao host, e os `dano`/`graze`/`fimEsquiva` são confiáveis (poucos por rodada), como na carga de teste da 5A. O desenho
