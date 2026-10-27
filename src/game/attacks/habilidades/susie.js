@@ -24,6 +24,7 @@ import { definirAtaque } from '../definir.js'
 import { ATAQUE } from '../../constants.js'
 import { tocar } from '../../audio.js'
 import { particulas } from '../../effects/particulas.js'
+import { duracaoPulso } from '../../acessibilidade.js'
 
 const T = (nome) => `hab-susie-${nome}`
 const ROXO = 0xb05cff
@@ -206,7 +207,7 @@ const susiePisao = definirAtaque({
       // o sinal: só a pegada rachada pisca na parede, soltando poeira
       const pe = p.ponto(u0, 6)
       const marca = a.decoracao(a.cena.add.image(pe.x, pe.y, T('marca')).setDepth(3).setAlpha(0.9).setRotation(p.rot))
-      a.cena.tweens.add({ targets: marca, alpha: 0.35, duration: 90, yoyo: true, repeat: -1 })
+      a.cena.tweens.add({ targets: marca, alpha: 0.35, duration: duracaoPulso(90), yoyo: true, repeat: -1 })
       a.aCada(150, () => particulas(a.cena, pe.x, pe.y, { cor: LILAS, quantidade: 3, velocidade: 50, vida: 240 }), Math.floor(cfg.aviso / 150), 0)
       a.depois(cfg.aviso, () => {
         a.cena.tweens.killTweensOf(marca)

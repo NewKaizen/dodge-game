@@ -44,6 +44,7 @@ import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
 import { entrarNoJogo, voltarAoMenu, levouGolpe } from '../../lib/saida.js'
+import { fatores } from '../acessibilidade.js'
 
 // CO-OP de cartas: os dois jogadores (ou 1 + CPU aliada) contra um chefe que
 // também joga cartas. Regras em coop/regras.js (docs/coop-cartas.md).
@@ -201,6 +202,8 @@ export default class CoopArena extends PvpArena {
     velocidadeMusica(1)
     this.estatisticas = [0, 1].map(() => ({ danoCausado: 0, danoRecebido: 0, cartasJogadas: 0, maiorCarta: null, grazes: 0, ases: 0, passes: 0, perfeitos: 0, maiorSequencia: 0, supers: 0, maiorGolpe: 0, golpes: 0, criticos: 0 }))
     this.combos = 0
+    // retomada (2D): alguém caiu e voltou; a luta volta ao começo da rodada (pvp/rede/ArenaRede.js)
+    this.retomada = this.rede?.aplicarRetomada(this.sys.settings.data?.retomada) ?? false
 
     this.desenharFundo()
     this.criarChefe()
@@ -410,29 +413,39 @@ export default class CoopArena extends PvpArena {
 
   // ---------- partida ----------
 
+  // o que a retomada (2D) guarda além do estado das regras (ArenaRede.guardarPonto)
+  extrasRetomada() {
+    return { estatisticas: this.estatisticas, combos: this.combos }
+  }
+
   async partida() {
-    await this.abertura()
-    while (!this.saindo) {
+    // a cena aberta de novo (retomada da 2D: o Phaser reaproveita o `this`) zera o
+    // saindo; a partida da abertura anterior para aqui, e não na rodada nova
+    const vez = (this.vezPartida = (this.vezPartida ?? 0) + 1)
+    const fora = () => this.saindo || this.vezPartida !== vez
+    if (this.retomada) this.mostrarFaseRetomada()
+    else await this.abertura()
+    while (!fora()) {
       await this.inicioDaRodada()
-      if (this.saindo) return
+      if (fora()) return
       const jogadas = await this.escolha()
-      if (this.saindo) return
+      if (fora()) return
       const r = await this.decidirRodadaCoop(jogadas)
-      if (this.saindo || !r) return
+      if (fora() || !r) return
       this.rodadaAtual = r
       this.contarJogadas(r)
       await this.revelacao(r)
-      if (this.saindo) return
+      if (fora()) return
       await this.anunciarSupers(r)
-      if (this.saindo) return
+      if (fora()) return
       await this.arremesso(r)
-      if (this.saindo) return
+      if (fora()) return
       await this.esquiva(r)
-      if (this.saindo) return
+      if (fora()) return
       await this.contraAtaque(r)
-      if (this.saindo) return
+      if (fora()) return
       const vencedor = await this.terminarRodada()
-      if (this.saindo) return
+      if (fora()) return
       if (vencedor) return this.resultado(vencedor)
     }
   }
@@ -886,7 +899,7 @@ export default class CoopArena extends PvpArena {
         inv.avisado = true
         tocar(this, 'inverter')
       }
-      const pisca = Math.floor(this.time.now / 180) % 2 ? 'CONTROLES\nINVERTIDOS!' : ''
+      const pisca = fatores().pulso > 1 || Math.floor(this.time.now / 180) % 2 ? 'CONTROLES\nINVERTIDOS!' : ''
       for (const j of [0, 1]) if (this.noQuadro(j) && !this.ko[j]) this.avisoPista[j].setText(pisca).setColor('#ff9a3a')
     } else if (inv?.avisado) {
       this.invertido[0] = 0
@@ -1143,6 +1156,14 @@ export default class CoopArena extends PvpArena {
     this.montes.forEach((m) => this.tweens.add({ targets: [...m.cartas, m.texto], alpha: 1, duration: 200 }))
     await this.esperar(300)
     return null
+  }
+
+  // retomada (2D) numa fase do chefe depois da primeira: o fundo já na velocidade dela
+  mostrarFaseRetomada() {
+    const f = this.estado.chefe?.fase ?? 0
+    if (!f) return
+    const fase = this.defChefe.fases[f] ?? {}
+    this.fundo?.setFase(f, fase.velocidadeFundo ?? 1 + f * 0.25)
   }
 
   // Fase nova: o chefe fica mais bravo, o fundo acelera e o baralho dele muda

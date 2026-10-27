@@ -4,6 +4,7 @@ import { tocar } from '../audio.js'
 import { RAIO_BALA } from '../arte/texturas.js'
 import { tremerCamera } from '../effects/shake.js'
 import { fatores } from '../acessibilidade.js'
+import { fadeParaBranco } from '../effects/flash.js'
 
 // O telão na parede do menu: é ONDE o caos mora. Dentro dele roda uma luta de
 // balas (os dois corações desviando), e a cor dele ilumina a sala.
@@ -702,7 +703,7 @@ export function criarTelao(cena, tela) {
       cena.tweens.add({ targets: p, sala: 1, delay: 110, duration: 480, ease: 'Cubic.easeIn', onUpdate: desenhar })
       cena.tweens.add({ targets: luz, scaleX: luz.scaleX * 6, scaleY: luz.scaleY * 6, alpha: 1, duration: 560, ease: 'Cubic.easeIn' })
       tremerCamera(cena.cameras.main, 260, 0.004)
-      cena.time.delayedCall(480, () => cena.cameras.main.fadeOut(200, 255, 255, 255))
+      cena.time.delayedCall(480, () => fadeParaBranco(cena.cameras.main, 200))
       cena.time.delayedCall(700, resolver)
     })
 

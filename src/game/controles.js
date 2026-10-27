@@ -47,7 +47,7 @@ export default class Controles {
       if (botao === 'C') return partidaOnline() || emRede() ? undefined : this.ouvintesPausa.forEach((fn) => fn(jogador))
       const j = emRede() ? meuLado() : this.numJogadores === 1 ? 0 : jogador
       if (j >= this.numJogadores) return
-      this.ouvintes.forEach((fn) => fn(j, botao))
+      this.ouvintes.forEach((fn) => fn(j, botao, jogador))
     }
     // a janela perdeu o foco ou um controle sumiu (game/entrada.js): as arenas pausam.
     // Partida em rede não pausa (o outro lado continuaria jogando).
@@ -63,7 +63,8 @@ export default class Controles {
     })
   }
 
-  // fn(jogador, 'A' | 'B')
+  // fn(jogador, 'A' | 'B', origem): `origem` é de qual conjunto o botão veio (0 = jogador 1, 1 = jogador 2),
+  // mesmo em modo 1 jogador, em que `jogador` é sempre 0 (as telas de escolha usam para o P2 entrar)
   onBotao(fn) {
     this.ouvintes.push(fn)
   }

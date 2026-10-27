@@ -2,6 +2,7 @@ import { get } from 'svelte/store'
 import { lan, iniciarPartida, sairSala } from '../lib/lan/rede.js'
 import { enviarRapido as enviarTransporte, enviarPeloServidor, aoRapido } from '../lib/lan/transmissao.js'
 import { criarCanal } from '../lib/lan/canal.js'
+import { interceptarBotao } from './controles.js'
 
 // Partida EM REDE (docs/rede-pvp.md): numa sala (LAN ou ONLINE) o PVP e o
 // CO-OP rodam no PC de cada um; só as decisões viajam, pelo canal
@@ -22,6 +23,19 @@ import { criarCanal } from '../lib/lan/canal.js'
 //                               cai no meio, cada um volta para onde dá. O
 //                               convidado parado na tela preta (esperando a cena
 //                               do host) por PRESO_MS sai da sala com um aviso
+//
+// QUEDA DE CONEXÃO no meio da partida (Fase 2D; lib/lan/religar.js e
+// server/lan.js): eu caí (lan.religando) ou o outro caiu (lan.outroCaiu).
+// Enquanto o servidor espera a volta (20 s), as cenas daqui ficam paradas, os
+// controles travados e a cena Religando (game/religando.js) diz quem caiu e
+// quanto falta. Voltou: o HOST volta a partida para o COMEÇO DA RODADA (a
+// cena abre de novo nos dois, com o ponto de retomada que a arena guardou:
+// ArenaRede.dadosRetomada), descartando a sessão do canal do outro (o que
+// ainda estava no caminho era da rodada velha); o convidado recebe a `cena`
+// com `retomada: true`, abre outra sessão do canal e reconstrói a rodada (se
+// ela não chegar em ESPERA_CENA_MS, sai da sala). As telas de fim (resultado,
+// vitória, game over) e o lobby só continuam de onde estavam. Não voltou: o
+// servidor tira quem caiu e o resto é o de sempre (volta ao lobby/menu).
 //
 // No dev: window.debugRede = { canal, atraso(ms, variacao), iniciar(chave, dados), emRede, meuLado }
 //   debugRede.atraso(150, 50)   simula internet ruim (chame nas duas abas)
@@ -44,6 +58,10 @@ export const PRESO_MS = 20000
 const ehBrave = () => typeof navigator !== 'undefined' && Boolean(navigator.brave)
 export const DICA_BRAVE = 'no Brave, se travar: escudos desligados para este site'
 export const MSG_PRESO = 'não deu para sincronizar com o host: voltando ao lobby'
+// 2D: cenas que, na volta, só continuam (não voltam a rodada) e cenas por cima das outras
+const SO_CONTINUAM = ['Lan', 'PvpResultado', 'Vitoria', 'GameOver']
+const POR_CIMA = ['Religando', 'Carregando', 'Pausa', 'Entrada']
+export const ESPERA_CENA_MS = 10_000 // convidado: a cena da retomada tem até isto para chegar
 
 const naSalaComParceiro = (s) => s.fase === 'sala' && (s.sala?.membros.length ?? 0) > 1
 
@@ -84,10 +102,64 @@ function telaPreta(game) {
   return cenas.length > 0 && cenas.every((c) => c.cameras?.main?.fadeEffect?.isComplete && c.cameras.main.fadeEffect.direction)
 }
 
+// ---------- queda de conexão (2D) ----------
+
+let queda = null // o que a cena Religando mostra (lib/lan/religar.js textoDaQueda)
+let congeladas = [] // cenas que paramos
+let destravar = null // tira o bloqueio dos botões
+let esperaCena = null // convidado: o timer da cena da retomada
+let retomadaChegou = 0 // convidado: quando chegou a cena da retomada (ela pode chegar pelo direto antes do bemvindo)
+const retomadaRecente = () => Date.now() - retomadaChegou < 3000
+
+function congelar(game) {
+  if (destravar) return
+  congeladas = game.scene
+    .getScenes(true)
+    .map((c) => c.scene.key)
+    .filter((k) => !POR_CIMA.includes(k) || k === 'Entrada')
+  for (const k of congeladas) game.scene.pause(k)
+  destravar = interceptarBotao(() => true) // os controles daqui não fazem nada
+  game.scene.run('Religando', { queda: () => queda })
+  game.scene.bringToTop('Religando')
+}
+
+function descongelar(game) {
+  clearTimeout(esperaCena)
+  esperaCena = null
+  destravar?.()
+  destravar = null
+  for (const k of congeladas) if (game.scene.isPaused(k)) game.scene.resume(k)
+  congeladas = []
+  if (game.scene.isActive('Religando') || game.scene.isPaused('Religando')) game.scene.stop('Religando')
+  queda = null
+}
+
+// a cena da partida que estava aberta (sem as que ficam por cima)
+const cenaDaPartida = () => congeladas.find((k) => !POR_CIMA.includes(k)) ?? null
+
+// host: a partida volta para o começo da rodada, nos dois PCs
+function voltarRodada(game, chave, parceiroId) {
+  const cena = game.scene.getScene(chave)
+  const dados = cena?.rede?.dadosRetomada?.() ?? { ...(cena?.sys.settings.data ?? {}) }
+  descongelar(game)
+  if (parceiroId) canal.descartar(parceiroId) // o que o outro mandou antes da queda era da rodada velha
+  canal.reiniciar()
+  ativar(true)
+  console.info('[rede] retomada: a partida volta ao começo da rodada', { chave, rodada: dados.retomada?.estado?.rodada ?? null })
+  canal.enviar('cena', null, { chave, dados, retomada: true })
+  trocarCena(game, chave, dados)
+}
+
 export function instalarRede(game) {
   jogoAtual = game
-  const pararCena = canal.ao('cena', ({ chave, dados } = {}) => {
+  const pararCena = canal.ao('cena', ({ chave, dados, retomada } = {}) => {
     if (souHostDaRede() || !chave) return
+    if (destravar) descongelar(game)
+    // a retomada do host (2D): as minhas confiáveis também começam de novo
+    if (retomada) {
+      canal.reiniciar()
+      retomadaChegou = Date.now()
+    }
     ativar(chave !== 'Lan')
     trocarCena(game, chave, dados ?? {})
   })
@@ -109,6 +181,31 @@ export function instalarRede(game) {
     // antes continuava e o outro ficava esperando a mensagem 0 para sempre
     if (outro !== parceiro) canal.reiniciar()
     parceiro = outro
+    // 2D: alguém caiu no meio da partida em rede
+    // (fora da sala com o parceiro não tem o que esperar: solta antes de trocar de cena)
+    const naSala = naSalaComParceiro(s)
+    const caiu = !naSala ? null : s.religando ? { eu: true, ate: s.religando.ate } : s.outroCaiu ? { eu: false, nome: s.outroCaiu.nome, ate: s.outroCaiu.ate } : null
+    if (caiu && ativa && !retomadaRecente()) {
+      queda = caiu
+      congelar(game)
+    } else if (destravar && !caiu && (!esperaCena || !naSala)) {
+      const chave = cenaDaPartida()
+      if (!ativa || !naSalaComParceiro(s) || !chave || SO_CONTINUAM.includes(chave) || retomadaRecente()) descongelar(game)
+      else if (souHostDaRede()) voltarRodada(game, chave, outro)
+      else {
+        // convidado: espera o host voltar a rodada
+        queda = { retomando: true }
+        esperaCena = setTimeout(() => {
+          esperaCena = null
+          console.warn('[rede] a cena da retomada não chegou: saindo da sala', canal.estadoDebug())
+          descongelar(game)
+          ativar(false)
+          sairSala()
+          lan.update((x) => ({ ...x, erro: MSG_PRESO }))
+          trocarCena(game, 'Lan')
+        }, ESPERA_CENA_MS)
+      }
+    }
     if (!ativa || naSalaComParceiro(s)) return
     ativar(false)
     // partida rápida (casual): volta para a tela ONLINE, onde dá para procurar outra
@@ -149,6 +246,7 @@ export function instalarRede(game) {
     }
 
   return () => {
+    descongelar(game)
     clearInterval(vigia)
     pararCena()
     pararSala()

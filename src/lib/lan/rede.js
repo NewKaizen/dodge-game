@@ -2,6 +2,7 @@ import { writable, get } from 'svelte/store'
 import { jogo } from '../estado.js'
 import { tokenConta, aoMudarConta, recarregarPerfil } from '../conta.js'
 import { codigoDaBusca, limparSalaDaUrl } from '../salaLink.js'
+import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 
 // Conexão do modo LAN/ONLINE com o servidor (server/lan.js, docs/lan.md,
 // docs/online.md) e o estado do lobby, lido pela cena Lan (Phaser) e pelos
@@ -37,7 +38,15 @@ import { codigoDaBusca, limparSalaDaUrl } from '../salaLink.js'
 // Conta (lib/conta.js): logado, o "ola" leva o JWT e o servidor responde com o
 // resumo do perfil (eu.conta). O token só vai para o servidor que serviu a
 // página (casa), nunca para o de outro PC da LAN.
-export const PROTOCOLO = 6
+//
+// Recuperação de conexão (Fase 2D, lib/lan/religar.js): a conexão caiu NO MEIO
+// DE UMA PARTIDA: o servidor guarda a vaga 20 s e daqui o lobby tenta voltar
+// sozinho (ola {retomar: chave}, a chave do último bemvindo, no sessionStorage),
+// SEM sair da sala: estado.religando = { ate } enquanto tenta. Voltou: o mesmo
+// lugar na sala (o host volta a rodada, game/rede.js). O outro caiu: o membro
+// dele vem com `caiu` e estado.outroCaiu = { id, nome, ate }. A janela acabou:
+// sai da sala com o aviso.
+export const PROTOCOLO = 7
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
@@ -75,6 +84,10 @@ const INICIAL = {
   ultimaCasual: false, // a última sala era casual: quem fica sem ela volta para a tela ONLINE
   // XP: a última resposta do servidor { partidaId, xpGanho, xpTotal?, nivelAntes?, nivelDepois?, itensNovos?, motivo }
   recompensa: null,
+  // 2D: a MINHA conexão caiu no meio da partida e está tentando voltar: { ate } (Date.now)
+  religando: null,
+  // 2D: o OUTRO caiu no meio da partida e o servidor espera por ele: { id, nome, ate }
+  outroCaiu: null,
 }
 export const lan = writable({ ...INICIAL })
 
@@ -89,6 +102,7 @@ let aoListar = null // conectarIp esperando a primeira lista
 let manter = false // logado: não fecha a conexão ao sair da tela ONLINE
 let telaAberta = false // a tela ONLINE (cena Lan) está aberta: só então lista as salas
 const relatadas = new Set() // partidaIds cujo resultado já foi mandado
+let relatoPendente = null // o resultado que não saiu porque a conexão estava caída (vai na volta)
 let salaPendente = typeof location === 'undefined' ? '' : codigoDaBusca(location.search) // do link ?sala=
 const ouvintesServidor = new Set()
 const ouvintesParceiro = new Set()
@@ -139,9 +153,10 @@ export const MSG_LOTADO = 'o servidor está lotado agora: tente de novo daqui a 
 export const MSG_CONTA_INVALIDA = 'não deu para confirmar a sua conta: você está jogando como convidado (sem XP). Saia e entre de novo com o Google; se continuar, o serviço de contas pode estar fora do ar'
 
 // Abre (ou troca) a conexão; resolve com true quando o servidor dá as boas-vindas
-function conectar(url) {
+// retomar: a chave da vaga guardada (2D): a sala continua na tela enquanto tenta
+function conectar(url, { retomar = null } = {}) {
   fecharConexao()
-  mudar({ fase: 'conectando', servidor: url, salas: [] })
+  if (!retomar) mudar({ fase: 'conectando', servidor: url, salas: [] })
   return new Promise((resolve) => {
     let socket
     try {
@@ -169,6 +184,17 @@ function conectar(url) {
       if (m.t === 'bemvindo') {
         aberto = true
         clearTimeout(tempo)
+        guardarChave(m.retomada)
+        if (retomar) {
+          if (m.retomado) {
+            voltou()
+            comecarTimers()
+            resolve(true)
+            return
+          }
+          // o servidor não guardou a vaga (prazo, sala fechada...): segue como conexão nova
+          perdeuSala(`não deu para voltar à partida: ${m.retomadaNegada || 'a vaga não existe mais'}`)
+        }
         lan.update((s) => ({
           ...s,
           fase: s.fase === 'conectando' ? 'navegando' : s.fase,
@@ -189,7 +215,7 @@ function conectar(url) {
     socket.onopen = () => {
       if (ws !== socket) return
       const token = url === casa ? tokenConta() : null
-      socket.send(JSON.stringify({ t: 'ola', protocolo: PROTOCOLO, nome: estado().eu.nome, ...(token && { token }) }))
+      socket.send(JSON.stringify({ t: 'ola', protocolo: PROTOCOLO, nome: estado().eu.nome, ...(token && { token }), ...(retomar && { retomar }) }))
     }
     socket.onclose = (ev) => {
       clearTimeout(tempo)
@@ -197,6 +223,17 @@ function conectar(url) {
       ws = null
       pararTimers()
       ouvintesServidor.forEach((fn) => fn({ t: '_fechou' }))
+      // tentando voltar para a partida: esta tentativa não deu, a próxima vem do religar
+      if (retomar && !aberto) {
+        resolve(false)
+        return religar.falhou()
+      }
+      // caiu no meio da partida: tenta voltar sem sair da sala (o servidor guarda a vaga)
+      const antes = estado()
+      if (aberto && antes.fase === 'sala' && antes.sala?.emPartida && lerChave()) {
+        resolve(false)
+        return comecarReligar(url)
+      }
       if (estado().fila) mudar({ fila: null, filaAviso: 'a conexão caiu e você saiu da fila: quando reconectar, é só procurar de novo' })
       const s = estado()
       if (!aberto) {
@@ -215,6 +252,44 @@ function conectar(url) {
       setTimeout(() => estado().fase === 'navegando' && !ws && conectar(casa), 1500)
     }
   })
+}
+
+// ---------- recuperação de conexão (2D) ----------
+
+let urlReligar = null
+const religar = criarReligar({
+  tentar: () => conectar(urlReligar, { retomar: lerChave() }),
+  desistir: () => perdeuSala('a conexão caiu e não voltou a tempo: você saiu da partida'),
+})
+
+function comecarReligar(url) {
+  urlReligar = url
+  religar.comecar()
+  mudar({ religando: { ate: religar.ate() } })
+}
+
+// o servidor devolveu a vaga: o mesmo lugar na sala (a sala nova chega logo depois)
+function voltou() {
+  religar.conseguiu()
+  mudar({ religando: null, erro: '' })
+  ouvintesServidor.forEach((fn) => fn({ t: '_retomado' }))
+  if (relatoPendente) {
+    const r = relatoPendente
+    relatoPendente = null
+    enviar({ t: 'resultado', ...r })
+  }
+}
+
+// não deu para voltar: sai da sala aqui (a conexão nova, se houver, segue no lobby)
+function perdeuSala(motivo) {
+  religar.parar()
+  relatoPendente = null
+  const s = estado()
+  const naSala = s.fase === 'sala'
+  if (naSala) sairDaSalaLocal(motivo)
+  mudar({ religando: null, outroCaiu: null, erro: motivo, ...(naSala && { filaAviso: motivo }) })
+  // sem conexão nenhuma (a janela acabou): conecta de novo como sempre
+  if (!ws && estado().fase !== 'fora') conectar(casa)
 }
 
 function fecharConexao() {
@@ -283,7 +358,10 @@ function receber(m) {
         for (const a of antes.membros) if (!m.sala.membros.some((x) => x.id === a.id)) avisoChat(`${a.nome} saiu da sala`)
         saiuNoMeio = antes.emPartida ? antes.membros.find((a) => a.id !== s.eu.id && !m.sala.membros.some((x) => x.id === a.id))?.nome ?? '' : ''
       } else avisoChat(papel === 'host' ? 'sala criada: esperando alguém entrar' : `você entrou na sala de ${m.sala.membros.find((x) => x.papel === 'host')?.nome ?? '?'}`)
-      mudar({ fase: 'sala', sala: m.sala, papel, erro: saiuNoMeio ? `${saiuNoMeio} saiu no meio da partida: a sala continua aberta, é só chamar outro` : '', ultimaCasual: Boolean(m.sala.casual) })
+      // 2D: o outro caiu e o servidor está esperando por ele (caiu = ms que faltam)
+      const caido = m.sala.membros.find((x) => x.id !== s.eu.id && x.caiu != null)
+      const outroCaiu = caido ? { id: caido.id, nome: caido.nome, ate: Date.now() + Number(caido.caiu) } : null
+      mudar({ fase: 'sala', sala: m.sala, papel, outroCaiu, erro: saiuNoMeio ? `${saiuNoMeio} saiu no meio da partida: a sala continua aberta, é só chamar outro` : '', ultimaCasual: Boolean(m.sala.casual) })
       break
     }
     case 'fechada':
@@ -376,7 +454,7 @@ function sairDaSalaLocal(motivo) {
   if (s.fase !== 'sala') return
   if (motivo) avisoChat(motivo)
   restaurarJogadores()
-  mudar({ fase: 'navegando', sala: null, papel: null, casual: null, revanche: null })
+  mudar({ fase: 'navegando', sala: null, papel: null, casual: null, revanche: null, outroCaiu: null })
 }
 
 // se a conexão era com o servidor de outro PC, volta para o daqui
@@ -421,6 +499,10 @@ export function fecharLobby() {
     limparSalaDaUrl()
   }
   if (estado().fase === 'fora') return
+  if (estado().religando) {
+    religar.parar()
+    mudar({ religando: null })
+  }
   sairFila()
   enviar({ t: 'sair' })
   // logado: a conexão com o servidor de casa continua (presença e convites)
@@ -490,6 +572,11 @@ export async function conectarIp(texto) {
 
 export function sairSala() {
   if (estado().fase !== 'sala') return
+  if (estado().religando) {
+    religar.parar()
+    mudar({ religando: null })
+    apagarChave()
+  }
   enviar({ t: 'sair' })
   sairDaSalaLocal('')
   voltarParaCasa()
@@ -570,7 +657,13 @@ export const limparRevanche = () => mudar({ revanche: null })
 // fim da partida PVP: o que este PC viu; true se mandou agora (uma vez por partidaId)
 export function enviarResultado({ partidaId, vencedorLado, rodadas, duracao, personagem }) {
   if (typeof partidaId !== 'string' || !partidaId || relatadas.has(partidaId)) return false
-  if (ws?.readyState !== WebSocket.OPEN) return false
+  if (ws?.readyState !== WebSocket.OPEN) {
+    // caiu e está voltando (2D): o relato sai na volta, uma vez só
+    if (!estado().religando) return false
+    relatadas.add(partidaId)
+    relatoPendente = { partidaId, vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null, rodadas, duracao, personagem }
+    return true
+  }
   relatadas.add(partidaId)
   if (relatadas.size > 200) relatadas.delete(relatadas.values().next().value)
   enviar({ t: 'resultado', partidaId, vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null, rodadas, duracao, personagem })

@@ -137,7 +137,7 @@ export default class HudPvp {
         g.fillStyle(0xffffff, 0.7)
         g.fillPoints([{ x, y: y - r + 1 }, { x: x + 2, y: y - 1 }, { x, y }, { x: x - 2, y: y - 1 }], true)
       } else {
-        g.lineStyle(1, 0x3a4a6a, 1)
+        g.lineStyle(1, CORES.gemaVazia, 1)
         g.strokePoints(losango(r), true)
       }
     }

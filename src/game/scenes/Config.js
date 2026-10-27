@@ -307,7 +307,7 @@ const ABAS = [
         id: 'reduzirMovimento',
         rotulo: 'REDUZIR ANIMAÇÕES',
         ...opcaoPref('reduzirMovimento'),
-        descricao: 'Deixa bem mais suaves (ou tira) tremores, zooms, clarões e câmeras lentas. Bom para quem enjoa ou se distrai com a tela mexendo.',
+        descricao: 'Deixa bem mais suaves (ou tira) tremores, zooms, clarões, piscadas e câmeras lentas. Bom para quem enjoa ou se distrai com a tela mexendo.',
       },
       {
         id: 'tremor',
@@ -320,7 +320,7 @@ const ABAS = [
         id: 'flashes',
         rotulo: 'CLARÕES',
         ...opcaoPref('flashes'),
-        descricao: 'Clarões de tela (brancos ou coloridos) em golpes, supers e explosões. DESLIGADO: nenhum clarão, para quem tem sensibilidade à luz.',
+        descricao: 'Clarões de tela (brancos ou coloridos) em golpes, supers e explosões. DESLIGADO: nenhum clarão e os avisos de ataque piscam mais devagar (o aviso dura o mesmo tempo), para quem tem sensibilidade à luz.',
       },
       {
         id: 'daltonismo',

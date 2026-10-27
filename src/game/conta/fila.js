@@ -8,8 +8,10 @@
 //   const fila = criarFilaAvisos()
 //   fila.empurrar(aviso)            false se o id já passou por aqui (não repete)
 //   fila.descartar(id)              tira da fila e da tela (o convite foi respondido / expirou)
-//   fila.atualizar(agora, pode)     o aviso da vez (ou null). `pode` false = não estamos num menu
-//                                   (partida rolando): ninguém aparece e o da tela volta ao começo da fila
+//   fila.atualizar(agora, pode, aceita)   o aviso da vez (ou null). `pode` false = não estamos num menu
+//                                   (partida rolando): ninguém aparece e o da tela volta ao começo da fila.
+//                                   `aceita(aviso)` (opcional) limita quais podem aparecer (as telas de escolha
+//                                   só mostram os 'info'; convite e pedido esperam o menu)
 //   fila.atual() · fila.pendentes()
 export const MS_PADRAO = 5000
 export const PAUSA_ENTRE_MS = 350 // folga entre um aviso e o seguinte
@@ -46,8 +48,8 @@ export function criarFilaAvisos({ pausaMs = PAUSA_ENTRE_MS, max = MAX_FILA } = {
       }
     },
 
-    atualizar(agora, pode = true) {
-      if (atual && !pode) {
+    atualizar(agora, pode = true, aceita = null) {
+      if (atual && (!pode || (aceita && !aceita(atual.aviso)))) {
         itens.unshift(atual.aviso)
         atual = null
       }
@@ -57,7 +59,8 @@ export function criarFilaAvisos({ pausaMs = PAUSA_ENTRE_MS, max = MAX_FILA } = {
       }
       if (!atual && pode && agora >= livreEm) {
         itens = itens.filter((a) => !venceu(a, agora))
-        const proximo = itens.shift()
+        const i = aceita ? itens.findIndex(aceita) : 0
+        const proximo = i < 0 ? undefined : itens.splice(i, 1)[0]
         if (proximo) atual = { aviso: proximo, fim: proximo.ate ?? agora + (proximo.ms ?? MS_PADRAO) }
       }
       return atual?.aviso ?? null

@@ -8,6 +8,7 @@
 //   const estado = criarPartida({ p1: 'kris', p2: 'susie', semente: 'sala-7' })
 //   iniciarRodada(estado)                         energia + mãos completas (5)
 //   podeJogar(estado, 0, 'kris-espadas-9')        { ok, motivo }
+//   motivoBloqueio(estado, 0, 'kris-espadas-9')   null (pode) ou { codigo, motivo, curto }: por que não pode
 //   const r = resolverRodada(estado, 'kris-espadas-9', 'susie-copas-5')
 //   r.caixas[0]  o que a caixa do P1 roda: { carta, de, refletida, dano, ritmo, inverterMs }
 //                inverterMs > 0: controles invertidos durante o ATAQUE TODO daquela caixa
@@ -108,14 +109,31 @@ export function iniciarRodada(estado) {
 // Jogada: id da carta, { carta: id } ou null (passar a vez)
 const idDaJogada = (jogada) => (jogada == null ? null : typeof jogada === 'string' ? jogada : jogada.carta ?? null)
 
+// Por que a carta NÃO pode ser jogada agora (ou null se pode). Fonte única: o
+// podeJogar abaixo e a UI das cartas (marca de bloqueio, texto do status) usam
+// esta função, então regra e tela não divergem.
+//   codigo  'fora-da-mao' | 'sem-energia'
+//   motivo  texto longo (mensagem de erro de resolverRodada/podeJogar)
+//   curto   texto para a tela, cabe no status em 854x480 ("falta energia (3/5)": tem/custa)
+// `carta` é o id da carta ou o objeto; `energia` (opcional) troca a energia do
+// jogador (o duelo passa Infinity: nada custa).
+export function motivoBloqueio(estado, j, carta, { energia } = {}) {
+  const id = typeof carta === 'string' ? carta : carta?.id
+  const jog = estado.jogadores[j]
+  const naMao = id == null ? null : cartaNaMao(jog.baralho, id)
+  if (!naMao) return { codigo: 'fora-da-mao', motivo: 'carta não está na mão', curto: 'carta fora da mão' }
+  const tem = energia ?? jog.energia
+  if (naMao.custo > tem) {
+    return { codigo: 'sem-energia', motivo: `energia insuficiente (custa ${naMao.custo}, tem ${tem})`, curto: `falta energia (${tem}/${naMao.custo})` }
+  }
+  return null
+}
+
 export function podeJogar(estado, j, jogada) {
   const id = idDaJogada(jogada)
   if (id === null) return { ok: true, motivo: null } // passar sempre pode
-  const jog = estado.jogadores[j]
-  const carta = cartaNaMao(jog.baralho, id)
-  if (!carta) return { ok: false, motivo: 'carta não está na mão' }
-  if (carta.custo > jog.energia) return { ok: false, motivo: `energia insuficiente (custa ${carta.custo}, tem ${jog.energia})` }
-  return { ok: true, motivo: null }
+  const bloqueio = motivoBloqueio(estado, j, id)
+  return bloqueio ? { ok: false, motivo: bloqueio.motivo, bloqueio } : { ok: true, motivo: null }
 }
 
 export function cartasJogaveis(estado, j) {

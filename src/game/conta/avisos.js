@@ -32,6 +32,7 @@ export const avisar = (aviso) => avisos.empurrar(aviso)
 
 const MODOS = { pvp: 'PVP', coop: 'CO-OP' }
 const SAIU_NO_MEIO = /saiu (no meio da partida|da partida)/
+const QUEDA = /não voltou a tempo|não deu para voltar à partida/
 const JANELA_SAIDA_MS = 30_000
 const FILA_PENDENTE_MS = 10_000
 
@@ -97,6 +98,8 @@ export function instalarAvisos() {
       } else if (filaPendente && Date.now() - filaPendente > FILA_PENDENTE_MS) filaPendente = 0
 
       if (s.erro && s.erro !== erroLan && SAIU_NO_MEIO.test(s.erro)) saiuEm = Date.now()
+      // a partida acabou por uma queda de conexão (2D): o aviso espera a tela de menu
+      if (s.erro && s.erro !== erroLan && QUEDA.test(s.erro)) avisar({ id: `queda:${Date.now()}`, tipo: 'erro', titulo: 'CONEXÃO', texto: s.erro, ms: 9000 })
       erroLan = s.erro
 
       const r = s.recompensa
@@ -143,7 +146,9 @@ const POS = { x: LARGURA - LARGURA_AVISO - 12, y: 40 }
 const BORDA = { convite: 0xffe040, amizade: 0x3fd6c8, xp: 0x6dffb0, erro: 0xff7a7a, info: 0xffffff }
 const COR_TITULO = { convite: '#ffe040', amizade: '#7fe8de', xp: '#7fe08a', erro: '#ff7a7a', info: '#ffffff' }
 
-export function montarAvisos(cena) {
+// `selecao: true` nas telas de escolha (PVP, party): ali só aparecem os avisos 'info'
+// (controle conectado, jogador 2 entrou); convite e pedido de amizade esperam o menu
+export function montarAvisos(cena, { selecao = false } = {}) {
   jogoDoMenu = cena.game
   const raiz = cena.add.container(POS.x, POS.y).setDepth(2000)
   let idAtual = null
@@ -185,7 +190,7 @@ export function montarAvisos(cena) {
 
   const aoQuadro = () => {
     const agora = Date.now()
-    const a = avisos.atualizar(agora, podeEntrarEmSala())
+    const a = selecao ? avisos.atualizar(agora, true, (x) => x.tipo === 'info') : avisos.atualizar(agora, podeEntrarEmSala())
     if (!a) {
       if (idAtual) raiz.removeAll(true)
       idAtual = null

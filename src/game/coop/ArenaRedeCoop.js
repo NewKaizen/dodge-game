@@ -52,8 +52,9 @@ export default class ArenaRedeCoop extends ArenaRede {
   async iniciarRodada() {
     const a = this.arena
     if (this.souHost) {
+      this.guardarPonto()
       const eventos = iniciarRodadaCoop(a.estado)
-      this.canal.enviar('inicio', a.estado.rodada, { estado: copiar(a.estado), eventos })
+      this.enviar('inicio', a.estado.rodada, { estado: copiar(a.estado), eventos })
       return eventos
     }
     const rodada = a.estado.rodada + 1
@@ -67,7 +68,7 @@ export default class ArenaRedeCoop extends ArenaRede {
   // ---------- resolução ----------
 
   enviarResolucao(jogadas, resultado) {
-    this.canal.enviar('resolucao', this.rodada, { jogadas, resultado, estado: copiar(this.arena.estado) })
+    this.enviar('resolucao', this.rodada, { jogadas, resultado, estado: copiar(this.arena.estado) })
   }
 
   // Convidado: o resultado de resolverRodadaCoop que o host calculou (null: a arena saiu)
@@ -84,7 +85,7 @@ export default class ArenaRedeCoop extends ArenaRede {
   // chegou: o fimEsquiva do outro vem depois de todo dano/graze dele)
   // (combo: 'super' | 'par' | 'combo' | null, comboDosGolpes com quem está de pé no host)
   enviarContra(golpes, combo) {
-    this.canal.enviar('contra', this.rodada, { golpes, combo })
+    this.enviar('contra', this.rodada, { golpes, combo })
   }
 
   // Convidado: { golpes, combo } do host (null: a arena saiu)
@@ -102,7 +103,7 @@ export default class ArenaRedeCoop extends ArenaRede {
     const rodada = this.rodada
     if (this.souHost) {
       const fim = fimDaRodadaCoop(a.estado)
-      this.canal.enviar('fimRodada', rodada, { estado: copiar(a.estado), ...fim })
+      this.enviar('fimRodada', rodada, { estado: copiar(a.estado), ...fim })
       return fim
     }
     fimDaRodadaCoop(a.estado)

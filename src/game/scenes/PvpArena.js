@@ -31,6 +31,7 @@ import FimDePartida from '../pvp/fimDePartida/index.js'
 import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe } from '../../lib/saida.js'
 import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
 import ArenaRede from '../pvp/rede/ArenaRede.js'
+import { fatores } from '../acessibilidade.js'
 
 // Partida PvP de cartas. Junta as peças de pvp/ (regras, baralho, cartas,
 // Pista) com o visual das cartas (Carta, Mao). Regras em docs/pvp-regras.md.
@@ -239,6 +240,8 @@ export default class PvpArena extends Phaser.Scene {
     this.combosRodada = [null, null] // multiplicador do combo de perfeitos nesta rodada (null = não fez)
     velocidadeMusica(1) // começa no andamento normal (revanche/recomeçar também)
     this.estatisticas = [0, 1].map(() => ({ danoCausado: 0, danoRecebido: 0, cartasJogadas: 0, maiorCarta: null, grazes: 0, ases: 0, passes: 0, perfeitos: 0, maiorSequencia: 0, supers: 0 }))
+    // retomada (2D): alguém caiu e voltou; a partida volta ao começo da rodada (pvp/rede/ArenaRede.js)
+    this.retomada = this.rede?.aplicarRetomada(this.sys.settings.data?.retomada) ?? false
 
     this.desenharFundo()
     this.criarPistas()
@@ -524,37 +527,46 @@ export default class PvpArena extends Phaser.Scene {
 
   // ---------- partida ----------
 
+  // o que a retomada (2D) guarda além do estado das regras (ArenaRede.guardarPonto)
+  extrasRetomada() {
+    return { estatisticas: this.estatisticas, bonusAnterior: this.bonusAnterior, comecouEm: this.comecouEm }
+  }
+
   async partida() {
-    await this.abertura()
-    while (!this.saindo) {
+    // a cena aberta de novo (retomada da 2D: o Phaser reaproveita o `this`) zera o
+    // saindo; a partida da abertura anterior para aqui, e não na rodada nova
+    const vez = (this.vezPartida = (this.vezPartida ?? 0) + 1)
+    const fora = () => this.saindo || this.vezPartida !== vez
+    if (!this.retomada) await this.abertura()
+    while (!fora()) {
       await this.inicioDaRodada()
-      if (this.saindo) return
+      if (fora()) return
       const jogadas = await this.escolha()
-      if (this.saindo) return
+      if (fora()) return
       // bonus round: o evento só é sorteado agora, com as cartas já escolhidas
       // (em rede o host decide tudo e o convidado recebe)
       const decisao = await this.decidirRodada(jogadas)
-      if (this.saindo || !decisao) return
+      if (fora() || !decisao) return
       await this.anunciarBonusDaRodada(decisao)
-      if (this.saindo) return
+      if (fora()) return
       const resultado = decisao.resultado
       this.contarJogadas(resultado)
       if (resultado.duelo || resultado.copia) {
         await this.revelacaoDuelo(resultado)
-        if (this.saindo) return
+        if (fora()) return
         await this.rodarDuelo(resultado)
       } else {
         await this.revelacao(resultado)
-        if (this.saindo) return
+        if (fora()) return
         await this.anunciarSupers(resultado)
-        if (this.saindo) return
+        if (fora()) return
         await this.arremesso(resultado)
-        if (this.saindo) return
+        if (fora()) return
         await this.esquiva(resultado)
       }
-      if (this.saindo) return
+      if (fora()) return
       const vencedor = await this.terminarRodada()
-      if (this.saindo) return
+      if (fora()) return
       if (vencedor) return this.resultado(vencedor)
     }
   }
@@ -941,7 +953,10 @@ export default class PvpArena extends Phaser.Scene {
         if (this.escolhas[j] !== undefined) texto = 'PRONTO!'
         else texto = j === this.cpu ? 'CPU pensando...' : this.rede && j !== this.rede.meuLado ? 'escolhendo...' : 'escolha uma carta'
       }
-      this.status[j].setText(texto)
+      // carta sob o cursor que não dá para jogar: diz POR QUÊ (texto + vermelho; pvp/regras.js motivoBloqueio)
+      const bloqueio = livre && naMao && j !== this.cpu && !(this.rede && j !== this.rede.meuLado) ? this.podeJogarAgora(j, this.maos[j].selecionada?.dados.id).bloqueio : null
+      if (bloqueio) texto = bloqueio.curto
+      this.status[j].setText(texto).setColor(bloqueio ? TEXTO.caido : corTexto(CORES.almas[j]))
       this.atualizarPrevia(j)
     }
     this.rede?.enviarCursor() // o meu cursor mudou? o outro PC mostra
@@ -1013,8 +1028,7 @@ export default class PvpArena extends Phaser.Scene {
     if (!v.ok) {
       carta.negar()
       this.previas[m]?.negar?.()
-      const custo = carta.dados.custo
-      this.status[m].setText(`energia insuficiente (custa ${custo})`).setColor(TEXTO.caido)
+      this.status[m].setText(v.bloqueio?.curto ?? v.motivo).setColor(TEXTO.caido)
       this.time.delayedCall(900, () => {
         this.status[m].setColor(corTexto(CORES.almas[m]))
         this.atualizarEscolha()
@@ -1826,7 +1840,7 @@ export default class PvpArena extends Phaser.Scene {
           tocar(this, 'inverter')
         }
         joy = { x: -joy.x, y: -joy.y }
-        this.avisoPista[j].setText(Math.floor(this.time.now / 180) % 2 ? 'CONTROLES INVERTIDOS!' : '').setColor('#ff9a3a')
+        this.avisoPista[j].setText(fatores().pulso > 1 || Math.floor(this.time.now / 180) % 2 ? 'CONTROLES INVERTIDOS!' : '').setColor('#ff9a3a')
       } else if (inv?.avisado) {
         this.invertido[j] = 0
         if (!this.ko[dono]) this.avisoPista[j].setText('')

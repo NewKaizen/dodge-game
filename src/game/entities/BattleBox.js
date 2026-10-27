@@ -3,7 +3,7 @@ import { CAIXA, CAIXA_DINAMICA, CORES } from '../constants.js'
 import { tocar } from '../audio.js'
 import { ajustarCamera } from '../resolucao.js'
 import { caixasDe, registrarCaixa, removerCaixa, ignorarNasCaixas } from '../recorte.js'
-import { fatores } from '../acessibilidade.js'
+import { fatores, duracaoPulso } from '../acessibilidade.js'
 
 // Faixa de aproximação em volta da caixa (ver aproximar()):
 //   px      quanto a faixa passa da caixa para cada lado (mundo 640x480)
@@ -328,7 +328,7 @@ export default class BattleBox {
     const dentro = this.scene.add.graphics().setDepth(8)
     desenhar(dentro)
     this.recortar(dentro)
-    const pulso = this.scene.tweens.add({ targets: [principal, dentro], alpha: 0.35, duration: 90, yoyo: true, repeat: -1 })
+    const pulso = this.scene.tweens.add({ targets: [principal, dentro], alpha: 0.35, duration: duracaoPulso(90), yoyo: true, repeat: -1 })
     return { objetos: [principal, dentro], pulso }
   }
 

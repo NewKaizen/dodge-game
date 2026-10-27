@@ -3,7 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { criarMetricas, percentil, CONTADORES, METRICAS_NULA } from '../metricas.js'
-import { criarLobby, PROTOCOLO } from '../lan.js'
+import { criarLobby, PROTOCOLO, RETOMADA_MS } from '../lan.js'
 import { ABANDONO_GRACA_MS } from '../partidas.js'
 
 test('percentil: posto mais próximo', () => {
@@ -111,13 +111,14 @@ test('lobby: fila, pares, partida abandonada, revanche, logins e reconexão', as
   host.mandar({ t: 'partida', valor: true })
   outro.mandar({ t: 'revanche', aceitar: true })
   host.mandar({ t: 'revanche', aceitar: true })
-  outro.sair() // abandono no meio da partida
+  outro.sair() // abandono no meio da partida (não voltou em RETOMADA_MS)
+  relogio.andar(RETOMADA_MS)
   relogio.andar(ABANDONO_GRACA_MS + 100)
   const r = metricas.resumo()
   assert.deepEqual(
     r.contadores,
-    { conexoes: 2, fila_entradas: 2, fila_pares: 1, logins: 1, partidas_abandonadas: 2, partidas_iniciadas: 2, revanches_aceitas: 1, revanches_pedidas: 1 },
-    'a revanche abre uma segunda partida; quem sai abandona as duas (a primeira ainda esperava os relatos)',
+    { conexoes: 2, fila_entradas: 2, fila_pares: 1, logins: 1, partidas_abandonadas: 1, partidas_finalizadas: 1, partidas_iniciadas: 2, partidas_quedas: 1, revanches_aceitas: 1, revanches_pedidas: 1 },
+    'a revanche abre uma segunda partida; a primeira acaba sem relato no prazo (20 s, o mesmo da volta) e a segunda é abandono',
   )
   assert.deepEqual(r.amostras.fila_espera_ms, { n: 2, p50: 0, p90: 4000, max: 4000 })
 

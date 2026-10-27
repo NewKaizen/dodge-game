@@ -1,5 +1,5 @@
 import { processarLinha } from './protocolo.js'
-import { definirFonte, MAX_JOGADORES } from './estado.js'
+import { definirPads, MAX_JOGADORES } from './estado.js'
 import { pref } from '../game/preferencias.js'
 import { criarLeitorPads, normalizarBotoes, chaveDoPad } from '../game/gamepad.js'
 import { criarAtribuidor } from '../game/fontes.js'
@@ -78,7 +78,7 @@ export function iniciarGamepads({ aviso = () => {}, aoPerder = () => {} } = {}) 
     const chave = chaveDoPad(pad)
     const { vaga, novo } = atribuidor.vagaDe(chave)
     ativos.set(pad.index, { chave, vaga })
-    definirFonte('gamepad', true)
+    definirPads(ativos.size)
     aviso({
       id: `controle:${chave}:${Date.now()}`,
       tipo: 'info',
@@ -129,7 +129,7 @@ export function iniciarGamepads({ aviso = () => {}, aoPerder = () => {} } = {}) 
         atribuidor.desligou(a.chave)
         mexeu = true
         aviso({ id: `controle-saiu:${a.chave}:${Date.now()}`, tipo: 'info', titulo: 'CONTROLE DESCONECTADO', texto: `jogador ${a.vaga + 1}`, ms: 4000 })
-        if (!ativos.size) definirFonte('gamepad', false)
+        definirPads(ativos.size)
         aoPerder('controle desconectado')
       }
     }
@@ -159,6 +159,6 @@ export function iniciarGamepads({ aviso = () => {}, aoPerder = () => {} } = {}) 
     window.removeEventListener('blur', aoPerderFoco)
     ativos.clear()
     direcoes.clear()
-    definirFonte('gamepad', false)
+    definirPads(0)
   }
 }

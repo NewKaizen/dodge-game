@@ -26,6 +26,7 @@ export const CORES = {
   aviso: 0xff3048,
   selecionado: 0xffe040,
   acerto: 0xff3048, // borda da caixa piscando no golpe
+  gemaVazia: 0x6a80b0, // contorno da gema de energia vazia (contraste >= 3:1 no preto, ver __tests__/contraste.test.js)
 }
 // aviso, acerto e almas mudam com o modo daltônico (daltonismo.js escreve
 // aqui): leia CORES.* na hora de desenhar, não guarde em constante de módulo.

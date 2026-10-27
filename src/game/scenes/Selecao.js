@@ -158,7 +158,7 @@ export default class Selecao extends Phaser.Scene {
     if (this.rede) this.info.setText(this.host ? 'você é o host (P1): você escolhe o chefe' : 'o host (P1) está escolhendo o chefe...')
     else {
       const jogadores = this.registry.get('numJogadores') ?? 1
-      this.info.setText(`${jogadores} ${jogadores > 1 ? 'JOGADORES' : 'JOGADOR'}  (mude no painel acima do jogo)`)
+      this.info.setText(`${jogadores} ${jogadores > 1 ? 'JOGADORES' : 'JOGADOR'}  (o 2º entra na escolha da party)`)
     }
   }
 }

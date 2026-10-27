@@ -12,6 +12,8 @@ import { CORES, FONTE, LARGURA, ALTURA, CENTRO_X, TEXTO, corTexto } from '../con
 import { tremerCamera } from '../effects/shake.js'
 import { claraoCamera } from '../effects/flash.js'
 import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
+import { montarAvisos } from '../conta/avisos.js'
+import { pedirP2, dicaDoP2 } from '../jogadoresLocais.js'
 
 // Área da grade de personagens e dos painéis de cada jogador (px)
 const GRADE = { topo: 62, base: 190, esquerda: 40, direita: LARGURA - 40, espaco: 8, larguraMax: 104, alturaMax: 128 }
@@ -65,7 +67,11 @@ export default class PvpEscolha extends Phaser.Scene {
     this.ids = PERSONAGENS_PVP.filter((id) => PERSONAGENS[id])
     this.perfis = Object.fromEntries(this.ids.map((id) => [id, perfilPvp(id)]))
     this.controles = new Controles(this)
-    this.controles.onBotao((jogador, botao) => (botao === 'A' ? this.confirmar(jogador) : this.desfazer(jogador)))
+    // `origem` = de qual conjunto o botão veio: o A do jogador 2 (Enter) entra, o B dele sai (game/jogadores.js)
+    this.controles.onBotao((jogador, botao, origem) => {
+      if (pedirP2(botao, origem, this.algoConfirmado(), this.rede)) return
+      botao === 'A' ? this.confirmar(jogador) : this.desfazer(jogador)
+    })
     this.solo = this.controles.numJogadores === 1
     this.rede = emRede()
     this.eu = this.rede ? meuLado() : null // em rede: o lado que este PC controla
@@ -96,11 +102,14 @@ export default class PvpEscolha extends Phaser.Scene {
 
     this.montarPaineis()
     const dica = this.rede ? '← → escolher     A: confirmar     B: voltar ao lobby' : '← → escolher     A: confirmar     B: desfazer / voltar'
-    this.texto(LARGURA / 2, ALTURA - 14, dica, 13, TEXTO.desabilitado, { strokeThickness: 0 })
+    this.texto(LARGURA / 2, ALTURA - 9, dica, 13, TEXTO.desabilitado, { strokeThickness: 0 })
+    // JOGADOR 2 entra aqui (dois no mesmo teclado): a dica some quando alguém confirma
+    this.dicaP2 = this.texto(LARGURA / 2, ALTURA - 25, '', 13, TEXTO.selecionado, { strokeThickness: 0 })
+    montarAvisos(this, { selecao: true })
 
     this.atualizarTela()
 
-    // o painel Svelte pode mudar o número de jogadores a qualquer momento
+    // o número de jogadores pode mudar sozinho (2º controle, JOGADOR 2 entrando): recomeça a escolha
     const aoMudar = (_, valor, anterior) => valor !== anterior && !this.vs && !this.rede && this.scene.restart()
     this.registry.events.on('changedata-numJogadores', aoMudar)
     this.events.once('shutdown', () => this.registry.events.off('changedata-numJogadores', aoMudar))
@@ -133,6 +142,11 @@ export default class PvpEscolha extends Phaser.Scene {
   mandarCursor() {
     if (this.confirmados[this.eu] || this.saindo) return
     canal.enviarRapido('cursor', { tela: 'escolha', indice: this.cursores[this.eu].indice })
+  }
+
+  // alguém já confirmou (ou a cena está saindo): o JOGADOR 2 não entra nem sai mais
+  algoConfirmado() {
+    return Boolean(this.saindo || this.vs || this.confirmados.some(Boolean))
   }
 
   // nome curto de cada lado (contra a CPU, o P2 é "CPU")
@@ -428,6 +442,7 @@ export default class PvpEscolha extends Phaser.Scene {
       this.status.setText(faltam ? 'cada jogador escolhe 1 lutador  ·  pode repetir!' : '').setColor(TEXTO.normal)
     }
 
+    this.dicaP2.setText(dicaDoP2(this.algoConfirmado(), this.rede) ?? '')
     this.paineis.forEach((p, j) => this.desenharPainel(p, j))
   }
 

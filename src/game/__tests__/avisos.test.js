@@ -81,3 +81,14 @@ test('avisos: fila cheia perde o mais antigo que não é convite', () => {
   assert.equal(f.atualizar(99_999), null)
   assert.equal(f.atualizar(99_999 + PAUSA_ENTRE_MS)?.id, 'b')
 })
+
+test('avisos: nas telas de escolha só os que o filtro aceita aparecem (convite espera o menu)', () => {
+  const f = criarFilaAvisos()
+  const soInfo = (a) => a.tipo === 'info'
+  f.empurrar(aviso('c', { tipo: 'convite', ate: 60_000 }))
+  f.empurrar(aviso('j'))
+  assert.equal(f.atualizar(0, true, soInfo)?.id, 'j', 'pula o convite')
+  assert.equal(f.pendentes(), 1)
+  assert.equal(f.atualizar(MS_PADRAO + PAUSA_ENTRE_MS, true, soInfo), null)
+  assert.equal(f.atualizar(MS_PADRAO + 2 * PAUSA_ENTRE_MS, true)?.id, 'c', 'no menu ele aparece')
+})
