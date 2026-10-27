@@ -9,6 +9,7 @@ import { CORES, FONTE, LARGURA, ALTURA, TEXTO, NIVEIS } from '../constants.js'
 import { tremerCamera } from '../effects/shake.js'
 import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
 import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
+import { prepararXpCoop, mostrarPainelXp } from '../conta/painelXp.js'
 import { partyDe } from '../data/batalha.js'
 
 // Tela de game over (os dois caíram na CoopArena).
@@ -86,6 +87,24 @@ const estilo = (tamanho, cor = TEXTO.normal, extra = {}) => ({
   ...extra,
 })
 
+// campos de cada abertura: o Phaser reaproveita a cena (cenasReaproveitadas.test.js)
+const estadoInicial = () => ({
+  fundo: null,
+  veu: null,
+  raios: null,
+  halo: null,
+  pulando: null,
+  tituloBrilho: null,
+  titulo: null,
+  dicaPular: null,
+  chao: null,
+  vinheta: null,
+  digitando: null,
+  mensagemCompleta: null,
+  textoMensagem: null,
+  barraHp: null,
+})
+
 export default class GameOver extends Phaser.Scene {
   constructor() {
     super('GameOver')
@@ -93,6 +112,7 @@ export default class GameOver extends Phaser.Scene {
 
   // estatisticas: CoopArena.resumo(); hpChefe/hpMaxChefe: quanto faltava do chefe
   create({ chefe, estatisticas, hpChefe, hpMaxChefe }) {
+    Object.assign(this, estadoInicial())
     this.idChefe = chefe
     this.def = CHEFES[chefe]
     this.stats = estatisticas
@@ -113,6 +133,7 @@ export default class GameOver extends Phaser.Scene {
     this.controles = new Controles(this)
     this.controles.onBotao((_, botao) => this.aoBotao(botao))
     this.rede = emRede()
+    this.xp = prepararXpCoop(this, { vitoria: false, estatisticas: this.stats }) // XP do CO-OP em rede (2F); null fora dela
     this.naSala = this.rede || partidaOnline() // sem revanche: só voltar ao lobby
     // em rede, o host volta com os dois quando o convidado pede (mesmo no meio da animação)
     if (this.rede && souHostDaRede()) {
@@ -404,6 +425,7 @@ export default class GameOver extends Phaser.Scene {
   liberar(rapido) {
     this.liberado = true
     this.dicaPular?.destroy()
+    mostrarPainelXp(this, this.xp, { y: 407 })
     const y = ALTURA - 38
     const opcao = (x, botao, rotulo, cor) => {
       const icone = this.add.image(x - 92, y, 'coracao').setTint(cor).setScale(1.6).setDepth(10)

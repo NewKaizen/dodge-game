@@ -84,7 +84,8 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 | R3 Revisão final + P2 plano 2–6 | concluído: 5 defeitos corrigidos, plano em `docs/plano-fases-2-6.md` |
 | Correções pós-Fase 1 | concluído (NewKaizen/dodge-game#44: tela preta do convidado, CARREGANDO…, nome da conta) |
 | 2A Consolidação das telas | concluído (Perfil, Amigos e Coleção como cenas; avisos no jogo; JOGAR RÁPIDO e PERFIL no menu); falta o teste restrito (`docs/teste-fase1.md`) e ver no navegador com contas reais |
-| Fase 2 | 2A e 2B concluídas (NewKaizen/dodge-game#45); 2C e 2D concluídas (PR aberto); próximas: 2E (revanche, ajustes do teste com a turma, auditoria de cenas reaproveitadas, cor do P1 x bloqueio) e 2F (pendências do servidor). Decisões: consolidação = 2A; controle padrão Xbox/PS remapeável; religação 20 s; host cai = sem XP e sem derrota; retomada no começo da rodada (recomendadas; podem mudar antes da 2B/2D) |
+| Fase 2 | 2A–2D concluídas (NewKaizen/dodge-game#45, #46, com dois jogadores locais automáticos); concluídas também: 2E (revanche, ajustes do teste com a turma, auditoria de cenas reaproveitadas, cor do P1 x bloqueio) e 2F (pendências do servidor). Decisões: consolidação = 2A; controle padrão Xbox/PS remapeável; religação 20 s; host cai = sem XP e sem derrota; retomada no começo da rodada (recomendadas; podem mudar antes da 2B/2D) **Fase 2 concluída** (PR aberto; rodar a 0005 antes). |
+| Fase 5 (adiantada) | aguardando o fim da Fase 2 (pedido do usuário); 5A base N jogadores (Opus) depois. Decisões do usuário (27/10): ordem 5A → CO-OP 3–4 (5B/5C) → 1x1x1x1 (5D) → 2x2 (5E); **só online** (salas de amigos); topologia **estrela pelo host** (WebRTC ou relé do servidor; TURN opcional). 2E e 2F vêm antes |
 
 ### Consolidação (depois das features da Fase 1)
 
@@ -92,16 +93,16 @@ Decisão do usuário: primeiro as features, depois organizar tudo. Itens anotado
 
 - ~~Trazer perfil, amigos e conta **para dentro do jogo** (cenas/visual da Mesa de Cartas), em vez das barras/overlays Svelte "fora do jogo".~~ Feito na 2A (a foto continua em Svelte: seletor de arquivo e recorte).
 - ~~Toast de aviso quando chega pedido de amizade (hoje só selo no botão).~~ Feito na 2A (`src/game/conta/avisos.js`).
-- Decidir se bloquear tira o bloqueado da sala atual (hoje não tira).
+- ~~Decidir se bloquear tira o bloqueado da sala atual (hoje não tira).~~ Feito na 2F (fora de partida, quem não é o host sai; no meio da partida vale depois).
 - ~~JOGAR RÁPIDO no menu principal (hoje só na tela ONLINE; a arte da Mesa tem 5 vagas).~~ Feito na 2A (7 linhas no espaço escuro da Mesa, sem mexer na arte).
 - ~~Avisar quando convidar um amigo tira você da fila (hoje é silencioso).~~ Feito na 2A (aviso ao aceitar um convite estando na fila).
-- Partida casual não começa se a aba do host estiver em segundo plano.
+- ~~Partida casual não começa se a aba do host estiver em segundo plano.~~ Casual já desiste em 15 s; salas de amigos: feito na 2F (aviso ao convidado e ao host).
 - ~~Aviso de XP para quem fica quando o oponente abandona (hoje só aparece no perfil).~~ Feito na 2A (toast "+XP").
-- Aplicar o verso de carta equipado nas partidas (hoje só na Coleção; precisa ir pela rede).
-- Rever o limite que conta todos os convidados como um único oponente.
-- XP no CO-OP.
-- Filtro de nomes também no nome inicial vindo do Google (hoje só ao trocar o nome).
-- (2E) Auditar cenas reaproveitadas pelo Phaser que guardam estado da partida anterior (o mesmo vício que travava o PvpResultado).
+- ~~Aplicar o verso de carta equipado nas partidas (hoje só na Coleção; precisa ir pela rede).~~ Feito na 2F.
+- ~~Rever o limite que conta todos os convidados como um único oponente.~~ Feito na 2F (por conexão; mesmo IP da conta = um só).
+- ~~XP no CO-OP.~~ Feito na 2F (migration 0005).
+- ~~Filtro de nomes também no nome inicial vindo do Google (hoje só ao trocar o nome).~~ Feito na 2F (migration 0005).
+- ~~(2E) Auditar cenas reaproveitadas pelo Phaser que guardam estado da partida anterior (o mesmo vício que travava o PvpResultado).~~ Feito na 2E: 13 cenas ganharam `estadoInicial()` + `Object.assign` no começo do `init`/`create`, a Pausa remove o ouvinte de `resume`, e `src/game/__tests__/cenasReaproveitadas.test.js` varre todas as cenas de `config.js` (campos e ouvintes). Pendente da 2F: `Vitoria` e `GameOver` (o teste só avisa).
 
 ### Controle de custo
 

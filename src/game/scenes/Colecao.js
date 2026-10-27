@@ -259,7 +259,7 @@ export default class Colecao extends CenaConta {
     else estado = { texto: `libera no nível ${item.nivel}`, cor: COR.aviso }
     this.t(cx, d.y + 232, estado.texto, 14, estado.cor).setOrigin(0.5)
     if (!tem) this.t(cx, d.y + 254, nivel >= item.nivel ? 'jogue uma partida para receber' : `faltam ${item.nivel - nivel} nível${item.nivel - nivel > 1 ? 'is' : ''}`, 11, COR.dica).setOrigin(0.5)
-    if (item.tipo === 'verso') this.t(cx, d.y + 282, 'o verso aparece aqui por enquanto;\nnas cartas da partida entra numa\npróxima versão', 10, COR.apagado, { align: 'center' }).setOrigin(0.5, 0)
+    if (item.tipo === 'verso') this.t(cx, d.y + 282, 'equipado, este verso aparece nas suas\ncartas nas partidas (online, o\noutro jogador também vê)', 10, COR.apagado, { align: 'center' }).setOrigin(0.5, 0)
     else this.t(cx, d.y + 290, 'cosméticos não mudam nada no jogo', 10, COR.apagado).setOrigin(0.5)
     const m = this.ocupado ? { texto: 'equipando…', cor: COR.aviso } : this.mensagem ?? (get(conta).inventario === null ? { texto: 'carregando o inventário…', cor: COR.dica } : null)
     if (m) this.t(cx, d.y + d.altura - 24, m.texto, 12, m.cor, { wordWrap: { width: d.largura - 28 }, align: 'center' }).setOrigin(0.5)

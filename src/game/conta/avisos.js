@@ -87,11 +87,28 @@ export function instalarAvisos() {
     }),
   )
 
+  // host com a aba escondida quando o convidado ficou pronto (Fase 2F): o servidor não
+  // começa sozinho numa sala de amigos, então o aviso é "todos prontos" ao voltar
+  let prontoEscondido = false
+  const todosProntos = (s) => s.fase === 'sala' && s.papel === 'host' && !s.sala?.emPartida && !s.sala?.casual && s.sala?.membros.length > 1 && s.sala.membros.filter((m) => m.papel !== 'host').every((m) => m.pronto)
+  const aoVoltar = () => {
+    if (typeof document === 'undefined' || document.visibilityState !== 'visible' || !prontoEscondido) return
+    prontoEscondido = false
+    if (todosProntos(get(lan))) avisar({ id: `todos-prontos:${Date.now()}`, tipo: 'info', titulo: 'TODOS ESTÃO PRONTOS', texto: 'seu amigo ficou pronto enquanto o jogo estava\nem segundo plano: é só começar a partida', ms: 8000 })
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', aoVoltar)
+    parar.push(() => document.removeEventListener('visibilitychange', aoVoltar))
+  }
+
   let recompensaVista = null
   let saiuEm = 0
   let erroLan = ''
   parar.push(
     lan.subscribe((s) => {
+      const prontos = todosProntos(s)
+      if (!prontos) prontoEscondido = false
+      else if (!prontoEscondido && typeof document !== 'undefined' && document.visibilityState === 'hidden') prontoEscondido = true
       if (filaPendente && s.fase === 'sala') {
         avisar({ id: `fila-saiu:${Date.now()}`, tipo: 'info', titulo: 'VOCÊ SAIU DA FILA', texto: 'o convite do seu amigo tirou você da fila do JOGAR RÁPIDO', ms: 6000 })
         filaPendente = 0

@@ -38,12 +38,21 @@ const PAINEL = { x: (LARGURA - 760) / 2, y: 232, largura: 760, altura: 196 }
 const VEU = 0.42 // véu escuro por cima do fundo da arena (o texto precisa ler)
 const CURSOR_MS = 300 // em rede: de quanto em quanto o meu cursor vai de novo para o outro PC
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
+// deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do init().
+// Testado em src/game/__tests__/cenasReaproveitadas.test.js.
+const estadoInicial = () => ({
+  cartoes: null,
+  painel: null,
+})
+
 export default class PvpVoto extends Phaser.Scene {
   constructor() {
     super('PvpVoto')
   }
 
   init(dados) {
+    Object.assign(this, estadoInicial())
     const salvo = this.registry.get('pvp') ?? {}
     this.p1 = dados?.p1 ?? salvo.p1 ?? 'kris'
     this.p2 = dados?.p2 ?? salvo.p2 ?? 'susie'

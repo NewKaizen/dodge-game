@@ -21,6 +21,13 @@ const CHEFE = { x: 172, y: 200 }
 const ENTRADA = { climax: 900, porNivel: 100, depois: 360 }
 const CURSOR_MS = 300 // em rede: de quanto em quanto o host manda o cursor de novo
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
+// deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do init().
+// Testado em src/game/__tests__/cenasReaproveitadas.test.js.
+const estadoInicial = () => ({
+  indice: null,
+})
+
 // Tela do nível da luta, depois de escolher o chefe (Selecao -> Dificuldade -> CoopArena).
 // FÁCIL é o chefe como ele é; MÉDIO e DIFÍCIL só apertam (números em NIVEIS).
 // A: lutar · B: voltar para a escolha do chefe
@@ -38,6 +45,7 @@ export default class Dificuldade extends Phaser.Scene {
   }
 
   init(dados) {
+    Object.assign(this, estadoInicial())
     this.idChefe = dados?.chefe ?? this.registry.get('chefe') ?? 'king'
     this.party = Array.isArray(dados?.party) ? dados.party : null
     this.nivelInicial = dados?.nivel ?? null

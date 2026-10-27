@@ -23,6 +23,7 @@ export const DURACAO_MINIMA_S = 60 // medida pelo servidor, do começo ao fim
 export const RODADAS_MINIMAS = 2 // quando o resultado diz quantas rodadas teve
 export const REPETICAO_CHEIA = 3 // partidas por dia contra o mesmo oponente com XP cheio
 export const REPETICAO_LIMITE = 5 // depois disso, 0 XP no dia (as do meio valem metade)
+export const CONVIDADOS_LIMITE_DIA = 10 // partidas com XP por dia contra convidados (todos somados; 0005)
 export const NIVEL_MAXIMO = 99
 
 // Curva: para passar do nível N ao N+1 são 100 + 25 × (N − 1) XP.

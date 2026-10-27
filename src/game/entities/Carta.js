@@ -42,6 +42,7 @@ import { fatores } from '../acessibilidade.js'
 //   virada       começa com o verso para cima
 //   corFoco      cor do brilho do cursor (Mao usa CORES.almas[jogador])
 //   cor          cor da faixa/verso (padrão: cor do personagem)
+//   corVerso     verso de carta equipado (Fase 2F, pvp/versos.js): cor de fundo do verso, no lugar da do personagem
 //   ampliada     número: já nasce ampliada nesse fator, com a legenda visível
 //   foco         { subida, escala } do estado com o cursor em cima (em px da carta base)
 
@@ -178,6 +179,7 @@ export default class Carta extends Phaser.GameObjects.Container {
     this.altura = opcoes.altura ?? Math.round((this.largura * 10) / 7)
     this.u = this.largura / BASE
     this.corPersonagem = opcoes.cor ?? PERSONAGENS[dados.personagem]?.cor ?? 0x8a7aff
+    this.corVerso = opcoes.corVerso ?? null
     this.corFoco = opcoes.corFoco ?? 0xffffff
     this.focoCfg = { subida: 14, escala: 1.1, ...opcoes.foco }
     this.virada = false
@@ -569,8 +571,9 @@ export default class Carta extends Phaser.GameObjects.Container {
     const { largura: w, altura: h, u } = this
     const hw = w / 2
     const hh = h / 2
-    const cor = this.corPersonagem
-    const fundo = misturar(CORES_CARTA.verso, cor, 0.18)
+    // verso equipado: o campo é a cor dele e a treliça/filetes ficam mais claros por cima
+    const cor = this.corVerso != null ? misturar(this.corVerso, 0xffffff, 0.55) : this.corPersonagem
+    const fundo = this.corVerso != null ? this.corVerso : misturar(CORES_CARTA.verso, cor, 0.18)
     const g = this.scene.add.graphics()
     this.verso.add(g)
 

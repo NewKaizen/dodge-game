@@ -71,6 +71,20 @@ const MODOS = { pvp: { rotulo: 'PVP', cor: '#ff3d6e', cena: 'PvpEscolha' }, coop
 const LINHAS_SALAS = 5 // salas visíveis na lista
 const LINHAS_CHAT = 9
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
+// deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do init().
+// Testado em src/game/__tests__/cenasReaproveitadas.test.js.
+const estadoInicial = () => ({
+  pingPartida: null,
+  nos: null,
+  ligacoes: [],
+  pacotes: null,
+  redeGfx: null,
+  titulo: null,
+  subtitulo: null,
+  barras: null,
+})
+
 export default class Lan extends Phaser.Scene {
   constructor() {
     super('Lan')
@@ -78,6 +92,7 @@ export default class Lan extends Phaser.Scene {
 
   // { rapido: true }: veio do JOGAR RÁPIDO do menu inicial, entra na fila assim que conectar
   init(dados) {
+    Object.assign(this, estadoInicial())
     this.rapidoPendente = Boolean(dados?.rapido)
   }
 
@@ -543,9 +558,13 @@ export default class Lan extends Phaser.Scene {
       t(x + largura - 14, y + 84, m.papel === 'host' ? 'ESCOLHE O MODO' : pronto ? 'PRONTO!' : 'ESPERANDO…', 12, pronto ? COR.ok : '#ffb040').setOrigin(1, 0.5)
     })
 
+    // o host largou a aba do jogo (em segundo plano há uns segundos) com o convidado esperando
+    const hostSumido = !host && vagas[0]?.segundoPlano && vagas[1]?.pronto && !sala.emPartida
+    if (hostSumido) t(LARGURA / 2, 216, 'o host está com o jogo em segundo plano', 12, '#ffb040', { strokeThickness: 0 }).setOrigin(0.5)
+
     // a ligação entre os dois PCs (a que vale na partida)
     const p = this.pingPartida
-    if (vagas[1] && p?.ms != null)
+    if (vagas[1] && p?.ms != null && !hostSumido)
       t(LARGURA / 2, 216, `ping entre vocês: ${p.ms} ms (${ROTAS[p.rota]})`, 12, corDoPing(p.ms), { strokeThickness: 0 }).setOrigin(0.5)
 
     // ações (esquerda)

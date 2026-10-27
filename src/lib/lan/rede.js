@@ -27,7 +27,7 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 //   pedirRevanche(aceitar) · limparRevanche() · salaCasual()   (PvpResultado) revanche com aceite duplo
 //   estado: fila (procurando/pareado), filaAviso, casual, revanche, ultimaCasual
 //
-// XP (server/partidas.js, Fase 1D): cada partida PVP da sala tem um
+// XP (server/partidas.js, Fase 1D; CO-OP na 2F): cada partida (PVP ou CO-OP de 2) da sala tem um
 // sala.partidaId; no fim, enviarResultado({...}) manda o que este PC viu UMA
 // vez por partida (revanche e cena reiniciando não reenviam). O servidor
 // responde com `recompensa` (estado.recompensa) e o perfil é relido.
@@ -142,15 +142,15 @@ function avisoChat(texto) {
 // ---------- conexão ----------
 
 // textos que o jogador vê quando a conexão ou a conta falham (cada um diz o que fazer)
-export const MSG_SEM_SERVIDOR = 'não deu para falar com o servidor: ele pode estar ligando (leva até 1 minuto) ou a sua internet caiu. Tentando de novo…'
+export const MSG_SEM_SERVIDOR = 'sem resposta do servidor: ele pode estar ligando (até 1 minuto) ou a sua internet caiu. Tentando de novo…'
 // antes da primeira conexão ainda não se sabe se o servidor é o online: a página
 // servida de um endereço público (não localhost nem rede local) já diz
 export const siteNaInternet = () => {
   const host = String(globalThis.location?.host ?? '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '')
   return Boolean(host) && !/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|::1$)/i.test(host) && !/\.local$/i.test(host)
 }
-export const MSG_LOTADO = 'o servidor está lotado agora: tente de novo daqui a pouco'
-export const MSG_CONTA_INVALIDA = 'não deu para confirmar a sua conta: você está jogando como convidado (sem XP). Saia e entre de novo com o Google; se continuar, o serviço de contas pode estar fora do ar'
+export const MSG_LOTADO = 'o servidor está lotado: tente de novo daqui a pouco'
+export const MSG_CONTA_INVALIDA = 'não deu para confirmar a sua conta: você joga como convidado (sem XP). Saia e entre de novo com o Google'
 
 // Abre (ou troca) a conexão; resolve com true quando o servidor dá as boas-vindas
 // retomar: a chave da vaga guardada (2D): a sala continua na tela enquanto tenta
@@ -162,7 +162,7 @@ function conectar(url, { retomar = null } = {}) {
     try {
       socket = new WebSocket(url)
     } catch {
-      mudar({ fase: 'navegando', erro: `endereço inválido: ${url}` })
+      mudar({ fase: 'navegando', erro: `endereço inválido (${url}): confira e tente de novo` })
       return resolve(false)
     }
     socket.binaryType = 'blob'
@@ -234,7 +234,7 @@ function conectar(url, { retomar = null } = {}) {
         resolve(false)
         return comecarReligar(url)
       }
-      if (estado().fila) mudar({ fila: null, filaAviso: 'a conexão caiu e você saiu da fila: quando reconectar, é só procurar de novo' })
+      if (estado().fila) mudar({ fila: null, filaAviso: 'a conexão caiu e você saiu da fila: procure de novo quando reconectar' })
       const s = estado()
       if (!aberto) {
         const semCasa = ev?.code === 1013 ? MSG_LOTADO : s.online || siteNaInternet() ? MSG_SEM_SERVIDOR : 'servidor LAN não encontrado: rode "npm run lan" neste PC'
@@ -248,7 +248,7 @@ function conectar(url, { retomar = null } = {}) {
       const estavaNaSala = s.fase === 'sala'
       sairDaSalaLocal(estavaNaSala ? 'a conexão com a sala caiu' : '')
       // o aviso da sala fica (filaAviso) depois que reconectar; o "reconectando" some sozinho
-      mudar({ fase: 'navegando', erro: 'a conexão caiu: reconectando…', ...(estavaNaSala && { filaAviso: 'a conexão caiu e você saiu da sala: entre de novo (com o código ou pelo convite do amigo)' }) })
+      mudar({ fase: 'navegando', erro: 'a conexão caiu: reconectando…', ...(estavaNaSala && { filaAviso: 'a conexão caiu e você saiu da sala: entre de novo pelo código ou pelo convite' }) })
       setTimeout(() => estado().fase === 'navegando' && !ws && conectar(casa), 1500)
     }
   })
@@ -302,8 +302,26 @@ function fecharConexao() {
   ouvintesServidor.forEach((fn) => fn({ t: '_fechou' }))
 }
 
+// aba do jogo em segundo plano (Fase 2F): o servidor avisa a sala se passar de uns segundos
+// (o convidado vê "o host está com o jogo em segundo plano"; o host ganha o aviso de volta, conta/avisos.js)
+let visivelEnviado = null
+function anunciarVisibilidade() {
+  if (typeof document === 'undefined') return
+  const valor = document.visibilityState !== 'hidden'
+  if (valor === visivelEnviado) return
+  visivelEnviado = valor
+  enviar({ t: 'visivel', valor })
+}
+if (typeof document !== 'undefined') document.addEventListener('visibilitychange', anunciarVisibilidade)
+// conexão nova: o servidor não sabe de nada; só precisa saber se já abriu escondida
+const visibilidadeInicial = () => {
+  visivelEnviado = true
+  anunciarVisibilidade()
+}
+
 function comecarTimers() {
   pararTimers()
+  visibilidadeInicial()
   const listar = () => telaAberta && estado().fase === 'navegando' && enviar({ t: 'listar' })
   listar()
   timerListar = setInterval(listar, LISTAR_MS)
@@ -361,7 +379,7 @@ function receber(m) {
       // 2D: o outro caiu e o servidor está esperando por ele (caiu = ms que faltam)
       const caido = m.sala.membros.find((x) => x.id !== s.eu.id && x.caiu != null)
       const outroCaiu = caido ? { id: caido.id, nome: caido.nome, ate: Date.now() + Number(caido.caiu) } : null
-      mudar({ fase: 'sala', sala: m.sala, papel, outroCaiu, erro: saiuNoMeio ? `${saiuNoMeio} saiu no meio da partida: a sala continua aberta, é só chamar outro` : '', ultimaCasual: Boolean(m.sala.casual) })
+      mudar({ fase: 'sala', sala: m.sala, papel, outroCaiu, erro: saiuNoMeio ? `${saiuNoMeio} saiu no meio da partida: a sala segue aberta, convide outro jogador` : '', ultimaCasual: Boolean(m.sala.casual) })
       break
     }
     case 'fechada':
@@ -549,7 +567,7 @@ export function entrarCodigo(texto) {
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '')
   if (!codigo) return
-  if (estado().fase !== 'navegando') return mudar({ erro: 'espere conectar no servidor' })
+  if (estado().fase !== 'navegando') return mudar({ erro: 'ainda conectando ao servidor: aguarde um instante' })
   enviar({ t: 'entrar', codigo })
 }
 
@@ -567,7 +585,7 @@ export async function conectarIp(texto) {
   if (!(await conectar(url))) return
   const daquele = (await lista).filter((s) => !s.emPartida && s.jogadores < s.max)
   if (daquele.length === 1) entrarSala(daquele[0])
-  else if (!daquele.length) mudar({ erro: 'nenhuma sala aberta nesse PC (alguém precisa criar uma)' })
+  else if (!daquele.length) mudar({ erro: 'nenhuma sala aberta neste PC: peça para alguém criar uma' })
 }
 
 export function sairSala() {
@@ -620,7 +638,7 @@ export function encerrarPartida() {
 // entra na fila (fora de sala); o servidor confirma com o "procurando"
 export function entrarFila() {
   const s = estado()
-  if (s.fase !== 'navegando' || !ws) return mudar({ erro: 'espere conectar no servidor' })
+  if (s.fase !== 'navegando' || !ws) return mudar({ erro: 'ainda conectando ao servidor: aguarde um instante' })
   if (s.fila) return
   mudar({ fila: { estado: 'procurando', inicio: Date.now(), convidado: !s.eu.conta }, filaAviso: '', erro: '' })
   enviar({ t: 'fila', acao: 'entrar' })
@@ -654,19 +672,23 @@ export const limparRevanche = () => mudar({ revanche: null })
 
 // ---------- XP ----------
 
-// fim da partida PVP: o que este PC viu; true se mandou agora (uma vez por partidaId)
-export function enviarResultado({ partidaId, vencedorLado, rodadas, duracao, personagem }) {
+// fim da partida: o que este PC viu; true se mandou agora (uma vez por partidaId).
+//   PVP:    { partidaId, vencedorLado: 0 | 1 | null, rodadas, duracao, personagem }
+//   CO-OP:  { partidaId, vitoria: true | false (o time venceu o chefe), rodadas, duracao, personagem }
+export function enviarResultado({ partidaId, vencedorLado, vitoria, rodadas, duracao, personagem }) {
   if (typeof partidaId !== 'string' || !partidaId || relatadas.has(partidaId)) return false
+  const resultado = typeof vitoria === 'boolean' ? { vitoria } : { vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null }
+  const relato = { partidaId, ...resultado, rodadas, duracao, personagem }
   if (ws?.readyState !== WebSocket.OPEN) {
     // caiu e está voltando (2D): o relato sai na volta, uma vez só
     if (!estado().religando) return false
     relatadas.add(partidaId)
-    relatoPendente = { partidaId, vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null, rodadas, duracao, personagem }
+    relatoPendente = relato
     return true
   }
   relatadas.add(partidaId)
   if (relatadas.size > 200) relatadas.delete(relatadas.values().next().value)
-  enviar({ t: 'resultado', partidaId, vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null, rodadas, duracao, personagem })
+  enviar({ t: 'resultado', ...relato })
   return true
 }
 export const jaRelatou = (partidaId) => relatadas.has(partidaId)

@@ -19,6 +19,7 @@ backup: `docs/operacao.md`), nesta ordem. Todas rodam de novo sem estragar:
 2. `0002_amigos.sql`: pedidos, amizades, bloqueios
 3. `0003_progresso.sql`: partidas, XP, níveis, inventário
 4. `0004_moderacao.sql`: denúncias e filtro de nomes (**nova na 1E**)
+5. `0005_pendencias.sql`: XP no CO-OP, convidados no limite e filtro do nome do Google (**nova na 2F**)
 
 Variáveis no Render: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`,
 `SUPABASE_SECRET_KEY` (e, se quiser, `METRICAS_MIN`, padrão 15).
@@ -62,7 +63,7 @@ Render, o X-Forwarded-For atrás do proxy e o cold start do plano grátis.
 ## Roteiro do teste restrito (6 a 10 pessoas conhecidas)
 
 Duração: uma sessão de ~1 hora marcada, mais três dias de uso solto. Antes:
-projeto de produção com as 4 migrations, backup feito, site aberto 2 minutos
+projeto de produção com as 5 migrations, backup feito, site aberto 2 minutos
 antes (o Render grátis dorme).
 
 ### O que pedir a cada pessoa (nesta ordem)
@@ -76,6 +77,10 @@ antes (o Render grátis dorme).
 6. Pedir **revanche** uma vez, e **sair no meio** de uma partida de propósito.
 7. Fechar a aba no meio da fila ou da sala e voltar (reconexão).
 8. Denunciar um perfil combinado de teste ("Teste Ofensivo", foto de teste).
+9. (2F) Jogar **uma luta CO-OP em sala** com um amigo e ver o XP na tela de
+   vitória/derrota; equipar um **verso** na Coleção e ver nas cartas (o amigo vê o
+   seu); **bloquear** o amigo estando na mesma sala (ele sai); deixar a aba do host
+   em segundo plano com o convidado pronto.
 
 ### O que observar (anote, não corrija na hora)
 

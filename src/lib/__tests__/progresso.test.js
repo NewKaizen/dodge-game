@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import * as P from '../progresso.js'
 
 const sql = fs.readFileSync(new URL('../../../supabase/migrations/0003_progresso.sql', import.meta.url), 'utf8')
+const sql5 = fs.readFileSync(new URL('../../../supabase/migrations/0005_pendencias.sql', import.meta.url), 'utf8')
 const docs = fs.readFileSync(new URL('../../../docs/online.md', import.meta.url), 'utf8')
 
 // a tabela documentada (docs/online.md): nível -> XP total para chegar nele
@@ -59,6 +60,7 @@ test('as constantes do SQL são as do JS', () => {
   assert.equal(constanteSql('repeticao_cheia'), P.REPETICAO_CHEIA)
   assert.equal(constanteSql('repeticao_limite'), P.REPETICAO_LIMITE)
   assert.equal(constanteSql('nivel_maximo'), P.NIVEL_MAXIMO)
+  assert.equal(Number(/function public\.convidados_limite_dia\(\)[^$]*\$\$ select (\d+) \$\$/.exec(sql5)?.[1]), P.CONVIDADOS_LIMITE_DIA)
   assert.match(sql, /select 100 \+ 25 \* \(greatest\(coalesce\(p_nivel, 1\), 1\) - 1\)/, 'a fórmula da curva no SQL')
 })
 

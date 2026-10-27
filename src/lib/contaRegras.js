@@ -2,6 +2,8 @@
 // novo: supabase/migrations/0001_contas.sql, normalizar_nome e atualizar_perfil).
 //
 //   validarNome(texto)  -> { ok: true, nome } | { ok: false, erro }
+//   nomeInicialDoGoogle(bruto)  o nome do perfil criado a partir do nome do Google (espelho de criar_perfil, 0005)
+//   nomeSeguro(nome)    o nome do perfil como o servidor mostra aos outros (lista de nomes: JOGADOR)
 //   AVATARES_JOGO       avatares prontos (os personagens jogáveis)
 //   avatarDoPerfil(p)   -> { tipo: 'padrao'|'jogo'|'enviado', id, url }
 //   (o XP e os níveis estão em lib/progresso.js)
@@ -36,3 +38,24 @@ export function avatarDoPerfil(perfil) {
   if (perfil?.avatar_tipo === 'jogo' && AVATARES_VALIDOS.includes(perfil.avatar_id)) return { tipo: 'jogo', id: perfil.avatar_id, url: null }
   return { tipo: 'padrao', id: null, url: null }
 }
+
+// Nome neutro quando o nome não serve (vazio, curto, fora da regra ou da lista de palavras)
+export const NOME_NEUTRO = 'JOGADOR'
+
+// O nome que o banco dá ao perfil novo (criar_perfil em 0001_contas.sql, com o filtro
+// da 0005_pendencias.sql): tira o que a regra não aceita, limita a 16 letras e, se
+// ficar curto demais ou tiver palavra da lista de nomes, vira JOGADOR (a tag nasce
+// do nome já filtrado). server/__tests__/pendenciasSql.test.js confere com o banco.
+export function nomeInicialDoGoogle(bruto) {
+  const limpo = String(bruto ?? '')
+    .replace(/[^\p{L}\p{N} _.-]/gu, '')
+    .trim()
+    .replace(/\s+/g, ' ')
+  const nome = [...limpo].slice(0, NOME_MAX).join('').trim()
+  const r = validarNome(nome)
+  return r.ok ? r.nome : NOME_NEUTRO
+}
+
+// O servidor repete o filtro no nome que lê do perfil (perfis antigos, banco sem a 0005):
+// nome fora da lista passa igual; da lista vira JOGADOR.
+export const nomeSeguro = (nome) => (nomeOfensivo(nome) ? NOME_NEUTRO : String(nome ?? ''))

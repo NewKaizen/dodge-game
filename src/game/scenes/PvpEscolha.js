@@ -38,6 +38,16 @@ function caber(texto, conteudo, largura, tamanho) {
   while (corte > 1 && texto.width > largura) texto.setText(`${conteudo.slice(0, --corte).trimEnd()}…`)
 }
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
+// deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do create().
+// Testado em src/game/__tests__/cenasReaproveitadas.test.js.
+const estadoInicial = () => ({
+  colunas: null,
+  card: null,
+  cards: null,
+  paineis: null,
+})
+
 // Escolha de personagem do PvP (Menu -> PvpEscolha -> PvpArena).
 //   2 jogadores: cada um tem seu cursor (cor da alma) e confirma o seu ao
 //                mesmo tempo; os dois PODEM pegar o mesmo personagem (espelho).
@@ -64,6 +74,7 @@ export default class PvpEscolha extends Phaser.Scene {
   }
 
   create() {
+    Object.assign(this, estadoInicial())
     this.ids = PERSONAGENS_PVP.filter((id) => PERSONAGENS[id])
     this.perfis = Object.fromEntries(this.ids.map((id) => [id, perfilPvp(id)]))
     this.controles = new Controles(this)

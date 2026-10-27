@@ -29,8 +29,11 @@ export const CENA_MENU = 'Menu'
 // cenas onde o número pode mudar: as que refazem os controles ao mudar (changedata-numJogadores)
 export const CENAS_LIVRES = [CENA_MENU, 'PvpEscolha', 'EscolhaParty', 'Grimorio']
 
-export const DICA_ENTRAR_P2 = 'JOGADOR 2: aperte ENTER (ou A no 2º controle) para entrar'
-export const DICA_SAIR_P2 = 'JOGADOR 2: aperte B para sair (volta a 1 jogador)'
+// Enter chama o P2 (não confirma): quem joga sozinho no teclado confirma com ESPAÇO
+export const DICA_ENTRAR_P2 = 'ESPAÇO: confirmar     JOGADOR 2: ENTER (ou A no 2º controle) para entrar'
+export const DICA_SAIR_P2 = 'JOGADOR 2: aperte B (Backspace) para sair e jogar sozinho'
+// o toast do primeiro Enter: quem só queria confirmar sabe o que houve e como desfazer
+export const AVISO_P2_ENTRANDO = { titulo: 'JOGADOR 2 ENTRANDO', texto: 'aperte B (Backspace) para cancelar' }
 
 export function contarFontes({ teclado = false, pads = 0, serial = false } = {}) {
   return (teclado ? 1 : 0) + Math.max(0, Math.floor(pads) || 0) + (serial ? 1 : 0)

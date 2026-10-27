@@ -1,6 +1,6 @@
 import { get } from 'svelte/store'
 import { jogo } from '../lib/estado.js'
-import { contarFontes, reagirAoBotaoP2, dicaP2, textoJogador2 } from './jogadores.js'
+import { contarFontes, reagirAoBotaoP2, dicaP2, AVISO_P2_ENTRANDO } from './jogadores.js'
 import { avisar } from './conta/avisos.js'
 
 // Ponte entre as telas de escolha e o store (a regra pura está em jogadores.js).
@@ -25,10 +25,10 @@ export function pedirP2(botao, origem, algoConfirmado, emRede = false) {
   if (!acao) return false
   if (acao === 'entrar') {
     jogo.update((x) => ({ ...x, numJogadores: 2, p2Teclado: true }))
-    avisar({ id: `p2:${Date.now()}`, tipo: 'info', titulo: textoJogador2('teclado'), ms: 3500 })
+    avisar({ id: `p2:${Date.now()}`, tipo: 'info', ...AVISO_P2_ENTRANDO, ms: 4500 })
   } else {
     jogo.update((x) => ({ ...x, numJogadores: 1, p2Teclado: false }))
-    avisar({ id: `p2:${Date.now()}`, tipo: 'info', titulo: 'JOGADOR 2 SAIU', texto: 'voltou a 1 jogador', ms: 3000 })
+    avisar({ id: `p2:${Date.now()}`, tipo: 'info', titulo: 'JOGADOR 2 SAIU', texto: 'voltou a 1 jogador: confirme com ESPAÇO', ms: 3500 })
   }
   return true
 }

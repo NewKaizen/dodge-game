@@ -76,12 +76,49 @@ const SEM_PREVIA = {
   malucas: 'Acontece na revelação das cartas, não na esquiva: veja numa partida do PvP.',
 }
 
+// A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
+// deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do create().
+// Testado em src/game/__tests__/cenasReaproveitadas.test.js.
+const estadoInicial = () => ({
+  pista: null,
+  nomePagina: null,
+  rotulosSecao: null,
+  abas: [],
+  rotulosAbas: null,
+  cursorAba: null,
+  molduraInfo: null,
+  molduraPrevia: null,
+  nomeCarta: null,
+  tipoCarta: null,
+  numeros: null,
+  larguraNumeros: null,
+  blocos: null,
+  separador: null,
+  rotuloPrevia: null,
+  statusPrevia: null,
+  placarPrevia: null,
+  semAtaque: null,
+  objetosCartas: null,
+  fichaGrande: null,
+  faixasJanela: null,
+  nomeArena: null,
+  subArena: null,
+  descArena: null,
+  musicaArena: null,
+  freqArena: null,
+  convite: null,
+  objetosArena: null,
+  indice: -1,
+  cartaGrande: null,
+})
+
 export default class Grimorio extends Phaser.Scene {
   constructor() {
     super('Grimorio')
   }
 
   create() {
+    Object.assign(this, estadoInicial())
     this.controles = new Controles(this)
     this.controles.onBotao((j, botao) => (botao === 'A' ? this.apertarA(j) : this.apertarB()))
     this.controles.onPausa(() => this.apertarB())

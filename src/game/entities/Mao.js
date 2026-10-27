@@ -28,6 +28,7 @@ import Carta from './Carta.js'
 //   monte        { x, y } de onde as cartas compradas saem (padrão: ao lado do leque)
 //   profundidade depth base das cartas (a carta com cursor fica por cima)
 //   rotulo       texto do cursor (padrão 'P1' / 'P2'); '' esconde
+//   corVerso     cor do verso de carta equipado deste jogador (null = o padrão; pvp/versos.js)
 export default class Mao {
   constructor(scene, opcoes = {}) {
     this.scene = scene
@@ -42,6 +43,7 @@ export default class Mao {
     this.curva = opcoes.curva ?? 2.2
     this.larguraMax = opcoes.larguraMax ?? 260
     this.larguraCarta = opcoes.largura ?? 70
+    this.corVerso = opcoes.corVerso ?? null
     this.monte = opcoes.monte ?? null
     this.profundidade = opcoes.profundidade ?? 20
     this.cartas = []
@@ -122,7 +124,7 @@ export default class Mao {
   //   para cada carta já voar para o lugar definitivo
   adicionar(dados, { atraso = 0, revelar = true, total = 0 } = {}) {
     const monte = this.posicaoMonte()
-    const carta = new Carta(this.scene, monte.x, monte.y, dados, { largura: this.larguraCarta, corFoco: this.cor })
+    const carta = new Carta(this.scene, monte.x, monte.y, dados, { largura: this.larguraCarta, corFoco: this.cor, corVerso: this.corVerso })
     carta.mao = this
     this.cartas.push(carta)
     const n = Math.max(total, this.cartas.length)

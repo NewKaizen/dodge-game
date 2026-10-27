@@ -14,6 +14,7 @@ Como as peças se juntam:
 | Servidor Node (`server/contas.js`) | entrega a URL + chave anon em `GET /api/config`, valida o JWT no lobby e recebe as fotos (`/api/avatar`) |
 | Postgres (`amizades`, `pedidos_amizade`, `bloqueios`) | amigos (migration 0002); o navegador só usa as funções, o servidor lê para filtrar presença e convites |
 | Postgres (`partidas`, `concessoes`, `inventario`, `catalogo_itens`) | XP, níveis e Coleção (migration 0003); só o servidor concede (`conceder_recompensa`), o navegador lê o catálogo e o próprio inventário e equipa |
+| Postgres (colunas `ref`/`oponente_ref`) | CO-OP com XP, convidados no limite diário e filtro do nome do Google (migration 0005) |
 | Postgres (`denuncias`) | denúncias de nome e foto (migration 0004); o navegador só chama `denunciar()`, a revisão é pelo `scripts/moderar.js` (`docs/moderacao.md`) |
 
 A chave `service_role` fica **só no servidor**. O navegador recebe a URL e a
@@ -102,6 +103,26 @@ Depois da 0003, rode `supabase/migrations/0004_moderacao.sql`. Ela cria:
 
 Quem revisa e como: `docs/moderacao.md`. Pode rodar de novo sem problema.
 Conferir: em **Table Editor** aparece `denuncias` com o cadeado de RLS.
+
+### 2.4 Migration 0005: pendências da Fase 1 (Fase 2F)
+
+Depois da 0004, rode `supabase/migrations/0005_pendencias.sql` (depende da 0001,
+da 0003 e da 0004; roda de novo sem estragar). Ela:
+
+- passa a contar a repetição diária do XP **por modo** (PVP e CO-OP separados) em
+  `conceder_recompensa`, o que deixa o CO-OP de 2 jogadores dar XP pelo mesmo
+  caminho do PVP (o PVP não muda);
+- guarda a chave do convidado (`partida_participantes.ref`, `concessoes.oponente_ref`)
+  para o limite diário contra convidados ser **por conexão** (o mesmo endereço da
+  conta continua contando como um só) e cria `convidados_limite_dia()` (10);
+- faz o nome inicial vindo do Google passar pelo filtro de nomes (`nome_ofensivo`):
+  nome da lista vira `JOGADOR` (a tag nasce do nome já filtrado) e os perfis
+  que já existiam com nome da lista também viram `JOGADOR` (a tag não muda).
+
+Sem rodar a 0005 o servidor novo funciona igual ao antigo: o CO-OP é registrado e
+decidido, mas o limite diário conta modos e convidados juntos como antes, e o nome
+do Google só passa pelo filtro do servidor (o `JOGADOR` que os outros veem), não no banco.
+O `pendenciasSql.test.js` roda a 0001–0005 duas vezes e confere tudo isso.
 
 ## 3. Conferir o bucket
 
