@@ -42,7 +42,9 @@
 // convidados, no convidado só o host) cada parceiro tem a SUA sessão, numeração e
 // recibos (um convidado lento ou que caiu não segura os outros). enviarBruto e
 // enviarReserva recebem o id do parceiro (msg, para). Sem `destinos` é o canal de
-// sempre, de um parceiro só (para = undefined).
+// sempre, de um parceiro só (para = undefined). `enviarTodos(msg)` (opcional): a rápida
+// igual para todos sai uma vez só (o transporte escolhe o direto de cada um ou uma
+// mensagem só pelo servidor).
 //   enviar(...) = enviarParaTodos(...)  para cada parceiro (cópia numerada na sessão dele)
 //   enviarPara(id, tipo, chave, dados)  só para um (a retomada de um convidado, 5A)
 //   enviarRapido(tipo, dados) · enviarRapidoPara(id, tipo, dados)
@@ -64,7 +66,7 @@ const novaSessao = () => Math.random().toString(36).slice(2, 10)
 
 const UM = '*' // o parceiro único do canal sem `destinos`
 
-export function criarCanal({ enviarBruto, enviarReserva = enviarBruto, meuId = () => 'eu', agora = () => Date.now(), agendar = (fn, ms) => setTimeout(fn, ms), sessao = novaSessao, destinos = null } = {}) {
+export function criarCanal({ enviarBruto, enviarReserva = enviarBruto, meuId = () => 'eu', agora = () => Date.now(), agendar = (fn, ms) => setTimeout(fn, ms), sessao = novaSessao, destinos = null, enviarTodos = null } = {}) {
   // o que eu mando, por parceiro: { sessao, seq, semRecibo: seq -> { msg, em } }
   const saidas = new Map()
   const saida = (para) => {
@@ -206,8 +208,11 @@ export function criarCanal({ enviarBruto, enviarReserva = enviarBruto, meuId = (
     enviarPara(para, tipo, chave, dados) {
       if (alvos().includes(destinos ? para : UM)) mandar(destinos ? para : UM, tipo, chave, dados)
     },
+    // a rápida é igual para todos: com `enviarTodos` (o transporte manda uma vez só para a sala) sai uma
     enviarRapido(tipo, dados) {
-      for (const para of alvos()) rapida(para, tipo, dados)
+      const lista = alvos()
+      if (destinos && enviarTodos && lista.length > 1) return enviarTodos({ tipo: TIPO_FIO, de: meuId(), s: null, t: agora(), k: tipo, c: null, d: dados ?? null })
+      for (const para of lista) rapida(para, tipo, dados)
     },
     enviarRapidoPara(para, tipo, dados) {
       if (alvos().includes(destinos ? para : UM)) rapida(destinos ? para : UM, tipo, dados)

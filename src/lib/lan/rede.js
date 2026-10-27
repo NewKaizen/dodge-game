@@ -46,6 +46,19 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 // lugar na sala (o host volta a rodada, game/rede.js). O outro caiu: o membro
 // dele vem com `caiu` e estado.outroCaiu = { id, nome, ate }. A janela acabou:
 // sai da sala com o aviso.
+//
+// Salas de N (Fase 5A, docs/rede-pvp.md "Salas de N"): cada membro tem uma vaga
+// (0..N-1, o dono é a 0) e a sala tem o DONO (lobby: modo, tirar, convidar,
+// começar) e o HOST DA PARTIDA (papel 'host': a autoridade e o centro da estrela,
+// eleito pelo servidor pela melhor conexão quando o dono começa).
+//   participantes()  [{ indice (vaga), id, nome, conta, host, dono, caiu }] em ordem de vaga
+//   minhaVaga() · souDono() · parceiros() · hostDaPartida()
+//   pedirPartida()   (dono) COMEÇAR: o servidor elege o host e manda `comecar` para ele
+//   consumirComeco() (cena Lan, host eleito) o id da sala a começar agora, uma vez só
+//   definirMedidor(fn)  (transmissao.js) as medidas da eleição: { idDoMembro: rtt direto }
+//   enviarAoParceiro(dados, para?)  para = id de um membro (só o host escolhe; o convidado
+//                    vai sempre ao host: o servidor repassa em estrela)
+//   estado: caidos [{ id, nome, ate }] (todos os que caíram; outroCaiu = o primeiro, como antes)
 export const PROTOCOLO = 8
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
@@ -88,6 +101,10 @@ const INICIAL = {
   religando: null,
   // 2D: o OUTRO caiu no meio da partida e o servidor espera por ele: { id, nome, ate }
   outroCaiu: null,
+  // 5A: todos os outros que caíram (sala de N: só a vaga deles espera)
+  caidos: [],
+  // 5A: o servidor elegeu ESTE PC como host da partida: o id da sala a começar (consumirComeco)
+  comecar: null,
 }
 export const lan = writable({ ...INICIAL })
 
@@ -110,7 +127,18 @@ const ouvintesQuadro = new Set()
 
 const mudar = (parcial) => lan.update((s) => ({ ...s, ...parcial }))
 const estado = () => get(lan)
+// host DA PARTIDA (o centro da estrela; fora da partida, o último eleito ou o dono)
 export const souHost = () => estado().fase === 'sala' && estado().papel === 'host'
+// dono da sala (quem criou: cuida do lobby)
+export const souDono = () => estado().fase === 'sala' && Boolean(estado().sala?.membros.find((m) => m.id === estado().eu.id)?.dono)
+// 5A: os membros em ordem de vaga
+export const participantes = () =>
+  [...(estado().sala?.membros ?? [])]
+    .sort((a, b) => (a.vaga ?? 0) - (b.vaga ?? 0))
+    .map((m) => ({ indice: m.vaga ?? 0, id: m.id, nome: m.nome, conta: m.conta ?? null, host: m.papel === 'host', dono: Boolean(m.dono), caiu: m.caiu ?? null }))
+export const minhaVaga = () => estado().sala?.membros.find((m) => m.id === estado().eu.id)?.vaga ?? 0
+export const parceiros = () => (estado().sala?.membros ?? []).filter((m) => m.id !== estado().eu.id)
+export const hostDaPartida = () => estado().sala?.membros.find((m) => m.papel === 'host') ?? null
 export const souConvidado = () => estado().fase === 'sala' && estado().papel === 'convidado'
 export const emPartida = () => estado().fase === 'sala' && Boolean(estado().sala?.emPartida)
 export const souOnline = () => estado().online
@@ -124,6 +152,7 @@ export function aoServidor(fn) {
 export const enviarLobby = (msg) => enviar(msg)
 // partida ONLINE rolando (sem pausa, sem revanche: game/online.js)
 export const partidaOnline = () => estado().online && emPartida()
+// o outro (salas de 2); na sala de N, o primeiro dos outros
 export const parceiro = () => estado().sala?.membros.find((m) => m.id !== estado().eu.id) ?? null
 
 function enderecoCasa() {
@@ -377,9 +406,9 @@ function receber(m) {
         saiuNoMeio = antes.emPartida ? antes.membros.find((a) => a.id !== s.eu.id && !m.sala.membros.some((x) => x.id === a.id))?.nome ?? '' : ''
       } else avisoChat(papel === 'host' ? 'sala criada: esperando alguém entrar' : `você entrou na sala de ${m.sala.membros.find((x) => x.papel === 'host')?.nome ?? '?'}`)
       // 2D: o outro caiu e o servidor está esperando por ele (caiu = ms que faltam)
-      const caido = m.sala.membros.find((x) => x.id !== s.eu.id && x.caiu != null)
-      const outroCaiu = caido ? { id: caido.id, nome: caido.nome, ate: Date.now() + Number(caido.caiu) } : null
-      mudar({ fase: 'sala', sala: m.sala, papel, outroCaiu, erro: saiuNoMeio ? `${saiuNoMeio} saiu no meio da partida: a sala segue aberta, convide outro jogador` : '', ultimaCasual: Boolean(m.sala.casual) })
+      const caidos = m.sala.membros.filter((x) => x.id !== s.eu.id && x.caiu != null).map((x) => ({ id: x.id, nome: x.nome, ate: Date.now() + Number(x.caiu), host: x.papel === 'host' }))
+      const outroCaiu = caidos[0] ?? null
+      mudar({ fase: 'sala', sala: m.sala, papel, outroCaiu, caidos, erro: saiuNoMeio ? `${saiuNoMeio} saiu no meio da partida: a sala segue aberta, convide outro jogador` : '', ultimaCasual: Boolean(m.sala.casual) })
       break
     }
     case 'fechada':
@@ -406,6 +435,18 @@ function receber(m) {
     }
     case 'de':
       ouvintesParceiro.forEach((fn) => fn(m.dados, m.de))
+      break
+    // ---------- eleição do host da partida (5A) ----------
+    case 'eleicao': {
+      let diretos = {}
+      try {
+        diretos = medidor?.() ?? {}
+      } catch {}
+      enviar({ t: 'medicao', id: m.id, diretos })
+      break
+    }
+    case 'comecar':
+      mudar({ comecar: m.salaId })
       break
     // ---------- JOGAR RÁPIDO ----------
     case 'fila':
@@ -472,7 +513,7 @@ function sairDaSalaLocal(motivo) {
   if (s.fase !== 'sala') return
   if (motivo) avisoChat(motivo)
   restaurarJogadores()
-  mudar({ fase: 'navegando', sala: null, papel: null, casual: null, revanche: null, outroCaiu: null })
+  mudar({ fase: 'navegando', sala: null, papel: null, casual: null, revanche: null, outroCaiu: null, caidos: [], comecar: null })
 }
 
 // se a conexão era com o servidor de outro PC, volta para o daqui
@@ -607,7 +648,8 @@ export function alternarPronto() {
 
 export const mudarModo = (modo) => enviar({ t: 'modo', modo })
 export const enviarChat = (texto) => String(texto ?? '').trim() && enviar({ t: 'chat', texto })
-export const expulsar = () => parceiro() && enviar({ t: 'expulsar', id: parceiro().id })
+// (dono) tira um membro da sala; sem id, o outro (sala de 2)
+export const expulsar = (id = parceiro()?.id) => id && enviar({ t: 'expulsar', id })
 
 export function mudarNome(nome) {
   const limpo = String(nome ?? '').trim().slice(0, 16)
@@ -619,7 +661,26 @@ export function mudarNome(nome) {
   enviar({ t: 'nome', nome: limpo })
 }
 
-// O host começa: avisa o servidor e já marca aqui (a cena vai trocar agora)
+// (dono, sala de amigos) COMEÇAR: o servidor mede as conexões, elege o host da partida
+// e manda `comecar` para ele (lan.comecar), que leva todos à primeira tela
+export function pedirPartida() {
+  if (!souDono() || estado().sala?.emPartida || estado().sala?.eleicao) return
+  enviar({ t: 'partida', valor: true, eleicao: true })
+}
+
+// (host eleito) a sala a começar agora, uma vez só
+export function consumirComeco() {
+  const id = estado().comecar
+  if (id) mudar({ comecar: null })
+  return id === estado().sala?.id ? id : null
+}
+
+// transmissao.js: o RTT do canal direto com cada membro (a eleição usa)
+let medidor = null
+export const definirMedidor = (fn) => (medidor = fn)
+
+// O host da partida marca a partida (casual, revanche; o servidor já marcou na eleição)
+// e já marca aqui (a cena vai trocar agora)
 export function iniciarPartida() {
   if (!souHost()) return
   usarDoisJogadores()
@@ -695,7 +756,7 @@ export const jaRelatou = (partidaId) => relatadas.has(partidaId)
 
 // ---------- canal com o outro PC (pelo servidor) ----------
 
-export const enviarAoParceiro = (dados) => enviar({ t: 'para', dados })
+export const enviarAoParceiro = (dados, para) => enviar({ t: 'para', dados, ...(para && { a: para }) })
 export function aoParceiro(fn) {
   ouvintesParceiro.add(fn)
   return () => ouvintesParceiro.delete(fn)

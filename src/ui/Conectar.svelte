@@ -6,7 +6,8 @@
 
   // modo LAN/ONLINE: na sala o número de jogadores é o da sala (sempre 2)
   let naSala = $derived($lan.fase === 'sala')
-  let outro = $derived($lan.sala?.membros.find((m) => m.id !== $lan.eu.id))
+  let outros = $derived(($lan.sala?.membros ?? []).filter((m) => m.id !== $lan.eu.id))
+  let outro = $derived(outros[0])
 
   // os controles se ligam sozinhos (game/entrada.js): a primeira tecla, o primeiro botão do
   // controle ou o joystick serial já autorizado. Aqui só um resumo discreto.
@@ -16,12 +17,12 @@
 
 {#if naSala}
   <div class="conectar lan">
-    <span>{$lan.online ? `ONLINE · sala ${$lan.sala.codigo}` : `LAN · ${$lan.sala.nome}`} · você é {$lan.papel === 'host' ? 'o HOST (P1)' : 'o CONVIDADO (P2)'}</span>
+    <span>{$lan.online ? `ONLINE · sala ${$lan.sala.codigo}` : `LAN · ${$lan.sala.nome}`} · você é {$lan.papel === 'host' ? 'o HOST da partida' : 'CONVIDADO'}</span>
     {#if outro}
       <!-- PVP e CO-OP na sala rodam no PC de cada um (game/rede.js): não tem imagem -->
-      <span class="dica">com {outro.nome} · partida em rede (cada um joga no seu PC)</span>
+      <span class="dica">com {outros.map((m) => m.nome).join(', ')} · partida em rede (cada um joga no seu PC)</span>
       <span class="ping" style:color={corDoPing($pingPartida.ms)}>ping {$pingPartida.ms ?? '…'} ms{$pingPartida.rota ? ` (${ROTAS[$pingPartida.rota]})` : ''}</span>
-      <span class="dica">servidor: você {$lan.ping ?? '…'} ms · {outro.nome} {outro.ping ?? '…'} ms</span>
+      <span class="dica">servidor: você {$lan.ping ?? '…'} ms{#each outros as o} · {o.nome} {o.ping ?? '…'} ms{/each}</span>
     {:else}
       <span class="dica">esperando alguém entrar</span>
     {/if}
