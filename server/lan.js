@@ -75,6 +75,7 @@ import { criarFila, agendarPadrao, ACOES_FILA_POR_MINUTO, REVANCHE_MS, FOLGA_PIN
 import { criarPartidas } from './partidas.js'
 import { METRICAS_NULA } from './metricas.js'
 import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
+import { nomeSeguro } from '../src/lib/contaRegras.js'
 
 export const PROTOCOLO = 7
 export const PORTA_DESCOBERTA = 47777
@@ -88,6 +89,9 @@ const RECONEXAO_MS = 120_000 // voltar em até 2 min depois de cair conta como r
 const MAX_NOME = 16
 const MAX_CHAT = 120
 const MODOS = ['pvp', 'coop']
+// a aba do jogo em segundo plano há tanto tempo: os outros da sala são avisados (Fase 2F)
+export const SEGUNDO_PLANO_MS = 4000
+const VERSO = /^verso\.[a-z0-9_]{2,24}$/
 // Limite de mensagens por cliente (balde de fichas): sobra para os controles e
 // o WebRTC, mas segura quem martela o servidor
 const FICHAS_POR_SEGUNDO = 120
@@ -104,13 +108,16 @@ const novoId = () => crypto.randomBytes(4).toString('hex')
 const resumoPerfil = (p) =>
   p && {
     tag: String(p.tag ?? ''),
-    nome: limpar(p.nome_exibicao, MAX_NOME),
+    // o filtro de nomes também vale aqui: perfil antigo, ou banco sem a 0005 (nome do Google)
+    nome: nomeSeguro(limpar(p.nome_exibicao, MAX_NOME)),
     avatar: { tipo: p.avatar_tipo ?? 'padrao', id: p.avatar_id ?? null, url: p.avatar_url ?? null },
     titulo: p.titulo_equipado ?? null,
+    // verso de carta equipado (Fase 2F): só o id; o cliente desenha (id desconhecido = o padrão)
+    verso: VERSO.test(p.verso_equipado ?? '') ? p.verso_equipado : null,
     nivel: Number(p.nivel) || 1,
     xp: Number(p.xp) || 0,
   }
-const contaPublica = (c) => (c.perfil ? { tag: c.perfil.tag, avatar: c.perfil.avatar, nivel: c.perfil.nivel, titulo: c.perfil.titulo } : null)
+const contaPublica = (c) => (c.perfil ? { tag: c.perfil.tag, avatar: c.perfil.avatar, nivel: c.perfil.nivel, titulo: c.perfil.titulo, verso: c.perfil.verso } : null)
 export const normalizarCodigo = (texto) =>
   String(texto ?? '')
     .toUpperCase()
@@ -251,7 +258,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     max: MAX_MEMBROS,
     membros: [...sala.membros].map((id) => {
       const c = clientes.get(id)
-      return { id, nome: c.nome, papel: id === sala.host ? 'host' : 'convidado', pronto: c.pronto, ping: c.ping, conta: contaPublica(c), caiu: c.caido ? Math.max(0, c.caido.desde + RETOMADA_MS - agora()) : null }
+      return { id, nome: c.nome, papel: id === sala.host ? 'host' : 'convidado', pronto: c.pronto, ping: c.ping, conta: contaPublica(c), segundoPlano: Boolean(c.segundoPlano), caiu: c.caido ? Math.max(0, c.caido.desde + RETOMADA_MS - agora()) : null }
     }),
   })
 
@@ -375,6 +382,8 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
         recarregar(o)
       }
     }
+    // bloqueou (ou foi bloqueado por) alguém da sala em que está
+    removerBloqueados(salas.get(c.sala))
   }
 
   // ---------- convites ----------
@@ -398,6 +407,23 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
   // ---------- JOGAR RÁPIDO (fila casual, server/fila.js) ----------
 
   const bloqueados = (a, b) => Boolean(a.usuario && b.usuario && (a.bloqueios.has(b.usuario) || b.bloqueios.has(a.usuario)))
+
+  // Bloquear alguém que está na MESMA sala (Fase 2F, docs/online.md): na sala (fora de
+  // partida) quem não é o host sai, não importa quem bloqueou quem: se o host bloqueou o
+  // convidado, ele é tirado; se o convidado bloqueou o host, é ele quem sai. O motivo é o
+  // mesmo para os dois (não diz quem bloqueou). No meio da partida nada muda: vale quando
+  // o host volta ao lobby (ação "partida" false). Entrar numa sala com bloqueio é barrado.
+  const MSG_BLOQUEIO = 'você não pode ficar nesta sala: há um bloqueio entre os jogadores'
+  function removerBloqueados(sala) {
+    if (!sala || salas.get(sala.id) !== sala || sala.emPartida) return false
+    const ms = membrosDaSala(sala)
+    if (ms.length < 2 || !bloqueados(ms[0], ms[1])) return false
+    const saindo = ms.find((c) => c.id !== sala.host)
+    if (!saindo) return false
+    sair(saindo, MSG_BLOQUEIO, { tirado: true }) // a partida (se houve) já acabou: não é abandono
+    enviar(saindo, { t: 'fechada', motivo: MSG_BLOQUEIO, ...(sala.casual && { casual: true }) })
+    return true
+  }
   // nunca a mesma conta (duas abas) nem quem se bloqueou; os dois fora de sala
   // pares que acabaram de falhar (a casual não começou): não juntam de novo logo
   const evitar = new Map() // `${id}|${id}` -> até quando
@@ -584,6 +610,8 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     if (retomadas.get(c.retomada) === c) retomadas.delete(c.retomada)
     c.cancelarConta?.()
     c.cancelarConta = null
+    c.cancelarSegundoPlano?.()
+    c.cancelarSegundoPlano = null
     if (c.usuario) {
       const t = agora()
       for (const [id, quando] of saiuDaConta) if (t - quando >= RECONEXAO_MS) saiuDaConta.delete(id)
@@ -765,6 +793,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       if (sala.membros.has(c.id)) return avisarSala(sala)
       if (sala.membros.size >= MAX_MEMBROS) return enviar(c, { t: 'erro', msg: 'a sala está cheia: peça outro código ao seu amigo' })
       if (sala.emPartida) return enviar(c, { t: 'erro', msg: 'a sala está no meio de uma partida: espere acabar e tente de novo' })
+      if ([...sala.membros].some((id) => bloqueados(c, clientes.get(id)))) return enviar(c, { t: 'erro', msg: 'não deu para entrar nessa sala' })
       entrarNaSala(c, sala)
     },
     sair(c) {
@@ -802,6 +831,7 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       }
       for (const id of sala.membros) atualizarStatus(clientes.get(id))
       avisarSala(sala)
+      if (!sala.emPartida && antes) removerBloqueados(sala) // bloqueou no meio da partida: vale agora
     },
     expulsar(c, m) {
       const sala = salas.get(c.sala)
@@ -897,6 +927,13 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
       const sala = salas.get(c.sala)
       if (!sala?.casual) return
       if (sala.membros.size < MAX_MEMBROS) return enviar(c, { t: 'revanche', estado: 'indisponivel', motivo: 'o oponente já saiu: escolha fila ou menu' })
+      // bloqueou o oponente depois da partida: sem revanche, a sala casual fecha
+      const ms = membrosDaSala(sala)
+      if (ms.length === 2 && bloqueados(ms[0], ms[1])) {
+        const saindo = ms.find((x) => x.id !== sala.host) ?? ms[1]
+        sair(saindo, MSG_BLOQUEIO, { tirado: true })
+        return enviar(saindo, { t: 'fechada', motivo: MSG_BLOQUEIO, casual: true })
+      }
       verificarRevanche(sala)
       if (m.aceitar !== true) {
         encerrarRevanche(sala)
@@ -925,6 +962,29 @@ export function criarLobby({ locais = enderecosLocais, salasRede = () => [], end
     // fim da partida: o que este cliente viu (uma vez por partida; server/partidas.js decide)
     resultado(c, m) {
       partidas.relatar(c, m)
+    },
+    // a aba do jogo foi para segundo plano / voltou (Fase 2F): depois de SEGUNDO_PLANO_MS
+    // escondida, a sala vê `segundoPlano: true` no membro (o convidado mostra "o host está
+    // com o jogo em segundo plano"). Voltar limpa na hora.
+    visivel(c, m) {
+      if (m.valor !== false) {
+        c.cancelarSegundoPlano?.()
+        c.cancelarSegundoPlano = null
+        if (c.segundoPlano) {
+          c.segundoPlano = false
+          const sala = salas.get(c.sala)
+          if (sala) avisarSala(sala)
+        }
+        return
+      }
+      if (c.segundoPlano || c.cancelarSegundoPlano) return
+      c.cancelarSegundoPlano = agendar(() => {
+        c.cancelarSegundoPlano = null
+        if (!clientes.has(c.id)) return
+        c.segundoPlano = true
+        const sala = salas.get(c.sala)
+        if (sala) avisarSala(sala)
+      }, SEGUNDO_PLANO_MS)
     },
     ping(c, m) {
       enviar(c, { t: 'pong', n: m.n })

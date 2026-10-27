@@ -76,7 +76,7 @@ test('token válido: valida antes das boas-vindas e usa o nome do perfil', async
   p.mandar({ t: 'criar' })
   const eu = p.ultima('sala').sala.membros[0]
   assert.equal(eu.nome, 'Ana Clara')
-  assert.deepEqual(eu.conta, { tag: 'ana#0042', avatar: { tipo: 'jogo', id: 'kris', url: null }, nivel: 3, titulo: null })
+  assert.deepEqual(eu.conta, { tag: 'ana#0042', avatar: { tipo: 'jogo', id: 'kris', url: null }, nivel: 3, titulo: null, verso: null })
   assert.doesNotMatch(JSON.stringify(p.recebidas), /ana@exemplo|11111111-/)
 })
 

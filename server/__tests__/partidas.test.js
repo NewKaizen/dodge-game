@@ -328,13 +328,6 @@ test('CPU (ou partida que o servidor não conhece): não registra nada', async (
   ana.mandar({ t: 'resultado', partidaId: 'cpu-local', vencedorLado: 0, rodadas: 3 })
   assert.equal(recompensa(ana).motivo, 'nao_registrada')
   assert.equal(m.sb.tabelas.partidas.length, 0)
-  // CO-OP não tem registro (fica para depois)
-  const beto = await m.entrar('beto')
-  ana.mandar({ t: 'criar' })
-  beto.mandar({ t: 'entrar', codigo: ana.ultima('sala').sala.codigo })
-  ana.mandar({ t: 'modo', modo: 'coop' })
-  ana.mandar({ t: 'partida', valor: true })
-  assert.equal(ana.ultima('sala').sala.partidaId, null)
 })
 
 test('partida curta demais: 0 XP para os dois', async () => {
@@ -569,10 +562,11 @@ test('lerRelato: só aceita o formato certo', () => {
   assert.deepEqual(lerRelato({ partidaId: 'x', vencedorLado: null, rodadas: 4, personagem: 'kris' }).personagem, 'kris')
 })
 
-test('criarPartidas sem lobby: sala de CO-OP ou incompleta não registra', () => {
+test('criarPartidas sem lobby: sala incompleta ou de modo desconhecido não registra', () => {
   const partidas = criarPartidas()
   assert.equal(partidas.iniciar({ id: 's', modo: 'pvp' }, [{ id: 'a' }]), null)
-  assert.equal(partidas.iniciar({ id: 's', modo: 'coop' }, [{ id: 'a' }, { id: 'b' }]), null)
+  assert.equal(partidas.iniciar({ id: 's', modo: 'coop' }, [{ id: 'a' }]), null)
+  assert.equal(partidas.iniciar({ id: 's', modo: 'treino' }, [{ id: 'a' }, { id: 'b' }]), null)
   partidas.fechar()
 })
 

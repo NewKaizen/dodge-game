@@ -32,7 +32,7 @@ export const AVATAR_POR_IP_POR_MINUTO = 40
 const MAX_TOKEN = 4096
 const TIPOS_ACEITOS = { 'image/png': 'png', 'image/jpeg': 'jpeg', 'image/webp': 'webp' }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-export const COLUNAS_PERFIL = 'id, tag, nome_exibicao, avatar_tipo, avatar_id, avatar_url, titulo_equipado, nivel, xp'
+export const COLUNAS_PERFIL = 'id, tag, nome_exibicao, avatar_tipo, avatar_id, avatar_url, titulo_equipado, verso_equipado, nivel, xp'
 
 // ---------- config ----------
 

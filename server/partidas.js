@@ -1,4 +1,5 @@
 // Registro de partidas e recompensas (Fase 1D; docs/online.md, docs/supabase.md).
+// PVP (Fase 1D) e CO-OP de 2 jogadores (Fase 2F) usam o mesmo caminho.
 //
 // O PVP em rede roda no PC de cada um (o host decide): o servidor NÃO vê a
 // partida. Por isso o resultado vem dos dois clientes ("resultado") e o
@@ -7,8 +8,9 @@
 // banco concede o XP (conceder_recompensa, idempotente por partida).
 //
 //   const partidas = criarPartidas({ registro, agora, agendar, entregar, log, versao })
-//   partidas.iniciar(sala, [host, convidado])   o host começou uma partida PVP (ou revanche)
-//   partidas.relatar(cliente, m)                 { partidaId, vencedorLado, rodadas, duracao, personagem }
+//   partidas.iniciar(sala, [host, convidado])   o host começou uma partida PVP ou CO-OP (ou revanche)
+//   partidas.relatar(cliente, m)                 PVP: { partidaId, vencedorLado, rodadas, duracao, personagem }
+//                                                CO-OP: { partidaId, vitoria: true|false, rodadas, duracao, personagem }
 //   partidas.saiu(cliente, sala, quando?)        saiu da sala (ou desconectou) por conta própria
 //                                                (quando: a vaga guardada que expirou saiu quando caiu)
 //   partidas.hostCaiu(sala)                      o host caiu e não voltou a tempo (Fase 2D)
@@ -27,12 +29,21 @@
 //   * ninguém relatou e o HOST caiu sem voltar a tempo -> encerrada ('host_caiu'): sem XP
 //                                                       e sem derrota para ninguém (Fase 2D)
 //   * ninguém relatou e os dois saíram / acabou o prazo -> encerrada, sem XP
+// CO-OP (2 jogadores, Fase 2F): a mesma política, só que o "vencedor" é o time:
+// os dois relatam `vitoria` (true = derrotaram o chefe) e, concordando, os dois
+// ganham `vitoria` ou os dois `derrota`; discordando, contestada (só participação).
+// Diferenças: ninguém relatou e um saiu = encerrada sem XP (quem ficou não
+// "venceu" ninguém: a luta não acabou); o parceiro faz o papel do "oponente" no
+// limite diário (docs/online.md). Vitória do time = participação + bônus.
 // O prazo para o segundo relato é RELATO_JANELA_MS; quando alguém sai sem ter
 // relatado, ABANDONO_GRACA_MS (para o relato do outro que estava a caminho).
 // Relato repetido não muda nada; relato depois da decisão recebe a resposta
 // que já existe (ou "atrasado"). Convidado e a mesma conta dos dois lados
 // nunca ganham XP. O resto dos limites (duração mínima, repetição contra o
-// mesmo oponente no dia, valores de XP) mora no banco (0003_progresso.sql).
+// mesmo oponente no dia, valores de XP) mora no banco (0003_progresso.sql e
+// 0005_pendencias.sql). Convidado do outro lado: a chave de repetição (`ref`)
+// é por conexão do convidado, a não ser que ele venha do MESMO endereço da
+// conta (aba anônima da própria conta): aí todos contam como um só ('convidado').
 //
 // registro: o banco (criarRegistro(supabase)) ou null (sem contas: ninguém ganha XP)
 // entregar(participante, msg): manda para o cliente dele (o lobby acha o cliente,
@@ -68,7 +79,7 @@ export function criarRegistro(supabase) {
         p_modo: p.modo,
         p_versao: p.versao,
         p_sala_tipo: p.salaTipo,
-        p_participantes: p.participantes.map((x) => ({ lado: x.lado, user_id: x.usuario })),
+        p_participantes: p.participantes.map((x) => ({ lado: x.lado, user_id: x.usuario, ref: x.ref ?? null })),
       }),
     encerrar: (p, d) =>
       chamar('encerrar_partida', {
@@ -90,6 +101,19 @@ export function criarRegistro(supabase) {
   }
 }
 
+// ---------- convidado como oponente (limite diário) ----------
+
+// A chave com que o banco conta "partidas de hoje contra o mesmo oponente" quando
+// o oponente é um convidado (conta nenhuma para identificar). Cada conexão de
+// convidado é um oponente diferente, a não ser que venha do MESMO endereço da
+// conta (a aba anônima da própria conta, ou alguém na mesma casa/escola): aí todos
+// os convidados daquele endereço contam como um só, como antes da Fase 2F.
+export const REF_CONVIDADO_JUNTO = 'convidado'
+export function refConvidado(convidado, conta) {
+  if (convidado.ip && conta.ip && convidado.ip === conta.ip) return REF_CONVIDADO_JUNTO
+  return `convidado:${convidado.cliente}`
+}
+
 // ---------- política ----------
 
 const resultadoDe = (lado, vencedor) => (vencedor == null ? 'empate' : vencedor === lado ? 'vitoria' : 'derrota')
@@ -98,6 +122,7 @@ const menor = (a, b) => (a == null ? b : b == null ? a : Math.min(a, b))
 // p: { criadaEm, participantes: [{ lado, relato, relatadoEm, saiuEm }] }, agora
 // -> { validacao, vencedorLado, motivo, resultados: { lado: resultado }, rodadas, duracaoS }
 export function decidir(p, agora) {
+  if (p.modo === 'coop') return decidirCoop(p, agora)
   const [a, b] = p.participantes
   const relataram = p.participantes.filter((x) => x.relato)
   const marcos = p.participantes.flatMap((x) => [x.relatadoEm, x.saiuEm]).filter((t) => t != null)
@@ -137,18 +162,52 @@ export function decidir(p, agora) {
   return d('encerrada', null, 'sem_relato', 'sem_relato', 'sem_relato')
 }
 
+// CO-OP: o time inteiro vence ou perde (relato.vitoria). Mesmas regras de
+// quem relatou / saiu do PVP, mas sem "vencedor do lado": o resultado é igual
+// para os dois.
+function decidirCoop(p, agora) {
+  const [a, b] = p.participantes
+  const relataram = p.participantes.filter((x) => x.relato)
+  const marcos = p.participantes.flatMap((x) => [x.relatadoEm, x.saiuEm]).filter((t) => t != null)
+  const fim = marcos.length ? Math.min(...marcos) : agora
+  const duracaoS = Math.max(0, Math.round((fim - p.criadaEm) / 1000))
+  const time = (venceu) => (venceu ? 'vitoria' : 'derrota')
+  const d = (validacao, motivo, ra, rb, rodadas = null) => ({ validacao, vencedorLado: null, motivo, resultados: { [a.lado]: ra, [b.lado]: rb }, rodadas, duracaoS })
+
+  if (relataram.length === 2) {
+    const rodadas = menor(a.relato.rodadas, b.relato.rodadas)
+    if (a.relato.vitoria === b.relato.vitoria) return d('validada', 'normal', time(a.relato.vitoria), time(a.relato.vitoria), rodadas)
+    return d('contestada', 'divergente', 'contestada', 'contestada', rodadas)
+  }
+
+  if (relataram.length === 1) {
+    const r = relataram[0]
+    const o = r === a ? b : a
+    const res = (rr, ro) => (r === a ? [rr, ro] : [ro, rr])
+    // o parceiro saiu antes do fim (o relato): vale o que quem ficou viu
+    if (o.saiuEm != null && o.saiuEm <= r.relatadoEm) return d('validada', 'abandono', ...res(time(r.relato.vitoria), 'abandono'), r.relato.rodadas)
+    // o parceiro está lá e não confirmou (ou saiu depois do fim): ninguém leva o time sozinho
+    return d('contestada', 'relato_unico', ...res('participacao', 'sem_relato'), r.relato.rodadas)
+  }
+
+  // ninguém relatou: a luta não acabou para ninguém (host caiu, parceiro saiu, prazo)
+  if (p.hostCaiu) return d('encerrada', 'host_caiu', 'sem_relato', 'sem_relato')
+  return d('encerrada', p.participantes.some((x) => x.saiuEm != null) ? 'abandono' : 'sem_relato', 'sem_relato', 'sem_relato')
+}
+
 // o que o cliente mandou, limpo (null = não serve)
-export function lerRelato(m) {
+export function lerRelato(m, modo = 'pvp') {
   if (!m || typeof m.partidaId !== 'string' || m.partidaId.length > 64) return null
-  const v = m.vencedorLado
-  if (!(v === 0 || v === 1 || v === null)) return null
   const inteiro = (x, max) => (Number.isInteger(x) && x >= 0 && x <= max ? x : null)
-  return {
-    vencedorLado: v,
+  const base = {
     rodadas: inteiro(m.rodadas, 999),
     duracao: inteiro(Math.round(Number(m.duracao)), 86_400),
     personagem: typeof m.personagem === 'string' && PERSONAGEM.test(m.personagem) ? m.personagem : null,
   }
+  if (modo === 'coop') return typeof m.vitoria === 'boolean' ? { vitoria: m.vitoria, ...base } : null
+  const v = m.vencedorLado
+  if (!(v === 0 || v === 1 || v === null)) return null
+  return { vencedorLado: v, ...base }
 }
 
 // ---------- o registro no lobby ----------
@@ -216,7 +275,7 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
 
   function iniciar(sala, membros) {
     encerrou(sala)
-    if (membros.length !== 2 || sala.modo !== 'pvp') return null
+    if (membros.length !== 2 || !['pvp', 'coop'].includes(sala.modo)) return null
     if (!podeIniciar(membros[0])) {
       log(`[partidas] sala ${sala.id}: partidas demais em um minuto, esta não é registrada`)
       return null
@@ -226,10 +285,10 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
       id: crypto.randomUUID(),
       salaId: sala.id,
       salaTipo: sala.casual ? 'casual' : 'amigos',
-      modo: 'pvp',
+      modo: sala.modo,
       versao,
       criadaEm: agora(),
-      participantes: membros.map((c, lado) => ({ lado, cliente: c.id, conta: c.usuario ?? null, usuario: c.usuario ?? null, nome: c.nome, semConta: c.usuario ? null : 'convidado', relato: null, relatadoEm: null, saiuEm: null, resposta: null })),
+      participantes: membros.map((c, lado) => ({ lado, cliente: c.id, ip: c.ip ?? null, conta: c.usuario ?? null, usuario: c.usuario ?? null, nome: c.nome, semConta: c.usuario ? null : 'convidado', ref: null, relato: null, relatadoEm: null, saiuEm: null, resposta: null })),
       prazo: null,
       cancelar: null,
       decisao: null,
@@ -237,6 +296,9 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
     }
     // a mesma conta dos dois lados (duas abas): ninguém ganha nada
     const [a, b] = p.participantes
+    // convidado do outro lado de uma conta: a chave do limite diário (refConvidado)
+    if (!a.conta && b.conta) a.ref = refConvidado(a, b)
+    if (!b.conta && a.conta) b.ref = refConvidado(b, a)
     if (a.usuario && a.usuario === b.usuario) for (const x of p.participantes) Object.assign(x, { usuario: null, semConta: 'mesma_conta' })
     partidas.set(p.id, p)
     for (const x of p.participantes) {
@@ -264,9 +326,9 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
   const completa = (p) => p.participantes.every((x) => x.relato || x.saiuEm != null)
 
   function relatar(c, m) {
-    const relato = lerRelato(m)
-    const p = relato && partidas.get(m.partidaId)
-    if (!p) {
+    const p = typeof m?.partidaId === 'string' && m.partidaId.length <= 64 ? partidas.get(m.partidaId) : null
+    const relato = p && lerRelato(m, p.modo)
+    if (!p || !relato) {
       if (typeof m?.partidaId === 'string' && m.partidaId.length <= 64) entregar({ cliente: c.id, conta: c.usuario ?? null }, { t: 'recompensa', partidaId: m.partidaId, xpGanho: 0, motivo: 'nao_registrada' })
       return
     }
@@ -328,7 +390,7 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
     desligar(p)
     p.esquecer = programar(() => partidas.get(p.id) === p && partidas.delete(p.id), GUARDAR_MS)
     const nomes = p.participantes.map((x) => x.nome).join(' x ')
-    if (d.validacao === 'contestada') log(`[partidas] ${p.id} contestada (${d.motivo}): ${nomes}, relatos ${p.participantes.map((x) => JSON.stringify(x.relato?.vencedorLado ?? '-')).join(' x ')}`)
+    if (d.validacao === 'contestada') log(`[partidas] ${p.id} contestada (${d.motivo}): ${nomes}, relatos ${p.participantes.map((x) => JSON.stringify(x.relato ? (p.modo === 'coop' ? x.relato.vitoria : x.relato.vencedorLado) : '-')).join(' x ')}`)
     else log(`[partidas] ${p.id} ${d.validacao} (${d.motivo}): ${nomes}, ${d.duracaoS}s`)
     p.pendente = true
     recompensar(p, d)

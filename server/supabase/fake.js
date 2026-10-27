@@ -16,7 +16,7 @@
 // sb.chamadas ficam expostos para o teste conferir. sb.falhar = { getUser: true,
 // upload: true, conceder_recompensa: true, ... } faz a operação devolver erro.
 
-import { xpDaPartida, nivelDoXp, itensAte, RESULTADOS_JOGADOS } from '../../src/lib/progresso.js'
+import { xpDaPartida, nivelDoXp, itensAte, RESULTADOS_JOGADOS, CONVIDADOS_LIMITE_DIA, REPETICAO_LIMITE } from '../../src/lib/progresso.js'
 
 const erro = (message) => ({ message })
 
@@ -101,7 +101,8 @@ function rpcs(sb) {
       t.partidas.push({ id: p_id, modo: p_modo ?? 'pvp', versao: p_versao, casual: p_sala_tipo === 'casual', sala_tipo: p_sala_tipo, estado: 'iniciada', iniciada_em: agora().toISOString(), validacao: null, vencedor_lado: null, duracao_s: null, rodadas: null })
       for (const e of p_participantes ?? []) {
         const uid = t.perfis.some((p) => p.id === e.user_id) ? e.user_id : null
-        t.partida_participantes.push({ partida_id: p_id, lado: e.lado, user_id: uid, personagem: null, resultado: null, relato: null, relatado_em: null })
+        const ref = !uid && typeof e.ref === 'string' && /^convidado(:[a-z0-9]{1,32})?$/.test(e.ref) ? e.ref : null
+        t.partida_participantes.push({ partida_id: p_id, lado: e.lado, user_id: uid, ref, personagem: null, resultado: null, relato: null, relatado_em: null })
       }
       return null
     },
@@ -128,15 +129,21 @@ function rpcs(sb) {
           const perfil = t.perfis.find((x) => x.id === pp.user_id)
           if (!perfil) continue
           if (t.concessoes.some((c) => c.partida_id === p_partida && c.user_id === pp.user_id)) continue
-          const oponente = lados.find((x) => x.lado !== pp.lado)?.user_id ?? null
-          const repeticoes = t.concessoes.filter((c) => c.user_id === pp.user_id && c.xp > 0 && sb.diaDe(c.criada_em) === dia && c.oponente_id === oponente).length
+          const outro = lados.find((x) => x.lado !== pp.lado)
+          const oponente = outro?.user_id ?? null
+          const oponenteRef = outro?.ref ?? null
+          // só conta partidas do mesmo modo, hoje, contra o mesmo oponente (a conta ou a chave do convidado)
+          const hoje = t.concessoes.filter((c) => c.user_id === pp.user_id && c.xp > 0 && sb.diaDe(c.criada_em) === dia && t.partidas.find((x) => x.id === c.partida_id)?.modo === p.modo)
+          let repeticoes = hoje.filter((c) => c.oponente_id === oponente && (c.oponente_ref ?? null) === oponenteRef).length
+          // contra convidados também há um teto por dia, somando todos
+          if (!oponente && oponenteRef && hoje.filter((c) => !c.oponente_id && c.oponente_ref).length >= CONVIDADOS_LIMITE_DIA) repeticoes = REPETICAO_LIMITE
           const { xp, motivo } = xpDaPartida({ resultado: pp.resultado, duracaoS: p.duracao_s, rodadas: p.rodadas, repeticoes })
           const total = (perfil.xp ?? 0) + xp
           const nivel = nivelDoXp(total)
           const tem = new Set(t.inventario.filter((i) => i.user_id === pp.user_id).map((i) => i.item_id))
           const novos = itensAte(nivel).filter((i) => !tem.has(i.id)).map((i) => i.id)
           for (const item_id of novos) t.inventario.push({ user_id: pp.user_id, item_id, obtido_em: agora().toISOString() })
-          t.concessoes.push({ partida_id: p_partida, user_id: pp.user_id, xp, motivo, itens: novos, xp_total: total, nivel_antes: perfil.nivel ?? 1, nivel_depois: nivel, oponente_id: oponente, criada_em: sb.agora() })
+          t.concessoes.push({ partida_id: p_partida, user_id: pp.user_id, xp, motivo, itens: novos, xp_total: total, nivel_antes: perfil.nivel ?? 1, nivel_depois: nivel, oponente_id: oponente, oponente_ref: oponenteRef, criada_em: sb.agora() })
           Object.assign(perfil, { xp: total, nivel })
           if (RESULTADOS_JOGADOS.includes(pp.resultado)) {
             let est = t.estatisticas_basicas.find((e) => e.usuario_id === pp.user_id)
