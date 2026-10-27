@@ -349,8 +349,8 @@ está logado. Cosmético nunca muda nada no jogo.
 
 ### Partidas de N (Fase 5A)
 
-A base dos modos de 3–4 (`server/partidas.js`; ainda **sem XP**: só `pvp` e `coop`
-estão em `MODOS_COM_XP`, cada sub-fase liga o seu modo quando ele existir). O lado de
+A base dos modos de 3–4 (`server/partidas.js`; só dão XP os modos em `MODOS_COM_XP`:
+`pvp`, `coop` e, desde a 5B, `coop4`; `ffa` e `2x2` ligam o deles quando a partida existir). O lado de
 cada um é a **vaga** da sala (0..3); o host da partida pode ser qualquer vaga
 (`hostLado`). Cada cliente relata o desfecho inteiro:
 
@@ -368,6 +368,23 @@ só vale se todos os outros já tinham saído antes dele. Quem saiu antes do pri
 relato: abandono (nada); quem ficou e não relatou: `sem_relato`. Ninguém relatou:
 encerrada (`host_caiu` se o host caiu; com 3 ou mais não há "vitória por abandono").
 O XP é o de sempre (participação + bônus de vitória, migration 0006).
+
+**CO-OP de 3 e 4 (`coop4`, Fase 5B)**: a mesma validação (o host decide, a maioria confere; `{ vitoria }` do time inteiro),
+com estas regras de XP:
+
+- **participação igual para todos** os que ficaram até o fim e **bônus da vitória do time** para todos (o resultado que
+  valeu é o do time, também para quem relatou o contrário); derrota do time = só a participação;
+- quem **saiu de vez** (ou não voltou em 20 s) é abandono: nada; quem caiu e **voltou** relata e ganha como os outros;
+- o limite diário "por parceiro" é por **par de contas**: o banco (0006) escolhe como "oponente" o 1º outro lado com
+  conta (senão o 1º convidado), então o 3º/4º dia de jogo com a mesma dupla cai para metade/zero como no CO-OP de 2
+  (`repeticao_cheia` 3, `repeticao_limite` 5 por modo) e um grupo com outra dupla de partida recomeça cheio. Convidado
+  conta pelo teto de convidados (10 por dia);
+- **duração**: em partidas de 3 e 4 a saída de um convidado **não acaba a partida**; a duração vai até o primeiro relato
+  (antes valia até a saída e quem seguia jogando depois de um abandono cedo perdia o XP por "partida curta"), e a
+  saída de um não abre mais o prazo da decisão (só o primeiro relato, o host voltar ao lobby ou a sala fechar com o host);
+- o host que cai fecha a decisão em ~3 s (`encerrada`, `host_caiu`: ninguém ganha nem perde).
+
+Testes: `server/__tests__/coop4Xp.test.js` (sala, banco falso, o limite por par e as quedas) e `partidasN.test.js`.
 
 ### Protocolo (versão 5)
 
