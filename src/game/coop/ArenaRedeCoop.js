@@ -24,6 +24,7 @@ import { iniciarRodadaCoop, fimDaRodadaCoop } from './regras.js'
 export default class ArenaRedeCoop extends ArenaRede {
   constructor(arena, opcoes) {
     super(arena, opcoes)
+    this.esconderCartas = false // no CO-OP os dois estão do mesmo lado: as cartas não se escondem
     this.debugPermitido.add('setHpChefe')
     this.debugPermitido.delete('forcarBonus') // o CO-OP não tem rodada bônus
   }

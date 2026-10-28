@@ -1,5 +1,6 @@
 import ArenaRedeCoopN from '../../coop/ArenaRedeCoopN.js'
 import { iniciarRodadaFfa, fimDaRodadaFfa, eliminarFfa, aplicarAusente } from '../ffa.js'
+import { criarFichas, embaralharEscondido, mascararEstado, mascararResultado, mascararJogada, mascararDadosDeCena } from '../categorias.js'
 
 // A ponte da PvpArenaN (TODOS CONTRA TODOS, 3 e 4 jogadores; docs/rede-pvp.md "Todos contra todos"). É a
 // ponte do CO-OP de 3 e 4 (coop/ArenaRedeCoopN.js: estrela pelo host, jogadas ao host, PRONTO, dano/graze
@@ -19,12 +20,54 @@ import { iniciarRodadaFfa, fimDaRodadaFfa, eliminarFfa, aplicarAusente } from '.
 // da rodada e o ataque que vinha para ele vale como acertos cheios (o host aplica no fim da rodada). Volta
 // na rodada seguinte com o HP que tem. Não voltou em 20 s: o host o ELIMINA na hora (a colocação é a
 // daquele momento: pvp/ffa.js eliminarFfa 'saiu').
+//
+// CARTAS ESCONDIDAS (pvp/categorias.js, docs/pvp-regras.md "Cartas escondidas no online"): o host manda
+// a CADA convidado (canal.enviarPara) o inicio / a resolucao / o fimRodada VISTOS POR ELE: as cartas dos
+// outros viram fichas e a carta jogada vira a categoria (com o descritor do ataque). A retomada e a
+// tela de resultado também (mascararCenaPara, game/rede.js).
 const DEBUG_FFA = new Set(['forcarMao', 'setHp', 'setEnergia'])
 
 export default class ArenaRedeN extends ArenaRedeCoopN {
   constructor(arena, opcoes) {
     super(arena, opcoes)
     this.debugPermitido = new Set(DEBUG_FFA)
+    this.fichas = criarFichas()
+  }
+
+  // ---------- cartas escondidas ----------
+
+  // host: manda a cada convidado a SUA versão (vista(vaga) -> dados)
+  enviarCada(tipo, chave, vista) {
+    if (this.destruido) return
+    for (const p of this.participantes()) if (p.indice !== this.meu && p.id) this.canal.enviarPara(p.id, tipo, chave, vista(p.indice))
+  }
+
+  // host, no começo da partida (sem retomada): os montes embaralhados com um sorteio só daqui
+  esconderBaralhos(estado) {
+    if (this.souHost) embaralharEscondido(estado)
+    return estado
+  }
+
+  estadoPara(vaga, estado = this.arena.estado) {
+    return mascararEstado(estado, vaga, this.fichas)
+  }
+
+  // o resultado da rodada como eu posso ver (no convidado ele já chegou assim)
+  verResultado(r) {
+    return this.souHost ? mascararResultado(r, this.meu, this.fichas) : r
+  }
+
+  mascararCenaPara(dados, para) {
+    if (!this.souHost) return dados
+    return mascararDadosDeCena(dados, para == null ? this.meu : this.vagaDe(para), this.fichas)
+  }
+
+  enviarResolucao(jogadas, resultado) {
+    this.enviarCada('resolucao', this.rodada, (vaga) => ({
+      jogadas: jogadas.map((id, j) => (j === vaga ? id : mascararJogada(id, this.fichas))),
+      resultado: mascararResultado(resultado, vaga, this.fichas),
+      estado: this.estadoPara(vaga),
+    }))
   }
 
   // o host espera a jogada de quem está vivo
@@ -44,7 +87,7 @@ export default class ArenaRedeN extends ArenaRedeCoopN {
       const antes = a.estado.jogadores.map((jog) => jog.ausente)
       iniciarRodadaFfa(a.estado, { ausentes })
       a.estado.jogadores.forEach((jog, j) => antes[j] && !jog.ausente && !jog.eliminado && eventos.push({ tipo: 'voltou', j }))
-      this.enviar('inicio', a.estado.rodada, { estado: structuredClone(a.estado), eventos })
+      this.enviarCada('inicio', a.estado.rodada, (vaga) => ({ estado: this.estadoPara(vaga), eventos }))
       return eventos
     }
     const msg = await this.esperar('inicio', a.estado.rodada + 1)
@@ -63,7 +106,7 @@ export default class ArenaRedeN extends ArenaRedeCoopN {
     if (this.souHost) {
       const aplicados = ausentes.map(({ j, caixa, jaLevou }) => ({ j, dano: aplicarAusente(a.estado, j, caixa, jaLevou) })).filter((x) => x.dano > 0)
       const fim = fimDaRodadaFfa(a.estado)
-      this.enviar('fimRodada', rodada, { estado: structuredClone(a.estado), ...fim, ausentes: aplicados })
+      this.enviarCada('fimRodada', rodada, (vaga) => ({ estado: this.estadoPara(vaga), ...fim, ausentes: aplicados }))
       return { ...fim, ausentes: aplicados }
     }
     const msg = await this.esperar('fimRodada', rodada)

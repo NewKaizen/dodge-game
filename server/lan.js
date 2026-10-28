@@ -104,7 +104,7 @@ import { METRICAS_NULA } from './metricas.js'
 import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
 import { nomeSeguro } from '../src/lib/contaRegras.js'
 
-export const PROTOCOLO = 10
+export const PROTOCOLO = 11
 export const PORTA_DESCOBERTA = 47777
 // Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
 // aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")
