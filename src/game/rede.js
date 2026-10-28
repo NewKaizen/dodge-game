@@ -125,7 +125,7 @@ function trocarCena(game, chave, dados) {
   else game.scene.start(chave, dados)
 }
 
-// Cartas escondidas no PVP online (pvp/categorias.js): a ponte da arena que sabe mascarar
+// Cartas escondidas no PVP online (pvp/sigilo.js): a ponte da arena que sabe mascarar
 // (mascararCenaPara) manda a CADA convidado os dados vistos por ele; sem ela, os mesmos para todos
 function mandarCena(cena, msg) {
   const rede = cena?.rede

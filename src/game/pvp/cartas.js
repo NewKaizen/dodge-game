@@ -197,50 +197,30 @@ export function inverterDaCarta(carta) {
   return detalhesDaCarta(carta)?.inverter ?? 0
 }
 
-// O ataque da carta sem a carta: { personagem, tipo, receita, naipe, t } (null = não manda ataque,
-// o Ás de copas). É o que o PVP online manda para quem não pode ver a carta do outro (pvp/categorias.js):
-// a esquiva precisa rodar o ataque, mas o id/valor/nome da carta não viajam.
-//   tipo 'super'     o SUPER do personagem
-//   tipo 'especial'  o ataque de um Ás (naipe = de qual ataque principal; t = a força dele)
-//   tipo 'leve'      o ataque fraquinho das copas
-//   tipo 'receita'   receita (chave do baralho ou de padroes.js) na força t
-export function descritorDoAtaque(carta) {
-  if (!carta) return null
-  if (carta.oculta) return carta.ataque ?? null
-  const det = detalhesDaCarta(carta)
-  if (!BARALHOS[carta.personagem] || !det) throw new Error(`carta desconhecida: ${carta.id}`)
-  const personagem = carta.personagem
-  if (det.especial === 'segundaChance') return null
-  if (det.super) return { personagem, tipo: 'super' }
-  if (det.especial) return { personagem, tipo: 'especial', naipe: det.especial === 'espelho' ? 'espadas' : carta.naipe, t: forca(VALOR_DO_ESPECIAL[det.especial]) }
-  if (carta.naipe === 'copas') return { personagem, tipo: 'leve' }
-  return { personagem, tipo: 'receita', receita: det.receita, t: forca(carta.valor) }
-}
-
-// O ataque (da linguagem de attacks/) de um descritor (descritorDoAtaque)
-export function ataqueDoDescritor(desc, contexto = {}) {
-  const A = contexto.ataques
-  if (!A) throw new Error('ataqueDoDescritor: passe contexto.ataques (attacks/index.js)')
-  if (!desc) return null
-  const def = BARALHOS[desc.personagem]
-  if (!def) throw new Error(`ataque de um personagem sem baralho: ${desc.personagem}`)
-  let ataque
-  if (desc.tipo === 'super') ataque = def.super.criar(A)
-  else if (desc.tipo === 'especial') ataque = criarReceita(A, def, def.principal[desc.naipe], desc.t)
-  else if (desc.tipo === 'leve') ataque = def.leve(A)
-  else if (desc.tipo === 'receita') ataque = criarReceita(A, def, desc.receita, desc.t)
-  else throw new Error(`descritor de ataque desconhecido: ${desc.tipo}`)
-  return contexto.caixaFixa ? A.comCaixa(null, ataque) : ataque
-}
-
 // Ataque (da linguagem de attacks/) que a carta manda para a caixa do adversário.
 //   contexto.ataques     biblioteca de attacks/index.js (obrigatória; injetada para testar em Node)
 //   contexto.caixaFixa   true: ignora as mudanças de caixa dos padrões (caixa sempre a padrão)
-// Devolve null quando a carta não manda ataque (Ás de copas). A carta revelada do PVP online
-// (pvp/categorias.js: só a categoria) traz o descritor do ataque no lugar dos detalhes.
+// Devolve null quando a carta não manda ataque (Ás de copas).
 export function ataqueDaCarta(carta, contexto = {}) {
-  if (!contexto.ataques) throw new Error('ataqueDaCarta: passe contexto.ataques (attacks/index.js)')
-  return ataqueDoDescritor(descritorDoAtaque(carta), contexto)
+  const A = contexto.ataques
+  if (!A) throw new Error('ataqueDaCarta: passe contexto.ataques (attacks/index.js)')
+  const def = BARALHOS[carta.personagem]
+  const det = detalhesDaCarta(carta)
+  if (!def || !det) throw new Error(`carta desconhecida: ${carta.id}`)
+
+  let ataque
+  if (det.especial === 'segundaChance') return null
+  if (det.super) {
+    ataque = def.super.criar(A)
+  } else if (det.especial) {
+    const naipe = det.especial === 'espelho' ? 'espadas' : carta.naipe
+    ataque = criarReceita(A, def, def.principal[naipe], forca(VALOR_DO_ESPECIAL[det.especial]))
+  } else if (carta.naipe === 'copas') {
+    ataque = def.leve(A)
+  } else {
+    ataque = criarReceita(A, def, det.receita, forca(carta.valor))
+  }
+  return contexto.caixaFixa ? A.comCaixa(null, ataque) : ataque
 }
 
 function criarReceita(A, def, chave, t) {

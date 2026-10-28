@@ -59,7 +59,7 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 //   enviarAoParceiro(dados, para?)  para = id de um membro (só o host escolhe; o convidado
 //                    vai sempre ao host: o servidor repassa em estrela)
 //   estado: caidos [{ id, nome, ate }] (todos os que caíram; outroCaiu = o primeiro, como antes)
-export const PROTOCOLO = 11
+export const PROTOCOLO = 12
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
