@@ -22,7 +22,10 @@
 //                     físico (Gamepad API, ver game/gamepad.js)
 //   joysticksSerial   null ou { '<vid>:<pid>#<índice>': jogador } quem é P1/P2 em cada porta serial (lib/joysticks.js)
 //   zonaMorta         0.1 a 0.8: quanto o analógico do controle precisa inclinar para contar (padrão 0.35)
+//   vibracao          true/false  vibração (rumble) do controle físico quando o jogador leva um golpe ou cai (game/vibracao.js)
+//   vibracaoIntensidade  null (automática: 75%, ou 25% com tremor/animações reduzidos) ou 0.25 | 0.5 | 0.75 | 1
 import { problemasDosBotoes, zonaMortaValida, ZONA_MORTA_PADRAO } from './gamepad.js'
+import { intensidadeValida } from './vibracao.js'
 
 const CHAVE = 'dodge-preferencias'
 
@@ -37,6 +40,8 @@ export const PREFERENCIAS_PADRAO = {
   botoesPad: null,
   zonaMorta: ZONA_MORTA_PADRAO,
   joysticksSerial: null,
+  vibracao: true,
+  vibracaoIntensidade: null,
 }
 
 export const OPCOES = {
@@ -53,6 +58,7 @@ function valido(chave, valor) {
   if (chave === 'botoesPad') return valor === null || problemasDosBotoes(valor).length === 0
   if (chave === 'joysticksSerial') return valor === null || (typeof valor === 'object' && !Array.isArray(valor))
   if (chave === 'zonaMorta') return zonaMortaValida(valor)
+  if (chave === 'vibracaoIntensidade') return intensidadeValida(valor)
   return typeof valor === typeof PREFERENCIAS_PADRAO[chave]
 }
 

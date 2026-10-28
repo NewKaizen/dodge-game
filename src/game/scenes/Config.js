@@ -13,6 +13,8 @@ import { ACOES_PAD, ROTULO_PAD, ZONA_MORTA_LIMITES, ZONA_MORTA_PADRAO, atribuirB
 import { capturarBotaoPad, controlesLigados } from '../../lib/gamepad.js'
 import { conectarSerial, desconectarSerial, serialAberto, serialSuportado, listarJoysticks, trocarJogadoresSerial } from '../../lib/serial.js'
 import { despedir } from '../../lib/saida.js'
+import { testarVibracao } from '../../lib/vibracao.js'
+import { INTENSIDADES, intensidadeEfetiva } from '../vibracao.js'
 import { rotulo as rotuloJoystick } from '../../lib/joysticks.js'
 
 // Configurações, no jeito dos menus de console (abas em cima, lista de opções
@@ -65,6 +67,8 @@ const COR = {
 // ---------- o que cada opção lê e grava ----------
 
 const estado = () => get(jogo)
+const intensidadeAtual = () =>
+  intensidadeEfetiva({ vibracaoIntensidade: pref('vibracaoIntensidade'), tremor: pref('tremor'), reduzirMovimento: pref('reduzirMovimento') })
 const mudarJogo = (fn) => jogo.update((s) => ({ ...s, ...fn(s) }))
 const LIGA = { valores: [true, false], nomes: (v) => (v ? 'LIGADO' : 'DESLIGADO'), cor: (v) => (v ? COR.ligado : COR.desligado) }
 // opção ligada a uma chave de game/preferencias.js (lista de OPCOES, ou liga/desliga)
@@ -281,6 +285,34 @@ const ABAS = [
         formato: (v) => `${v}%`,
         descricao: `Quanto o analógico precisa inclinar antes de contar. Mais alto ignora o "tremor" de um analógico gasto; mais baixo responde ao menor toque. A volta para o padrão (${Math.round(ZONA_MORTA_PADRAO * 100)}%).`,
       },
+      {
+        id: 'vibracao',
+        rotulo: 'VIBRAÇÃO',
+        ...opcaoPref('vibracao'),
+        descricao:
+          'O controle vibra quando o jogador dele leva um golpe (curtinho) e quando cai (mais longo). Só vibra o controle do jogador que sofreu o golpe, nunca o do adversário. Para sozinha na pausa, ao perder o foco e ao voltar ao menu.\n\nFunciona no Chrome e no Edge; Firefox e Safari costumam não deixar.',
+      },
+      {
+        id: 'vibracaoIntensidade',
+        rotulo: 'INTENSIDADE',
+        tipo: 'opcoes',
+        valores: INTENSIDADES.map((v) => Math.round(v * 100)),
+        nomes: (v) => `${v}%`,
+        ler: () => Math.round(intensidadeAtual() * 100),
+        escrever: (v) => definirPref('vibracaoIntensidade', v / 100),
+        padrao: () => Math.round(intensidadeEfetiva({ tremor: pref('tremor'), reduzirMovimento: pref('reduzirMovimento') }) * 100),
+        descricao: 'Força da vibração: 25%, 50%, 75% ou 100%. O padrão é 75%, ou 25% se TREMORES estiver reduzido ou desligado (ou REDUZIR ANIMAÇÕES ligado); escolha a que preferir.',
+      },
+      {
+        id: 'vibracaoTestar',
+        rotulo: 'TESTAR VIBRAÇÃO',
+        tipo: 'acao',
+        descricao: 'A faz o controle que apertou A por último dar dois pulsos. Se nada vibrar: "este controle não vibra (ou o navegador não deixa)".',
+        fazer: () => {
+          const r = testarVibracao()
+          return { texto: r.texto, cor: r.ok ? COR.ok : COR.erro }
+        },
+      },
       // Web Serial só existe no Chrome/Edge: sem ele as opções nem aparecem
       ...(serialSuportado()
         ? [
@@ -316,132 +348,8 @@ const ABAS = [
         id: 'restaurar',
         rotulo: 'RESTAURAR PADRÃO',
         tipo: 'acao',
-        fazer: restaurarJogo({ volume: CONFIG_PADRAO.volume, som: CONFIG_PADRAO.som }),
-        descricao: `Volta a música para ${CONFIG_PADRAO.volume.musica}%, os efeitos para ${CONFIG_PADRAO.volume.efeitos}% e liga o som.`,
-      },
-    ],
-  },
-  {
-    id: 'jogo',
-    rotulo: 'JOGO',
-    itens: [
-      {
-        id: 'velocidade',
-        rotulo: 'VELOCIDADE',
-        titulo: 'VELOCIDADE DO CORAÇÃO',
-        tipo: 'barra',
-        min: 60,
-        max: 400,
-        passo: 10,
-        aVoltaAoPadrao: true,
-        ler: () => estado().velocidade,
-        escrever: (v) => mudarJogo(() => ({ velocidade: v })),
-        padrao: () => CORACAO.velocidadePadrao,
-        formato: (v) => (v === CORACAO.velocidadePadrao ? `${v} (padrão)` : `${v}`),
-        unidade: 'px/s',
-        descricao: `Quantos pixels por segundo o coração anda. Mais rápido desvia de longe, mas fica difícil de acertar os vãos apertados. A volta para o padrão (${CORACAO.velocidadePadrao}).`,
-      },
-      {
-        id: 'telaCheia',
-        rotulo: 'TELA CHEIA',
-        tipo: 'opcoes',
-        ...LIGA,
-        nomes: (v) => (v ? 'LIGADA' : 'DESLIGADA'),
-        ler: () => Boolean(document.fullscreenElement),
-        escrever: () => alternarTelaCheia(),
-        descricao: 'Só o jogo na tela inteira, sem as barras de cima da página. Atalho: tecla F (Esc sai).',
-      },
-      {
-        id: 'restaurar',
-        rotulo: 'RESTAURAR PADRÃO',
-        tipo: 'acao',
-        fazer: restaurarJogo({ velocidade: CORACAO.velocidadePadrao }),
-        descricao: `Volta a velocidade do coração para ${CORACAO.velocidadePadrao}. A tela cheia não muda.`,
-      },
-    ],
-  },
-  {
-    id: 'controles',
-    rotulo: 'CONTROLES',
-    itens: [
-      {
-        id: 'jogador',
-        rotulo: 'JOGADOR',
-        tipo: 'opcoes',
-        valores: ['p1', 'p2'],
-        nomes: (v) => (v === 'p1' ? 'JOGADOR 1' : 'JOGADOR 2'),
-        cor: (v) => corTexto(CORES.almas[v === 'p1' ? 0 : 1]),
-        ler: (cena) => cena.jogadorTeclas,
-        escrever: (v, cena) => (cena.jogadorTeclas = v),
-        semSalvar: true,
-        descricao:
-          'De quem são as teclas da lista. Com 1 jogador, os dois conjuntos de teclas controlam o mesmo coração.\n\nO controle físico tem a aba GAMEPAD; o joystick (porta serial) não é remapeável.',
-      },
-      ...ACOES.map((acao) => ({
-        id: `tecla-${acao}`,
-        rotulo: ROTULO_ACAO[acao],
-        tipo: 'tecla',
-        acao,
-        descricao: 'A: escolher a nova tecla (Esc cancela). Se ela já for de outra ação, sai de lá; se aquela ação ficar sem nenhuma, fica com as teclas antigas desta.',
-      })),
-      {
-        id: 'restaurar',
-        rotulo: 'RESTAURAR TECLAS PADRÃO',
-        tipo: 'acao',
-        fazer: () => definirPref('teclas', null),
-        descricao: 'Volta as teclas dos dois jogadores para as de fábrica:\nP1: WASD · A Espaço/Z/E · B Q/X/Shift esq. · pausa C/Esc\nP2: setas · A Enter · B Shift dir./Backspace · pausa P',
-      },
-    ],
-  },
-  {
-    id: 'gamepad',
-    rotulo: 'GAMEPAD',
-    itens: [
-      ...ACOES_PAD.map((acao) => ({
-        id: `pad-${acao}`,
-        rotulo: ROTULO_PAD[acao],
-        tipo: 'botaoPad',
-        acao,
-        descricao:
-          'A: escolher o novo botão do controle (aperte o botão que quiser; qualquer tecla cancela). Se ele já for de outra ação, sai de lá; se aquela ficar sem nenhum, fica com os antigos desta. O D-pad e o analógico esquerdo sempre movem.',
-      })),
-      {
-        id: 'zonaMorta',
-        rotulo: 'ZONA MORTA',
-        titulo: 'ZONA MORTA DO ANALÓGICO',
-        tipo: 'barra',
-        min: Math.round(ZONA_MORTA_LIMITES.min * 100),
-        max: Math.round(ZONA_MORTA_LIMITES.max * 100),
-        passo: 5,
-        aVoltaAoPadrao: true,
-        ler: () => Math.round(pref('zonaMorta') * 100),
-        escrever: (v) => definirPref('zonaMorta', v / 100),
-        padrao: () => Math.round(ZONA_MORTA_PADRAO * 100),
-        formato: (v) => `${v}%`,
-        descricao: `Quanto o analógico precisa inclinar antes de contar. Mais alto ignora o "tremor" de um analógico gasto; mais baixo responde ao menor toque. A volta para o padrão (${Math.round(ZONA_MORTA_PADRAO * 100)}%).`,
-      },
-      // Web Serial só existe no Chrome/Edge: sem ele a opção nem aparece
-      ...(serialSuportado()
-        ? [
-            {
-              id: 'serial',
-              rotulo: 'CONECTAR JOYSTICK SERIAL',
-              tipo: 'acao',
-              ler: () => serialAberto(),
-              descricao: (aberto) =>
-                aberto
-                  ? 'O joystick serial (Arduino) está conectado. A desconecta (ele não reconecta sozinho até você parear de novo).'
-                  : 'Pareia um joystick com cabo (Arduino). A abre a janela do navegador para escolher a porta; só dá para fazer a primeira vez (depois ele reconecta sozinho ao abrir o jogo e ao plugar o cabo). Se o navegador reclamar de "gesto", aperte Espaço ou Enter no teclado nesta opção.',
-              fazer: alternarSerial,
-            },
-          ]
-        : []),
-      {
-        id: 'restaurar',
-        rotulo: 'RESTAURAR PADRÃO',
-        tipo: 'acao',
-        fazer: () => ['botoesPad', 'zonaMorta'].forEach((k) => definirPref(k, PREFERENCIAS_PADRAO[k])),
-        descricao: 'Volta os botões do controle (A: A/X · B: B/Y · pausa: Start) e a zona morta (35%) para os de fábrica.',
+        fazer: () => ['botoesPad', 'zonaMorta', 'vibracao', 'vibracaoIntensidade'].forEach((k) => definirPref(k, PREFERENCIAS_PADRAO[k])),
+        descricao: 'Volta os botões do controle (A: A/X · B: B/Y · pausa: Start) a zona morta (35%) e a vibração (ligada, intensidade automática) para os de fábrica.',
       },
     ],
   },
@@ -1126,7 +1034,7 @@ export default class Config extends Phaser.Scene {
         audio: 'Volume da música e dos efeitos, e o som ligado ou desligado.',
         jogo: 'Velocidade do coração e tela cheia.',
         controles: 'Troque as teclas do teclado de cada jogador. O controle físico tem a aba GAMEPAD; o joystick serial não muda.',
-        gamepad: 'Botões do controle físico, zona morta do analógico e o pareamento do joystick serial.',
+        gamepad: 'Botões do controle físico, zona morta do analógico, vibração e o pareamento do joystick serial.',
         acessibilidade: 'Menos tremores, clarões e animações, e cores para daltonismo.',
         graficos: 'Qualidade dos gráficos: partículas, fundos animados e filtros.',
       }[aba.id]
@@ -1168,7 +1076,7 @@ export default class Config extends Phaser.Scene {
       add(t, u)
       if (item.mudo?.()) add(this.texto(u.x + u.width + 10, y + 12, '(som desligado)', 11, COR.desligado))
       else if (v === item.padrao()) add(this.texto(u.x + u.width + 10, y + 12, 'PADRÃO', 11, COR.ligado))
-    } else if (item.tipo === 'botaoPad' || item.id === 'zonaMorta') {
+    } else if (item.tipo === 'botaoPad' || ['zonaMorta', 'vibracao', 'vibracaoIntensidade', 'vibracaoTestar'].includes(item.id)) {
       const ligados = controlesLigados()
       const status = ligados.length
         ? `CONTROLES EM USO\n${ligados.map((c) => `jogador ${c.vaga + 1}: controle ${c.pad + 1}`).join('\n')}`

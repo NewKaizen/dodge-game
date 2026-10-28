@@ -6,6 +6,7 @@ import { vigiarSerial } from '../lib/serial.js'
 import { avisar } from './conta/avisos.js'
 import { criarDetector } from './jogadores.js'
 import { lan } from '../lib/lan/rede.js'
+import { pararVibracao, bloquearVibracao } from '../lib/vibracao.js'
 
 // Liga os controles do jogo sozinhos (Game.svelte chama uma vez), sem botão nenhum
 // para clicar:
@@ -19,7 +20,10 @@ import { lan } from '../lib/lan/rede.js'
 // E decide sozinho se são 1 ou 2 jogadores locais (game/jogadores.js): duas fontes
 // distintas ativas = 2 jogadores, com um aviso; sem botão nenhum.
 export function instalarEntrada(game) {
-  const perdeu = (motivo) => game.events.emit('entrada-perdida', motivo)
+  const perdeu = (motivo) => {
+    pararVibracao() // janela sem foco, controle ou joystick fora: o controle não fica tremendo sozinho
+    game.events.emit('entrada-perdida', motivo)
+  }
 
   const pararTeclado = armarTeclado()
   const pararPads = iniciarGamepads({ aviso: avisar, aoPerder: perdeu })
@@ -48,6 +52,8 @@ export function instalarEntrada(game) {
     avisar: (titulo) => avisar({ id: `p2:${Date.now()}`, tipo: 'info', titulo, ms: 3500 }),
   })
   const avaliar = () => {
+    // partida pausada (cena Pausa por cima): o controle para de vibrar e não vibra até voltar
+    bloquearVibracao(game.scene.getScenes(true).some((c) => c.scene.key === 'Pausa'))
     const s = get(jogo)
     detector.avaliar({
       numero: s.numJogadores,
@@ -68,7 +74,9 @@ export function instalarEntrada(game) {
   })
   const relogio = setInterval(avaliar, 150)
 
-  const aoPerderFoco = () => perdeu('a janela perdeu o foco')
+  const aoPerderFoco = () => {
+    perdeu('a janela perdeu o foco')
+  }
   const aoMudarVisibilidade = () => document.hidden && aoPerderFoco()
   window.addEventListener('blur', aoPerderFoco)
   document.addEventListener('visibilitychange', aoMudarVisibilidade)
@@ -81,6 +89,7 @@ export function instalarEntrada(game) {
     clearInterval(relogio)
     pararSerial()
     pararPads()
+    pararVibracao()
     pararTeclado()
   }
 }
