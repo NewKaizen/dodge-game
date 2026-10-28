@@ -71,6 +71,18 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 - As revisões R1/R2 são absorvidas: cada agente se revisa e roda `npm test` antes do PR; a sessão principal faz a conferência rápida do diff. O R3 continua.
 - A sessão principal agenda o retorno a cada 5 horas, retoma do ponto anotado na seção "Progresso" e dispara o próximo agente.
 
+## Próxima semana (pausa por limite semanal, 28/10)
+
+Estado: Fases 1 e 2 na `main`; Fase 5 com 5A, 5B (#48, #49) na `main`; **5D (1x1x1x1) + foco no par com whoosh + cartas ocultas no online** no PR NewKaizen/dodge-game#51 (pronto, testado, smoke test ok).
+
+Ordem para retomar:
+1. Rodar `supabase/migrations/0007_ffa.sql` no Supabase (XP do todos-contra-todos) e fazer o merge do #51.
+2. Teste com gente: CO-OP 3–4, 1x1x1x1, joysticks seriais (um por porta), vibração do controle.
+3. **5E (2x2)**, Opus — antes, decidir com o usuário: condição de vitória (os dois adversários caem x um cai), alvos fixos x cruzados, apoio/resgate entre parceiros, XP por equipe.
+4. **5C** (balanceamento do CO-OP 4) com os dados do teste.
+5. Pendências menores: vibração no SUPER/vitória/K.O. do CO-OP clássico (o `CoopArena` não chama `informarVida`, então o OLED serial também não recebe a vida nesse modo — conferir); ESLint com `no-undef` (proposto, evitaria o `alternarSerial`); smoke test de abrir a página obrigatório antes de cada PR.
+6. Depois: Fase 3 (Manual do Ralsei), Fase 4, Fase 6.
+
 ## Progresso
 
 | Etapa | Estado |
@@ -85,7 +97,7 @@ retrabalho. As estimativas valem como ordem de grandeza, não como promessa.
 | Correções pós-Fase 1 | concluído (NewKaizen/dodge-game#44: tela preta do convidado, CARREGANDO…, nome da conta) |
 | 2A Consolidação das telas | concluído (Perfil, Amigos e Coleção como cenas; avisos no jogo; JOGAR RÁPIDO e PERFIL no menu); falta o teste restrito (`docs/teste-fase1.md`) e ver no navegador com contas reais |
 | Fase 2 | 2A–2D concluídas (NewKaizen/dodge-game#45, #46, com dois jogadores locais automáticos); concluídas também: 2E (revanche, ajustes do teste com a turma, auditoria de cenas reaproveitadas, cor do P1 x bloqueio) e 2F (pendências do servidor). Decisões: consolidação = 2A; controle padrão Xbox/PS remapeável; religação 20 s; host cai = sem XP e sem derrota; retomada no começo da rodada (recomendadas; podem mudar antes da 2B/2D) **Fase 2 concluída** (NewKaizen/dodge-game#47). |
-| Fase 5 (adiantada) | **5A concluída** (base N jogadores: salas de até 4 com vagas, estrela pelo host com sessão por convidado, troca de cena confirmada por convidado, queda de um convidado sem parar os outros, partidas de N + migration 0006, lobby de 4 cartões, orçamento em `docs/rede-pvp.md`; a pedido do usuário, **dono da sala x host da partida eleito pela melhor conexão**). Próxima: 5B. Decisões do usuário (27/10): ordem 5A → CO-OP 3–4 (5B/5C) → 1x1x1x1 (5D) → 2x2 (5E); **só online** (salas de amigos); topologia **estrela pelo host** (WebRTC ou relé do servidor; TURN opcional). 2E e 2F vêm antes 5A mergeada (NewKaizen/dodge-game#48). **5B concluída** (CO-OP de 3 e 4 online: `coop4` abre na sala de 3–4, party por vaga, `CoopArenaN` com corações de cor + forma + nome, rodízio de mira, resgate por rodada limpa, combos de grupo, queda e volta de um convidado, XP no servidor e PROTOCOLO 9; detalhes em `docs/coop-cartas.md`). Próxima: 5C (equilíbrio dos grupos). 5B mergeada (NewKaizen/dodge-game#49, com joysticks seriais um por porta). **5D (1x1x1x1) em andamento**; 5C (balanceamento do CO-OP 4) fica para depois do teste com gente. |
+| Fase 5 (adiantada) | **5A concluída** (base N jogadores: salas de até 4 com vagas, estrela pelo host com sessão por convidado, troca de cena confirmada por convidado, queda de um convidado sem parar os outros, partidas de N + migration 0006, lobby de 4 cartões, orçamento em `docs/rede-pvp.md`; a pedido do usuário, **dono da sala x host da partida eleito pela melhor conexão**). Próxima: 5B. Decisões do usuário (27/10): ordem 5A → CO-OP 3–4 (5B/5C) → 1x1x1x1 (5D) → 2x2 (5E); **só online** (salas de amigos); topologia **estrela pelo host** (WebRTC ou relé do servidor; TURN opcional). 2E e 2F vêm antes 5A mergeada (NewKaizen/dodge-game#48). **5B concluída** (CO-OP de 3 e 4 online: `coop4` abre na sala de 3–4, party por vaga, `CoopArenaN` com corações de cor + forma + nome, rodízio de mira, resgate por rodada limpa, combos de grupo, queda e volta de um convidado, XP no servidor e PROTOCOLO 9; detalhes em `docs/coop-cartas.md`). Próxima: 5C (equilíbrio dos grupos). 5B mergeada (NewKaizen/dodge-game#49, com joysticks seriais um por porta). **5D concluída** (todos contra todos de 3 e 4 online: `ffa` abre na sala de 3–4, `PvpEscolhaN` → `PvpArenaN` (grade 2×2, uma caixa por jogador) → `PvpResultadoN`, rodízio de alvos anunciado sem foco, Ases por par, rodadas bônus desligadas, eliminação com espectador, morte súbita na rodada 15 e limite na 24, quem cai não leva vantagem, XP por colocação (1º +20, 2º +10, migration 0007) e PROTOCOLO 10; detalhes em `docs/pvp-regras.md` "Todos contra todos"). Próxima: 5E (2x2); 5C (balanceamento do CO-OP 4) fica para depois do teste com gente. |
 
 ### Consolidação (depois das features da Fase 1)
 

@@ -49,7 +49,7 @@
 // N LADOS (Fase 5A, a base dos modos de 3–4; docs/online.md "Partidas de N"): o
 // registro, a leitura do relato e a decisão já aceitam N participantes (lado =
 // vaga da sala, 0 = host). Só dão XP os modos cuja partida
-// existe (MODOS_COM_XP: o coop4 entrou na 5B; ffa e 2x2 entram com a 5D e a 5E). O que cada um relata:
+// existe (MODOS_COM_XP: o coop4 entrou na 5B, o ffa na 5D; o 2x2 entra com a 5E). O que cada um relata:
 //   coop4  { vitoria }                    o time inteiro vence ou perde
 //   ffa    { colocacoes: [lado, ...] }    do 1º ao último (todos os lados, sem repetir)
 //   2x2    { vencedorTime: 0 | 1 | null } time = timeDoLado(lado) (null = empate)
@@ -62,7 +62,7 @@
 // Quem ficou e não relatou: sem_relato. Ninguém relatou: encerrada (host_caiu se
 // o host caiu; sem vitória por abandono com 3 ou mais). Resultado por lado:
 // coop4 vitoria/derrota para todos; ffa 1º = vitoria, o resto derrota (e a
-// colocação de cada um); 2x2 o time vencedor vitoria, o outro derrota (null:
+// colocação de cada um; o 2º ganha o bônus da 0007); 2x2 o time vencedor vitoria, o outro derrota (null:
 // empate). O XP (participação + vitória) é o mesmo do banco (0006_n_jogadores.sql).
 //
 // registro: o banco (criarRegistro(supabase)) ou null (sem contas: ninguém ganha XP)
@@ -91,8 +91,8 @@ export const MODOS_PARTIDA = {
   ffa: { min: 3, max: 4, decide: 'colocacao' },
   '2x2': { min: 4, max: 4, decide: 'times' },
 }
-// os modos que registram partida e dão XP hoje (5B ligou o coop4; 5D/5E acrescentam os seus)
-export const MODOS_COM_XP = ['pvp', 'coop', 'coop4']
+// os modos que registram partida e dão XP hoje (5B ligou o coop4, 5D o ffa; a 5E acrescenta o 2x2)
+export const MODOS_COM_XP = ['pvp', 'coop', 'coop4', 'ffa']
 // 2x2: as vagas 0 e 2 (host e 2º convidado) contra 1 e 3
 export const timeDoLado = (lado) => lado % 2
 const ehModoN = (modo) => Boolean(MODOS_PARTIDA[modo]?.decide)

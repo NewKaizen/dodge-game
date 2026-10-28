@@ -125,12 +125,21 @@ function trocarCena(game, chave, dados) {
   else game.scene.start(chave, dados)
 }
 
+// Cartas escondidas no PVP online (pvp/categorias.js): a ponte da arena que sabe mascarar
+// (mascararCenaPara) manda a CADA convidado os dados vistos por ele; sem ela, os mesmos para todos
+function mandarCena(cena, msg) {
+  const rede = cena?.rede
+  if (!rede?.mascararCenaPara) return canal.enviar('cena', null, msg)
+  for (const id of destinos()) canal.enviarPara(id, 'cena', null, { ...msg, dados: rede.mascararCenaPara(msg.dados, id) })
+}
+
 export function irParaCena(cena, chave, dados = {}) {
   if (!souHostDaRede() || !naSalaComParceiro(get(lan))) return cena.scene.start(chave, dados)
   ativar(chave !== 'Lan')
   const n = sincCena.nova(chave, destinos())
-  canal.enviar('cena', null, { chave, dados, n })
-  cena.scene.start(chave, dados)
+  mandarCena(cena, { chave, dados, n })
+  // (a tela que vem depois da arena também esconde as cartas dos outros aqui)
+  cena.scene.start(chave, cena?.rede?.mascararCenaPara?.(dados, null) ?? dados)
 }
 
 // a cena Lan chama ao abrir: no lobby não tem partida em rede. PvpResultado
@@ -189,7 +198,7 @@ function voltarRodada(game, chave, parceiroId) {
   ativar(true)
   console.info('[rede] retomada: a partida volta ao começo da rodada', { chave, rodada: dados.retomada?.estado?.rodada ?? null })
   const n = sincCena.nova(chave, destinos())
-  canal.enviar('cena', null, { chave, dados, retomada: true, n })
+  mandarCena(cena, { chave, dados, retomada: true, n })
   trocarCena(game, chave, dados)
 }
 
@@ -203,7 +212,7 @@ function voltarVaga(game, id) {
   canal.descartar(id)
   canal.reiniciar(id)
   console.info('[rede] retomada de uma vaga: a cena atual vai só para quem voltou', { id, chave })
-  canal.enviarPara(id, 'cena', null, { chave, dados, retomada: true, n: sincCena.estado().n })
+  canal.enviarPara(id, 'cena', null, { chave, dados: cena.rede?.mascararCenaPara?.(dados, id) ?? dados, retomada: true, n: sincCena.estado().n })
 }
 
 // 5A: a queda de alguém para a partida de todos? Sala de 2: sim (2D). Sala de N: só se

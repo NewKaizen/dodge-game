@@ -73,8 +73,8 @@ test('o tamanho da sala vem do modo', () => {
   assert.equal(maxDoModo('ffa'), 4)
   assert.equal(maxDoModo('2x2'), 4)
   assert.equal(maxDoModo('inexistente'), 2)
-  assert.ok(MODOS_SALA.ffa.emBreve && MODOS_SALA['2x2'].emBreve)
-  assert.ok(!MODOS_SALA.pvp.emBreve && !MODOS_SALA.coop.emBreve && !MODOS_SALA.coop4.emBreve, 'o CO-OP 3–4 existe desde a 5B')
+  assert.ok(MODOS_SALA['2x2'].emBreve)
+  assert.ok(!MODOS_SALA.pvp.emBreve && !MODOS_SALA.coop.emBreve && !MODOS_SALA.coop4.emBreve && !MODOS_SALA.ffa.emBreve, 'o CO-OP 3–4 existe desde a 5B e o todos contra todos desde a 5D')
 
   const m = montar()
   const { host, codigo } = m.sala(1, 'pvp')

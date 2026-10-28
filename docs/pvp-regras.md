@@ -473,3 +473,70 @@ junto com o Último Bis, o mais fraco).
 Na partida o lado é identificado pelo **nome do jogador**, não pelo do personagem (o personagem fica como linha pequena): HUD, abertura, replay do K.O., "… VENCE!" e tela de resultado. Online/LAN: o nome do membro da sala (conta ou convidado, já filtrado pelo servidor). Mesmo PC: P1 = nome da conta logada ou `JOGADOR 1`; P2 = `JOGADOR 2`; contra a CPU, `CPU`. Nomes passam pelo filtro de palavras (`nomeSeguro`) e são cortados em 12 letras com "…". Lógica pura em `src/game/pvp/nomes.js` (`nomeDoJogador(lado, contexto)`).
 
 O motivo de carta bloqueada aparece numa pílula vermelha com texto branco e "×" (a cor do P1 é parecida com o vermelho do bloqueio).
+
+## Todos contra todos
+
+Modo `ffa` (1x1x1x1), **3 ou 4 jogadores**, só **online** em sala de amigos (Fase 5D). Regras puras em `src/game/pvp/ffa.js` (testes em `pvp/__tests__/ffa.test.js`); a arena é `scenes/PvpArenaN.js`, a rede `pvp/rede/ArenaRedeN.js` ([rede-pvp.md](rede-pvp.md#todos-contra-todos-fase-5d)). O PVP 1x1 não muda: são cenas separadas (`PvpEscolhaN` → `PvpArenaN` → `PvpResultadoN`).
+
+**Telas.** Lobby (modo TODOS CONTRA TODOS com 3–4 na sala) → `PvpEscolhaN` (a grade da party do CO-OP 3–4: cada um escolhe o próprio personagem, **sem repetir**, para as caixas ficarem distintas; quem arbitra é o host) → `PvpArenaN` (sem votação de arena: o host sorteia uma, que vale para fundo e música) → `PvpResultadoN`.
+
+**Arena (854×480).** No alto, um cartão por vaga (forma + nome + HP + energia + estado). Embaixo, uma **grade 2×2 com uma caixa por jogador** (220×170, o tamanho do 1x1: os ataques medidos continuam valendo): vaga 0 em cima à esquerda, 1 em cima à direita, 2 embaixo à esquerda, 3 embaixo à direita. Cada célula tem a cor, a forma e o nome do dono (também no coração), o personagem e, à direita da caixa, **quem ataca ela e com o quê** ("BETO: ♦ CONTROLE, 9 por acerto"). Com 3 jogadores a 4ª célula mostra o rodízio da rodada. Só a minha mão aparece.
+
+**Foco no meu par (`pvp/focoFfa.js`, testes em `pvp/__tests__/focoFfa.test.js`).** A grade é a visão geral (o anúncio "ANA → BETO", a escolha, a revelação). Na esquiva a tela vai para o **meu par**:
+1. **Anúncio** (como antes): a grade e o painel do rodízio.
+2. **Transição** (`TRANSICAO.ms` = 700 ms, Cubic in-out, com um "whoosh" que sobe): as caixas abrem na grade e vão para o **foco**: a **minha caixa grande no meio-esquerda** (escala 1,42: eu desvio do ataque que vem para mim) e a do **meu alvo menor em cima à direita** (escala 0,62: eu vejo o meu ataque chegar), cada uma com forma, nome na cor da vaga, barra e número de HP e o que ela recebe ("desvie de DUDA: ♦ CONTROLE · 6/acerto"). Os outros encolhem até um **cartão pequeno** embaixo à direita (forma, nome, barra de HP e DESVIANDO / CAÍDO / SEM CONEXÃO / ELIMINADO 4º / SEM ATAQUE) e **a caixa deles não é desenhada**. Só as duas cartas que importam (a que vem para mim e a minha) voam; as outras saem da mesa.
+3. **Fim da rodada**: a tela volta à grade (o "whoosh" desce), as caixas fecham e cada célula mostra o **dano da rodada** ("-18 HP", "causou 16" ou "SEM DANO"); depois o anúncio seguinte.
+4. **Espectador** (eliminado): o mesmo foco, no par de quem ele segue (←/→ troca com uma transição curta de 320 ms).
+5. **Reduzir animações**: **corte seco** no lugar do zoom (e um "whoosh" mais curto e baixo).
+
+É **só apresentação**: as caixas continuam no mesmo lugar do **mundo** (limites, balas, colisão, as posições do coração que viajam pela rede) e todas continuam rodando como antes (a minha de verdade, as dos outros espelho; o dano de cada coração continua sendo decidido no PC do dono). O foco só muda **onde e de que tamanho** a caixa aparece (`BattleBox.setVista`: as câmeras de recorte mostram a região dela em outro lugar, a borda vai junto) ou se ela aparece (`BattleBox.setOculta`: câmeras e borda apagadas, sem parar o ataque). As faíscas e o coração quebrado de uma caixa vão para onde ela aparece (`pontoNaTela`) e somem com ela. O replay do último K.O. continua gravando as caixas escondidas.
+
+**Rodízio de alvos (anunciado ANTES da escolha).** Os vivos em ordem de vaga, `v[0..n-1]`; na rodada `r` cada um ataca `v[(i + passo) mod n]`, com `passo = 1 + (r − 1) mod (n − 1)`. O passo nunca é 0 nem múltiplo de `n`: é uma permutação **sem ponto fixo**, então cada um ataca exatamente **um** e recebe exatamente **um** ataque — não dá para três baterem no líder (anti-foco). Com 3 vivos é sempre um ciclo (direita, esquerda, direita…); com 4, o passo 2 faz duas duplas (A↔C, B↔D); com 2 vivos vira o 1x1. Na escolha, o painel "RODÍZIO DA RODADA" lista os pares ("ANA → BETO", com forma e cor) e a minha linha ("VOCÊ ATACA BETO · DUDA ATACA VOCÊ").
+
+**Cartas, energia, dano.** Tudo do 1x1 (energia 3/+2/teto 10, passar +1, grazes, desvio perfeito e combo, ♥ suporte em quem joga, escudo, custos, SUPER custando 10), resolvido **por par atacante → alvo** (`resolverRodadaFfa`):
+
+| Carta | No todos contra todos |
+| --- | --- |
+| ataque (♠ ♦ ♣, figuras) | vai para a caixa do **meu alvo** |
+| ♦ Ás Anular | cancela a carta de **quem me ataca** (ataque, suporte e especial; o SUPER não) e manda o ataque leve para o meu alvo |
+| ♠ Ás Espelho | **passa adiante** o ataque que vinha para mim: ele vai para o meu alvo (no lugar do eco) e não chega em mim. Sem ataque para passar (passou, copas, Espelho, SUPER), manda o eco ao meu alvo. Assim ninguém recebe dois ataques |
+| ♣ Ás Roubo | rouba uma carta da mão do **meu alvo** |
+| ♥ Ás Segunda chance | igual (o HP não passa de 1 nesta rodada) |
+| SUPER | imparável como no 1x1, vai para o meu alvo |
+
+**Rodadas bônus e eventos: desligados** no todos contra todos. Os eventos de arena desenham coisas **entre duas caixas** (teclado, relógio, imperador, gladiador) e o Duelo, o CTRL+C CTRL+V e o Coração trocado são minigames de exatamente 2; com até 4 caixas abertas a rodada já é caótica. A aceleração a cada 5 rodadas (morte súbita de velocidade) continua.
+
+**Eliminação.** HP 0 no fim da rodada = **eliminado** (quem cai na mesma rodada fica no mesmo lote). A caixa dele não abre mais, ele não está no rodízio e o cartão diz "ELIMINADO 4º". Quem foi eliminado vira **espectador**: "ELIMINADO — assistindo", sem mão; **←/→ escolhe quem seguir** (na grade a borda da célula pisca; na esquiva o foco é o par dele: "ASSISTINDO CAIO").
+
+**Tempo de espectador (limitado e medido).** A partida acaba quando sobra **1 de pé** (ou 0: os últimos caíram juntos). Para ninguém assistir para sempre: a partir da **rodada 15** (`FFA.morteSubita`) o dano por bala de toda caixa é **×1,5**, e no fim da **rodada 24** (`FFA.limiteRodadas`) a partida acaba e quem está vivo é classificado pelo HP. A tela de resultado mostra quantas rodadas cada eliminado assistiu (`espectador`, também no log `[ffa] fim`).
+
+**Classificação** (`classificacao`): quem caiu **depois** fica na frente (vivo à frente de todos); empate (o mesmo lote, ou os vivos no limite) pelo **HP que sobrou**, depois o **dano causado**, depois o **menor dano recebido** e por fim a vaga (a ordem é sempre estrita: é ela que vai para o servidor). Dano causado = o dano efetivo que a caixa que eu mandei fez (Espelho: conta para quem passou adiante; sem conexão: para quem atacou).
+
+**Queda no meio da partida (regra de N: quem cai não leva vantagem).** Enquanto está sem conexão: **não ataca** (passa sem o +1), **não ganha** a energia da rodada, e o ataque que vinha para ele **vale como 3 acertos** cheios (`FFA.acertosAusente`; menos o que ele já tinha levado na rodada), aplicados pelo host no fim da rodada. Voltou: entra na **rodada seguinte** com o HP que tem. Não voltou em **20 s**: é **eliminado na hora** (a colocação é a daquele momento: fica atrás de quem cair depois na mesma rodada). O host que cai: tudo para nos 3–4 PCs e a rodada recomeça na volta (2D), ou a sala fecha sem XP.
+
+**Cartas escondidas:** como em todo PVP online, a carta dos outros só aparece como a **categoria** (ver [Cartas escondidas no online](#cartas-escondidas-no-online)).
+
+**Resultado e fim.** A lista do 1º ao último (forma, nome, personagem, dano causado/recebido, HP, quando caiu e quantas rodadas assistiu), o replay do **último K.O.** (câmera lenta + TV; o placar mostra o vencedor e quem caiu por último), a faixa de XP e o fim da 2E para N (`pvp/fimDePartidaN.js`): **REVANCHE** (mesmos personagens e arena) e **TROCAR PERSONAGEM** só com **todos** de acordo (um TROCAR vale para todos; 15 s sem acordo cancela; quem sai da sala não segura os outros), **VOLTAR AO LOBBY** na hora. O host leva todos (`irParaCena`) e abre uma partida nova no servidor (XP novo).
+
+**XP** ([online.md](online.md#todos-contra-todos-fase-5d)): participação 40 para quem jogou até o fim, **1º +20** (vitória), **2º +10** (migration 0007), o resto só a participação.
+
+Testando no navegador (dev, 3 ou 4 abas): o dono cria a sala, `mudarModo('ffa')`, os outros `entrarCodigo`, todos `alternarPronto()` e o dono `pedirPartida()`; na escolha, **Q** (acorda o teclado) e **espaço** em cada aba. Na arena, `debugJogo.set({ acelerar: 2 })` e, no host, `pvpArenaN.setHp(j, 5)` aceleram o fim; `pvpArenaN.estadoDebug()` mostra os alvos, a classificação e as caixas.
+
+## Cartas escondidas no online
+
+No **PVP online** (1x1 em sala de amigos e no Jogar Rápido, e o todos contra todos) ninguém vê a **carta exata** do outro: a mão dele fica **virada**, sem prévia ampliada, e a carta que ele joga aparece como a **CATEGORIA**, com a mesma linguagem da carta do chefe no CO-OP (a carta virada com o selo: ícone + rótulo + cor). As **minhas** cartas são sempre inteiras para mim. O PVP local (mesmo PC) e o vs CPU não mudam. Lógica em `pvp/categorias.js` (testes em `pvp/__tests__/categorias.test.js`).
+
+| Categoria | Cartas | Selo |
+| --- | --- | --- |
+| **ATAQUE** | ♠ espadas 2–K e o **Ás ♠ Espelho** (manda o eco ou o ataque que passou adiante) | ♠ branco |
+| **CONTROLE** | ♦ ouros 2–K (balas rápidas, caixa menor, Q/K invertem) e o **Ás ♦ Anular** | ♦ vermelho |
+| **ARMADILHA** | ♣ paus 2–K (bombas, lasers, colunas...) e o **Ás ♣ Roubo** | ♣ branco |
+| **SUPORTE** | ♥ copas 2–K (cura, escudo, energia, compra) e o **Ás ♥ Segunda chance** | ♥ vermelho |
+| **SUPER** | ★ a SUPER do personagem (valor 14, uma por baralho) | ★ dourado |
+
+A categoria é o **naipe** (o tipo da carta nas regras: ver [Naipes](#naipes)); o ♥ se chama SUPORTE como no texto da própria carta (não é só cura). O **Ás fica na categoria do naipe dele**: o efeito especial aparece quando acontece (ESPELHO!, ANULADA!, ROUBO!, SEGUNDA CHANCE!), como o ataque aparece na esquiva. O SUPER anuncia o nome dele (só existe um por baralho).
+
+Onde a carta do outro aparecia: a revelação (a carta vira e acende o selo), o texto embaixo da caixa ("♦ CONTROLE (Kris) · 6 de dano por acerto"), o rótulo do foco e a coluna "quem ataca" do todos contra todos, as cartas malucas ("VIROU ATAQUE!"), a arma do duelo ("ESPADA (ATAQUE)") e a **maior carta** da tela de resultado (o selo).
+
+**No fio** (o host roda as regras e sabe tudo): cada convidado recebe o estado e o resultado **vistos por ele** ([rede-pvp.md](rede-pvp.md#cartas-escondidas-no-online)). As cartas dos outros viram **fichas** sorteadas por partida (sem relação com o id), a carta jogada vira `{ categoria, naipe da categoria, descritor do ataque, energia do desvio perfeito }` (a esquiva precisa rodar o ataque) e o host **embaralha os montes com um sorteio só dele** (a semente da partida, que os dois conhecem, refaria a ordem do baralho do outro); o RNG dos baralhos dos outros não viaja.
+

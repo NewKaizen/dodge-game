@@ -3,6 +3,7 @@ import { TEMPOS } from '../../constants.js'
 import { tocar } from '../../audio.js'
 import { particulas } from '../../effects/particulas.js'
 import { diferencasDeEstado, criarEspelhoCoracao } from './sincronia.js'
+import { criarFichas, embaralharEscondido, mascararEstado, mascararResultado, mascararJogada, mascararDadosDeCena, cartaOculta } from '../categorias.js'
 
 // A PvpArena EM REDE (docs/rede-pvp.md, seção da arena): cada PC roda a arena
 // inteira, desvia na própria caixa sem atraso, e só as decisões viajam pelo
@@ -36,6 +37,13 @@ import { diferencasDeEstado, criarEspelhoCoracao } from './sincronia.js'
 // arena de novo nos dois com dadosRetomada() (os dados de sempre + `retomada`),
 // e cada PC troca o estado novo pelo do ponto (aplicarRetomada) e pula a
 // abertura: a rodada recomeça do zero, com a mesma mão (o RNG é o mesmo).
+//
+// CARTAS ESCONDIDAS (docs/pvp-regras.md "Cartas escondidas no online", pvp/categorias.js): o host sabe
+// tudo (roda as regras), mas o que vai ao convidado é o estado e o resultado VISTOS POR ELE: as cartas
+// do host viram fichas (a mão, o monte, o descarte) e a carta jogada vira só a CATEGORIA (com o
+// descritor do ataque para a esquiva rodar). A jogada do host vai como a ficha da carta (a carta virada
+// na mão dele). Nos dois PCs a mão do outro fica virada e a carta dele aparece como categoria
+// (verResultado/verMao); a retomada e a tela de resultado também vão mascaradas (mascararCenaPara).
 //
 // A CoopArena (CO-OP de cartas) usa esta mesma ponte estendida
 // (coop/ArenaRedeCoop.js): as esperas, a escolha, o dano/graze e o coração do
@@ -73,6 +81,8 @@ export default class ArenaRede {
     this.aplicandoDebug = false
     this.debugPermitido = new Set(DEBUG_PERMITIDO) // ações de debug que valem nos dois PCs
     this.ponto = null // host: o começo da rodada atual (retomada da 2D)
+    this.fichas = criarFichas() // host: os apelidos das cartas que o convidado não pode ver
+    this.esconderCartas = true // (o CO-OP de 2, coop/ArenaRedeCoop.js, desliga: lá os dois veem tudo)
 
     this.desligar = [
       canal.ao('cursor', (d) => this.aoCursor(d)),
@@ -168,14 +178,18 @@ export default class ArenaRede {
     if (this.souHost) {
       this.guardarPonto()
       a.comecarRodada()
-      this.enviar('inicio', a.estado.rodada, { estado: copiar(a.estado), bonusPendente: a.bonusPendente })
+      this.enviar('inicio', a.estado.rodada, { estado: this.paraOutro(a.estado), bonusPendente: a.bonusPendente })
       return true
     }
     const rodada = a.estado.rodada + 1
     const msg = await this.esperar('inicio', rodada)
     if (!msg) return false
-    iniciarRodada(a.estado)
-    this.trocarEstado(msg.estado, 'inicio')
+    // (com as cartas escondidas o estado daqui não tem as do outro: não dá para conferir)
+    if (this.esconderCartas) this.trocarEstado(msg.estado, 'inicio', { conferir: false })
+    else {
+      iniciarRodada(a.estado)
+      this.trocarEstado(msg.estado, 'inicio')
+    }
     a.bonusProximo = null
     a.bonusPendente = msg.bonusPendente ?? null
     return true
@@ -200,7 +214,8 @@ export default class ArenaRede {
     const a = this.arena
     const o = this.outroLado
     const mao = a.maos[o]
-    const i = id ? mao.cartas.findIndex((c) => c.dados.id === id) : -1
+    const visto = this.souHost && this.esconderCartas && id ? this.fichas(id) : id // na mão virada do outro a carta é a ficha
+    const i = id ? mao.cartas.findIndex((c) => c.dados.id === visto) : -1
     if (i >= 0) {
       a.noPassar[o] = false
       mao.selecionar(i)
@@ -208,8 +223,9 @@ export default class ArenaRede {
     a.escolher(o, id, { remoto: true })
   }
 
+  // (a do host vai como a ficha da carta: o convidado só vê qual carta virada saiu da mão)
   enviarJogada(id) {
-    this.enviar('jogada', this.rodada, { jogada: id ?? null })
+    this.enviar('jogada', this.rodada, { jogada: this.souHost && this.esconderCartas ? mascararJogada(id ?? null, this.fichas) : id ?? null })
   }
 
   // cursor da MINHA mão (só manda quando muda)
@@ -247,7 +263,45 @@ export default class ArenaRede {
 
   enviarResolucao(jogadas, decisao) {
     const { bonus, adiado, resultado } = decisao
-    this.enviar('resolucao', this.rodada, { jogadas, bonus, adiado, resultado, estado: copiar(this.arena.estado) })
+    const o = this.outroLado
+    if (!this.esconderCartas) return this.enviar('resolucao', this.rodada, { jogadas, bonus, adiado, resultado, estado: copiar(this.arena.estado) })
+    this.enviar('resolucao', this.rodada, {
+      jogadas: jogadas.map((id, j) => (j === o ? id : mascararJogada(id, this.fichas))),
+      bonus,
+      adiado,
+      resultado: mascararResultado(resultado, o, this.fichas),
+      estado: this.paraOutro(this.arena.estado),
+    })
+  }
+
+  // ---------- cartas escondidas ----------
+
+  // host, no começo da partida (sem retomada): os montes embaralhados com um sorteio só daqui
+  esconderBaralhos(estado) {
+    if (this.souHost && this.esconderCartas) embaralharEscondido(estado)
+    return estado
+  }
+
+  // host: o estado como o convidado pode ver
+  paraOutro(estado) {
+    if (!this.esconderCartas) return copiar(estado)
+    return mascararEstado(estado, this.outroLado, this.fichas)
+  }
+
+  // o resultado da rodada como EU posso ver (no convidado ele já chegou assim)
+  verResultado(resultado) {
+    return this.souHost && this.esconderCartas ? mascararResultado(resultado, this.meuLado, this.fichas) : resultado
+  }
+
+  // as cartas da mão do lado j como eu posso ver (a do outro: viradas, só a ficha)
+  verMao(j, cartas) {
+    return j === this.meuLado || !this.esconderCartas ? cartas : cartas.map((c) => cartaOculta(c, this.fichas))
+  }
+
+  // os dados de uma cena que o host manda (irParaCena, retomada): `para` = id do convidado, ou null = eu
+  mascararCenaPara(dados, para) {
+    if (!this.souHost || !this.esconderCartas) return dados
+    return mascararDadosDeCena(dados, para == null ? this.meuLado : this.outroLado, this.fichas)
   }
 
   // Convidado: o que o host resolveu (evento, malucas, resultado) e o estado depois
@@ -406,7 +460,7 @@ export default class ArenaRede {
     const rodada = this.rodada
     if (this.souHost) {
       const vencedor = fimDaRodada(a.estado)
-      this.enviar('fimRodada', rodada, { estado: copiar(a.estado), vencedor })
+      this.enviar('fimRodada', rodada, { estado: this.paraOutro(a.estado), vencedor })
       return vencedor
     }
     fimDaRodada(a.estado)

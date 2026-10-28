@@ -263,13 +263,18 @@ export default class ArenaRedeCoopN {
   async juntarJogadas(tempoMs) {
     const rodada = this.rodada
     const todas = () => this.jogadas.get(rodada) ?? {}
-    const faltam = () => Array.from({ length: this.n }, (_, j) => j).filter((j) => !(j in todas()) && !this.fora(j) && !this.arena.estado.jogadores[j].caido)
+    const faltam = () => Array.from({ length: this.n }, (_, j) => j).filter((j) => !(j in todas()) && !this.fora(j) && this.precisaJogar(j))
     await this.esperarAte(() => faltam().length === 0, tempoMs + FOLGA_JOGADAS_MS)
     if (this.destruido) return PARADA
     const mapa = todas()
     const faltou = faltam()
     if (faltou.length) console.warn('[rede] sem jogada a tempo: passa', { rodada, vagas: faltou })
     return Array.from({ length: this.n }, (_, j) => mapa[j] ?? null)
+  }
+
+  // o host espera a jogada de j? (no CO-OP: quem não está caído; o todos contra todos troca por "vivo")
+  precisaJogar(j) {
+    return !this.arena.estado.jogadores[j].caido
   }
 
   // jogada que não vale aqui (estado divergiu? quem caiu da rede?) vira passar, senão resolverRodadaCoop estoura

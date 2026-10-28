@@ -159,7 +159,7 @@ A base para os modos de 3 e 4 (CO-OP 3–4, todos contra todos, 2x2). Nenhum mod
 ainda: os de 2 (PVP 1x1 e CO-OP de 2) continuam iguais, só passam pelo caminho novo.
 
 **Sala** (`server/lan.js`): o tamanho vem do modo (`MODOS_SALA`: `pvp`/`coop` = 2,
-`coop4` e `ffa` 3–4, `2x2` = 4; o `coop4` abre desde a 5B, `ffa` e `2x2` ainda são "em breve": a sala aceita, a partida
+`coop4` e `ffa` 3–4, `2x2` = 4; o `coop4` abre desde a 5B e o `ffa` desde a 5D, o `2x2` ainda é "em breve": a sala aceita, a partida
 não abre). Cada membro tem uma **vaga** 0..N-1 (o dono é a 0; quem entra pega a menor
 livre). Na partida a vaga não muda (a retomada da 2D volta para a mesma); no lobby, quem
 sai faz as outras descerem (0..n-1 sem buracos: num modo de 2 o convidado é sempre a 1).
@@ -376,3 +376,58 @@ No navegador (dev), com 4 abas: o dono cria a sala, `mudarModo('coop4')`, os out
 de A/B/C só acorda o teclado: aperte Q uma vez antes), o host escolhe o chefe e o nível. `debugJogo.set({ acelerar: 3, invencivel: true })`
 acelera a luta; `coopArena.setHpChefe(0)` no host termina na rodada seguinte; `coopArena.setHp(j, 8)` leva a party à derrota;
 `coopArena.estadoDebug()` mostra a mira, os corações (`espelho`, `mirado`), os `prontos` e o estado de cada jogador.
+
+## Todos contra todos (Fase 5D)
+
+O `PROTOCOLO` subiu para **10** (`server/lan.js` e `lib/lan/rede.js`): o `ffa` deixou de ser "em breve", registra XP e o relato
+`resultado` aceita `colocacoes` (as vagas do 1º ao último). Um cliente velho não entra mais na sala.
+
+A `PvpArenaN` e a ponte dela (`pvp/rede/ArenaRedeN.js`, que **estende** a `coop/ArenaRedeCoopN.js`) usam a estrela da 5A com as
+mesmas regras de autoridade: o **host da partida decide** o rodízio, a resolução, o ataque inteiro de quem está sem conexão, a
+eliminação e o fim; **cada PC é dono do PRÓPRIO coração**. A diferença para o CO-OP 3–4 é que há **uma caixa por jogador**
+(`pistas[vaga]`): cada PC roda todas as caixas com a mesma semente (`<semente>:<rodada>:<vaga>`); a minha é de verdade e as dos outros
+são espelho (`pista.espelho`), com o coração de cada uma andando pelo pacote `coracoes` que o host junta (um por tick para todos).
+
+| Tipo | Chave | De → para | Dados |
+| --- | --- | --- | --- |
+| `inicio` | rodada | host → todos | `{ estado, eventos }`: o estado traz `alvos` (o rodízio, anunciado antes da escolha) e `ausentes`; eventos `voltou {j}` / `saiu {j}` |
+| `jogada` · `pronto` · `resolucao` | rodada | como no CO-OP 3–4 | o host espera só quem está **vivo e com conexão** (`precisaJogar`) |
+| `coracao` / `coracoes` (rápidas) · `dano` · `graze` · `fimEsquiva` | | como no CO-OP 3–4 | `dano {lado, dano, r}`: o acerto no coração da vaga `lado`; cada PC credita o dano a quem mandou a caixa (`caixas[lado].de`) |
+| `fimRodada` | rodada | host → todos | `{ estado, eliminados, fim, restam, ausentes: [{ j, dano }] }` |
+| `resultadoPronto` | rodada | conv. → host | o replay acabou aqui; o host abre a `PvpResultadoN` em todos |
+| `escolhaFim` / `aceiteFim` / `voltarLobby` | | conv. → host / host → todos | o fim da 2E para N: cada vaga escolhe; o host repassa `{ escolhas }` e, com todos de acordo, leva todos |
+
+**Queda:** um convidado que cai não para os outros (5A). O host o trata como **ausente**: ninguém espera a jogada nem o
+`fimEsquiva` dele, a caixa dele não abre ("SEM CONEXÃO: leva o ataque inteiro") e no fim da rodada o host aplica o ataque inteiro
+(`aplicarAusente`); a energia da rodada ele não ganha. Voltou: `dadosRetomadaPara` (o estado de agora, `entrando`) e ele entra na
+rodada seguinte com o HP que tem. Não voltou em 20 s: o host o **elimina no tick em que a vaga sai** (`eliminarFfa 'saiu'`, colocação
+daquele momento). O host que cai: todos param e a rodada recomeça na volta (2D: `guardarPonto` no começo de cada rodada).
+
+Testando: `node --test src/game/pvp/__tests__/ffa.test.js src/game/pvp/__tests__/redeFfa.test.js src/game/pvp/__tests__/fimDePartidaN.test.js
+server/__tests__/ffaXp.test.js`. No navegador: ver o fim de [pvp-regras.md](pvp-regras.md#todos-contra-todos).
+
+## Cartas escondidas no online
+
+O `PROTOCOLO` subiu para **11** (`server/lan.js` e `lib/lan/rede.js`): o que o host manda ao convidado mudou de forma. Regra em
+[pvp-regras.md](pvp-regras.md#cartas-escondidas-no-online); lógica em `pvp/categorias.js`.
+
+O host continua sabendo tudo (roda as regras), mas **nenhuma mensagem leva ao convidado o id exato de uma carta dos outros**:
+
+| Mensagem | O que muda |
+| --- | --- |
+| `inicio` / `resolucao` / `fimRodada` (`estado`) | `mascararEstado(estado, vaga)`: a mão, o monte e o descarte dos outros viram `{ id: ficha, oculta: true, personagem }` (só a contagem e a ordem servem); o RNG dos baralhos dos outros e o das regras vão como `{ s: 0 }`; o `historico` leva fichas no lugar dos ids que não são do convidado |
+| `resolucao` (`resultado`) | `mascararResultado(r, vaga)`: `jogadas[j].carta`, `caixas[k].carta` (dono ≠ convidado), `trocas` (malucas) e `armas[j].carta` (duelo) viram a **carta revelada** `{ id: ficha, oculta, personagem, categoria, naipe, valor (14 só no SUPER), nome: rótulo, ataque: descritor, perfeito }`; `efeitos[j]` dos outros com fichas; `eventos` vazio (os textos do host têm o nome das cartas) |
+| `resolucao` (`jogadas`) e `jogada` do host | a ficha da carta (a carta virada que sai da mão do host) |
+| `cena` (`irParaCena`, retomada 2D e volta de vaga 5A) | `mascararCenaPara(dados, id)`: `retomada.estado`, as `estatisticas` e os `jogadores[].maiorCarta` do resultado vistos por quem recebe |
+
+- **1x1** (`pvp/rede/ArenaRede.js`): um convidado só; o convidado não refaz o `iniciarRodada` para conferir (o estado dele não tem as cartas do outro).
+- **Todos contra todos** (`pvp/rede/ArenaRedeN.js`): o `inicio`, a `resolucao` e o `fimRodada` saem **um por convidado** (`canal.enviarPara`), cada um com a versão daquela vaga.
+- **CO-OP de 2** (`coop/ArenaRedeCoop.js`, `esconderCartas = false`) e o PVP local/vs CPU: nada muda.
+- **Fichas**: `criarFichas()` no host, por ponte (a mesma carta tem a mesma ficha enquanto a arena existe; a mão virada anima e a carta jogada é achada nela). Ficha e id não têm relação nenhuma.
+- **Descritor do ataque** (`cartas.js descritorDoAtaque` / `ataqueDoDescritor`): `{ personagem, tipo: 'super' | 'especial' | 'leve' | 'receita', receita, naipe, t }`, o que a esquiva precisa para rodar o mesmo ataque (a esquiva mostra o ataque de qualquer jeito).
+- **Baralhos**: no começo da partida o host embaralha os montes de novo com `Math.random` (`embaralharEscondido`): com a semente da partida, que viaja na `cena`, o convidado refaria a ordem do baralho do outro.
+- Nos **dois** PCs a tela usa o resultado visto daqui (`verResultado`, também no host) e a mão do outro virada (`verMao`).
+
+Testando: `node --test src/game/pvp/__tests__/categorias.test.js` (o mapa de toda carta, e uma varredura do estado, do resultado e de
+tudo que as pontes de 1x1 e de N mandam atrás de ids exatos dos outros).
+

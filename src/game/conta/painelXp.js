@@ -43,6 +43,29 @@ export function prepararXpCoop(cena, { vitoria, estatisticas }) {
   return xp
 }
 
+// XP do TODOS CONTRA TODOS (Fase 5D): manda a classificação (as vagas do 1º ao último) UMA vez e mostra a mesma
+// faixa. `colocacao` é a MINHA (1..n): o texto explica o bônus (1º vitória, 2º o bônus do 2º lugar)
+export function prepararXpFfa(cena, { colocacoes, colocacao, rodadas, duracao, personagem }) {
+  if (!emRede()) return null
+  const s = get(lan)
+  const partidaId = s.sala?.partidaId ?? null
+  const xp = { partidaId, motivo: null, recompensa: null, aoChegar: null, motivoTexto: (m) => motivoFfa(m, colocacao) }
+  if (!partidaId) return { ...xp, motivo: 'nao_registrada' }
+  enviarResultado({ partidaId, colocacoes, rodadas, duracao, personagem })
+  if (!s.eu.conta) xp.motivo = 'convidado'
+  const parar = lan.subscribe((estado) => {
+    const r = estado.recompensa
+    if (r?.partidaId !== partidaId || r === xp.recompensa) return
+    xp.recompensa = r
+    xp.aoChegar?.()
+  })
+  cena.events.once('shutdown', parar)
+  return xp
+}
+
+export const motivoFfa = (motivo, colocacao) =>
+  motivo === 'vitoria' ? '1º lugar: participação + vitória' : motivo === 'derrota' ? (colocacao === 2 ? 'participação + bônus do 2º lugar' : 'participação') : textoMotivo(motivo) || 'participação'
+
 // o texto de quanto XP veio e por quê (a vitória do time tem o bônus)
 export const motivoCoop = (motivo) => (motivo === 'vitoria' ? 'vitória do time: participação + bônus' : motivo === 'derrota' ? 'participação' : textoMotivo(motivo) || 'participação')
 
@@ -90,7 +113,7 @@ export function mostrarPainelXp(cena, xp, { x = LARGURA / 2, y, profundidade = 1
     if (subiu) partes.push(`SUBIU PARA O NÍVEL ${r.nivelDepois}!`)
     if (novos.length) partes.push(`NOVO: ${novos[0].nome} (${NOME_TIPO[novos[0].tipo]})${novos.length > 1 ? ` +${novos.length - 1}` : ''}`)
     titulo.setText(`+${r.xpGanho} XP`).setColor(COR.ok)
-    nota.setText(partes.length ? partes.join(' · ') : motivoCoop(r.motivo)).setColor(partes.length ? COR.gold : COR.dica)
+    nota.setText(partes.length ? partes.join(' · ') : (xp.motivoTexto ?? motivoCoop)(r.motivo)).setColor(partes.length ? COR.gold : COR.dica)
     centrar()
     const antes = Math.max(0, r.xpTotal - r.xpGanho)
     barra(antes)

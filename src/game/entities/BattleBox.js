@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { CAIXA, CAIXA_DINAMICA, CORES } from '../constants.js'
 import { tocar } from '../audio.js'
-import { ajustarCamera } from '../resolucao.js'
+import { ajustarCamera, RES } from '../resolucao.js'
 import { caixasDe, registrarCaixa, removerCaixa, ignorarNasCaixas } from '../recorte.js'
 import { fatores, duracaoPulso } from '../acessibilidade.js'
 
@@ -23,6 +23,14 @@ export const FAIXA = { px: 52, alpha: 0.85 }
 //   campoFaixa        região da tela onde a faixa de aproximação pode aparecer
 //                     ({ esquerda, direita, topo, base }; padrão: dinamica.campo).
 //                     Caixas vizinhas: campos que não se cruzam e não pegam o HUD
+//
+// VISTA (só apresentação; o todos contra todos usa para o "zoom" no par em foco): a caixa continua no
+// mesmo lugar do MUNDO (limites, balas, corações, colisão e as posições que viajam pela rede não mudam),
+// mas aparece na tela em outro lugar e tamanho. setVista(x, y, escala) diz onde o centro padrão aparece e
+// com que escala: as câmeras de recorte mostram a região da caixa ali, a borda vai junto e
+// naTela(x, y) leva um ponto do mundo da caixa para a tela. setOculta(true) não desenha a caixa
+// (câmeras e borda), sem parar nada do que roda nela.
+//
 // As formas pedidas pelos ataques ({ largura, altura, x, y }) são pensadas
 // para a caixa padrão CAIXA; numa caixa de outro tamanho elas são escaladas
 // na mesma proporção (ver destinoDe).
@@ -30,6 +38,10 @@ export default class BattleBox {
   constructor(scene, { x, y, largura, altura, dinamica, cor, campoFaixa }) {
     this.scene = scene
     this.base = { x, y, largura, altura } // centro e tamanho padrão
+    this.vista = { x, y, escala: 1 } // onde o centro padrão aparece na tela (setVista)
+    this.oculta = false
+    this.cameraAberta = false
+    this.bordaVisivel = false
     this.dinamica = { ...CAIXA_DINAMICA, ...dinamica }
     this.escala = { x: largura / CAIXA.largura, y: altura / CAIXA.altura } // formas dos ataques -> esta caixa
     // `limites` é um objeto só, alterado no lugar: quem guardou a referência (ataques, corações, balas) sempre vê a caixa atual
@@ -50,6 +62,7 @@ export default class BattleBox {
     this.campoFaixa = campoFaixa ?? this.dinamica.campo ?? null
     this.limitesFaixa = new Phaser.Geom.Rectangle()
     this.cameraFaixa = scene.cameras.add().setAlpha(FAIXA.alpha).setVisible(false)
+    this.camera = null // (criada logo abaixo; ajustarFaixa só precisa da da faixa)
     this.naFaixa = new Set() // objetos que a faixa desenha
     this.faixaLigada = true // eventos que escurecem a caixa (apagão) desligam a faixa
     this.ajustarFaixa()
@@ -64,7 +77,7 @@ export default class BattleBox {
     // fica visível com a caixa aberta. Cada caixa tem a sua: quem precisa
     // dela usa caixa.camera (ou recorte.js para "todas as caixas").
     const l = this.limites
-    this.camera = ajustarCamera(scene.cameras.add(), l.x, l.y, l.width, l.height).setScroll(l.x, l.y).setVisible(false)
+    this.camera = this.ajustarRecorte(scene.cameras.add(), l.x, l.y, l.width, l.height).setVisible(false)
     // objetos recortados por esta caixa: as câmeras das outras caixas não os desenham
     this.recortados = new Set()
     for (const outra of caixasDe(scene)) this.camera.ignore([...outra.recortados])
@@ -81,6 +94,57 @@ export default class BattleBox {
 
   get emTransicao() {
     return this.mudanca !== null
+  }
+
+  // ---------- vista (só apresentação) ----------
+
+  get vistaNormal() {
+    const v = this.vista
+    return v.escala === 1 && v.x === this.base.x && v.y === this.base.y
+  }
+
+  // ponto do mundo desta caixa -> onde ele aparece na tela
+  naTela(x, y) {
+    const v = this.vista
+    return { x: v.x + (x - this.base.x) * v.escala, y: v.y + (y - this.base.y) * v.escala }
+  }
+
+  setVista(x, y, escala = 1) {
+    this.vista = { x, y, escala }
+    // fora do lugar, a câmera da caixa não desenha a borda (ela está em outro ponto da tela)
+    if (!this.vistaNormal) this.retangulo.cameraFilter |= this.camera.id
+    this.reaplicar()
+    this.posicionarBorda()
+    return this
+  }
+
+  setOculta(oculta) {
+    this.oculta = Boolean(oculta)
+    this.camera.setVisible(this.cameraAberta && !this.oculta)
+    this.retangulo.setVisible(this.bordaVisivel && !this.oculta)
+    return this
+  }
+
+  mostrarBorda(visivel) {
+    this.bordaVisivel = visivel
+    this.retangulo.setVisible(visivel && !this.oculta)
+  }
+
+  posicionarBorda() {
+    const l = this.limites
+    const p = this.naTela(l.centerX, l.centerY)
+    const r = this.retangulo
+    r.setPosition(p.x, p.y)
+    if (!this.scene.tweens.isTweening(r)) r.setScale(this.vista.escala * (this.cameraAberta ? 1 : 0.05))
+  }
+
+  // câmera de recorte que mostra o retângulo (x0, y0, w, h) do mundo onde a vista põe ele
+  ajustarRecorte(camera, x0, y0, w, h) {
+    const s = this.vista.escala
+    if (s === 1 && this.vistaNormal) return ajustarCamera(camera, x0, y0, w, h).setScroll(x0, y0)
+    const p = this.naTela(x0, y0)
+    ajustarCamera(camera, p.x, p.y, w * s, h * s).setZoom(RES.escala * s)
+    return camera.setScroll(x0, y0)
   }
 
   // Os objetos passam a ser desenhados só pela câmera desta caixa
@@ -177,15 +241,18 @@ export default class BattleBox {
     this.cancelarMudanca()
     this.aplicar(this.base.x, this.base.y, this.base.largura, this.base.altura)
     this.scene.tweens.killTweensOf(this.retangulo)
-    this.retangulo.setVisible(true).setScale(0.05, 0.05)
+    const s = this.vista.escala
+    this.mostrarBorda(true)
+    this.retangulo.setScale(0.05 * s, 0.05 * s)
     this.scene.tweens.add({
       targets: this.retangulo,
-      scaleX: 1,
-      scaleY: 1,
+      scaleX: s,
+      scaleY: s,
       duration: CAIXA.tweenMs,
       ease: 'Back.easeOut',
       onComplete: () => {
-        this.camera.setVisible(true)
+        this.cameraAberta = true
+        this.camera.setVisible(!this.oculta)
         aoAbrir?.()
       },
     })
@@ -193,16 +260,17 @@ export default class BattleBox {
 
   esconder(aoFechar) {
     this.cancelarMudanca()
+    this.cameraAberta = false
     this.camera.setVisible(false)
     this.scene.tweens.killTweensOf(this.retangulo)
     this.scene.tweens.add({
       targets: this.retangulo,
-      scaleX: 0.05,
-      scaleY: 0.05,
+      scaleX: 0.05 * this.vista.escala,
+      scaleY: 0.05 * this.vista.escala,
       duration: CAIXA.tweenMs,
       ease: 'Back.easeIn',
       onComplete: () => {
-        this.retangulo.setVisible(false)
+        this.mostrarBorda(false)
         // fechada, volta ao tamanho padrão (invisível, sem pulo)
         this.aplicar(this.base.x, this.base.y, this.base.largura, this.base.altura)
         aoFechar?.()
@@ -281,8 +349,10 @@ export default class BattleBox {
     const h = Math.round(altura)
     const l = this.limites
     l.setTo(Math.round(cx - w / 2), Math.round(cy - h / 2), w, h)
-    this.retangulo.setPosition(l.centerX, l.centerY).setSize(w, h)
-    ajustarCamera(this.camera, l.x, l.y, l.width, l.height).setScroll(l.x, l.y)
+    this.retangulo.setSize(w, h)
+    const p = this.naTela(l.centerX, l.centerY)
+    this.retangulo.setPosition(p.x, p.y)
+    this.ajustarRecorte(this.camera, l.x, l.y, l.width, l.height)
     this.ajustarFaixa()
     this.aoMudar?.()
   }
@@ -290,7 +360,7 @@ export default class BattleBox {
   // A resolução da tela mudou (resolucao.js): refaz as câmeras de recorte
   reaplicar() {
     const l = this.limites
-    ajustarCamera(this.camera, l.x, l.y, l.width, l.height).setScroll(l.x, l.y)
+    this.ajustarRecorte(this.camera, l.x, l.y, l.width, l.height)
     this.ajustarFaixa()
   }
 
@@ -305,7 +375,7 @@ export default class BattleBox {
     const y0 = Math.min(l.top, Math.max(l.top - m, c?.topo ?? -Infinity))
     const y1 = Math.max(l.bottom, Math.min(l.bottom + m, c?.base ?? Infinity))
     this.limitesFaixa.setTo(x0, y0, x1 - x0, y1 - y0)
-    ajustarCamera(this.cameraFaixa, x0, y0, x1 - x0, y1 - y0).setScroll(x0, y0)
+    this.ajustarRecorte(this.cameraFaixa, x0, y0, x1 - x0, y1 - y0)
   }
 
   // Pré-visualização: contorno pulsante da caixa nova e, nas partes da caixa
@@ -324,6 +394,10 @@ export default class BattleBox {
     }
     const principal = this.scene.add.graphics().setDepth(8)
     desenhar(principal)
+    // (com a vista fora do lugar, o desenho de fora da caixa vai para onde ela aparece)
+    const v = this.vista
+    if (!this.vistaNormal) principal.setPosition(v.x - this.base.x * v.escala, v.y - this.base.y * v.escala).setScale(v.escala)
+    if (this.oculta) principal.setVisible(false)
     ignorarNasCaixas(this.scene, principal) // fora da caixa: só a câmera principal
     const dentro = this.scene.add.graphics().setDepth(8)
     desenhar(dentro)
