@@ -10,6 +10,9 @@ import PvpVoto from './scenes/PvpVoto.js'
 import CoopArena from './scenes/CoopArena.js'
 import CoopArenaN from './scenes/CoopArenaN.js'
 import EscolhaPartyN from './scenes/EscolhaPartyN.js'
+import PvpEscolhaN from './scenes/PvpEscolhaN.js'
+import PvpArenaN from './scenes/PvpArenaN.js'
+import PvpResultadoN from './scenes/PvpResultadoN.js'
 import PvpResultado from './scenes/PvpResultado.js'
 import Selecao from './scenes/Selecao.js'
 import Dificuldade from './scenes/Dificuldade.js'
@@ -40,6 +43,6 @@ export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCs
     scale: { mode: Phaser.Scale.NONE, zoom: zoomCss },
     // um contexto de áudio só para o jogo inteiro (a transmissão LAN copia o som dele)
     audio: { context: contextoAudio() ?? undefined },
-    scene: [Boot, Menu, EscolhaParty, EscolhaPartyN, PvpEscolha, PvpVoto, PvpArena, PvpResultado, Selecao, Dificuldade, CoopArena, CoopArenaN, Vitoria, GameOver, Entrada, Pausa, Config, Grimorio, GuiaBonus, Lan, Perfil, Amigos, Colecao, Carregando, Religando],
+    scene: [Boot, Menu, EscolhaParty, EscolhaPartyN, PvpEscolha, PvpVoto, PvpArena, PvpResultado, PvpEscolhaN, PvpArenaN, PvpResultadoN, Selecao, Dificuldade, CoopArena, CoopArenaN, Vitoria, GameOver, Entrada, Pausa, Config, Grimorio, GuiaBonus, Lan, Perfil, Amigos, Colecao, Carregando, Religando],
   }
 }

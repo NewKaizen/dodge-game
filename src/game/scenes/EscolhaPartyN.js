@@ -41,8 +41,22 @@ const estadoInicial = () => ({
 //   convidado -> host   cursor {tela:'party', indice} (rápida) · personagem {id} · voltarLobby {}
 //   host -> todos       partyEstado {c: [id|null por vaga], k: [índice do cursor por vaga]} (rápida, a cada 250 ms)
 export default class EscolhaPartyN extends Phaser.Scene {
-  constructor() {
-    super('EscolhaPartyN')
+  // a PvpEscolhaN (todos contra todos, 5D) estende esta cena com outra chave e outro destino
+  constructor(chave = 'EscolhaPartyN') {
+    super(chave)
+  }
+
+  tituloDaTela() {
+    return 'ESCOLHA O SEU PERSONAGEM'
+  }
+
+  textoPronto() {
+    return 'PARTY PRONTA!'
+  }
+
+  // todos escolheram: a próxima tela, nos dois PCs (o CO-OP vai para a escolha do chefe)
+  irParaLuta(lista) {
+    irParaCena(this, 'Selecao', { party: lista, chefe: this.registry.get('chefe') })
   }
 
   create() {
@@ -63,7 +77,7 @@ export default class EscolhaPartyN extends Phaser.Scene {
 
     this.fundo = criarFundo(this, 'king')
     this.fundo.escurecer()
-    this.texto(LARGURA / 2, 26, 'ESCOLHA O SEU PERSONAGEM', 26, TEXTO.normal, { strokeThickness: 4 })
+    this.texto(LARGURA / 2, 26, this.tituloDaTela(), 26, TEXTO.normal, { strokeThickness: 4 })
     this.status = this.texto(LARGURA / 2, 52, '', 13, TEXTO.selecionado)
     this.montarGrade()
     this.montarPainel()
@@ -170,11 +184,11 @@ export default class EscolhaPartyN extends Phaser.Scene {
     } catch {
       // sem armazenamento: fica só no registry
     }
-    this.status.setText('PARTY PRONTA!').setColor(TEXTO.selecionado)
+    this.status.setText(this.textoPronto()).setColor(TEXTO.selecionado)
     claraoCamera(this.cameras.main, 200, 255, 255, 255)
     this.mandarEstado()
     this.time.delayedCall(420, () => this.cameras.main.fadeOut(300, 0, 0, 0))
-    this.time.delayedCall(780, () => irParaCena(this, 'Selecao', { party: lista, chefe: this.registry.get('chefe') }))
+    this.time.delayedCall(780, () => this.irParaLuta(lista))
   }
 
   ultimaParty() {
