@@ -48,9 +48,13 @@ Quem decide o que mandar é [src/lib/saida.js](../src/lib/saida.js) e quem escol
 | Entrou numa luta (PvP ou coop) | `GAME`                             | todas as portas abertas      |
 | Saiu da luta (menu, resultado) | `MENU`                             | todas as portas abertas      |
 | O HP de um jogador mudou       | `1 VIDA <hpAtual> <hpMaximo>`      | só a porta desse jogador     |
-| Jogador levou golpe            | `1 BUZZER` (no máximo um a cada 250 ms) | só a porta desse jogador |
+| HP baixo (< 25%, uma vez por luta) | `1 BUZZER`                      | só a porta desse jogador     |
+| K.O. / caído (HP chegou a 0)   | `1 BUZZER` duas vezes, ~350 ms entre elas | só a porta desse jogador |
+| Levou golpe de SUPER           | `1 BUZZER`                         | só a porta desse jogador     |
+| Fim da luta, jogador venceu    | `1 BUZZER`                         | só a porta de cada vencedor  |
 | Botão Desconectar / fechar aba | `DISCONNECT`                       | todas as portas abertas      |
 
+- **O BUZZER é pontual, nunca a cada golpe** (política em [game/buzzer.js](../src/game/buzzer.js)): só nos quatro momentos da tabela, para o jogador afetado. O firmware toca `tone(BUZZER_PIN, 1000, 250)` a cada `BUZZER`, daí os 350 ms entre os dois do K.O. O HP baixo apita uma vez por luta por jogador (rearma se curar acima de 40%); há um intervalo mínimo de 1 s por jogador entre apitos (o K.O. fura o intervalo); CPU/ausente não recebe nada; online só o seu lado. CONFIGURAÇÕES → GAMEPAD → **BUZZER DO JOYSTICK** (padrão ligado) desliga tudo isso e **TESTAR BUZZER** manda um `BUZZER` a cada joystick conectado (mesmo com a preferência desligada). O firmware não muda.
 - Com **uma placa por porta**, a linha de um jogador sai com o número **local `1`** (o que o firmware executa na própria placa): o P2 recebe `1 VIDA 150 200` na porta dele, nunca `2 VIDA`. Jogador sem porta (a CPU) não recebe nada.
 - No **relé** (uma porta só, jogador 1) as linhas vão como o jogo as pensa: `1 VIDA ...` e `2 VIDA ...`/`2 BUZZER` pela mesma porta; a placa principal executa as do `1` e repassa as do `2` à secundária.
 - Quando uma porta abre, fecha ou troca de jogador, o jogo repete `PING`, o estado atual (`MENU`/`GAME`) e o HP.

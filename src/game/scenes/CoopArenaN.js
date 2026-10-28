@@ -41,7 +41,7 @@ import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
-import { entrarNoJogo, voltarAoMenu, levouGolpe, informarVida } from '../../lib/saida.js'
+import { entrarNoJogo, voltarAoMenu, levouGolpe, informarVida, venceu } from '../../lib/saida.js'
 import { fatores } from '../acessibilidade.js'
 
 // CO-OP de 3 e 4 jogadores, ONLINE (Fase 5B): cada PC roda esta cena; o HOST DA PARTIDA decide toda regra
@@ -183,6 +183,7 @@ export default class CoopArenaN extends Phaser.Scene {
     this.invertido = 0
     this.ko = Array(this.n).fill(false)
     this.acertosRodada = Array(this.n).fill(0)
+    this.superDoChefeNoQuadro = false // o quadro desta rodada é o SUPER do chefe? (BUZZER)
     this.grazesRodada = Array(this.n).fill(0)
     this.perfeitosRodada = Array(this.n).fill(null)
     this.combosRodada = Array(this.n).fill(null)
@@ -1215,6 +1216,7 @@ export default class CoopArenaN extends Phaser.Scene {
     this.combosRodada = Array(this.n).fill(null)
     this.perfeitoCoop = Array(this.n).fill(false)
     const q = r.destino === 'quadro' ? r.quadro : null
+    this.superDoChefeNoQuadro = Boolean(q && ehSuper(q.carta))
     if (!q) return
     const ataque = ataqueDaCartaChefe(q.carta, { ataques })
     if (q.inverter) this.invertido = { avisado: false }
@@ -1343,7 +1345,7 @@ export default class CoopArenaN extends Phaser.Scene {
     const hud = this.huds[j]
     hud.setHp(jog.hp)
     hud.tremer()
-    if (j === this.meu) levouGolpe(0)
+    if (j === this.meu) levouGolpe(0, { super: this.superDoChefeNoQuadro })
     numero(this, hud.pontoHp.x, hud.pontoHp.y, efetivo ? `-${efetivo}` : '0', TEXTO.caido, { tamanho: 13, desvio: 12 })
     this.quadro.caixa.tremer(110, 2)
     this.personagemDoi(j)
@@ -1619,6 +1621,7 @@ export default class CoopArenaN extends Phaser.Scene {
       this.balao.esconder()
       this.inimigo.sumir()
       tocar(this, 'vitoria')
+      venceu(0) // BUZZER do meu joystick
       await this.esperar(1100)
       this.mostrarBanner('VITÓRIA!', TEXTO.selecionado, { y: 236, tamanho: 36 })
       await this.esperar(1300)

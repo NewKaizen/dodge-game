@@ -28,7 +28,7 @@ import { particulas } from '../effects/particulas.js'
 import { fogoArtificio, canhoesConfete, chuvaConfete } from '../effects/festa.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
 import FimDePartida from '../pvp/fimDePartida/index.js'
-import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe } from '../../lib/saida.js'
+import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe, venceu } from '../../lib/saida.js'
 import { nomesDaPartida } from '../pvp/nomesDaPartida.js'
 import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos } from '../rede.js'
 import ArenaRede from '../pvp/rede/ArenaRede.js'
@@ -241,6 +241,7 @@ export default class PvpArena extends Phaser.Scene {
     this.esquivaBot = this.cpu === null ? null : new EsquivaBot({ nivel: this.nivelBot })
     this.tempoEscolha = this.tempoBase
     this.hpAvisado = [false, false]
+    this.superNaPista = [false, false] // o golpe que cai em cada pista é de SUPER? (BUZZER)
     this.estado = criarPartida({ p1: this.ids[0], p2: this.ids[1], semente: this.semente })
     this.rede?.esconderBaralhos?.(this.estado) // em rede o host embaralha com um sorteio só dele (pvp/sigilo.js)
     this.fase = 'abertura'
@@ -1525,6 +1526,7 @@ export default class PvpArena extends Phaser.Scene {
     this.acertosRodada = [0, 0]
     this.perfeitosRodada = [null, null]
     this.combosRodada = [null, null]
+    this.superNaPista = r.caixas.map((c) => ehSuper(c?.carta)) // o golpe que cai em cada pista é de SUPER?
     this.esquivaBot?.reiniciar()
     const bonus = this.temEfeitoBonus
     if (!r.caixas.some(Boolean) && !bonus) return
@@ -1691,7 +1693,7 @@ export default class PvpArena extends Phaser.Scene {
     hud.setHp(jog.hp)
     hud.tremer()
     const joystick = this.joystickDoLado(j)
-    if (joystick >= 0) levouGolpe(joystick) // buzzer no joystick de quem levou
+    if (joystick >= 0) levouGolpe(joystick, { super: this.fase === 'esquiva' && Boolean(this.superNaPista?.[this.pistaDe(j)]) }) // BUZZER só se foi SUPER
     numero(this, hud.pontoHp.x, hud.pontoHp.y + 4, efetivo ? `-${efetivo}` : '0', TEXTO.caido, { tamanho: 16, desvio: 12 })
     const k = this.pistaDe(j) // a pista onde o coração dele está (CORAÇÃO TROCADO)
     this.pistas[k].caixa.tremer(110, 2) // só a caixa de quem levou (a tela toda tremendo enjoa)
@@ -1799,6 +1801,8 @@ export default class PvpArena extends Phaser.Scene {
       this.mostrarBanner(`${this.nomesJog[v - 1]} VENCEU!`, cor, { y: 200, tamanho: 34 })
       this.huds[outro(v - 1)].container.setAlpha(0.5)
       tocar(this, 'vitoria')
+      const joystick = this.joystickDoLado(v - 1)
+      if (joystick >= 0) venceu(joystick) // BUZZER de quem ganhou
     } else {
       this.mostrarBanner('EMPATE!', TEXTO.selecionado, { y: 200, tamanho: 34 })
       tocar(this, 'sino')

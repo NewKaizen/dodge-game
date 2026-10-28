@@ -12,7 +12,7 @@ import { capturarTecla } from '../../lib/simulador.js'
 import { ACOES_PAD, ROTULO_PAD, ZONA_MORTA_LIMITES, ZONA_MORTA_PADRAO, atribuirBotao, nomeBotao, normalizarBotoes, resumoBotoes } from '../gamepad.js'
 import { capturarBotaoPad, controlesLigados } from '../../lib/gamepad.js'
 import { conectarSerial, desconectarSerial, serialAberto, serialSuportado, listarJoysticks, trocarJogadoresSerial } from '../../lib/serial.js'
-import { despedir } from '../../lib/saida.js'
+import { despedir, testarBuzzer } from '../../lib/saida.js'
 import { testarVibracao } from '../../lib/vibracao.js'
 import { INTENSIDADES, intensidadeEfetiva } from '../vibracao.js'
 import { rotulo as rotuloJoystick } from '../../lib/joysticks.js'
@@ -335,6 +335,23 @@ const ABAS = [
               fazer: () => (trocarJogadoresSerial() ? 'Jogadores dos joysticks trocados.' : { texto: 'Nenhum joystick conectado.', cor: COR.apagado }),
             },
             {
+              id: 'buzzerJoystick',
+              rotulo: 'BUZZER DO JOYSTICK',
+              ...opcaoPref('buzzerJoystick'),
+              descricao:
+                'O buzzer do joystick serial apita só em momentos pontuais, no joystick de quem foi afetado: HP abaixo de 25% (uma vez por luta), K.O. (dois apitos), golpe de SUPER e vitória. Não apita a cada golpe. Não muda o firmware.',
+            },
+            {
+              id: 'buzzerTestar',
+              rotulo: 'TESTAR BUZZER',
+              tipo: 'acao',
+              descricao: 'A manda um apito para cada joystick serial conectado, para você conferir se o buzzer funciona.',
+              fazer: () => {
+                const r = testarBuzzer()
+                return { texto: r.texto, cor: r.ok ? COR.ok : COR.erro }
+              },
+            },
+            {
               id: 'serialDesligar',
               rotulo: 'DESCONECTAR JOYSTICKS SERIAL',
               tipo: 'acao',
@@ -348,8 +365,8 @@ const ABAS = [
         id: 'restaurar',
         rotulo: 'RESTAURAR PADRÃO',
         tipo: 'acao',
-        fazer: () => ['botoesPad', 'zonaMorta', 'vibracao', 'vibracaoIntensidade'].forEach((k) => definirPref(k, PREFERENCIAS_PADRAO[k])),
-        descricao: 'Volta os botões do controle (A: A/X · B: B/Y · pausa: Start) a zona morta (35%) e a vibração (ligada, intensidade automática) para os de fábrica.',
+        fazer: () => ['botoesPad', 'zonaMorta', 'vibracao', 'vibracaoIntensidade', 'buzzerJoystick'].forEach((k) => definirPref(k, PREFERENCIAS_PADRAO[k])),
+        descricao: 'Volta os botões do controle (A: A/X · B: B/Y · pausa: Start) a zona morta (35%), a vibração (ligada, intensidade automática) e o BUZZER do joystick (ligado) para os de fábrica.',
       },
     ],
   },
