@@ -3,7 +3,7 @@ import { TEMPOS } from '../../constants.js'
 import { tocar } from '../../audio.js'
 import { particulas } from '../../effects/particulas.js'
 import { diferencasDeEstado, criarEspelhoCoracao } from './sincronia.js'
-import { criarFichas, embaralharEscondido, mascararEstado, mascararResultado, mascararJogada, mascararDadosDeCena, cartaOculta } from '../categorias.js'
+import { criarFichas, embaralharEscondido, mascararEstado, mascararResultado, mascararJogada, mascararDadosDeCena, cartaOculta } from '../sigilo.js'
 
 // A PvpArena EM REDE (docs/rede-pvp.md, seção da arena): cada PC roda a arena
 // inteira, desvia na própria caixa sem atraso, e só as decisões viajam pelo
@@ -38,12 +38,12 @@ import { criarFichas, embaralharEscondido, mascararEstado, mascararResultado, ma
 // e cada PC troca o estado novo pelo do ponto (aplicarRetomada) e pula a
 // abertura: a rodada recomeça do zero, com a mesma mão (o RNG é o mesmo).
 //
-// CARTAS ESCONDIDAS (docs/pvp-regras.md "Cartas escondidas no online", pvp/categorias.js): o host sabe
-// tudo (roda as regras), mas o que vai ao convidado é o estado e o resultado VISTOS POR ELE: as cartas
-// do host viram fichas (a mão, o monte, o descarte) e a carta jogada vira só a CATEGORIA (com o
-// descritor do ataque para a esquiva rodar). A jogada do host vai como a ficha da carta (a carta virada
-// na mão dele). Nos dois PCs a mão do outro fica virada e a carta dele aparece como categoria
-// (verResultado/verMao); a retomada e a tela de resultado também vão mascaradas (mascararCenaPara).
+// ESCOLHA ÀS CEGAS (docs/pvp-regras.md "Escolha às cegas no online", pvp/sigilo.js): o host sabe tudo
+// (roda as regras), mas o convidado NÃO recebe a carta que o host escolheu enquanto as jogadas não estão
+// travadas: a jogada do host vai como a ficha da carta (a carta virada na mão dele). Travadas as jogadas, a
+// resolução leva as jogadas e as cartas de verdade (o id da carta do host vem como ficha, para achar a carta
+// virada na mão dele). A MÃO, o monte e o descarte do outro ficam virados o tempo todo (mascararEstado,
+// verMao); a retomada também vai mascarada (mascararCenaPara).
 //
 // A CoopArena (CO-OP de cartas) usa esta mesma ponte estendida
 // (coop/ArenaRedeCoop.js): as esperas, a escolha, o dano/graze e o coração do
@@ -184,7 +184,7 @@ export default class ArenaRede {
     const rodada = a.estado.rodada + 1
     const msg = await this.esperar('inicio', rodada)
     if (!msg) return false
-    // (com as cartas escondidas o estado daqui não tem as do outro: não dá para conferir)
+    // (com a mão do outro escondida o estado daqui não tem as cartas dele: não dá para conferir)
     if (this.esconderCartas) this.trocarEstado(msg.estado, 'inicio', { conferir: false })
     else {
       iniciarRodada(a.estado)
@@ -223,7 +223,7 @@ export default class ArenaRede {
     a.escolher(o, id, { remoto: true })
   }
 
-  // (a do host vai como a ficha da carta: o convidado só vê qual carta virada saiu da mão)
+  // (a do host vai como a ficha da carta até travarem as jogadas: o convidado só vê qual carta virada saiu da mão)
   enviarJogada(id) {
     this.enviar('jogada', this.rodada, { jogada: this.souHost && this.esconderCartas ? mascararJogada(id ?? null, this.fichas) : id ?? null })
   }
@@ -266,7 +266,7 @@ export default class ArenaRede {
     const o = this.outroLado
     if (!this.esconderCartas) return this.enviar('resolucao', this.rodada, { jogadas, bonus, adiado, resultado, estado: copiar(this.arena.estado) })
     this.enviar('resolucao', this.rodada, {
-      jogadas: jogadas.map((id, j) => (j === o ? id : mascararJogada(id, this.fichas))),
+      jogadas, // travadas: as de verdade
       bonus,
       adiado,
       resultado: mascararResultado(resultado, o, this.fichas),

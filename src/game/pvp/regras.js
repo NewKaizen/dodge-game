@@ -342,7 +342,6 @@ export function registrarGrazes(estado, j, n = 1) {
 // carta daquele ataque. 2-8 -> 1, 9 a Q -> 2, K e SUPER -> 3, Ás que manda
 // ataque (espelho/eco, anular, roubo) -> 1. Copas e caixa vazia (null) -> 0.
 export function energiaPerfeito(carta) {
-  if (carta?.oculta) return carta.perfeito ?? 0 // a carta do outro no PVP online (pvp/categorias.js): o host já contou
   if (!carta || carta.naipe === 'copas') return 0
   if (ehSuper(carta) || carta.valor === 13) return 3
   if (carta.valor === 1) return especialDaCarta(carta) ? 1 : 0

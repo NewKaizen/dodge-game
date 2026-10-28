@@ -1,6 +1,6 @@
 import ArenaRedeCoopN from '../../coop/ArenaRedeCoopN.js'
 import { iniciarRodadaFfa, fimDaRodadaFfa, eliminarFfa, aplicarAusente } from '../ffa.js'
-import { criarFichas, embaralharEscondido, mascararEstado, mascararResultado, mascararJogada, mascararDadosDeCena } from '../categorias.js'
+import { criarFichas, embaralharEscondido, mascararEstado, mascararResultado, mascararJogada, mascararDadosDeCena } from '../sigilo.js'
 
 // A ponte da PvpArenaN (TODOS CONTRA TODOS, 3 e 4 jogadores; docs/rede-pvp.md "Todos contra todos"). É a
 // ponte do CO-OP de 3 e 4 (coop/ArenaRedeCoopN.js: estrela pelo host, jogadas ao host, PRONTO, dano/graze
@@ -21,10 +21,11 @@ import { criarFichas, embaralharEscondido, mascararEstado, mascararResultado, ma
 // na rodada seguinte com o HP que tem. Não voltou em 20 s: o host o ELIMINA na hora (a colocação é a
 // daquele momento: pvp/ffa.js eliminarFfa 'saiu').
 //
-// CARTAS ESCONDIDAS (pvp/categorias.js, docs/pvp-regras.md "Cartas escondidas no online"): o host manda
-// a CADA convidado (canal.enviarPara) o inicio / a resolucao / o fimRodada VISTOS POR ELE: as cartas dos
-// outros viram fichas e a carta jogada vira a categoria (com o descritor do ataque). A retomada e a
-// tela de resultado também (mascararCenaPara, game/rede.js).
+// ESCOLHA ÀS CEGAS (pvp/sigilo.js, docs/pvp-regras.md "Escolha às cegas no online"): ninguém recebe a carta
+// de ninguém antes das jogadas travarem (cada convidado manda a dele só ao host). Travadas, o host manda a
+// CADA convidado (canal.enviarPara) o inicio / a resolucao / o fimRodada VISTOS POR ELE: a mão, o monte e o
+// descarte dos outros viram fichas, e a carta jogada vem de verdade (o id dela vem como ficha). A retomada
+// também (mascararCenaPara, game/rede.js).
 const DEBUG_FFA = new Set(['forcarMao', 'setHp', 'setEnergia'])
 
 export default class ArenaRedeN extends ArenaRedeCoopN {
@@ -64,7 +65,7 @@ export default class ArenaRedeN extends ArenaRedeCoopN {
 
   enviarResolucao(jogadas, resultado) {
     this.enviarCada('resolucao', this.rodada, (vaga) => ({
-      jogadas: jogadas.map((id, j) => (j === vaga ? id : mascararJogada(id, this.fichas))),
+      jogadas, // travadas: as de verdade
       resultado: mascararResultado(resultado, vaga, this.fichas),
       estado: this.estadoPara(vaga),
     }))

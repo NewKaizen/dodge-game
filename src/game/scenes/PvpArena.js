@@ -17,7 +17,6 @@ import { criarRng, aleatorio, inteiro } from '../pvp/baralho.js'
 import { EVENTOS, EVENTO, ehRodadaBonus, adiarBonus, sortearEvento, transformarMalucas, desfazerMalucas, podeJogarDuelo, resolverDuelo, resolverCopia } from '../pvp/bonus.js'
 import { EFEITOS } from '../pvp/bonus/eventos/index.js'
 import { ARENA, ARENA_PADRAO, eventosDaArena } from '../pvp/arenas.js'
-import { infoCategoria } from '../pvp/categorias.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { anunciarBonus } from '../pvp/bonus/anuncio.js'
 import Duelo from '../pvp/bonus/Duelo.js'
@@ -243,7 +242,7 @@ export default class PvpArena extends Phaser.Scene {
     this.tempoEscolha = this.tempoBase
     this.hpAvisado = [false, false]
     this.estado = criarPartida({ p1: this.ids[0], p2: this.ids[1], semente: this.semente })
-    this.rede?.esconderBaralhos?.(this.estado) // em rede o host embaralha com um sorteio só dele (pvp/categorias.js)
+    this.rede?.esconderBaralhos?.(this.estado) // em rede o host embaralha com um sorteio só dele (pvp/sigilo.js)
     this.fase = 'abertura'
     this.saindo = false
     this.pausado = false
@@ -583,8 +582,8 @@ export default class PvpArena extends Phaser.Scene {
       await this.anunciarBonusDaRodada(decisao)
       if (fora()) return
       this.contarJogadas(decisao.resultado)
-      // em rede, a carta do outro só aparece como a CATEGORIA (pvp/categorias.js; o host sabe tudo, mas
-      // mostra igual ao convidado): o resto da rodada anda com o resultado visto daqui
+      // em rede, as jogadas já travaram: a carta do outro aparece de verdade (só a mão dele fica virada,
+      // pvp/sigilo.js); o resultado visto daqui tem o id da carta dele como a ficha da mão virada
       const resultado = this.rede ? this.rede.verResultado(decisao.resultado) : decisao.resultado
       if (resultado.duelo || resultado.copia) {
         await this.revelacaoDuelo(resultado)
@@ -804,8 +803,7 @@ export default class PvpArena extends Phaser.Scene {
       const carta = mao.cartas.find((c) => c.dados.id === jog.carta.id)
       carta.focar(false)
       mao.retirar(carta)
-      if (carta.oculta) carta.definirCategoria(jog.carta.categoria)
-      return carta.setDepth(80 + j)
+      return this.cartaDeVerdade(carta, jog.carta).setDepth(80 + j)
     })
     this.maos.forEach((m) => m.setTravada(false))
     tocar(this, 'cartaDeslizar')
@@ -904,7 +902,16 @@ export default class PvpArena extends Phaser.Scene {
     await this.esperar(1500)
   }
 
-  // a mão do lado j como ela aparece aqui (em rede a do outro fica virada: pvp/categorias.js)
+  // a carta virada da mão do outro (rede) vira a carta de verdade, no mesmo lugar e do mesmo jeito
+  cartaDeVerdade(carta, dados) {
+    if (!carta.oculta) return carta
+    const nova = new Carta(this, carta.x, carta.y, { ...dados }, { largura: carta.largura, corFoco: carta.corFoco, corVerso: carta.corVerso, virada: true })
+    nova.setDepth(carta.depth).setRotation(carta.rotation).setScale(carta.scaleX, carta.scaleY)
+    carta.destroy()
+    return nova
+  }
+
+  // a mão do lado j como ela aparece aqui (em rede a do outro fica virada: pvp/sigilo.js)
   maoVista(j) {
     const mao = this.estado.jogadores[j].baralho.mao
     return this.rede ? this.rede.verMao(j, mao) : mao
@@ -1001,7 +1008,7 @@ export default class PvpArena extends Phaser.Scene {
       this.botoesPassar[j].setFoco(livre && this.noPassar[j])
       let texto = ''
       if (escolhendo) {
-        if (this.escolhas[j] !== undefined) texto = 'PRONTO!'
+        if (this.escolhas[j] !== undefined) texto = this.rede && j !== this.rede.meuLado ? `${this.nomesJog[j]} já escolheu ✓` : 'PRONTO!'
         else texto = j === this.cpu ? 'CPU pensando...' : this.rede && j !== this.rede.meuLado ? 'escolhendo...' : 'escolha uma carta'
       }
       // carta sob o cursor que não dá para jogar: diz POR QUÊ (texto + vermelho; pvp/regras.js motivoBloqueio)
@@ -1219,8 +1226,6 @@ export default class PvpArena extends Phaser.Scene {
       const e = this.estatisticas[j]
       if (jog.passou) return e.passes++
       e.cartasJogadas++
-      // a carta do outro no convidado (só a categoria): as estatísticas que valem são as do host
-      if (jog.carta.oculta) return void (ehSuper(jog.carta) && e.supers++)
       if (jog.carta.valor === 1) e.ases++
       if (ehSuper(jog.carta)) e.supers++
       const forca = (c) => (ehSuper(c) ? 15 : c.valor === 1 ? 14 : c.valor)
@@ -1280,9 +1285,7 @@ export default class PvpArena extends Phaser.Scene {
       const carta = mao.cartas.find((c) => c.dados.id === id)
       carta.focar(false)
       mao.retirar(carta)
-      carta.setDepth(80 + j)
-      if (carta.oculta) carta.definirCategoria((r.trocas?.[j]?.de ?? jog.carta).categoria) // a do outro em rede: a categoria aparece ao revelar
-      return carta
+      return this.cartaDeVerdade(carta, r.trocas?.[j]?.de ?? jog.carta).setDepth(80 + j)
     })
     this.maos.forEach((m) => m.setTravada(false))
     tocar(this, 'cartaDeslizar')
@@ -1356,7 +1359,6 @@ export default class PvpArena extends Phaser.Scene {
         for (let k = 0; k < 3; k++) await this.tween({ targets: velha, scaleX: 0.05, duration: 70 + k * 30, yoyo: true, ease: 'Sine.easeInOut' })
         await this.tween({ targets: velha, scaleX: 0.05, duration: 110, ease: 'Sine.easeIn' })
         const nova = new Carta(this, velha.x, velha.y, { ...troca.para }, { largura: velha.largura }).setDepth(velha.depth)
-        nova.mostrarSelo() // (a do outro em rede: virou outra categoria)
         nova.setScale(0.05, velha.scaleY)
         velha.destroy()
         this.reveladas[j] = nova
@@ -1411,9 +1413,7 @@ export default class PvpArena extends Phaser.Scene {
     this.fase = 'super'
     this.esconderBanner()
     for (const j of lados) {
-      // (o SUPER do outro em rede chega só como a categoria: ela já diz qual é, um por baralho)
-      const jogada = r.jogadas[j].carta
-      const carta = jogada.oculta ? { ...jogada, nome: superDoPersonagem(jogada.personagem).nome } : jogada
+      const carta = r.jogadas[j].carta
       await anunciarSuper(this, { jogador: j, personagem: carta.personagem, carta })
       if (this.saindo) return
     }
@@ -1506,8 +1506,7 @@ export default class PvpArena extends Phaser.Scene {
     const borda = pista.caixa.retangulo
     borda.setStrokeStyle(6, 0xffffff)
     this.time.delayedCall(120, () => borda.setStrokeStyle(4, CORES.almas[j]))
-    // a carta do outro em rede: só a categoria (pvp/categorias.js)
-    const nome = caixa.carta.oculta ? `${infoCategoria(caixa.carta)?.icone ?? ''} ${caixa.carta.nome}` : caixa.carta.nome
+    const nome = caixa.carta.nome
     const quem = PERSONAGENS[caixa.carta.personagem]?.nome ?? caixa.carta.personagem
     this.infoPista[j].setText(`${nome} (${quem})${caixa.refletida ? ' · devolvida' : ''}\n${caixa.dano} de dano por acerto`).setColor(TEXTO.normal)
     if (caixa.escudo != null) {

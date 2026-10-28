@@ -45,24 +45,15 @@ import { fatores } from '../acessibilidade.js'
 //   corVerso     verso de carta equipado (Fase 2F, pvp/versos.js): cor de fundo do verso, no lugar da do personagem
 //   ampliada     número: já nasce ampliada nesse fator, com a legenda visível
 //
-// Carta ESCONDIDA (dados.oculta, a carta do outro no PVP online: pvp/categorias.js): fica sempre com o
-// verso para cima (virar/revelar não mostram a frente, que nem é desenhada). Com dados.categoria (a
-// carta jogada), revelar() acende no verso o SELO da categoria (ícone + rótulo + cor, a mesma linguagem
-// da carta do chefe no CO-OP)
+// Carta ESCONDIDA (dados.oculta, a da mão do outro no PVP online: pvp/sigilo.js): fica sempre com o
+// verso para cima (virar/revelar não mostram a frente, que nem é desenhada). Quando ela é jogada, a arena
+// troca por uma Carta de verdade no mesmo lugar (PvpArena cartaDeVerdade)
 //   foco         { subida, escala } do estado com o cursor em cima (em px da carta base)
 
 const ROTULOS = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K', 14: '★' }
 export const rotuloValor = (valor) => ROTULOS[valor] ?? String(valor)
 export const TIPOS = { espadas: 'ATAQUE', ouros: 'CONTROLE', paus: 'ARMADILHA', copas: 'SUPORTE' }
 export const SIMBOLOS = { espadas: '♠', copas: '♥', ouros: '♦', paus: '♣' }
-// o selo da carta escondida (o mesmo que pvp/categorias.js CATEGORIAS: aqui sem importar as regras)
-const CATEGORIA_SELO = {
-  ataque: { icone: '♠', rotulo: 'ATAQUE', cor: '#ffffff' },
-  controle: { icone: '♦', rotulo: 'CONTROLE', cor: '#ff5a70' },
-  armadilha: { icone: '♣', rotulo: 'ARMADILHA', cor: '#ffffff' },
-  suporte: { icone: '♥', rotulo: 'SUPORTE', cor: '#ff5a70' },
-  super: { icone: '★', rotulo: 'SUPER', cor: '#ffd23c', corRotulo: '#ff6a4a' },
-}
 export const CORES_CARTA = {
   papel: 0xfbf6ea,
   papelSombra: 0xe6dcc4,
@@ -230,8 +221,6 @@ export default class Carta extends Phaser.GameObjects.Container {
     this.desenharSombra()
     if (!this.oculta) this.desenharFrente()
     this.desenharVerso()
-    this.selo = null
-    if (this.oculta) this.criarSelo()
     const { largura: w, altura: h, u } = this
     for (const [g, cor] of [[this.veu, 0x000000], [this.clarao, 0xffffff]]) {
       g.fillStyle(cor, 1)
@@ -674,41 +663,6 @@ export default class Carta extends Phaser.GameObjects.Container {
     return c
   }
 
-  // ---------- carta escondida (PVP online) ----------
-
-  // O selo da categoria no meio do verso: fundo escuro, o ícone grande e o rótulo (CO-OP: a carta do chefe)
-  criarSelo() {
-    const c = this.scene.add.container(0, 0).setVisible(false)
-    this.verso.add(c)
-    this.selo = c
-    if (this.dados.categoria) this.definirCategoria(this.dados.categoria)
-    return c
-  }
-
-  // a categoria da carta escondida (a da mão não tem: ela chega na revelação)
-  definirCategoria(categoria) {
-    const info = CATEGORIA_SELO[categoria]
-    if (!this.selo || !info) return this
-    this.dados = { ...this.dados, categoria }
-    const { u } = this
-    this.selo.removeAll(true)
-    const g = this.scene.add.graphics()
-    g.fillStyle(0x0b0914, 0.92)
-    g.fillRoundedRect(-22 * u, -20 * u, 44 * u, 40 * u, 5 * u)
-    g.lineStyle(1.2 * u, Phaser.Display.Color.HexStringToColor(info.cor).color, 0.9)
-    g.strokeRoundedRect(-22 * u, -20 * u, 44 * u, 40 * u, 5 * u)
-    const icone = this.texto(0, -5 * u, info.icone, 20 * u, info.cor, { stroke: '#000000', strokeThickness: 3 * u }).setOrigin(0.5)
-    const rotulo = this.texto(0, 12 * u, info.rotulo, (info.rotulo.length > 8 ? 5.2 : 6) * u, info.corRotulo ?? '#e8e8f0', { stroke: '#000000', strokeThickness: 2 * u }).setOrigin(0.5)
-    this.selo.add([g, icone, rotulo])
-    return this
-  }
-
-  mostrarSelo() {
-    if (!this.selo || !this.scene || !this.dados.categoria) return
-    this.selo.setVisible(true).setScale(0.4).setAlpha(0)
-    this.scene.tweens.add({ targets: this.selo, scale: 1, alpha: 1, duration: 200, ease: 'Back.easeOut' })
-  }
-
   // ---------- brilho (cursor e cartas especiais) ----------
 
   iniciarBrilhos() {
@@ -922,7 +876,6 @@ export default class Carta extends Phaser.GameObjects.Container {
   revelar({ duracao = 320 } = {}) {
     tocar(this.scene, 'cartaRevelar')
     const p = this.virar(true, { duracao, som: false })
-    if (this.oculta) this.scene.time.delayedCall(duracao / 2, () => this.mostrarSelo())
     this.scene.time.delayedCall(duracao / 2, () => {
       if (!this.scene) return
       this.clarao.setAlpha(0.9)

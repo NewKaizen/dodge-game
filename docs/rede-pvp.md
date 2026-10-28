@@ -406,28 +406,26 @@ daquele momento). O host que cai: todos param e a rodada recomeça na volta (2D:
 Testando: `node --test src/game/pvp/__tests__/ffa.test.js src/game/pvp/__tests__/redeFfa.test.js src/game/pvp/__tests__/fimDePartidaN.test.js
 server/__tests__/ffaXp.test.js`. No navegador: ver o fim de [pvp-regras.md](pvp-regras.md#todos-contra-todos).
 
-## Cartas escondidas no online
+## Escolha às cegas no online
 
-O `PROTOCOLO` subiu para **11** (`server/lan.js` e `lib/lan/rede.js`): o que o host manda ao convidado mudou de forma. Regra em
-[pvp-regras.md](pvp-regras.md#cartas-escondidas-no-online); lógica em `pvp/categorias.js`.
+O `PROTOCOLO` subiu para **12** (`server/lan.js` e `lib/lan/rede.js`): a `resolucao` passou a levar as jogadas e as cartas de verdade. Regra em
+[pvp-regras.md](pvp-regras.md#escolha-às-cegas-no-online); lógica em `pvp/sigilo.js`.
 
-O host continua sabendo tudo (roda as regras), mas **nenhuma mensagem leva ao convidado o id exato de uma carta dos outros**:
+O host sabe tudo (roda as regras), mas **até as jogadas travarem nenhuma mensagem leva ao convidado o id de uma carta do host**; a mão, o monte e o descarte dos outros nunca vão de verdade:
 
-| Mensagem | O que muda |
+| Mensagem | O que vai |
 | --- | --- |
+| `jogada` do host (antes de travar) | a **ficha** da carta (a carta virada que sai da mão do host); a do convidado vai só ao host |
 | `inicio` / `resolucao` / `fimRodada` (`estado`) | `mascararEstado(estado, vaga)`: a mão, o monte e o descarte dos outros viram `{ id: ficha, oculta: true, personagem }` (só a contagem e a ordem servem); o RNG dos baralhos dos outros e o das regras vão como `{ s: 0 }`; o `historico` leva fichas no lugar dos ids que não são do convidado |
-| `resolucao` (`resultado`) | `mascararResultado(r, vaga)`: `jogadas[j].carta`, `caixas[k].carta` (dono ≠ convidado), `trocas` (malucas) e `armas[j].carta` (duelo) viram a **carta revelada** `{ id: ficha, oculta, personagem, categoria, naipe, valor (14 só no SUPER), nome: rótulo, ataque: descritor, perfeito }`; `efeitos[j]` dos outros com fichas; `eventos` vazio (os textos do host têm o nome das cartas) |
-| `resolucao` (`jogadas`) e `jogada` do host | a ficha da carta (a carta virada que sai da mão do host) |
-| `cena` (`irParaCena`, retomada 2D e volta de vaga 5A) | `mascararCenaPara(dados, id)`: `retomada.estado`, as `estatisticas` e os `jogadores[].maiorCarta` do resultado vistos por quem recebe |
+| `resolucao` (travadas) | `jogadas`: as de verdade. `resultado` (`mascararResultado(r, vaga)`): `jogadas[j].carta`, `caixas[k].carta`, `trocas` e `armas[j].carta` dos outros são a **carta real** (`cartaRevelada`) só com o `id` trocado pela ficha (é por ele que a mão virada acha a carta que saiu); `efeitos[j]` dos outros (compradas, roubada) com fichas |
+| `cena` (`irParaCena`, retomada 2D e volta de vaga 5A) | `mascararCenaPara(dados, id)`: `retomada.estado` visto por quem recebe |
 
 - **1x1** (`pvp/rede/ArenaRede.js`): um convidado só; o convidado não refaz o `iniciarRodada` para conferir (o estado dele não tem as cartas do outro).
 - **Todos contra todos** (`pvp/rede/ArenaRedeN.js`): o `inicio`, a `resolucao` e o `fimRodada` saem **um por convidado** (`canal.enviarPara`), cada um com a versão daquela vaga.
 - **CO-OP de 2** (`coop/ArenaRedeCoop.js`, `esconderCartas = false`) e o PVP local/vs CPU: nada muda.
-- **Fichas**: `criarFichas()` no host, por ponte (a mesma carta tem a mesma ficha enquanto a arena existe; a mão virada anima e a carta jogada é achada nela). Ficha e id não têm relação nenhuma.
-- **Descritor do ataque** (`cartas.js descritorDoAtaque` / `ataqueDoDescritor`): `{ personagem, tipo: 'super' | 'especial' | 'leve' | 'receita', receita, naipe, t }`, o que a esquiva precisa para rodar o mesmo ataque (a esquiva mostra o ataque de qualquer jeito).
+- **Fichas**: `criarFichas()` no host, por ponte (a mesma carta tem a mesma ficha enquanto a arena existe). Ficha e id não têm relação nenhuma. Na revelação a arena troca a carta virada da mão pela carta de verdade no mesmo lugar (`PvpArena.cartaDeVerdade`).
 - **Baralhos**: no começo da partida o host embaralha os montes de novo com `Math.random` (`embaralharEscondido`): com a semente da partida, que viaja na `cena`, o convidado refaria a ordem do baralho do outro.
 - Nos **dois** PCs a tela usa o resultado visto daqui (`verResultado`, também no host) e a mão do outro virada (`verMao`).
+- O host vê o id da jogada do convidado no fio (ele é quem resolve); a tela dele só mostra "<nome> já escolheu ✓" até a revelação.
 
-Testando: `node --test src/game/pvp/__tests__/categorias.test.js` (o mapa de toda carta, e uma varredura do estado, do resultado e de
-tudo que as pontes de 1x1 e de N mandam atrás de ids exatos dos outros).
-
+Testando: `node --test src/game/pvp/__tests__/sigilo.test.js` (nada de carta do host antes de travar, carta real depois, mão sempre escondida, 1x1 e N).

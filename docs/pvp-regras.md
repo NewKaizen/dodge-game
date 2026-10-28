@@ -514,7 +514,7 @@ Modo `ffa` (1x1x1x1), **3 ou 4 jogadores**, só **online** em sala de amigos (Fa
 
 **Queda no meio da partida (regra de N: quem cai não leva vantagem).** Enquanto está sem conexão: **não ataca** (passa sem o +1), **não ganha** a energia da rodada, e o ataque que vinha para ele **vale como 3 acertos** cheios (`FFA.acertosAusente`; menos o que ele já tinha levado na rodada), aplicados pelo host no fim da rodada. Voltou: entra na **rodada seguinte** com o HP que tem. Não voltou em **20 s**: é **eliminado na hora** (a colocação é a daquele momento: fica atrás de quem cair depois na mesma rodada). O host que cai: tudo para nos 3–4 PCs e a rodada recomeça na volta (2D), ou a sala fecha sem XP.
 
-**Cartas escondidas:** como em todo PVP online, a carta dos outros só aparece como a **categoria** (ver [Cartas escondidas no online](#cartas-escondidas-no-online)).
+**Escolha às cegas:** como em todo PVP online, a carta dos outros só aparece quando todos confirmam (ver [Escolha às cegas no online](#escolha-às-cegas-no-online)).
 
 **Resultado e fim.** A lista do 1º ao último (forma, nome, personagem, dano causado/recebido, HP, quando caiu e quantas rodadas assistiu), o replay do **último K.O.** (câmera lenta + TV; o placar mostra o vencedor e quem caiu por último), a faixa de XP e o fim da 2E para N (`pvp/fimDePartidaN.js`): **REVANCHE** (mesmos personagens e arena) e **TROCAR PERSONAGEM** só com **todos** de acordo (um TROCAR vale para todos; 15 s sem acordo cancela; quem sai da sala não segura os outros), **VOLTAR AO LOBBY** na hora. O host leva todos (`irParaCena`) e abre uma partida nova no servidor (XP novo).
 
@@ -522,21 +522,9 @@ Modo `ffa` (1x1x1x1), **3 ou 4 jogadores**, só **online** em sala de amigos (Fa
 
 Testando no navegador (dev, 3 ou 4 abas): o dono cria a sala, `mudarModo('ffa')`, os outros `entrarCodigo`, todos `alternarPronto()` e o dono `pedirPartida()`; na escolha, **Q** (acorda o teclado) e **espaço** em cada aba. Na arena, `debugJogo.set({ acelerar: 2 })` e, no host, `pvpArenaN.setHp(j, 5)` aceleram o fim; `pvpArenaN.estadoDebug()` mostra os alvos, a classificação e as caixas.
 
-## Cartas escondidas no online
+## Escolha às cegas no online
 
-No **PVP online** (1x1 em sala de amigos e no Jogar Rápido, e o todos contra todos) ninguém vê a **carta exata** do outro: a mão dele fica **virada**, sem prévia ampliada, e a carta que ele joga aparece como a **CATEGORIA**, com a mesma linguagem da carta do chefe no CO-OP (a carta virada com o selo: ícone + rótulo + cor). As **minhas** cartas são sempre inteiras para mim. O PVP local (mesmo PC) e o vs CPU não mudam. Lógica em `pvp/categorias.js` (testes em `pvp/__tests__/categorias.test.js`).
+No **PVP online** (1x1 em sala de amigos e no Jogar Rápido, e o todos contra todos) a escolha é **simultânea e às cegas**: enquanto alguém está escolhendo, **ninguém vê a carta que o outro escolheu** (nem o tipo dela), só "<nome> já escolheu ✓". Quando **todos confirmaram** e as jogadas travam, a rodada começa e a **carta de verdade** de cada um é revelada como no jogo original (a carta vira, nome, valor, ataque); dali em diante o texto da caixa, a coluna "quem ataca", o log, o replay e as estatísticas do resultado mostram as cartas reais. A **mão** do outro (e o monte e o descarte) fica **virada** o tempo todo, sem prévia ampliada; as **minhas** cartas são sempre inteiras para mim. O PVP local (mesmo PC) e o vs CPU não mudam. Lógica em `pvp/sigilo.js` (testes em `pvp/__tests__/sigilo.test.js`).
 
-| Categoria | Cartas | Selo |
-| --- | --- | --- |
-| **ATAQUE** | ♠ espadas 2–K e o **Ás ♠ Espelho** (manda o eco ou o ataque que passou adiante) | ♠ branco |
-| **CONTROLE** | ♦ ouros 2–K (balas rápidas, caixa menor, Q/K invertem) e o **Ás ♦ Anular** | ♦ vermelho |
-| **ARMADILHA** | ♣ paus 2–K (bombas, lasers, colunas...) e o **Ás ♣ Roubo** | ♣ branco |
-| **SUPORTE** | ♥ copas 2–K (cura, escudo, energia, compra) e o **Ás ♥ Segunda chance** | ♥ vermelho |
-| **SUPER** | ★ a SUPER do personagem (valor 14, uma por baralho) | ★ dourado |
-
-A categoria é o **naipe** (o tipo da carta nas regras: ver [Naipes](#naipes)); o ♥ se chama SUPORTE como no texto da própria carta (não é só cura). O **Ás fica na categoria do naipe dele**: o efeito especial aparece quando acontece (ESPELHO!, ANULADA!, ROUBO!, SEGUNDA CHANCE!), como o ataque aparece na esquiva. O SUPER anuncia o nome dele (só existe um por baralho).
-
-Onde a carta do outro aparecia: a revelação (a carta vira e acende o selo), o texto embaixo da caixa ("♦ CONTROLE (Kris) · 6 de dano por acerto"), o rótulo do foco e a coluna "quem ataca" do todos contra todos, as cartas malucas ("VIROU ATAQUE!"), a arma do duelo ("ESPADA (ATAQUE)") e a **maior carta** da tela de resultado (o selo).
-
-**No fio** (o host roda as regras e sabe tudo): cada convidado recebe o estado e o resultado **vistos por ele** ([rede-pvp.md](rede-pvp.md#cartas-escondidas-no-online)). As cartas dos outros viram **fichas** sorteadas por partida (sem relação com o id), a carta jogada vira `{ categoria, naipe da categoria, descritor do ataque, energia do desvio perfeito }` (a esquiva precisa rodar o ataque) e o host **embaralha os montes com um sorteio só dele** (a semente da partida, que os dois conhecem, refaria a ordem do baralho do outro); o RNG dos baralhos dos outros não viaja.
+**No fio** (o host roda as regras e sabe tudo; [rede-pvp.md](rede-pvp.md#escolha-às-cegas-no-online)): até as jogadas travarem o convidado **não recebe o id de nenhuma carta do host** (a jogada do host vai como uma **ficha** sorteada por partida, a carta virada que sai da mão dele; a do convidado só vai ao host). Travadas, o host manda a todos as jogadas e o resultado com a carta de verdade. O host também **embaralha os montes com um sorteio só dele** (a semente da partida, que os dois conhecem, refaria a ordem do baralho do outro); o RNG dos baralhos dos outros não viaja.
 
