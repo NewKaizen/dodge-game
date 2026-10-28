@@ -350,14 +350,14 @@ está logado. Cosmético nunca muda nada no jogo.
 ### Partidas de N (Fase 5A)
 
 A base dos modos de 3–4 (`server/partidas.js`; só dão XP os modos em `MODOS_COM_XP`:
-`pvp`, `coop` e, desde a 5B, `coop4`; `ffa` e `2x2` ligam o deles quando a partida existir). O lado de
+`pvp`, `coop`, desde a 5B `coop4` e desde a 5D `ffa`; o `2x2` liga o dele quando a partida existir). O lado de
 cada um é a **vaga** da sala (0..3); o host da partida pode ser qualquer vaga
 (`hostLado`). Cada cliente relata o desfecho inteiro:
 
 | Modo | Relato | Resultado de cada lado |
 | --- | --- | --- |
 | `coop4` | `{ vitoria }` | o time inteiro: vitória ou derrota |
-| `ffa` | `{ colocacoes: [lado, ...] }` (do 1º ao último, todos os lados, sem repetir) | 1º = vitória, o resto derrota; a colocação vai para o banco |
+| `ffa` | `{ colocacoes: [lado, ...] }` (do 1º ao último, todos os lados, sem repetir) | 1º = vitória, o resto derrota; a colocação vai para o banco (o 2º ganha +10, 0007) |
 | `2x2` | `{ vencedorTime: 0 \| 1 \| null }` (time = vaga % 2: 0 e 2 contra 1 e 3) | o time vencedor vitória, o outro derrota; `null` = empate |
 
 **Política (o host decide, conferido pela maioria):** vale o desfecho do **host da
@@ -385,6 +385,23 @@ com estas regras de XP:
 - o host que cai fecha a decisão em ~3 s (`encerrada`, `host_caiu`: ninguém ganha nem perde).
 
 Testes: `server/__tests__/coop4Xp.test.js` (sala, banco falso, o limite por par e as quedas) e `partidasN.test.js`.
+
+### Todos contra todos (Fase 5D)
+
+O `ffa` (3 e 4 jogadores) usa a mesma validação de N (o host decide, a maioria confere; o relato é `{ colocacoes }`, as vagas
+do 1º ao último). XP:
+
+| Quem | XP |
+| --- | --- |
+| todos que jogaram até o fim (inclusive quem caiu e voltou) | participação **40** |
+| 1º lugar (resultado `vitoria`) | **+20** (o bônus de vitória de sempre) |
+| 2º lugar | **+10** (`xp_ffa_segundo()`, migration **0007**) |
+| 3º e 4º | só a participação |
+| quem saiu de vez (ou não voltou em 20 s) antes do primeiro relato | abandono: nada |
+
+Os limites diários são os de sempre e contam **por modo** (`ffa` tem a sua conta) e pelo "oponente" da 0006 (o 1º outro lado
+com conta): o mesmo grupo jogando muito no dia cai para metade (4ª e 5ª partida) e zero (6ª), como no 1x1. Convidado: o teto
+de convidados (10 por dia). Testes: `server/__tests__/ffaXp.test.js` e, num Postgres de verdade, `ffaSql.test.js` (com `DODGE_PG`).
 
 ### Protocolo (versão 5)
 
