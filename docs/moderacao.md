@@ -12,7 +12,7 @@ uma foto ofensivos. Este documento diz **como a denúncia chega**, **quem revisa
 | `denunciar(tag, tipo, motivo)` | `supabase/migrations/0004_moderacao.sql` | grava a denúncia; só o navegador logado chama |
 | Tabela `denuncias` | mesma migration | `id, denunciante, denunciado, tipo ('nome'\|'foto'), motivo, estado ('aberta'\|'aceita'\|'rejeitada'), criada_em, revisada_em, revisor` |
 | `scripts/moderar.js` | `npm run moderar -- <comando>` | lista as abertas, aceita ou rejeita (usa a chave secreta) |
-| Filtro de nomes | `src/lib/palavrasBloqueadas.js` + `nome_ofensivo()` no banco | barra nomes com palavras da lista ao **mudar** o nome |
+| Filtro de palavrões | `src/lib/palavrasBloqueadas.js` + `src/lib/filtro/` + `nome_ofensivo()` no banco (0008) | censura o chat da sala e barra nomes ao **mudar** o nome |
 
 ### Regras da denúncia (no banco)
 
@@ -74,14 +74,74 @@ Detalhes:
   novo e considere o ban. O filtro de palavras só pega o óbvio.
 - Se o Storage falhar ao apagar a foto, nada é fechado: rode o `aceitar` de novo.
 
-## Filtro de nomes
+## Filtro de palavrões (chat e nomes)
 
-Lista curta, em pt e en, em `src/lib/palavrasBloqueadas.js` (`PALAVRAS_EXATAS`
-só valem como palavra inteira; `PALAVRAS_CONTIDAS` valem coladas e com pontuação
-no meio). A função `nome_ofensivo()` da migration 0004 tem **as mesmas listas** e
-é conferida em `atualizar_perfil`; o teste `server/__tests__/moderacaoSql.test.js`
-falha se as duas divergirem. Para mudar a lista: edite o JS **e** o SQL (um novo
-`create or replace function` numa migration nova) juntos.
+Um só filtro para o **chat da sala** (servidor, `censurarTexto`) e para os
+**nomes** (`nomeOfensivo`, no navegador, no servidor e no banco).
+
+### Como funciona
+
+- Motor: biblioteca [`obscenity`](https://github.com/jo3-l/obscenity) 0.4.6
+  (MIT, offline, sem chamada de rede), em `dependencies` (o Dockerfile instala
+  com `npm ci --omit=dev`). Código em `src/lib/filtro/matcher.js`; fachada em
+  `src/lib/palavrasBloqueadas.js`.
+- Dados: o dicionário em inglês do próprio obscenity (menos as frases que dão
+  falso positivo em português: `negro`, `cum`, `ass`, `anal`, `fag`, `retard`,
+  `semen`, `rape`, `bestiality`) **mais** `src/lib/filtro/ptbr.js`
+  (palavrões, termos sexuais, xingamentos e ódio em português, siglas como
+  `vsf`, `vtnc`, `pqp`, `krl`, `fdp`, `tnc`, `pnc`, `sfd`, e inglês extra).
+- Normalização antes de comparar: minúsculas, sem acento, "leet" desfeito
+  (`0 1 3 4 5 7 @ $`), `_` e `2 6 8 9` viram espaço, `.` e `*` somem, letras
+  repetidas juntadas (`porrrra`, `caraaalho`), caracteres "parecidos" de outros
+  alfabetos resolvidos (só no JS).
+- Dois jeitos de casar:
+  - **EXATAS**: palavra inteira (com `s` de plural opcional). Para termos curtos
+    ou que aparecem dentro de palavras inocentes: `cu` barra "cu" e "seu cu!",
+    não "curso", "Cuiabá" nem "computador"; `puta` não barra "disputa".
+  - **COLADAS**: valem coladas em outras palavras e com separadores no meio
+    (`c.a.r.a.l.h.o`, `c a r a l h o`, `xcaralhox`). Só termos longos que não
+    têm uso inocente: ao ignorar espaços, letras de palavras vizinhas se juntam
+    ("via do" viraria "viado"), por isso `viado` é EXATA.
+- **PERMITIDAS** (lista branca): texto inocente que contém um termo
+  (`cacetinho`, `cacetete`, `shiitake`, ...). O dicionário em inglês traz as
+  dele (`Dickens`, `Scunthorpe`-style).
+- **LEVES** (`otario`, `burro`, `idiota`, ...): xingamento brando, **não** é
+  barrado por padrão; `nomeOfensivo(t, { leves: true })` e
+  `censurarTexto(t, { leves: true })` incluem.
+- Decisões de palavras comuns: `pinto`, `negro`, `preto` e `macaco` **não** são
+  barradas (palavras do dia a dia); `veado` é (xingamento mais comum que o bicho).
+  `kkk` ficou de fora (em português é risada).
+- Chat: cada trecho achado vira asteriscos do mesmo tamanho (um por caractere) e
+  o resto da mensagem fica igual: `que PORRA de jogo` vira `que ***** de jogo`.
+
+### Como acrescentar uma palavra
+
+1. Edite `src/lib/filtro/ptbr.js`: a palavra em minúsculas, sem acento, só `a-z`
+   (`EXATAS` se for curta ou aparecer dentro de outras; `COLADAS` se for longa
+   e sem uso inocente). Se um texto inocente cair, ponha em `PERMITIDAS`.
+2. Acrescente o caso em `src/lib/__tests__/filtroCasos.js` (`POSITIVOS` ou
+   `NEGATIVOS`).
+3. Regere a migration: `node scripts/gerar-filtro-sql.mjs` (reescreve
+   `supabase/migrations/0008_filtro_palavras.sql`; o teste falha se ela ficar
+   desatualizada) e rode `npm test`.
+4. Publique o servidor (o chat passa a barrar na hora) e rode a 0008 no banco
+   (abaixo). **Nunca** edite as migrations 0001–0007 (já estão no ar).
+
+### Rodar a 0008 no Supabase
+
+No **SQL Editor** do projeto, cole o conteúdo de
+`supabase/migrations/0008_filtro_palavras.sql` e rode (pode rodar de novo: é
+`create or replace`). Ela só troca `nome_ofensivo()`; `atualizar_perfil` e
+`criar_perfil` (0004/0005) já chamam essa função e não mudam. Nomes que já estão
+no ar continuam como estão (a 0008 não renomeia ninguém): só vale para quem criar
+conta ou trocar de nome daqui para a frente. Para trocar por `JOGADOR` os que já
+existem e agora caem no filtro, rode uma vez:
+`update public.perfis set nome_exibicao = 'JOGADOR' where public.nome_ofensivo(nome_exibicao);`
+
+O SQL é **gerado** dos mesmos dados do JS; as diferenças que sobram: o banco não
+resolve caracteres "parecidos" de outros alfabetos (o JS barra antes). O teste
+`server/__tests__/moderacaoSql.test.js` (com `DODGE_PG`, veja o topo do arquivo)
+compara o banco com o JS nos casos de `filtroCasos.js`.
 
 O nome de **convidado** (sem conta, sem tag: não dá para denunciar) passa pela
 mesma lista no servidor do lobby (`server/lan.js`): o que cai nela aparece como
@@ -95,8 +155,9 @@ trocados por `JOGADOR` ao rodar a 0005. O servidor repete o filtro no nome que l
 do perfil (`nomeSeguro`, `src/lib/contaRegras.js`), e `nomeInicialDoGoogle` é o
 espelho em JS do SQL (conferido em `pendenciasSql.test.js`).
 
-Limites conhecidos: não pega "f d p" com espaços, nem variações criativas (a
-denúncia cobre).
+Limites conhecidos: não pega "f d p" com espaços (as siglas curtas só valem como
+palavra inteira), nem variações criativas (a denúncia cobre). O filtro acrescenta
+~200 KB (minificado) ao pacote do navegador por causa do obscenity.
 
 ## O que a revisão NÃO faz (Fase 1)
 
