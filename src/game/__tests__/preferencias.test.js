@@ -86,3 +86,17 @@ test('piscadas dos avisos: mais lentas (3x) sem clarões ou com reduzir animaç�
   assert.equal(fatoresDe({ reduzirMovimento: true }).pulso, 3)
   assert.equal(fatoresDe({ tremor: 'desligado' }).pulso, 1, 'tremor não tem a ver com piscar')
 })
+
+test('vibração: padrão ligada e intensidade automática; valores inválidos voltam ao padrão', async () => {
+  const { pref } = await carregar()
+  assert.equal(pref('vibracao'), true)
+  assert.equal(pref('vibracaoIntensidade'), null)
+  const m = await carregar({ vibracao: 'sim', vibracaoIntensidade: 0.6 })
+  assert.equal(m.pref('vibracao'), true)
+  assert.equal(m.pref('vibracaoIntensidade'), null)
+  const ok = await carregar({ vibracao: false, vibracaoIntensidade: 0.5 })
+  assert.equal(ok.pref('vibracao'), false)
+  assert.equal(ok.pref('vibracaoIntensidade'), 0.5)
+  ok.definirPref('vibracaoIntensidade', 2) // inválido: ignorado
+  assert.equal(ok.pref('vibracaoIntensidade'), 0.5)
+})
