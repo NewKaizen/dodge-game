@@ -218,7 +218,8 @@ export default class Duelo {
   nomeDaArma(j) {
     const a = this.armas[j]
     const nome = ARMAS_DUELO[a.arma]?.nome ?? a.arma
-    const carta = a.carta ? `${rotuloValor(a.carta.valor)}${SIMBOLOS[a.carta.naipe] ?? ''}` : 'passou'
+    // (a carta do outro no PVP online: só a categoria, pvp/categorias.js)
+    const carta = !a.carta ? 'passou' : a.carta.oculta ? a.carta.nome : `${rotuloValor(a.carta.valor)}${SIMBOLOS[a.carta.naipe] ?? ''}`
     return `${nome} (${carta})`
   }
 

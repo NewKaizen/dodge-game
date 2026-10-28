@@ -12,6 +12,7 @@ import { ataqueDaCartaNoJogo } from '../pvp/ataquesDasCartas.js'
 import { podeJogar, registrarGrazes, registrarPerfeitoCombo, energiaPerfeito, ENERGIA } from '../pvp/regras.js'
 import { FFA, criarPartidaFfa, resolverRodadaFfa, aplicarDanoFfa, danoAusente, classificacao, colocacoes, vivos } from '../pvp/ffa.js'
 import { ARENA, ARENA_PADRAO } from '../pvp/arenas.js'
+import { infoCategoria } from '../pvp/categorias.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
 import FimDePartida from '../pvp/fimDePartida/index.js'
@@ -140,6 +141,7 @@ export default class PvpArenaN extends Phaser.Scene {
     this.nomesJog = this.nomes.map((nome) => nomeNoCoracao(nome, 10))
     this.controles = new Controles(this)
     this.rede = new ArenaRedeN(this, { canal, meuIndice: this.meu, souHost: souHostDaRede(), participantes: participantesDaPartida, dev: Boolean(import.meta.env?.DEV) })
+    this.rede.esconderBaralhos(this.estado) // o host embaralha com um sorteio só dele (pvp/categorias.js)
     this.tempoEscolha = this.tempoBase
     this.fase = 'abertura'
     this.saindo = false
@@ -519,10 +521,12 @@ export default class PvpArenaN extends Phaser.Scene {
       if (fora()) return
       const jogadas = await this.escolha()
       if (fora()) return
-      const r = await this.decidirRodada(jogadas)
-      if (fora() || !r) return
+      const decidida = await this.decidirRodada(jogadas)
+      if (fora() || !decidida) return
+      this.contarJogadas(decidida)
+      // a carta dos outros só aparece como a CATEGORIA (pvp/categorias.js; o host sabe tudo, mas mostra igual)
+      const r = this.rede.verResultado(decidida)
       this.rodadaAtual = r
-      this.contarJogadas(r)
       await this.revelacao(r)
       if (fora()) return
       await this.anunciarSupers(r)
@@ -810,6 +814,7 @@ export default class PvpArenaN extends Phaser.Scene {
       const e = this.estatisticas[j]
       if (jog.passou) return e.passes++
       e.cartasJogadas++
+      if (jog.carta.oculta) return void (ehSuper(jog.carta) && e.supers++) // (no convidado: as do host valem)
       if (jog.carta.valor === 1) e.ases++
       if (ehSuper(jog.carta)) e.supers++
       const forca = (c) => (ehSuper(c) ? 15 : c.valor === 1 ? 14 : c.valor)
@@ -928,7 +933,9 @@ export default class PvpArenaN extends Phaser.Scene {
     this.fase = 'super'
     this.esconderBanner()
     for (const j of lados) {
-      const carta = r.jogadas[j].carta
+      // (o SUPER do outro em rede chega só como a categoria: ela já diz qual é, um por baralho)
+      const jogada = r.jogadas[j].carta
+      const carta = jogada.oculta ? { ...jogada, nome: superDoPersonagem(jogada.personagem).nome } : jogada
       await anunciarSuper(this, { jogador: j % 2, personagem: carta.personagem, carta })
       if (this.saindo) return
     }
@@ -995,7 +1002,7 @@ export default class PvpArenaN extends Phaser.Scene {
     borda.setStrokeStyle(6, 0xffffff)
     this.time.delayedCall(120, () => borda.scene && borda.setStrokeStyle(4, corDaVaga(k)))
     const cel = this.celulas[k]
-    cel.ataque.setText(`${this.nomeDe(caixa.de)}:\n${caixa.carta.nome}\n${caixa.dano} por\nacerto${caixa.refletida ? '\n(passada\nadiante)' : ''}`).setColor(textoDaVaga(caixa.de))
+    cel.ataque.setText(`${this.nomeDe(caixa.de)}:\n${caixa.carta.oculta ? `${infoCategoria(caixa.carta)?.icone ?? ''} ${caixa.carta.nome}` : caixa.carta.nome}\n${caixa.dano} por\nacerto${caixa.refletida ? '\n(passada\nadiante)' : ''}`).setColor(textoDaVaga(caixa.de))
     if (caixa.escudo != null) {
       this.etiquetaEm(cel.x, cel.y - PISTA.altura / 2 - 6, `ESCUDO! -${Math.round((1 - caixa.escudo) * 100)}%`, TEXTO.guarda, { tamanho: 11, ms: 1100 })
       tocar(this, 'escudo')
