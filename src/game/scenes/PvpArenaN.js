@@ -28,6 +28,8 @@ import { particulas } from '../effects/particulas.js'
 import { fogoArtificio } from '../effects/festa.js'
 import { entrarNoJogo, voltarAoMenu, levouGolpe, informarVida } from '../../lib/saida.js'
 import { fatores } from '../acessibilidade.js'
+import { pref } from '../preferencias.js'
+import { quemEmFoco, estadoDoCartao, TEXTO_CARTAO, vistasDaGrade, vistasDoFoco, criarTransicao, avancarTransicao, parametrosSopro, posicaoDoCartao, FOCO, TRANSICAO } from '../pvp/focoFfa.js'
 
 // TODOS CONTRA TODOS (1x1x1x1, 3 e 4 jogadores, ONLINE; Fase 5D). Regras em pvp/ffa.js e docs/pvp-regras.md
 // "Todos contra todos"; rede em pvp/rede/ArenaRedeN.js e docs/rede-pvp.md. A PvpArena de 2 continua como era:
@@ -45,11 +47,17 @@ import { fatores } from '../acessibilidade.js'
 //                minha mão. Os outros aparecem como ESCOLHENDO / PRONTO. Confirmar é definitivo
 //   'revelacao'  as cartas de todos viram (o host resolveu: resolverRodadaFfa)
 //   'super'      a animação de cada SUPER jogado
-//   'arremesso'  as caixas dos vivos abrem e cada carta voa até a caixa do ALVO do dono (o Espelho passa adiante)
-//   'esquiva'    cada PC roda todas as caixas: a minha de verdade, as dos outros espelho
+//   'arremesso'  as caixas dos vivos abrem na grade e a tela vai para o FOCO (pvp/focoFfa.js, ~700 ms com
+//                ease; "reduzir animações": corte seco): a MINHA caixa grande no meio, a do meu ALVO menor
+//                ao lado (cada uma com forma, nome e HP), os outros só como cartões pequenos no canto
+//                (nome, HP, DESVIANDO / CAÍDO / SEM CONEXÃO / ELIMINADO), sem caixa desenhada. As cartas
+//                que importam (a que vem para mim e a minha) voam para as duas caixas
+//   'esquiva'    cada PC roda todas as caixas (a minha de verdade, as dos outros espelho): as de fora do
+//                foco continuam rodando, só não são desenhadas (BattleBox.setOculta). No fim a tela
+//                volta à grade e cada célula mostra o dano da rodada
 //   'fim'        o host aplica o ataque inteiro em quem está sem conexão, elimina quem zerou e manda o estado
 // ELIMINADO: o cartão fica "ELIMINADO 4º" e quem caiu vira ESPECTADOR ("ELIMINADO — assistindo"): ←/→
-// escolhe qual caixa seguir (a borda dela pisca e o nome aparece). O último K.O. tem câmera lenta e o
+// escolhe qual caixa seguir (a borda dela pisca e o nome aparece; no foco, o par de quem ele segue). O último K.O. tem câmera lenta e o
 // replay (pvp/fimDePartida/, o placar mostra quem venceu e quem caiu por último). Acaba com 1 vivo ou no
 // limite de rodadas (FFA.limiteRodadas); a partir de FFA.morteSubita o dano sobe.
 //
@@ -113,6 +121,15 @@ const estadoInicial = () => ({
   espectadorDesde: null,
   rodadaAtual: null,
   paradas: null,
+  objetosGrade: [],
+  fundoGrade: null,
+  alphaGrade: 1,
+  vistas: null,
+  transicao: null,
+  selecao: null,
+  emFoco: false,
+  rotulosFoco: null,
+  cartoes: null,
 })
 
 export default class PvpArenaN extends Phaser.Scene {
@@ -174,6 +191,8 @@ export default class PvpArenaN extends Phaser.Scene {
     this.criarMao()
     this.criarTextos()
     this.fimDePartida = new FimDePartida(this, { campos: Array.from({ length: this.n }, (_, k) => campoDe(k)) })
+    this.vistas = vistasDaGrade(this.n)
+    this.criarFoco()
 
     this.controles.onBotao((_, botao) => {
       if (this.saindo) return
@@ -215,6 +234,8 @@ export default class PvpArenaN extends Phaser.Scene {
   // A grade: cada célula com o brilho da cor da vaga, a forma, o nome e o personagem do dono
   criarCelulas() {
     const g = this.add.graphics().setDepth(-3)
+    this.fundoGrade = g
+    this.objetosGrade = []
     this.celulas = []
     for (let k = 0; k < 4; k++) {
       const c = celula(k)
@@ -238,7 +259,9 @@ export default class PvpArenaN extends Phaser.Scene {
       const ataque = this.add.text(c.x0 + CELULA.largura - LADO, c.y0 + 14, '', { ...estilo(9, TEXTO.normal), wordWrap: { width: LADO - 6 } }).setDepth(5)
       const destaque = this.add.rectangle(c.x, c.y, CELULA.largura - 6, CELULA.altura - 6).setStrokeStyle(3, 0xffe14a).setDepth(6).setVisible(false)
       this.celulas.push({ ...c, forma, nome, voce, personagem, estado, ataque, destaque })
+      this.objetosGrade.push(estado, ataque, ...(voce ? [voce] : []))
     }
+    if (this.legenda) this.objetosGrade.push(this.legenda)
   }
 
   criarPistas() {
@@ -448,7 +471,19 @@ export default class PvpArenaN extends Phaser.Scene {
       cel.estado.setText(jog.eliminado ? `ELIMINADO\n${this.posicaoDe(j)}º LUGAR` : this.rede.fora(j) ? 'SEM CONEXÃO\n(leva o ataque\ninteiro)' : '').setColor(jog.eliminado ? TEXTO.caido : '#ff9a3a')
       if (this.fase !== 'esquiva' && this.fase !== 'arremesso') cel.ataque.setText(atacante >= 0 && !jog.eliminado ? `atacado por\n${this.nomeDe(atacante)}` : '').setColor(atacante >= 0 ? textoDaVaga(atacante) : TEXTO.normal)
       const apagar = jog.eliminado ? 0.4 : 1
-      for (const o of [cel.nome, cel.personagem, cel.forma]) o.setAlpha(apagar)
+      for (const o of [cel.nome, cel.personagem, cel.forma]) o.setAlpha(apagar * this.alphaGrade)
+    })
+  }
+
+  // a grade (fundos, nomes, estados) some no foco
+  aplicarAlphaGrade(a) {
+    this.alphaGrade = a
+    this.fundoGrade?.setAlpha(a)
+    for (const o of this.objetosGrade) o.setAlpha(a)
+    this.celulas?.forEach((cel, j) => {
+      const apagar = this.estado.jogadores[j]?.eliminado ? 0.4 : 1
+      for (const o of [cel.nome, cel.personagem, cel.forma]) o.setAlpha(apagar * a)
+      cel.destaque.setVisible(a > 0.5 && j === this.seguindo)
     })
   }
 
@@ -958,8 +993,10 @@ export default class PvpArenaN extends Phaser.Scene {
     this.esconderBanner()
     for (const t of this.etiquetasMesa ?? []) if (t.scene) this.tweens.add({ targets: t, alpha: 0, duration: 150, onComplete: () => t.destroy() })
     this.etiquetasMesa = []
-    // quem manda caixa voa; o resto sai da mesa
-    const voam = new Set(r.caixas.filter(Boolean).flatMap((c) => [c.de, c.dono]))
+    // o foco desta rodada: só as cartas que vão para as duas caixas do foco voam; o resto sai da mesa
+    const sel = this.calcularFoco(r)
+    const doFoco = (k) => k === sel.foco || k === sel.alvo
+    const voam = new Set(r.caixas.flatMap((c, k) => (c && doFoco(k) ? [c.de, c.dono] : [])))
     this.reveladas.forEach((c, j) => !voam.has(j) && this.tirarDaMesa(c))
     this.mao.setPosicao({ y: MAO_FORA })
     this.botaoPassar.descer(true)
@@ -971,6 +1008,10 @@ export default class PvpArenaN extends Phaser.Scene {
     const abrir = this.pistas.map((p, k) => (!this.eliminado(k) ? p.mostrar() : null))
     await Promise.all([...naColuna, ...abrir])
     if (this.saindo) return
+    // as caixas abertas na grade: a tela vai para o par em foco (as cartas esperam no vão entre as duas)
+    ;[...voam].forEach((j, i) => this.reveladas[j] && this.tweens.add({ targets: this.reveladas[j], x: 548, y: 300 + i * 84, duration: TRANSICAO.ms, ease: 'Cubic.easeInOut' }))
+    await this.irParaFoco(sel)
+    if (this.saindo) return
     this.pistas.forEach((p, k) => {
       if (this.eliminado(k)) return
       const caixa = r.caixas[k]
@@ -979,7 +1020,7 @@ export default class PvpArenaN extends Phaser.Scene {
     })
     const voos = r.caixas.map(async (caixa, k) => {
       if (!caixa) return
-      const carta = this.reveladas[caixa.dono] ?? this.reveladas[caixa.de]
+      const carta = doFoco(k) ? this.reveladas[caixa.dono] ?? this.reveladas[caixa.de] : null
       if (!carta) return this.impactoNaCaixa(k, caixa)
       await this.esperar(caixa.de * 120)
       if (caixa.refletida && this.reveladas[caixa.de]) {
@@ -990,7 +1031,7 @@ export default class PvpArenaN extends Phaser.Scene {
         tocar(this, 'espelho')
         espelho.descartar?.()
       }
-      await carta.arremessar({ x: celula(k).x, y: celula(k).y }, { aoImpacto: () => this.impactoNaCaixa(k, caixa) })
+      await carta.arremessar(this.centroNaTela(k), { aoImpacto: () => this.impactoNaCaixa(k, caixa) })
     })
     await Promise.all(voos)
     this.reveladas = []
@@ -1004,11 +1045,13 @@ export default class PvpArenaN extends Phaser.Scene {
     const cel = this.celulas[k]
     cel.ataque.setText(`${this.nomeDe(caixa.de)}:\n${caixa.carta.oculta ? `${infoCategoria(caixa.carta)?.icone ?? ''} ${caixa.carta.nome}` : caixa.carta.nome}\n${caixa.dano} por\nacerto${caixa.refletida ? '\n(passada\nadiante)' : ''}`).setColor(textoDaVaga(caixa.de))
     if (caixa.escudo != null) {
-      this.etiquetaEm(cel.x, cel.y - PISTA.altura / 2 - 6, `ESCUDO! -${Math.round((1 - caixa.escudo) * 100)}%`, TEXTO.guarda, { tamanho: 11, ms: 1100 })
+      const c = this.centroNaTela(k)
+      if (!this.pistas[k].caixa.oculta) this.etiquetaEm(c.x, c.y - (PISTA.altura / 2) * c.escala - 6, `ESCUDO! -${Math.round((1 - caixa.escudo) * 100)}%`, TEXTO.guarda, { tamanho: 11, ms: 1100 })
       tocar(this, 'escudo')
       this.huds[k].setEscudo(this.estado.jogadores[k].escudo)
     }
     if (this.estado.jogadores[k].ausente || this.rede.fora(k)) this.infoPista[k].setText(`SEM CONEXÃO\nleva ${danoAusente(caixa)} de dano`).setColor('#ff9a3a')
+    this.atualizarFoco()
   }
 
   // ---------- esquiva ----------
@@ -1032,7 +1075,7 @@ export default class PvpArenaN extends Phaser.Scene {
       if (k === this.meu && caixa.inverterMs) this.invertido = { avisado: false }
       return pista.rodar(ataque, { dano: caixa.dano, ritmo: caixa.ritmo, semente: `${this.semente}:${this.estado.rodada}:${k}`, aceleracao: this.aceleracao })
     })
-    if (!promessas.some(Boolean)) return
+    if (!promessas.some(Boolean)) return this.voltarParaGrade({ fechar: true })
     this.rede.comecarLuta()
     await this.rede.esperarFimEsquiva(promessas[this.meu] ?? Promise.resolve(), no)
     if (this.saindo) return
@@ -1042,10 +1085,8 @@ export default class PvpArenaN extends Phaser.Scene {
     this.invertido = 0
     await this.esperar(250)
     if (this.saindo) return
-    tocar(this, 'caixaFechar')
-    await Promise.all(this.pistas.map((p) => p.esconder()))
-    this.avisoPista.forEach((t) => t.setText(''))
-    this.infoPista.forEach((t) => t.setText(''))
+    // de volta à grade (o dano da rodada de todos) e as caixas fecham lá
+    await this.voltarParaGrade({ fechar: true })
     if (this.saindo || !perfeitos.length) return
     this.festejarPerfeitos(perfeitos)
     await this.esperar(900)
@@ -1112,7 +1153,8 @@ export default class PvpArenaN extends Phaser.Scene {
     const borda = pista.caixa.retangulo
     borda.setStrokeStyle(4, CORES.acerto)
     this.time.delayedCall(140, () => borda.scene && borda.setStrokeStyle(4, corDaVaga(j)))
-    if (jog.protegido && jog.hp === 1 && dano > 0) this.etiquetaEm(celula(j).x, celula(j).y - 60, 'SEGUNDA CHANCE: AGUENTA!', '#ffe9a0', { tamanho: 10, ms: 700 })
+    if (jog.protegido && jog.hp === 1 && dano > 0 && !pista.caixa.oculta) this.etiquetaEm(this.centroNaTela(j).x, this.centroNaTela(j).y - 60, 'SEGUNDA CHANCE: AGUENTA!', '#ffe9a0', { tamanho: 10, ms: 700 })
+    this.atualizarFoco()
     if (jog.hp > 0 && jog.hp <= jog.hpMax * HP_BAIXO && !this.hpAvisado[j]) {
       this.hpAvisado[j] = true
       if (j === this.meu) this.time.delayedCall(120, () => tocar(this, 'hpBaixo'))
@@ -1160,7 +1202,7 @@ export default class PvpArenaN extends Phaser.Scene {
 
   // não voltou em 20 s (o host elimina na hora: ArenaRedeN)
   aoSaiu(j) {
-    const c = celula(j)
+    const c = this.centroNaTela(j)
     this.etiquetaEm(c.x, c.y, `${this.nomeDe(j)} SAIU: ELIMINADO`, TEXTO.caido, { tamanho: 12, ms: 1800 })
     this.pistas[j]?.parar()
     this.atualizarEstados()
@@ -1209,6 +1251,218 @@ export default class PvpArenaN extends Phaser.Scene {
     return null
   }
 
+  // ---------- foco (pvp/focoFfa.js) ----------
+
+  // o par em foco desta rodada: eu (vivo) ou quem eu sigo (espectador)
+  calcularFoco(r) {
+    return quemEmFoco({ alvos: r.alvos, eu: this.meu, eliminados: this.estado.jogadores.map((j) => Boolean(j.eliminado)), seguindo: this.seguindo })
+  }
+
+  get reduzirAnimacoes() {
+    return Boolean(pref('reduzirMovimento'))
+  }
+
+  // onde o centro da caixa k aparece agora (e com que escala)
+  centroNaTela(k) {
+    const v = this.pistas[k]?.caixa.vista ?? { ...celula(k), escala: 1 }
+    return { x: v.x, y: v.y, escala: v.escala }
+  }
+
+  // particulas()/efeitos no MUNDO de uma caixa durante a esquiva vão para onde a caixa aparece (null: não aparece)
+  pontoNaTela(x, y) {
+    if (!this.emFoco || this.fase !== 'esquiva' || !this.pistas) return undefined
+    for (let k = 0; k < this.n; k++) {
+      const c = campoDe(k)
+      if (x < c.esquerda - 60 || x > c.direita + 60 || y < c.topo - 60 || y > c.base + 60) continue
+      const caixa = this.pistas[k].caixa
+      if (caixa.oculta) return null
+      return { ...caixa.naTela(x, y), escala: caixa.vista.escala }
+    }
+    return undefined
+  }
+
+  aplicarVistas(vistas) {
+    this.vistas = vistas
+    vistas.forEach((v, k) => {
+      const caixa = this.pistas[k]?.caixa
+      if (!caixa) return
+      caixa.setVista(v.x, v.y, v.escala)
+      caixa.setOculta(!v.visivel)
+      const e = Math.max(0.75, Math.min(1.25, v.escala))
+      this.avisoPista[k].setPosition(v.x, v.y - 18 * v.escala).setScale(e).setVisible(v.visivel)
+      this.infoPista[k].setPosition(v.x, v.y + 18 * v.escala).setScale(e).setVisible(v.visivel)
+    })
+  }
+
+  // a transição anda pelo relógio de verdade (não pela câmera lenta nem pelo acelerar do debug)
+  avancarVista(dt) {
+    const t = this.transicao
+    if (!t) return
+    const { vistas, k, fim } = avancarTransicao(t, dt)
+    this.aplicarVistas(vistas)
+    const a = t.paraFoco ? 1 - k : k
+    this.aplicarAlphaGrade(a)
+    this.rotulosFoco?.forEach((r) => r.c.setAlpha(1 - a))
+    this.cartoes?.forEach((c) => c.c.setAlpha(1 - a))
+    if (!fim) return
+    this.transicao = null
+    t.resolver?.()
+  }
+
+  transicionar(para, { paraFoco, ms = TRANSICAO.ms, som = paraFoco ? 'entrar' : 'sair' } = {}) {
+    const reduzir = this.reduzirAnimacoes
+    this.transicao?.resolver?.()
+    const t = criarTransicao(this.vistas ?? vistasDaGrade(this.n), para, { ms, reduzir })
+    t.paraFoco = paraFoco
+    this.transicao = t
+    tocar(this, 'sopro', parametrosSopro(som, { reduzir }))
+    return new Promise((resolver) => {
+      t.resolver = resolver
+      if (t.corte) this.avancarVista(0)
+    })
+  }
+
+  async irParaFoco(sel, { ms } = {}) {
+    this.selecao = sel
+    this.emFoco = true
+    this.montarFoco(sel)
+    this.legenda?.setVisible(false)
+    await this.transicionar(vistasDoFoco(sel, this.n), { paraFoco: true, ms })
+  }
+
+  // volta à grade: as caixas de fora do foco crescem de volta do cartão; no fim cada célula mostra o dano
+  // da rodada (recebido e causado) e as caixas fecham
+  async voltarParaGrade({ fechar = false } = {}) {
+    if (this.emFoco) {
+      this.emFoco = false
+      await this.transicionar(vistasDaGrade(this.n), { paraFoco: false })
+      this.rotulosFoco.forEach((r) => r.c.setVisible(false))
+      this.cartoes.forEach((c) => c.c.setVisible(false))
+      this.legenda?.setVisible(true)
+      if (this.saindo) return
+      this.mostrarDanoDaRodada()
+    }
+    if (!fechar) return
+    tocar(this, 'caixaFechar')
+    await Promise.all(this.pistas.map((p) => p.esconder()))
+    this.avisoPista.forEach((t) => t.setText(''))
+    this.infoPista.forEach((t) => t.setText(''))
+  }
+
+  // na grade, depois do foco: o dano que cada um levou e causou nesta rodada
+  mostrarDanoDaRodada() {
+    const r = this.rodadaAtual
+    if (!r) return
+    const causado = Array(this.n).fill(0)
+    r.caixas.forEach((caixa, k) => caixa && (causado[caixa.de] += this.danoRodada[k] ?? 0))
+    for (let k = 0; k < this.n; k++) {
+      if (this.eliminado(k)) continue
+      const c = celula(k)
+      const levou = this.danoRodada[k] ?? 0
+      this.etiquetaEm(c.x, c.y - 8, levou ? `-${levou} HP` : r.caixas[k] ? 'SEM DANO' : '', levou ? TEXTO.caido : TEXTO.cura, { tamanho: levou ? 16 : 12, ms: 1500 })
+      if (causado[k]) this.etiquetaEm(c.x, c.y + 14, `causou ${causado[k]}`, textoDaVaga(k), { atraso: 120, tamanho: 10, ms: 1400 })
+    }
+  }
+
+  // os rótulos das duas caixas do foco e os cartões dos de fora (criados uma vez, atualizados a cada rodada)
+  criarFoco() {
+    const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3 })
+    this.rotulosFoco = ['foco', 'alvo'].map((papel) => {
+      const c = this.add.container(0, 0).setDepth(42).setVisible(false)
+      const forma = this.add.graphics()
+      const nome = this.add.text(14, 0, '', estilo(papel === 'foco' ? 13 : 10, '#ffffff')).setOrigin(0, 0.5)
+      const hp = this.add.text(0, 0, '', estilo(papel === 'foco' ? 11 : 9, TEXTO.normal)).setOrigin(1, 0.5)
+      const barra = this.add.graphics()
+      const linha = this.add.text(0, papel === 'foco' ? 16 : 13, '', estilo(papel === 'foco' ? 9 : 8, TEXTO.desabilitado)).setOrigin(0, 0.5)
+      c.add([forma, nome, hp, barra, linha])
+      return { papel, c, forma, nome, hp, barra, linha, vaga: null }
+    })
+    const { largura, altura } = FOCO.cartoes
+    this.cartoes = Array.from({ length: 3 }, (_, i) => {
+      const p = posicaoDoCartao(i)
+      const c = this.add.container(p.x, p.y).setDepth(42).setVisible(false)
+      const fundo = this.add.graphics()
+      const forma = this.add.graphics()
+      const nome = this.add.text(22, 11, '', estilo(10, '#ffffff')).setOrigin(0, 0.5)
+      const status = this.add.text(largura - 8, 11, '', estilo(8, TEXTO.normal)).setOrigin(1, 0.5)
+      const barra = this.add.graphics()
+      const hp = this.add.text(largura - 8, 31, '', estilo(8, TEXTO.normal)).setOrigin(1, 0.5)
+      c.add([fundo, forma, nome, status, barra, hp])
+      return { c, fundo, forma, nome, status, barra, hp, vaga: null, largura, altura }
+    })
+  }
+
+  montarFoco(sel) {
+    const [rf, ra] = this.rotulosFoco
+    rf.vaga = sel.foco
+    ra.vaga = sel.alvo
+    const posicao = (r, v) => {
+      const largura = 220 * v.escala
+      r.c.setPosition(v.x - largura / 2, v.y - (170 * v.escala) / 2 - (r.papel === 'foco' ? 40 : 34))
+      r.largura = largura
+    }
+    posicao(rf, FOCO.foco)
+    posicao(ra, FOCO.alvo)
+    for (const r of this.rotulosFoco) {
+      r.c.setVisible(r.vaga != null).setAlpha(0)
+      if (r.vaga == null) continue
+      r.forma.clear()
+      desenharForma(r.forma, formaDaVaga(r.vaga), 5, 0, r.papel === 'foco' ? 6 : 5, corDaVaga(r.vaga))
+      r.nome.setColor(textoDaVaga(r.vaga))
+      r.hp.setX(r.largura)
+    }
+    this.cartoes.forEach((c, i) => {
+      c.vaga = sel.outros[i] ?? null
+      c.c.setVisible(c.vaga != null).setAlpha(0)
+      if (c.vaga == null) return
+      const cor = corDaVaga(c.vaga)
+      c.fundo.clear().fillStyle(0x0b0914, 0.88).fillRoundedRect(0, 0, c.largura, c.altura, 6).lineStyle(2, cor, 0.9).strokeRoundedRect(0, 0, c.largura, c.altura, 6)
+      c.forma.clear()
+      desenharForma(c.forma, formaDaVaga(c.vaga), 12, 11, 5, cor)
+      c.nome.setText(this.nomeDe(c.vaga)).setColor(textoDaVaga(c.vaga))
+    })
+    this.atualizarFoco()
+  }
+
+  // HP, estado e o que cada caixa do foco recebe; o estado de cada cartão
+  atualizarFoco() {
+    if (!this.rotulosFoco || !this.selecao) return
+    const r = this.rodadaAtual
+    const sel = this.selecao
+    const barra = (g, x, y, w, h, jog, cor) => {
+      const f = Math.max(0, jog.hp) / jog.hpMax
+      g.clear().fillStyle(0x000000, 0.7).fillRect(x, y, w, h).fillStyle(f <= HP_BAIXO ? 0xff4060 : cor, 1).fillRect(x, y, Math.round(w * f), h)
+    }
+    for (const rot of this.rotulosFoco) {
+      const k = rot.vaga
+      if (k == null) continue
+      const jog = this.estado.jogadores[k]
+      const eu = k === this.meu
+      const titulo = rot.papel === 'foco' ? (eu ? `VOCÊ · ${this.nomeDe(k)}` : `ASSISTINDO ${this.nomeDe(k)}`) : `${this.nomeDe(k)}`
+      rot.nome.setText(titulo)
+      rot.hp.setText(`HP ${Math.max(0, jog.hp)}/${jog.hpMax}`)
+      barra(rot.barra, 0, 7, rot.largura, 3, jog, corDaVaga(k))
+      const caixa = r?.caixas[k]
+      const de = caixa ? this.nomeDe(caixa.de) : null
+      const carta = caixa ? (caixa.carta.oculta ? `${infoCategoria(caixa.carta)?.icone ?? ''} ${caixa.carta.nome}` : caixa.carta.nome) : ''
+      let linha = ''
+      if (rot.papel === 'foco') linha = caixa ? `${eu ? 'desvie' : 'desvia'} de ${de}: ${carta} · ${caixa.dano}/acerto` : 'nenhum ataque vem para cá'
+      else linha = caixa ? `${caixa.de === this.meu ? 'o seu ataque' : `ataque de ${de}`}: ${carta}` : 'sem ataque nesta rodada'
+      rot.linha.setText(linha)
+    }
+    for (const c of this.cartoes) {
+      const k = c.vaga
+      if (k == null) continue
+      const jog = this.estado.jogadores[k]
+      const estado = estadoDoCartao({ eliminado: Boolean(jog.eliminado), fora: this.rede.fora(k) || jog.ausente, caido: this.ko[k] || jog.hp <= 0, comAtaque: this.fase === 'esquiva' && Boolean(this.pistas[k].rodando) })
+      const cor = { eliminado: TEXTO.caido, semConexao: '#ff9a3a', caido: TEXTO.caido, desviando: TEXTO.cura, livre: TEXTO.desabilitado }[estado]
+      c.status.setText(estado === 'eliminado' ? `ELIMINADO ${this.posicaoDe(k)}º` : TEXTO_CARTAO[estado]).setColor(cor)
+      barra(c.barra, 22, 27, c.largura - 96, 6, jog, corDaVaga(k))
+      c.hp.setText(`${Math.max(0, jog.hp)}/${jog.hpMax}`)
+      c.c.setAlpha(this.transicao ? c.c.alpha : 1)
+    }
+  }
+
   // ---------- espectador ----------
 
   virarEspectador() {
@@ -1226,7 +1480,9 @@ export default class PvpArenaN extends Phaser.Scene {
     if (!lista.length) return
     const i = this.seguindo == null ? -1 : lista.indexOf(this.seguindo)
     this.seguindo = lista[(i + passo + lista.length) % lista.length]
-    this.celulas.forEach((c, k) => c.destaque.setVisible(k === this.seguindo))
+    this.celulas.forEach((c, k) => c.destaque.setVisible(k === this.seguindo && this.alphaGrade > 0.5))
+    // no foco: o par de quem eu sigo (uma transição curta, ou o corte)
+    if (this.emFoco && this.rodadaAtual) this.irParaFoco(this.calcularFoco(this.rodadaAtual), { ms: TRANSICAO.msSeguir })
     this.dica.setText(`ELIMINADO — assistindo ${this.nomeDe(this.seguindo)}   (←/→: outro jogador)`)
     tocar(this, 'mover')
   }
@@ -1305,6 +1561,7 @@ export default class PvpArenaN extends Phaser.Scene {
     if (this.fase === 'escolha') this.atualizarRelogio(delta)
     this.atualizarPistas(delta)
     this.rede.atualizar(delta)
+    this.avancarVista(deltaReal)
     if (this.seguindo != null) {
       const c = this.celulas[this.seguindo]
       c?.destaque.setAlpha(fatores().piscar ? 0.5 + 0.5 * Math.abs(Math.sin(this.time.now / 260)) : 1)
@@ -1342,6 +1599,7 @@ export default class PvpArenaN extends Phaser.Scene {
 
   // quem cai da rede no meio da esquiva some da caixa dele (o host aplica o ataque inteiro no fim)
   vigiarPresenca() {
+    if (this.emFoco) this.atualizarFoco()
     if (this.fase === 'esquiva') {
       this.pistas.forEach((p, k) => {
         if (k === this.meu || !p.coracoes[0]?.ativo || !this.rede.fora(k)) return
@@ -1393,6 +1651,9 @@ export default class PvpArenaN extends Phaser.Scene {
       vencedor: this.estado.vencedor,
       prontos: [...this.prontos],
       seguindo: this.seguindo,
+      foco: this.emFoco ? { ...this.selecao } : null,
+      transicao: this.transicao ? { t: Math.round(this.transicao.t), ms: this.transicao.ms, corte: this.transicao.corte } : null,
+      vistas: this.pistas.map((p) => ({ ...p.caixa.vista, oculta: p.caixa.oculta })),
       classificacao: classificacao(this.estado),
       escolhido: this.escolhido === undefined ? 'escolhendo' : this.escolhido,
       pistas: this.pistas.map((p) => ({ aberta: p.aberta, espelho: p.espelho, rodando: p.ataque?.nome ?? null, coracao: { x: Math.round(p.coracoes[0].x), y: Math.round(p.coracoes[0].y), ativo: p.coracoes[0].ativo } })),

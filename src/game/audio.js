@@ -247,6 +247,28 @@ function sintetizador(c) {
       fonte.connect(filtro).connect(g).connect(saida)
       fonte.start(t)
     },
+    // "whoosh": ruído num passa-faixa que varre de `de` a `para` Hz; o volume sobe até `pico` (fração
+    // da duração) e some (o zoom do todos contra todos: pvp/focoFfa.js parametrosSopro)
+    varredura({ dur = 0.4, vol = 0.15, de = 400, para = 2400, q = 1.1, pico = 0.5, atraso = 0 } = {}) {
+      const t = agora + atraso
+      const buffer = c.createBuffer(1, Math.ceil(c.sampleRate * dur), c.sampleRate)
+      const dados = buffer.getChannelData(0)
+      for (let i = 0; i < dados.length; i++) dados[i] = Math.random() * 2 - 1
+      const fonte = c.createBufferSource()
+      fonte.buffer = buffer
+      const filtro = c.createBiquadFilter()
+      filtro.type = 'bandpass'
+      filtro.Q.value = q
+      filtro.frequency.setValueAtTime(Math.max(1, de), t)
+      filtro.frequency.exponentialRampToValueAtTime(Math.max(1, para), t + dur)
+      const g = c.createGain()
+      g.gain.setValueAtTime(0.0001, t)
+      g.gain.linearRampToValueAtTime(vol, t + dur * pico)
+      g.gain.exponentialRampToValueAtTime(0.001, t + dur)
+      fonte.connect(filtro).connect(g).connect(saida)
+      fonte.start(t)
+      fonte.stop(t + dur + 0.02)
+    },
     // bolinha rolando na roda da roleta: chiado num passa-faixa que desce de
     // tom, com um "trrr" (tremolo) que desacelera junto com a roda
     rolamento(dur, vol = 0.1, atraso = 0) {
@@ -343,6 +365,8 @@ const SINTESE = {
     s.tom(300, 0.2, 'square', 0.15, 60)
   },
   voo: (s) => s.tom(400, 0.18, 'sine', 0.1, 1200),
+  // o zoom do todos contra todos (opções: pvp/focoFfa.js parametrosSopro; entrar sobe, sair desce)
+  sopro: (s, opcoes) => s.varredura(opcoes),
   // fom-fom: dois tons juntos (acorde "desafinado" de buzina), duas vezes
   buzina: (s) => {
     for (const atraso of [0, 0.22]) {
