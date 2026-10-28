@@ -1,12 +1,12 @@
 # Controles
 
-O jogo se liga ao primeiro controle que o jogador usar, **sem nenhum botão para clicar**. Teclado, controle físico (gamepad) e joystick serial (Arduino) podem estar ligados ao mesmo tempo.
+O jogo se liga ao primeiro controle que o jogador usar, **sem nenhum botão para clicar**. Teclado, controle físico (gamepad) e joysticks serial (Arduino, um por porta USB) podem estar ligados ao mesmo tempo.
 
 | Controle | Como liga | O que ainda exige clique |
 | --- | --- | --- |
 | Teclado | A primeira tecla do jogo (WASD, setas, Espaço, Enter, C, P, Esc, as remapeadas) apertada na página. Direções valem na hora; a primeira A/B/C só "acorda" | Nada |
 | Controle físico | O primeiro botão apertado (o navegador só mostra o controle à página depois disso). Mexer só o analógico não liga | Nada |
-| Joystick serial | Ao abrir a página, o jogo reabre sozinho a porta já autorizada (`navigator.serial.getPorts`) e religa quando o cabo é plugado de novo (evento `connect`) | **O primeiro pareamento**: o navegador só abre a lista de portas (`requestPort`) com um gesto do jogador. CONFIGURAÇÕES → GAMEPAD → CONECTAR JOYSTICK SERIAL (A no teclado) |
+| Joystick serial (um Arduino por porta USB) | Ao abrir a página, o jogo reabre sozinho **todas** as portas já autorizadas (`navigator.serial.getPorts`) e religa cada uma quando o cabo é plugado de novo (evento `connect`). Cada porta é uma fonte; a 1ª é o jogador 1, a 2ª o jogador 2 | **O primeiro pareamento de cada placa**: o navegador só abre a lista de portas (`requestPort`) com um gesto do jogador. CONFIGURAÇÕES → GAMEPAD → CONECTAR JOYSTICK SERIAL (A no teclado), uma vez por joystick |
 
 Navegador sem Web Serial (Firefox, Safari): a opção CONECTAR JOYSTICK SERIAL nem aparece.
 
@@ -36,7 +36,7 @@ Controles fora do padrão usam os mesmos índices de botão; com 8 eixos ou mais
 
 | Situação | O que acontece |
 | --- | --- |
-| **Duas fontes distintas ativas**: 2 controles; controle + teclado; joystick serial + teclado ou + controle | 2 jogadores na hora, com o aviso "JOGADOR 2 ENTROU (controle / teclado / joystick serial)". O teclado inteiro (WASD e setas) conta como **uma** fonte |
+| **Duas fontes distintas ativas**: 2 controles; controle + teclado; 2 joysticks serial; joystick serial + teclado ou + controle | 2 jogadores na hora, com o aviso "JOGADOR 2 ENTROU (controle / teclado / joystick serial)". O teclado inteiro (WASD e setas) conta como **uma** fonte |
 | **Só teclado**, duas pessoas no mesmo teclado | Não dá para saber pelas teclas (em 1 jogador os dois conjuntos comandam o jogador 1). Nas telas de escolha do **PVP** e da **party do CO-OP**, o rodapé diz "JOGADOR 2: aperte ENTER (ou A no 2º controle) para entrar": o A do jogador 2 (Enter / Enter do numérico, em `teclas.js` `p2.A`) troca para 2 jogadores e o P2 ganha o seu cursor. Em 2 jogadores, WASD/Espaço = P1 e setas/Enter = P2, como sempre |
 | **P2 desiste** (entrou pelo teclado) | Antes de alguém confirmar, o B do jogador 2 (Backspace / Shift direito) volta a 1 jogador ("JOGADOR 2 SAIU"). Depois que alguém confirma, o B só desfaz a escolha, como antes. Com duas fontes de verdade o B não tira o jogador 2 |
 | **Durante a partida** | Nunca muda. Só muda em cena livre: Menu e telas de escolha (`CENAS_LIVRES`). Se o 2º controle ligar no meio de uma partida, o número muda quando voltar a uma dessas telas |
@@ -55,7 +55,7 @@ Em partida **local** (CO-OP ou PvP contra a CPU/mesmo PC), o jogo **pausa sozinh
 ## Remapear (CONFIGURAÇÕES)
 
 - **CONTROLES**: teclas do teclado, por jogador (como antes).
-- **GAMEPAD**: A · CONFIRMAR, B · VOLTAR e PAUSA (A na linha, depois aperte o botão novo do controle; qualquer tecla cancela), ZONA MORTA do analógico (barra, 10% a 80%), CONECTAR JOYSTICK SERIAL e RESTAURAR PADRÃO. O painel mostra quais controles estão em uso.
+- **GAMEPAD**: A · CONFIRMAR, B · VOLTAR e PAUSA (A na linha, depois aperte o botão novo do controle; qualquer tecla cancela), ZONA MORTA do analógico (barra, 10% a 80%), CONECTAR JOYSTICK SERIAL (lista os joysticks e o jogador de cada um), TROCAR JOGADORES DOS JOYSTICKS, DESCONECTAR JOYSTICKS SERIAL e RESTAURAR PADRÃO. O painel mostra quais controles estão em uso.
 
 Ficam no navegador, em `dodge-preferencias`: `botoesPad` (`null` ou `{ A: [...], B: [...], C: [...] }` com índices de botão, validado em [src/game/gamepad.js](../src/game/gamepad.js)) e `zonaMorta` (número de 0.1 a 0.8). Valor inválido volta ao padrão.
 

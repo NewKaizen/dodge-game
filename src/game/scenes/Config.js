@@ -11,8 +11,9 @@ import { alternarTelaCheia } from '../../lib/telaCheia.js'
 import { capturarTecla } from '../../lib/simulador.js'
 import { ACOES_PAD, ROTULO_PAD, ZONA_MORTA_LIMITES, ZONA_MORTA_PADRAO, atribuirBotao, nomeBotao, normalizarBotoes, resumoBotoes } from '../gamepad.js'
 import { capturarBotaoPad, controlesLigados } from '../../lib/gamepad.js'
-import { conectarSerial, desconectarSerial, serialAberto, serialSuportado } from '../../lib/serial.js'
+import { conectarSerial, desconectarSerial, serialAberto, serialSuportado, listarJoysticks, trocarJogadoresSerial } from '../../lib/serial.js'
 import { despedir } from '../../lib/saida.js'
+import { rotulo as rotuloJoystick } from '../../lib/joysticks.js'
 
 // Configurações, no jeito dos menus de console (abas em cima, lista de opções
 // à esquerda com o valor alinhado à direita "◀ VALOR ▶", painel à direita
@@ -102,14 +103,9 @@ const TEXTO_DALTONISMO = {
   tritanopia: 'Para quem confunde azul e amarelo: o coração do P2 e os avisos trocam para cores fáceis de separar.',
 }
 
-// CONECTAR JOYSTICK SERIAL: pareia (precisa de gesto: o A do teclado vale) ou, se já está
-// conectado, desconecta. Devolve a mensagem para o painel
-async function alternarSerial() {
-  if (serialAberto()) {
-    await despedir() // DISCONNECT antes de fechar a porta
-    await desconectarSerial({ esquecer: true })
-    return 'Joystick serial desconectado.'
-  }
+// CONECTAR JOYSTICK SERIAL: pareia mais um joystick (um Arduino por porta USB; precisa de gesto:
+// o A do teclado vale). Devolve a mensagem para o painel
+async function conectarJoystick() {
   try {
     await conectarSerial()
     return 'Joystick serial conectado. Ele reconecta sozinho da próxima vez.'
@@ -118,6 +114,17 @@ async function alternarSerial() {
     if (e?.name === 'SecurityError') return { texto: 'O navegador exige um clique ou tecla: use Espaço/Enter do teclado.', cor: COR.erro }
     return { texto: `Não abriu: ${e?.message ?? e}`, cor: COR.erro }
   }
+}
+
+async function desconectarJoysticks() {
+  await despedir() // DISCONNECT antes de fechar as portas
+  await desconectarSerial({ esquecer: true })
+  return 'Joysticks serial desconectados.'
+}
+
+const textoJoysticks = () => {
+  const l = listarJoysticks()
+  return l.length ? l.map(rotuloJoystick).join('\n') : 'nenhum'
 }
 
 const restaurarJogo = (campos) => () => mudarJogo(() => structuredClone(campos))
@@ -166,6 +173,145 @@ const ABAS = [
         padrao: () => CONFIG_PADRAO.som,
         descricao: 'Desligado, o jogo fica mudo (música e efeitos) sem esquecer os volumes escolhidos.',
       },
+      {
+        id: 'restaurar',
+        rotulo: 'RESTAURAR PADRÃO',
+        tipo: 'acao',
+        fazer: restaurarJogo({ volume: CONFIG_PADRAO.volume, som: CONFIG_PADRAO.som }),
+        descricao: `Volta a música para ${CONFIG_PADRAO.volume.musica}%, os efeitos para ${CONFIG_PADRAO.volume.efeitos}% e liga o som.`,
+      },
+    ],
+  },
+  {
+    id: 'jogo',
+    rotulo: 'JOGO',
+    itens: [
+      {
+        id: 'velocidade',
+        rotulo: 'VELOCIDADE',
+        titulo: 'VELOCIDADE DO CORAÇÃO',
+        tipo: 'barra',
+        min: 60,
+        max: 400,
+        passo: 10,
+        aVoltaAoPadrao: true,
+        ler: () => estado().velocidade,
+        escrever: (v) => mudarJogo(() => ({ velocidade: v })),
+        padrao: () => CORACAO.velocidadePadrao,
+        formato: (v) => (v === CORACAO.velocidadePadrao ? `${v} (padrão)` : `${v}`),
+        unidade: 'px/s',
+        descricao: `Quantos pixels por segundo o coração anda. Mais rápido desvia de longe, mas fica difícil de acertar os vãos apertados. A volta para o padrão (${CORACAO.velocidadePadrao}).`,
+      },
+      {
+        id: 'telaCheia',
+        rotulo: 'TELA CHEIA',
+        tipo: 'opcoes',
+        ...LIGA,
+        nomes: (v) => (v ? 'LIGADA' : 'DESLIGADA'),
+        ler: () => Boolean(document.fullscreenElement),
+        escrever: () => alternarTelaCheia(),
+        descricao: 'Só o jogo na tela inteira, sem as barras de cima da página. Atalho: tecla F (Esc sai).',
+      },
+      {
+        id: 'restaurar',
+        rotulo: 'RESTAURAR PADRÃO',
+        tipo: 'acao',
+        fazer: restaurarJogo({ velocidade: CORACAO.velocidadePadrao }),
+        descricao: `Volta a velocidade do coração para ${CORACAO.velocidadePadrao}. A tela cheia não muda.`,
+      },
+    ],
+  },
+  {
+    id: 'controles',
+    rotulo: 'CONTROLES',
+    itens: [
+      {
+        id: 'jogador',
+        rotulo: 'JOGADOR',
+        tipo: 'opcoes',
+        valores: ['p1', 'p2'],
+        nomes: (v) => (v === 'p1' ? 'JOGADOR 1' : 'JOGADOR 2'),
+        cor: (v) => corTexto(CORES.almas[v === 'p1' ? 0 : 1]),
+        ler: (cena) => cena.jogadorTeclas,
+        escrever: (v, cena) => (cena.jogadorTeclas = v),
+        semSalvar: true,
+        descricao:
+          'De quem são as teclas da lista. Com 1 jogador, os dois conjuntos de teclas controlam o mesmo coração.\n\nO controle físico tem a aba GAMEPAD; o joystick (porta serial) não é remapeável.',
+      },
+      ...ACOES.map((acao) => ({
+        id: `tecla-${acao}`,
+        rotulo: ROTULO_ACAO[acao],
+        tipo: 'tecla',
+        acao,
+        descricao: 'A: escolher a nova tecla (Esc cancela). Se ela já for de outra ação, sai de lá; se aquela ação ficar sem nenhuma, fica com as teclas antigas desta.',
+      })),
+      {
+        id: 'restaurar',
+        rotulo: 'RESTAURAR TECLAS PADRÃO',
+        tipo: 'acao',
+        fazer: () => definirPref('teclas', null),
+        descricao: 'Volta as teclas dos dois jogadores para as de fábrica:\nP1: WASD · A Espaço/Z/E · B Q/X/Shift esq. · pausa C/Esc\nP2: setas · A Enter · B Shift dir./Backspace · pausa P',
+      },
+    ],
+  },
+  {
+    id: 'gamepad',
+    rotulo: 'GAMEPAD',
+    itens: [
+      ...ACOES_PAD.map((acao) => ({
+        id: `pad-${acao}`,
+        rotulo: ROTULO_PAD[acao],
+        tipo: 'botaoPad',
+        acao,
+        descricao:
+          'A: escolher o novo botão do controle (aperte o botão que quiser; qualquer tecla cancela). Se ele já for de outra ação, sai de lá; se aquela ficar sem nenhum, fica com os antigos desta. O D-pad e o analógico esquerdo sempre movem.',
+      })),
+      {
+        id: 'zonaMorta',
+        rotulo: 'ZONA MORTA',
+        titulo: 'ZONA MORTA DO ANALÓGICO',
+        tipo: 'barra',
+        min: Math.round(ZONA_MORTA_LIMITES.min * 100),
+        max: Math.round(ZONA_MORTA_LIMITES.max * 100),
+        passo: 5,
+        aVoltaAoPadrao: true,
+        ler: () => Math.round(pref('zonaMorta') * 100),
+        escrever: (v) => definirPref('zonaMorta', v / 100),
+        padrao: () => Math.round(ZONA_MORTA_PADRAO * 100),
+        formato: (v) => `${v}%`,
+        descricao: `Quanto o analógico precisa inclinar antes de contar. Mais alto ignora o "tremor" de um analógico gasto; mais baixo responde ao menor toque. A volta para o padrão (${Math.round(ZONA_MORTA_PADRAO * 100)}%).`,
+      },
+      // Web Serial só existe no Chrome/Edge: sem ele as opções nem aparecem
+      ...(serialSuportado()
+        ? [
+            {
+              id: 'serial',
+              rotulo: 'CONECTAR JOYSTICK SERIAL',
+              tipo: 'acao',
+              ler: () => listarJoysticks().length,
+              descricao: () =>
+                `Pareia mais um joystick com cabo (um Arduino por porta USB; repita para o segundo). A abre a janela do navegador para escolher a porta; só dá para fazer a primeira vez (depois eles reconectam sozinhos ao abrir o jogo e ao plugar o cabo). Se o navegador reclamar de "gesto", aperte Espaço ou Enter no teclado nesta opção.\n\nJoysticks: ${textoJoysticks()}`,
+              fazer: conectarJoystick,
+            },
+            {
+              id: 'serialTrocar',
+              rotulo: 'TROCAR JOGADORES DOS JOYSTICKS',
+              tipo: 'acao',
+              ler: () => listarJoysticks().length,
+              descricao: () =>
+                `Troca quem é o JOGADOR 1 e o JOGADOR 2 entre os joysticks (com um só, ele passa a ser o outro jogador). Vale na hora e fica salvo.\n\nJoysticks: ${textoJoysticks()}`,
+              fazer: () => (trocarJogadoresSerial() ? 'Jogadores dos joysticks trocados.' : { texto: 'Nenhum joystick conectado.', cor: COR.apagado }),
+            },
+            {
+              id: 'serialDesligar',
+              rotulo: 'DESCONECTAR JOYSTICKS SERIAL',
+              tipo: 'acao',
+              ler: () => serialAberto(),
+              descricao: () => 'Fecha todos os joysticks serial. Eles não reconectam sozinhos até você parear de novo.',
+              fazer: () => (serialAberto() ? desconectarJoysticks() : { texto: 'Nenhum joystick conectado.', cor: COR.apagado }),
+            },
+          ]
+        : []),
       {
         id: 'restaurar',
         rotulo: 'RESTAURAR PADRÃO',

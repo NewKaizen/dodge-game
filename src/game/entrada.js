@@ -12,7 +12,7 @@ import { lan } from '../lib/lan/rede.js'
 //   - teclado: a primeira tecla do jogo apertada na página liga (lib/simulador.js)
 //   - controle físico: o primeiro botão apertado liga (lib/gamepad.js)
 //   - joystick serial: reabre sozinho uma porta já autorizada e religa ao plugar o cabo
-//     (lib/serial.js); o PRIMEIRO pareamento precisa de um gesto, em CONFIGURAÇÕES
+//     (lib/serial.js), uma fonte por porta; o PRIMEIRO pareamento precisa de um gesto, em CONFIGURAÇÕES
 // Também avisa o jogo quando a entrada some no meio da partida (janela sem foco,
 // controle ou joystick desconectado): o evento 'entrada-perdida' do Phaser, que as
 // arenas locais ouvem para pausar (game/controles.js, onPerdaDeFoco).
@@ -25,19 +25,20 @@ export function instalarEntrada(game) {
   const pararPads = iniciarGamepads({ aviso: avisar, aoPerder: perdeu })
   const pararSerial = vigiarSerial()
 
-  // joystick serial ligou / desligou
-  let serialLigado = get(jogo).fontes.serial
+  // joystick serial ligou / desligou (um por porta USB)
+  let seriais = get(jogo).seriais
   const pararStore = jogo.subscribe((s) => {
-    if (s.fontes.serial === serialLigado) return
-    serialLigado = s.fontes.serial
+    if (s.seriais === seriais) return
+    const ligou = s.seriais > seriais
+    seriais = s.seriais
     avisar({
       id: `serial:${Date.now()}`,
       tipo: 'info',
-      titulo: serialLigado ? 'JOYSTICK CONECTADO' : 'JOYSTICK DESCONECTADO',
-      texto: serialLigado ? 'joystick serial pronto' : 'plugue o cabo para voltar',
+      titulo: ligou ? 'JOYSTICK CONECTADO' : 'JOYSTICK DESCONECTADO',
+      texto: ligou ? `${seriais} joystick${seriais > 1 ? 's' : ''} serial pronto${seriais > 1 ? 's' : ''}` : 'plugue o cabo para voltar',
       ms: 3500,
     })
-    if (!serialLigado) perdeu('joystick desconectado')
+    if (!ligou) perdeu('joystick desconectado')
   })
 
   // 1 ou 2 jogadores: reavalia quando uma fonte muda e de tempos em tempos (a cena ativa
@@ -53,14 +54,14 @@ export function instalarEntrada(game) {
       p2Teclado: s.p2Teclado,
       teclado: s.fontes.teclado,
       pads: s.pads,
-      serial: s.fontes.serial,
+      serial: s.seriais,
       cenas: game.scene.getScenes(true).map((c) => c.scene.key),
       emSala: get(lan).fase === 'sala',
     })
   }
   let chaveFontes = ''
   const pararFontes = jogo.subscribe((s) => {
-    const chave = `${s.fontes.teclado}|${s.pads}|${s.fontes.serial}|${s.numJogadores}|${s.p2Teclado}`
+    const chave = `${s.fontes.teclado}|${s.pads}|${s.seriais}|${s.numJogadores}|${s.p2Teclado}`
     if (chave === chaveFontes) return // os joysticks mexem no store 60 vezes por segundo
     chaveFontes = chave
     queueMicrotask(avaliar)

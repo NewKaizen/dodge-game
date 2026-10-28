@@ -11,7 +11,7 @@ import { avisar } from './conta/avisos.js'
 
 export const fontesAgora = () => {
   const s = get(jogo)
-  return { s, fontes: contarFontes({ teclado: s.fontes.teclado, pads: s.pads, serial: s.fontes.serial }) }
+  return { s, fontes: contarFontes({ teclado: s.fontes.teclado, pads: s.pads, serial: s.seriais }) }
 }
 
 export function dicaDoP2(algoConfirmado, emRede = false) {
