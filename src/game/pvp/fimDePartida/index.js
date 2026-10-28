@@ -206,7 +206,10 @@ export default class FimDePartida {
     const pista = a.pistas[k]
     const coracao = pista.coracoes[0]
     const cor = a.corDoLado?.(j) ?? CORES.almas[j] // (todos contra todos: a cor da vaga)
-    this.quebras.push(quebrarCoracao(a, { x: coracao.x, y: coracao.y, cor, escala: coracao.sprite?.scaleX ?? ESCALA.coracao }))
+    // (na tela: a caixa pode estar com a vista fora do lugar, BattleBox.setVista)
+    const caixa = pista.caixa
+    const p = caixa.naTela?.(coracao.x, coracao.y) ?? coracao
+    this.quebras.push(quebrarCoracao(a, { x: p.x, y: p.y, cor, escala: (coracao.sprite?.scaleX ?? ESCALA.coracao) * (caixa.vista?.escala ?? 1) }))
     coracao.esconder()
     this.criarFantasma(k)
     a.avisoPista[k].setText('K.O.!').setColor(TEXTO.caido).setFontSize(20).setScale(2.4)
@@ -352,7 +355,8 @@ function fontePista(arena, pista, campo) {
     campo,
     // (a arena pode dispensar uma pista: no todos contra todos só grava quando o K.O. pode acabar a partida)
     gravando: () => arena.fase === 'esquiva' && pista.aberta && (arena.gravarPista?.(pista) ?? true),
-    visivel: () => pista.aberta && pista.caixa.camera.visible,
+    // (a caixa escondida pela vista do todos contra todos continua gravando: o K.O. pode ser nela)
+    visivel: () => pista.aberta && (pista.caixa.camera.visible || pista.caixa.oculta),
     objetos: () => arena.children.list.filter((o) => o.willRender?.(pista.caixa.camera)),
     coracoes: () => pista.coracoes.map((c) => ({ sprite: c.sprite, x: c.x, y: c.y, ativo: c.ativo, cor: c.cor, j: c.jogador })),
     limites: () => pista.caixa.limites,
