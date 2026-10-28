@@ -19,6 +19,7 @@
 
 export const XP_PARTICIPACAO = 40 // jogou a partida até o fim (as duas pontas confirmaram)
 export const XP_VITORIA = 20 // bônus de quem venceu (só com resultado confirmado)
+export const XP_SEGUNDO_FFA = 10 // todos contra todos (5D, 0007): bônus do 2º lugar (o 1º é a vitória)
 export const DURACAO_MINIMA_S = 60 // medida pelo servidor, do começo ao fim
 export const RODADAS_MINIMAS = 2 // quando o resultado diz quantas rodadas teve
 export const REPETICAO_CHEIA = 3 // partidas por dia contra o mesmo oponente com XP cheio
@@ -64,12 +65,12 @@ export function progressoDoXp(total) {
 export const RESULTADOS_JOGADOS = ['vitoria', 'derrota', 'empate', 'contestada', 'participacao']
 
 // O mesmo cálculo do conceder_recompensa (SQL). repeticoes = partidas com XP
-// hoje contra esse oponente ANTES desta.
-export function xpDaPartida({ resultado, duracaoS, rodadas = null, repeticoes = 0 }) {
+// hoje contra esse oponente ANTES desta. modo/colocacao: o 2º lugar do 'ffa' (0007)
+export function xpDaPartida({ resultado, duracaoS, rodadas = null, repeticoes = 0, modo = null, colocacao = null }) {
   if (!RESULTADOS_JOGADOS.includes(resultado)) return { xp: 0, motivo: resultado ?? 'sem_relato' }
   if ((Number(duracaoS) || 0) < DURACAO_MINIMA_S || (rodadas != null && rodadas < RODADAS_MINIMAS)) return { xp: 0, motivo: 'curta' }
   if (repeticoes >= REPETICAO_LIMITE) return { xp: 0, motivo: 'repeticao' }
-  let xp = XP_PARTICIPACAO + (resultado === 'vitoria' ? XP_VITORIA : 0)
+  let xp = XP_PARTICIPACAO + (resultado === 'vitoria' ? XP_VITORIA : 0) + (modo === 'ffa' && resultado === 'derrota' && colocacao === 2 ? XP_SEGUNDO_FFA : 0)
   if (repeticoes >= REPETICAO_CHEIA) return { xp: Math.floor(xp / 2), motivo: 'repeticao_metade' }
   return { xp, motivo: resultado }
 }

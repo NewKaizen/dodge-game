@@ -103,3 +103,9 @@ test('próxima recompensa e itens até o nível', () => {
   assert.equal(P.nomeDoItem('titulo.veterano'), 'Veterano da Mesa')
   for (const m of ['convidado', 'curta', 'repeticao', 'abandono', 'sem_relato', 'contestada', 'participacao', 'cpu']) assert.ok(P.textoMotivo(m), m)
 })
+
+test('0007 (todos contra todos): o bônus do 2º lugar no SQL é o do JS', () => {
+  const sql7 = fs.readFileSync(new URL('../../../supabase/migrations/0007_ffa.sql', import.meta.url), 'utf8')
+  assert.equal(Number(/function public\.xp_ffa_segundo\(\)[^$]*\$\$ select (\d+) \$\$/.exec(sql7)?.[1]), P.XP_SEGUNDO_FFA)
+  assert.match(sql7, /v_p\.modo = 'ffa' and v_r\.resultado = 'derrota' and v_r\.colocacao = 2/)
+})

@@ -59,7 +59,7 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 //   enviarAoParceiro(dados, para?)  para = id de um membro (só o host escolhe; o convidado
 //                    vai sempre ao host: o servidor repassa em estrela)
 //   estado: caidos [{ id, nome, ate }] (todos os que caíram; outroCaiu = o primeiro, como antes)
-export const PROTOCOLO = 9
+export const PROTOCOLO = 10
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
@@ -736,9 +736,10 @@ export const limparRevanche = () => mudar({ revanche: null })
 // fim da partida: o que este PC viu; true se mandou agora (uma vez por partidaId).
 //   PVP:    { partidaId, vencedorLado: 0 | 1 | null, rodadas, duracao, personagem }
 //   CO-OP:  { partidaId, vitoria: true | false (o time venceu o chefe), rodadas, duracao, personagem }
-export function enviarResultado({ partidaId, vencedorLado, vitoria, rodadas, duracao, personagem }) {
+export function enviarResultado({ partidaId, vencedorLado, vitoria, colocacoes, rodadas, duracao, personagem }) {
   if (typeof partidaId !== 'string' || !partidaId || relatadas.has(partidaId)) return false
-  const resultado = typeof vitoria === 'boolean' ? { vitoria } : { vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null }
+  // todos contra todos (5D): as vagas do 1º ao último
+  const resultado = Array.isArray(colocacoes) ? { colocacoes: [...colocacoes] } : typeof vitoria === 'boolean' ? { vitoria } : { vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null }
   const relato = { partidaId, ...resultado, rodadas, duracao, personagem }
   if (ws?.readyState !== WebSocket.OPEN) {
     // caiu e está voltando (2D): o relato sai na volta, uma vez só

@@ -113,7 +113,7 @@ function rpcs(sb) {
       if (!['validada', 'contestada', 'encerrada'].includes(p_validacao)) throw new Error('validação inválida')
       for (const e of p_participantes ?? []) {
         const pp = t.partida_participantes.find((x) => x.partida_id === p_id && x.lado === e.lado)
-        if (pp) Object.assign(pp, { resultado: e.resultado, personagem: e.personagem ?? null, relato: e.relato ?? null, relatado_em: e.relatado_em ?? null })
+        if (pp) Object.assign(pp, { resultado: e.resultado, personagem: e.personagem ?? null, relato: e.relato ?? null, relatado_em: e.relatado_em ?? null, colocacao: [1, 2, 3, 4].includes(e.colocacao) ? e.colocacao : null })
       }
       Object.assign(p, { estado: p_validacao, validacao: p_validacao, vencedor_lado: p_vencedor_lado, motivo_termino: p_motivo, duracao_s: p_duracao_s, rodadas: p_rodadas, encerrada_em: agora().toISOString() })
       return p_validacao
@@ -139,7 +139,7 @@ function rpcs(sb) {
           let repeticoes = hoje.filter((c) => c.oponente_id === oponente && (c.oponente_ref ?? null) === oponenteRef).length
           // contra convidados também há um teto por dia, somando todos
           if (!oponente && oponenteRef && hoje.filter((c) => !c.oponente_id && c.oponente_ref).length >= CONVIDADOS_LIMITE_DIA) repeticoes = REPETICAO_LIMITE
-          const { xp, motivo } = xpDaPartida({ resultado: pp.resultado, duracaoS: p.duracao_s, rodadas: p.rodadas, repeticoes })
+          const { xp, motivo } = xpDaPartida({ resultado: pp.resultado, duracaoS: p.duracao_s, rodadas: p.rodadas, repeticoes, modo: p.modo, colocacao: pp.colocacao ?? null })
           const total = (perfil.xp ?? 0) + xp
           const nivel = nivelDoXp(total)
           const tem = new Set(t.inventario.filter((i) => i.user_id === pp.user_id).map((i) => i.item_id))
