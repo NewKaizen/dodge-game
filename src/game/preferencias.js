@@ -20,6 +20,7 @@
 //                     p2: {...} } com códigos de KeyboardEvent.code (ver lib/simulador.js)
 //   botoesPad         null (padrão) ou { A: [...], B: [...], C: [...] } com índices de botão do controle
 //                     físico (Gamepad API, ver game/gamepad.js)
+//   joysticksSerial   null ou { '<vid>:<pid>#<índice>': jogador } quem é P1/P2 em cada porta serial (lib/joysticks.js)
 //   zonaMorta         0.1 a 0.8: quanto o analógico do controle precisa inclinar para contar (padrão 0.35)
 import { problemasDosBotoes, zonaMortaValida, ZONA_MORTA_PADRAO } from './gamepad.js'
 
@@ -35,6 +36,7 @@ export const PREFERENCIAS_PADRAO = {
   teclas: null,
   botoesPad: null,
   zonaMorta: ZONA_MORTA_PADRAO,
+  joysticksSerial: null,
 }
 
 export const OPCOES = {
@@ -49,6 +51,7 @@ function valido(chave, valor) {
   if (OPCOES[chave]) return OPCOES[chave].includes(valor)
   if (chave === 'teclas') return valor === null || typeof valor === 'object'
   if (chave === 'botoesPad') return valor === null || problemasDosBotoes(valor).length === 0
+  if (chave === 'joysticksSerial') return valor === null || (typeof valor === 'object' && !Array.isArray(valor))
   if (chave === 'zonaMorta') return zonaMortaValida(valor)
   return typeof valor === typeof PREFERENCIAS_PADRAO[chave]
 }

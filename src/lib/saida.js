@@ -1,9 +1,11 @@
 import { jogo, MAX_JOGADORES } from './estado.js'
-import { enviarSerial } from './serial.js'
+import { enviarSerial, aoMudarJoysticks } from './serial.js'
 import { linhaVida } from './conversao.js'
 
-// Comandos do jogo para o joystick (docs/protocolo-serial.md): o Arduino
-// principal (jogador 1) executa os "1 ..." e repassa os "2 ..." ao secundário.
+// Comandos do jogo para os joysticks (docs/protocolo-serial.md): uma placa por porta USB.
+// PING/GAME/MENU/DISCONNECT vão a todas as portas; "<n> VIDA/BUZZER" só à do jogador n
+// (lib/joysticks.js decide; com uma porta só e uma placa secundária atrás, o "2 ..." segue
+// pela mesma porta e a principal repassa).
 // As cenas só avisam o que aconteceu; aqui decide o que mandar e evita repetir
 // linha (a serial é 9600 baud). Sem joystick conectado, nada sai.
 //
@@ -12,7 +14,7 @@ import { linhaVida } from './conversao.js'
 //   informarVida(j, hp, max)  pode chamar todo frame: só manda VIDA quando o HP muda
 //   levouGolpe(j)             BUZZER do jogador
 //
-// O LED RGB do principal fica por conta do firmware (vermelho sem conexão,
+// O LED RGB fica por conta do firmware (vermelho sem conexão,
 // verde no menu, azul piscando na luta): ele sobrescreveria um "1 LED ..." daqui.
 
 const INTERVALO_PING = 1000 // ms: os Arduinos mostram SEM CONEXAO depois de 3 s calados
@@ -37,7 +39,7 @@ function mandarEstado() {
   timerEstado = null
   if (estado === estadoEnviado) return
   estadoEnviado = estado
-  enviar(`1 ${estado}`)
+  enviar(estado)
 }
 
 function mudarEstado(novo) {
@@ -71,9 +73,18 @@ export function levouGolpe(j) {
   enviar(`${j + 1} BUZZER`)
 }
 
+// Um joystick abriu, fechou ou trocou de jogador: a placa nova precisa do estado e da vida de novo
+aoMudarJoysticks(() => {
+  if (fonte !== 'serial') return
+  estadoEnviado = null
+  vidasEnviadas = []
+  enviar('PING')
+  mandarEstado()
+})
+
 // Ao conectar: PING, o estado atual (a vida vai no próximo frame da luta) e um
-// PING por segundo enquanto a porta estiver aberta, mesmo sem nada mudar (o
-// principal repassa ao secundário; os dois só sabem que o jogo está vivo assim)
+// PING por segundo enquanto a porta estiver aberta, mesmo sem nada mudar (as placas
+// só sabem que o jogo está vivo assim)
 jogo.subscribe((s) => {
   if (s.fonte === fonte) return
   fonte = s.fonte
@@ -82,9 +93,9 @@ jogo.subscribe((s) => {
   if (fonte !== 'serial') return
   estadoEnviado = null
   vidasEnviadas = []
-  enviar('1 PING')
+  enviar('PING')
   mandarEstado()
-  timerPing = setInterval(() => enviar('1 PING'), INTERVALO_PING)
+  timerPing = setInterval(() => enviar('PING'), INTERVALO_PING)
 })
 
 // Avisa o Arduino que o jogo vai embora (botão Desconectar ou fechar a aba).
@@ -93,7 +104,7 @@ export function despedir() {
   clearInterval(timerPing)
   timerPing = null
   clearTimeout(timerEstado)
-  return enviar('1 DISCONNECT')
+  return enviar('DISCONNECT')
 }
 // fechando a aba a escrita pode não dar tempo de sair, mas não custa tentar
 if (typeof window !== 'undefined') window.addEventListener('pagehide', despedir)

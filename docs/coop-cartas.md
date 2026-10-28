@@ -286,6 +286,126 @@ HP 0 → cai: não joga cartas e não entra no quadro (o coração dele some). V
 sozinho depois de 2 rodadas (30% do HP), ou antes, com uma cura de copas do
 parceiro (aí entra no quadro na rodada seguinte).
 
+## CO-OP de 3 e 4 (online, Fase 5B)
+
+Só nas salas de amigos ONLINE: o dono escolhe **CO-OP 3–4** (`coop4`, 3 ou 4 jogadores) no lobby. Com 2
+jogadores o CO-OP continua o `coop` de sempre (a `CoopArena`, sem nenhuma mudança). Fluxo:
+Lobby → `EscolhaPartyN` → `Selecao` (chefe) → `Dificuldade` (nível) → **`CoopArenaN`** → `Vitoria` / `GameOver` → lobby.
+O host da partida (o eleito, [rede-pvp.md](rede-pvp.md)) troca as cenas com `irParaCena` e cada convidado confirma
+que abriu (`cenaOk`). As regras são as mesmas deste documento, generalizadas para N em `coop/regras.js`
+(`resolverRodadaCoop(estado, ...jogadas)` aceita uma jogada por jogador); o que o grupo acrescenta está abaixo.
+
+- **Party**: cada um escolhe o PRÓPRIO personagem, sem repetir (o baralho de cada personagem é só dele). Quem arbitra é
+  o host: o primeiro pedido a chegar leva o personagem e quem perdeu vê "FULANO pegou X primeiro". Confirmar é
+  definitivo; com todos confirmados o host leva todos à `Selecao`. A party vai **por vaga** (`party[vaga]`), não por lado.
+- **Quadro único com N corações**: o quadro cresce com o grupo (`quadroDoGrupo`, até o campo dele: 3 jogadores
+  386×187, 4 jogadores 437×194 contra 336×180 de 2) e os corações começam lado a lado em ordem de vaga.
+  Cada coração é identificado por **três pistas, a cor nunca é a única**: a cor da vaga (`game/vagas.js`), uma
+  **forma** (P1 círculo, P2 quadrado, P3 triângulo, P4 losango) e o **nome** do jogador em cima dele. Os mesmos
+  formato e cor aparecem no cartão do jogador no HUD e na carta revelada. As cores P3/P4 de protanopia,
+  deuteranopia e tritanopia foram trocadas na 5B (o P4 era quase igual ao P1 para quem tem protanopia, ΔE 9);
+  `src/game/__tests__/coresDasVagas.test.js` confere os quatro modos (ΔE ≥ 40 entre as quatro vagas, longe das
+  balas brancas e do aviso, 3:1 contra o fundo).
+- **Sem colisão entre aliados**: o coração só leva dano de bala (cada um só se machuca no PC dele); aliados se
+  atravessam. O meu coração anda pelo meu joystick e colide aqui; os dos outros são espelho (andam pelas posições que
+  chegam, interpoladas) e não colidem aqui.
+- **HUD de 4** (854×480): um cartão de 190×62 por jogador no alto (vagas 0 e 1 à esquerda do relógio, 2 e 3 à direita):
+  forma + nome, **estado da mão** (ESCOLHENDO / PRONTO / CAÍDO volta em N / SEM CONEXÃO (volta caído) 12s / SAIU), barra e número de HP,
+  as 10 gemas de energia, o combo de perfeitos, escudo / 2ª chance e as cartas da mão. O cartão do jogador deste PC
+  tem borda grossa e "VOCÊ". Só a MINHA mão aparece na tela (cursor, prévia e PASSAR são só meus): as cartas dos outros
+  só viram na revelação, com o nome de cada um em cima.
+
+### Mira do chefe: rodízio
+
+Antes, os ataques mirados (`a.alvo()`) alternavam entre todos. Num grupo de 3 ou mais o chefe **escolhe quem mira** a
+cada rodada (`escolherMira`, `coop/regras.js`):
+
+- de pé = não caído, com conexão e que não saiu; com 2 ou menos de pé, mira em todos (como no CO-OP de 2);
+- com 3 ou mais de pé, mira em **metade deles, arredondada para cima** (3 de pé: 2; 4 de pé: 2);
+- os escolhidos são **os que levaram mira há mais tempo** (`ultimaMira`); empate: o mirado menos vezes, depois a menor vaga.
+  Com 4 de pé cada um é mirado a cada duas rodadas; com 3 de pé a diferença entre dois jogadores nunca passa de uma
+  mira; quem volta de uma queda ou foi resgatado passa na frente da fila.
+
+Os tiros mirados só vão para os corações dos escolhidos (`ContextoAtaque.mira`, o resto do ataque, como paredes,
+chuvas e áreas dos SUPER, é para todos). **A mira aparece antes do ataque**: o nome dos alvos ("ALVO: ANA · CAIO") sai
+junto da carta do chefe, os personagens deles ganham "ALVO!" e, quando o quadro abre, cada coração mirado ganha uma mira
+girando (anel com 4 pontas) e o nome dos alvos fica na linha de baixo do quadro.
+
+### Resgate e apoio
+
+- **♥ cura e escudo**: com 2 jogadores valem para os dois. Num grupo valem para **quem jogou e até 2 aliados**
+  (`GRUPO[n].apoioAliados`): primeiro os caídos (o que caiu há mais tempo), depois os de menor fração de HP. O ♥ continua
+  **levantando** o caído (com pelo menos 25% do HP máx). O texto da carta mostra "VOCÊ E 2 ALIADOS (os caídos primeiro,
+  depois os mais feridos)" e a revelação mostra "APOIA FULANO+CICRANO". O **A♥ (Segunda chance)** vale para **todos**
+  e levanta todos os caídos.
+- **Resgate por rodada limpa** (novo, só no grupo): se havia quadro e **ninguém no quadro levou um acerto**, o caído há
+  mais tempo volta na hora do fim da rodada, com 30% do HP (`resgatarPorRodadaLimpa`). É o jeito de salvar um aliado só
+  com esquiva, sem gastar carta; aparece "RODADA LIMPA! FULANO VOLTA" e "RESGATADO!". Rodada sem quadro (A♠/A♦/A♣/SUPER
+  tiraram o ataque) não vale. A volta sozinha depois de 2 rodadas continua.
+
+### Combos de carta no grupo
+
+- **COMBO** (mesmo naipe, ×1,25) e **PAR** (mesmo valor, ×1,5) valem para quem combina com **qualquer outro** golpe comum
+  da rodada, cada um com o seu grupo: três espadas valem ×1,35 em cada, quatro ×1,45 (`COOP.comboGrupo` 0,10 por
+  jogador a mais). Dois do mesmo naipe e um de outro: só os dois combinam. Caído não combina.
+- **SUPER COMBO**: 2 ou mais SUPER na mesma rodada. O teto e a divisão seguem o do CO-OP de 2 (40/45/50% do HP máx por
+  nível, dividido entre os SUPER) e sobe `COOP.superComboGrupo` (25%) por SUPER a mais (3 SUPER: +25%; 4: +50%), então o
+  terceiro e o quarto SUPER não são jogados fora. O chefe com mais da metade do HP continua aguentando.
+
+### Equilíbrio por tamanho (provisório; a 5C mede e ajusta)
+
+`GRUPO[n]` em `coop/regras.js` (3 e 4 jogadores) mexe em **quatro frentes**, não só na vida do chefe:
+
+| | 2 (como sempre) | 3 | 4 |
+|---|---|---|---|
+| vida do chefe (`hpChefe`) | ×1 | ×1,60 | ×2,20 |
+| densidade das balas do quadro (`densidade`) | ×1 | ×1,15 | ×1,30 |
+| espaço do quadro (`espaco`, largura × altura) | 336×180 | ×1,15 × ×1,04 | ×1,30 × ×1,08 |
+| aliados que o ♥ alcança (`apoioAliados`) | o outro | 2 | 2 |
+| mira por rodada (`miraPorRodada`) | todos | metade | metade |
+
+A vida do chefe sozinha só mantém a **duração** da luta: cada jogador a mais bate nele, então ×1,35/×1,70 deixavam a luta de 4 em
+4,7 rodadas (contra 6,5 de 2, no FÁCIL); com ×1,60 e ×2,20 as lutas ficam em 6,6 e 6,1 rodadas (`scripts/balanceamento/simularGrupo.mjs`,
+uma simulação grossa com os bots aliados e acertos sorteados, que mostra também que o grupo ainda ganha mais que a dupla: no DIFÍCIL
+com muitos acertos a dupla vence 55% e os de 3 e 4 vencem 100%). Por isso densidade, espaço e apoio são os botões que a 5C deve
+mexer para dar perigo ao grupo.
+
+A densidade soma à do quadro de 2 (`QUADRO.ritmo`, 30% a mais). Tudo o resto (SUPER do chefe a cada 10 rodadas, dano por
+acerto, cura do chefe, `retornoRodadas`) ficou como no CO-OP de 2.
+
+### Queda e volta no meio da luta
+
+Sala de 3 ou 4 (5A): quem cai da rede fica **20 s** na vaga; os outros **não param**. Na hora o cartão dele diz
+"SEM CONEXÃO (volta caído) 12s", o personagem fica apagado e o coração some do quadro. A rodada que está rolando termina sem ele (o
+host não espera a jogada nem o fim da esquiva dele; jogada = passar, sem energia). O host marca `ausente` no estado a
+cada rodada (`definirPresenca`): **fora do quadro, fora da mira, sem carta** (e quem está ausente não segura a
+derrota: perde quando todos os que ainda estão na luta caíram).
+
+- **Volta caído (regra anti-fuga)**: quem cai da rede durante a luta é **derrubado na hora** (HP 0, o mesmo estado de
+  quem foi nocauteado). Só o host marca (`derrubarAusentes`, a cada tick e no começo da rodada), então vale mesmo que o
+  convidado nunca volte e puxar o cabo no meio do SUPER do chefe (ou numa rodada ruim) não desvia o dano: ele não volta
+  com o HP de antes. O resgate é o de sempre: rodada limpa (o caído há mais tempo volta com 30%), ♥ e A♥; a volta
+  sozinha após `retornoRodadas` não corre enquanto ele está sem conexão. Dentro ou depois dos 20 s é igual (depois,
+  `saiu`). Quem já estava caído continua caído. Quem cai da rede não conta como de pé: se os que sobram estão todos
+  caídos, a derrota é a de sempre. O CO-OP de 2 e o PVP não mudam.
+- **Voltou em 20 s**: o host manda a cena só para ele (`dadosRetomadaPara`, 5A) com o **estado de agora**. Ele vê a luta
+  como está (HP, energia, o monte dele) e **entra na próxima rodada** ("VOCÊ VOLTOU! entra na próxima rodada"); o
+  que sobrar da rodada atual ele ignora. Ele **continua caído**: na rodada em que entra, todos veem "voltou caído:
+  precisa de resgate" (evento `voltouCaido` do `inicio`).
+- **Não voltou**: sai da luta de vez (`saiu`: o cartão diz SAIU, o coração e a mira somem e ele não volta); a luta
+  continua com os outros e o servidor registra o abandono dele (sem XP, [online.md](online.md)).
+- **Caiu o host**: como na 2D, todos param e a rodada volta ao começo (ponto de retomada); sem volta em 20 s a sala fecha.
+
+### Pendências (ideias para a 5C)
+
+- medir as lutas de 3 e 4 (`scripts/balanceamento/` ainda é de 2): vitória por chefe/nível/grupo, rodadas por luta, e ajustar `GRUPO[n]`;
+- o SUPER do chefe (carga de 10 rodadas) e a lentidão do ♦ podem escalar com o grupo; hoje não escalam;
+- dano por acerto e HP dos personagens nos grupos grandes (cada coração a mais é mais um lugar para uma bala acertar);
+- o resgate por rodada limpa pode precisar de um piso (ex.: só 1 resgate a cada 3 rodadas) se virar fácil demais com 4;
+- um combo de equipe de verdade (ex.: um naipe de cada: ♠♦♣♥ juntos), hoje só as combinações de naipe e valor;
+- a CPU aliada (`bot.js`) já sabe escolher o aliado que mais precisa, mas o modo de 3–4 não tem CPU: dá para completar a
+  sala com CPU depois.
+
 ## Arquivos
 
 | Arquivo | O que faz |
@@ -298,6 +418,7 @@ parceiro (aí entra no quadro na rodada seguinte).
 | `src/game/coop/bot.js` | CPU aliada (1 jogador) |
 | `src/game/scenes/CoopArena.js` | a cena (estende a PvpArena: mesma escolha de cartas) |
 | `src/game/coop/ArenaRedeCoop.js` | a ponte da partida em rede (estende `pvp/rede/ArenaRede.js`) |
+| `src/game/coop/ArenaRedeCoopN.js` · `scenes/CoopArenaN.js` · `scenes/EscolhaPartyN.js` · `coop/HudCoopN.js` · `coop/partyN.js` · `coop/marcadores.js` | o CO-OP de 3 e 4: ponte em estrela, arena, escolha de party, HUD, party e formas dos corações (5B) |
 | `src/game/coop/__tests__/` | testes |
 
 ## Testes

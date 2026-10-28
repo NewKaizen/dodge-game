@@ -19,7 +19,11 @@ import { TEXTO_JOGADOR } from './pvp/perfil.js'
 //   almas       o coração (e a cor) de cada jogador: P1 e P2
 //   textoAlmas  as mesmas, claras, para texto em fundo escuro (TEXTO_JOGADOR)
 //   vagasExtra  a cor do P3 e do P4 nas salas de N (Fase 5A; o lobby usa, game/vagas.js).
-//               A forma e o nome do coração de cada um ficam para a 5B
+//               Na 5B os quatro corações do CO-OP 3–4 também têm FORMA e NOME (coop/marcadores.js: a
+//               cor nunca é a única pista). Os P3/P4 de protanopia/deuteranopia/tritanopia foram
+//               escolhidos por busca (distancia() >= 40 entre os quatro e das balas brancas, claridade
+//               >= 50) e conferidos em __tests__/coresDasVagas.test.js: com o P3 e o P4 de antes, o
+//               P4 (violeta) era quase igual ao P1 (azul) para quem tem protanopia (ΔE 9)
 //
 // Como as paletas foram escolhidas: a partir das cores de Okabe & Ito (seguras
 // para daltônicos), clareadas para aparecer no fundo preto, e conferidas com a
@@ -33,9 +37,9 @@ export const MODOS = ['nenhum', 'protanopia', 'deuteranopia', 'tritanopia']
 
 const PALETAS = {
   nenhum: { aviso: 0xff3048, acerto: 0xff3048, almas: [0xff2030, 0xffd23a], textoAlmas: ['#ff5a66', '#ffd23a'], vagasExtra: [0x4da6ff, 0x6dffb0] },
-  protanopia: { aviso: 0xff8ae6, acerto: 0xff8ae6, almas: [0x3d9bff, 0xffc23a], textoAlmas: ['#6cb4ff', '#ffc23a'], vagasExtra: [0xf0f0f0, 0xb07cff] },
-  deuteranopia: { aviso: 0xff8ae6, acerto: 0xff8ae6, almas: [0x3d9bff, 0xffc23a], textoAlmas: ['#6cb4ff', '#ffc23a'], vagasExtra: [0xf0f0f0, 0xb07cff] },
-  tritanopia: { aviso: 0xe060ff, acerto: 0xe060ff, almas: [0xff3040, 0x30e0c0], textoAlmas: ['#ff6a74', '#4ee8cc'], vagasExtra: [0xffd0f0, 0x6a8cff] },
+  protanopia: { aviso: 0xff8ae6, acerto: 0xff8ae6, almas: [0x3d9bff, 0xffc23a], textoAlmas: ['#6cb4ff', '#ffc23a'], vagasExtra: [0x777788, 0xaa7744] },
+  deuteranopia: { aviso: 0xff8ae6, acerto: 0xff8ae6, almas: [0x3d9bff, 0xffc23a], textoAlmas: ['#6cb4ff', '#ffc23a'], vagasExtra: [0x777788, 0xaa7744] },
+  tritanopia: { aviso: 0xe060ff, acerto: 0xe060ff, almas: [0xff3040, 0x30e0c0], textoAlmas: ['#ff6a74', '#4ee8cc'], vagasExtra: [0x8855ff, 0xeeaa77] },
 }
 
 export function paletaDaltonismo(modo) {

@@ -289,7 +289,7 @@ export default class Vitoria extends Phaser.Scene {
 
   mensagem(rapido) {
     const nome = this.def.nome
-    const texto = `${nome} caiu! Ninguém segura essa dupla!`
+    const texto = `${nome} caiu! Ninguém segura ${partyDe(this.registry).length > 2 ? 'essa turma' : 'essa dupla'}!`
     const t = this.add
       .text(LARGURA / 2, 114, texto, estilo(18, TEXTO.normal))
       .setOrigin(0.5)
@@ -316,7 +316,7 @@ export default class Vitoria extends Phaser.Scene {
     membros.forEach(({ textura, x, atraso }, i) => {
       const sombra = this.add.ellipse(x, chao + 2, 40, 10, 0x000000, 0.45).setDepth(4)
       const s = this.add.image(x, chao, textura).setOrigin(0.5, 1).setScale(ESCALA.personagem).setDepth(5)
-      if (i === 1) s.setFlipX(true) // os dois virados um para o outro
+      if (i >= Math.ceil(party.length / 2)) s.setFlipX(true) // a metade de lá vira para a de cá (com 2: os dois virados um para o outro)
       if (!rapido) {
         s.x -= 200
         sombra.x -= 200

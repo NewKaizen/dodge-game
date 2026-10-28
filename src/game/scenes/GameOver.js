@@ -76,6 +76,13 @@ const DICAS = [
   'A barra ★ embaixo do HP do chefe é o SUPER dele. O Ás de ouros tira carga dela.',
   'A armadilha (♣) fica mais forte a cada graze. Passe raspando!',
 ]
+// só nas salas de 3 e 4 (CO-OP 3–4, Fase 5B)
+const DICAS_GRUPO = [
+  'Rodada limpa (ninguém levou acerto) levanta o caído há mais tempo. Esquivem juntos!',
+  'O chefe mira em metade do grupo por rodada, os mirados há mais tempo: a mira gira no coração do alvo.',
+  'Três jogando o mesmo naipe fazem COMBO x1,35 em cada um; quatro, x1,45.',
+  'Uma carta de cura (♥) alcança você e dois aliados, os caídos primeiro.',
+]
 const DICA_NIVEL = 'Está difícil demais? Em B dá para escolher o chefe de novo e trocar o nível.'
 
 const estilo = (tamanho, cor = TEXTO.normal, extra = {}) => ({
@@ -406,7 +413,8 @@ export default class GameOver extends Phaser.Scene {
   }
 
   dica(rapido) {
-    const dicas = this.nivel !== 'facil' && Math.random() < 0.3 ? [DICA_NIVEL] : DICAS
+    const grupo = partyDe(this.registry).length > 2
+    const dicas = this.nivel !== 'facil' && Math.random() < 0.3 ? [DICA_NIVEL] : grupo ? [...DICAS, ...DICAS_GRUPO, ...DICAS_GRUPO] : DICAS
     const texto = Phaser.Utils.Array.GetRandom(dicas)
     const y = 368
     const caixa = this.add.rectangle(LARGURA / 2, y, 560, 52, CORES.painel, 0.85).setStrokeStyle(2, 0x5a2a30).setDepth(9)

@@ -34,6 +34,25 @@
 //   const lista = calcularGolpes(estado, r.golpes, desempenho)   desempenho[j] = { perfeito, grazes }
 //   lista.forEach((g) => aplicarGolpe(estado, g.dano))
 //   fimDaRodadaCoop(estado)            -> { vencedor: 'vitoria' | 'derrota' | null, novaFase }
+//
+// GRUPOS DE 3 E 4 (Fase 5B, só online: docs/coop-cartas.md "CO-OP de 3 e 4"): o estado
+// ganha `n` jogadores (p1..p4) e tudo acima vale para N (`resolverRodadaCoop(estado,
+// ...jogadas)` aceita uma jogada por jogador). Com 2 jogadores nada muda. O que o grupo
+// acrescenta (regras puras, testadas em __tests__/grupoN.test.js):
+//   GRUPO[n]              botões de equilíbrio por tamanho (vida do chefe, densidade e espaço
+//                         do quadro, quantos aliados o ♥ alcança); a 5C ajusta
+//   escolherMira(estado)  RODÍZIO DE MIRA: com 3 ou mais de pé, o chefe mira em metade deles
+//                         (arredondada para cima), os que levaram mira há MAIS tempo; os tiros
+//                         mirados (a.alvo()) só vão para esses (estado.chefe.mira, quadro.mira)
+//   resgate               RODADA LIMPA: ninguém no quadro levou acerto -> o caído há mais tempo
+//                         volta (retornoHp) já no fim da rodada (fimDaRodadaCoop devolve
+//                         `resgatados`). O ♥ também levanta (como no CO-OP de 2) e a volta
+//                         sozinha continua
+//   definirPresenca       quem caiu da rede (`ausente`: não joga, fora do quadro, sem mira) e quem
+//                         saiu de vez (`saiu`); a luta segue com os outros
+//   combos                COMBO (mesmo naipe) e PAR (mesmo valor) valem para quem combina com
+//                         QUALQUER outro; cada jogador a mais no grupo soma +0,10 ao fator;
+//                         SUPER COMBO com 2+ SUPER (3 SUPER: teto +25%, 4: +50%)
 
 import { NIVEIS } from '../constants.js'
 import { criarBaralho, completarMao, comprar, descartar, cartaNaMao, criarRng, embaralhar, MAO } from '../pvp/baralho.js'
@@ -98,7 +117,24 @@ export const COOP = {
   rouboEnergia: 2,
   anularCarga: 2,
   segundaChance: 0.25,
+  comboGrupo: 0.1, // 3+ jogadores no mesmo COMBO/PAR: soma isto ao fator por jogador a mais
+  superComboGrupo: 0.25, // 3+ SUPER na mesma rodada: soma isto ao teto do SUPER COMBO por SUPER a mais
 }
+
+// Equilíbrio por tamanho do grupo (online, 5B; a 5C mede e ajusta). Mais corações no quadro
+// = mais lugares para uma bala acertar, então o chefe aperta em TRÊS frentes, não só na vida:
+//   hpChefe      multiplica a vida do chefe (cada jogador a mais bate nele)
+//   densidade    multiplica a densidade das balas do quadro (QUADRO.ritmo)
+//   espaco       multiplica a largura/altura do quadro (coop/quadro.js, até o campo dele)
+//   apoioAliados quantos ALIADOS um ♥ alcança além de quem jogou (2 jogadores: o outro)
+//   miraPorRodada fração dos jogadores de pé que o chefe mira por rodada (rodízio)
+export const GRUPO = {
+  2: { hpChefe: 1, densidade: 1, espaco: { largura: 1, altura: 1 }, apoioAliados: 1, miraPorRodada: 1 },
+  3: { hpChefe: 1.6, densidade: 1.15, espaco: { largura: 1.15, altura: 1.04 }, apoioAliados: 2, miraPorRodada: 0.5 },
+  4: { hpChefe: 2.2, densidade: 1.3, espaco: { largura: 1.3, altura: 1.08 }, apoioAliados: 2, miraPorRodada: 0.5 },
+}
+export const MAX_GRUPO = 4
+export const grupoDe = (n) => GRUPO[Math.min(MAX_GRUPO, Math.max(2, n))]
 
 // Dano base do contra-ataque de cada naipe, pelo valor da carta
 export const GOLPE = {
@@ -119,8 +155,9 @@ export function danoComEscudo(dano, escudo) {
 const pct = (f) => `${Math.round(f * 100)}%`
 
 // Texto da carta no CO-OP (a prévia ampliada mostra este no lugar do texto do PvP).
-// luta = { hpMax, nivel } do chefe: o SUPER mostra o dano de verdade nesta luta
-// (sem ela, como no Guia, mostra as frações do HP)
+// luta = { hpMax, nivel, grupo? } do chefe: o SUPER mostra o dano de verdade nesta luta
+// (sem ela, como no Guia, mostra as frações do HP); `grupo` (GRUPO[n], 3 e 4 jogadores) troca
+// "o parceiro" por "os aliados" nos textos de suporte
 export function descricaoCoop(carta, luta = null) {
   if (ehSuper(carta)) {
     const fim = `Com mais da metade do HP, o chefe aguenta.`
@@ -135,21 +172,23 @@ export function descricaoCoop(carta, luta = null) {
   if (especial === 'espelho') return `ESPECIAL: o ataque do chefe volta e acerta ele (ninguém desvia). Sem nada para refletir (ou contra o SUPER dele), golpe de ${GOLPE.espadas(ECO)}.`
   if (especial === 'anular') return `ESPECIAL: cancela o ataque do chefe (ninguém desvia) e tira ${COOP.anularCarga} da carga do SUPER dele.`
   if (especial === 'roubo') return `ESPECIAL: rouba o ataque do chefe (ninguém desvia) e você ganha +${COOP.rouboEnergia} de energia.`
-  if (especial === 'segundaChance') return `ESPECIAL: VOCÊ E O PARCEIRO curam ${pct(COOP.segundaChance)} do HP máximo e ninguém cai nesta rodada. Levanta o parceiro caído.`
+  const grupo = luta?.grupo ?? null
+  if (especial === 'segundaChance') return grupo ? `ESPECIAL: TODOS curam ${pct(COOP.segundaChance)} do HP máximo e ninguém cai nesta rodada. Levanta os caídos.` : `ESPECIAL: VOCÊ E O PARCEIRO curam ${pct(COOP.segundaChance)} do HP máximo e ninguém cai nesta rodada. Levanta o parceiro caído.`
   const v = carta.valor
   if (carta.naipe === 'espadas') return `Contra-ataque: golpe de ${GOLPE.espadas(v)} no chefe depois da esquiva (CRÍTICO x${COOP.critico} se você não levar dano).`
   if (carta.naipe === 'ouros') return `Contra-ataque: golpe de ${GOLPE.ouros(v)} e o ataque do chefe fica ${pct(1 - lentidaoDoOuros(v))} mais lento para os dois.`
   if (carta.naipe === 'paus') return `Armadilha: golpe de ${GOLPE.paus(v)} no chefe, +${pct(COOP.grazeArmadilha)} a cada graze na esquiva (até +${pct(COOP.grazeArmadilhaMax)}).`
   const ef = efeitosDaCarta(carta) ?? {}
   const partes = []
-  if (ef.cura) partes.push(`cura ${ef.cura} HP em VOCÊ E NO PARCEIRO (levanta o parceiro caído)`)
-  if (ef.escudo) partes.push(`escudo nos DOIS: o próximo ataque causa ${pct(ef.escudo)} do dano`)
+  const quem = grupo ? `VOCÊ E ${grupo.apoioAliados} ALIADOS (os caídos primeiro, depois os mais feridos)` : 'VOCÊ E NO PARCEIRO'
+  if (ef.cura) partes.push(`cura ${ef.cura} HP em ${quem}${grupo ? '; levanta o caído' : ' (levanta o parceiro caído)'}`)
+  if (ef.escudo) partes.push(`escudo ${grupo ? 'neles' : 'nos DOIS'}: o próximo ataque causa ${pct(ef.escudo)} do dano`)
   if (ef.energia) partes.push(`+${ef.energia} de energia para você`)
   if (ef.compra) partes.push(`você compra ${ef.compra} carta${ef.compra > 1 ? 's' : ''}`)
   return `Suporte: ${partes.join('; ')}.`
 }
 
-const ID_JOGADOR = ['p1', 'p2']
+const ID_JOGADOR = ['p1', 'p2', 'p3', 'p4']
 
 // ---------- partida ----------
 
@@ -158,6 +197,9 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
   if (!def) throw new Error(`chefe sem baralho de cartas: ${chefe}`)
   const niv = nivelDoChefe(chefe, nivel)
   const rng = criarRng(`${semente}:coop`)
+  // 2 jogadores (ou 1 + CPU aliada) é o CO-OP de sempre; 3 e 4 são do online (5B)
+  const n = Math.min(MAX_GRUPO, Math.max(2, party.length))
+  const grupo = n > 2 ? grupoDe(n) : null
   const jogador = (personagem, j) => {
     const hp = hpInicial(personagem)
     return {
@@ -176,12 +218,12 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
       baralho: criarBaralho(personagem, `${semente}:${ID_JOGADOR[j]}`),
     }
   }
-  const hpChefe = Math.round(def.hp * niv.hp)
+  const hpChefe = Math.round(def.hp * niv.hp * (grupo?.hpChefe ?? 1))
   const nivelDaLuta = NIVEIS[nivel] ? nivel : 'facil'
   const comTextoCoop = (jog) => {
     for (const carta of jog.baralho.monte) {
       if (ehSuper(carta)) carta.custo = COOP.custoSuper
-      carta.descricao = descricaoCoop(carta, { hpMax: hpChefe, nivel: nivelDaLuta })
+      carta.descricao = descricaoCoop(carta, { hpMax: hpChefe, nivel: nivelDaLuta, grupo })
     }
     return jog
   }
@@ -193,7 +235,9 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
     rodada: 0,
     fase: 'inicio',
     rng,
-    jogadores: [comTextoCoop(jogador(party[0], 0)), comTextoCoop(jogador(party[1] ?? party[0], 1))],
+    n,
+    grupo, // os botões de equilíbrio do tamanho (GRUPO; null com 2 jogadores)
+    jogadores: Array.from({ length: n }, (_, j) => comTextoCoop(jogador(party[j] ?? party[0], j))),
     chefe: {
       id: chefe,
       hp: hpChefe,
@@ -205,6 +249,7 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
       monte: embaralhar(CARTAS_CHEFES[chefe].fases[0].map((c) => ({ ...c })), rng),
       descarte: [],
       intencao: null, // a carta virada que o chefe vai jogar nesta rodada (no quadro, nos dois)
+      mira: null, // (3+ jogadores) quem o chefe mira nesta rodada: índices dos jogadores (escolherMira)
     },
     vencedor: null,
     historico: [],
@@ -237,7 +282,60 @@ function derrubar(estado, j) {
   jog.voltaEm = estado.rodada + COOP.retornoRodadas + 1
 }
 
-const emPe = (estado) => [0, 1].filter((j) => !estado.jogadores[j].caido)
+// quem está fora da luta (grupo de 3+): caiu da rede (ausente, volta em até 20 s) ou saiu de vez
+const fora = (jog) => Boolean(jog.ausente || jog.saiu)
+// os índices dos jogadores (0..n-1)
+const indices = (estado) => estado.jogadores.map((_, j) => j)
+const emPe = (estado) => indices(estado).filter((j) => !estado.jogadores[j].caido && !fora(estado.jogadores[j]))
+
+// Quem caiu da rede / saiu de vez (grupo de 3+, definido pelo host): fora do quadro, sem mira,
+// sem jogar carta; a luta segue com os outros. saiu não volta. REGRA ANTI-FUGA: quem cai da rede
+// durante a luta VOLTA CAÍDO (HP 0, igual a quem foi derrubado): puxar o cabo não desvia o SUPER
+// nem uma rodada ruim. Quem estava de pé é derrubado na hora; quem já estava caído continua caído
+// (e o relógio de volta não corre). derrubarAusentes devolve quem foi derrubado agora; definirPresenca
+// devolve também `voltaram`: quem estava fora e voltou (continua caído: precisa de resgate)
+export function derrubarAusentes(estado, { ausentes = [], saiu = [] } = {}) {
+  const derrubados = []
+  if (estado.n <= 2) return derrubados
+  estado.jogadores.forEach((jog, j) => {
+    if (!ausentes.includes(j) && !saiu.includes(j)) return
+    if (ausentes.includes(j)) jog.ausente = true // (a volta é notada em definirPresenca)
+    if (jog.caido) return
+    derrubar(estado, j)
+    derrubados.push(j)
+  })
+  return derrubados
+}
+
+export function definirPresenca(estado, { ausentes = [], saiu = [] } = {}) {
+  const voltaram = []
+  estado.jogadores.forEach((jog, j) => {
+    if (jog.ausente && !ausentes.includes(j) && !saiu.includes(j) && jog.caido) voltaram.push(j)
+    jog.ausente = ausentes.includes(j)
+    if (saiu.includes(j)) jog.saiu = true
+  })
+  const derrubados = derrubarAusentes(estado, { ausentes, saiu })
+  return { derrubados, voltaram }
+}
+
+// RODÍZIO DE MIRA (3+ de pé): o chefe mira em `miraPorRodada` dos que estão de pé (metade,
+// arredondada para cima), os que levaram mira há MAIS tempo (empate: o mirado menos vezes, depois
+// o de menor vaga). Os tiros
+// mirados (a.alvo()) só vão para eles; o resto do ataque (áreas, paredes) é para todos. Com 2 ou
+// menos de pé, todos. Devolve os índices em ordem e anota a rodada em `ultimaMira`
+export function escolherMira(estado) {
+  const vivos = emPe(estado)
+  if (vivos.length <= 2) return vivos
+  const k = Math.max(1, Math.ceil(vivos.length * (estado.grupo?.miraPorRodada ?? 0.5)))
+  const jog = (j) => estado.jogadores[j]
+  const ordem = [...vivos].sort((a, b) => (jog(a).ultimaMira ?? 0) - (jog(b).ultimaMira ?? 0) || (jog(a).miras ?? 0) - (jog(b).miras ?? 0) || a - b)
+  const alvos = ordem.slice(0, k).sort((a, b) => a - b)
+  for (const j of alvos) {
+    jog(j).ultimaMira = estado.rodada
+    jog(j).miras = (jog(j).miras ?? 0) + 1 // desempate: quem foi mirado menos vezes (3 de pé: o P1 não fica sempre com a mira)
+  }
+  return alvos
+}
 
 // Começo da rodada: quem caiu há tempo suficiente volta, energia e mãos (como
 // no PvP), a carga do SUPER do chefe sobe e ele escolhe UMA carta para a
@@ -248,7 +346,7 @@ export function iniciarRodadaCoop(estado) {
   estado.rodada++
   const eventos = []
   estado.jogadores.forEach((jog, j) => {
-    if (jog.caido && estado.rodada >= jog.voltaEm) {
+    if (jog.caido && !fora(jog) && estado.rodada >= jog.voltaEm) {
       levantar(estado, j, jog.hpMax * COOP.retornoHp)
       eventos.push({ tipo: 'voltou', j })
     }
@@ -259,6 +357,7 @@ export function iniciarRodadaCoop(estado) {
 
   const c = estado.chefe
   c.intencao = null
+  c.mira = null
   c.carga = Math.min(c.cargaMax, c.carga + 1)
   if (emPe(estado).length) {
     if (c.carga >= c.cargaMax) {
@@ -266,6 +365,7 @@ export function iniciarRodadaCoop(estado) {
       c.intencao = { ...CARTAS_CHEFES[c.id].super }
       eventos.push({ tipo: 'superChefe' })
     } else c.intencao = comprarDoChefe(estado)
+    if (estado.n > 2) c.mira = escolherMira(estado)
   }
   estado.fase = 'escolha'
   return eventos
@@ -277,6 +377,7 @@ const idDaJogada = (jogada) => (jogada == null ? null : typeof jogada === 'strin
 
 // Mesmo contrato de pvp/regras.js motivoBloqueio, com o "caído" do CO-OP na frente
 export function motivoBloqueioCoop(estado, j, carta) {
+  if (fora(estado.jogadores[j])) return { codigo: 'ausente', motivo: 'fora da luta', curto: 'sem conexão: não joga carta' }
   if (estado.jogadores[j].caido) return { codigo: 'caido', motivo: 'caído', curto: 'caído: não joga carta' }
   return motivoBloqueio(estado, j, carta)
 }
@@ -304,25 +405,26 @@ function novoEfeito() {
 //      forte) e os golpes
 // Fica no quadro quem estava de pé quando o chefe mostrou a carta: quem
 // levanta agora (cura, A♥) volta à mesa e entra na próxima.
-export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
+export function resolverRodadaCoop(estado, ...entradas) {
   if (estado.vencedor) throw new Error('a partida já acabou')
-  const jogadas = [jogadaP1, jogadaP2]
+  const todos = indices(estado)
+  const jogadas = todos.map((j) => entradas[j])
   jogadas.forEach((jogada, j) => {
     const v = podeJogarCoop(estado, j, jogada)
     if (!v.ok) throw new Error(`jogada inválida do ${ID_JOGADOR[j]}: ${v.motivo}`)
   })
   const c = estado.chefe
   const eventos = []
-  const efeitos = [novoEfeito(), novoEfeito()]
+  const efeitos = todos.map(() => novoEfeito())
   // no quadro: quem estava de pé quando o chefe mostrou a carta (antes das curas desta rodada)
-  const noQuadro = estado.jogadores.map((jog) => !jog.caido)
+  const noQuadro = estado.jogadores.map((jog) => !jog.caido && !fora(jog))
 
   // 1. paga e descarta
   const cartas = jogadas.map((jogada, j) => {
     const jog = estado.jogadores[j]
     const id = idDaJogada(jogada)
     if (id === null) {
-      if (!jog.caido) {
+      if (!jog.caido && !fora(jog)) {
         jog.energia = Math.min(ENERGIA.maxima, jog.energia + ENERGIA.passar)
         efeitos[j].energia += ENERGIA.passar
       }
@@ -335,14 +437,31 @@ export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
   })
   const especiais = cartas.map(especialDaCarta)
 
-  // 2. suporte
-  for (const j of [0, 1]) {
+  // 2. suporte. Com 2 jogadores o ♥ vale para os dois; num grupo de 3+ alcança quem jogou e
+  // até GRUPO[n].apoioAliados aliados (primeiro os caídos, o que caiu há mais tempo; depois o
+  // de menor fração de HP). O A♥ vale para todos
+  const destinosDoApoio = (j) => {
+    if (!estado.grupo) return todos
+    const aliados = todos
+      .filter((k) => k !== j && !fora(estado.jogadores[k]))
+      .sort((x, y) => {
+        const a = estado.jogadores[x]
+        const b = estado.jogadores[y]
+        if (a.caido !== b.caido) return a.caido ? -1 : 1
+        if (a.caido) return (a.voltaEm ?? 0) - (b.voltaEm ?? 0) || x - y
+        return a.hp / a.hpMax - b.hp / b.hpMax || x - y
+      })
+      .slice(0, estado.grupo.apoioAliados)
+    return [j, ...aliados].sort((x, y) => x - y)
+  }
+  for (const j of todos) {
     const carta = cartas[j]
     if (!carta) continue
     const jog = estado.jogadores[j]
     if (especiais[j] === 'segundaChance') {
-      for (const k of [0, 1]) {
+      for (const k of todos) {
         const alvo = estado.jogadores[k]
+        if (fora(alvo)) continue
         const cura = Math.round(alvo.hpMax * COOP.segundaChance)
         if (alvo.caido) {
           efeitos[k].cura += levantar(estado, k, cura)
@@ -351,13 +470,14 @@ export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
         alvo.protegido = true
       }
       efeitos[j].segundaChance = true
-      eventos.push(`${jog.id}: segunda chance para os dois`)
+      eventos.push(`${jog.id}: segunda chance para ${estado.grupo ? 'todos' : 'os dois'}`)
       continue
     }
     const sup = carta.naipe === 'copas' && !especiais[j] ? efeitosDaCarta(carta) : null
     if (!sup) continue
+    const destinos = destinosDoApoio(j)
     if (sup.cura) {
-      for (const k of [0, 1]) {
+      for (const k of destinos) {
         const alvo = estado.jogadores[k]
         if (alvo.caido) {
           if (k === j) continue
@@ -368,13 +488,14 @@ export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
       }
     }
     if (sup.escudo) {
-      for (const k of [0, 1]) {
+      for (const k of destinos) {
         const alvo = estado.jogadores[k]
         if (alvo.caido) continue
         alvo.escudo = Math.min(alvo.escudo ?? 1, sup.escudo)
         efeitos[k].escudo = alvo.escudo
       }
     }
+    if (estado.grupo) efeitos[j].apoio = destinos.filter((k) => k !== j) // os aliados que o ♥ alcançou
     if (sup.energia) {
       const antes = jog.energia
       jog.energia = Math.min(ENERGIA.maxima, jog.energia + sup.energia)
@@ -387,20 +508,20 @@ export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
   const intencao = c.intencao
   let destino = intencao ? 'quadro' : null // 'quadro' | 'varrida' | 'refletida' | 'anulada' | 'roubada'
   const livre = () => destino === 'quadro' && !ehSuper(intencao)
-  const golpes = [null, null]
-  for (const j of [0, 1]) {
+  const golpes = todos.map(() => null)
+  for (const j of todos) {
     if (!ehSuper(cartas[j])) continue
     if (livre()) destino = 'varrida'
     golpes[j] = { carta: cartas[j], tipo: 'super', base: danoDoSuper(c) }
   }
-  for (const j of [0, 1]) {
+  for (const j of todos) {
     if (especiais[j] !== 'espelho') continue
     if (livre()) {
       destino = 'refletida'
       golpes[j] = { carta: cartas[j], tipo: 'espelho', base: poderDaCartaChefe(intencao, estado.fatorDano), refletida: intencao }
     } else golpes[j] = { carta: cartas[j], tipo: 'eco', base: GOLPE.espadas(ECO) }
   }
-  for (const j of [0, 1]) {
+  for (const j of todos) {
     if (especiais[j] !== 'anular') continue
     if (livre()) destino = 'anulada'
     const antes = c.carga
@@ -408,7 +529,7 @@ export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
     efeitos[j].anulou = true
     if (antes !== c.carga) eventos.push(`a carga do SUPER do chefe caiu para ${c.carga}`)
   }
-  for (const j of [0, 1]) {
+  for (const j of todos) {
     if (especiais[j] !== 'roubo') continue
     if (livre()) {
       destino = 'roubada'
@@ -421,7 +542,7 @@ export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
   }
   // golpes das cartas de ataque e a lentidão do ♦ (o ataque é dos dois: vale o ♦ mais forte)
   let lentidao = 1
-  for (const j of [0, 1]) {
+  for (const j of todos) {
     const carta = cartas[j]
     if (!carta || especiais[j] || ehSuper(carta) || !GOLPE[carta.naipe]) continue
     golpes[j] = { carta, tipo: carta.naipe, base: GOLPE[carta.naipe](carta.valor) }
@@ -443,14 +564,14 @@ export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
     }
   }
 
-  // 5. o quadro: o mesmo ataque para os dois; o dano por acerto de cada um sai com o escudo dele
+  // 5. o quadro: o mesmo ataque para todos; o dano por acerto de cada um sai com o escudo dele
   let quadro = null
   if (destino === 'quadro' && noQuadro.some(Boolean)) {
     const ritmo = ritmoDaCartaChefe(intencao)
     if (lentidao < 1) ritmo.velocidade = Math.round(ritmo.velocidade * lentidao * 100) / 100
     const dano = danoDaCartaChefe(intencao, estado.fatorDano * COOP.danoQuadro)
-    const escudos = [null, null]
-    const danos = [0, 1].map((j) => {
+    const escudos = todos.map(() => null)
+    const danos = todos.map((j) => {
       if (!noQuadro[j]) return null
       const jog = estado.jogadores[j]
       escudos[j] = jog.escudo ?? null
@@ -458,6 +579,8 @@ export function resolverRodadaCoop(estado, jogadaP1, jogadaP2) {
       return danoComEscudo(dano, escudos[j])
     })
     quadro = { carta: intencao, dano, danos, escudos, jogadores: noQuadro, ritmo, inverter: inverteControles(intencao), lento: lentidao < 1 }
+    // a mira do rodízio (3+): só entra quem de fato está no quadro; sem ela, todos
+    if (estado.n > 2) quadro.mira = (c.mira ?? []).filter((j) => noQuadro[j])
   }
 
   // a carta do chefe vai para o descarte dele (o SUPER não)
@@ -493,16 +616,33 @@ export function aplicarDanoCoop(estado, j, dano) {
 
 // ---------- contra-ataque ----------
 
-// Combo da rodada entre os dois golpes: 'super' (os dois SUPER), 'par' (cartas
-// comuns de mesmo valor), 'combo' (mesmo naipe) ou null
-export function comboDosGolpes(golpes) {
-  const [a, b] = golpes
-  if (a?.tipo === 'super' && b?.tipo === 'super') return 'super'
-  const comum = (g) => g && GOLPE[g.tipo]
-  if (!comum(a) || !comum(b)) return null
-  if (a.carta.valor === b.carta.valor) return 'par'
-  if (a.carta.naipe === b.carta.naipe) return 'combo'
-  return null
+// O que cada golpe combina com os outros da rodada (só os de quem está de pé):
+// [{ tipo: 'par' | 'combo', grupo }] por jogador (null = sem combo). 'par' = mesmo valor que
+// outro golpe comum, 'combo' = mesmo naipe; `grupo` = quantos jogadores combinam entre si
+// (2 = o combo de sempre; cada um a mais soma COOP.comboGrupo ao fator). Os SUPER têm o
+// SUPER COMBO (`supersDaRodada`)
+export function combosDosGolpes(golpes, caidos = []) {
+  const comum = (g, j) => g && GOLPE[g.tipo] && !caidos[j]
+  return golpes.map((g, j) => {
+    if (!comum(g, j)) return null
+    const outros = golpes.filter((h, k) => k !== j && comum(h, k))
+    const par = outros.filter((h) => h.carta.valor === g.carta.valor).length
+    if (par) return { tipo: 'par', grupo: par + 1 }
+    const naipe = outros.filter((h) => h.carta.naipe === g.carta.naipe).length
+    return naipe ? { tipo: 'combo', grupo: naipe + 1 } : null
+  })
+}
+
+// os golpes de SUPER de quem está de pé (2 ou mais = SUPER COMBO)
+const supersDaRodada = (golpes, caidos = []) => golpes.filter((g, j) => g?.tipo === 'super' && !caidos[j])
+
+// Combo da rodada (o rótulo do banner): 'super' (2 ou mais SUPER), 'par' (cartas comuns de mesmo
+// valor), 'combo' (mesmo naipe) ou null. `caidos[j]`: o golpe de j não conta
+export function comboDosGolpes(golpes, caidos = []) {
+  if (supersDaRodada(golpes, caidos).length >= 2) return 'super'
+  const lista = combosDosGolpes(golpes, caidos).filter(Boolean)
+  if (lista.some((x) => x.tipo === 'par')) return 'par'
+  return lista.length ? 'combo' : null
 }
 
 // Dano base do SUPER de um jogador contra este chefe: COOP.superGolpe do HP
@@ -511,12 +651,13 @@ export function danoDoSuper(chefe) {
   return Math.max(COOP.superPiso, Math.round(chefe.hpMax * COOP.superGolpe))
 }
 
-// Fração do HP máximo que o SUPER COMBO tira neste nível (e o teto de qualquer SUPER)
-export const fracaoDoCombo = (nivel) => COOP.superCombo[nivel] ?? COOP.superCombo.facil
+// Fração do HP máximo que o SUPER COMBO tira neste nível (e o teto de qualquer SUPER). Com 3 ou 4
+// SUPER na rodada (grupo de 3+) o teto sobe COOP.superComboGrupo por SUPER a mais
+export const fracaoDoCombo = (nivel, supers = 2) => (COOP.superCombo[nivel] ?? COOP.superCombo.facil) * (1 + COOP.superComboGrupo * (Math.max(2, supers) - 2))
 
-// Dano base de CADA SUPER no SUPER COMBO: metade do combo
-export function danoNoCombo(estado) {
-  return Math.round((estado.chefe.hpMax * fracaoDoCombo(estado.nivel)) / 2)
+// Dano base de CADA SUPER no SUPER COMBO: o combo dividido entre os SUPER (metade, com 2)
+export function danoNoCombo(estado, supers = 2) {
+  return Math.round((estado.chefe.hpMax * fracaoDoCombo(estado.nivel, supers)) / Math.max(2, supers))
 }
 
 // Quanto HP o SUPER desta rodada (um ou os dois do SUPER COMBO, somados) pode
@@ -525,12 +666,12 @@ export function danoNoCombo(estado) {
 //   - chefe acima de COOP.superFinaliza: ele aguenta com COOP.superSobra do HP máx
 //     (abaixo disso o SUPER pode finalizar)
 //   - no máximo uma fase: o chefe fica acima do limite da fase depois da próxima
-export function limiteDoSuper(estado) {
+export function limiteDoSuper(estado, supers = 2) {
   const c = estado.chefe
   let piso = c.hp > c.hpMax * COOP.superFinaliza ? Math.ceil(c.hpMax * COOP.superSobra) : 0
   const depois = CHEFES[c.id].fases[c.fase + 2]
   if (depois) piso = Math.max(piso, Math.floor(c.hpMax * depois.hp) + 1)
-  return Math.max(0, Math.min(Math.round(c.hpMax * fracaoDoCombo(estado.nivel)), c.hp - piso))
+  return Math.max(0, Math.min(Math.round(c.hpMax * fracaoDoCombo(estado.nivel, supers)), c.hp - piso))
 }
 
 // Dano final de cada golpe (não muda o estado). desempenho[j] = { perfeito, grazes }.
@@ -542,7 +683,7 @@ export function calcularGolpes(estado, golpes, desempenho = []) {
   const lista = golpesSemLimite(estado, golpes, desempenho)
   const supers = lista.filter((g) => !g.falhou && g.golpe.tipo === 'super')
   const total = supers.reduce((t, g) => t + g.dano, 0)
-  const limite = limiteDoSuper(estado)
+  const limite = limiteDoSuper(estado, supers.length)
   if (total > limite) {
     let resto = limite
     supers.forEach((g, k) => {
@@ -555,23 +696,27 @@ export function calcularGolpes(estado, golpes, desempenho = []) {
 }
 
 function golpesSemLimite(estado, golpes, desempenho) {
-  const combo = comboDosGolpes(golpes.map((g, j) => (estado.jogadores[j].caido ? null : g)))
+  const caidos = estado.jogadores.map((jog) => jog.caido)
+  const combos = combosDosGolpes(golpes, caidos)
+  const nSuper = supersDaRodada(golpes, caidos).length
   const guarda = estado.chefe.guarda
-  return [0, 1]
-    .filter((j) => golpes[j])
-    .map((j) => {
-      const golpe = golpes[j]
+  return golpes
+    .map((golpe, j) => ({ golpe, j }))
+    .filter(({ golpe }) => golpe)
+    .map(({ golpe, j }) => {
       if (estado.jogadores[j].caido) return { j, golpe, dano: 0, falhou: true, multiplicadores: [] }
       const d = desempenho[j] ?? {}
       const mult = []
       if (d.perfeito) mult.push(['CRÍTICO', COOP.critico])
       if (golpe.tipo === 'paus' && d.grazes) mult.push([`+${d.grazes} GRAZE`, 1 + Math.min(COOP.grazeArmadilhaMax, d.grazes * COOP.grazeArmadilha)])
-      if (combo === 'par' && GOLPE[golpe.tipo]) mult.push(['PAR', COOP.par])
-      if (combo === 'combo' && GOLPE[golpe.tipo]) mult.push(['COMBO', COOP.combo])
+      const combo = combos[j]
+      const extra = combo ? COOP.comboGrupo * (combo.grupo - 2) : 0 // 2 jogadores: 0 (o combo de sempre)
+      if (combo?.tipo === 'par') mult.push(['PAR', Math.round((COOP.par + extra) * 100) / 100])
+      if (combo?.tipo === 'combo') mult.push(['COMBO', Math.round((COOP.combo + extra) * 100) / 100])
       if (guarda != null) mult.push(['GUARDA', guarda])
       const fator = mult.reduce((m, [, f]) => m * f, 1)
-      // SUPER COMBO: cada SUPER vira a metade do combo do nível (no lugar do golpe sozinho)
-      const base = combo === 'super' ? danoNoCombo(estado) : golpe.base
+      // SUPER COMBO: cada SUPER vira a parte dele do combo do nível (no lugar do golpe sozinho)
+      const base = golpe.tipo === 'super' && nSuper >= 2 ? danoNoCombo(estado, nSuper) : golpe.base
       return { j, golpe, dano: Math.max(1, Math.round(base * fator)), falhou: false, multiplicadores: mult }
     })
 }
@@ -586,12 +731,29 @@ export function aplicarGolpe(estado, dano) {
 
 // ---------- fim da rodada ----------
 
+// Resgate por RODADA LIMPA (grupo de 3+): se havia quadro e NINGUÉM nele levou acerto, o caído há mais
+// tempo volta (COOP.retornoHp do HP máx), já a partir da próxima rodada. `acertos[j]` = acertos de j
+// na esquiva; `quadro` = r.quadro da rodada. Devolve os índices que voltaram
+export function resgatarPorRodadaLimpa(estado, { quadro, acertos = [] } = {}) {
+  if (estado.n <= 2 || !quadro || estado.chefe.hp <= 0) return []
+  const noQuadro = indices(estado).filter((j) => quadro.jogadores[j])
+  if (!noQuadro.length || noQuadro.some((j) => (acertos[j] ?? 0) > 0 || estado.jogadores[j].caido)) return []
+  const caidos = indices(estado)
+    .filter((j) => estado.jogadores[j].caido && !fora(estado.jogadores[j]))
+    .sort((a, b) => (estado.jogadores[a].voltaEm ?? 0) - (estado.jogadores[b].voltaEm ?? 0) || a - b)
+  if (!caidos.length) return []
+  levantar(estado, caidos[0], estado.jogadores[caidos[0]].hpMax * COOP.retornoHp)
+  return [caidos[0]]
+}
+
 // Tira a proteção e a guarda, troca a fase do chefe (o baralho dele passa a
-// ser o da fase nova) e vê se a luta acabou
-export function fimDaRodadaCoop(estado) {
+// ser o da fase nova) e vê se a luta acabou. `limpa` = { quadro, acertos } (grupo de 3+: o
+// resgate por rodada limpa). Derrota: todos os que ainda estão na luta caíram
+export function fimDaRodadaCoop(estado, limpa = null) {
   const c = estado.chefe
   for (const jog of estado.jogadores) jog.protegido = false
   c.guarda = null
+  const resgatados = limpa ? resgatarPorRodadaLimpa(estado, limpa) : []
   let novaFase = null
   if (c.hp > 0) {
     const f = faseDoChefe(c.id, c.hp / c.hpMax)
@@ -604,8 +766,8 @@ export function fimDaRodadaCoop(estado) {
   }
   let vencedor = null
   if (c.hp <= 0) vencedor = 'vitoria'
-  else if (estado.jogadores.every((jog) => jog.caido)) vencedor = 'derrota'
+  else if (estado.jogadores.every((jog) => jog.caido || fora(jog)) && estado.jogadores.some((jog) => !fora(jog))) vencedor = 'derrota'
   estado.vencedor = vencedor
   estado.fase = vencedor ? 'fim' : 'inicio'
-  return { vencedor, novaFase }
+  return estado.n > 2 ? { vencedor, novaFase, resgatados } : { vencedor, novaFase }
 }

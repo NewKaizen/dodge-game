@@ -67,8 +67,8 @@
 //                        sala {... membros: [{..., caiu: ms | null}]}
 //
 // SALAS DE N (Fase 5A, docs/rede-pvp.md "Salas de N"): o tamanho da sala vem do
-// modo (MODOS_SALA: PVP 1x1 e CO-OP de 2 = 2; 'coop4' 3–4, 'ffa' 3–4 e '2x2' = 4,
-// ainda "em breve": a sala existe, a partida desses modos ainda não). Cada membro
+// modo (MODOS_SALA: PVP 1x1 e CO-OP de 2 = 2; 'coop4' 3–4 (CO-OP de 3 e 4, Fase 5B),
+// 'ffa' 3–4 e '2x2' = 4, estes dois ainda "em breve": a sala existe, a partida ainda não). Cada membro
 // tem uma VAGA (0..N-1, o host é a 0): a menor livre quando entra, a mesma na
 // retomada e durante a partida; fora da partida as vagas são recompactadas quando
 // alguém sai (0..n-1 sem buracos: num modo de 2 o convidado é sempre a vaga 1).
@@ -104,14 +104,14 @@ import { METRICAS_NULA } from './metricas.js'
 import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
 import { nomeSeguro } from '../src/lib/contaRegras.js'
 
-export const PROTOCOLO = 8
+export const PROTOCOLO = 9
 export const PORTA_DESCOBERTA = 47777
 // Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
 // aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")
 export const MODOS_SALA = {
   pvp: { min: 2, max: 2 },
   coop: { min: 2, max: 2 },
-  coop4: { min: 3, max: 4, emBreve: true },
+  coop4: { min: 3, max: 4 }, // 5B: o CO-OP de 3 e 4 existe (coop/ArenaRedeCoopN.js)
   ffa: { min: 3, max: 4, emBreve: true },
   '2x2': { min: 4, max: 4, emBreve: true },
 }

@@ -19,7 +19,7 @@
 //     fontes. Quem entrou pelo teclado também volta a 1 ao passar pelo menu.
 //   - Sala LAN/online: não mexe (a sala tem a sua regra, lib/lan/rede.js).
 //
-//   contarFontes({ teclado, pads, serial })        quantas fontes distintas
+//   contarFontes({ teclado, pads, serial })        (serial = quantos joysticks, um por porta USB) quantas fontes distintas
 //   fonteNova(antes, depois)                       'controle' | 'joystick serial' | 'teclado' | null
 //   decidirJogadores({ numero, p2Teclado, fontes, cenas, emSala })   { numero, p2Teclado, motivo }
 //   reagirAoBotaoP2({ ... })                       'entrar' | 'sair' | null
@@ -35,14 +35,17 @@ export const DICA_SAIR_P2 = 'JOGADOR 2: aperte B (Backspace) para sair e jogar s
 // o toast do primeiro Enter: quem só queria confirmar sabe o que houve e como desfazer
 export const AVISO_P2_ENTRANDO = { titulo: 'JOGADOR 2 ENTRANDO', texto: 'aperte B (Backspace) para cancelar' }
 
-export function contarFontes({ teclado = false, pads = 0, serial = false } = {}) {
-  return (teclado ? 1 : 0) + Math.max(0, Math.floor(pads) || 0) + (serial ? 1 : 0)
+// serial: quantos joysticks serial (um por porta USB); true vale 1
+const quantos = (n) => (typeof n === 'number' ? Math.max(0, Math.floor(n) || 0) : n ? 1 : 0)
+
+export function contarFontes({ teclado = false, pads = 0, serial = 0 } = {}) {
+  return (teclado ? 1 : 0) + quantos(pads) + quantos(serial)
 }
 
 // o que foi ligado entre `antes` e `depois` (os dois no formato de contarFontes)
 export function fonteNova(antes = {}, depois = {}) {
   if ((depois.pads ?? 0) > (antes.pads ?? 0)) return 'controle'
-  if (depois.serial && !antes.serial) return 'joystick serial'
+  if (quantos(depois.serial) > quantos(antes.serial)) return 'joystick serial'
   if (depois.teclado && !antes.teclado) return 'teclado'
   return null
 }
@@ -86,11 +89,11 @@ export const textoJogador2 = (dispositivo) => `JOGADOR 2 ENTROU (${dispositivo})
 // Junta tudo: chame avaliar() quando uma fonte ou a cena mudar. `aplicar({ numero, p2Teclado })`
 // grava no store; `avisar(texto)` mostra o toast (só quando o 2º jogador entra por uma fonte nova).
 export function criarDetector({ aplicar, avisar = () => {} }) {
-  let antes = { teclado: false, pads: 0, serial: false }
+  let antes = { teclado: false, pads: 0, serial: 0 }
   let segundo = null // o dispositivo que passou de 1 para 2 fontes (o aviso fala dele, mesmo se esperou a cena)
   return {
-    avaliar({ numero, p2Teclado = false, teclado = false, pads = 0, serial = false, cenas = [], emSala = false }) {
-      const agora = { teclado: Boolean(teclado), pads, serial: Boolean(serial) }
+    avaliar({ numero, p2Teclado = false, teclado = false, pads = 0, serial = 0, cenas = [], emSala = false }) {
+      const agora = { teclado: Boolean(teclado), pads, serial: quantos(serial) }
       const fontes = contarFontes(agora)
       if (fontes < 2) segundo = null
       else if (contarFontes(antes) < 2) segundo = fonteNova(antes, agora) ?? segundo ?? 'outro controle'

@@ -192,3 +192,13 @@ test('detector: quem entrou pelo teclado volta a 1 no menu; em sala o detector n
   sala.ev({ pads: 2, cenas: MENU, emSala: true })
   assert.deepEqual(sala.log.aplicados, [])
 })
+
+test('dois joysticks serial (um por porta USB) são duas fontes: 2 jogadores', () => {
+  assert.equal(contarFontes({ serial: 2 }), 2)
+  assert.equal(contarFontes({ serial: 1 }), 1)
+  assert.equal(contarFontes({ serial: true, teclado: true }), 2)
+  const r = []
+  const d = criarDetector({ aplicar: (x) => r.push(x), avisar: () => {} })
+  d.avaliar({ numero: 1, serial: 2, cenas: ['Menu'] })
+  assert.deepEqual(r.at(-1), { numero: 2, p2Teclado: false })
+})

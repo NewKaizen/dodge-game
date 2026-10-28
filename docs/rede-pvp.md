@@ -159,7 +159,7 @@ A base para os modos de 3 e 4 (CO-OP 3–4, todos contra todos, 2x2). Nenhum mod
 ainda: os de 2 (PVP 1x1 e CO-OP de 2) continuam iguais, só passam pelo caminho novo.
 
 **Sala** (`server/lan.js`): o tamanho vem do modo (`MODOS_SALA`: `pvp`/`coop` = 2,
-`coop4` e `ffa` 3–4, `2x2` = 4; os três últimos "em breve": a sala aceita, a partida
+`coop4` e `ffa` 3–4, `2x2` = 4; o `coop4` abre desde a 5B, `ffa` e `2x2` ainda são "em breve": a sala aceita, a partida
 não abre). Cada membro tem uma **vaga** 0..N-1 (o dono é a 0; quem entra pega a menor
 livre). Na partida a vaga não muda (a retomada da 2D volta para a mesma); no lobby, quem
 sai faz as outras descerem (0..n-1 sem buracos: num modo de 2 o convidado é sempre a 1).
@@ -236,7 +236,7 @@ de 2: tudo como antes.
 
 Testando: `node --test server/__tests__/salaN.test.js server/__tests__/eleicao.test.js
 src/lib/__tests__/estrela.test.js server/__tests__/partidasN.test.js`. No navegador (dev),
-com 4 abas: o dono escolhe `CO-OP 3–4` (no dev os modos "em breve" podem ser escolhidos),
+com 4 abas: o dono escolhe `CO-OP 3–4` (já abre; os "em breve" `ffa` e `2x2` no dev podem ser escolhidos),
 os outros entram pelo código; `pedirPartida()` (de `lib/lan/rede.js`) faz a eleição sem
 abrir cena; no host, `irParaCena(cena, 'Config')` e `debugRede.sinc()` mostram as
 confirmações; `debugRede.carga({ segundos, hz })` nas 4 abas mede o tráfego (abaixo).
@@ -330,3 +330,49 @@ As mesmas regras de autoridade do PVP:
 Uma rodada: `inicio` → escolha (`jogada`, `cursor`) → `resolucao` → revelação e arremesso iguais nos dois → esquiva (`coracao`, `dano`, `graze`, e os dois trocam `fimEsquiva`) → `contra` → `fimRodada`. O outro saiu no meio: `game/rede.js` tira os dois da cena e toda espera solta (`this.saindo`).
 
 Testando: no host, `debugRede.iniciar('CoopArena', { chefe: 'king', nivel: 'facil', party: ['kris', 'susie'] })` abre a arena nos dois; `window.coopArena.estadoDebug()` traz `rede: { meuLado, souHost, espelhos }` (`espelhos[j]`: o coração j é espelho aqui) e o `quadro`; `forcarMao`/`setHp`/`setEnergia`/`setHpChefe` valem nos dois PCs. Com `debugRede.atraso(150, 50)` nas duas abas o coração de cada um continua respondendo na hora.
+
+## CO-OP de 3 e 4 em rede (Fase 5B)
+
+O `PROTOCOLO` subiu para **9** (`server/lan.js` e `lib/lan/rede.js`): o `coop4` deixou de ser "em breve" e passou a registrar XP; um cliente velho não entra mais na sala.
+
+A `CoopArenaN` (`scenes/CoopArenaN.js`) e a ponte dela (`coop/ArenaRedeCoopN.js`) são o CO-OP de 3 e 4 sobre a estrela da 5A. As
+regras de autoridade são as do CO-OP de 2 (o **host da partida decide toda regra**: a carta do chefe, a mira, a resolução, o
+contra-ataque, a fase e o fim; **cada PC é dono do PRÓPRIO coração**: anda e colide aqui e manda o que lhe aconteceu), mas
+**um convidado nunca fala com outro**: o que um precisa ver do outro passa pelo host, que repassa. A ponte é lógica pura
+(sem Phaser) e testada com canais de verdade numa estrela em memória (`coop/__tests__/redeN.test.js`).
+
+| Tipo | Chave | De → para | Dados |
+| --- | --- | --- | --- |
+| `inicio` | rodada | host → todos | `{ estado, eventos }`: o host marca quem caiu da rede / saiu (`definirPresenca`), tira a carta do chefe e a **mira** (rodízio) |
+| `jogada` | rodada | conv. → host | `{ jogada, r }`: a minha carta (ou `null`); uma por rodada |
+| `pronto` | rodada | host → todos | `{ j, r }`: o jogador `j` já escolheu (o PRONTO do cartão; ninguém vê a carta antes da revelação) |
+| `resolucao` | rodada | host → todos | `{ jogadas, resultado, estado }`: o host espera as jogadas de **quem está** (até o relógio + 4 s; quem não jogou a tempo ou caiu da rede passa) |
+| `coracao` (rápida) | | conv. → host | `{ x, y, r }`: o MEU coração no quadro |
+| `coracoes` (rápida) | | host → todos | `{ r, c: [[vaga, x, y], ...] }`: **um pacote por tick** com todos os corações (5A: "o host junta o estado rápido num pacote") |
+| `dano` / `graze` | | dono → host → todos | `{ lado, dano \| n, r }`: o host confere que `lado` é a vaga de quem mandou, repassa na mesma ordem e aplica; o dono não aplica de volta |
+| `fimEsquiva` | | dono → host → todos | `{ acertos, ko, lado, r }`: o quadro acabou aqui; o dano e o graze do dono chegam antes (canal em ordem) |
+| `contra` · `fimRodada` | rodada | host → todos | como no CO-OP de 2; `fimRodada` traz `resgatados` (rodada limpa) |
+| `resultadoPronto` | rodada | conv. → host | a animação do fim acabou; o host espera os convidados que estão e abre a `Vitoria`/`GameOver` |
+| `debug` (dev) | | todos | `forcarMao`/`setHp`/`setEnergia`/`setHpChefe` valem em todos os PCs |
+
+Fim da esquiva: cada PC espera o `fimEsquiva` de todos que estavam no quadro e **não esperam quem caiu da rede** (até 15 s
+no máximo); o host só calcula os golpes depois (todo dano dos outros já chegou). Antes da arena, a `EscolhaPartyN` usa
+`cursor` (rápida, ao host), `personagem {id}` (o pedido), `partyEstado {c, k}` (rápida, do host a cada 250 ms: a party de
+verdade e os cursores) e `voltarLobby`.
+
+**Queda de um convidado na luta** (5A: `dadosRetomadaPara`): a sala segue; o host marca `ausente`, **derruba o jogador na hora** (HP 0: volta caído, sem escapar do dano do chefe) e ninguém espera por ele.
+Quando ele volta, o `game/rede.js` manda a cena só para ele, com `retomada: { estado (o de agora do host), entrando: true }`: a
+arena dele troca o estado, mostra a luta como está e **só entra na rodada seguinte** (espera o `inicio` depois do estado que
+recebeu e ignora `dano`/`graze`/`fimEsquiva` das rodadas até ali) ainda **caído**, com o aviso "voltou caído: precisa de resgate" (evento `voltouCaido`). Quem esgota os 20 s sai (`saiu`).
+
+**Orçamento (5A) na prática**: o pacote `coracoes` sai uma vez por tick para todos (~30/s), cada convidado manda ~30
+`coracao`/s ao host, e os `dano`/`graze`/`fimEsquiva` são confiáveis (poucos por rodada), como na carga de teste da 5A. O desenho
+(4 corações com forma e nome, 4 cartões de HUD, 3 caixas espelho que não existem: o quadro é um só) é o gasto de CPU: o HUD é
+um `container` de gráficos simples e só a MINHA mão tem 5 cartas na tela.
+
+Testando: `node --test src/game/coop/__tests__/redeN.test.js src/game/coop/__tests__/grupoN.test.js src/game/coop/__tests__/partyN.test.js`.
+No navegador (dev), com 4 abas: o dono cria a sala, `mudarModo('coop4')`, os outros `entrarCodigo`, `alternarPronto()` e `pedirPartida()`
+(o host eleito faz o "VALENDO!" e abre a escolha de party); depois **Espaço** em cada aba confirma o personagem (a 1ª tecla
+de A/B/C só acorda o teclado: aperte Q uma vez antes), o host escolhe o chefe e o nível. `debugJogo.set({ acelerar: 3, invencivel: true })`
+acelera a luta; `coopArena.setHpChefe(0)` no host termina na rodada seguinte; `coopArena.setHp(j, 8)` leva a party à derrota;
+`coopArena.estadoDebug()` mostra a mira, os corações (`espelho`, `mirado`), os `prontos` e o estado de cada jogador.

@@ -31,6 +31,7 @@ export const jogo = writable({
   fontes: { teclado: false, gamepad: false, serial: false }, // todas as ligadas
   numJogadores: 1, // jogadores locais; o jogo decide sozinho (game/jogadores.js). As telas de escolha recomeçam quando muda
   p2Teclado: false, // o jogador 2 entrou pelo teclado (A na tela de escolha), não por um 2º dispositivo
+  seriais: 0, // quantos joysticks serial abertos (um Arduino por porta USB); cada um é uma fonte distinta
   pads: 0, // quantos controles físicos em uso (cada um é uma fonte distinta)
   jogadores: Array.from({ length: MAX_JOGADORES }, () => ({ joy: { x: 0, y: 0 } })),
   botao: null, // último botão apertado: { jogador, botao: 'A' | 'B' | 'C', id } (C = pause)
@@ -47,6 +48,12 @@ export function definirFonte(nome, ativa) {
     const fontes = { ...s.fontes, [nome]: Boolean(ativa) }
     return { ...s, fontes, ...resumirFontes(fontes) }
   })
+}
+
+// Quantos joysticks serial estão abertos (lib/serial.js): liga/desliga a fonte 'serial'
+export function definirSeriais(n) {
+  jogo.update((s) => (s.seriais === n ? s : { ...s, seriais: n }))
+  definirFonte('serial', n > 0)
 }
 
 // Quantos controles físicos estão em uso (lib/gamepad.js): liga/desliga a fonte 'gamepad'
