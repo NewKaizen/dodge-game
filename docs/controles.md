@@ -50,17 +50,21 @@ As telas de escolha mostram os avisos do tipo "info" (controle conectado, jogado
 
 ## Vibração do controle (rumble)
 
-O controle físico vibra no mesmo momento em que o joystick serial recebe o `BUZZER` ([lib/saida.js](../src/lib/saida.js) chama [lib/vibracao.js](../src/lib/vibracao.js); as cenas não sabem). Por isso todo modo que já manda BUZZER (PVP 1x1, CO-OP, FFA quando existir) vibra de graça. Só vibra o controle da vaga do jogador que sofreu o evento (com 1 jogador local, todos os controles); eventos do adversário online nunca chegam aqui.
+O controle físico vibra a cada golpe e nos mesmos avisos por jogador do joystick serial ([lib/saida.js](../src/lib/saida.js) chama [lib/vibracao.js](../src/lib/vibracao.js); as cenas não sabem). Todo modo que avisa o joystick (PVP 1x1, CO-OP, FFA) vibra de graça. Só vibra o controle da vaga do jogador que sofreu o evento (com 1 jogador local, todos os controles); eventos do adversário online nunca chegam aqui.
 
 | Evento | Padrão (antes da intensidade) |
 | --- | --- |
-| Levou golpe (`levouGolpe`, no máx. 1 a cada 250 ms por jogador, como o BUZZER) | 120 ms, forte 0,5 / fraca 0,7 |
+| Levou golpe (`levouGolpe`, no máx. 1 a cada 250 ms por jogador) | 120 ms, forte 0,5 / fraca 0,7 |
 | K.O. / caído (o HP passou de positivo para 0 em `informarVida`) | 400 ms, forte 1,0 / fraca 0,5 |
 | Teste (e padrão "dupla", reservado a momentos grandes) | dois pulsos de 90 ms, 180 ms entre eles |
 
 A intensidade multiplica as duas forças. Para tudo (`reset()`) ao pausar (cena Pausa), ao perder o foco ou esconder a aba, ao desconectar entrada e ao entrar/sair da luta (`GAME`/`MENU`).
 
 CONFIGURAÇÕES → GAMEPAD: **VIBRAÇÃO** (ligada/desligada, padrão ligada), **INTENSIDADE** (25/50/75/100%; padrão automático: 75%, ou 25% se TREMORES estiver reduzido/desligado ou REDUZIR ANIMAÇÕES ligado; o jogador pode mudar) e **TESTAR VIBRAÇÃO** (dois pulsos no controle que apertou A por último; sem motor mostra "este controle não vibra (ou o navegador não deixa)"). RESTAURAR PADRÃO também volta a vibração. Preferências `vibracao` (boolean) e `vibracaoIntensidade` (`null` ou 0.25/0.5/0.75/1), validadas em `preferencias.js`.
+
+### Quando o BUZZER do joystick apita
+
+Só em momentos pontuais, no joystick de quem foi afetado (nunca a cada golpe; CPU/ausente nada; online só o seu lado): **HP abaixo de 25%** (uma vez por luta, rearma ao curar acima de 40%), **K.O./caído** (dois apitos), **golpe de SUPER** (do adversário no PVP/FFA, do chefe no CO-OP) e **vitória** (um apito para quem ganhou). Intervalo mínimo de 1 s por jogador. CONFIGURAÇÕES → GAMEPAD: **BUZZER DO JOYSTICK** (liga/desliga, padrão ligado) e **TESTAR BUZZER** (um apito em cada joystick conectado). Detalhes em [protocolo-serial.md](protocolo-serial.md).
 
 Navegadores: Chrome e Edge usam `gamepad.vibrationActuator.playEffect('dual-rumble', ...)`; se existir, `hapticActuators[0].pulse` serve de reserva. Firefox e Safari costumam não ter nada disso: o jogo não vibra e não dá erro. A lógica pura está em [src/game/vibracao.js](../src/game/vibracao.js), testada em `src/game/__tests__/vibracao.test.js` e `src/lib/__tests__/vibracaoSaida.test.js`.
 

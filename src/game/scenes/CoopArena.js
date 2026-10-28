@@ -44,7 +44,7 @@ import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
-import { entrarNoJogo, voltarAoMenu, levouGolpe } from '../../lib/saida.js'
+import { entrarNoJogo, voltarAoMenu, levouGolpe, venceu } from '../../lib/saida.js'
 import { fatores } from '../acessibilidade.js'
 
 // CO-OP de cartas: os dois jogadores (ou 1 + CPU aliada) contra um chefe que
@@ -214,6 +214,7 @@ export default class CoopArena extends PvpArena {
     this.grazesRodada = [0, 0]
     this.rodadaAtual = null // o resultado da rodada (r.quadro: quem está no quadro, o escudo de cada um)
     this.intencaoVisual = null
+    this.superDoChefeNoQuadro = false // o quadro desta rodada é o SUPER do chefe? (BUZZER)
     this.armadas = [null, null]
     this.inicioLuta = this.time.now
     velocidadeMusica(1)
@@ -862,6 +863,7 @@ export default class CoopArena extends PvpArena {
     this.perfeitoCoop = [false, false]
     this.esquivaBot?.reiniciar()
     const q = r.destino === 'quadro' ? r.quadro : null
+    this.superDoChefeNoQuadro = Boolean(q && ehSuper(q.carta))
     if (!q) return
     const ataque = ataqueDaCartaChefe(q.carta, { ataques })
     if (q.inverter) this.invertido[0] = { avisado: false }
@@ -964,7 +966,7 @@ export default class CoopArena extends PvpArena {
     hud.setHp(jog.hp)
     hud.tremer()
     const joystick = this.joystickDoLado(j)
-    if (joystick >= 0) levouGolpe(joystick) // buzzer no joystick de quem levou
+    if (joystick >= 0) levouGolpe(joystick, { super: this.superDoChefeNoQuadro }) // BUZZER só se foi o SUPER do chefe
     numero(this, hud.pontoHp.x, hud.pontoHp.y + 4, efetivo ? `-${efetivo}` : '0', TEXTO.caido, { tamanho: 16, desvio: 12 })
     this.quadro.caixa.tremer(110, 2)
     this.personagemDoi(j)
@@ -1218,6 +1220,7 @@ export default class CoopArena extends PvpArena {
       this.balao.esconder()
       this.inimigo.sumir()
       tocar(this, 'vitoria')
+      for (let j = 0; j < 2; j++) if (this.joystickDoLado(j) >= 0) venceu(this.joystickDoLado(j)) // BUZZER dos jogadores
       await this.esperar(1100)
       this.mostrarBanner('VITÓRIA!', TEXTO.selecionado, { y: 236, tamanho: 36 })
       await this.esperar(1300)

@@ -24,6 +24,7 @@
 //   zonaMorta         0.1 a 0.8: quanto o analógico do controle precisa inclinar para contar (padrão 0.35)
 //   vibracao          true/false  vibração (rumble) do controle físico quando o jogador leva um golpe ou cai (game/vibracao.js)
 //   vibracaoIntensidade  null (automática: 75%, ou 25% com tremor/animações reduzidos) ou 0.25 | 0.5 | 0.75 | 1
+//   buzzerJoystick    true/false  BUZZER do joystick serial em HP baixo, K.O., golpe de SUPER e vitória (game/buzzer.js)
 import { problemasDosBotoes, zonaMortaValida, ZONA_MORTA_PADRAO } from './gamepad.js'
 import { intensidadeValida } from './vibracao.js'
 
@@ -42,6 +43,7 @@ export const PREFERENCIAS_PADRAO = {
   joysticksSerial: null,
   vibracao: true,
   vibracaoIntensidade: null,
+  buzzerJoystick: true,
 }
 
 export const OPCOES = {

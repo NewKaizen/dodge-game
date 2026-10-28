@@ -25,7 +25,7 @@ import { flashTela, claraoCamera } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
 import { fogoArtificio } from '../effects/festa.js'
-import { entrarNoJogo, voltarAoMenu, levouGolpe, informarVida } from '../../lib/saida.js'
+import { entrarNoJogo, voltarAoMenu, levouGolpe, informarVida, venceu } from '../../lib/saida.js'
 import { fatores } from '../acessibilidade.js'
 import { pref } from '../preferencias.js'
 import { quemEmFoco, estadoDoCartao, TEXTO_CARTAO, vistasDaGrade, vistasDoFoco, criarTransicao, avancarTransicao, parametrosSopro, posicaoDoCartao, FOCO, TRANSICAO } from '../pvp/focoFfa.js'
@@ -173,6 +173,7 @@ export default class PvpArenaN extends Phaser.Scene {
     this.hpAvisado = Array(this.n).fill(false)
     this.ko = Array(this.n).fill(false)
     this.acertosRodada = Array(this.n).fill(0)
+    this.superNaPista = Array(this.n).fill(false) // o golpe que cai em cada pista é de SUPER? (BUZZER)
     this.danoRodada = Array(this.n).fill(0)
     this.prontos = Array(this.n).fill(false)
     this.paradas = Array(this.n).fill(false)
@@ -1058,6 +1059,7 @@ export default class PvpArenaN extends Phaser.Scene {
     this.acertosRodada = Array(this.n).fill(0)
     this.danoRodada = Array(this.n).fill(0)
     this.paradas = Array(this.n).fill(false)
+    this.superNaPista = r.caixas.map((c) => ehSuper(c?.carta)) // o golpe que cai em cada pista é de SUPER?
     const no = Array(this.n).fill(false)
     const comAtaque = Array(this.n).fill(false)
     const promessas = this.pistas.map((pista, k) => {
@@ -1137,7 +1139,7 @@ export default class PvpArenaN extends Phaser.Scene {
     const hud = this.huds[j]
     hud.setHp(jog.hp)
     hud.tremer()
-    if (j === this.meu) levouGolpe(0)
+    if (j === this.meu) levouGolpe(0, { super: Boolean(this.superNaPista?.[j]) })
     numero(this, hud.pontoHp.x, hud.pontoHp.y, efetivo ? `-${efetivo}` : '0', TEXTO.caido, { tamanho: 13, desvio: 12 })
     const pista = this.pistas[j]
     pista.caixa.tremer(110, 2)
@@ -1506,6 +1508,7 @@ export default class PvpArenaN extends Phaser.Scene {
     const motivo = this.estado.fim === 'limite' ? `LIMITE DE ${FFA.limiteRodadas} RODADAS` : ''
     this.mostrarBanner(`${this.nomeDe(v)} VENCEU!${motivo ? `\n${motivo}` : ''}`, textoDaVaga(v), { y: 236, tamanho: 30 })
     tocar(this, 'vitoria')
+    if (v === this.meu) venceu(0) // BUZZER do meu joystick
     shake(this, 300, 0.012)
     claraoCamera(this.cameras.main, 250, 255, 255, 255)
     await this.esperar(1800)

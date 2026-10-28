@@ -100,3 +100,10 @@ test('vibração: padrão ligada e intensidade automática; valores inválidos v
   ok.definirPref('vibracaoIntensidade', 2) // inválido: ignorado
   assert.equal(ok.pref('vibracaoIntensidade'), 0.5)
 })
+
+test('buzzerJoystick: padrão ligado, só aceita boolean', async () => {
+  const { pref } = await carregar()
+  assert.equal(pref('buzzerJoystick'), true)
+  assert.equal((await carregar({ buzzerJoystick: 'não' })).pref('buzzerJoystick'), true)
+  assert.equal((await carregar({ buzzerJoystick: false })).pref('buzzerJoystick'), false)
+})
