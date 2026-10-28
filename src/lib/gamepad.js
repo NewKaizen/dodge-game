@@ -14,6 +14,7 @@ import { criarAtribuidor } from '../game/fontes.js'
 //     aoPerder(motivo)                         um controle sumiu no meio do jogo (a partida local pausa)
 //   capturarBotaoPad(fn)                       remapear (CONFIGURAÇÕES): fn(indice) com o próximo botão apertado
 //                                              de qualquer controle; nada chega ao jogo enquanto espera
+//   ultimoPadQueApertou()                      índice do último controle que apertou A/B/C (-1 se nenhum)
 //   controlesLigados()                         [{ pad, vaga, id }] dos controles em uso
 //
 // Quem liga: o primeiro botão apertado num controle (o Chrome só mostra o controle
@@ -34,8 +35,11 @@ const ativos = new Map() // índice do controle -> { chave, vaga }
 const direcoes = new Map() // índice do controle -> { x, y } (de todos, ligados ou não)
 const ultimoJoy = []
 let captura = null
+let ultimoPad = -1 // índice do último controle ligado que apertou um botão do jogo (TESTAR VIBRAÇÃO)
 
 export const controlesLigados = () => [...ativos].map(([pad, a]) => ({ pad, vaga: a.vaga, chave: a.chave }))
+
+export const ultimoPadQueApertou = () => ultimoPad
 
 export function capturarBotaoPad(fn) {
   captura = fn
@@ -120,9 +124,13 @@ export function iniciarGamepads({ aviso = () => {}, aoPerder = () => {} } = {}) 
         }
       } else if (e.tipo === 'botao') {
         const a = ativos.get(e.pad)
-        if (a && !acordados.has(e.pad)) processarLinha(`BTN ${a.vaga + 1} ${e.botao}`)
+        if (a && !acordados.has(e.pad)) {
+          ultimoPad = e.pad
+          processarLinha(`BTN ${a.vaga + 1} ${e.botao}`)
+        }
       } else if (e.tipo === 'saiu') {
         direcoes.delete(e.pad)
+        if (ultimoPad === e.pad) ultimoPad = -1
         const a = ativos.get(e.pad)
         if (!a) continue
         ativos.delete(e.pad)
