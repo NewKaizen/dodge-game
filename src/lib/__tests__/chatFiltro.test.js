@@ -4,7 +4,7 @@ import { censurarTexto } from '../palavrasBloqueadas.js'
 
 test('chat: troca a palavra da lista por asteriscos e mantém o resto', () => {
   assert.equal(censurarTexto('boa partida, seu fdp'), 'boa partida, seu ***')
-  assert.equal(censurarTexto('que BOSTA!'), 'que ******')
+  assert.equal(censurarTexto('que BOSTA!'), 'que *****!')
   assert.equal(censurarTexto('c4r4lh0 que jogo'), '******* que jogo')
   assert.equal(censurarTexto('c.a.r.a.l.h.o'), '*************')
 })

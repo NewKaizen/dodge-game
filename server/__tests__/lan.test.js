@@ -148,6 +148,11 @@ test('chat da sala passa pelo filtro de palavras (os dois veem ***)', () => {
   conv.mandar({ t: 'entrar', sala: host.ultima('sala').sala.id })
   conv.mandar({ t: 'chat', texto: 'vai fdp' })
   for (const p of [host, conv]) assert.equal(p.ultima('chat').texto, 'vai ***')
+  // o filtro novo: porra, caralho com leet, cu só como palavra inteira
+  for (const [entrada, saida] of [['que PORRA, vsf', 'que *****, ***'], ['c4r4lh0 de jogo', '******* de jogo'], ['curso de computador', 'curso de computador'], ['vai tomar no cu', 'vai tomar no **']]) {
+    conv.mandar({ t: 'chat', texto: entrada })
+    for (const p of [host, conv]) assert.equal(p.ultima('chat').texto, saida)
+  }
 })
 
 // ---------- ONLINE ----------

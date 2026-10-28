@@ -13,8 +13,9 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY server ./server
-# a lista de palavras do filtro de nomes (o lobby usa a mesma do navegador)
+# o filtro de palavrões (o lobby usa o mesmo do navegador: docs/moderacao.md)
 COPY src/lib/palavrasBloqueadas.js ./src/lib/palavrasBloqueadas.js
+COPY src/lib/filtro ./src/lib/filtro
 COPY --from=build /app/dist ./dist
 # Contas (opcional, docs/supabase.md): passe SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY e
 # SUPABASE_SECRET_KEY ao RODAR o contêiner (não no build: o navegador

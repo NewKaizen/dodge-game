@@ -99,7 +99,7 @@ Depois da 0003, rode `supabase/migrations/0004_moderacao.sql`. Ela cria:
   aceita denunciar a si mesmo, uma denúncia aberta por par e tipo, no máximo 10
   por dia por conta;
 - `nome_ofensivo()` e uma nova `atualizar_perfil` que barra nomes da lista de
-  palavras (a mesma lista de `src/lib/palavrasBloqueadas.js`).
+  palavras (lista ampliada pela 0008: `supabase/migrations/0008_filtro_palavras.sql`, gerada de `src/lib/filtro/`; veja `docs/moderacao.md`).
 
 Quem revisa e como: `docs/moderacao.md`. Pode rodar de novo sem problema.
 Conferir: em **Table Editor** aparece `denuncias` com o cadeado de RLS.

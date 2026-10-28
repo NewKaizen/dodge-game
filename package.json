@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
+    "obscenity": "0.4.6",
     "phaser": "^4.2.1",
     "sharp": "^0.35.5",
     "spessasynth_lib": "4.3.14",

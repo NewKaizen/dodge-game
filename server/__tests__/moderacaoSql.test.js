@@ -1,15 +1,18 @@
 // A 0004_moderacao.sql num Postgres de verdade (opcional): roda só com
 //   DODGE_PG="-h /caminho/do/socket -p 5432 -U postgres" npm test
 // (mesmo esquema do progressoSql.test.js: banco descartável dodge_teste_moderacao,
-// "auth"/"storage" de mentira). Confere: as migrations 0001–0004 rodam duas
+// "auth"/"storage" de mentira). Confere: as migrations 0001–0004 e 0008 rodam duas
 // vezes; denunciar (sem si mesmo, sem duplicata aberta, limite por dia, foto só
 // de quem tem foto); o navegador não lê denúncia nenhuma; o filtro de nomes do
-// banco é igual ao do JS e vale no atualizar_perfil.
+// banco (nome_ofensivo da 0008, gerada do mesmo dado do JS) dá a mesma resposta
+// que o JS nos casos de filtroCasos.js e vale no atualizar_perfil.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { nomeOfensivo } from '../../src/lib/palavrasBloqueadas.js'
+import { POSITIVOS, NEGATIVOS } from '../../src/lib/__tests__/filtroCasos.js'
 
 const ARGS = process.env.DODGE_PG ? process.env.DODGE_PG.split(/\s+/).filter(Boolean) : null
 const BANCO = 'dodge_teste_moderacao'
@@ -45,13 +48,9 @@ const comoAnonimo = (sql) => `begin; set local role anon; ${sql}; commit;`
 const tagDe = (n) => `(select tag from public.perfis where id = '${uid(n)}')`
 const denunciar = (de, para, tipo = 'nome', motivo = 'nome ofensivo') => comoNavegador(`select public.denunciar(${para === 99 ? `'zzz#0000'` : tagDe(para)}, '${tipo}', '${motivo}')`, de)
 
-test('as listas do banco e do JS são as mesmas', () => {
-  const sql = execFileSync('cat', [migration('0004_moderacao')], { encoding: 'utf8' })
-  const lista = (re) => [...re.exec(sql)[1].matchAll(/'([a-z]+)'/g)].map((m) => m[1])
-  return import('../../src/lib/palavrasBloqueadas.js').then((js) => {
-    assert.deepEqual(lista(/any \(array\[([^\]]+)\]\)/), js.PALAVRAS_EXATAS)
-    assert.deepEqual(lista(/unnest\(array\[([^\]]+)\]\) as p/), js.PALAVRAS_CONTIDAS)
-  })
+test('0008 (gerada dos mesmos dados do JS) está em dia', async () => {
+  const { gerarSql } = await import('../../scripts/gerar-filtro-sql.mjs')
+  assert.equal(readFileSync(migration('0008_filtro_palavras'), 'utf8'), gerarSql(), 'rode: node scripts/gerar-filtro-sql.mjs')
 })
 
 test('0004 no Postgres (duas vezes): denunciar, RLS e filtro de nomes', { skip: !ARGS && 'defina DODGE_PG para rodar no Postgres' }, () => {
@@ -59,11 +58,11 @@ test('0004 no Postgres (duas vezes): denunciar, RLS e filtro de nomes', { skip: 
   psql(`create database ${BANCO}`, 'postgres')
   try {
     psql(STUB)
-    for (let vez = 0; vez < 2; vez++) for (const n of ['0001_contas', '0002_amigos', '0003_progresso', '0004_moderacao']) arquivo(migration(n))
+    for (let vez = 0; vez < 2; vez++) for (const n of ['0001_contas', '0002_amigos', '0003_progresso', '0004_moderacao', '0008_filtro_palavras']) arquivo(migration(n))
     for (let i = 1; i <= 13; i++) psql(`insert into auth.users (id, raw_user_meta_data) values ('${uid(i)}', '{"full_name":"Jogador ${i}"}')`)
 
     // ---- filtro de nomes: o banco e o JS concordam ----
-    const nomes = ['Caralho', 'c.a.r.a.l.h.o', 'xcaralhox', 'Put4', 'puta_x', 'Computador', 'Disputa', 'Ana Maria', 'João', 'F D P', 'fdp', 'Hitler99', 'Shit', 'Shiitake', 'cuzão', 'Cuzao', 'Assassino', 'Analista', 'Pqp', 'n1gger', 'Kris', 'Susie 2000', 'Scunthorpe', 'Rapedo', 'Rape', 'dick_pro', 'Dickens', 'Bostoniano', 'Bosta']
+    const nomes = [...POSITIVOS, ...NEGATIVOS, 'Caralho', 'c.a.r.a.l.h.o', 'xcaralhox', 'Put4', 'puta_x', 'Computador', 'Disputa', 'Ana Maria', 'João', 'F D P', 'fdp', 'Hitler99', 'Shit', 'Shiitake', 'cuzão', 'Cuzao', 'Assassino', 'Analista', 'Pqp', 'n1gger', 'Kris', 'Susie 2000', 'Scunthorpe', 'Rapedo', 'Rape', 'dick_pro', 'Dickens', 'Bostoniano', 'Bosta']
     for (const nome of nomes) assert.equal(psql(`select public.nome_ofensivo('${nome}')`), nomeOfensivo(nome) ? 't' : 'f', `nome_ofensivo(${nome})`)
     assert.equal(nomeOfensivo('Computador'), false)
     assert.equal(nomeOfensivo('Caralho'), true)
