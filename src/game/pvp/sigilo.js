@@ -1,49 +1,19 @@
-// Cartas escondidas no PVP ONLINE (1x1 em sala de amigos e partida rápida, e o todos contra todos):
-// ninguém vê a carta EXATA do outro, só a CATEGORIA dela, como as cartas do chefe no CO-OP
-// (docs/pvp-regras.md "Cartas escondidas no online"). Lógica pura, testada em
-// __tests__/categorias.test.js. O PVP local (mesmo PC) e o vs CPU não passam por aqui.
+// Cartas escondidas SÓ ATÉ A REVELAÇÃO no PVP ONLINE (1x1 em sala de amigos e partida rápida, e o todos
+// contra todos; docs/pvp-regras.md "Escolha às cegas no online"). Lógica pura, testada em
+// __tests__/sigilo.test.js. O PVP local (mesmo PC) e o vs CPU não passam por aqui.
 //
-// Categoria = o naipe (o tipo da carta nas regras: cartas.js), com o SUPER à parte:
-//   ♠ espadas  ATAQUE      (o Ás ♠ Espelho também: ele manda um ataque, o eco ou o que passou adiante)
-//   ♦ ouros    CONTROLE    (o Ás ♦ Anular também: ele controla a carta do outro)
-//   ♣ paus     ARMADILHA   (o Ás ♣ Roubo também: a armadilha pega uma carta da mão)
-//   ♥ copas    SUPORTE     (cura, escudo, energia, compra; o Ás ♥ Segunda chance também)
-//   ★ SUPER    SUPER       (valor 14, uma por baralho)
-// O Ás fica na categoria do naipe dele: o efeito especial aparece quando acontece (ESPELHO!, ANULADA!...),
-// como o ataque aparece na esquiva.
+//   - A escolha é simultânea e às cegas: enquanto alguém escolhe, ninguém vê a carta do outro (a jogada do
+//     host vai ao convidado como FICHA, e o do convidado só vai ao host). Só aparece "<nome> já escolheu".
+//   - Todos confirmaram (as jogadas travadas): o host manda as jogadas de verdade e o resultado com a carta
+//     real de cada um (nome, valor, ataque), e dali em diante tudo se mostra como no jogo original.
+//   - A MÃO, o monte e o descarte do outro continuam escondidos (viram fichas), o tempo todo.
 //
-// No fio, o host (que roda as regras e sabe tudo) manda a cada convidado o estado e o resultado VISTOS
-// POR ELE (mascararEstado / mascararResultado): as cartas dele como são; as dos outros viram
-//   oculta     { id: ficha, oculta: true, personagem }                  (mão, monte, descarte)
-//   revelada   { id: ficha, oculta: true, personagem, categoria, naipe, valor, nome,
-//                ataque, perfeito }                                      (a carta jogada na rodada)
+// No fio, o host (que roda as regras e sabe tudo) manda a cada convidado o estado visto por ele
+// (mascararEstado): as cartas dele como são; as dos outros viram
+//   oculta     { id: ficha, oculta: true, personagem }       (mão, monte, descarte)
 // `ficha` é um apelido sorteado por partida (criarFichas): o mesmo para a mesma carta enquanto a ponte
-// existe (a mão do outro anima direito, a carta jogada é achada na mão virada), sem nenhuma relação com o
-// id. `ataque` é o descritor do ataque (cartas.js descritorDoAtaque: a esquiva precisa rodar o ataque, e
-// a esquiva mostra o ataque de qualquer jeito) e `perfeito` a energia do desvio perfeito daquela carta.
-// `naipe` é o da categoria (o SUPER vai como espadas, valor 14); `nome` é o rótulo da categoria.
-
-import { ehSuper, descritorDoAtaque } from './cartas.js'
-import { energiaPerfeito } from './regras.js'
-
-export const CATEGORIAS = {
-  ataque: { id: 'ataque', rotulo: 'ATAQUE', icone: '♠', cor: '#ffffff', naipe: 'espadas' },
-  controle: { id: 'controle', rotulo: 'CONTROLE', icone: '♦', cor: '#ff5a70', naipe: 'ouros' },
-  armadilha: { id: 'armadilha', rotulo: 'ARMADILHA', icone: '♣', cor: '#ffffff', naipe: 'paus' },
-  suporte: { id: 'suporte', rotulo: 'SUPORTE', icone: '♥', cor: '#ff5a70', naipe: 'copas' },
-  super: { id: 'super', rotulo: 'SUPER', icone: '★', cor: '#ffd23c', corRotulo: '#ff6a4a', naipe: 'espadas' },
-}
-const POR_NAIPE = { espadas: 'ataque', ouros: 'controle', paus: 'armadilha', copas: 'suporte' }
-
-// a categoria (id de CATEGORIAS) de uma carta (de verdade ou já revelada); null sem carta
-export function categoriaDaCarta(carta) {
-  if (!carta) return null
-  if (carta.categoria) return carta.categoria
-  if (ehSuper(carta)) return 'super'
-  return POR_NAIPE[carta.naipe] ?? null
-}
-
-export const infoCategoria = (carta) => CATEGORIAS[categoriaDaCarta(carta)] ?? null
+// existe (a mão virada do outro anima direito e a carta jogada é achada nela), sem relação com o id. A
+// carta jogada, já revelada (cartaRevelada), é a carta de verdade, só que com o id = ficha.
 
 // Apelidos de carta da partida: ficha(id) -> 'c' + 7 letras sorteadas, sempre o mesmo para o mesmo id
 export function criarFichas(sorte = Math.random) {
@@ -72,21 +42,11 @@ export function cartaOculta(carta, ficha) {
   return { id: ficha(carta.id), oculta: true, personagem: carta.personagem }
 }
 
+// a carta jogada, já revelada: a de verdade (a frente, o nome, o valor, o ataque), com a ficha no lugar do
+// id (é por ele que a mão virada do outro acha a carta que saiu dela)
 export function cartaRevelada(carta, ficha) {
   if (!carta || carta.oculta) return carta
-  const categoria = categoriaDaCarta(carta)
-  const info = CATEGORIAS[categoria]
-  return {
-    id: ficha(carta.id),
-    oculta: true,
-    personagem: carta.personagem,
-    categoria,
-    naipe: info.naipe,
-    valor: categoria === 'super' ? 14 : null,
-    nome: info.rotulo,
-    ataque: descritorDoAtaque(carta),
-    perfeito: energiaPerfeito(carta),
-  }
+  return { ...carta, id: ficha(carta.id) }
 }
 
 // O host embaralha os montes de novo com um sorteio que só ele tem (no lugar da semente da partida, que
@@ -147,33 +107,19 @@ export function mascararResultado(r, eu, ficha) {
     )
   if (copia.trocas) copia.trocas = copia.trocas.map((t, j) => (!t || j === eu ? t : { de: cartaRevelada(t.de, ficha), para: cartaRevelada(t.para, ficha) }))
   if (copia.armas) copia.armas = copia.armas.map((a, j) => (!a || j === eu ? a : { ...a, carta: a.carta ? cartaRevelada(a.carta, ficha) : a.carta }))
-  if (copia.eventos) copia.eventos = [] // (textos do host com o nome das cartas)
   return copia
 }
 
 // A jogada que vai para os outros: a ficha da carta (a carta virada na mão de quem jogou) ou null
 export const mascararJogada = (id, ficha) => (id == null ? null : ficha(id))
 
-// maiorCarta das estatísticas (PvpResultado): a dos outros vira a categoria
-// (lista por vaga, ou o { p1, p2 } da PvpResultado)
-export function mascararEstatisticas(lista, eu, ficha) {
-  const ver = (e, j) => (j === eu || !e?.maiorCarta ? e : { ...e, maiorCarta: cartaRevelada(e.maiorCarta, ficha) })
-  if (Array.isArray(lista)) return lista.map(ver)
-  if (lista && typeof lista === 'object' && ('p1' in lista || 'p2' in lista)) return { ...lista, p1: ver(lista.p1, 0), p2: ver(lista.p2, 1) }
-  return lista
-}
-
-// Os dados de uma cena que o host manda (irParaCena, retomada da 2D/5A) vistos por `eu`: o estado da
-// retomada, as estatísticas e a lista de jogadores do resultado
+// Os dados de uma cena que o host manda (irParaCena, retomada da 2D/5A) vistos por `eu`: o estado da retomada
 export function mascararDadosDeCena(dados, eu, ficha) {
   if (!dados || typeof dados !== 'object') return dados
   const copia = { ...dados }
   if (copia.retomada?.estado) {
     copia.retomada = { ...copia.retomada, estado: mascararEstado(copia.retomada.estado, eu, ficha) }
-    if (copia.retomada.extra?.estatisticas) copia.retomada.extra = { ...copia.retomada.extra, estatisticas: mascararEstatisticas(copia.retomada.extra.estatisticas, eu, ficha) }
   }
-  if (copia.estatisticas) copia.estatisticas = mascararEstatisticas(copia.estatisticas, eu, ficha)
-  if (Array.isArray(copia.jogadores)) copia.jogadores = mascararEstatisticas(copia.jogadores, eu, ficha)
   return copia
 }
 

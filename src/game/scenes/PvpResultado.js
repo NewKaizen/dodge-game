@@ -910,7 +910,6 @@ export default class PvpResultado extends Phaser.Scene {
     const fora = lado(k)
     const personagem = carta.personagem ?? (k === 0 ? this.p1 : this.p2)
     const mini = new Carta(this, x + fora * 40, y + 2, { id: `resultado-${k}`, custo: 0, descricao: '', ...carta, personagem }, { largura: 24 }).setDepth(7)
-    mini.mostrarSelo() // a do outro no PVP online: só a categoria (pvp/categorias.js)
     const nome = this.add
       .text(x + fora * 24, y + 2, carta.nome ?? '', estilo(12, cor, { strokeThickness: 3, wordWrap: { width: 80 }, lineSpacing: -2, align: k === 0 ? 'left' : 'right' }))
       .setOrigin(k === 0 ? 0 : 1, 0.5)
