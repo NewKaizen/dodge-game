@@ -205,7 +205,7 @@ export default class FimDePartida {
     const a = this.arena
     const pista = a.pistas[k]
     const coracao = pista.coracoes[0]
-    const cor = CORES.almas[j]
+    const cor = a.corDoLado?.(j) ?? CORES.almas[j] // (todos contra todos: a cor da vaga)
     this.quebras.push(quebrarCoracao(a, { x: coracao.x, y: coracao.y, cor, escala: coracao.sprite?.scaleX ?? ESCALA.coracao }))
     coracao.esconder()
     this.criarFantasma(k)
@@ -274,7 +274,9 @@ export default class FimDePartida {
       return
     }
     const a = this.arena
-    const jogadores = [0, 1].map((j) => {
+    // o placar tem dois lados: no 1x1 o P1 e o P2; no todos contra todos (5D) quem venceu e quem caiu por último
+    const lados = a.ladosDoReplay?.() ?? [0, 1]
+    const jogadores = lados.map((j) => {
       const p = PERSONAGENS[a.ids?.[j]]
       return { rotulo: a.rotulo(j), nome: a.nomesJog?.[j] ?? p?.nome ?? `P${j + 1}`, cor: p?.cor ?? CORES.almas[j], hp: Math.max(0, Math.round(a.estado?.jogadores[j]?.hp ?? 0)) }
     })
@@ -283,7 +285,7 @@ export default class FimDePartida {
       quadros,
       pistas: alvos.map((_, n) => n),
       campos: alvos.map((m) => this.fontes[m.k].campo),
-      mortos: alvos.map((m, n) => ({ j: m.j, k: n })),
+      mortos: alvos.map((m, n) => ({ j: Math.max(0, lados.indexOf(m.j)), k: n })),
       jogadores,
       arena: a.arena,
       andamento: andamentoMusica(),
@@ -348,7 +350,8 @@ const emissores = (cena) => cena.children.list.filter((o) => o.type === 'Particl
 function fontePista(arena, pista, campo) {
   return {
     campo,
-    gravando: () => arena.fase === 'esquiva' && pista.aberta,
+    // (a arena pode dispensar uma pista: no todos contra todos só grava quando o K.O. pode acabar a partida)
+    gravando: () => arena.fase === 'esquiva' && pista.aberta && (arena.gravarPista?.(pista) ?? true),
     visivel: () => pista.aberta && pista.caixa.camera.visible,
     objetos: () => arena.children.list.filter((o) => o.willRender?.(pista.caixa.camera)),
     coracoes: () => pista.coracoes.map((c) => ({ sprite: c.sprite, x: c.x, y: c.y, ativo: c.ativo, cor: c.cor, j: c.jogador })),

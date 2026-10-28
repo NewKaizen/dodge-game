@@ -31,6 +31,7 @@ const PERSISTENTES = {
   PvpArena: ['vezPartida'],
   CoopArena: ['vezPartida'],
   CoopArenaN: ['vezPartida'],
+  PvpArenaN: ['vezPartida'],
   // idem para a prévia do Grimório (geracaoPrevia = (geracaoPrevia ?? 0) + 1, no create)
   // CenaConta.iniciarBase() (conta/Base.js) refaz sujo/saindo/digitando/cursor... a cada abertura
   Amigos: ['sujo'],
