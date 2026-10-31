@@ -102,7 +102,7 @@ function rpcs(sb) {
       for (const e of p_participantes ?? []) {
         const uid = t.perfis.some((p) => p.id === e.user_id) ? e.user_id : null
         const ref = !uid && typeof e.ref === 'string' && /^convidado(:[a-z0-9]{1,32})?$/.test(e.ref) ? e.ref : null
-        t.partida_participantes.push({ partida_id: p_id, lado: e.lado, user_id: uid, ref, personagem: null, resultado: null, relato: null, relatado_em: null })
+        t.partida_participantes.push({ partida_id: p_id, lado: e.lado, time: e.time === 0 || e.time === 1 ? e.time : null, user_id: uid, ref, personagem: null, resultado: null, relato: null, relatado_em: null })
       }
       return null
     },
@@ -131,12 +131,26 @@ function rpcs(sb) {
           if (t.concessoes.some((c) => c.partida_id === p_partida && c.user_id === pp.user_id)) continue
           // como a 0006: o "oponente" do limite diário é o 1º outro lado COM conta (senão o 1º outro lado);
           // com 2 lados só existe um. Nas partidas de 3 e 4 isso conta por par de contas
-          const outro = lados.filter((x) => x.lado !== pp.lado).sort((x, y) => Number(!x.user_id) - Number(!y.user_id) || x.lado - y.lado)[0]
+          // 2x2 (0009): os "outros" são só os do OUTRO time (o parceiro não conta)
+          const dupla = p.modo === '2x2' && pp.time != null
+          const outros = lados.filter((x) => x.lado !== pp.lado && (!dupla || x.time !== pp.time))
+          const outro = outros.sort((x, y) => Number(!x.user_id) - Number(!y.user_id) || x.lado - y.lado)[0]
           const oponente = outro?.user_id ?? null
           const oponenteRef = outro?.ref ?? null
           // só conta partidas do mesmo modo, hoje, contra o mesmo oponente (a conta ou a chave do convidado)
           const hoje = t.concessoes.filter((c) => c.user_id === pp.user_id && c.xp > 0 && sb.diaDe(c.criada_em) === dia && t.partidas.find((x) => x.id === c.partida_id)?.modo === p.modo)
           let repeticoes = hoje.filter((c) => c.oponente_id === oponente && (c.oponente_ref ?? null) === oponenteRef).length
+          // 2x2 (0009): o limite conta contra CADA adversário com conta (vale o par mais repetido hoje): as
+          // partidas de hoje em que eu e ele estávamos em times opostos
+          if (dupla) {
+            const contra = (u) =>
+              hoje.filter((c) => {
+                const eu = t.partida_participantes.find((x) => x.partida_id === c.partida_id && x.user_id === pp.user_id)
+                return t.partida_participantes.some((x) => x.partida_id === c.partida_id && x.user_id === u && eu && x.time != null && x.time !== eu.time)
+              }).length
+            const contas = outros.filter((x) => x.user_id).map((x) => x.user_id)
+            if (contas.length) repeticoes = Math.max(...contas.map(contra))
+          }
           // contra convidados também há um teto por dia, somando todos
           if (!oponente && oponenteRef && hoje.filter((c) => !c.oponente_id && c.oponente_ref).length >= CONVIDADOS_LIMITE_DIA) repeticoes = REPETICAO_LIMITE
           const { xp, motivo } = xpDaPartida({ resultado: pp.resultado, duracaoS: p.duracao_s, rodadas: p.rodadas, repeticoes, modo: p.modo, colocacao: pp.colocacao ?? null })

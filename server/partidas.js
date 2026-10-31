@@ -49,10 +49,10 @@
 // N LADOS (Fase 5A, a base dos modos de 3–4; docs/online.md "Partidas de N"): o
 // registro, a leitura do relato e a decisão já aceitam N participantes (lado =
 // vaga da sala, 0 = host). Só dão XP os modos cuja partida
-// existe (MODOS_COM_XP: o coop4 entrou na 5B, o ffa na 5D; o 2x2 entra com a 5E). O que cada um relata:
+// existe (MODOS_COM_XP: o coop4 entrou na 5B, o ffa na 5D, o 2x2 na 5E). O que cada um relata:
 //   coop4  { vitoria }                    o time inteiro vence ou perde
 //   ffa    { colocacoes: [lado, ...] }    do 1º ao último (todos os lados, sem repetir)
-//   2x2    { vencedorTime: 0 | 1 | null } time = timeDoLado(lado) (null = empate)
+//   2x2    { vencedorTime: 0 | 1 | null } time = timeDoLado(lado, arranjo da sala) (null = empate)
 // POLÍTICA de N (decidirN): o host decide, conferido pela maioria. Vale o
 // resultado do HOST se pelo menos metade de quem relatou concorda com ele (o host
 // desempata); sem relato do host, vale o que mais da metade relatou. Nos dois casos
@@ -70,6 +70,7 @@
 // mesmo que tenha reconectado com a mesma conta). participante.conta = a conta
 // do cliente quando a partida começou (para entregar); participante.usuario =
 // quem ganha o XP (null: convidado ou a mesma conta dos dois lados)
+import { timesDoArranjo } from '../src/lib/times2x2.js'
 import crypto from 'node:crypto'
 import { agendarPadrao } from './fila.js'
 import { METRICAS_NULA } from './metricas.js'
@@ -91,10 +92,12 @@ export const MODOS_PARTIDA = {
   ffa: { min: 3, max: 4, decide: 'colocacao' },
   '2x2': { min: 4, max: 4, decide: 'times' },
 }
-// os modos que registram partida e dão XP hoje (5B ligou o coop4, 5D o ffa; a 5E acrescenta o 2x2)
-export const MODOS_COM_XP = ['pvp', 'coop', 'coop4', 'ffa']
+// os modos que registram partida e dão XP hoje (5B ligou o coop4, 5D o ffa, 5E o 2x2)
+export const MODOS_COM_XP = ['pvp', 'coop', 'coop4', 'ffa', '2x2']
 // 2x2: as vagas 0 e 2 (host e 2º convidado) contra 1 e 3
 export const timeDoLado = (lado) => lado % 2
+// o time de cada lado no 2x2 com o arranjo da sala (TROCAR TIME, src/lib/times2x2.js; o 0 é o timeDoLado)
+export const timeNoArranjo = (lado, arranjo = 0) => timesDoArranjo(arranjo)[lado] ?? timeDoLado(lado)
 const ehModoN = (modo) => Boolean(MODOS_PARTIDA[modo]?.decide)
 
 // ---------- banco ----------
@@ -411,7 +414,7 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
       versao,
       criadaEm: agora(),
       // lado = a posição na lista (a vaga da sala: o host é o 0); time só no 2x2
-      participantes: membros.map((c, lado) => ({ lado, time: sala.modo === '2x2' ? timeDoLado(lado) : null, cliente: c.id, ip: c.ip ?? null, conta: c.usuario ?? null, usuario: c.usuario ?? null, nome: c.nome, semConta: c.usuario ? null : 'convidado', ref: null, relato: null, relatadoEm: null, saiuEm: null, resposta: null })),
+      participantes: membros.map((c, lado) => ({ lado, time: sala.modo === '2x2' ? timeNoArranjo(lado, sala.arranjo) : null, cliente: c.id, ip: c.ip ?? null, conta: c.usuario ?? null, usuario: c.usuario ?? null, nome: c.nome, semConta: c.usuario ? null : 'convidado', ref: null, relato: null, relatadoEm: null, saiuEm: null, resposta: null })),
       prazo: null,
       cancelar: null,
       decisao: null,
