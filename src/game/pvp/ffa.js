@@ -107,11 +107,12 @@ export function iniciarRodadaFfa(estado, { ausentes = [] } = {}) {
 
 const idDaJogada = (jogada) => (jogada == null ? null : typeof jogada === 'string' ? jogada : jogada.carta ?? null)
 const mandaAtaque = (carta) => carta && especialDaCarta(carta) !== 'segundaChance'
-const novoEfeito = () => ({ cura: 0, escudo: null, energia: 0, compradas: [], roubou: null, perdeu: null, segundaChance: false })
+const novoEfeito = () => ({ cura: 0, escudo: null, energia: 0, compradas: [], roubou: null, perdeu: null, segundaChance: false, apoiou: null })
 const montarCaixa = (carta, de, refletida, dono = de) => ({ carta, de, dono, refletida, escudo: null, ...resumoDoAtaque(carta) })
 
 // quem pode jogar nesta rodada (vivo e com conexão)
-export const joga = (estado, j) => !estado.jogadores[j].eliminado && !estado.jogadores[j].ausente
+// (no 2x2, pvp/dupla.js, quem está CAÍDO também não joga)
+export const joga = (estado, j) => !estado.jogadores[j].eliminado && !estado.jogadores[j].ausente && !estado.jogadores[j].caido
 
 // Resolve a rodada (o host). jogadas[vaga] = id | null. Quem não joga (eliminado, sem conexão) passa SEM
 // o bônus de passar. Valida tudo antes de mudar o estado. Por par atacante -> alvo, como no 1x1:
@@ -124,7 +125,9 @@ export const joga = (estado, j) => !estado.jogadores[j].eliminado && !estado.jog
 //      recebendo no máximo UM ataque
 //   5. morte súbita (rodada >= FFA.morteSubita): dano ×FFA.fatorMorteSubita; depois o escudo de quem recebe
 //   6. ♣ Roubo de X pega uma carta da mão do alvo de X
-export function resolverRodadaFfa(estado, jogadas) {
+// opcoes (o 2x2, pvp/dupla.js): apoio[j] = em quem vai a cura/escudo/Segunda chance do ♥ de j (o padrão é j;
+// a energia e a compra ficam sempre com j); fatorDano[j] = multiplica o dano da caixa que j manda
+export function resolverRodadaFfa(estado, jogadas, opcoes = {}) {
   if (estado.fim) throw new Error('a partida já acabou')
   const n = estado.n
   const entrada = Array.from({ length: n }, (_, j) => (joga(estado, j) ? idDaJogada(jogadas[j]) : null))
@@ -163,19 +166,22 @@ export function resolverRodadaFfa(estado, jogadas) {
     const carta = valendo(j)
     if (!carta) continue
     const jog = estado.jogadores[j]
+    const q = carta.naipe === 'copas' && Number.isInteger(opcoes.apoio?.[j]) ? opcoes.apoio[j] : j
+    const quem = estado.jogadores[q]
+    if (q !== j) efeitos[j].apoiou = q
     if (especiais[j] === 'segundaChance') {
-      const cura = curar(estado, j, Math.round(jog.hpMax * PVP.segundaChance))
-      jog.protegido = true
+      const cura = curar(estado, q, Math.round(quem.hpMax * PVP.segundaChance))
+      quem.protegido = true
       efeitos[j].cura += cura
       efeitos[j].segundaChance = true
       continue
     }
     const sup = carta.naipe === 'copas' ? efeitosDaCarta(carta) : null
     if (!sup) continue
-    if (sup.cura) efeitos[j].cura += curar(estado, j, sup.cura)
+    if (sup.cura) efeitos[j].cura += curar(estado, q, sup.cura)
     if (sup.escudo) {
-      jog.escudo = Math.min(jog.escudo ?? 1, sup.escudo)
-      efeitos[j].escudo = jog.escudo
+      quem.escudo = Math.min(quem.escudo ?? 1, sup.escudo)
+      efeitos[j].escudo = quem.escudo
     }
     if (sup.energia) {
       const antes = jog.energia
@@ -210,7 +216,8 @@ export function resolverRodadaFfa(estado, jogadas) {
   const forte = estado.rodada >= FFA.morteSubita
   caixas.forEach((caixa, j) => {
     if (!caixa) return
-    if (forte) caixa.dano = Math.ceil(caixa.dano * FFA.fatorMorteSubita)
+    const fator = (forte ? FFA.fatorMorteSubita : 1) * (opcoes.fatorDano?.[caixa.de] ?? 1)
+    if (fator !== 1) caixa.dano = Math.ceil(caixa.dano * fator)
     const jog = estado.jogadores[j]
     if (jog.escudo == null) return
     caixa.escudo = jog.escudo
