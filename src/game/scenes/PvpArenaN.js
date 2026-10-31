@@ -11,6 +11,8 @@ import { CARTAS, TEMAS, ehSuper, superDoPersonagem } from '../pvp/cartas.js'
 import { ataqueDaCartaNoJogo } from '../pvp/ataquesDasCartas.js'
 import { podeJogar, registrarGrazes, registrarPerfeitoCombo, energiaPerfeito, ENERGIA } from '../pvp/regras.js'
 import { FFA, criarPartidaFfa, resolverRodadaFfa, aplicarDanoFfa, danoAusente, classificacao, colocacoes, vivos } from '../pvp/ffa.js'
+import { DUPLA, criarPartidaDupla, resolverRodadaDupla, podeJogarDupla, parceiroDe, membros, dePe, alvosDeApoio, classificacaoDupla } from '../pvp/dupla.js'
+import { timesDoArranjo, ROTULO_TIME } from '../../lib/times2x2.js'
 import { ARENA, ARENA_PADRAO } from '../pvp/arenas.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
@@ -60,7 +62,13 @@ import { quemEmFoco, estadoDoCartao, TEXTO_CARTAO, vistasDaGrade, vistasDoFoco, 
 // replay (pvp/fimDePartida/, o placar mostra quem venceu e quem caiu por último). Acaba com 1 vivo ou no
 // limite de rodadas (FFA.limiteRodadas); a partir de FFA.morteSubita o dano sobe.
 //
-//   irParaCena(this, 'PvpArenaN', { personagens: [p0..pN-1] (por vaga), arena, semente })
+// 2x2 (Fase 5E, modo '2x2': regras em pvp/dupla.js, docs/pvp-regras.md "2x2"): a MESMA cena com 4 caixas e
+// TIMES. O painel do anúncio mostra os DOIS DUELOS da rodada; cada célula tem a etiqueta e a borda da cor do
+// time. Quem zera CAI (não sai): a caixa não abre, a mão desce e o foco vai para o duelo do parceiro, que
+// resgata com uma rodada limpa ou um ♥ (o ♥ escolhe o alvo com ←/→: VOCÊ ou o PARCEIRO). No foco, o parceiro
+// é um cartão pequeno ("PARCEIRO"). Acaba quando um time tem os dois caídos (os dois times juntos: empate).
+//
+//   irParaCena(this, 'PvpArenaN', { personagens: [p0..pN-1] (por vaga), arena, semente, modo?: '2x2', times?: [t0..t3] })
 //   window.pvpArenaN (dev): estadoDebug, setHp(j, hp), setEnergia, forcarMao (valem em todos os PCs)
 
 const TEMPO_ESCOLHA = 15000
@@ -129,7 +137,14 @@ const estadoInicial = () => ({
   emFoco: false,
   rotulosFoco: null,
   cartoes: null,
+  escolhaApoio: null,
+  rotulosTime: [],
+  comAtaque: null,
 })
+
+// as cores dos times do 2x2 (a etiqueta e a borda da célula; a forma e o nome continuam na cor da vaga)
+const COR_TIME = [0x4ab0ff, 0xffa040]
+const TEXTO_TIME = ['#7cc8ff', '#ffb870']
 
 export default class PvpArenaN extends Phaser.Scene {
   constructor() {
@@ -143,6 +158,8 @@ export default class PvpArenaN extends Phaser.Scene {
     this.arena = ARENA[dados?.arena] ?? ARENA[ARENA_PADRAO]
     this.semente = dados?.semente ?? `ffa:${Date.now()}`
     this.tempoBase = dados?.tempo ?? TEMPO_ESCOLHA
+    this.modo = dados?.modo === '2x2' ? '2x2' : 'ffa'
+    this.timesDados = Array.isArray(dados?.times) && dados.times.length === 4 ? dados.times : null
   }
 
   create() {
@@ -152,7 +169,8 @@ export default class PvpArenaN extends Phaser.Scene {
     this.ids = this.idsDosDados
     this.n = this.ids.length
     this.meu = meuIndice()
-    this.estado = criarPartidaFfa({ personagens: this.ids, semente: this.semente })
+    this.dupla = this.modo === '2x2' && this.n === DUPLA.jogadores
+    this.estado = this.dupla ? criarPartidaDupla({ personagens: this.ids, times: this.timesDados ?? timesDoArranjo(0), semente: this.semente }) : criarPartidaFfa({ personagens: this.ids, semente: this.semente })
     this.nomes = Array.from({ length: this.n }, (_, j) => participantesDaPartida().find((p) => p.indice === j)?.nome ?? `P${j + 1}`)
     this.nomesJog = this.nomes.map((nome) => nomeNoCoracao(nome, 10))
     this.controles = new Controles(this)
@@ -258,6 +276,16 @@ export default class PvpArenaN extends Phaser.Scene {
       // à direita da caixa: quem ataca esta caixa e com o quê
       const ataque = this.add.text(c.x0 + CELULA.largura - LADO, c.y0 + 14, '', { ...estilo(9, TEXTO.normal), wordWrap: { width: LADO - 6 } }).setDepth(5)
       const destaque = this.add.rectangle(c.x, c.y, CELULA.largura - 6, CELULA.altura - 6).setStrokeStyle(3, 0xffe14a).setDepth(6).setVisible(false)
+      // 2x2: a borda e a etiqueta do time (embaixo à esquerda da célula)
+      if (this.dupla) {
+        const t = this.estado.times[k]
+        g.lineStyle(2, COR_TIME[t], 0.85)
+        g.strokeRect(c.x0 + 4, c.y0 + 4, CELULA.largura - 8, CELULA.altura - 8)
+        const parceiro = parceiroDe(this.estado, this.meu)
+        const rot = this.add.text(c.x0 + 8, c.y0 + CELULA.altura - 14, `${ROTULO_TIME[t]}${k === parceiro ? ' · PARCEIRO' : ''}`, estilo(9, TEXTO_TIME[t])).setOrigin(0, 0.5).setDepth(5)
+        this.rotulosTime.push(rot)
+        this.objetosGrade.push(rot)
+      }
       this.celulas.push({ ...c, forma, nome, voce, personagem, estado, ataque, destaque })
       this.objetosGrade.push(estado, ataque, ...(voce ? [voce] : []))
     }
@@ -294,7 +322,7 @@ export default class PvpArenaN extends Phaser.Scene {
     const texto = (y, tamanho, cor) => this.add.text(CENTRO_X, y, '', { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(70)
     this.textoRodada = texto(5, 8, TEXTO.normal)
     this.textoRelogio = texto(18, 22, TEXTO.selecionado)
-    this.textoModo = texto(46, 7, '#ff7a9a').setText(`TODOS x TODOS · ${this.n}`)
+    this.textoModo = texto(46, 7, '#ff7a9a').setText(this.dupla ? '2x2 · EQUIPES' : `TODOS x TODOS · ${this.n}`)
   }
 
   criarMao() {
@@ -359,7 +387,7 @@ export default class PvpArenaN extends Phaser.Scene {
     const linhas = Array.from({ length: 4 }, (_, i) => this.add.text(0, 136 + i * 24, '', estilo(14, TEXTO.normal)).setOrigin(0.5))
     const meu = this.add.text(0, 136 + 4 * 24 + 6, '', estilo(11, TEXTO.selecionado)).setOrigin(0.5)
     painel.add([fundo, titulo, sub, formas, ...linhas, meu])
-    this.painelAlvos = { painel, fundo, titulo, formas, linhas, meu }
+    this.painelAlvos = { painel, fundo, titulo, sub, formas, linhas, meu }
   }
 
   filtrarCaixas() {
@@ -442,6 +470,28 @@ export default class PvpArenaN extends Phaser.Scene {
     return this.eliminado(this.meu)
   }
 
+  // fora da rodada: eliminado, ou CAÍDO no 2x2 (não joga, não é alvo; pode voltar)
+  inativo(j) {
+    const jog = this.estado.jogadores[j]
+    return Boolean(jog?.eliminado || (this.dupla && jog?.caido))
+  }
+
+  get euFora() {
+    return this.inativo(this.meu)
+  }
+
+  podeJogarAgora(j, jogada) {
+    return this.dupla ? podeJogarDupla(this.estado, j, jogada) : podeJogar(this.estado, j, jogada)
+  }
+
+  parceiro(j = this.meu) {
+    return this.dupla ? parceiroDe(this.estado, j) : -1
+  }
+
+  semAlvo(j) {
+    return this.dupla && this.estado.semAlvo.includes(j)
+  }
+
   // posição de cada um agora (para "ELIMINADO 4º")
   posicaoDe(j) {
     return colocacoes(this.estado)[j]
@@ -452,10 +502,13 @@ export default class PvpArenaN extends Phaser.Scene {
   textoDoEstado(j) {
     const jog = this.estado.jogadores[j]
     const p = participantesDaPartida().find((x) => x.indice === j)
+    if (this.dupla && jog.eliminado) return ['FORA (saiu)', TEXTO.caido]
     if (jog.eliminado) return [`ELIMINADO ${this.posicaoDe(j)}º${jog.eliminado.motivo === 'saiu' ? ' (saiu)' : ''}`, TEXTO.caido]
     if (!p) return ['SAIU', TEXTO.caido]
     if (p.caiu != null) return [`SEM CONEXÃO ${Math.max(0, Math.ceil(p.caiu / 1000))}s`, '#ff9a3a']
+    if (this.dupla && jog.caido) return ['CAÍDO · resgate!', TEXTO.caido]
     if (this.fase === 'escolha') return this.prontos[j] ? ['já escolheu ✓', TEXTO.cura] : ['ESCOLHENDO', TEXTO.desabilitado]
+    if (this.semAlvo(j)) return ['SEM ALVO: apoio', '#7fd8ff']
     const alvo = this.estado.alvos[j]
     return alvo != null ? [`→ ${this.nomeDe(alvo)}`, textoDaVaga(alvo)] : ['', TEXTO.desabilitado]
   }
@@ -468,9 +521,10 @@ export default class PvpArenaN extends Phaser.Scene {
       const cel = this.celulas[j]
       if (!cel) return
       const atacante = this.estado.alvos.indexOf(j)
-      cel.estado.setText(jog.eliminado ? `ELIMINADO\n${this.posicaoDe(j)}º LUGAR` : this.rede.fora(j) ? 'SEM CONEXÃO\n(leva o ataque\ninteiro)' : '').setColor(jog.eliminado ? TEXTO.caido : '#ff9a3a')
-      if (this.fase !== 'esquiva' && this.fase !== 'arremesso') cel.ataque.setText(atacante >= 0 && !jog.eliminado ? `atacado por\n${this.nomeDe(atacante)}` : '').setColor(atacante >= 0 ? textoDaVaga(atacante) : TEXTO.normal)
-      const apagar = jog.eliminado ? 0.4 : 1
+      const textoCel = this.dupla && jog.eliminado ? 'FORA\n(saiu)' : jog.eliminado ? `ELIMINADO\n${this.posicaoDe(j)}º LUGAR` : this.rede.fora(j) ? 'SEM CONEXÃO\n(leva o ataque\ninteiro)' : this.dupla && jog.caido ? 'CAÍDO\n(o parceiro\nresgata)' : this.semAlvo(j) ? 'SEM ALVO\n+1 energia\nsó ♥' : ''
+      cel.estado.setText(textoCel).setColor(jog.eliminado || (this.dupla && jog.caido) ? TEXTO.caido : this.semAlvo(j) && !this.rede.fora(j) ? '#7fd8ff' : '#ff9a3a')
+      if (this.fase !== 'esquiva' && this.fase !== 'arremesso') cel.ataque.setText(atacante >= 0 && !this.inativo(j) ? `${this.dupla ? 'duelo com' : 'atacado por'}\n${this.nomeDe(atacante)}` : '').setColor(atacante >= 0 ? textoDaVaga(atacante) : TEXTO.normal)
+      const apagar = this.inativo(j) ? 0.4 : 1
       for (const o of [cel.nome, cel.personagem, cel.forma]) o.setAlpha(apagar * this.alphaGrade)
     })
   }
@@ -481,7 +535,7 @@ export default class PvpArenaN extends Phaser.Scene {
     this.fundoGrade?.setAlpha(a)
     for (const o of this.objetosGrade) o.setAlpha(a)
     this.celulas?.forEach((cel, j) => {
-      const apagar = this.estado.jogadores[j]?.eliminado ? 0.4 : 1
+      const apagar = this.inativo(j) ? 0.4 : 1
       for (const o of [cel.nome, cel.personagem, cel.forma]) o.setAlpha(apagar * a)
       cel.destaque.setVisible(a > 0.5 && j === this.seguindo)
     })
@@ -505,6 +559,7 @@ export default class PvpArenaN extends Phaser.Scene {
 
   // o painel do rodízio: um par por linha (forma + nome na cor da vaga), o meu em destaque
   mostrarAlvos() {
+    if (this.dupla) return this.mostrarDuelos()
     const p = this.painelAlvos
     const pares = this.estado.alvos.map((alvo, j) => (alvo == null ? null : [j, alvo])).filter(Boolean)
     const altura = 70 + pares.length * 24 + 30
@@ -529,6 +584,48 @@ export default class PvpArenaN extends Phaser.Scene {
     this.tweens.add({ targets: p.painel, alpha: 1, duration: 200 })
     this.legenda?.setText(`RODÍZIO\n${pares.map(([a, b]) => `${this.nomeDe(a)} → ${this.nomeDe(b)}`).join('\n')}`)
     if (meuAlvo != null) this.etiquetaEm(CENTRO_X, 372, `SEU ALVO: ${this.nomeDe(meuAlvo)}`, textoDaVaga(meuAlvo), { tamanho: 13, ms: 1600 })
+  }
+
+  // 2x2: os dois duelos da rodada ("ANA × BETO", o meu em destaque) e quem está SEM ALVO / CAÍDO
+  mostrarDuelos() {
+    const p = this.painelAlvos
+    const e = this.estado
+    const pares = e.alvos.map((alvo, j) => (alvo != null && j < alvo ? [j, alvo] : null)).filter(Boolean)
+    const extras = e.jogadores.map((jog, j) => (jog.eliminado ? [j, 'FORA'] : jog.caido ? [j, 'CAÍDO: o parceiro resgata'] : this.semAlvo(j) ? [j, 'SEM ALVO: +1 energia, só ♥'] : null)).filter(Boolean)
+    const linhas = pares.length + extras.length
+    const altura = 70 + linhas * 24 + 30
+    p.fundo.clear().fillStyle(0x0b0914, 0.9).fillRoundedRect(-210, 80, 420, altura, 8).lineStyle(2, 0xffd23a, 0.9).strokeRoundedRect(-210, 80, 420, altura, 8)
+    p.titulo.setText(`DUELOS DA RODADA ${e.rodada}`).setColor('#ffd23a')
+    p.sub.setText('cada duelo é um 1x1 · o ♥ vai em você ou no parceiro')
+    p.formas.clear()
+    p.linhas.forEach((l, i) => {
+      if (i < pares.length) {
+        const [a, b] = pares[i]
+        const meu = a === this.meu || b === this.meu
+        l.setText(`${this.nomeDe(a)}   ×   ${this.nomeDe(b)}`).setColor(meu ? '#ffffff' : TEXTO.normal).setFontSize(meu ? 16 : 14)
+        desenharForma(p.formas, formaDaVaga(a), -l.width / 2 - 14, l.y, 6, corDaVaga(a))
+        desenharForma(p.formas, formaDaVaga(b), l.width / 2 + 14, l.y, 6, corDaVaga(b))
+        return
+      }
+      const extra = extras[i - pares.length]
+      if (!extra) return l.setText('')
+      const [j, texto] = extra
+      l.setText(`${this.nomeDe(j)}: ${texto}`).setColor(textoDaVaga(j)).setFontSize(11)
+      desenharForma(p.formas, formaDaVaga(j), -l.width / 2 - 12, l.y, 5, corDaVaga(j))
+    })
+    const meuAlvo = e.alvos[this.meu]
+    const parc = this.parceiro()
+    const alvoParc = parc >= 0 ? e.alvos[parc] : null
+    const partes = []
+    if (meuAlvo != null) partes.push(`VOCÊ × ${this.nomeDe(meuAlvo)}`)
+    else if (this.euFora) partes.push(e.jogadores[this.meu].caido ? 'VOCÊ CAIU: o parceiro pode te resgatar' : 'você saiu')
+    else if (this.semAlvo(this.meu)) partes.push('VOCÊ: SEM ALVO (apoie o parceiro)')
+    if (parc >= 0 && alvoParc != null) partes.push(`PARCEIRO ${this.nomeDe(parc)} × ${this.nomeDe(alvoParc)}`)
+    p.meu.setY(136 + linhas * 24 + 4)
+    p.meu.setText(partes.join(' · '))
+    p.painel.setVisible(true).setAlpha(0)
+    this.tweens.add({ targets: p.painel, alpha: 1, duration: 200 })
+    if (meuAlvo != null) this.etiquetaEm(CENTRO_X, 372, `SEU DUELO: ${this.nomeDe(meuAlvo)}`, textoDaVaga(meuAlvo), { tamanho: 13, ms: 1600 })
   }
 
   esconderAlvos() {
@@ -579,10 +676,17 @@ export default class PvpArenaN extends Phaser.Scene {
   async abertura() {
     this.fase = 'abertura'
     const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 5, align: 'center' })
-    const titulo = this.add.text(CENTRO_X, 150, 'TODOS CONTRA TODOS', estilo(30, '#ff7a9a')).setOrigin(0.5).setDepth(96).setScale(0)
+    const titulo = this.add.text(CENTRO_X, 150, this.dupla ? '2x2 · EQUIPES' : 'TODOS CONTRA TODOS', estilo(30, this.dupla ? '#ffd23a' : '#ff7a9a')).setOrigin(0.5).setDepth(96).setScale(0)
     const nomes = this.nomes.map((nome, j) => this.add.text(mesaDe(j, this.n).x, 230, nomeNoCoracao(nome, 9), estilo(this.n === 4 ? 16 : 20, textoDaVaga(j))).setOrigin(0.5).setDepth(96).setAlpha(0))
     const pers = this.ids.map((id, j) => this.add.text(mesaDe(j, this.n).x, 256, (PERSONAGENS[id]?.nome ?? id).toUpperCase(), estilo(10, '#b8b8c8')).setOrigin(0.5).setDepth(96).setAlpha(0))
-    const regra = this.add.text(CENTRO_X, 300, 'o último de pé vence · o alvo de cada um é anunciado a cada rodada', estilo(10, TEXTO.normal)).setOrigin(0.5).setDepth(96).setAlpha(0)
+    const regra = this.add.text(CENTRO_X, 300, this.dupla ? 'derrube os DOIS adversários · o parceiro caído volta com uma rodada limpa ou um ♥' : 'o último de pé vence · o alvo de cada um é anunciado a cada rodada', estilo(10, TEXTO.normal)).setOrigin(0.5).setDepth(96).setAlpha(0)
+    // 2x2: os times
+    if (this.dupla) {
+      const time = (t) => `${ROTULO_TIME[t]}: ${membros(this.estado, t).map((j) => nomeNoCoracao(this.nomes[j], 8)).join(' + ')}`
+      pers.push(this.add.text(CENTRO_X - 20, 330, time(0), estilo(12, TEXTO_TIME[0])).setOrigin(1, 0.5).setDepth(96).setAlpha(0))
+      pers.push(this.add.text(CENTRO_X, 330, '×', estilo(12, '#ffffff')).setOrigin(0.5).setDepth(96).setAlpha(0))
+      pers.push(this.add.text(CENTRO_X + 20, 330, time(1), estilo(12, TEXTO_TIME[1])).setOrigin(0, 0.5).setDepth(96).setAlpha(0))
+    }
     tocar(this, 'voo')
     await this.tween({ targets: titulo, scale: 1, duration: 300, ease: 'Back.easeOut' })
     tocar(this, 'impacto')
@@ -639,9 +743,9 @@ export default class PvpArenaN extends Phaser.Scene {
   // Só o host resolve (a jogada que não vale lá vira passar) e manda
   async decidirRodada() {
     if (!this.rede.souHost) return this.rede.receberResolucao()
-    const jogadas = this.rede.validarJogadas(await this.rede.juntarJogadas(this.tempoEscolha), (j, id) => podeJogar(this.estado, j, id))
+    const jogadas = this.rede.validarJogadas(await this.rede.juntarJogadas(this.tempoEscolha), (j, id) => this.podeJogarAgora(j, id))
     if (this.saindo) return null
-    const r = resolverRodadaFfa(this.estado, jogadas)
+    const r = this.dupla ? resolverRodadaDupla(this.estado, jogadas) : resolverRodadaFfa(this.estado, jogadas)
     this.rede.enviarResolucao(jogadas, r)
     return r
   }
@@ -685,11 +789,12 @@ export default class PvpArenaN extends Phaser.Scene {
     this.mao.selecionar(Math.floor(this.mao.cartas.length / 2))
     this.botaoPassar.setEscolhido(false)
     this.botaoPassar.setFoco(false)
-    this.botaoPassar.c.setVisible(!this.euEliminado)
-    this.dica.setText(this.euEliminado ? '←/→: escolher quem assistir' : '←/→ escolher   A: confirmar (não dá para desfazer)   →: PASSAR')
+    this.escolhaApoio = null
+    this.botaoPassar.c.setVisible(!this.euFora)
+    this.dica.setText(this.euFora ? (this.euEliminado ? '←/→: escolher quem assistir' : 'CAÍDO: o parceiro resgata com uma rodada limpa ou um ♥   (←/→: quem assistir)') : this.semAlvo(this.meu) ? 'SEM ALVO: jogue um ♥ (em você ou no parceiro) ou passe   A: confirmar' : '←/→ escolher   A: confirmar (não dá para desfazer)   →: PASSAR')
     this.rede.comecarEscolha()
     this.atualizarEstados()
-    if (this.euEliminado) {
+    if (this.euFora) {
       this.escolhido = null
       this.noPassar = true
     }
@@ -703,16 +808,18 @@ export default class PvpArenaN extends Phaser.Scene {
   atualizarEscolha() {
     const escolhendo = this.fase === 'escolha'
     const livre = escolhendo && this.escolhido === undefined
-    this.mao.setAtiva(livre && !this.noPassar)
+    this.mao.setAtiva(livre && !this.noPassar && !this.escolhaApoio)
     this.mao.setTravada(typeof this.escolhido === 'string')
     this.botaoPassar.setFoco(livre && this.noPassar)
     let texto = ''
     let bloqueado = false
-    if (this.euEliminado) texto = 'ELIMINADO — assistindo'
+    if (this.euEliminado) texto = this.dupla ? 'FORA — assistindo' : 'ELIMINADO — assistindo'
+    else if (this.euFora) texto = 'CAÍDO — assistindo o parceiro'
+    else if (escolhendo && this.escolhaApoio) texto = this.textoApoio()
     else if (escolhendo) {
       if (this.escolhido !== undefined) texto = 'PRONTO! esperando os outros...'
       else texto = 'escolha uma carta'
-      const bloqueio = livre && !this.noPassar ? podeJogar(this.estado, this.meu, this.mao.selecionada?.dados.id).bloqueio : null
+      const bloqueio = livre && !this.noPassar ? this.podeJogarAgora(this.meu, this.mao.selecionada?.dados.id).bloqueio : null
       if (bloqueio) {
         texto = bloqueio.curto
         bloqueado = true
@@ -725,11 +832,11 @@ export default class PvpArenaN extends Phaser.Scene {
   mostrarStatus(texto, bloqueado) {
     const t = this.status
     if (bloqueado && texto) return t.setText(`× ${texto}`).setColor('#ffffff').setBackgroundColor(PILULA_BLOQUEIO).setPadding(6, 2, 6, 2)
-    return t.setText(texto).setColor(this.euEliminado ? TEXTO.caido : textoDaVaga(this.meu)).setBackgroundColor('').setPadding(0, 0, 0, 0)
+    return t.setText(texto).setColor(this.euFora ? TEXTO.caido : textoDaVaga(this.meu)).setBackgroundColor('').setPadding(0, 0, 0, 0)
   }
 
   atualizarPrevia() {
-    const ativo = this.fase === 'escolha' && this.escolhido === undefined && !this.euEliminado
+    const ativo = this.fase === 'escolha' && this.escolhido === undefined && !this.euFora
     const carta = ativo && !this.noPassar ? this.mao.selecionada : null
     const chave = !ativo ? null : this.noPassar ? 'passar' : carta?.dados.id ?? null
     if (this.previa?.chave === chave && (!carta || this.previa.indisponivel === carta.indisponivel)) return
@@ -758,8 +865,15 @@ export default class PvpArenaN extends Phaser.Scene {
   }
 
   moverCursor(direcao) {
-    if (this.euEliminado) return this.seguir(direcao === 'direita' ? 1 : -1)
+    if (this.euFora) return this.seguir(direcao === 'direita' ? 1 : -1)
     if (this.fase !== 'escolha' || this.escolhido !== undefined) return
+    if (this.escolhaApoio) {
+      // 2x2: ←/→ troca o alvo do ♥ (VOCÊ / PARCEIRO)
+      const a = this.escolhaApoio
+      a.indice = (a.indice + 1) % a.opcoes.length
+      tocar(this, 'cartaSelecionar')
+      return this.atualizarEscolha()
+    }
     const mao = this.mao
     if (this.noPassar) {
       if (direcao === 'direita' || !mao.cartas.length) return
@@ -774,11 +888,16 @@ export default class PvpArenaN extends Phaser.Scene {
   }
 
   apertarA() {
-    if (this.fase !== 'escolha' || this.escolhido !== undefined || this.euEliminado) return
+    if (this.fase !== 'escolha' || this.escolhido !== undefined || this.euFora) return
+    if (this.escolhaApoio) {
+      const { id, opcoes, indice } = this.escolhaApoio
+      this.escolhaApoio = null
+      return this.escolher(id, { apoio: opcoes[indice] })
+    }
     if (this.noPassar || !this.mao.cartas.length) return this.escolher(null)
     const carta = this.mao.selecionada
     if (!carta) return
-    const v = podeJogar(this.estado, this.meu, carta.dados.id)
+    const v = this.podeJogarAgora(this.meu, carta.dados.id)
     if (!v.ok) {
       carta.negar()
       this.previa?.negar?.()
@@ -786,19 +905,43 @@ export default class PvpArenaN extends Phaser.Scene {
       this.time.delayedCall(900, () => this.atualizarEscolha())
       return
     }
+    // 2x2: o ♥ pergunta em quem vai (o parceiro caído vem primeiro: é o resgate)
+    const opcoes = this.dupla && carta.dados.naipe === 'copas' ? alvosDeApoio(this.estado, this.meu) : null
+    if (opcoes?.length > 1) {
+      const p = opcoes[1]
+      this.escolhaApoio = { id: carta.dados.id, opcoes, indice: this.estado.jogadores[p].caido ? 1 : 0 }
+      tocar(this, 'cartaSelecionar')
+      this.mao.setAtiva(false)
+      return this.atualizarEscolha()
+    }
     this.escolher(carta.dados.id)
   }
 
+  // o texto da escolha do alvo do ♥ (2x2)
+  textoApoio() {
+    const { opcoes, indice } = this.escolhaApoio
+    const alvo = opcoes[indice]
+    const nome = alvo === this.meu ? 'VOCÊ' : `PARCEIRO ${this.nomeDe(alvo)}${this.estado.jogadores[alvo].caido ? ' (LEVANTA!)' : ''}`
+    return `♥ EM: ◀ ${nome} ▶   A confirma · B volta`
+  }
+
   apertarB() {
-    if (this.fase !== 'escolha' || this.escolhido !== undefined || this.noPassar || this.euEliminado) return
+    if (this.escolhaApoio && this.fase === 'escolha' && this.escolhido === undefined) {
+      this.escolhaApoio = null
+      tocar(this, 'cancelar')
+      return this.atualizarEscolha()
+    }
+    if (this.fase !== 'escolha' || this.escolhido !== undefined || this.noPassar || this.euFora) return
     this.noPassar = true
     tocar(this, 'cartaSelecionar')
     this.atualizarEscolha()
   }
 
-  escolher(id, { automatico = false } = {}) {
+  // apoio (2x2): em quem vai o ♥ (a jogada vai como { carta, apoio })
+  escolher(id, { automatico = false, apoio = null } = {}) {
     this.escolhido = id
-    this.rede.enviarJogada(id)
+    this.escolhaApoio = null
+    this.rede.enviarJogada(id && apoio != null ? { carta: id, apoio } : id)
     this.prontos[this.meu] = true
     if (id) this.mao.selecionada?.confirmar()
     else {
@@ -865,12 +1008,15 @@ export default class PvpArenaN extends Phaser.Scene {
     const jog = r.jogadas[j]
     const ef = r.efeitos[j]
     if (this.eliminado(j) && jog.passou) return []
+    if (jog.fora && this.dupla && !this.rede.fora(j) && !this.estado.jogadores[j].ausente) return [['CAÍDO', TEXTO.caido]]
     if (jog.fora) return [['SEM CONEXÃO', '#ff9a3a']]
     if (jog.passou) return [['PASSOU', TEXTO.desabilitado], ...(ef.energia ? [[`+${ef.energia} ENERGIA`, '#7fd8ff']] : [])]
     if (jog.anulada) return [['ANULADA!', TEXTO.caido]]
     const lista = []
     if (jog.super) lista.push(['★ SUPER! ★', corTexto(superDoPersonagem(jog.carta.personagem)?.cor ?? 0xffe9a0)])
     if (NOMES_ESPECIAIS[jog.especial]) lista.push([NOMES_ESPECIAIS[jog.especial], '#ffe9a0'])
+    if (ef.apoiou != null) lista.push([`♥ EM ${this.nomeDe(ef.apoiou)}`, textoDaVaga(ef.apoiou)])
+    if (r.levantados?.some((x) => x.por === j)) lista.push(['LEVANTOU O PARCEIRO!', TEXTO.cura])
     if (ef.cura) lista.push([`+${ef.cura} HP`, TEXTO.cura])
     if (ef.escudo) lista.push([`ESCUDO -${Math.round((1 - ef.escudo) * 100)}%`, TEXTO.guarda])
     if (ef.energia) lista.push([`+${ef.energia} ENERGIA`, '#7fd8ff'])
@@ -878,6 +1024,7 @@ export default class PvpArenaN extends Phaser.Scene {
     if (ef.roubou) lista.push(['ROUBOU 1 CARTA', '#d0b8ff'])
     const alvo = r.alvos[j]
     if (alvo != null && r.caixas[alvo]?.de === j) lista.push([`→ ${this.nomeDe(alvo)}`, textoDaVaga(alvo)])
+    if (r.superDupla?.includes(this.estado.times?.[j])) lista.push([`SUPER EM DUPLA +${Math.round((DUPLA.superDupla - 1) * 100)}%`, '#ffd23a'])
     return lista
   }
 
@@ -897,8 +1044,8 @@ export default class PvpArenaN extends Phaser.Scene {
     this.esconderAlvos()
     this.atualizarEscolha()
     this.mao.setAtiva(false)
-    this.status.setText(this.euEliminado ? 'ELIMINADO — assistindo' : '')
-    if (!this.euEliminado) this.dica.setText('')
+    this.status.setText(this.euEliminado ? (this.dupla ? 'FORA — assistindo' : 'ELIMINADO — assistindo') : this.euFora ? 'CAÍDO — assistindo o parceiro' : '')
+    if (!this.euFora) this.dica.setText('')
     this.atualizarEstados()
     this.reveladas = r.jogadas.map((jog, j) => {
       const hud = this.huds[j]
@@ -947,11 +1094,20 @@ export default class PvpArenaN extends Phaser.Scene {
       const hud = this.huds[j]
       if (ef.cura) {
         tocar(this, 'cura')
-        numero(this, hud.pontoHp.x, hud.pontoHp.y, `+${ef.cura}`, TEXTO.cura, { tamanho: 13 })
+        const quem = this.huds[ef.apoiou ?? j]
+        numero(this, quem.pontoHp.x, quem.pontoHp.y, `+${ef.cura}`, TEXTO.cura, { tamanho: 13 })
       }
       hud.setEscudo(r.caixas[j]?.escudo ?? this.estado.jogadores[j].escudo)
       hud.setProtegido(this.estado.jogadores[j].protegido)
     }
+    // 2x2: o ♥ levantou o parceiro caído; os dois SUPER do time
+    for (const { j, por } of r.levantados ?? []) {
+      const c = celula(j)
+      this.etiquetaEm(c.x, c.y, `${this.nomeDe(j)} LEVANTOU!\n♥ de ${this.nomeDe(por)}`, TEXTO.cura, { tamanho: 13, ms: 1800 })
+      tocar(this, 'cura')
+      if (j === this.meu) this.mostrarBanner('RESGATADO!\nvocê volta na próxima rodada', TEXTO.cura, { y: 236, tamanho: 18, ms: 1800 })
+    }
+    for (const t of r.superDupla ?? []) this.etiquetaEm(CENTRO_X, 150, `SUPER EM DUPLA! ${ROTULO_TIME[t]} +${Math.round((DUPLA.superDupla - 1) * 100)}%`, TEXTO_TIME[t], { tamanho: 16, ms: 1600 })
     this.atualizarHuds()
     if (r.efeitos[this.meu].compradas.length || r.efeitos[this.meu].roubou || r.efeitos[this.meu].perdeu) {
       await this.esperar(400)
@@ -1002,7 +1158,7 @@ export default class PvpArenaN extends Phaser.Scene {
     // as que voam esperam na coluna do meio (entre as caixas) enquanto elas abrem
     tocar(this, 'caixaAbrir')
     const naColuna = [...voam].map((j, i) => this.reveladas[j] && this.tween({ targets: this.reveladas[j], x: CENTRO_X, y: 110 + i * 90, scaleX: 0.7, scaleY: 0.7, duration: 260, ease: 'Cubic.easeOut' }))
-    const abrir = this.pistas.map((p, k) => (!this.eliminado(k) ? p.mostrar() : null))
+    const abrir = this.pistas.map((p, k) => (!this.eliminado(k) && !(this.dupla && this.estado.jogadores[k].caido) ? p.mostrar() : null))
     await Promise.all([...naColuna, ...abrir])
     if (this.saindo) return
     // as caixas abertas na grade: a tela vai para o par em foco (as cartas esperam no vão entre as duas)
@@ -1010,9 +1166,9 @@ export default class PvpArenaN extends Phaser.Scene {
     await this.irParaFoco(sel)
     if (this.saindo) return
     this.pistas.forEach((p, k) => {
-      if (this.eliminado(k)) return
+      if (this.inativo(k)) return
       const caixa = r.caixas[k]
-      if (!caixa) this.infoPista[k].setText(this.rede.fora(k) ? '' : 'caixa livre nesta rodada').setColor(TEXTO.desabilitado)
+      if (!caixa) this.infoPista[k].setText(this.rede.fora(k) ? '' : this.semAlvo(k) ? 'SEM ALVO nesta rodada' : 'caixa livre nesta rodada').setColor(TEXTO.desabilitado)
       if (this.rede.fora(k) || this.estado.jogadores[k].ausente) p.coracoes[0]?.esconder()
     })
     const voos = r.caixas.map(async (caixa, k) => {
@@ -1064,7 +1220,7 @@ export default class PvpArenaN extends Phaser.Scene {
     const comAtaque = Array(this.n).fill(false)
     const promessas = this.pistas.map((pista, k) => {
       const caixa = r.caixas[k]
-      if (this.eliminado(k) || !caixa || this.estado.jogadores[k].ausente || this.rede.fora(k)) return null
+      if (this.inativo(k) || !caixa || this.estado.jogadores[k].ausente || this.rede.fora(k)) return null
       const ataque = ataqueDaCartaNoJogo(caixa.carta)
       if (!ataque) return null
       comAtaque[k] = true
@@ -1073,6 +1229,7 @@ export default class PvpArenaN extends Phaser.Scene {
       if (k === this.meu && caixa.inverterMs) this.invertido = { avisado: false }
       return pista.rodar(ataque, { dano: caixa.dano, ritmo: caixa.ritmo, semente: `${this.semente}:${this.estado.rodada}:${k}`, aceleracao: this.aceleracao })
     })
+    this.comAtaque = comAtaque
     if (!promessas.some(Boolean)) return this.voltarParaGrade({ fechar: true })
     this.rede.comecarLuta()
     await this.rede.esperarFimEsquiva(promessas[this.meu] ?? Promise.resolve(), no)
@@ -1164,8 +1321,10 @@ export default class PvpArenaN extends Phaser.Scene {
   // HP zerou: o coração quebra e a caixa dele para. O ÚLTIMO K.O. (sobra um de pé) tem câmera lenta e replay
   nocaute(j) {
     this.ko[j] = true
-    const dePe = vivos(this.estado).filter((k) => !this.ko[k] && this.estado.jogadores[k].hp > 0)
-    if (dePe.length <= 1 && this.fimDePartida?.nocaute(j, j)) return
+    const dePe = vivos(this.estado).filter((k) => !this.ko[k] && this.estado.jogadores[k].hp > 0 && !this.inativo(k))
+    // o último K.O. (câmera lenta + replay): no 2x2, quando o time de j não tem mais ninguém de pé
+    const ultimo = this.dupla ? !dePe.some((k) => this.estado.times[k] === this.estado.times[j]) : dePe.length <= 1
+    if (ultimo && this.fimDePartida?.nocaute(j, j)) return
     const pista = this.pistas[j]
     const coracao = pista.coracoes[0]
     tocar(this, 'quebrar')
@@ -1173,7 +1332,7 @@ export default class PvpArenaN extends Phaser.Scene {
     pista.caixa.tremer(260, 4)
     if (coracao?.ativo) particulas(this, coracao.x, coracao.y, { cor: corDaVaga(j), quantidade: 30, velocidade: 220, vida: 700 })
     coracao?.esconder()
-    this.avisoPista[j].setText(`K.O.!\n${this.nomeDe(j)}`).setColor(TEXTO.caido)
+    this.avisoPista[j].setText(`${this.dupla ? 'CAIU' : 'K.O.'}!\n${this.nomeDe(j)}`).setColor(TEXTO.caido)
     if (this.paradas[j]) return
     this.paradas[j] = true
     this.time.delayedCall(700, () => pista.parar())
@@ -1218,7 +1377,9 @@ export default class PvpArenaN extends Phaser.Scene {
           .filter((j) => r.caixas[j] && (this.estado.jogadores[j].ausente || this.rede.fora(j)) && !(j in fins))
           .map((j) => ({ j, caixa: r.caixas[j], jaLevou: this.danoRodada[j] }))
       : []
-    const fim = await this.rede.fimDaRodada(ausentes)
+    // 2x2: a RODADA LIMPA de cada um (tinha ataque e não levou acerto) resgata o parceiro caído
+    const limpas = this.dupla ? Array.from({ length: this.n }, (_, k) => Boolean(this.comAtaque?.[k]) && !this.acertosRodada[k] && !this.ko[k] && !this.rede.fora(k)) : []
+    const fim = await this.rede.fimDaRodada(ausentes, { limpas })
     if (this.saindo || !fim) return null
     for (const { j, dano } of fim.ausentes) {
       const c = celula(j)
@@ -1236,11 +1397,12 @@ export default class PvpArenaN extends Phaser.Scene {
       tocar(this, 'quebrar')
     }
     if (fim.eliminados.includes(this.meu) && !fim.fim) this.virarEspectador()
+    if (this.dupla) this.mostrarQuedas(fim)
     if (fim.fim) return fim
-    if (fim.eliminados.length) await this.esperar(1100)
+    if (fim.eliminados.length || fim.caidos?.length || fim.resgatados?.length) await this.esperar(1100)
     this.estado.jogadores.forEach((jog, j) => jog.hp > jog.hpMax * HP_BAIXO && (this.hpAvisado[j] = false))
     tocar(this, 'cartaDeslizar')
-    if (!this.euEliminado) {
+    if (!this.euFora) {
       this.mao.setPosicao({ y: MAO.y })
       this.botaoPassar.descer(false)
       this.tweens.add({ targets: [...this.monte.cartas, this.monte.texto], alpha: 1, duration: 200 })
@@ -1249,10 +1411,45 @@ export default class PvpArenaN extends Phaser.Scene {
     return null
   }
 
+  // 2x2: quem caiu nesta rodada e quem voltou pela rodada limpa do parceiro
+  mostrarQuedas(fim) {
+    for (const { j, por } of fim.resgatados ?? []) {
+      const c = celula(j)
+      this.etiquetaEm(c.x, c.y - 8, `RODADA LIMPA!\n${this.nomeDe(j)} VOLTA`, TEXTO.cura, { tamanho: 14, ms: 1900 })
+      this.etiquetaEm(celula(por).x, celula(por).y + 20, 'RESGATOU O PARCEIRO!', TEXTO.cura, { atraso: 200, tamanho: 11, ms: 1600 })
+      tocar(this, 'cura')
+      particulas(this, c.x, c.y, { cor: corDaVaga(j), quantidade: 24, velocidade: 140 })
+      if (j === this.meu) {
+        this.mostrarBanner('RESGATADO!\nvocê volta na próxima rodada', TEXTO.cura, { y: 236, tamanho: 18, ms: 1900 })
+        this.seguindo = null
+      }
+    }
+    for (const j of fim.caidos ?? []) {
+      const c = celula(j)
+      this.etiquetaEm(c.x, c.y, `${this.nomeDe(j)} CAIU!${fim.fim ? '' : '\no parceiro pode resgatar'}`, TEXTO.caido, { tamanho: 14, ms: 1800 })
+      tocar(this, 'quebrar')
+    }
+    if (!fim.fim && fim.caidos?.includes(this.meu)) {
+      this.mostrarBanner('VOCÊ CAIU\nseu parceiro pode te resgatar', TEXTO.caido, { y: 236, tamanho: 18, ms: 2200 })
+      this.mao.setPosicao({ y: MAO_FORA })
+      this.seguindo = this.parceiro()
+      this.dica.setText(`CAÍDO — assistindo ${this.nomeDe(this.seguindo)}`)
+    }
+  }
+
   // ---------- foco (pvp/focoFfa.js) ----------
 
   // o par em foco desta rodada: eu (vivo) ou quem eu sigo (espectador)
   calcularFoco(r) {
+    if (this.dupla) {
+      // 2x2: caído ou SEM ALVO, o foco vai para o duelo do parceiro (←/→ troca); o parceiro vem primeiro nos cartões
+      const parc = this.parceiro()
+      const fora = this.estado.jogadores.map((_, k) => this.inativo(k) || r.alvos[k] == null)
+      if (fora[this.meu] && (this.seguindo == null || fora[this.seguindo])) this.seguindo = !fora[parc] ? parc : this.estado.jogadores.findIndex((_, k) => !fora[k])
+      const sel = quemEmFoco({ alvos: r.alvos, eu: this.meu, eliminados: fora, seguindo: this.seguindo })
+      sel.outros.sort((a, b) => Number(b === parc) - Number(a === parc) || Number(b === this.meu) - Number(a === this.meu))
+      return sel
+    }
     return quemEmFoco({ alvos: r.alvos, eu: this.meu, eliminados: this.estado.jogadores.map((j) => Boolean(j.eliminado)), seguindo: this.seguindo })
   }
 
@@ -1417,7 +1614,9 @@ export default class PvpArenaN extends Phaser.Scene {
       c.fundo.clear().fillStyle(0x0b0914, 0.88).fillRoundedRect(0, 0, c.largura, c.altura, 6).lineStyle(2, cor, 0.9).strokeRoundedRect(0, 0, c.largura, c.altura, 6)
       c.forma.clear()
       desenharForma(c.forma, formaDaVaga(c.vaga), 12, 11, 5, cor)
-      c.nome.setText(this.nomeDe(c.vaga)).setColor(textoDaVaga(c.vaga))
+      const papel = !this.dupla ? '' : c.vaga === this.meu ? 'VOCÊ · ' : c.vaga === this.parceiro() ? 'PARCEIRO · ' : ''
+      c.nome.setText(`${papel}${this.nomeDe(c.vaga)}`).setColor(textoDaVaga(c.vaga))
+      if (this.dupla) c.fundo.lineStyle(2, COR_TIME[this.estado.times[c.vaga]], 0.9).strokeRoundedRect(0, 0, c.largura, c.altura, 6)
     })
     this.atualizarFoco()
   }
@@ -1436,7 +1635,7 @@ export default class PvpArenaN extends Phaser.Scene {
       if (k == null) continue
       const jog = this.estado.jogadores[k]
       const eu = k === this.meu
-      const titulo = rot.papel === 'foco' ? (eu ? `VOCÊ · ${this.nomeDe(k)}` : `ASSISTINDO ${this.nomeDe(k)}`) : `${this.nomeDe(k)}`
+      const titulo = rot.papel === 'foco' ? (eu ? `VOCÊ · ${this.nomeDe(k)}` : `${this.dupla && k === this.parceiro() ? 'PARCEIRO' : 'ASSISTINDO'} ${this.nomeDe(k)}`) : `${this.nomeDe(k)}`
       rot.nome.setText(titulo)
       rot.hp.setText(`HP ${Math.max(0, jog.hp)}/${jog.hpMax}`)
       barra(rot.barra, 0, 7, rot.largura, 3, jog, corDaVaga(k))
@@ -1452,9 +1651,9 @@ export default class PvpArenaN extends Phaser.Scene {
       const k = c.vaga
       if (k == null) continue
       const jog = this.estado.jogadores[k]
-      const estado = estadoDoCartao({ eliminado: Boolean(jog.eliminado), fora: this.rede.fora(k) || jog.ausente, caido: this.ko[k] || jog.hp <= 0, comAtaque: this.fase === 'esquiva' && Boolean(this.pistas[k].rodando) })
+      const estado = estadoDoCartao({ eliminado: Boolean(jog.eliminado), fora: this.rede.fora(k) || jog.ausente, caido: this.ko[k] || jog.hp <= 0 || Boolean(this.dupla && jog.caido), comAtaque: this.fase === 'esquiva' && Boolean(this.pistas[k].rodando) })
       const cor = { eliminado: TEXTO.caido, semConexao: '#ff9a3a', caido: TEXTO.caido, desviando: TEXTO.cura, livre: TEXTO.desabilitado }[estado]
-      c.status.setText(estado === 'eliminado' ? `ELIMINADO ${this.posicaoDe(k)}º` : TEXTO_CARTAO[estado]).setColor(cor)
+      c.status.setText(estado === 'eliminado' ? (this.dupla ? 'FORA' : `ELIMINADO ${this.posicaoDe(k)}º`) : estado === 'livre' && this.semAlvo(k) ? 'SEM ALVO' : TEXTO_CARTAO[estado]).setColor(cor)
       barra(c.barra, 22, 27, c.largura - 96, 6, jog, corDaVaga(k))
       c.hp.setText(`${Math.max(0, jog.hp)}/${jog.hpMax}`)
       c.c.setAlpha(this.transicao ? c.c.alpha : 1)
@@ -1474,14 +1673,14 @@ export default class PvpArenaN extends Phaser.Scene {
 
   // ←/→ do espectador: qual caixa seguir (a borda da célula pisca e o nome aparece)
   seguir(passo) {
-    const lista = vivos(this.estado)
+    const lista = this.dupla ? vivos(this.estado).filter((k) => dePe(this.estado, k) && k !== this.meu) : vivos(this.estado)
     if (!lista.length) return
     const i = this.seguindo == null ? -1 : lista.indexOf(this.seguindo)
     this.seguindo = lista[(i + passo + lista.length) % lista.length]
     this.celulas.forEach((c, k) => c.destaque.setVisible(k === this.seguindo && this.alphaGrade > 0.5))
     // no foco: o par de quem eu sigo (uma transição curta, ou o corte)
     if (this.emFoco && this.rodadaAtual) this.irParaFoco(this.calcularFoco(this.rodadaAtual), { ms: TRANSICAO.msSeguir })
-    this.dica.setText(`ELIMINADO — assistindo ${this.nomeDe(this.seguindo)}   (←/→: outro jogador)`)
+    this.dica.setText(`${this.dupla ? (this.euEliminado ? 'FORA' : 'CAÍDO') : 'ELIMINADO'} — assistindo ${this.nomeDe(this.seguindo)}   (←/→: outro jogador)`)
     tocar(this, 'mover')
   }
 
@@ -1489,6 +1688,10 @@ export default class PvpArenaN extends Phaser.Scene {
 
   // o placar do replay: quem venceu (esquerda) e quem caiu por último (direita)
   ladosDoReplay() {
+    if (this.dupla) {
+      const ordem = classificacaoDupla(this.estado)
+      return [ordem[0], ordem[2]]
+    }
     const ordem = classificacao(this.estado)
     return [ordem[0], ordem[1]]
   }
@@ -1496,6 +1699,7 @@ export default class PvpArenaN extends Phaser.Scene {
   // só grava o replay quando o próximo K.O. pode acabar a partida (economiza o desenho com 4 caixas)
   gravarPista(pista) {
     const k = this.pistas.indexOf(pista)
+    if (this.dupla) return k >= 0 && !this.inativo(k) && [0, 1].some((t) => membros(this.estado, t).filter((j) => dePe(this.estado, j)).length <= 1)
     return vivos(this.estado).length <= 3 && k >= 0 && !this.eliminado(k)
   }
 
@@ -1503,6 +1707,7 @@ export default class PvpArenaN extends Phaser.Scene {
     this.fase = 'resultado'
     await this.fimDePartida?.replay()
     if (this.saindo) return
+    if (this.dupla) return this.resultadoDupla()
     const ordem = classificacao(this.estado)
     const v = ordem[0]
     const motivo = this.estado.fim === 'limite' ? `LIMITE DE ${FFA.limiteRodadas} RODADAS` : ''
@@ -1543,6 +1748,52 @@ export default class PvpArenaN extends Phaser.Scene {
     irParaCena(this, 'PvpResultadoN', dados)
   }
 
+  // 2x2: o time vencedor (ou o empate) e a tela de resultado com os times
+  async resultadoDupla() {
+    const e = this.estado
+    const t = e.vencedorTime
+    const motivo = e.fim === 'limite' ? `\nLIMITE DE ${FFA.limiteRodadas} RODADAS` : ''
+    const nomes = t == null ? '' : `\n${membros(e, t).map((j) => this.nomeDe(j)).join(' + ')}`
+    this.mostrarBanner(t == null ? `EMPATE!${motivo}` : `${ROTULO_TIME[t]} VENCEU!${nomes}${motivo}`, t == null ? TEXTO.selecionado : TEXTO_TIME[t], { y: 236, tamanho: 28 })
+    tocar(this, 'vitoria')
+    if (t != null && e.times[this.meu] === t) venceu(0) // BUZZER do meu joystick
+    shake(this, 300, 0.012)
+    claraoCamera(this.cameras.main, 250, 255, 255, 255)
+    await this.esperar(1800)
+    if (this.saindo) return
+    if (!(await this.rede.prontoParaResultado())) return
+    if (this.saindo) return
+    this.saindo = true
+    this.cameras.main.fadeOut(400, 0, 0, 0)
+    await this.esperar(420)
+    const ordem = classificacaoDupla(e)
+    const dados = {
+      modo: '2x2',
+      times: [...e.times],
+      vencedorTime: t,
+      personagens: [...this.ids],
+      arena: this.arena.id,
+      classificacao: ordem,
+      rodadas: e.rodada,
+      fim: e.fim,
+      duracao: Math.round((Date.now() - this.comecouEm) / 1000),
+      jogadores: e.jogadores.map((jog, j) => ({
+        nome: this.nomes[j],
+        time: e.times[j],
+        posicao: t == null ? 1 : e.times[j] === t ? 1 : 2,
+        hp: Math.max(0, jog.hp),
+        hpMax: jog.hpMax,
+        caido: jog.caido,
+        eliminado: jog.eliminado,
+        ...this.estatisticas[j],
+        danoCausado: jog.danoCausado,
+        danoRecebido: jog.danoRecebido,
+      })),
+    }
+    console.info('[2x2] fim', { rodadas: dados.rodadas, fim: dados.fim, vencedorTime: t, duracao: dados.duracao })
+    irParaCena(this, 'PvpResultadoN', dados)
+  }
+
   // ---------- frame ----------
 
   update(_, deltaReal) {
@@ -1556,7 +1807,7 @@ export default class PvpArenaN extends Phaser.Scene {
     const jog = this.estado.jogadores[this.meu]
     if (jog) informarVida(0, jog.hp, jog.hpMax)
     const direcao = this.controles.toque(meuLado())
-    if ((direcao === 'esquerda' || direcao === 'direita') && (this.fase === 'escolha' || this.euEliminado)) this.moverCursor(direcao)
+    if ((direcao === 'esquerda' || direcao === 'direita') && (this.fase === 'escolha' || this.euFora)) this.moverCursor(direcao)
     if (this.fase === 'escolha') this.atualizarRelogio(delta)
     this.atualizarPistas(delta)
     this.rede.atualizar(delta)
@@ -1646,6 +1897,10 @@ export default class PvpArenaN extends Phaser.Scene {
       meu: this.meu,
       souHost: this.rede.souHost,
       alvos: [...this.estado.alvos],
+      modo: this.estado.modo,
+      times: this.estado.times ?? null,
+      semAlvo: this.estado.semAlvo ?? null,
+      vencedorTime: this.estado.vencedorTime ?? null,
       fim: this.estado.fim,
       vencedor: this.estado.vencedor,
       prontos: [...this.prontos],
@@ -1656,7 +1911,7 @@ export default class PvpArenaN extends Phaser.Scene {
       classificacao: classificacao(this.estado),
       escolhido: this.escolhido === undefined ? 'escolhendo' : this.escolhido,
       pistas: this.pistas.map((p) => ({ aberta: p.aberta, espelho: p.espelho, rodando: p.ataque?.nome ?? null, coracao: { x: Math.round(p.coracoes[0].x), y: Math.round(p.coracoes[0].y), ativo: p.coracoes[0].ativo } })),
-      jogadores: this.estado.jogadores.map((jog) => ({ personagem: jog.personagem, hp: jog.hp, hpMax: jog.hpMax, energia: jog.energia, eliminado: jog.eliminado, ausente: jog.ausente, danoCausado: jog.danoCausado, mao: jog.baralho.mao.map((c) => c.id) })),
+      jogadores: this.estado.jogadores.map((jog) => ({ personagem: jog.personagem, hp: jog.hp, hpMax: jog.hpMax, energia: jog.energia, eliminado: jog.eliminado, caido: jog.caido ?? null, ausente: jog.ausente, danoCausado: jog.danoCausado, mao: jog.baralho.mao.map((c) => c.id) })),
     }
   }
 }

@@ -20,6 +20,7 @@ import {
   sairSala,
   alternarPronto,
   mudarModo,
+  mudarTimes,
   enviarChat,
   expulsar,
   mudarNome,
@@ -34,6 +35,7 @@ import {
   CPU_APOS_MS,
 } from '../../lib/lan/rede.js'
 import { jogo } from '../../lib/estado.js'
+import { timesDoArranjo, proximoArranjo, ROTULO_TIME } from '../../lib/times2x2.js'
 import { pingPartida, ligacoes, ROTAS, corDoPing } from '../../lib/lan/transmissao.js'
 import { encerrarRede, irParaCena } from '../rede.js'
 import { criarAvatar } from '../conta/ui.js'
@@ -51,8 +53,9 @@ import { corDaVaga, textoDaVaga } from '../vagas.js'
 //               prontos. Na sala de amigos o COMEÇAR pede a eleição do HOST DA
 //               PARTIDA (o servidor mede as conexões; Fase 5A): o eleito recebe
 //               `comecar` e leva todos à primeira tela. O seletor de modo só mostra
-//               os modos que cabem na sala; os de 3–4 aparecem como "em breve"
-//               (no dev dá para escolher, para testar a sala de N; começar não)
+//               os modos que cabem na sala (um modo "em breve" aparece apagado; no
+//               dev dá para escolher, começar não). No 2x2 o dono troca os times
+//               (TIMES ◀ ▶, src/lib/times2x2.js) e cada cartão mostra o time da vaga
 //   FILA        (ONLINE: JOGAR RÁPIDO, docs/online.md) procurando com o tempo de
 //               espera, o oponente achado (A aceita, B recusa, com contagem) e,
 //               depois de CPU_APOS_MS, a oferta de jogar contra a CPU. Os dois
@@ -82,7 +85,7 @@ const MODOS = {
   coop: { rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty', min: 2, max: 2 },
   coop4: { rotulo: 'CO-OP 3–4', cor: '#6dd0ff', cena: 'EscolhaPartyN', min: 3, max: 4 },
   ffa: { rotulo: 'TODOS CONTRA TODOS', cor: '#ff3d6e', cena: 'PvpEscolhaN', min: 3, max: 4 }, // 5D
-  '2x2': { rotulo: '2x2', cor: '#ffd23a', cena: null, min: 4, max: 4, emBreve: true },
+  '2x2': { rotulo: '2x2 EQUIPES', cor: '#ffd23a', cena: 'PvpEscolhaN', min: 4, max: 4 }, // 5E
 }
 // no dev os modos "em breve" podem ser escolhidos (para testar a sala de N; a partida não começa)
 const ESCOLHE_EM_BREVE = Boolean(import.meta.env?.DEV)
@@ -298,6 +301,7 @@ export default class Lan extends Phaser.Scene {
         const alvo = convidados[this.alvoTirar % Math.max(1, convidados.length)]
         return [
           ...(casual ? [] : [{ id: 'modo', tipo: 'modo', acao: () => this.trocarModo(1) }]),
+          ...(s.sala.modo === '2x2' && !casual ? [{ id: 'times', tipo: 'times', rotulo: 'TROCAR TIME', acao: () => this.trocarTimes() }] : []),
           { id: 'comecar', rotulo: 'COMEÇAR PARTIDA', ativo: !this.motivoSemComeco(), acao: () => this.comecar() },
           { id: 'chat', rotulo: 'CONVERSAR', acao: () => this.digitar('chat') },
           ...(s.online && s.sala.codigo ? [{ id: 'link', rotulo: 'COPIAR LINK DA SALA', acao: () => this.copiarLink() }] : []),
@@ -591,6 +595,11 @@ export default class Lan extends Phaser.Scene {
       t(x + 32, y + 18, `P${j + 1}${papel ? ` · ${papel}` : ''}`, 11, m ? textoDaVaga(j) : '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
       // o host da partida (eleito; fora da partida, o último eleito)
       if (m?.papel === 'host' && sala.eleito) t(x + largura - 8, y + 18, 'HOST', 10, COR.rapido, { strokeThickness: 0 }).setOrigin(1, 0.5)
+      // 2x2: o time da vaga
+      if (sala.modo === '2x2') {
+        const time = timesDoArranjo(sala.arranjo)[j]
+        t(x + largura - 8, y + 32, ROTULO_TIME[time], 10, time ? '#ffb870' : '#7cc8ff', { strokeThickness: 0 }).setOrigin(1, 0.5)
+      }
       if (!m) {
         const espera = t(x + 14, y + 46, 'vaga livre', 14, COR.apagado).setOrigin(0, 0.5)
         this.dinamicos.push({ tipo: 'pontos', obj: espera, base: estreito ? 'livre' : 'esperando alguém' })
@@ -642,7 +651,7 @@ export default class Lan extends Phaser.Scene {
     // ações (esquerda)
     const xOp = 40
     const yOp = 236
-    const passoOp = itens.length > 5 ? 26 : 30 // com o COPIAR LINK a lista do host tem 6
+    const passoOp = itens.length > 6 ? 24 : itens.length > 5 ? 26 : 30 // com o COPIAR LINK a lista do host tem 6 (7 com o TROCAR TIME do 2x2)
     itens.forEach((it, k) => {
       const y = yOp + k * passoOp
       const ativo = it.ativo !== false
@@ -651,6 +660,12 @@ export default class Lan extends Phaser.Scene {
         t(xOp + 6, y, 'MODO', 15, ativo ? TEXTO.normal : COR.apagado).setOrigin(0, 0.5)
         const rotulo = t(xOp + 62, y, `◀ ${modo.rotulo}${modo.emBreve ? ' (em breve)' : ''} ▶`, modo.rotulo.length > 10 || modo.emBreve ? 12 : 15, modo.emBreve ? COR.apagado : modo.cor).setOrigin(0, 0.5)
         if (rotulo.width > 230) rotulo.setFontSize(10)
+        return
+      }
+      if (it.tipo === 'times') {
+        const nomes = (k) => membros.filter((m) => timesDoArranjo(sala.arranjo)[m.vaga ?? 0] === k).map((m) => m.nome.slice(0, 5)).join('+')
+        const rotulo = t(xOp + 6, y, `TROCAR TIME  A: ${nomes(0) || '—'} × B: ${nomes(1) || '—'}`, 10, TEXTO.normal).setOrigin(0, 0.5)
+        if (rotulo.width > 248) caber(rotulo, rotulo.text, 248)
         return
       }
       if (it.id === 'chat' && this.digitando?.campo === 'chat') {
@@ -665,7 +680,7 @@ export default class Lan extends Phaser.Scene {
     if (!dono) t(xOp + 6, yNota, `MODO: ${modo.rotulo}${modo.emBreve ? ' (em breve)' : ''}  (o dono escolhe)`, 12, modo.emBreve ? COR.apagado : modo.cor).setOrigin(0, 0.5)
     else if (!itens.find((it) => it.id === 'comecar').ativo) t(xOp + 6, yNota, this.motivoSemComeco(), 11, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
     // os modos maiores ainda não existem: aparecem como "em breve"
-    if (dono && !sala.casual) {
+    if (dono && !sala.casual && Object.values(MODOS).some((x) => x.emBreve)) {
       const breve = Object.values(MODOS)
         .filter((x) => x.emBreve)
         .map((x) => x.rotulo)
@@ -769,6 +784,13 @@ export default class Lan extends Phaser.Scene {
     if (ids.length < 2) return tocar(this, 'cancelar')
     const i = Math.max(0, ids.indexOf(this.s.sala.modo))
     mudarModo(ids[(i + passo + ids.length) % ids.length])
+    tocar(this, 'mover')
+  }
+
+  // (dono, 2x2) o próximo arranjo dos times (A: vagas 0+2 · 0+1 · 0+3)
+  trocarTimes() {
+    if (!this.souDono() || this.s.sala.modo !== '2x2') return
+    mudarTimes(proximoArranjo(this.s.sala.arranjo))
     tocar(this, 'mover')
   }
 

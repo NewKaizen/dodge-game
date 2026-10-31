@@ -19,7 +19,7 @@ test('os tamanhos de cada modo e os que dão XP hoje', () => {
   assert.deepEqual(MODOS_PARTIDA.pvp, { min: 2, max: 2 })
   assert.equal(MODOS_PARTIDA.coop4.max, 4)
   assert.equal(MODOS_PARTIDA['2x2'].min, 4)
-  assert.deepEqual(MODOS_COM_XP, ['pvp', 'coop', 'coop4', 'ffa'])
+  assert.deepEqual(MODOS_COM_XP, ['pvp', 'coop', 'coop4', 'ffa', '2x2'])
   assert.deepEqual([0, 1, 2, 3].map(timeDoLado), [0, 1, 0, 1])
 })
 
@@ -130,12 +130,14 @@ test('os modos de 2 não passam pela política de N', () => {
   assert.equal(d.colocacoes, undefined)
 })
 
-test('registro: coop4 e ffa registram com 3 ou 4; 2x2 (sem XP ainda) não; o tamanho tem que servir', () => {
+test('registro: coop4 e ffa registram com 3 ou 4; 2x2 com 4 (o time pelo arranjo da sala); o tamanho tem que servir', () => {
   const partidas = criarPartidas({ agora: () => T0, agendar: () => () => {} })
   const membros = (n) => Array.from({ length: n }, (_, i) => ({ id: `c${i}`, nome: `J${i}`, usuario: null }))
   assert.equal(partidas.iniciar({ id: 's1', modo: 'ffa' }, membros(4)).participantes.length, 4)
   assert.equal(partidas.iniciar({ id: 's1f', modo: 'ffa' }, membros(2)), null, 'ffa precisa de 3')
-  assert.equal(partidas.iniciar({ id: 's1b', modo: '2x2' }, membros(4)), null)
+  assert.deepEqual(partidas.iniciar({ id: 's1b', modo: '2x2' }, membros(4)).participantes.map((x) => x.time), [0, 1, 0, 1])
+  assert.deepEqual(partidas.iniciar({ id: 's1g', modo: '2x2', arranjo: 2 }, membros(4)).participantes.map((x) => x.time), [0, 1, 1, 0])
+  assert.equal(partidas.iniciar({ id: 's1h', modo: '2x2' }, membros(3)), null, '2x2 precisa de 4')
   assert.equal(partidas.iniciar({ id: 's1c', modo: 'coop4' }, membros(2)), null, 'coop4 precisa de 3')
   assert.equal(partidas.iniciar({ id: 's1d', modo: 'coop4' }, membros(4)).participantes.length, 4)
   assert.equal(partidas.iniciar({ id: 's1e', modo: 'coop4' }, membros(3)).participantes.length, 3)
