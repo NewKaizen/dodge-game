@@ -522,6 +522,66 @@ Modo `ffa` (1x1x1x1), **3 ou 4 jogadores**, só **online** em sala de amigos (Fa
 
 Testando no navegador (dev, 3 ou 4 abas): o dono cria a sala, `mudarModo('ffa')`, os outros `entrarCodigo`, todos `alternarPronto()` e o dono `pedirPartida()`; na escolha, **Q** (acorda o teclado) e **espaço** em cada aba. Na arena, `debugJogo.set({ acelerar: 2 })` e, no host, `pvpArenaN.setHp(j, 5)` aceleram o fim; `pvpArenaN.estadoDebug()` mostra os alvos, a classificação e as caixas.
 
+## 2x2
+
+Modo `2x2` (duas equipes de 2), **exatamente 4 jogadores**, só **online** em sala de amigos (Fase 5E). Regras puras em
+`src/game/pvp/dupla.js` (testes em `pvp/__tests__/dupla.test.js`), por cima das do [todos contra todos](#todos-contra-todos):
+a mesma cena (`PvpEscolhaN` → `PvpArenaN` com `modo: '2x2'` → `PvpResultadoN`), a mesma ponte (`ArenaRedeN`) e a mesma
+escolha às cegas. O 1x1 e o todos contra todos não mudam.
+
+**Times.** Por vaga da sala, num de 3 arranjos (`src/lib/times2x2.js`): **A = vagas 0+2, B = 1+3** (padrão), A = 0+1 / B = 2+3,
+A = 0+3 / B = 1+2. No lobby o **dono** passa ao próximo com **TROCAR TIME** (o servidor guarda `sala.arranjo`; cada cartão do lobby
+mostra o time). Na arena cada célula tem a **borda e a etiqueta da cor do time** (A azul, B laranja); a forma e o nome continuam
+na cor da vaga.
+
+**Duelos cruzados (anunciados antes da escolha: "DUELOS DA RODADA").** Com os 4 de pé: rodada ímpar **A1×B1 e A2×B2**, rodada
+par **A1×B2 e A2×B1** (A1/A2 = os do time em ordem de vaga). Cada duelo é um 1x1: os dois do par atacam um ao outro, com todas as
+cartas, a energia, os Ases e o SUPER do 1x1 (♠ Espelho devolve ao oponente, ♦ Anular cancela a carta dele, ♣ Roubo rouba dele).
+
+**Anti-foco.** Ninguém recebe mais de um ataque por rodada. Quando um time tem só **um de pé**, ele enfrenta **um** adversário
+(alternando a cada rodada) e o outro adversário fica **SEM ALVO**: ganha **+1 de energia** no começo da rodada e só pode jogar
+**♥** (em si ou no parceiro) ou passar.
+
+**Caído e resgate.** HP 0 no fim da rodada = **CAÍDO** (não sai): não joga, não é alvo, não ganha energia, a caixa não abre, a mão
+desce e a tela segue o **duelo do parceiro** (←/→ troca quem assistir). O parceiro resgata:
+1. **Rodada limpa**: ele tinha ataque na caixa e **não levou nenhum acerto** → no fim da rodada o caído (de uma rodada anterior)
+   volta com **30%** do HP ("RODADA LIMPA! X VOLTA").
+2. **♥ no caído**: a carta vale nele (cura, escudo, Segunda chance) e ele **levanta na hora** com pelo menos **25%** do HP
+   ("LEVANTOU!"). Nos dois casos volta a jogar na rodada seguinte.
+
+**♥ no parceiro.** Ao confirmar um ♥ no 2x2 aparece "♥ EM: ◀ VOCÊ ▶": **←/→** escolhe você ou o parceiro (o parceiro caído vem
+selecionado: é o resgate), **A** confirma, **B** volta à mão. A cura, o escudo e a Segunda chance vão no alvo; a **energia e a compra
+ficam com quem jogou**. A jogada vai ao host como `{ carta, apoio }`.
+
+**SUPER em dupla.** Os dois do time jogam SUPER na mesma rodada: as duas caixas de SUPER têm **+25% de dano por acerto**
+("SUPER EM DUPLA!"). Nada além disso (o bônus é limitado).
+
+**Vitória.** Vence o time cujos **dois adversários estão caídos (ou fora)** no fim da rodada. O resgate vem antes: um caído que
+volta pela rodada limpa salva o time. Os **dois times zerados no mesmo fim de rodada = EMPATE**. Morte súbita na rodada 15 e
+limite na 24 como no todos contra todos; no limite vence o time com **mais HP somado** (dos de pé), igual = empate.
+
+**Rodadas bônus e eventos: desligados** (como no todos contra todos).
+
+**Queda no meio da partida (quem cai não leva vantagem).** Igual ao todos contra todos: sem conexão não ataca, não ganha a energia
+da rodada e o ataque que vinha para ele vale como 3 acertos; volta na rodada seguinte. Não voltou em **20 s**: fica **FORA**
+(eliminado; **não dá para resgatar**) e conta como caído para a vitória (o parceiro segue sozinho, com o anti-foco). Host que cai: 2D.
+
+**Câmera.** O foco do todos contra todos: a **minha caixa grande** + a do **meu oponente**; o **parceiro** é o primeiro cartão
+pequeno ("PARCEIRO · NOME", HP e DESVIANDO / CAÍDO / SEM ALVO / SEM CONEXÃO), com o "whoosh" nas transições. Caído (ou SEM
+ALVO) o foco vai para o duelo do parceiro.
+
+**Resultado.** "TIME A VENCEU!" (ou EMPATE) com os nomes, o time vencedor primeiro (etiqueta do time, dano causado/recebido,
+HP, quando caiu). Fim: **REVANCHE**, **TROCAR PERSONAGEM** e **TROCAR TIME** (a revanche com o próximo arranjo) com **todos**
+respondendo (vale a maior mudança pedida: personagem > time > revanche; 15 s sem acordo cancela), **VOLTAR AO LOBBY** na hora.
+
+**XP** ([online.md](online.md#2x2-fase-5e)): participação 40 para todos que jogaram até o fim, **+20 para os dois do time
+vencedor**, empate só a participação; o limite diário conta contra **cada adversário** (migration 0009).
+
+**Buzzer/vibração:** os ganchos de sempre (golpe de SUPER, K.O./queda pelo HP, vitória do meu time).
+
+Testando no navegador (dev, 4 abas): como no todos contra todos com `mudarModo('2x2')` (e `mudarTimes(1)` para trocar os times);
+`pvpArenaN.setHp(j, 1)` no host derruba alguém; `pvpArenaN.estadoDebug()` mostra `times`, `semAlvo`, `caido` e `vencedorTime`.
+
 ## Escolha às cegas no online
 
 No **PVP online** (1x1 em sala de amigos e no Jogar Rápido, e o todos contra todos) a escolha é **simultânea e às cegas**: enquanto alguém está escolhendo, **ninguém vê a carta que o outro escolheu** (nem o tipo dela), só "<nome> já escolheu ✓". Quando **todos confirmaram** e as jogadas travam, a rodada começa e a **carta de verdade** de cada um é revelada como no jogo original (a carta vira, nome, valor, ataque); dali em diante o texto da caixa, a coluna "quem ataca", o log, o replay e as estatísticas do resultado mostram as cartas reais. A **mão** do outro (e o monte e o descarte) fica **virada** o tempo todo, sem prévia ampliada; as **minhas** cartas são sempre inteiras para mim. O PVP local (mesmo PC) e o vs CPU não mudam. Lógica em `pvp/sigilo.js` (testes em `pvp/__tests__/sigilo.test.js`).
