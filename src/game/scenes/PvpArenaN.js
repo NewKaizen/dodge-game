@@ -15,6 +15,8 @@ import { DUPLA, criarPartidaDupla, resolverRodadaDupla, podeJogarDupla, parceiro
 import { timesDoArranjo, ROTULO_TIME } from '../../lib/times2x2.js'
 import { ARENA, ARENA_PADRAO } from '../pvp/arenas.js'
 import { criarFundo } from '../backgrounds/index.js'
+import AnuncioAlvos from '../pvp/AnuncioAlvos.js'
+import { estadoDoNo, quemDestacar } from '../pvp/anuncioAlvos.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
 import FimDePartida from '../pvp/fimDePartida/index.js'
 import ArenaRedeN from '../pvp/rede/ArenaRedeN.js'
@@ -44,8 +46,8 @@ import { quemEmFoco, estadoDoCartao, TEXTO_CARTAO, vistasDaGrade, vistasDoFoco, 
 //
 // Uma rodada:
 //   'inicio'     o host inicia (pvp/ffa.js iniciarRodadaFfa) e manda o estado COM O RODÍZIO
-//   'escolha'    o painel do RODÍZIO no meio ("ANA → BETO", com forma e cor; o meu par em destaque) e a
-//                minha mão. Os outros aparecem como ESCOLHENDO / PRONTO. Confirmar é definitivo
+//   'escolha'    o ANÚNCIO DESENHADO do rodízio (pvp/AnuncioAlvos.js: sprites + setas animadas, o meu par em
+//                destaque; ~1,2 s, A/B pulam, depois encolhe no meio) e a minha mão. Os outros aparecem como ESCOLHENDO / PRONTO. Confirmar é definitivo
 //   'revelacao'  as cartas de todos viram (o host resolveu: resolverRodadaFfa)
 //   'super'      a animação de cada SUPER jogado
 //   'arremesso'  as caixas dos vivos abrem na grade e a tela vai para o FOCO (pvp/focoFfa.js, ~700 ms com
@@ -63,7 +65,7 @@ import { quemEmFoco, estadoDoCartao, TEXTO_CARTAO, vistasDaGrade, vistasDoFoco, 
 // limite de rodadas (FFA.limiteRodadas); a partir de FFA.morteSubita o dano sobe.
 //
 // 2x2 (Fase 5E, modo '2x2': regras em pvp/dupla.js, docs/pvp-regras.md "2x2"): a MESMA cena com 4 caixas e
-// TIMES. O painel do anúncio mostra os DOIS DUELOS da rodada; cada célula tem a etiqueta e a borda da cor do
+// TIMES. O anúncio desenhado mostra os DOIS DUELOS da rodada (time A à esquerda, B à direita); cada célula tem a etiqueta e a borda da cor do
 // time. Quem zera CAI (não sai): a caixa não abre, a mão desce e o foco vai para o duelo do parceiro, que
 // resgata com uma rodada limpa ou um ♥ (o ♥ escolhe o alvo com ←/→: VOCÊ ou o PARCEIRO). No foco, o parceiro
 // é um cartão pequeno ("PARCEIRO"). Acaba quando um time tem os dois caídos (os dois times juntos: empate).
@@ -114,8 +116,7 @@ const estadoInicial = () => ({
   celulas: null,
   avisoPista: null,
   infoPista: null,
-  painelAlvos: null,
-  legenda: null,
+  anuncio: null,
   etiquetasMesa: [],
   reveladas: [],
   rede: null,
@@ -215,6 +216,7 @@ export default class PvpArenaN extends Phaser.Scene {
     this.controles.onBotao((_, botao) => {
       if (this.saindo) return
       if (this.fimDePartida?.botao(botao)) return
+      if ((botao === 'A' || botao === 'B') && this.anuncio?.pular()) return // A ou B: direto ao desenho final
       if (botao === 'A') this.apertarA()
       else if (botao === 'B') this.apertarB()
     })
@@ -260,7 +262,6 @@ export default class PvpArenaN extends Phaser.Scene {
       g.lineStyle(1, this.arena.moldura?.cor ?? 0x5a4a7a, 0.6)
       g.strokeRect(c.x0 + 2, c.y0 + 2, CELULA.largura - 4, CELULA.altura - 4)
       if (k >= this.n) {
-        this.legenda = this.add.text(c.x, c.y, '', { fontFamily: FONTE, fontSize: '10px', color: TEXTO.normal, stroke: '#000000', strokeThickness: 3, align: 'center', lineSpacing: 4 }).setOrigin(0.5).setDepth(5)
         continue
       }
       const cor = corDaVaga(k)
@@ -274,6 +275,7 @@ export default class PvpArenaN extends Phaser.Scene {
       const personagem = this.add.text(c.x0 + 8, c.y0 + (voce ? 46 : 32), (PERSONAGENS[this.ids[k]]?.nome ?? this.ids[k]).toUpperCase(), estilo(9, corTexto(PERSONAGENS[this.ids[k]]?.cor ?? 0xffffff))).setDepth(5)
       const estado = this.add.text(c.x0 + 8, c.y0 + 64, '', estilo(9, TEXTO.normal)).setDepth(5)
       // à direita da caixa: quem ataca esta caixa e com o quê
+      const marca = this.add.graphics().setDepth(5)
       const ataque = this.add.text(c.x0 + CELULA.largura - LADO, c.y0 + 14, '', { ...estilo(9, TEXTO.normal), wordWrap: { width: LADO - 6 } }).setDepth(5)
       const destaque = this.add.rectangle(c.x, c.y, CELULA.largura - 6, CELULA.altura - 6).setStrokeStyle(3, 0xffe14a).setDepth(6).setVisible(false)
       // 2x2: a borda e a etiqueta do time (embaixo à esquerda da célula)
@@ -286,10 +288,9 @@ export default class PvpArenaN extends Phaser.Scene {
         this.rotulosTime.push(rot)
         this.objetosGrade.push(rot)
       }
-      this.celulas.push({ ...c, forma, nome, voce, personagem, estado, ataque, destaque })
-      this.objetosGrade.push(estado, ataque, ...(voce ? [voce] : []))
+      this.celulas.push({ ...c, forma, nome, voce, personagem, estado, ataque, marca, destaque })
+      this.objetosGrade.push(estado, ataque, marca, ...(voce ? [voce] : []))
     }
-    if (this.legenda) this.objetosGrade.push(this.legenda)
   }
 
   criarPistas() {
@@ -378,16 +379,8 @@ export default class PvpArenaN extends Phaser.Scene {
     this.banner = this.add.text(CENTRO_X, 200, '', estilo(26, TEXTO.selecionado)).setOrigin(0.5).setDepth(96)
     this.status = this.add.text(MAO.x, 372, '', estilo(11, textoDaVaga(this.meu))).setOrigin(0.5).setDepth(40)
     this.dica = this.add.text(CENTRO_X, 466, '', { ...estilo(9, TEXTO.desabilitado), strokeThickness: 2 }).setOrigin(0.5).setDepth(40)
-    // o painel do rodízio (na escolha): fundo + uma linha por par
-    const painel = this.add.container(CENTRO_X, 0).setDepth(30).setVisible(false)
-    const fundo = this.add.graphics()
-    const titulo = this.add.text(0, 92, '', estilo(13, '#ff7a9a')).setOrigin(0.5)
-    const sub = this.add.text(0, 110, 'cada um ataca UM e recebe UM ataque', { ...estilo(9, TEXTO.desabilitado), strokeThickness: 2 }).setOrigin(0.5)
-    const formas = this.add.graphics()
-    const linhas = Array.from({ length: 4 }, (_, i) => this.add.text(0, 136 + i * 24, '', estilo(14, TEXTO.normal)).setOrigin(0.5))
-    const meu = this.add.text(0, 136 + 4 * 24 + 6, '', estilo(11, TEXTO.selecionado)).setOrigin(0.5)
-    painel.add([fundo, titulo, sub, formas, ...linhas, meu])
-    this.painelAlvos = { painel, fundo, titulo, sub, formas, linhas, meu }
+    // o anúncio DESENHADO de quem ataca quem (pvp/AnuncioAlvos.js): personagens + setas, sem texto
+    this.anuncio = new AnuncioAlvos(this, { ids: this.ids })
   }
 
   filtrarCaixas() {
@@ -510,20 +503,36 @@ export default class PvpArenaN extends Phaser.Scene {
     if (this.fase === 'escolha') return this.prontos[j] ? ['já escolheu ✓', TEXTO.cura] : ['ESCOLHENDO', TEXTO.desabilitado]
     if (this.semAlvo(j)) return ['SEM ALVO: apoio', '#7fd8ff']
     const alvo = this.estado.alvos[j]
-    return alvo != null ? [`→ ${this.nomeDe(alvo)}`, textoDaVaga(alvo)] : ['', TEXTO.desabilitado]
+    return ['', TEXTO.desabilitado] // o alvo é um ícone no cartão (setAlvo em atualizarEstados), não um nome
   }
 
   atualizarEstados() {
     this.estado.jogadores.forEach((jog, j) => {
       const [texto, cor] = this.textoDoEstado(j)
       this.huds[j].setEstado(texto, cor)
+      const alvoJ = this.estado.alvos[j]
+      this.huds[j].setAlvo(this.fase !== 'escolha' && !jog.eliminado && !(this.dupla && jog.caido) && !this.rede.fora(j) && !this.semAlvo(j) && alvoJ != null ? alvoJ : null)
       this.huds[j].setApagado(Boolean(jog.eliminado) || this.rede.fora(j))
       const cel = this.celulas[j]
       if (!cel) return
+      const c = celula(j)
       const atacante = this.estado.alvos.indexOf(j)
       const textoCel = this.dupla && jog.eliminado ? 'FORA\n(saiu)' : jog.eliminado ? `ELIMINADO\n${this.posicaoDe(j)}º LUGAR` : this.rede.fora(j) ? 'SEM CONEXÃO\n(leva o ataque\ninteiro)' : this.dupla && jog.caido ? 'CAÍDO\n(o parceiro\nresgata)' : this.semAlvo(j) ? 'SEM ALVO\n+1 energia\nsó ♥' : ''
       cel.estado.setText(textoCel).setColor(jog.eliminado || (this.dupla && jog.caido) ? TEXTO.caido : this.semAlvo(j) && !this.rede.fora(j) ? '#7fd8ff' : '#ff9a3a')
-      if (this.fase !== 'esquiva' && this.fase !== 'arremesso') cel.ataque.setText(atacante >= 0 && !this.inativo(j) ? `${this.dupla ? 'duelo com' : 'atacado por'}\n${this.nomeDe(atacante)}` : '').setColor(atacante >= 0 ? textoDaVaga(atacante) : TEXTO.normal)
+      if (this.fase !== 'esquiva' && this.fase !== 'arremesso') {
+        cel.ataque.setText('')
+        // quem ataca esta caixa: uma seta que chega + a forma e a cor dele (sem nome)
+        cel.marca.clear()
+        if (atacante >= 0 && !this.inativo(j)) {
+          const mx = c.x0 + CELULA.largura - LADO + 16
+          const my = c.y0 + 22
+          const cor = corDaVaga(atacante)
+          cel.marca.fillStyle(0x000000, 0.55).fillRoundedRect(mx - 14, my - 12, 62, 24, 6)
+          desenharForma(cel.marca, formaDaVaga(atacante), mx, my, 6, cor)
+          cel.marca.lineStyle(5, 0x000000, 0.9).lineBetween(mx + 36, my, mx + 12, my).lineBetween(mx + 12, my, mx + 19, my - 6).lineBetween(mx + 12, my, mx + 19, my + 6)
+          cel.marca.lineStyle(3, cor, 1).lineBetween(mx + 36, my, mx + 12, my).lineBetween(mx + 12, my, mx + 19, my - 6).lineBetween(mx + 12, my, mx + 19, my + 6)
+        }
+      }
       const apagar = this.inativo(j) ? 0.4 : 1
       for (const o of [cel.nome, cel.personagem, cel.forma]) o.setAlpha(apagar * this.alphaGrade)
     })
@@ -557,80 +566,18 @@ export default class PvpArenaN extends Phaser.Scene {
     this.atualizarEstados()
   }
 
-  // o painel do rodízio: um par por linha (forma + nome na cor da vaga), o meu em destaque
+  // o anúncio da rodada (pvp/anuncioAlvos.js): os personagens e as setas de quem ataca quem, em vez do painel de
+  // texto. Eu em destaque (ou, sendo espectador/caído, quem eu sigo). A/B pulam a animação (ver o onBotao)
   mostrarAlvos() {
-    if (this.dupla) return this.mostrarDuelos()
-    const p = this.painelAlvos
-    const pares = this.estado.alvos.map((alvo, j) => (alvo == null ? null : [j, alvo])).filter(Boolean)
-    const altura = 70 + pares.length * 24 + 30
-    p.fundo.clear().fillStyle(0x0b0914, 0.9).fillRoundedRect(-200, 80, 400, altura, 8).lineStyle(2, 0xff7a9a, 0.9).strokeRoundedRect(-200, 80, 400, altura, 8)
-    p.titulo.setText(`RODÍZIO DA RODADA ${this.estado.rodada}`)
-    p.formas.clear()
-    p.linhas.forEach((l, i) => {
-      const par = pares[i]
-      if (!par) return l.setText('')
-      const [a, b] = par
-      l.setText(`${this.nomeDe(a)}   →   ${this.nomeDe(b)}`).setColor(a === this.meu || b === this.meu ? '#ffffff' : TEXTO.normal)
-      l.setFontSize(a === this.meu ? 16 : 14)
-      const y = l.y
-      desenharForma(p.formas, formaDaVaga(a), -l.width / 2 - 14, y, 6, corDaVaga(a))
-      desenharForma(p.formas, formaDaVaga(b), l.width / 2 + 14, y, 6, corDaVaga(b))
-    })
-    const meuAlvo = this.estado.alvos[this.meu]
-    const quem = this.estado.alvos.indexOf(this.meu)
-    p.meu.setY(136 + pares.length * 24 + 4)
-    p.meu.setText(this.euEliminado ? 'você foi eliminado: assistindo' : meuAlvo != null ? `VOCÊ ATACA ${this.nomeDe(meuAlvo)} · ${this.nomeDe(quem)} ATACA VOCÊ` : '')
-    p.painel.setVisible(true).setAlpha(0)
-    this.tweens.add({ targets: p.painel, alpha: 1, duration: 200 })
-    this.legenda?.setText(`RODÍZIO\n${pares.map(([a, b]) => `${this.nomeDe(a)} → ${this.nomeDe(b)}`).join('\n')}`)
-    if (meuAlvo != null) this.etiquetaEm(CENTRO_X, 372, `SEU ALVO: ${this.nomeDe(meuAlvo)}`, textoDaVaga(meuAlvo), { tamanho: 13, ms: 1600 })
-  }
-
-  // 2x2: os dois duelos da rodada ("ANA × BETO", o meu em destaque) e quem está SEM ALVO / CAÍDO
-  mostrarDuelos() {
-    const p = this.painelAlvos
     const e = this.estado
-    const pares = e.alvos.map((alvo, j) => (alvo != null && j < alvo ? [j, alvo] : null)).filter(Boolean)
-    const extras = e.jogadores.map((jog, j) => (jog.eliminado ? [j, 'FORA'] : jog.caido ? [j, 'CAÍDO: o parceiro resgata'] : this.semAlvo(j) ? [j, 'SEM ALVO: +1 energia, só ♥'] : null)).filter(Boolean)
-    const linhas = pares.length + extras.length
-    const altura = 70 + linhas * 24 + 30
-    p.fundo.clear().fillStyle(0x0b0914, 0.9).fillRoundedRect(-210, 80, 420, altura, 8).lineStyle(2, 0xffd23a, 0.9).strokeRoundedRect(-210, 80, 420, altura, 8)
-    p.titulo.setText(`DUELOS DA RODADA ${e.rodada}`).setColor('#ffd23a')
-    p.sub.setText('cada duelo é um 1x1 · o ♥ vai em você ou no parceiro')
-    p.formas.clear()
-    p.linhas.forEach((l, i) => {
-      if (i < pares.length) {
-        const [a, b] = pares[i]
-        const meu = a === this.meu || b === this.meu
-        l.setText(`${this.nomeDe(a)}   ×   ${this.nomeDe(b)}`).setColor(meu ? '#ffffff' : TEXTO.normal).setFontSize(meu ? 16 : 14)
-        desenharForma(p.formas, formaDaVaga(a), -l.width / 2 - 14, l.y, 6, corDaVaga(a))
-        desenharForma(p.formas, formaDaVaga(b), l.width / 2 + 14, l.y, 6, corDaVaga(b))
-        return
-      }
-      const extra = extras[i - pares.length]
-      if (!extra) return l.setText('')
-      const [j, texto] = extra
-      l.setText(`${this.nomeDe(j)}: ${texto}`).setColor(textoDaVaga(j)).setFontSize(11)
-      desenharForma(p.formas, formaDaVaga(j), -l.width / 2 - 12, l.y, 5, corDaVaga(j))
-    })
-    const meuAlvo = e.alvos[this.meu]
-    const parc = this.parceiro()
-    const alvoParc = parc >= 0 ? e.alvos[parc] : null
-    const partes = []
-    if (meuAlvo != null) partes.push(`VOCÊ × ${this.nomeDe(meuAlvo)}`)
-    else if (this.euFora) partes.push(e.jogadores[this.meu].caido ? 'VOCÊ CAIU: o parceiro pode te resgatar' : 'você saiu')
-    else if (this.semAlvo(this.meu)) partes.push('VOCÊ: SEM ALVO (apoie o parceiro)')
-    if (parc >= 0 && alvoParc != null) partes.push(`PARCEIRO ${this.nomeDe(parc)} × ${this.nomeDe(alvoParc)}`)
-    p.meu.setY(136 + linhas * 24 + 4)
-    p.meu.setText(partes.join(' · '))
-    p.painel.setVisible(true).setAlpha(0)
-    this.tweens.add({ targets: p.painel, alpha: 1, duration: 200 })
-    if (meuAlvo != null) this.etiquetaEm(CENTRO_X, 372, `SEU DUELO: ${this.nomeDe(meuAlvo)}`, textoDaVaga(meuAlvo), { tamanho: 13, ms: 1600 })
+    const estados = e.jogadores.map((jog, j) => estadoDoNo({ eliminado: Boolean(jog.eliminado), caido: Boolean(this.dupla && jog.caido), fora: this.rede.fora(j) || Boolean(jog.ausente), semAlvo: this.semAlvo(j) }))
+    const inativos = estados.map((s) => s === 'eliminado' || s === 'caido')
+    const destaque = quemDestacar({ meu: this.meu, inativos, seguindo: this.seguindo ?? (this.dupla ? this.parceiro() : null), n: this.n })
+    this.anuncio.mostrar({ n: this.n, dupla: this.dupla, times: e.times ?? [], alvos: e.alvos, estados, meu: this.meu, destaque, reduzir: this.reduzirAnimacoes })
   }
 
   esconderAlvos() {
-    const p = this.painelAlvos.painel
-    this.tweens.add({ targets: p, alpha: 0, duration: 160, onComplete: () => p.setVisible(false) })
+    this.anuncio?.esconder()
   }
 
   // ---------- partida ----------
@@ -1022,8 +969,6 @@ export default class PvpArenaN extends Phaser.Scene {
     if (ef.energia) lista.push([`+${ef.energia} ENERGIA`, '#7fd8ff'])
     if (ef.compradas.length) lista.push([`+${ef.compradas.length} CARTA${ef.compradas.length > 1 ? 'S' : ''}`, TEXTO.normal])
     if (ef.roubou) lista.push(['ROUBOU 1 CARTA', '#d0b8ff'])
-    const alvo = r.alvos[j]
-    if (alvo != null && r.caixas[alvo]?.de === j) lista.push([`→ ${this.nomeDe(alvo)}`, textoDaVaga(alvo)])
     if (r.superDupla?.includes(this.estado.times?.[j])) lista.push([`SUPER EM DUPLA +${Math.round((DUPLA.superDupla - 1) * 100)}%`, '#ffd23a'])
     return lista
   }
@@ -1196,7 +1141,7 @@ export default class PvpArenaN extends Phaser.Scene {
     borda.setStrokeStyle(6, 0xffffff)
     this.time.delayedCall(120, () => borda.scene && borda.setStrokeStyle(4, corDaVaga(k)))
     const cel = this.celulas[k]
-    cel.ataque.setText(`${this.nomeDe(caixa.de)}:\n${caixa.carta.nome}\n${caixa.dano} por\nacerto${caixa.refletida ? '\n(passada\nadiante)' : ''}`).setColor(textoDaVaga(caixa.de))
+    cel.ataque.setText(`${caixa.carta.nome}\n${caixa.dano} por\nacerto${caixa.refletida ? '\n(passada\nadiante)' : ''}`).setColor(textoDaVaga(caixa.de))
     if (caixa.escudo != null) {
       const c = this.centroNaTela(k)
       if (!this.pistas[k].caixa.oculta) this.etiquetaEm(c.x, c.y - (PISTA.altura / 2) * c.escala - 6, `ESCUDO! -${Math.round((1 - caixa.escudo) * 100)}%`, TEXTO.guarda, { tamanho: 11, ms: 1100 })
@@ -1521,7 +1466,6 @@ export default class PvpArenaN extends Phaser.Scene {
     this.selecao = sel
     this.emFoco = true
     this.montarFoco(sel)
-    this.legenda?.setVisible(false)
     await this.transicionar(vistasDoFoco(sel, this.n), { paraFoco: true, ms })
   }
 
@@ -1533,7 +1477,6 @@ export default class PvpArenaN extends Phaser.Scene {
       await this.transicionar(vistasDaGrade(this.n), { paraFoco: false })
       this.rotulosFoco.forEach((r) => r.c.setVisible(false))
       this.cartoes.forEach((c) => c.c.setVisible(false))
-      this.legenda?.setVisible(true)
       if (this.saindo) return
       this.mostrarDanoDaRodada()
     }
@@ -1640,11 +1583,10 @@ export default class PvpArenaN extends Phaser.Scene {
       rot.hp.setText(`HP ${Math.max(0, jog.hp)}/${jog.hpMax}`)
       barra(rot.barra, 0, 7, rot.largura, 3, jog, corDaVaga(k))
       const caixa = r?.caixas[k]
-      const de = caixa ? this.nomeDe(caixa.de) : null
       const carta = caixa ? caixa.carta.nome : ''
       let linha = ''
-      if (rot.papel === 'foco') linha = caixa ? `${eu ? 'desvie' : 'desvia'} de ${de}: ${carta} · ${caixa.dano}/acerto` : 'nenhum ataque vem para cá'
-      else linha = caixa ? `${caixa.de === this.meu ? 'o seu ataque' : `ataque de ${de}`}: ${carta}` : 'sem ataque nesta rodada'
+      if (rot.papel === 'foco') linha = caixa ? `${eu ? 'desvie' : 'desvia'}: ${carta} · ${caixa.dano}/acerto` : 'nenhum ataque vem para cá'
+      else linha = caixa ? `${caixa.de === this.meu ? 'o seu ataque' : 'ataque'}: ${carta}` : 'sem ataque nesta rodada'
       rot.linha.setText(linha)
     }
     for (const c of this.cartoes) {
@@ -1803,6 +1745,7 @@ export default class PvpArenaN extends Phaser.Scene {
     this.tweens.timeScale = animacao
     this.time.timeScale = animacao
     this.controles.atualizar()
+    this.anuncio?.atualizar(deltaReal)
     this.fundoArena?.atualizar(delta)
     const jog = this.estado.jogadores[this.meu]
     if (jog) informarVida(0, jog.hp, jog.hpMax)
