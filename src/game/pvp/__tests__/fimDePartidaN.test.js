@@ -35,3 +35,18 @@ test('expira em 15 s; linhas e dica por vaga', () => {
   assert.equal(dicaDoAceiteN(a, [0, 1, 2], 5000), 'esperando 2 jogadores (10s)')
   assert.equal(dicaDoAceiteN(novoAceiteN(), [0, 1], 0), '')
 })
+
+test('2x2: TROCAR TIME só com todos respondendo; TROCAR PERSONAGEM vale mais, depois TROCAR TIME', () => {
+  let a = novoAceiteN()
+  for (const v of [0, 1, 2]) a = registrarN(a, v, 'revanche', 0)
+  a = registrarN(a, 3, 'trocarTime', 0)
+  assert.equal(decidirN(a, [0, 1, 2, 3]), 'trocarTime')
+  assert.equal(decidirN(registrarN(novoAceiteN(), 3, 'trocarTime', 0), [0, 1, 2, 3]), null, 'faltam três')
+  let b = novoAceiteN()
+  b = registrarN(b, 0, 'trocarTime', 0)
+  b = registrarN(b, 1, 'trocar', 0)
+  b = registrarN(b, 2, 'revanche', 0)
+  b = registrarN(b, 3, 'revanche', 0)
+  assert.equal(decidirN(b, [0, 1, 2, 3]), 'trocar')
+  assert.equal(dicaDoAceiteN(a, [0, 1, 2, 3], 0), 'trocando os times…')
+})
