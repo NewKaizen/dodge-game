@@ -480,10 +480,10 @@ Modo `ffa` (1x1x1x1), **3 ou 4 jogadores**, só **online** em sala de amigos (Fa
 
 **Telas.** Lobby (modo TODOS CONTRA TODOS com 3–4 na sala) → `PvpEscolhaN` (a grade da party do CO-OP 3–4: cada um escolhe o próprio personagem, **sem repetir**, para as caixas ficarem distintas; quem arbitra é o host) → `PvpArenaN` (sem votação de arena: o host sorteia uma, que vale para fundo e música) → `PvpResultadoN`.
 
-**Arena (854×480).** No alto, um cartão por vaga (forma + nome + HP + energia + estado). Embaixo, uma **grade 2×2 com uma caixa por jogador** (220×170, o tamanho do 1x1: os ataques medidos continuam valendo): vaga 0 em cima à esquerda, 1 em cima à direita, 2 embaixo à esquerda, 3 embaixo à direita. Cada célula tem a cor, a forma e o nome do dono (também no coração), o personagem e, à direita da caixa, **quem ataca ela e com o quê** ("BETO: ♦ CONTROLE, 9 por acerto"). Com 3 jogadores a 4ª célula mostra o rodízio da rodada. Só a minha mão aparece.
+**Arena (854×480).** No alto, um cartão por vaga (forma + nome + HP + energia + estado). Embaixo, uma **grade 2×2 com uma caixa por jogador** (220×170, o tamanho do 1x1: os ataques medidos continuam valendo): vaga 0 em cima à esquerda, 1 em cima à direita, 2 embaixo à esquerda, 3 embaixo à direita. Cada célula tem a cor, a forma e o nome do dono (também no coração), o personagem e, à direita da caixa, **quem ataca ela** (uma setinha que chega + a forma e a cor dele, sem nome; na esquiva, a carta e o dano por acerto). No cartão do alto, depois da escolha, o **alvo** de cada um aparece como uma setinha + a forma e a cor dele. Só a minha mão aparece.
 
-**Foco no meu par (`pvp/focoFfa.js`, testes em `pvp/__tests__/focoFfa.test.js`).** A grade é a visão geral (o anúncio "ANA → BETO", a escolha, a revelação). Na esquiva a tela vai para o **meu par**:
-1. **Anúncio** (como antes): a grade e o painel do rodízio.
+**Foco no meu par (`pvp/focoFfa.js`, testes em `pvp/__tests__/focoFfa.test.js`).** A grade é a visão geral (o anúncio desenhado, a escolha, a revelação). Na esquiva a tela vai para o **meu par**:
+1. **Anúncio desenhado** (`pvp/anuncioAlvos.js` + `pvp/AnuncioAlvos.js`, testes em `pvp/__tests__/anuncioAlvos.test.js`): sem caixa de texto. Os **sprites** dos jogadores aparecem num losango/triângulo (2x2: time A à esquerda, B à direita, cor do time atrás), cada um com o anel da cor da vaga e a forma da vaga; **setas animadas** (uma a cada ~130 ms, ~1,2 s no total) mostram quem ataca quem. A **minha** seta é grossa, na minha cor e pulsa; a que **vem para mim** é tracejada na cor de quem ataca; as outras ficam apagadas. Só há uma palavra, "VOCÊ", em cima do meu personagem. Caído/eliminado = sprite cinza com X; SEM ALVO = raio de energia no lugar da seta; sem conexão = ícone de sinal cortado (não ataca, mas leva o ataque). No 2x2 meu parceiro tem um coraçãozinho ligando a mim. Espectador: o mesmo desenho, com quem ele segue em destaque. **A ou B** pulam a animação; com **"reduzir animações"** as setas aparecem de uma vez, paradas, por ~0,8 s. Depois o desenho encolhe para o meio da tela e fica como lembrete durante a escolha.
 2. **Transição** (`TRANSICAO.ms` = 700 ms, Cubic in-out, com um "whoosh" que sobe): as caixas abrem na grade e vão para o **foco**: a **minha caixa grande no meio-esquerda** (escala 1,42: eu desvio do ataque que vem para mim) e a do **meu alvo menor em cima à direita** (escala 0,62: eu vejo o meu ataque chegar), cada uma com forma, nome na cor da vaga, barra e número de HP e o que ela recebe ("desvie de DUDA: ♦ CONTROLE · 6/acerto"). Os outros encolhem até um **cartão pequeno** embaixo à direita (forma, nome, barra de HP e DESVIANDO / CAÍDO / SEM CONEXÃO / ELIMINADO 4º / SEM ATAQUE) e **a caixa deles não é desenhada**. Só as duas cartas que importam (a que vem para mim e a minha) voam; as outras saem da mesa.
 3. **Fim da rodada**: a tela volta à grade (o "whoosh" desce), as caixas fecham e cada célula mostra o **dano da rodada** ("-18 HP", "causou 16" ou "SEM DANO"); depois o anúncio seguinte.
 4. **Espectador** (eliminado): o mesmo foco, no par de quem ele segue (←/→ troca com uma transição curta de 320 ms).
@@ -491,7 +491,7 @@ Modo `ffa` (1x1x1x1), **3 ou 4 jogadores**, só **online** em sala de amigos (Fa
 
 É **só apresentação**: as caixas continuam no mesmo lugar do **mundo** (limites, balas, colisão, as posições do coração que viajam pela rede) e todas continuam rodando como antes (a minha de verdade, as dos outros espelho; o dano de cada coração continua sendo decidido no PC do dono). O foco só muda **onde e de que tamanho** a caixa aparece (`BattleBox.setVista`: as câmeras de recorte mostram a região dela em outro lugar, a borda vai junto) ou se ela aparece (`BattleBox.setOculta`: câmeras e borda apagadas, sem parar o ataque). As faíscas e o coração quebrado de uma caixa vão para onde ela aparece (`pontoNaTela`) e somem com ela. O replay do último K.O. continua gravando as caixas escondidas.
 
-**Rodízio de alvos (anunciado ANTES da escolha).** Os vivos em ordem de vaga, `v[0..n-1]`; na rodada `r` cada um ataca `v[(i + passo) mod n]`, com `passo = 1 + (r − 1) mod (n − 1)`. O passo nunca é 0 nem múltiplo de `n`: é uma permutação **sem ponto fixo**, então cada um ataca exatamente **um** e recebe exatamente **um** ataque — não dá para três baterem no líder (anti-foco). Com 3 vivos é sempre um ciclo (direita, esquerda, direita…); com 4, o passo 2 faz duas duplas (A↔C, B↔D); com 2 vivos vira o 1x1. Na escolha, o painel "RODÍZIO DA RODADA" lista os pares ("ANA → BETO", com forma e cor) e a minha linha ("VOCÊ ATACA BETO · DUDA ATACA VOCÊ").
+**Rodízio de alvos (anunciado ANTES da escolha).** Os vivos em ordem de vaga, `v[0..n-1]`; na rodada `r` cada um ataca `v[(i + passo) mod n]`, com `passo = 1 + (r − 1) mod (n − 1)`. O passo nunca é 0 nem múltiplo de `n`: é uma permutação **sem ponto fixo**, então cada um ataca exatamente **um** e recebe exatamente **um** ataque — não dá para três baterem no líder (anti-foco). Com 3 vivos é sempre um ciclo (direita, esquerda, direita…); com 4, o passo 2 faz duas duplas (A↔C, B↔D); com 2 vivos vira o 1x1. O rodízio é anunciado pelo desenho acima (setas entre os personagens), não por texto.
 
 **Cartas, energia, dano.** Tudo do 1x1 (energia 3/+2/teto 10, passar +1, grazes, desvio perfeito e combo, ♥ suporte em quem joga, escudo, custos, SUPER custando 10), resolvido **por par atacante → alvo** (`resolverRodadaFfa`):
 
@@ -521,6 +521,66 @@ Modo `ffa` (1x1x1x1), **3 ou 4 jogadores**, só **online** em sala de amigos (Fa
 **XP** ([online.md](online.md#todos-contra-todos-fase-5d)): participação 40 para quem jogou até o fim, **1º +20** (vitória), **2º +10** (migration 0007), o resto só a participação.
 
 Testando no navegador (dev, 3 ou 4 abas): o dono cria a sala, `mudarModo('ffa')`, os outros `entrarCodigo`, todos `alternarPronto()` e o dono `pedirPartida()`; na escolha, **Q** (acorda o teclado) e **espaço** em cada aba. Na arena, `debugJogo.set({ acelerar: 2 })` e, no host, `pvpArenaN.setHp(j, 5)` aceleram o fim; `pvpArenaN.estadoDebug()` mostra os alvos, a classificação e as caixas.
+
+## 2x2
+
+Modo `2x2` (duas equipes de 2), **exatamente 4 jogadores**, só **online** em sala de amigos (Fase 5E). Regras puras em
+`src/game/pvp/dupla.js` (testes em `pvp/__tests__/dupla.test.js`), por cima das do [todos contra todos](#todos-contra-todos):
+a mesma cena (`PvpEscolhaN` → `PvpArenaN` com `modo: '2x2'` → `PvpResultadoN`), a mesma ponte (`ArenaRedeN`) e a mesma
+escolha às cegas. O 1x1 e o todos contra todos não mudam.
+
+**Times.** Por vaga da sala, num de 3 arranjos (`src/lib/times2x2.js`): **A = vagas 0+2, B = 1+3** (padrão), A = 0+1 / B = 2+3,
+A = 0+3 / B = 1+2. No lobby o **dono** passa ao próximo com **TROCAR TIME** (o servidor guarda `sala.arranjo`; cada cartão do lobby
+mostra o time). Na arena cada célula tem a **borda e a etiqueta da cor do time** (A azul, B laranja); a forma e o nome continuam
+na cor da vaga.
+
+**Duelos cruzados (anunciados antes da escolha: "DUELOS DA RODADA").** Com os 4 de pé: rodada ímpar **A1×B1 e A2×B2**, rodada
+par **A1×B2 e A2×B1** (A1/A2 = os do time em ordem de vaga). Cada duelo é um 1x1: os dois do par atacam um ao outro, com todas as
+cartas, a energia, os Ases e o SUPER do 1x1 (♠ Espelho devolve ao oponente, ♦ Anular cancela a carta dele, ♣ Roubo rouba dele).
+
+**Anti-foco.** Ninguém recebe mais de um ataque por rodada. Quando um time tem só **um de pé**, ele enfrenta **um** adversário
+(alternando a cada rodada) e o outro adversário fica **SEM ALVO**: ganha **+1 de energia** no começo da rodada e só pode jogar
+**♥** (em si ou no parceiro) ou passar.
+
+**Caído e resgate.** HP 0 no fim da rodada = **CAÍDO** (não sai): não joga, não é alvo, não ganha energia, a caixa não abre, a mão
+desce e a tela segue o **duelo do parceiro** (←/→ troca quem assistir). O parceiro resgata:
+1. **Rodada limpa**: ele tinha ataque na caixa e **não levou nenhum acerto** → no fim da rodada o caído (de uma rodada anterior)
+   volta com **30%** do HP ("RODADA LIMPA! X VOLTA").
+2. **♥ no caído**: a carta vale nele (cura, escudo, Segunda chance) e ele **levanta na hora** com pelo menos **25%** do HP
+   ("LEVANTOU!"). Nos dois casos volta a jogar na rodada seguinte.
+
+**♥ no parceiro.** Ao confirmar um ♥ no 2x2 aparece "♥ EM: ◀ VOCÊ ▶": **←/→** escolhe você ou o parceiro (o parceiro caído vem
+selecionado: é o resgate), **A** confirma, **B** volta à mão. A cura, o escudo e a Segunda chance vão no alvo; a **energia e a compra
+ficam com quem jogou**. A jogada vai ao host como `{ carta, apoio }`.
+
+**SUPER em dupla.** Os dois do time jogam SUPER na mesma rodada: as duas caixas de SUPER têm **+25% de dano por acerto**
+("SUPER EM DUPLA!"). Nada além disso (o bônus é limitado).
+
+**Vitória.** Vence o time cujos **dois adversários estão caídos (ou fora)** no fim da rodada. O resgate vem antes: um caído que
+volta pela rodada limpa salva o time. Os **dois times zerados no mesmo fim de rodada = EMPATE**. Morte súbita na rodada 15 e
+limite na 24 como no todos contra todos; no limite vence o time com **mais HP somado** (dos de pé), igual = empate.
+
+**Rodadas bônus e eventos: desligados** (como no todos contra todos).
+
+**Queda no meio da partida (quem cai não leva vantagem).** Igual ao todos contra todos: sem conexão não ataca, não ganha a energia
+da rodada e o ataque que vinha para ele vale como 3 acertos; volta na rodada seguinte. Não voltou em **20 s**: fica **FORA**
+(eliminado; **não dá para resgatar**) e conta como caído para a vitória (o parceiro segue sozinho, com o anti-foco). Host que cai: 2D.
+
+**Câmera.** O foco do todos contra todos: a **minha caixa grande** + a do **meu oponente**; o **parceiro** é o primeiro cartão
+pequeno ("PARCEIRO · NOME", HP e DESVIANDO / CAÍDO / SEM ALVO / SEM CONEXÃO), com o "whoosh" nas transições. Caído (ou SEM
+ALVO) o foco vai para o duelo do parceiro.
+
+**Resultado.** "TIME A VENCEU!" (ou EMPATE) com os nomes, o time vencedor primeiro (etiqueta do time, dano causado/recebido,
+HP, quando caiu). Fim: **REVANCHE**, **TROCAR PERSONAGEM** e **TROCAR TIME** (a revanche com o próximo arranjo) com **todos**
+respondendo (vale a maior mudança pedida: personagem > time > revanche; 15 s sem acordo cancela), **VOLTAR AO LOBBY** na hora.
+
+**XP** ([online.md](online.md#2x2-fase-5e)): participação 40 para todos que jogaram até o fim, **+20 para os dois do time
+vencedor**, empate só a participação; o limite diário conta contra **cada adversário** (migration 0009).
+
+**Buzzer/vibração:** os ganchos de sempre (golpe de SUPER, K.O./queda pelo HP, vitória do meu time).
+
+Testando no navegador (dev, 4 abas): como no todos contra todos com `mudarModo('2x2')` (e `mudarTimes(1)` para trocar os times);
+`pvpArenaN.setHp(j, 1)` no host derruba alguém; `pvpArenaN.estadoDebug()` mostra `times`, `semAlvo`, `caido` e `vencedorTime`.
 
 ## Escolha às cegas no online
 

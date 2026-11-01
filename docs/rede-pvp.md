@@ -406,6 +406,24 @@ daquele momento). O host que cai: todos param e a rodada recomeça na volta (2D:
 Testando: `node --test src/game/pvp/__tests__/ffa.test.js src/game/pvp/__tests__/redeFfa.test.js src/game/pvp/__tests__/fimDePartidaN.test.js
 server/__tests__/ffaXp.test.js`. No navegador: ver o fim de [pvp-regras.md](pvp-regras.md#todos-contra-todos).
 
+## 2x2 (Fase 5E)
+
+O `PROTOCOLO` subiu para **13** (`server/lan.js` e `lib/lan/rede.js`): o `2x2` deixou de ser "em breve", registra XP, o relato
+`resultado` aceita `vencedorTime` e a sala tem `arranjo` (mensagem `times {arranjo}`).
+
+A arena é a `PvpArenaN` com `modo: '2x2'` e `times` nos dados da cena, e a ponte é a mesma `ArenaRedeN` (regras de `pvp/dupla.js`
+quando `estado.modo === '2x2'`). Diferenças no fio:
+
+| Tipo | Diferença |
+| --- | --- |
+| `inicio` | o `estado` leva `times`, `semAlvo` e o `caido` de cada um; `alvos` são os duelos (mútuos) |
+| `jogada` | `jogada` pode ser `{ carta, apoio }` (em quem vai o ♥); o host não espera quem está **caído** |
+| `fimRodada` | o host passa as **rodadas limpas** (quem tinha ataque e não levou acerto) ao `fimDaRodadaDupla`; a mensagem leva também `{ caidos, resgatados, vencedorTime }` |
+
+Quem cai da rede é tratado como no todos contra todos (ausente, ataque inteiro, volta na rodada seguinte; 20 s: `eliminarFfa 'saiu'`,
+que no 2x2 é FORA, sem resgate). Testando: `node --test src/game/pvp/__tests__/dupla.test.js src/game/pvp/__tests__/redeDupla.test.js
+server/__tests__/duplaXp.test.js`.
+
 ## Escolha às cegas no online
 
 O `PROTOCOLO` subiu para **12** (`server/lan.js` e `lib/lan/rede.js`): a `resolucao` passou a levar as jogadas e as cartas de verdade. Regra em

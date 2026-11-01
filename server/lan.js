@@ -68,7 +68,7 @@
 //
 // SALAS DE N (Fase 5A, docs/rede-pvp.md "Salas de N"): o tamanho da sala vem do
 // modo (MODOS_SALA: PVP 1x1 e CO-OP de 2 = 2; 'coop4' 3–4 (CO-OP de 3 e 4, Fase 5B),
-// 'ffa' 3–4 (todos contra todos, Fase 5D) e '2x2' = 4, este ainda "em breve": a sala existe, a partida ainda não). Cada membro
+// 'ffa' 3–4 (todos contra todos, Fase 5D) e '2x2' = 4 (duas equipes, Fase 5E)). Cada membro
 // tem uma VAGA (0..N-1, o host é a 0): a menor livre quando entra, a mesma na
 // retomada e durante a partida; fora da partida as vagas são recompactadas quando
 // alguém sai (0..n-1 sem buracos: num modo de 2 o convidado é sempre a vaga 1).
@@ -103,8 +103,9 @@ import { elegerHost, lerDiretos, ELEICAO_MS } from './eleicao.js'
 import { METRICAS_NULA } from './metricas.js'
 import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
 import { nomeSeguro } from '../src/lib/contaRegras.js'
+import { arranjoValido } from '../src/lib/times2x2.js'
 
-export const PROTOCOLO = 12
+export const PROTOCOLO = 13
 export const PORTA_DESCOBERTA = 47777
 // Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
 // aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")
@@ -113,7 +114,7 @@ export const MODOS_SALA = {
   coop: { min: 2, max: 2 },
   coop4: { min: 3, max: 4 }, // 5B: o CO-OP de 3 e 4 existe (coop/ArenaRedeCoopN.js)
   ffa: { min: 3, max: 4 }, // 5D: o todos contra todos existe (scenes/PvpArenaN.js)
-  '2x2': { min: 4, max: 4, emBreve: true },
+  '2x2': { min: 4, max: 4 }, // 5E: duas equipes de 2 (scenes/PvpArenaN.js com pvp/dupla.js)
 }
 export const MAX_MEMBROS = 4 // a maior sala de todas (o de cada sala: maxDoModo)
 export const maxDoModo = (modo) => (MODOS_SALA[modo] ?? MODOS_SALA.pvp).max
@@ -300,6 +301,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
     dono: sala.dono,
     eleicao: Boolean(sala.eleicao),
     eleito: sala.eleito ?? null,
+    arranjo: sala.arranjo ?? 0, // 2x2: quem joga com quem (src/lib/times2x2.js)
     membros: membrosDaSala(sala).map((c) => ({ id: c.id, vaga: c.vaga, nome: c.nome, papel: c.id === sala.host ? 'host' : 'convidado', dono: c.id === sala.dono, pronto: c.pronto, ping: c.ping, conta: contaPublica(c), segundoPlano: Boolean(c.segundoPlano), caiu: c.caido ? Math.max(0, c.caido.desde + RETOMADA_MS - agora()) : null })),
   })
 
@@ -972,6 +974,14 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       }
       if (sala.host !== c.id || sala.eleicao) return
       marcarPartida(sala, m.valor)
+    },
+    // 2x2 (5E): o TROCAR TIME. O dono no lobby; o host da partida na revanche (antes de abrir a partida nova)
+    times(c, m) {
+      const sala = salas.get(c.sala)
+      if (!sala || sala.modo !== '2x2' || sala.emPartida || sala.eleicao || !arranjoValido(m.arranjo)) return
+      if (sala.dono !== c.id && sala.host !== c.id) return
+      sala.arranjo = m.arranjo
+      avisarSala(sala)
     },
     // as medidas para a eleição: { id, diretos: { idDoMembro: rtt em ms } }
     medicao(c, m) {

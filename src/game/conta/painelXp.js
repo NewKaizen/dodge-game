@@ -63,6 +63,27 @@ export function prepararXpFfa(cena, { colocacoes, colocacao, rodadas, duracao, p
   return xp
 }
 
+// XP do 2x2 (Fase 5E): manda o time vencedor (0 | 1 | null = empate) UMA vez e mostra a mesma faixa
+export function prepararXpDupla(cena, { vencedorTime, rodadas, duracao, personagem }) {
+  if (!emRede()) return null
+  const s = get(lan)
+  const partidaId = s.sala?.partidaId ?? null
+  const xp = { partidaId, motivo: null, recompensa: null, aoChegar: null, motivoTexto: motivoDupla }
+  if (!partidaId) return { ...xp, motivo: 'nao_registrada' }
+  enviarResultado({ partidaId, vencedorTime: vencedorTime ?? null, rodadas, duracao, personagem })
+  if (!s.eu.conta) xp.motivo = 'convidado'
+  const parar = lan.subscribe((estado) => {
+    const r = estado.recompensa
+    if (r?.partidaId !== partidaId || r === xp.recompensa) return
+    xp.recompensa = r
+    xp.aoChegar?.()
+  })
+  cena.events.once('shutdown', parar)
+  return xp
+}
+
+export const motivoDupla = (motivo) => (motivo === 'vitoria' ? 'vitória do time: participação + vitória' : motivo === 'derrota' || motivo === 'empate' ? 'participação' : textoMotivo(motivo) || 'participação')
+
 export const motivoFfa = (motivo, colocacao) =>
   motivo === 'vitoria' ? '1º lugar: participação + vitória' : motivo === 'derrota' ? (colocacao === 2 ? 'participação + bônus do 2º lugar' : 'participação') : textoMotivo(motivo) || 'participação'
 

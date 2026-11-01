@@ -1,5 +1,6 @@
 import ArenaRedeCoopN from '../../coop/ArenaRedeCoopN.js'
 import { iniciarRodadaFfa, fimDaRodadaFfa, eliminarFfa, aplicarAusente } from '../ffa.js'
+import { iniciarRodadaDupla, fimDaRodadaDupla } from '../dupla.js'
 import { criarFichas, embaralharEscondido, mascararEstado, mascararResultado, mascararJogada, mascararDadosDeCena } from '../sigilo.js'
 
 // A ponte da PvpArenaN (TODOS CONTRA TODOS, 3 e 4 jogadores; docs/rede-pvp.md "Todos contra todos"). É a
@@ -26,7 +27,13 @@ import { criarFichas, embaralharEscondido, mascararEstado, mascararResultado, ma
 // CADA convidado (canal.enviarPara) o inicio / a resolucao / o fimRodada VISTOS POR ELE: a mão, o monte e o
 // descarte dos outros viram fichas, e a carta jogada vem de verdade (o id dela vem como ficha). A retomada
 // também (mascararCenaPara, game/rede.js).
+//
+// 2x2 (Fase 5E, pvp/dupla.js; estado.modo === '2x2'): a mesma ponte com as regras das equipes. A jogada pode
+// levar em quem vai o ♥ ({ carta, apoio }); o host não espera quem está CAÍDO; o fimRodada leva também
+// { caidos, resgatados, vencedorTime } (o host passa as RODADAS LIMPAS de cada um: quem tinha ataque e não
+// levou acerto).
 const DEBUG_FFA = new Set(['forcarMao', 'setHp', 'setEnergia'])
+const ehDupla = (estado) => estado?.modo === '2x2'
 
 export default class ArenaRedeN extends ArenaRedeCoopN {
   constructor(arena, opcoes) {
@@ -71,9 +78,20 @@ export default class ArenaRedeN extends ArenaRedeCoopN {
     }))
   }
 
-  // o host espera a jogada de quem está vivo
+  // o host espera a jogada de quem está vivo (no 2x2, de pé: o caído não joga)
   precisaJogar(j) {
-    return !this.arena.estado.jogadores[j].eliminado
+    const jog = this.arena.estado.jogadores[j]
+    return !jog.eliminado && !jog.caido
+  }
+
+  // a jogada de um convidado: o id, ou no 2x2 { carta, apoio } (em quem vai o ♥)
+  aoJogada(d, de) {
+    if (!this.souHost || !d || this.arena.saindo) return
+    const vaga = this.vagaDe(de)
+    if (vaga < 0 || vaga === this.meu) return
+    const j = d.jogada
+    const jogada = typeof j === 'string' ? j : j && typeof j === 'object' && typeof j.carta === 'string' ? { carta: j.carta, apoio: Number.isInteger(j.apoio) ? j.apoio : null } : null
+    this.registrarJogada(d.r ?? this.rodada, vaga, jogada)
   }
 
   // ---------- começo da rodada ----------
@@ -86,7 +104,7 @@ export default class ArenaRedeN extends ArenaRedeCoopN {
       const eventos = []
       for (const j of saiu) if (eliminarFfa(a.estado, j, 'saiu')) eventos.push({ tipo: 'saiu', j })
       const antes = a.estado.jogadores.map((jog) => jog.ausente)
-      iniciarRodadaFfa(a.estado, { ausentes })
+      ;(ehDupla(a.estado) ? iniciarRodadaDupla : iniciarRodadaFfa)(a.estado, { ausentes })
       a.estado.jogadores.forEach((jog, j) => antes[j] && !jog.ausente && !jog.eliminado && eventos.push({ tipo: 'voltou', j }))
       this.enviarCada('inicio', a.estado.rodada, (vaga) => ({ estado: this.estadoPara(vaga), eventos }))
       return eventos
@@ -101,19 +119,20 @@ export default class ArenaRedeN extends ArenaRedeCoopN {
 
   // Host: quem estava sem conexão leva o ataque inteiro, quem zerou é eliminado, e manda o estado.
   // ausentes: [{ j, caixa, jaLevou }] (a arena sabe o que cada um levou nesta rodada)
-  async fimDaRodada(ausentes = []) {
+  // limpas (2x2): limpas[j] = j tinha ataque na caixa e não levou acerto (resgata o parceiro caído)
+  async fimDaRodada(ausentes = [], { limpas = [] } = {}) {
     const a = this.arena
     const rodada = this.rodada
     if (this.souHost) {
       const aplicados = ausentes.map(({ j, caixa, jaLevou }) => ({ j, dano: aplicarAusente(a.estado, j, caixa, jaLevou) })).filter((x) => x.dano > 0)
-      const fim = fimDaRodadaFfa(a.estado)
+      const fim = ehDupla(a.estado) ? fimDaRodadaDupla(a.estado, { limpas }) : fimDaRodadaFfa(a.estado)
       this.enviarCada('fimRodada', rodada, (vaga) => ({ estado: this.estadoPara(vaga), ...fim, ausentes: aplicados }))
       return { ...fim, ausentes: aplicados }
     }
     const msg = await this.esperar('fimRodada', rodada)
     if (!msg) return null
     this.trocarEstado(msg.estado, 'fimRodada', { conferir: false })
-    return { eliminados: msg.eliminados ?? [], fim: msg.fim ?? null, restam: msg.restam ?? [], ausentes: msg.ausentes ?? [] }
+    return { eliminados: msg.eliminados ?? [], fim: msg.fim ?? null, restam: msg.restam ?? [], ausentes: msg.ausentes ?? [], caidos: msg.caidos ?? [], resgatados: msg.resgatados ?? [], vencedorTime: msg.vencedorTime ?? null }
   }
 
   // ---------- corações: uma caixa por jogador ----------

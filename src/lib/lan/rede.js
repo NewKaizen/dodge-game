@@ -59,7 +59,7 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 //   enviarAoParceiro(dados, para?)  para = id de um membro (só o host escolhe; o convidado
 //                    vai sempre ao host: o servidor repassa em estrela)
 //   estado: caidos [{ id, nome, ate }] (todos os que caíram; outroCaiu = o primeiro, como antes)
-export const PROTOCOLO = 12
+export const PROTOCOLO = 13
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
@@ -647,6 +647,8 @@ export function alternarPronto() {
 }
 
 export const mudarModo = (modo) => enviar({ t: 'modo', modo })
+// 2x2 (5E): o TROCAR TIME (o dono no lobby; o host na revanche, antes de abrir a partida nova)
+export const mudarTimes = (arranjo) => enviar({ t: 'times', arranjo })
 export const enviarChat = (texto) => String(texto ?? '').trim() && enviar({ t: 'chat', texto })
 // (dono) tira um membro da sala; sem id, o outro (sala de 2)
 export const expulsar = (id = parceiro()?.id) => id && enviar({ t: 'expulsar', id })
@@ -736,10 +738,11 @@ export const limparRevanche = () => mudar({ revanche: null })
 // fim da partida: o que este PC viu; true se mandou agora (uma vez por partidaId).
 //   PVP:    { partidaId, vencedorLado: 0 | 1 | null, rodadas, duracao, personagem }
 //   CO-OP:  { partidaId, vitoria: true | false (o time venceu o chefe), rodadas, duracao, personagem }
-export function enviarResultado({ partidaId, vencedorLado, vitoria, colocacoes, rodadas, duracao, personagem }) {
+export function enviarResultado({ partidaId, vencedorLado, vitoria, colocacoes, vencedorTime, rodadas, duracao, personagem }) {
   if (typeof partidaId !== 'string' || !partidaId || relatadas.has(partidaId)) return false
   // todos contra todos (5D): as vagas do 1º ao último
-  const resultado = Array.isArray(colocacoes) ? { colocacoes: [...colocacoes] } : typeof vitoria === 'boolean' ? { vitoria } : { vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null }
+  // 2x2 (5E): o time vencedor (0 | 1 | null = empate)
+  const resultado = vencedorTime !== undefined ? { vencedorTime: vencedorTime === 0 || vencedorTime === 1 ? vencedorTime : null } : Array.isArray(colocacoes) ? { colocacoes: [...colocacoes] } : typeof vitoria === 'boolean' ? { vitoria } : { vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null }
   const relato = { partidaId, ...resultado, rodadas, duracao, personagem }
   if (ws?.readyState !== WebSocket.OPEN) {
     // caiu e está voltando (2D): o relato sai na volta, uma vez só

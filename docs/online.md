@@ -350,7 +350,7 @@ está logado. Cosmético nunca muda nada no jogo.
 ### Partidas de N (Fase 5A)
 
 A base dos modos de 3–4 (`server/partidas.js`; só dão XP os modos em `MODOS_COM_XP`:
-`pvp`, `coop`, desde a 5B `coop4` e desde a 5D `ffa`; o `2x2` liga o dele quando a partida existir). O lado de
+`pvp`, `coop`, desde a 5B `coop4`, desde a 5D `ffa` e desde a 5E `2x2`). O lado de
 cada um é a **vaga** da sala (0..3); o host da partida pode ser qualquer vaga
 (`hostLado`). Cada cliente relata o desfecho inteiro:
 
@@ -358,7 +358,7 @@ cada um é a **vaga** da sala (0..3); o host da partida pode ser qualquer vaga
 | --- | --- | --- |
 | `coop4` | `{ vitoria }` | o time inteiro: vitória ou derrota |
 | `ffa` | `{ colocacoes: [lado, ...] }` (do 1º ao último, todos os lados, sem repetir) | 1º = vitória, o resto derrota; a colocação vai para o banco (o 2º ganha +10, 0007) |
-| `2x2` | `{ vencedorTime: 0 \| 1 \| null }` (time = vaga % 2: 0 e 2 contra 1 e 3) | o time vencedor vitória, o outro derrota; `null` = empate |
+| `2x2` | `{ vencedorTime: 0 \| 1 \| null }` (time = o arranjo da sala, `src/lib/times2x2.js`; o padrão é vaga % 2: 0 e 2 contra 1 e 3) | o time vencedor vitória, o outro derrota; `null` = empate |
 
 **Política (o host decide, conferido pela maioria):** vale o desfecho do **host da
 partida** se pelo menos **metade** de quem relatou concorda com ele (o host desempata);
@@ -402,6 +402,24 @@ do 1º ao último). XP:
 Os limites diários são os de sempre e contam **por modo** (`ffa` tem a sua conta) e pelo "oponente" da 0006 (o 1º outro lado
 com conta): o mesmo grupo jogando muito no dia cai para metade (4ª e 5ª partida) e zero (6ª), como no 1x1. Convidado: o teto
 de convidados (10 por dia). Testes: `server/__tests__/ffaXp.test.js` e, num Postgres de verdade, `ffaSql.test.js` (com `DODGE_PG`).
+
+### 2x2 (Fase 5E)
+
+O `2x2` (4 jogadores, dois times de 2) usa a validação de N (o host decide, a maioria confere; o relato é `{ vencedorTime }`).
+O time de cada lado vem do **arranjo da sala** (`sala.arranjo`, mensagem `times {arranjo}`: o dono no lobby ou o host na revanche,
+sempre fora da partida; PROTOCOLO 13) e é gravado em `partida_participantes.time`. XP:
+
+| Quem | XP |
+| --- | --- |
+| todos que jogaram até o fim (inclusive quem caiu e voltou) | participação **40** |
+| os **dois** do time vencedor | **+20** (vitória) |
+| empate | só a participação |
+| quem saiu de vez (ou não voltou em 20 s) antes do primeiro relato | abandono: nada |
+
+**Limite diário contra cada adversário** (migration **0009**, `conceder_recompensa`): no 2x2 o parceiro não conta; a repetição de
+uma partida é a do **par mais repetido hoje** entre os adversários com conta (quantas partidas de 2x2 com XP eu já joguei hoje
+com ele no time oposto): a 4ª e a 5ª valem metade, a 6ª nada. O "oponente" gravado na concessão é o 1º adversário com conta.
+Testes: `server/__tests__/duplaXp.test.js` (banco falso) e, num Postgres de verdade, `duplaSql.test.js` (com `DODGE_PG`).
 
 ### Protocolo (versão 5)
 

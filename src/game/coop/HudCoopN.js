@@ -19,6 +19,7 @@ import { fatores } from '../acessibilidade.js'
 //   hud.setHp(70) · setEnergia(5) · setSequencia(3) · comboQuebrou() · setEscudo(0.6) · setProtegido(true)
 //   hud.setMao(5)                  quantas cartas na mão (retângulos acesos)
 //   hud.setEstado('PRONTO', cor)   o estado da mão (linha 1, à direita); null apaga
+//   hud.setAlvo(vaga)              o alvo (seta + forma + cor, sem nome); null apaga
 //   hud.setApagado(true)           caído / sem conexão / saiu: cartão apagado
 //   hud.tremer()                   levou um golpe
 //   hud.pontoHp / hud.pontoEnergia onde soltar números flutuantes
@@ -65,6 +66,7 @@ export default class HudCoopN {
     if (this.nome.width > 100) this.nome.setFontSize(9)
     this.voce = meu ? texto(this.nome.x + this.nome.width + 5, y0 + 7, 'VOCÊ', 7, '#ffffff', { strokeThickness: 2 }).setOrigin(0, 0) : null
     this.estado = texto(x0 + CARTAO.largura - 6, y0 + 6, '', 8, TEXTO.desabilitado, { strokeThickness: 2 }).setOrigin(1, 0)
+    this.marcaAlvo = cena.add.graphics()
 
     // linha 2: HP
     const yb = y0 + 22
@@ -87,7 +89,7 @@ export default class HudCoopN {
     this.textoEfeito = texto(x0 + 6, this.yLinha4, '', 8, TEXTO.guarda, { strokeThickness: 2 }).setOrigin(0, 0)
     this.cartas = cena.add.graphics()
 
-    c.add([moldura, forma, this.nome, ...(this.voce ? [this.voce] : []), this.estado, fundo, vazio, this.rastro, this.barra, this.textoHp, this.gemas, this.textoEnergia, this.textoCombo, this.textoEfeito, this.cartas])
+    c.add([moldura, forma, this.nome, ...(this.voce ? [this.voce] : []), this.estado, this.marcaAlvo, fundo, vazio, this.rastro, this.barra, this.textoHp, this.gemas, this.textoEnergia, this.textoCombo, this.textoEfeito, this.cartas])
     this.setHp(hpMax, false)
     this.setEnergia(0, false)
     this.setMao(0)
@@ -217,6 +219,19 @@ export default class HudCoopN {
   // o estado da mão (ESCOLHENDO, PRONTO...) na linha 1
   setEstado(texto, cor = TEXTO.desabilitado) {
     this.estado.setText(texto ?? '').setColor(cor)
+  }
+
+  // o alvo de quem este cartão é (depois da escolha): uma seta + a forma e a cor do alvo, sem nome. null apaga
+  setAlvo(vaga) {
+    const g = this.marcaAlvo
+    g.clear()
+    if (vaga == null) return
+    const cor = corDaVaga(vaga)
+    const x = this.x0 + CARTAO.largura - 16
+    const y = this.y0 + 11
+    g.lineStyle(4, 0x000000, 0.9).lineBetween(x - 30, y, x - 12, y).lineBetween(x - 12, y, x - 18, y - 5).lineBetween(x - 12, y, x - 18, y + 5)
+    g.lineStyle(2, 0xffffff, 0.95).lineBetween(x - 30, y, x - 12, y).lineBetween(x - 12, y, x - 18, y - 5).lineBetween(x - 12, y, x - 18, y + 5)
+    desenharForma(g, formaDaVaga(vaga), x, y, 6, cor)
   }
 
   setApagado(apagado) {
