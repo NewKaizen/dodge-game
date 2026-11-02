@@ -101,6 +101,14 @@
 //   aberta {valor}     a tela CONTINUAR/SAIR: só com `aberta` alguém de fora entra (na próxima votação)
 //   fim                a party acaba (o host ou o dono; a sala volta ao lobby normal)
 // A party também acaba sozinha quando a sala fica com menos de 3 ou o host da party sai.
+//
+// BOSS SEMANAL (PROTOCOLO 15, docs/boss-semanal.md): a semana e o chefe vêm do relógio DESTE servidor
+// (src/lib/semanal.js). O `bemvindo` leva `semanal` ({ semana, chefe, trofeu, restanteMs }) e
+// `semanalInfo` pede de novo (resposta `semanal`, na virada da semana). A sala de amigos do BOSS
+// SEMANAL (`criar {semanal: true}` ou `salaSemanal {valor}` do dono) é CO-OP de 2 a 4: o modo segue o
+// tamanho (coop com 2, coop4 com 3–4) e a sala mostra `semanal` (a semana fica fixa enquanto a
+// partida roda). Na party, o host manda `party {acao: 'modo', modo: 'coop4', semanal: true}`. A
+// partida nasce marcada com a semana (server/partidas.js: o troféu exclusivo, 0010).
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
@@ -114,8 +122,9 @@ import { METRICAS_NULA } from './metricas.js'
 import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
 import { nomeSeguro } from '../src/lib/contaRegras.js'
 import { arranjoValido } from '../src/lib/times2x2.js'
+import { infoSemanal } from '../src/lib/semanal.js'
 
-export const PROTOCOLO = 14
+export const PROTOCOLO = 15
 export const PORTA_DESCOBERTA = 47777
 // Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
 // aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")
@@ -307,7 +316,8 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
     emPartida: sala.emPartida,
     casual: Boolean(sala.casual),
     partidaId: sala.partidaId ?? null,
-    max: maxDoModo(sala.modo),
+    max: maxDaSala(sala),
+    semanal: semanalDaSala(sala),
     dono: sala.dono,
     eleicao: Boolean(sala.eleicao),
     eleito: sala.eleito ?? null,
@@ -321,7 +331,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
     nome: sala.nome,
     host: clientes.get(sala.host)?.nome ?? '?',
     jogadores: sala.membros.size,
-    max: maxDoModo(sala.modo),
+    max: maxDaSala(sala),
     modo: sala.modo,
     emPartida: sala.emPartida,
   })
@@ -339,7 +349,15 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
     if (maxDoModo(sala.modo) > 2) return ms
     return [...ms.filter((c) => c.id === sala.host), ...ms.filter((c) => c.id !== sala.host)]
   }
-  const cheia = (sala) => sala.membros.size >= maxDoModo(sala.modo)
+  // a sala do boss semanal aceita até 4 (o modo acompanha o tamanho: ajustarSemanal)
+  const maxDaSala = (sala) => (sala.semanal && !sala.party ? MAX_MEMBROS : maxDoModo(sala.modo))
+  const cheia = (sala) => sala.membros.size >= maxDaSala(sala)
+  // BOSS SEMANAL: coop com 2, coop4 com 3 ou 4 (fora da partida e da party)
+  const ajustarSemanal = (sala) => {
+    if (!sala.semanal || sala.emPartida || sala.party) return
+    sala.modo = sala.membros.size >= 3 ? 'coop4' : 'coop'
+  }
+  const semanalDaSala = (sala) => (sala.semanal ? (sala.semanalFixo ?? infoSemanal(agora())) : null)
   // a menor vaga livre (o host é sempre a 0)
   const vagaLivre = (sala) => {
     const usadas = new Set(membrosDaSala(sala).map((c) => c.vaga))
@@ -353,6 +371,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
   }
 
   const avisarSala = (sala) => {
+    ajustarSemanal(sala)
     const msg = { t: 'sala', sala: publica(sala) }
     for (const id of sala.membros) enviar(clientes.get(id), msg)
   }
@@ -367,7 +386,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
     if (!tirado) partidas.saiu(cliente, sala, saiuEm) // no meio da partida = abandono (server/partidas.js)
     sala.membros.delete(cliente.id)
     // party: com menos de 3, ou sem o host da party, ela acaba (a sala segue, no lobby normal)
-    if (sala.party && (sala.membros.size < 3 || cliente.id === sala.host)) sala.party = null
+    if (sala.party && (sala.membros.size < 3 || cliente.id === sala.host)) { sala.party = null; sala.semanal = false }
     atualizarStatus(cliente)
     // sala casual (JOGAR RÁPIDO): sem o oponente não tem o que fazer nela. O dono saindo
     // fecha a sala; o host da partida saindo no meio dela também (a partida morre com ele)
@@ -664,6 +683,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       online,
       ice,
       conta: c.perfil,
+      semanal: infoSemanal(agora()),
       retomada: darChave(c),
       ...(negada && { retomadaNegada: negada }),
       ...(tentouConta && !c.usuario && { contaInvalida: true }),
@@ -750,6 +770,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       online,
       ice,
       conta: velho.perfil,
+      semanal: infoSemanal(agora()),
       retomada: darChave(velho),
       retomado: true,
     })
@@ -819,8 +840,11 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       sala.esperaInicio?.() // a casual começou: o prazo para começar acabou
       sala.esperaInicio = null
     }
+    // BOSS SEMANAL: a semana da partida é a do relógio daqui agora (fica fixa até ela acabar)
+    if (sala.emPartida && !antes) sala.semanalFixo = sala.semanal ? infoSemanal(agora()) : null
     if (sala.emPartida && !antes) partidas.iniciar(sala, membrosDaPartida(sala))
     else if (!sala.emPartida && antes) partidas.encerrou(sala)
+    if (!sala.emPartida) sala.semanalFixo = null
     if (!sala.emPartida) {
       for (const id of sala.membros) if (id !== sala.dono) clientes.get(id).pronto = false
       compactar(sala) // alguém saiu no meio: as vagas voltam a ser 0..n-1
@@ -955,7 +979,24 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       enviar(c, { t: 'salas', salas: [...salas.values()].map(resumo), rede: salasRede() })
     },
     criar(c, m) {
-      criarSalaDe(c, m.nome)
+      const sala = criarSalaDe(c, m.nome)
+      if (sala && m.semanal === true) {
+        sala.semanal = true
+        avisarSala(sala)
+      }
+    },
+    // BOSS SEMANAL: a semana de agora (o lobby pede de novo na virada)
+    semanalInfo(c) {
+      enviar(c, { t: 'semanal', ...infoSemanal(agora()) })
+    },
+    // (dono, no lobby) a sala vira (ou deixa de ser) a do boss semanal: CO-OP de 2 a 4
+    salaSemanal(c, m) {
+      const sala = salas.get(c.sala)
+      if (!sala || sala.dono !== c.id || sala.casual || sala.emPartida || sala.eleicao || sala.party) return
+      sala.semanal = m.valor === true
+      if (!sala.semanal && sala.membros.size > maxDoModo(sala.modo)) sala.modo = 'coop4'
+      for (const id of sala.membros) if (id !== sala.dono) clientes.get(id).pronto = false
+      avisarSala(sala)
     },
     // pela lista (m.sala, só na LAN) ou pelo código (m.codigo)
     entrar(c, m) {
@@ -983,6 +1024,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       // a sala tem mais gente do que o modo comporta: tire alguém antes (5A)
       if (sala.membros.size > maxDoModo(m.modo)) return enviar(c, { t: 'erro', msg: `esse modo é para até ${maxDoModo(m.modo)} jogadores: a sala tem ${sala.membros.size}` })
       sala.modo = m.modo
+      sala.semanal = false // escolher outro modo tira o boss semanal
       for (const id of sala.membros) if (id !== sala.dono) clientes.get(id).pronto = false // mudou o combinado: confirma de novo
       avisarSala(sala)
     },
@@ -1011,6 +1053,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       if (m.acao === 'fim') {
         if (c.id !== sala.host && c.id !== sala.dono) return
         sala.party = null
+        sala.semanal = false
         return avisarSala(sala)
       }
       if (c.id !== sala.host || sala.emPartida) return
@@ -1022,6 +1065,8 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
         const def = MODOS_SALA[m.modo]
         if (!def || def.max < 3 || sala.membros.size < def.min || sala.membros.size > def.max) return enviar(c, { t: 'erro', msg: 'esse modo não cabe na party agora' })
         sala.modo = m.modo
+        // BOSS SEMANAL na party: só no CO-OP (pula a votação do chefe)
+        sala.semanal = m.semanal === true && m.modo === 'coop4'
         return avisarSala(sala)
       }
     },
