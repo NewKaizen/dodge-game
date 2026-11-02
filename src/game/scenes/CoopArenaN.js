@@ -36,6 +36,8 @@ import HudCoopN from '../coop/HudCoopN.js'
 import { marcadorDaVaga, nomeNoCoracao } from '../coop/marcadores.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
 import { canal, emRede, meuLado, meuIndice, souHostDaRede, irParaCena, participantesDaPartida } from '../rede.js'
+import { ligarEscuridao } from '../coop/semanal/escuridao.js'
+import { ligarLadra } from '../coop/semanal/ladraCena.js'
 import { corDaVaga, textoDaVaga } from '../vagas.js'
 import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
@@ -227,6 +229,9 @@ export default class CoopArenaN extends Phaser.Scene {
       velocidadeMusica(1)
       if (window.coopArena === this) delete window.coopArena
     })
+    // BOSS SEMANAL: a caixa no escuro com pistas de som (Escuridão) e a mão da Ladra em cima dela
+    this.escuridao = this.defChefe.escuro ? ligarEscuridao(this, { quadro: this.quadro, meu: this.meu, jogadores: () => this.estado.jogadores }) : null
+    this.ladra = this.defChefe.ladra ? ligarLadra(this, { chefe: CHEFE, jogadores: () => this.estado.jogadores, chefeEstado: () => this.estado.chefe, alvoDe: (j) => PERSONAGEM[j] }) : null
     musica(this.defChefe.musica)
     this.cameras.main.fadeIn(300)
     this.atualizarHuds(false)

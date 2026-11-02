@@ -401,10 +401,16 @@ const ABAS = [
         descricao: (v) => `Troca as cores que importam no jogo (avisos de perigo, corações, balas do tema). ${TEXTO_DALTONISMO[v]}`,
       },
       {
+        id: 'pistasVisuais',
+        rotulo: 'PISTAS VISUAIS NO LUGAR DO SOM',
+        ...opcaoPref('pistasVisuais'),
+        descricao: 'BOSS SEMANAL · ESCURIDÃO: as balas ficam invisíveis e você desvia pelo som. LIGADO: setas piscam na borda da caixa na direção de cada bala (mais fortes quanto mais perto). Liga sozinho na luta se o volume dos efeitos estiver no 0.',
+      },
+      {
         id: 'restaurar',
         rotulo: 'RESTAURAR PADRÃO',
         tipo: 'acao',
-        fazer: () => ['reduzirMovimento', 'tremor', 'flashes', 'daltonismo'].forEach((k) => definirPref(k, PREFERENCIAS_PADRAO[k])),
+        fazer: () => ['reduzirMovimento', 'tremor', 'flashes', 'daltonismo', 'pistasVisuais'].forEach((k) => definirPref(k, PREFERENCIAS_PADRAO[k])),
         descricao: 'Animações e clarões normais, tremores normais e as cores originais.',
       },
     ],

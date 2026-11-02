@@ -180,6 +180,66 @@ export function somContinuo(scene, nome) {
   return controle
 }
 
+// BOSS SEMANAL · ESCURIDÃO (coop/semanal/escuridao.js): um bipe curto de PISTA no contexto de áudio
+// único, com panorâmica (-1..1), altura (Hz) e o timbre do tipo de ataque (coop/semanal/pistas.js):
+//   chiado (chuva: ruído filtrado) · zumbido (laser: serra) · tambor (bomba: grave que cai) ·
+//   sino (o resto: triângulo) · aliado (um aliado levou um acerto: duas notas descendo)
+// volume 0..1 em cima do slider de efeitos. false se não tocou (som desligado, efeitos no 0, sem áudio).
+export const volumeEfeitos = () => (ligado ? volumes.efeitos : 0)
+let ruido = null
+export function pistaSonora({ pan = 0, freq = 440, timbre = 'sino', volume = 0.5 } = {}) {
+  if (!ligado || volumes.efeitos <= 0) return false
+  const c = obterContexto()
+  if (!c) return false
+  const t = c.currentTime
+  const saida = c.createGain()
+  saida.gain.value = AUDIO.volume * volumes.efeitos * Math.max(0, Math.min(1, volume))
+  let destino = saida
+  if (c.createStereoPanner) {
+    const p = c.createStereoPanner()
+    p.pan.value = Math.max(-1, Math.min(1, pan))
+    saida.connect(p)
+    p.connect(c.destination)
+  } else saida.connect(c.destination)
+  const envelope = (dur, pico = 0.5) => {
+    const g = c.createGain()
+    g.gain.setValueAtTime(pico, t)
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur)
+    g.connect(destino)
+    return g
+  }
+  const oscilador = (tipo, f0, f1, dur, pico, atraso = 0) => {
+    const o = c.createOscillator()
+    o.type = tipo
+    o.frequency.setValueAtTime(f0, t + atraso)
+    o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + atraso + dur)
+    o.connect(envelope(dur + atraso, pico))
+    o.start(t + atraso)
+    o.stop(t + atraso + dur + 0.02)
+  }
+  if (timbre === 'chiado') {
+    if (!ruido || ruido.sampleRate !== c.sampleRate) {
+      ruido = c.createBuffer(1, Math.round(c.sampleRate * 0.08), c.sampleRate)
+      const d = ruido.getChannelData(0)
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1
+    }
+    const fonte = c.createBufferSource()
+    fonte.buffer = ruido
+    const filtro = c.createBiquadFilter()
+    filtro.type = 'bandpass'
+    filtro.frequency.value = freq * 4
+    filtro.Q.value = 3
+    fonte.connect(filtro).connect(envelope(0.07, 0.9))
+    fonte.start(t)
+  } else if (timbre === 'zumbido') oscilador('sawtooth', freq, freq * 0.97, 0.08, 0.28)
+  else if (timbre === 'tambor') oscilador('sine', freq / 2, freq / 5, 0.14, 0.9)
+  else if (timbre === 'aliado') {
+    oscilador('square', 660, 640, 0.06, 0.2)
+    oscilador('square', 440, 420, 0.08, 0.2, 0.07)
+  } else oscilador('triangle', freq, freq, 0.09, 0.5)
+  return true
+}
+
 // O contexto de áudio do jogo inteiro (o Phaser usa o mesmo: config.js), para
 // a transmissão do modo LAN pegar todo o som num lugar só (lib/lan/audioTap.js)
 export function contextoAudio() {
