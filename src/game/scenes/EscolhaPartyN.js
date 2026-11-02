@@ -12,6 +12,8 @@ import { montarAvisos } from '../conta/avisos.js'
 import { corDaVaga, textoDaVaga } from '../vagas.js'
 import { criarParty, avisoRepetido } from '../coop/partyN.js'
 import { desenharForma, formaDaVaga, nomeNoCoracao } from '../coop/marcadores.js'
+import { CHEFES } from '../coop/chefes/index.js'
+import { partyAtiva, vigiarParty } from '../party/cliente.js'
 
 // Area da grade de personagens e do painel de detalhes (px)
 const GRADE = { topo: 70, base: 262, esquerda: 40, direita: LARGURA - 40, espaco: 10, larguraMax: 188, alturaMax: 180 }
@@ -55,7 +57,11 @@ export default class EscolhaPartyN extends Phaser.Scene {
   }
 
   // todos escolheram: a próxima tela, nos dois PCs (o CO-OP vai para a escolha do chefe)
+  // na party o chefe já foi votado (PartyVoto): pula a Selecao e vai ao nível (o host escolhe; o cursor
+  // começa no último usado)
   irParaLuta(lista) {
+    const chefe = this.sys.settings.data?.chefe
+    if (partyAtiva() && CHEFES[chefe]) return irParaCena(this, 'Dificuldade', { chefe, party: lista, nivel: this.registry.get('nivel') })
     irParaCena(this, 'Selecao', { party: lista, chefe: this.registry.get('chefe') })
   }
 
@@ -88,6 +94,7 @@ export default class EscolhaPartyN extends Phaser.Scene {
     const anterior = this.ultimaParty()
     this.cursorDe[this.meu] = Math.max(0, this.ids.indexOf(anterior[this.meu])) || this.meu % this.ids.length
     this.ligarRede()
+    vigiarParty(this)
     this.atualizarTela()
     musica('selecao')
     this.cameras.main.fadeIn(250)

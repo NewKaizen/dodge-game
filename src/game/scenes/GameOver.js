@@ -9,6 +9,7 @@ import { CORES, FONTE, LARGURA, ALTURA, TEXTO, NIVEIS } from '../constants.js'
 import { tremerCamera } from '../effects/shake.js'
 import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
 import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
+import { partyAtiva, destinoDoFim } from '../party/cliente.js'
 import { prepararXpCoop, mostrarPainelXp } from '../conta/painelXp.js'
 import { partyDe } from '../data/batalha.js'
 
@@ -251,7 +252,7 @@ export default class GameOver extends Phaser.Scene {
     this.cameras.main.fadeOut(300, 0, 0, 0)
     // convidado em rede: pede ao host, que traz os dois (a cena Lan chega pelo canal)
     if (this.rede && !souHostDaRede()) return canal.enviar('voltarLobby', null, {})
-    this.time.delayedCall(320, () => (this.rede ? irParaCena(this, 'Lan') : voltarAoLobbyOnline(this)))
+    this.time.delayedCall(320, () => (this.rede ? irParaCena(this, destinoDoFim()) : voltarAoLobbyOnline(this)))
   }
 
   // ---------- título ----------
@@ -441,7 +442,7 @@ export default class GameOver extends Phaser.Scene {
       return [icone, t]
     }
     const itens = this.naSala
-      ? opcao(LARGURA / 2 + 30, 'A', 'VOLTAR AO LOBBY', CORES.almas[0])
+      ? opcao(LARGURA / 2 + 30, 'A', partyAtiva() ? 'CONTINUAR' : 'VOLTAR AO LOBBY', CORES.almas[0])
       : [...opcao(LARGURA / 2 - 120, 'A', 'TENTAR DE NOVO', CORES.almas[0]), ...opcao(LARGURA / 2 + 160, 'B', 'ESCOLHER CHEFE', 0xb0b0b0)]
     for (const o of itens) {
       o.setAlpha(0)

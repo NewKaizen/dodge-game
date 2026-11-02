@@ -30,7 +30,9 @@ export default class PvpEscolhaN extends EscolhaPartyN {
   }
 
   irParaLuta(lista) {
-    const arena = ARENAS[Math.floor(Math.random() * ARENAS.length)].id // (só o host sorteia: vai nos dados da cena)
+    // a arena votada na party (PartyVoto) ou sorteada pelo host (vai nos dados da cena)
+    const votada = this.sys.settings.data?.arena
+    const arena = ARENAS.some((a) => a.id === votada) ? votada : ARENAS[Math.floor(Math.random() * ARENAS.length)].id
     if (this.dupla && lista.length === 4) return irParaCena(this, 'PvpArenaN', { personagens: lista, arena, semente: `2x2:${Date.now()}`, modo: '2x2', times: timesDoArranjo(get(lan).sala?.arranjo) })
     irParaCena(this, 'PvpArenaN', { personagens: lista, arena, semente: `ffa:${Date.now()}` })
   }

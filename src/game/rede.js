@@ -96,7 +96,7 @@ const ehBrave = () => typeof navigator !== 'undefined' && Boolean(navigator.brav
 export const DICA_BRAVE = 'no Brave, se travar: escudos desligados para este site'
 export const MSG_PRESO = 'não deu para sincronizar com o host: voltando ao lobby (comecem de novo)'
 // 2D: cenas que, na volta, só continuam (não voltam a rodada) e cenas por cima das outras
-const SO_CONTINUAM = ['Lan', 'PvpResultado', 'Vitoria', 'GameOver']
+const SO_CONTINUAM = ['Lan', 'PvpResultado', 'Vitoria', 'GameOver', 'PartyVoto', 'PartyFim']
 const POR_CIMA = ['Religando', 'Carregando', 'Pausa', 'Entrada']
 export const ESPERA_CENA_MS = 10_000 // convidado: a cena da retomada tem até isto para chegar
 
@@ -266,6 +266,7 @@ export function instalarRede(game) {
     // começam outra sessão, do 0 (lib/lan/canal.js). Sem isso o número de
     // antes continuava e o outro ficava esperando a mensagem 0 para sempre.
     // Trocou o host da partida (eleição, 5A): todas recomeçam
+    const novos = parceirosAntes.size ? [...outros].filter((id) => !parceirosAntes.has(id)) : []
     if (host !== hostAntes) canal.reiniciar()
     else for (const id of outros) if (!parceirosAntes.has(id)) canal.reiniciar(id)
     parceirosAntes = outros
@@ -274,6 +275,9 @@ export function instalarRede(game) {
     const caidosAgora = new Set((s.caidos ?? []).map((c) => c.id))
     if (ativa && souHostDaRede() && outros.size > 1 && !s.religando) for (const id of caidosAntes) if (!caidosAgora.has(id) && outros.has(id)) voltarVaga(game, id)
     caidosAntes = caidosAgora
+    // MODO PARTY: quem entrou na sala com a party aberta (a tela CONTINUAR/SAIR) recebe a cena atual
+    // do host e vota na próxima (docs/online.md "Modo Party")
+    if (ativa && souHostDaRede() && s.sala?.party) for (const id of novos) voltarVaga(game, id)
     // 2D: alguém caiu no meio da partida em rede
     // (fora da sala com o parceiro não tem o que esperar: solta antes de trocar de cena)
     const naSala = naSalaComParceiro(s)

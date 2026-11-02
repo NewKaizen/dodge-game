@@ -32,12 +32,15 @@ import {
   consumirCasual,
   consumirComeco,
   pedirPartida,
+  pedirParty,
+  encerrarParty,
   CPU_APOS_MS,
 } from '../../lib/lan/rede.js'
 import { jogo } from '../../lib/estado.js'
 import { timesDoArranjo, proximoArranjo, ROTULO_TIME } from '../../lib/times2x2.js'
 import { pingPartida, ligacoes, ROTAS, corDoPing } from '../../lib/lan/transmissao.js'
 import { encerrarRede, irParaCena } from '../rede.js'
+import { opcoesDeModo } from '../party/regras.js'
 import { criarAvatar } from '../conta/ui.js'
 import { corDaVaga, textoDaVaga } from '../vagas.js'
 
@@ -149,6 +152,8 @@ export default class Lan extends Phaser.Scene {
     const pararLigacoes = ligacoes.subscribe((l) => (this.pingsDiretos = l))
     // voltou de uma partida (o Menu mandou para cá): avisa que acabou
     if (this.s.papel === 'host' && this.s.sala?.emPartida) encerrarPartida()
+    // o host voltou ao lobby no meio da party (B na escolha de personagem, fim sem gente): a party acaba
+    if (this.s.papel === 'host' && this.s.sala?.party) encerrarParty()
     // convidado: o host começar uma partida é avisado no update (só a
     // virada conta: na volta de uma partida a sala ainda pode estar marcada)
     this.convidadoComecou = this.convidadoEmPartida()
@@ -303,6 +308,8 @@ export default class Lan extends Phaser.Scene {
           ...(casual ? [] : [{ id: 'modo', tipo: 'modo', acao: () => this.trocarModo(1) }]),
           ...(s.sala.modo === '2x2' && !casual ? [{ id: 'times', tipo: 'times', rotulo: 'TROCAR TIME', acao: () => this.trocarTimes() }] : []),
           { id: 'comecar', rotulo: 'COMEÇAR PARTIDA', ativo: !this.motivoSemComeco(), acao: () => this.comecar() },
+          // MODO PARTY (3 ou 4): votação do modo e do mapa a cada partida (docs/online.md "Modo Party")
+          ...(!casual && (MODOS[s.sala.modo]?.max ?? 2) > 2 ? [{ id: 'party', rotulo: 'COMEÇAR PARTY', ativo: !this.motivoSemParty(), acao: () => this.comecarParty() }] : []),
           { id: 'chat', rotulo: 'CONVERSAR', acao: () => this.digitar('chat') },
           ...(s.online && s.sala.codigo ? [{ id: 'link', rotulo: 'COPIAR LINK DA SALA', acao: () => this.copiarLink() }] : []),
           ...(alvo && !casual ? [{ id: 'expulsar', tipo: convidados.length > 1 ? 'tirar' : undefined, rotulo: convidados.length > 1 ? `TIRAR ◀ ${alvo.nome} ▶` : `TIRAR ${alvo.nome}`, acao: () => expulsar(alvo.id) }] : []),
@@ -343,6 +350,17 @@ export default class Lan extends Phaser.Scene {
     if (modo.emBreve) return `${modo.rotulo}: em breve`
     if (n < modo.min) return n < 2 ? 'falta o convidado' : `${modo.rotulo} precisa de ${modo.min} jogadores`
     if (sala.membros.some((m) => !m.dono && !m.pronto)) return n > 2 ? 'esperando todos ficarem prontos' : 'esperando o convidado ficar pronto'
+    return ''
+  }
+
+  // por que o COMEÇAR PARTY está apagado ('' = pode começar)
+  motivoSemParty() {
+    const sala = this.s.sala
+    const n = sala.membros.length
+    if (sala.eleicao || this.infoComeco) return 'escolhendo o host da partida…'
+    if (sala.party) return 'a party já começou'
+    if (n < 3) return 'a party precisa de 3 ou 4 jogadores'
+    if (sala.membros.some((m) => !m.dono && !m.pronto)) return 'esperando todos ficarem prontos'
     return ''
   }
 
@@ -651,7 +669,7 @@ export default class Lan extends Phaser.Scene {
     // ações (esquerda)
     const xOp = 40
     const yOp = 236
-    const passoOp = itens.length > 6 ? 24 : itens.length > 5 ? 26 : 30 // com o COPIAR LINK a lista do host tem 6 (7 com o TROCAR TIME do 2x2)
+    const passoOp = itens.length > 7 ? 22 : itens.length > 6 ? 24 : itens.length > 5 ? 26 : 30 // com o COPIAR LINK a lista do host tem 6 (7 com o TROCAR TIME do 2x2)
     itens.forEach((it, k) => {
       const y = yOp + k * passoOp
       const ativo = it.ativo !== false
@@ -673,11 +691,12 @@ export default class Lan extends Phaser.Scene {
         this.dinamicos.push({ tipo: 'campo', obj: campo, campo: 'chat', prefixo: '> ' })
         return
       }
-      const cor = it.id === 'comecar' || it.id === 'pronto' ? (ativo ? COR.ok : COR.apagado) : ativo ? TEXTO.normal : COR.apagado
+      const cor = it.id === 'comecar' || it.id === 'pronto' || it.id === 'party' ? (ativo ? COR.ok : COR.apagado) : ativo ? TEXTO.normal : COR.apagado
       t(xOp + 6, y, it.rotulo, 15, cor).setOrigin(0, 0.5)
     })
     const yNota = yOp + itens.length * passoOp + 4
-    if (!dono) t(xOp + 6, yNota, `MODO: ${modo.rotulo}${modo.emBreve ? ' (em breve)' : ''}  (o dono escolhe)`, 12, modo.emBreve ? COR.apagado : modo.cor).setOrigin(0, 0.5)
+    if (!dono && sala.party) t(xOp + 6, yNota, 'PARTY EM ANDAMENTO: você entra na próxima votação', 11, COR.rapido, { strokeThickness: 0 }).setOrigin(0, 0.5)
+    else if (!dono) t(xOp + 6, yNota, `MODO: ${modo.rotulo}${modo.emBreve ? ' (em breve)' : ''}  (o dono escolhe)`, 12, modo.emBreve ? COR.apagado : modo.cor).setOrigin(0, 0.5)
     else if (!itens.find((it) => it.id === 'comecar').ativo) t(xOp + 6, yNota, this.motivoSemComeco(), 11, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
     // os modos maiores ainda não existem: aparecem como "em breve"
     if (dono && !sala.casual && Object.values(MODOS).some((x) => x.emBreve)) {
@@ -867,8 +886,16 @@ export default class Lan extends Phaser.Scene {
     this.infoComeco = { desde: Date.now() }
   }
 
+  // (dono) COMEÇAR PARTY: a mesma eleição; o eleito leva todos à votação do modo (abrirPartida)
+  comecarParty() {
+    if (!this.s.sala || this.motivoSemParty()) return
+    pedirParty()
+    this.infoComeco = { desde: Date.now() }
+  }
+
   // (host da partida) marca a partida e leva todos à primeira tela do modo
   abrirPartida() {
+    if (this.s.sala?.party) return this.abrirParty()
     const modo = MODOS[this.s.sala.modo] ?? MODOS.pvp
     if (!modo.cena) return
     this.infoComeco = null
@@ -882,6 +909,19 @@ export default class Lan extends Phaser.Scene {
       // create desmarca a partida)
       if ((this.s.sala?.membros.length ?? 0) < 2) return this.scene.restart()
       irParaCena(this, modo.cena)
+    })
+  }
+
+  // (host da party) a votação do modo abre em todos; a partida só é marcada depois da do mapa
+  abrirParty() {
+    this.infoComeco = null
+    this.comecando = true
+    this.valendo(COR.rapido)
+    this.time.delayedCall(560, () => {
+      const n = this.s.sala?.membros.length ?? 0
+      const opcoes = opcoesDeModo(n)
+      if (!opcoes.length || !this.s.sala?.party) return this.scene.restart()
+      irParaCena(this, 'PartyVoto', { fase: 'modo', opcoes, id: `v${Date.now()}` })
     })
   }
 
@@ -968,7 +1008,7 @@ export default class Lan extends Phaser.Scene {
       this.abrirPartida()
     }
     // a eleição acabou (o host é outro, ou não começou): some o "medindo"
-    if (this.infoComeco && !s.sala?.eleicao && (s.sala?.emPartida || Date.now() - this.infoComeco.desde > 4000)) this.infoComeco = null
+    if (this.infoComeco && !s.sala?.eleicao && (s.sala?.emPartida || s.sala?.party || Date.now() - this.infoComeco.desde > 4000)) this.infoComeco = null
 
     this.redesenhar()
     for (const d of this.dinamicos) {

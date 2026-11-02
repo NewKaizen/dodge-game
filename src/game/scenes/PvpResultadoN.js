@@ -6,6 +6,7 @@ import { tocar, musica } from '../audio.js'
 import { FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 import { get } from 'svelte/store'
 import { canal, emRede, meuIndice, meuLado, souHostDaRede, irParaCena, participantesDaPartida } from '../rede.js'
+import { partyAtiva, destinoDoFim } from '../party/cliente.js'
 import { iniciarPartida, encerrarPartida, mudarTimes, lan } from '../../lib/lan/rede.js'
 import { timesDoArranjo, proximoArranjo, ROTULO_TIME } from '../../lib/times2x2.js'
 import { corDaVaga, textoDaVaga } from '../vagas.js'
@@ -48,6 +49,7 @@ const estadoInicial = () => ({
   liberado: false,
   saindo: false,
   aceite: null,
+  party: false,
   opcao: 0,
   desligar: [],
   ultimoSegundo: null,
@@ -63,7 +65,8 @@ export default class PvpResultadoN extends Phaser.Scene {
     if (!emRede() || !Array.isArray(dados.jogadores)) return this.scene.start('Lan')
     this.dados = dados
     this.dupla = dados.modo === '2x2'
-    this.listaOpcoes = this.dupla ? OPCOES_2X2 : OPCOES_N
+    this.party = partyAtiva() // na party o fim é só CONTINUAR (a tela PartyFim decide quem segue)
+    this.listaOpcoes = this.party ? ['lobby'] : this.dupla ? OPCOES_2X2 : OPCOES_N
     this.n = dados.jogadores.length
     this.meu = meuIndice()
     this.souHost = souHostDaRede()
@@ -150,7 +153,7 @@ export default class PvpResultadoN extends Phaser.Scene {
   montarOpcoes() {
     const y = ALTURA - 24
     const estilo = { fontFamily: FONTE, fontSize: '15px', color: TEXTO.normal, stroke: '#000000', strokeThickness: 3 }
-    this.opcoes = this.listaOpcoes.map((id) => this.add.text(0, y, ROTULO[id], estilo).setOrigin(0.5).setAlpha(0))
+    this.opcoes = this.listaOpcoes.map((id) => this.add.text(0, y, this.party ? 'CONTINUAR' : ROTULO[id], estilo).setOrigin(0.5).setAlpha(0))
     const folga = this.dupla ? 30 : 46
     const total = this.opcoes.reduce((s, o) => s + o.width, 0) + folga * (this.opcoes.length - 1)
     let x = LARGURA / 2 - total / 2
@@ -245,13 +248,13 @@ export default class PvpResultadoN extends Phaser.Scene {
     if (this.saindo) return
     if (!this.souHost) {
       tocar(this, 'cancelar')
-      this.dicaAceite.setText('voltando ao lobby...')
+      this.dicaAceite.setText(this.party ? 'continuando...' : 'voltando ao lobby...')
       return canal.enviar('voltarLobby', null, {})
     }
     this.saindo = true
     tocar(this, 'cancelar')
     this.cameras.main.fadeOut(250, 0, 0, 0)
-    this.time.delayedCall(260, () => irParaCena(this, 'Lan'))
+    this.time.delayedCall(260, () => irParaCena(this, destinoDoFim()))
   }
 
   atualizarOpcoes() {
