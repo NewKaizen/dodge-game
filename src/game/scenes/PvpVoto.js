@@ -430,7 +430,7 @@ export default class PvpVoto extends Phaser.Scene {
 }
 
 // Ícone de cada arena (vetorial, ~44 px), centrado em (x, y)
-function desenharIcone(g, id, x, y, cor) {
+export function desenharIcone(g, id, x, y, cor) {
   const escuro = 0x000000
   if (id === 'castelo') {
     g.fillStyle(cor, 1)
