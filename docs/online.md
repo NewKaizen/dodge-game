@@ -139,6 +139,92 @@ Convidado joga normalmente, só não tem amigos.
   `convite`, `conviteEnviado`, `conviteResposta`, `conviteFim`, `conviteNegado`,
   `amigosAtualizar` (servidor).
 
+## Modo Party (salas de amigos com 3 ou 4)
+
+Com 3 ou 4 na sala, o dono tem, além do COMEÇAR PARTIDA de sempre (o modo que ele escolheu), o **COMEÇAR PARTY**: a
+cada partida o grupo vota o modo e o mapa. A sala 1x1 e o JOGAR RÁPIDO não mudam. O dono continua com os poderes de
+sempre no lobby (modo, tirar, convidar, fechar).
+
+**O ciclo:** lobby → COMEÇAR PARTY → **votação do modo** → **votação do mapa** → partida (direto, sem tela de
+escolha de personagem) → resultado (A: **CONTINUAR**) → tela **CONTINUAR / SAIR DA PARTY** → votação do modo → …
+
+| Votação | Opções |
+| --- | --- |
+| modo | `2x2` (só com **exatamente 4** na sala), `ffa` (todos contra todos) e `coop4` (CO-OP), com 3 ou 4 |
+| mapa (PVP) | **3 arenas** sorteadas do mesmo conjunto da votação do 1x1 (`pvp/arenas.js`) |
+| mapa (CO-OP) | **3 chefes** sorteados de `ORDEM_CHEFES` (o chefe é o "mapa"); o nível é escolhido pelo host na tela de nível, com o cursor no último usado (o B dela não volta: o chefe foi votado) |
+
+O mapa (arena ou chefe) do jogo anterior não aparece entre os 3 se o conjunto tiver outros 3.
+
+**Regras do voto** (`src/game/party/regras.js`, testadas em `party/__tests__/regras.test.js`): cada um move o próprio
+coração (←/→) e vota com A; dá para **trocar o voto** até acabar. Embaixo de cada cartão aparece a forma + cor da vaga de
+quem votou nele (sem lista de nomes). **10 s** (a barra no topo); acaba antes se todos votaram. Quem não votou não conta;
+quem saiu da sala também não. Empate (ou ninguém votou): **roleta rápida** entre as empatadas, sorteada no host e mandada
+pronta (todos veem a mesma); com "reduzir animações" não gira, só destaca a vencedora.
+
+**Personagem escolhido na espera** (`party/escolha.js` + `party/seletor.js`, testado em `party/__tests__/escolha.test.js`):
+na tela CONTINUAR / SAIR e nas duas votações cada um tem, embaixo, uma faixa com um cartãozinho por jogador (forma +
+cor da vaga, retrato e nome do personagem; assim todos veem o pick de todos). O seu muda com **↑/↓** (a votação e o
+CONTINUAR usam ←/→ + A, então não há choque; a dica de baixo mostra "↑ ↓ personagem"). O pick **começa no último
+personagem usado por aquela vaga** (registry `party` / `localStorage` `dodge-party`; sem histórico, um por vaga) e vale
+para as próximas partidas até a pessoa trocar. Sem repetir: o host é a autoridade (o primeiro pedido a chegar leva o
+personagem; ↑/↓ já pula os que os outros têm). Quem entra na sala ganha o padrão; quem sai perde o pick. Depois do voto
+do mapa o host chama `montarInicio` e abre **direto** a `PvpArenaN` (2x2 / todos contra todos: `personagens` com os
+picks de todos, arena votada) ou a `Dificuldade` (CO-OP: `party` com os picks, chefe votado, nível pré-escolhido no
+último usado; o host pode mudar o nível e, se não mexer, a cena confirma sozinha em **3 s**). A escolha final passa por
+`resolver`: o pick válido (no elenco e que ninguém de vaga menor tenha) fica; senão vale o último usado da vaga; senão o
+personagem livre mais próximo na ordem da grade. O elenco é o mesmo em PVP e CO-OP, então a regra é a mesma nos três modos.
+`PvpEscolhaN` / `EscolhaPartyN` continuam só no COMEÇAR PARTIDA normal do lobby.
+
+**Host:** a eleição do 5A roda **uma vez**, no COMEÇAR PARTY, e o eleito é o host de todo o ciclo (votações, partidas e
+telas de fim). Ele conta os tempos, apura e troca as cenas (`irParaCena`); os outros só mandam o voto. O host marca a
+partida no servidor (`iniciarPartida`, o registro de XP com o modo votado) quando a votação do mapa acaba, e desmarca
+quando abre a tela CONTINUAR/SAIR.
+
+**Quem entra e quem sai:**
+
+- A sala só aceita gente nova (código, link, convite) durante a tela **CONTINUAR / SAIR** (`party.aberta`); fora dela o
+  aviso é "a sala está no meio de uma partida". Quem entra cai nessa tela (o host manda a cena atual para ele) e vota na
+  próxima votação de modo. No lobby, quem está numa sala com a party andando vê "PARTY EM ANDAMENTO".
+- A sala ficou com **2** (ou menos): a party acaba e todos voltam ao lobby normal com um aviso curto. No meio de uma
+  partida, a partida segue como sempre (o modo de N já trata quem sai) e o fim dela volta ao lobby.
+- Um modo que deixou de caber (ex.: `2x2` com 3) some da próxima votação; se alguém saiu entre a votação do modo e o fim
+  da do mapa e o modo não cabe mais, vota-se o modo de novo.
+- **O host da party sai:** a party acaba (o centro volta ao dono, todos ao lobby). No meio de uma partida, vale a regra
+  da 2D/5A de sempre (a sala fecha). O dono saindo fecha a sala, como sempre.
+
+**Tela CONTINUAR / SAIR DA PARTY** (`scenes/PartyFim.js`): **15 s**. CONTINUAR marca o ✓ no cartão; quando todos
+apertaram (ou o tempo acabou) a party segue. Quem não apertou nada **continua**; SAIR DA PARTY sai da sala na hora.
+
+**Mensagens** (servidor, `server/lan.js`, PROTOCOLO **14**):
+
+| Mensagem | Sentido | Dados |
+| --- | --- | --- |
+| `partida` | dono → servidor | `{ valor: true, eleicao: true, party: true }`: elege o host, **não** marca a partida |
+| `comecar` | servidor → host eleito | `{ salaId, party: true }`: o Lan dele abre a votação do modo |
+| `party` | host → servidor | `{ acao: 'modo', modo }` · `{ acao: 'aberta', valor }` (fora da partida) · `{ acao: 'fim' }` (o host ou o dono) |
+| `sala` | servidor → todos | `{ ..., party: { aberta } \| null }` |
+
+No canal da partida (estrela pelo host): `partyVoto {id, opcao}` (convidado → host), `partyVotos {id, votos, restante}`
+e `partyApuracao {id, vencedora, empatadas, voltas, votos, contagem}` (host → todos), `partyFimEscolha {escolha}` e
+`partyFimEstado {escolhas, restante}`; a escolha de personagem: `partyPick {id}` (convidado → host) e `partyPicks {picks: {vaga: id}}` (host → todos, a
+cada mudança e a cada segundo). Tudo pelo canal da partida: o PROTOCOLO do servidor não muda. As cenas são `PartyVoto` (as duas votações; dados `{ fase, modo?, opcoes, id }`) e
+`PartyFim`; no resultado de cada modo (PvpResultadoN, Vitoria, GameOver) o A vira **CONTINUAR** e leva à `PartyFim`.
+
+Testando: `node --test src/game/party/__tests__/regras.test.js server/__tests__/party.test.js`. No navegador (dev), com 4
+abas na mesma sala de 3–4: o dono aperta COMEÇAR PARTY; `window.partyVoto.votar(id)` / `estadoDebug()` e
+`window.partyFim.escolher('continuar' | 'sair')`; `window.partySemente = 'x'` (no host) fixa o sorteio do empate.
+
+## Boss semanal (Fase 4E)
+
+Toda segunda 00:00 de São Paulo entra um chefe novo (a semana vem do relógio do servidor). O cartão **BOSS
+SEMANAL** fica na tela ONLINE (à direita do JOGAR) e o boss também é uma opção da votação do Modo Party (só
+CO-OP). Sala do boss: CO-OP de 2 a 4. Vencer dá o **troféu exclusivo da semana** (uma vez por conta), pela mesma
+validação do XP do CO-OP (host decide + maioria, 60 s e 2 rodadas, convidado nada), migration
+`0010_boss_semanal.sql`. PROTOCOLO **15**: `bemvindo.semanal`, `semanalInfo`/`semanal`, `criar {semanal}`,
+`salaSemanal {valor}`, `party {acao: 'modo', semanal}`, `sala.semanal`, `resultado.semana` e
+`recompensa.trofeu`. Tudo em [boss-semanal.md](boss-semanal.md).
+
 ## Jogar Rápido (fila casual de PVP 1x1)
 
 Menu → **ONLINE** → **JOGAR RÁPIDO** (a primeira opção). Vale para quem tem

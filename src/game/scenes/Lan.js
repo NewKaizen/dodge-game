@@ -32,12 +32,20 @@ import {
   consumirCasual,
   consumirComeco,
   pedirPartida,
+  pedirParty,
+  encerrarParty,
+  mudarSemanal,
+  pedirSemanal,
   CPU_APOS_MS,
 } from '../../lib/lan/rede.js'
+import { textoRestante } from '../../lib/semanal.js'
+import { CHEFES } from '../coop/chefes/index.js'
+import { ESCALA } from '../arte/texturas.js'
 import { jogo } from '../../lib/estado.js'
 import { timesDoArranjo, proximoArranjo, ROTULO_TIME } from '../../lib/times2x2.js'
 import { pingPartida, ligacoes, ROTAS, corDoPing } from '../../lib/lan/transmissao.js'
 import { encerrarRede, irParaCena } from '../rede.js'
+import { opcoesDeModo } from '../party/regras.js'
 import { criarAvatar } from '../conta/ui.js'
 import { corDaVaga, textoDaVaga } from '../vagas.js'
 
@@ -72,6 +80,10 @@ import { corDaVaga, textoDaVaga } from '../vagas.js'
 // ONLINE, fora de sala: JOGAR RÁPIDO, criar sala, entrar com código e, embaixo, os atalhos
 // AMIGOS · PERFIL · COLEÇÃO (cenas Amigos, Perfil e Colecao; B volta para cá). Vindo do
 // JOGAR RÁPIDO do menu inicial (init { rapido: true }), entra direto na fila ao conectar.
+// BOSS SEMANAL (docs/boss-semanal.md): o cartão à direita do JOGAR (o chefe da semana, a mecânica, quanto
+// falta para a troca na segunda 00:00 de São Paulo e o troféu, com cadeado ou ✓). A cria a sala do boss
+// (CO-OP de 2 a 4, só online: o troféu é validado pelo servidor). Na sala, o MODO do dono ganha a opção
+// BOSS SEMANAL. A semana e o tempo vêm do servidor (lan.semanal); na virada a tela pede de novo.
 const ATALHOS = [
   { id: 'amigos', rotulo: 'AMIGOS', cena: 'Amigos', dica: 'amigos, pedidos e convites' },
   { id: 'perfil', rotulo: 'PERFIL', cena: 'Perfil', dica: 'nome, avatar, foto, XP e nível' },
@@ -90,6 +102,7 @@ const MODOS = {
 // no dev os modos "em breve" podem ser escolhidos (para testar a sala de N; a partida não começa)
 const ESCOLHE_EM_BREVE = Boolean(import.meta.env?.DEV)
 const LINHAS_SALAS = 5 // salas visíveis na lista
+const CARTAO_SEMANAL = { largura: 300 } // o cartão do BOSS SEMANAL, à direita do JOGAR (ONLINE)
 const LINHAS_CHAT = 9
 
 // A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
@@ -107,6 +120,7 @@ const estadoInicial = () => ({
   titulo: null,
   subtitulo: null,
   barras: null,
+  semanalPedidoEm: 0, // (a contagem chegou a zero) quando pediu a semana nova ao servidor
 })
 
 export default class Lan extends Phaser.Scene {
@@ -149,6 +163,8 @@ export default class Lan extends Phaser.Scene {
     const pararLigacoes = ligacoes.subscribe((l) => (this.pingsDiretos = l))
     // voltou de uma partida (o Menu mandou para cá): avisa que acabou
     if (this.s.papel === 'host' && this.s.sala?.emPartida) encerrarPartida()
+    // o host voltou ao lobby no meio da party (B na escolha de personagem, fim sem gente): a party acaba
+    if (this.s.papel === 'host' && this.s.sala?.party) encerrarParty()
     // convidado: o host começar uma partida é avisado no update (só a
     // virada conta: na volta de uma partida a sala ainda pode estar marcada)
     this.convidadoComecou = this.convidadoEmPartida()
@@ -278,6 +294,7 @@ export default class Lan extends Phaser.Scene {
         { id: 'rapido', rotulo: 'JOGAR RÁPIDO', ativo: s.fase === 'navegando', acao: () => entrarFila() },
         { id: 'criar', rotulo: 'JOGAR COM AMIGOS', ativo: s.fase === 'navegando', acao: () => criarSala() },
         { id: 'codigo', rotulo: 'ENTRAR COM CÓDIGO…', ativo: s.fase === 'navegando', acao: () => this.digitar('codigo') },
+        { id: 'semanal', tipo: 'semanal', rotulo: 'BOSS SEMANAL', ativo: s.fase === 'navegando' && Boolean(s.semanal), acao: () => criarSala({ semanal: true }) },
         ...ATALHOS.map((a) => ({ id: a.id, tipo: 'atalho', rotulo: a.rotulo, dica: a.dica, acao: () => this.abrirConta(a.cena) })),
       ]
     if (this.modoTela === 'salas') {
@@ -303,6 +320,8 @@ export default class Lan extends Phaser.Scene {
           ...(casual ? [] : [{ id: 'modo', tipo: 'modo', acao: () => this.trocarModo(1) }]),
           ...(s.sala.modo === '2x2' && !casual ? [{ id: 'times', tipo: 'times', rotulo: 'TROCAR TIME', acao: () => this.trocarTimes() }] : []),
           { id: 'comecar', rotulo: 'COMEÇAR PARTIDA', ativo: !this.motivoSemComeco(), acao: () => this.comecar() },
+          // MODO PARTY (3 ou 4): votação do modo e do mapa a cada partida (docs/online.md "Modo Party")
+          ...(!casual && (MODOS[s.sala.modo]?.max ?? 2) > 2 ? [{ id: 'party', rotulo: 'COMEÇAR PARTY', ativo: !this.motivoSemParty(), acao: () => this.comecarParty() }] : []),
           { id: 'chat', rotulo: 'CONVERSAR', acao: () => this.digitar('chat') },
           ...(s.online && s.sala.codigo ? [{ id: 'link', rotulo: 'COPIAR LINK DA SALA', acao: () => this.copiarLink() }] : []),
           ...(alvo && !casual ? [{ id: 'expulsar', tipo: convidados.length > 1 ? 'tirar' : undefined, rotulo: convidados.length > 1 ? `TIRAR ◀ ${alvo.nome} ▶` : `TIRAR ${alvo.nome}`, acao: () => expulsar(alvo.id) }] : []),
@@ -346,6 +365,17 @@ export default class Lan extends Phaser.Scene {
     return ''
   }
 
+  // por que o COMEÇAR PARTY está apagado ('' = pode começar)
+  motivoSemParty() {
+    const sala = this.s.sala
+    const n = sala.membros.length
+    if (sala.eleicao || this.infoComeco) return 'escolhendo o host da partida…'
+    if (sala.party) return 'a party já começou'
+    if (n < 3) return 'a party precisa de 3 ou 4 jogadores'
+    if (sala.membros.some((m) => !m.dono && !m.pronto)) return 'esperando todos ficarem prontos'
+    return ''
+  }
+
   // Remonta a tela quando algo que aparece nela mudou
   redesenhar() {
     const s = this.s
@@ -353,7 +383,9 @@ export default class Lan extends Phaser.Scene {
     const i = this.indiceSelecionado(itens)
     // na fila, o relógio (espera / contagem) também muda a tela
     const relogioFila = s.fila ? Math.floor((s.fila.estado === 'pareado' ? s.fila.expira - Date.now() : Date.now() - s.fila.inicio) / 1000) : null
-    const assinatura = JSON.stringify([this.modoTela, s.fase, s.online, s.eu.nome, s.eu.conta?.tag, s.salas, s.sala, s.chat.length, s.erro, s.enderecos, this.selId, this.digitando, s.ping, this.pingPartida, this.pingsDiretos, this.alvoTirar, this.infoComeco, s.fila, s.filaAviso, relogioFila, this.info, get(conta).estado, get(amigos).recebidos.length])
+    // o cartão do boss semanal conta o tempo até a troca (de segundo em segundo na última hora)
+    const relogioSemanal = s.semanal && this.modoTela === 'salas' && s.online ? textoRestante(s.semanal.ate - Date.now()) : null
+    const assinatura = JSON.stringify([relogioSemanal, s.semanal?.semana, get(conta).inventario?.size, this.modoTela, s.fase, s.online, s.eu.nome, s.eu.conta?.tag, s.salas, s.sala, s.chat.length, s.erro, s.enderecos, this.selId, this.digitando, s.ping, this.pingPartida, this.pingsDiretos, this.alvoTirar, this.infoComeco, s.fila, s.filaAviso, relogioFila, this.info, get(conta).estado, get(amigos).recebidos.length])
     if (assinatura === this.assinatura) return
     this.assinatura = assinatura
     this.view.removeAll(true)
@@ -458,21 +490,23 @@ export default class Lan extends Phaser.Scene {
     // jogar rápido / criar / entrar com código
     const topo = 136
     const passo = 46
-    this.add2(this.add.rectangle(20, topo - 6, LARGURA - 40, passo * 3 + 50, COR.painel, 0.82).setOrigin(0).setStrokeStyle(2, COR.temaNum, 0.6))
+    const larguraJogar = LARGURA - 40 - CARTAO_SEMANAL.largura - 10
+    this.add2(this.add.rectangle(20, topo - 6, larguraJogar, passo * 3 + 50, COR.painel, 0.82).setOrigin(0).setStrokeStyle(2, COR.temaNum, 0.6))
     t(36, topo + 8, 'JOGAR', 12, COR.tema).setOrigin(0, 0.5)
-    t(LARGURA - 36, topo + 8, s.fase === 'conectando' ? 'conectando…' : s.fase === 'navegando' ? 'conectado' : '', 11, '#9a9ab0').setOrigin(1, 0.5)
+    t(20 + larguraJogar - 16, topo + 8, s.fase === 'conectando' ? 'conectando…' : s.fase === 'navegando' ? 'conectado' : '', 11, '#9a9ab0').setOrigin(1, 0.5)
     const explica = {
       rapido: s.eu.conta ? 'PVP 1x1 contra alguém da fila' : 'PVP 1x1 contra alguém da fila · como convidado, sem XP',
       criar: 'cria a sala e dá um código (ou convide quem está em AMIGOS, logo abaixo)',
       codigo: 'digite o código que o seu amigo passou',
     }
+    this.cartaoSemanal(itens.find((it) => it.tipo === 'semanal'), LARGURA - 20 - CARTAO_SEMANAL.largura, topo - 6, passo * 3 + 50)
     itens
-      .filter((it) => it.tipo !== 'atalho')
+      .filter((it) => it.tipo !== 'atalho' && it.tipo !== 'semanal')
       .forEach((it, k) => {
         const y = topo + 44 + k * passo
         const ativo = it.ativo !== false
         if (it.id === this.selId) {
-          this.add2(this.add.rectangle(30, y - passo / 2 + 4, LARGURA - 60, passo - 8, COR.temaNum, 0.12).setOrigin(0))
+          this.add2(this.add.rectangle(30, y - passo / 2 + 4, larguraJogar - 20, passo - 8, COR.temaNum, 0.12).setOrigin(0))
           this.cursor(44, y)
         }
         if (it.id === 'codigo' && this.digitando?.campo === 'codigo') {
@@ -509,6 +543,47 @@ export default class Lan extends Phaser.Scene {
     t(LARGURA / 2, yInfo + 24, `o amigo abre  ${location.host}  no Chrome/Edge`, 12, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0.5)
     t(LARGURA / 2, yInfo + 42, 'PVP e CO-OP: cada um joga no próprio PC', 10, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
     this.rodape(this.digitando ? 'digite  ·  Enter: confirmar  ·  Esc: cancelar' : '↑↓ escolher     A: confirmar     B: voltar ao menu')
+  }
+
+  // BOSS SEMANAL: o cartão em destaque (o chefe, a mecânica, a contagem e o troféu da semana)
+  cartaoSemanal(it, x, y, altura) {
+    const s = this.s
+    const t = (...a) => this.add2(this.texto(...a))
+    const sel = it && it.id === this.selId
+    const L = CARTAO_SEMANAL.largura
+    const ouro = 0xffb060
+    this.add2(this.add.rectangle(x, y, L, altura, 0x140c08, 0.9).setOrigin(0).setStrokeStyle(sel ? 3 : 2, ouro, sel ? 1 : 0.7))
+    t(x + L / 2, y + 14, 'BOSS SEMANAL', 14, '#ffb060').setOrigin(0.5)
+    const info = s.semanal
+    if (!info) {
+      t(x + L / 2, y + altura / 2, s.fase === 'conectando' ? 'conectando…' : 'o servidor ainda não mandou a semana', 11, COR.apagado, { strokeThickness: 0, wordWrap: { width: L - 20 }, align: 'center' }).setOrigin(0.5)
+      return
+    }
+    const def = CHEFES[info.chefe]
+    if (def && this.textures.exists(def.sprite)) {
+      const img = this.add2(this.add.image(x + 42, y + 74, def.sprite).setScale(ESCALA.chefe * 0.72))
+      this.dinamicos.push({ tipo: 'flutuar', obj: img, y: y + 74 })
+    }
+    const xt = x + 86
+    t(xt, y + 42, info.nome.toUpperCase(), info.nome.length > 11 ? 13 : 16, TEXTO.normal).setOrigin(0, 0.5)
+    t(xt, y + 62, info.mecanica, 11, '#ffd8a8', { strokeThickness: 0, wordWrap: { width: L - 96 } }).setOrigin(0, 0.5)
+    t(xt, y + 84, `troca em ${textoRestante(info.ate - Date.now())}`, 11, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
+    // o troféu: ✓ se a conta já tem, cadeado se não
+    const tem = Boolean(get(conta).inventario?.has(info.trofeu.id))
+    const yT = y + 112
+    const g = this.add2(this.add.graphics())
+    if (tem) t(x + 16, yT, '✓', 16, COR.ok).setOrigin(0, 0.5)
+    else {
+      g.fillStyle(0xc8b8a0, 1).fillRect(x + 14, yT - 2, 12, 9)
+      g.lineStyle(2, 0xc8b8a0, 1).strokeRect(x + 16.5, yT - 8, 7, 7)
+    }
+    const trofeu = t(x + 34, yT, `troféu: ${info.trofeu.nome}`, 11, tem ? COR.ok : '#ffe0b0', { strokeThickness: 0 }).setOrigin(0, 0.5)
+    if (trofeu.width > L - 44) caber(trofeu, trofeu.text, L - 44)
+    t(x + L / 2, yT + 18, tem ? 'já é seu: dá para jogar de novo pelo XP' : s.eu.conta ? 'vença uma vez para levar (só esta semana)' : 'convidado: entre com o Google para levar', 10, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0.5)
+    if (sel) {
+      this.cursor(x + 12, y + 14)
+      t(x + L / 2, y + altura - 14, 'A: criar a sala (CO-OP de 2 a 4)', 11, COR.ok, { strokeThickness: 0 }).setOrigin(0.5)
+    } else t(x + L / 2, y + altura - 14, 'online · CO-OP de 2 a 4 jogadores', 10, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
   }
 
   // JOGAR RÁPIDO: procurando (com a espera), o oponente achado (aceitar com
@@ -568,7 +643,8 @@ export default class Lan extends Phaser.Scene {
     const sala = s.sala
     const t = (...a) => this.add2(this.texto(...a))
     const dono = this.souDono()
-    const modo = MODOS[sala.modo] ?? MODOS.pvp
+    // BOSS SEMANAL: a sala é CO-OP de 2 a 4 contra o chefe da semana (o modo segue o tamanho)
+    const modo = sala.semanal ? { rotulo: `BOSS SEMANAL · ${String(sala.semanal.nome).toUpperCase()}`, cor: '#ffb060', min: 2, max: 4 } : MODOS[sala.modo] ?? MODOS.pvp
 
     if (s.online && sala.codigo) {
       t(LARGURA / 2, 62, sala.nome, 16, TEXTO.normal, { strokeThickness: 4 }).setOrigin(0.5)
@@ -651,7 +727,7 @@ export default class Lan extends Phaser.Scene {
     // ações (esquerda)
     const xOp = 40
     const yOp = 236
-    const passoOp = itens.length > 6 ? 24 : itens.length > 5 ? 26 : 30 // com o COPIAR LINK a lista do host tem 6 (7 com o TROCAR TIME do 2x2)
+    const passoOp = itens.length > 7 ? 22 : itens.length > 6 ? 24 : itens.length > 5 ? 26 : 30 // com o COPIAR LINK a lista do host tem 6 (7 com o TROCAR TIME do 2x2)
     itens.forEach((it, k) => {
       const y = yOp + k * passoOp
       const ativo = it.ativo !== false
@@ -673,11 +749,12 @@ export default class Lan extends Phaser.Scene {
         this.dinamicos.push({ tipo: 'campo', obj: campo, campo: 'chat', prefixo: '> ' })
         return
       }
-      const cor = it.id === 'comecar' || it.id === 'pronto' ? (ativo ? COR.ok : COR.apagado) : ativo ? TEXTO.normal : COR.apagado
+      const cor = it.id === 'comecar' || it.id === 'pronto' || it.id === 'party' ? (ativo ? COR.ok : COR.apagado) : ativo ? TEXTO.normal : COR.apagado
       t(xOp + 6, y, it.rotulo, 15, cor).setOrigin(0, 0.5)
     })
     const yNota = yOp + itens.length * passoOp + 4
-    if (!dono) t(xOp + 6, yNota, `MODO: ${modo.rotulo}${modo.emBreve ? ' (em breve)' : ''}  (o dono escolhe)`, 12, modo.emBreve ? COR.apagado : modo.cor).setOrigin(0, 0.5)
+    if (!dono && sala.party) t(xOp + 6, yNota, 'PARTY EM ANDAMENTO: você entra na próxima votação', 11, COR.rapido, { strokeThickness: 0 }).setOrigin(0, 0.5)
+    else if (!dono) t(xOp + 6, yNota, `MODO: ${modo.rotulo}${modo.emBreve ? ' (em breve)' : ''}  (o dono escolhe)`, 12, modo.emBreve ? COR.apagado : modo.cor).setOrigin(0, 0.5)
     else if (!itens.find((it) => it.id === 'comecar').ativo) t(xOp + 6, yNota, this.motivoSemComeco(), 11, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0, 0.5)
     // os modos maiores ainda não existem: aparecem como "em breve"
     if (dono && !sala.casual && Object.values(MODOS).some((x) => x.emBreve)) {
@@ -781,9 +858,13 @@ export default class Lan extends Phaser.Scene {
     if (!this.souDono()) return
     const n = this.s.sala.membros.length
     const ids = Object.keys(MODOS).filter((id) => MODOS[id].max >= n && (ESCOLHE_EM_BREVE || !MODOS[id].emBreve || id === this.s.sala.modo))
+    // BOSS SEMANAL: mais uma opção do seletor (só online, com a semana do servidor; CO-OP de 2 a 4)
+    if (this.s.online && this.s.semanal && n <= 4 && !this.s.sala.casual) ids.push('semanal')
     if (ids.length < 2) return tocar(this, 'cancelar')
-    const i = Math.max(0, ids.indexOf(this.s.sala.modo))
-    mudarModo(ids[(i + passo + ids.length) % ids.length])
+    const i = Math.max(0, ids.indexOf(this.s.sala.semanal ? 'semanal' : this.s.sala.modo))
+    const novo = ids[(i + passo + ids.length) % ids.length]
+    if (novo === 'semanal') mudarSemanal(true)
+    else mudarModo(novo)
     tocar(this, 'mover')
   }
 
@@ -867,8 +948,16 @@ export default class Lan extends Phaser.Scene {
     this.infoComeco = { desde: Date.now() }
   }
 
+  // (dono) COMEÇAR PARTY: a mesma eleição; o eleito leva todos à votação do modo (abrirPartida)
+  comecarParty() {
+    if (!this.s.sala || this.motivoSemParty()) return
+    pedirParty()
+    this.infoComeco = { desde: Date.now() }
+  }
+
   // (host da partida) marca a partida e leva todos à primeira tela do modo
   abrirPartida() {
+    if (this.s.sala?.party) return this.abrirParty()
     const modo = MODOS[this.s.sala.modo] ?? MODOS.pvp
     if (!modo.cena) return
     this.infoComeco = null
@@ -882,6 +971,19 @@ export default class Lan extends Phaser.Scene {
       // create desmarca a partida)
       if ((this.s.sala?.membros.length ?? 0) < 2) return this.scene.restart()
       irParaCena(this, modo.cena)
+    })
+  }
+
+  // (host da party) a votação do modo abre em todos; a partida só é marcada depois da do mapa
+  abrirParty() {
+    this.infoComeco = null
+    this.comecando = true
+    this.valendo(COR.rapido)
+    this.time.delayedCall(560, () => {
+      const n = this.s.sala?.membros.length ?? 0
+      const opcoes = opcoesDeModo(n)
+      if (!opcoes.length || !this.s.sala?.party) return this.scene.restart()
+      irParaCena(this, 'PartyVoto', { fase: 'modo', opcoes, id: `v${Date.now()}` })
     })
   }
 
@@ -945,11 +1047,19 @@ export default class Lan extends Phaser.Scene {
         if ((d === 'esquerda' || d === 'direita') && this.selId === 'modo') this.trocarModo(d === 'direita' ? 1 : -1)
         if ((d === 'esquerda' || d === 'direita') && this.selId === 'expulsar') this.trocarAlvo(d === 'direita' ? 1 : -1)
         if ((d === 'esquerda' || d === 'direita') && ATALHOS.some((a) => a.id === this.selId)) this.moverAtalho(d === 'direita' ? 1 : -1)
+        // ONLINE: → do JOGAR vai ao cartão do BOSS SEMANAL, ← volta
+        if (this.modoTela === 'salas' && this.s.online && d === 'direita' && ['rapido', 'criar', 'codigo'].includes(this.selId)) this.mover(['rapido', 'criar', 'codigo'].length - ['rapido', 'criar', 'codigo'].indexOf(this.selId))
+        else if (this.modoTela === 'salas' && this.s.online && d === 'esquerda' && this.selId === 'semanal') this.mover(-2)
       }
     }
 
     this.acompanharComeco()
     this.entrarNaFilaDoMenu()
+    // BOSS SEMANAL: a semana virou (a contagem zerou): pede a nova ao servidor (no máximo a cada 5 s)
+    if (this.s.semanal && Date.now() >= this.s.semanal.ate && Date.now() - this.semanalPedidoEm > 5000 && this.s.fase !== 'fora') {
+      this.semanalPedidoEm = Date.now()
+      pedirSemanal()
+    }
 
     // JOGAR RÁPIDO: a sala casual nasceu com os dois; o host começa sozinho
     const s = this.s
@@ -968,11 +1078,12 @@ export default class Lan extends Phaser.Scene {
       this.abrirPartida()
     }
     // a eleição acabou (o host é outro, ou não começou): some o "medindo"
-    if (this.infoComeco && !s.sala?.eleicao && (s.sala?.emPartida || Date.now() - this.infoComeco.desde > 4000)) this.infoComeco = null
+    if (this.infoComeco && !s.sala?.eleicao && (s.sala?.emPartida || s.sala?.party || Date.now() - this.infoComeco.desde > 4000)) this.infoComeco = null
 
     this.redesenhar()
     for (const d of this.dinamicos) {
       if (d.tipo === 'cursor') d.obj.setX(d.x + Math.sin(time / 160) * 2)
+      if (d.tipo === 'flutuar') d.obj.setY(d.y + Math.sin(time / 420) * 3)
       if (d.tipo === 'pulso') d.obj.setScale((d.escala ?? 1.6) + 0.12 * Math.max(0, Math.sin(time / 260 + d.fase * 1.7)))
       if (d.tipo === 'pontos') d.obj.setText(`${d.base}${'.'.repeat(Math.floor(time / 400) % 4)}`)
       if (d.tipo === 'campo') d.obj.setText(`${d.prefixo ?? ''}${this.campoTexto(d.campo, '')}`)

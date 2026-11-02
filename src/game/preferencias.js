@@ -25,6 +25,8 @@
 //   vibracao          true/false  vibração (rumble) do controle físico quando o jogador leva um golpe ou cai (game/vibracao.js)
 //   vibracaoIntensidade  null (automática: 75%, ou 25% com tremor/animações reduzidos) ou 0.25 | 0.5 | 0.75 | 1
 //   buzzerJoystick    true/false  BUZZER do joystick serial em HP baixo, K.O., golpe de SUPER e vitória (game/buzzer.js)
+//   pistasVisuais     true/false  BOSS SEMANAL · ESCURIDÃO: setas na borda da caixa no lugar das pistas de som
+//                     (coop/semanal/escuridao.js; sugerido sozinho quando o volume dos efeitos está no 0)
 import { problemasDosBotoes, zonaMortaValida, ZONA_MORTA_PADRAO } from './gamepad.js'
 import { intensidadeValida } from './vibracao.js'
 
@@ -44,6 +46,7 @@ export const PREFERENCIAS_PADRAO = {
   vibracao: true,
   vibracaoIntensidade: null,
   buzzerJoystick: true,
+  pistasVisuais: false,
 }
 
 export const OPCOES = {

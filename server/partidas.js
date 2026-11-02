@@ -74,6 +74,7 @@ import { timesDoArranjo } from '../src/lib/times2x2.js'
 import crypto from 'node:crypto'
 import { agendarPadrao } from './fila.js'
 import { METRICAS_NULA } from './metricas.js'
+import { infoSemanal, ID_SEMANA } from '../src/lib/semanal.js'
 
 export const RELATO_JANELA_MS = 20_000
 export const ABANDONO_GRACA_MS = 3_000
@@ -136,6 +137,8 @@ export function criarRegistro(supabase) {
         })),
       }),
     conceder: async (id) => (await chamar('conceder_recompensa', { p_partida: id })) ?? [],
+    // BOSS SEMANAL (0010): o troféu exclusivo da semana, depois do XP (o banco confere tudo de novo)
+    concederTrofeu: async (id, t) => (await chamar('conceder_trofeu_semanal', { p_partida: id, p_semana: t.semana, p_item: t.id, p_tipo: t.tipo, p_nome: t.nome })) ?? [],
   }
 }
 
@@ -308,6 +311,20 @@ export function decidirN(p, agora) {
   })
 }
 
+// BOSS SEMANAL (docs/boss-semanal.md): os lados que levam o troféu da semana. A mesma validação do XP
+// do CO-OP (a decisão `d` já é a do host conferida pela maioria): partida marcada como semanal pelo
+// servidor (p.semanal, a semana do relógio dele quando a partida começou), decisão 'validada', duração
+// e rodadas mínimas, e o lado com conta, resultado 'vitoria' e o relato dizendo a MESMA semana.
+// Convidado, contestada, curta ou relato de outra semana: nada. O banco confere tudo de novo (0010).
+export const DURACAO_MINIMA_TROFEU_S = 60 // = duracao_minima_s() (0003)
+export const RODADAS_MINIMAS_TROFEU = 2 // = rodadas_minimas() (0003)
+export function ladosDoTrofeu(p, d) {
+  const semana = p.semanal?.semana
+  if (!semana || (p.modo !== 'coop' && p.modo !== 'coop4') || d?.validacao !== 'validada') return []
+  if ((d.duracaoS ?? 0) < DURACAO_MINIMA_TROFEU_S || (d.rodadas != null && d.rodadas < RODADAS_MINIMAS_TROFEU)) return []
+  return p.participantes.filter((x) => x.usuario && d.resultados[x.lado] === 'vitoria' && x.relato?.semana === semana).map((x) => x.lado)
+}
+
 // o que o cliente mandou, limpo (null = não serve). n: quantos lados a partida tem (modos de N)
 export function lerRelato(m, modo = 'pvp', n = 2) {
   if (!m || typeof m.partidaId !== 'string' || m.partidaId.length > 64) return null
@@ -317,7 +334,8 @@ export function lerRelato(m, modo = 'pvp', n = 2) {
     duracao: inteiro(Math.round(Number(m.duracao)), 86_400),
     personagem: typeof m.personagem === 'string' && PERSONAGEM.test(m.personagem) ? m.personagem : null,
   }
-  if (modo === 'coop' || modo === 'coop4') return typeof m.vitoria === 'boolean' ? { vitoria: m.vitoria, ...base } : null
+  // (BOSS SEMANAL: `semana` = a semana do chefe que este PC enfrentou; não muda o XP)
+  if (modo === 'coop' || modo === 'coop4') return typeof m.vitoria === 'boolean' ? { vitoria: m.vitoria, ...base, ...(typeof m.semana === 'string' && ID_SEMANA.test(m.semana) && { semana: m.semana }) } : null
   if (modo === 'ffa') {
     const c = m.colocacoes
     const ok = Array.isArray(c) && c.length === n && c.every((l) => Number.isInteger(l) && l >= 0 && l < n) && new Set(c).size === n
@@ -419,6 +437,8 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
       cancelar: null,
       decisao: null,
       gravada: null,
+      // BOSS SEMANAL: a sala pediu o chefe da semana; a semana é a do relógio do servidor AGORA
+      semanal: sala.semanal && (sala.modo === 'coop' || sala.modo === 'coop4') ? (sala.semanalFixo ?? infoSemanal(agora())) : null,
     }
     // a mesma conta em dois lados (duas abas): ninguém ganha nada
     // convidado numa partida com conta: a chave do limite diário (refConvidado, contra a 1ª conta)
@@ -555,6 +575,7 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
     } catch {
       linhas = await registro.conceder(p.id)
     }
+    const trofeus = await trofeusDaPartida(p, d)
     for (const x of comConta) {
       const l = linhas.find((y) => y.usuario === x.usuario)
       if (!l) {
@@ -570,8 +591,23 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
         nivelDepois: l.nivel_depois,
         itensNovos: Array.isArray(l.itens_novos) ? l.itens_novos : [],
         motivo: l.motivo,
+        ...(trofeus.has(x.usuario) && { trofeu: trofeus.get(x.usuario) }),
       })
     }
+  }
+
+  // BOSS SEMANAL: usuario -> { id, semana, novo } de quem levou o troféu (uma falha aqui não tira o XP)
+  async function trofeusDaPartida(p, d) {
+    const mapa = new Map()
+    const lados = ladosDoTrofeu(p, d)
+    if (!lados.length || !registro?.concederTrofeu) return mapa
+    try {
+      const linhas = await registro.concederTrofeu(p.id, p.semanal.trofeu)
+      for (const l of linhas) if (l?.usuario && lados.some((lado) => p.participantes[lado]?.usuario === l.usuario)) mapa.set(l.usuario, { id: l.item_id, semana: p.semanal.semana, novo: Boolean(l.novo) })
+    } catch (e) {
+      log(`[partidas] não deu para conceder o troféu semanal de ${p.id}: ${e.message}`)
+    }
+    return mapa
   }
 
   return {

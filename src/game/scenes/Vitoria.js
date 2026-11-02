@@ -12,6 +12,7 @@ import { flashTela, claraoCamera } from '../effects/flash.js'
 import { FONTE, LARGURA, ALTURA, CENTRO_X, TEXTO, NIVEIS } from '../constants.js'
 import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
 import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
+import { partyAtiva, destinoDoFim } from '../party/cliente.js'
 import { prepararXpCoop, mostrarPainelXp } from '../conta/painelXp.js'
 
 // Tela de vitória, em etapas com ritmo:
@@ -163,7 +164,7 @@ export default class Vitoria extends Phaser.Scene {
     this.cameras.main.fadeOut(250, 0, 0, 0)
     // convidado em rede: pede ao host, que traz os dois (a cena Lan chega pelo canal)
     if (this.rede && !souHostDaRede()) return canal.enviar('voltarLobby', null, {})
-    this.time.delayedCall(260, () => (this.rede ? irParaCena(this, 'Lan') : voltarAoLobbyOnline(this)))
+    this.time.delayedCall(260, () => (this.rede ? irParaCena(this, destinoDoFim()) : voltarAoLobbyOnline(this)))
   }
 
   // ---------- etapas ----------
@@ -488,7 +489,7 @@ export default class Vitoria extends Phaser.Scene {
     if (rapido) this.time.delayedCall(400, () => (this.liberado = true))
     else this.liberado = true
     mostrarPainelXp(this, this.xp, { y: 404 })
-    const opcoes = this.add.text(LARGURA / 2, ALTURA - 26, this.naSala ? 'A: voltar ao lobby' : 'A: lutar de novo     B: escolher chefe', estilo(16)).setOrigin(0.5).setDepth(10).setAlpha(0)
+    const opcoes = this.add.text(LARGURA / 2, ALTURA - 26, this.naSala ? (partyAtiva() ? 'A: continuar' : 'A: voltar ao lobby') : 'A: lutar de novo     B: escolher chefe', estilo(16)).setOrigin(0.5).setDepth(10).setAlpha(0)
     this.tweens.add({
       targets: opcoes,
       alpha: 1,

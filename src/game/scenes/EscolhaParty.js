@@ -9,6 +9,7 @@ import { perfilPvp, rotuloCarta } from '../pvp/perfil.js'
 import { SIMBOLOS } from '../pvp/cartas.js'
 import { claraoCamera } from '../effects/flash.js'
 import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
+import { salaSemanal } from '../../lib/lan/rede.js'
 import { montarAvisos } from '../conta/avisos.js'
 import { pedirP2, dicaDoP2 } from '../jogadoresLocais.js'
 
@@ -335,6 +336,8 @@ export default class EscolhaParty extends Phaser.Scene {
     // luta, para os dois cursores começarem no mesmo lugar; o convidado espera
     this.time.delayedCall(740, () => {
       if (!this.rede) irCarregando(this, 'Selecao', { party })
+      // BOSS SEMANAL: o chefe é o da semana (sem Selecao), direto para o nível
+      else if (souHostDaRede() && salaSemanal()) irParaCena(this, 'Dificuldade', { party, chefe: salaSemanal().chefe, nivel: this.registry.get('nivel') })
       else if (souHostDaRede()) irParaCena(this, 'Selecao', { party, chefe: this.registry.get('chefe') })
     })
   }

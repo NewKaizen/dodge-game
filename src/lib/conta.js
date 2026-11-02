@@ -34,7 +34,8 @@ let iniciando = null
 const ouvintes = new Set()
 
 const mudar = (parcial) => conta.update((s) => ({ ...s, ...parcial }))
-export const tokenConta = () => sessao?.access_token ?? null
+let tokenDev = null // (só no dev) a conta de teste de window.debugConta.fingir (server/contasFalsas.js)
+export const tokenConta = () => tokenDev ?? sessao?.access_token ?? null
 // cliente do Supabase (chave anon + sessão do usuário) para as funções do banco; null sem contas
 export const clienteSupabase = () => supabase
 export const contasDisponiveis = () => get(conta).estado !== 'indisponivel'
@@ -124,6 +125,25 @@ export async function carregarInventario() {
   if (!supabase || !sessao) return
   const r = await supabase.from('inventario').select('item_id')
   if (!r.error) mudar({ inventario: new Set((r.data ?? []).map((l) => l.item_id)) })
+}
+
+// BOSS SEMANAL: o servidor confirmou um troféu (recompensa.trofeu, lib/lan/rede.js): já entra na
+// Coleção daqui (o perfil relido traz o mesmo do banco)
+export function ganhouItem(id) {
+  if (typeof id !== 'string' || !id) return
+  mudar({ inventario: new Set([...(get(conta).inventario ?? []), id]) })
+}
+
+// (só no dev) entra com uma conta de teste do servidor de dev (DODGE_CONTAS_FALSAS=1): para ver o
+// XP e o troféu semanal chegando sem Supabase. window.debugConta.fingir({ id: '<uuid>', nome: 'ANA' })
+if (import.meta.env?.DEV && typeof window !== 'undefined') {
+  window.debugConta = {
+    fingir({ id, nome }) {
+      tokenDev = `falsa:${id}:${nome}`
+      mudar({ estado: 'logado', perfil: { id, tag: `${nome}#0001`, nome_exibicao: nome, avatar_tipo: 'padrao', avatar_id: null, avatar_url: null, titulo_equipado: null, moldura_equipada: null, verso_equipado: null, nivel: 1, xp: 0 }, estatisticas: ESTATISTICAS_ZERO, inventario: new Set(), erro: '' })
+      avisar()
+    },
+  }
 }
 
 // tipo: 'titulo' | 'moldura' | 'verso' | 'avatar'; itemId null tira (menos o avatar)

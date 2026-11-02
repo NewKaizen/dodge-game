@@ -7,6 +7,8 @@ import { abaVizinha, escondidas, janela, moverNaGrade } from '../conta/lista.js'
 import { conta, carregarInventario, equipar, entrarComGoogle } from '../../lib/conta.js'
 import { avatarDoPerfil } from '../../lib/contaRegras.js'
 import { CATALOGO, TIPOS_ITEM, corDaMoldura, progressoDoXp } from '../../lib/progresso.js'
+import { trofeuDoId, ehTrofeuSemanal, SEMANAIS } from '../../lib/semanal.js'
+import { lan } from '../../lib/lan/rede.js'
 
 // COLEÇÃO, dentro do jogo (antes era o painel Svelte por cima dele): os
 // cosméticos da trilha de níveis, o que a conta já tem e o que falta (com o
@@ -15,6 +17,10 @@ import { CATALOGO, TIPOS_ITEM, corDaMoldura, progressoDoXp } from '../../lib/pro
 // O banco confere se a conta tem o item (equipar, 0003_progresso.sql);
 // cosmético nunca muda nada na partida.
 //
+// TROFÉUS SEMANAIS (BOSS SEMANAL, docs/boss-semanal.md): os troféus exclusivos que a conta já ganhou
+// (um por semana, título/moldura/verso; equipam como os outros) e o da semana de agora, com cadeado
+// enquanto não ganhou (a semana vem do servidor: lan.semanal).
+//
 //   ↑↓←→ escolhe na grade (↑ no topo vai para as abas, ←→ troca de aba) · A equipa · B volta
 //   scene.start('Colecao', { pilha: [{ cena: 'Perfil' }] })
 const ABAS = [
@@ -22,6 +28,7 @@ const ABAS = [
   { tipo: 'titulo', rotulo: 'TÍTULOS' },
   { tipo: 'moldura', rotulo: 'MOLDURAS' },
   { tipo: 'verso', rotulo: 'VERSOS' },
+  { tipo: 'semanal', rotulo: 'TROFÉUS SEMANAIS' },
 ]
 const GRADE = { x: 24, y: 78, largura: 510, altura: 358, colunas: 4, linhas: 3, cel: { l: 120, a: 100 } }
 const DETALHE = { x: 544, y: 78, largura: 286, altura: 358 }
@@ -55,7 +62,16 @@ export default class Colecao extends CenaConta {
   // ---------- dados ----------
 
   itens() {
-    return CATALOGO.filter((i) => i.tipo === ABAS[this.aba].tipo)
+    return this.itensDe(ABAS[this.aba].tipo)
+  }
+
+  itensDe(tipo) {
+    if (tipo !== 'semanal') return CATALOGO.filter((i) => i.tipo === tipo)
+    // os ganhos (a semana mais nova primeiro) e o desta semana, se ainda não tem
+    const ganhos = [...(get(conta).inventario ?? [])].filter(ehTrofeuSemanal).map(trofeuDoId).filter(Boolean)
+    const atual = get(lan).semanal?.trofeu
+    const lista = atual && !ganhos.some((t) => t.id === atual.id) ? [atual, ...ganhos] : ganhos
+    return lista.sort((a, b) => (a.semana < b.semana ? 1 : -1))
   }
 
   possui(item) {
@@ -183,10 +199,11 @@ export default class Colecao extends CenaConta {
     ABAS.forEach((aba, i) => {
       const x = ABAS_UI.esquerda + i * (largura + ABAS_UI.folga)
       const ativa = i === this.aba
-      const doTipo = CATALOGO.filter((c) => c.tipo === aba.tipo)
+      const doTipo = this.itensDe(aba.tipo)
       g.fillStyle(0x0b0914, 0.94).fillRect(x, ABAS_UI.y - ABAS_UI.altura / 2, largura, ABAS_UI.altura)
       g.lineStyle(3, ativa ? 0xffe040 : 0x4a4a5c, 1).strokeRect(x + 1.5, ABAS_UI.y - ABAS_UI.altura / 2 + 1.5, largura - 3, ABAS_UI.altura - 3)
-      this.t(x + largura / 2, ABAS_UI.y, `${aba.rotulo}  ${doTipo.filter((c) => this.possui(c)).length}/${doTipo.length}`, 15, ativa ? '#ffe040' : COR.apagado).setOrigin(0.5)
+      const rotulo = `${aba.rotulo}  ${doTipo.filter((c) => this.possui(c)).length}/${doTipo.length}`
+      this.t(x + largura / 2, ABAS_UI.y, rotulo, rotulo.length > 14 ? 11 : 15, ativa ? (aba.tipo === 'semanal' ? '#ffb060' : '#ffe040') : COR.apagado).setOrigin(0.5)
       if (ativa && this.foco === 'abas') this.cursorEm(x + 16, ABAS_UI.y, 0.85)
     })
     seta(g, 24, ABAS_UI.y, 'esquerda', 6, 0xffe040)
@@ -230,7 +247,7 @@ export default class Colecao extends CenaConta {
         g.lineStyle(3, 0x9a9ab0, 1).strokeRect(lx - 5, ly - 10, 10, 10)
       }
       if (item.tipo !== 'titulo') caber(this.t(x, y + 22, item.nome, 12, tem ? COR.texto : COR.apagado).setOrigin(0.5), item.nome, cel.l - 14)
-      const estado = tem ? (this.equipado(item) ? 'EQUIPADO' : item.padrao ? 'padrão' : 'seu') : `nível ${item.nivel}`
+      const estado = tem ? (this.equipado(item) ? 'EQUIPADO' : item.padrao ? 'padrão' : 'seu') : item.exclusivo ? 'esta semana' : `nível ${item.nivel}`
       this.t(x, y + (item.tipo === 'titulo' ? 22 : 36), estado, 10, tem ? (this.equipado(item) ? COR.ok : COR.dica) : COR.aviso).setOrigin(0.5)
       if (sel) this.cursorEm(x - cel.l / 2 + 16, y - cel.a / 2 + 16, 0.7)
     })
@@ -252,13 +269,15 @@ export default class Colecao extends CenaConta {
     this.amostra(item, p, cx, d.y + (item.tipo === 'titulo' ? 140 : 96), 2.2)
     if (item.tipo !== 'titulo') caber(this.t(cx, d.y + 176, item.nome, 20, COR.texto, { strokeThickness: 4 }).setOrigin(0.5), item.nome, d.largura - 24)
     const tipo = { avatar: 'AVATAR', titulo: 'TÍTULO', moldura: 'MOLDURA', verso: 'VERSO DE CARTA' }[item.tipo]
-    this.t(cx, d.y + 200, tipo, 11, COR.dica).setOrigin(0.5)
+    this.t(cx, d.y + 200, item.exclusivo ? `${tipo} · TROFÉU SEMANAL ${item.semana}` : tipo, 11, item.exclusivo ? '#ffb060' : COR.dica).setOrigin(0.5)
     let estado
     if (this.equipado(item)) estado = { texto: item.tipo === 'titulo' ? 'EQUIPADO  ·  A tira o título' : 'EQUIPADO', cor: COR.ok }
     else if (tem) estado = { texto: 'A: EQUIPAR', cor: COR.gold }
+    else if (item.exclusivo) estado = { texto: `vença: ${SEMANAIS[item.chefe]?.nome ?? 'o boss semanal'}`, cor: COR.aviso }
     else estado = { texto: `libera no nível ${item.nivel}`, cor: COR.aviso }
     this.t(cx, d.y + 232, estado.texto, 14, estado.cor).setOrigin(0.5)
-    if (!tem) this.t(cx, d.y + 254, nivel >= item.nivel ? 'jogue uma partida para receber' : `faltam ${item.nivel - nivel} nível${item.nivel - nivel > 1 ? 'is' : ''}`, 11, COR.dica).setOrigin(0.5)
+    if (!tem && item.exclusivo) this.t(cx, d.y + 254, 'ONLINE · BOSS SEMANAL · só até domingo, nunca volta', 11, COR.dica).setOrigin(0.5)
+    else if (!tem) this.t(cx, d.y + 254, nivel >= item.nivel ? 'jogue uma partida para receber' : `faltam ${item.nivel - nivel} nível${item.nivel - nivel > 1 ? 'is' : ''}`, 11, COR.dica).setOrigin(0.5)
     if (item.tipo === 'verso') this.t(cx, d.y + 282, 'equipado, este verso aparece nas suas\ncartas nas partidas (online, o\noutro jogador também vê)', 10, COR.apagado, { align: 'center' }).setOrigin(0.5, 0)
     else this.t(cx, d.y + 290, 'cosméticos não mudam nada no jogo', 10, COR.apagado).setOrigin(0.5)
     const m = this.ocupado ? { texto: 'equipando…', cor: COR.aviso } : this.mensagem ?? (get(conta).inventario === null ? { texto: 'carregando o inventário…', cor: COR.dica } : null)

@@ -348,6 +348,9 @@ const GERADORES = {
   queen: sprite('queen'),
   jevil: sprite('jevil'),
   coronel: sprite('coronel'),
+  // BOSS SEMANAL (coop/chefes/escuridao.js, ladra.js)
+  escuridao: sprite('escuridao'),
+  ladra: sprite('ladra'),
   // colorida: a caminhonete usa cor 0xffffff na bala para não ser pintada pelo tema
   'bala-caminhonete': sprite('caminhonete'),
 

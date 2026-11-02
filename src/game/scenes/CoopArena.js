@@ -46,6 +46,9 @@ import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
 import { entrarNoJogo, voltarAoMenu, levouGolpe, venceu } from '../../lib/saida.js'
 import { fatores } from '../acessibilidade.js'
+import { ligarEscuridao } from '../coop/semanal/escuridao.js'
+import { salaSemanal } from '../../lib/lan/rede.js'
+import { ligarLadra } from '../coop/semanal/ladraCena.js'
 
 // CO-OP de cartas: os dois jogadores (ou 1 + CPU aliada) contra um chefe que
 // também joga cartas. Regras em coop/regras.js (docs/coop-cartas.md).
@@ -264,6 +267,14 @@ export default class CoopArena extends PvpArena {
       if (window.coopArena === this) delete window.coopArena
     })
 
+    // BOSS SEMANAL: a semana desta luta (a da sala, que o servidor fixou quando a partida começou; vai no
+    // relato do resultado, conta/painelXp.js). Fora da sala do boss (ou outro chefe): null
+    const semanal = this.rede ? salaSemanal() : null
+    this.registry.set('semanal', semanal && semanal.chefe === this.idChefe ? semanal.semana : null)
+    // BOSS SEMANAL: a caixa no escuro com pistas de som (Escuridão) e a mão da Ladra em cima dela
+    const meu = this.rede ? meuLado() : 0
+    this.escuridao = this.defChefe.escuro ? ligarEscuridao(this, { quadro: this.quadro, meu, jogadores: () => this.estado.jogadores }) : null
+    this.ladra = this.defChefe.ladra ? ligarLadra(this, { chefe: CHEFE, jogadores: () => this.estado.jogadores, chefeEstado: () => this.estado.chefe, alvoDe: (j) => PERSONAGEM[j] }) : null
     musica(this.defChefe.musica)
     this.cameras.main.fadeIn(300)
     this.partida()

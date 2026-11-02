@@ -16,7 +16,7 @@
 // sb.chamadas ficam expostos para o teste conferir. sb.falhar = { getUser: true,
 // upload: true, conceder_recompensa: true, ... } faz a operação devolver erro.
 
-import { xpDaPartida, nivelDoXp, itensAte, RESULTADOS_JOGADOS, CONVIDADOS_LIMITE_DIA, REPETICAO_LIMITE } from '../../src/lib/progresso.js'
+import { xpDaPartida, nivelDoXp, itensAte, RESULTADOS_JOGADOS, CONVIDADOS_LIMITE_DIA, REPETICAO_LIMITE, DURACAO_MINIMA_S, RODADAS_MINIMAS } from '../../src/lib/progresso.js'
 
 const erro = (message) => ({ message })
 
@@ -118,6 +118,25 @@ function rpcs(sb) {
       Object.assign(p, { estado: p_validacao, validacao: p_validacao, vencedor_lado: p_vencedor_lado, motivo_termino: p_motivo, duracao_s: p_duracao_s, rodadas: p_rodadas, encerrada_em: agora().toISOString() })
       return p_validacao
     },
+    // BOSS SEMANAL (0010): o espelho de conceder_trofeu_semanal
+    conceder_trofeu_semanal({ p_partida, p_semana, p_item, p_tipo, p_nome }) {
+      if (!/^[0-9]{4}-S[0-9]{2}$/.test(p_semana ?? '')) throw new Error('semana inválida')
+      if (!['titulo', 'moldura', 'verso'].includes(p_tipo) || p_item !== `${p_tipo}.semanal_${p_semana.replace('-S', '_')}`) throw new Error('troféu inválido')
+      const p = t.partidas.find((x) => x.id === p_partida)
+      if (!p) throw new Error('partida não existe')
+      if (!['coop', 'coop4'].includes(p.modo) || p.validacao !== 'validada' || !['validada', 'recompensada'].includes(p.estado) || (p.duracao_s ?? 0) < DURACAO_MINIMA_S || (p.rodadas != null && p.rodadas < RODADAS_MINIMAS)) return []
+      if (p.semana == null) p.semana = p_semana
+      else if (p.semana !== p_semana) return []
+      if (!t.catalogo_itens.some((c) => c.id === p_item)) t.catalogo_itens.push({ id: p_item, tipo: p_tipo, nome: String(p_nome || p_item).slice(0, 32), nivel_requerido: 1000, padrao: false, exclusivo: true, semana: p_semana })
+      const linhas = []
+      for (const pp of t.partida_participantes.filter((x) => x.partida_id === p_partida && x.user_id && x.resultado === 'vitoria' && x.relato?.semana === p_semana).sort((a, b) => (a.user_id < b.user_id ? -1 : 1))) {
+        const novo = !t.trofeus_semanais.some((x) => x.user_id === pp.user_id && x.semana === p_semana)
+        if (novo) t.trofeus_semanais.push({ user_id: pp.user_id, semana: p_semana, item_id: p_item, partida_id: p_partida })
+        if (!t.inventario.some((i) => i.user_id === pp.user_id && i.item_id === p_item)) t.inventario.push({ user_id: pp.user_id, item_id: p_item, obtido_em: agora().toISOString() })
+        linhas.push({ usuario: pp.user_id, item_id: p_item, novo })
+      }
+      return linhas
+    },
     conceder_recompensa({ p_partida }) {
       sb.concederChamadas++
       const p = t.partidas.find((x) => x.id === p_partida)
@@ -184,7 +203,7 @@ function rpcs(sb) {
 
 export function criarSupabaseFalso({ usuarios = {}, perfis = [], url = 'https://falso.supabase.co', agora = Date.now } = {}) {
   const sb = {
-    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [], denuncias: [] },
+    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [], denuncias: [], catalogo_itens: [], trofeus_semanais: [] },
     agora,
     diaDe: (ms) => Math.floor((ms - 3 * 3600_000) / 86_400_000), // dia em São Paulo (UTC−3)
     concederChamadas: 0,

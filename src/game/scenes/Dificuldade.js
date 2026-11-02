@@ -11,6 +11,8 @@ import { tremerCamera } from '../effects/shake.js'
 import { claraoCamera, alphaClarao } from '../effects/flash.js'
 import { partyDe } from '../data/batalha.js'
 import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
+import { partyAtiva } from '../party/cliente.js'
+import { salaSemanal } from '../../lib/lan/rede.js'
 
 // painel do chefe à esquerda (62..282) e as opções à direita (322..792): bloco centralizado em 854
 const OPCAO = { x: 557, largura: 470, altura: 100, y: 128, passo: 112 }
@@ -19,6 +21,7 @@ const CHEFE = { x: 172, y: 200 }
 // Transição de entrada na batalha (ms desde o A). Cada nível soma `porNivel`
 // ao clímax: DIFÍCIL segura a tensão um pouco mais e explode mais forte.
 const ENTRADA = { climax: 900, porNivel: 100, depois: 360 }
+const AUTO_PARTY_S = 3 // party: o host confirma o nível sozinho depois disto
 const CURSOR_MS = 300 // em rede: de quanto em quanto o host manda o cursor de novo
 
 // A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
@@ -103,12 +106,15 @@ export default class Dificuldade extends Phaser.Scene {
     })
 
     this.cursor = this.add.image(0, 0, 'coracao').setTint(CORES.almas[0]).setScale(1.8)
-    const dica = this.host ? '↑ ↓ escolher     A: lutar     B: voltar' : 'o host da partida está escolhendo o nível...'
+    // na party o nível chega pré-escolhido (o último usado) e o host confirma sozinho em 3 s (ainda dá para mudar)
+    const autoParty = this.host && this.rede && Boolean(this.party) && partyAtiva()
+    const dica = autoParty ? `↑ ↓ mudar     A: lutar agora     começa sozinho em ${AUTO_PARTY_S} s` : this.host ? '↑ ↓ escolher     A: lutar     B: voltar' : 'o host da partida está escolhendo o nível...'
     this.dica = texto(LARGURA / 2, ALTURA - 30, dica, 14, TEXTO.desabilitado, { strokeThickness: 0 })
 
     const ultimo = ORDEM_NIVEIS.indexOf(this.nivelInicial ?? this.registry.get('nivel'))
     this.selecionar(Math.max(0, ultimo), false)
     if (this.rede) this.ligarRede()
+    if (autoParty) this.time.delayedCall(AUTO_PARTY_S * 1000, () => this.confirmar())
     musica('selecao')
     this.cameras.main.fadeIn(250)
   }
@@ -283,7 +289,8 @@ export default class Dificuldade extends Phaser.Scene {
 
   voltar() {
     if (this.saindo) return
-    if (!this.host) return this.soHost()
+    // (na party o chefe foi votado; no BOSS SEMANAL o chefe é o da semana: não volta)
+    if (!this.host || partyAtiva() || (this.rede && salaSemanal())) return this.soHost()
     this.saindo = true
     tocar(this, 'mover')
     this.cameras.main.fadeOut(200, 0, 0, 0)

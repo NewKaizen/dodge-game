@@ -9,6 +9,7 @@ import { pedirFoto } from '../../lib/fotoModal.js'
 import { AVATARES_JOGO, avatarDoPerfil, NOME_MAX } from '../../lib/contaRegras.js'
 import { AVATARES_TRILHA, corDaMoldura, nomeDoItem, progressoDoXp, proximaRecompensa, NOME_TIPO } from '../../lib/progresso.js'
 import { siteNaInternet } from '../../lib/lan/rede.js'
+import { ehTrofeuSemanal } from '../../lib/semanal.js'
 
 // PERFIL, dentro do jogo (antes era o painel Svelte por cima dele): o cartão da
 // conta (avatar com a moldura equipada, nome, tag, título, nível e barra de XP,
@@ -216,10 +217,12 @@ export default class Perfil extends CenaConta {
     caber(this.t(cx, e.y + 266, textoProx, 10, COR.dica).setOrigin(0.5), textoProx, e.largura - 24)
 
     const est = get(conta).estatisticas ?? { partidas: 0, vitorias: 0, personagem_favorito: null }
-    const linhas = [['partidas', String(est.partidas)], ['vitórias', String(est.vitorias)], ['favorito', NOMES[est.personagem_favorito] ?? '—']]
+    // BOSS SEMANAL: quantos troféus semanais a conta tem (a lista fica na COLEÇÃO, aba TROFÉUS SEMANAIS)
+    const trofeus = [...(get(conta).inventario ?? [])].filter(ehTrofeuSemanal).length
+    const linhas = [['partidas', String(est.partidas)], ['vitórias', String(est.vitorias)], ['favorito', NOMES[est.personagem_favorito] ?? '—'], ['troféus semanais', String(trofeus)]]
     this.grafico().lineStyle(1, 0xffffff, 0.15).lineBetween(e.x + 18, e.y + 284, e.x + e.largura - 18, e.y + 284)
     linhas.forEach(([rotulo, valor], i) => {
-      const y = e.y + 302 + i * 18
+      const y = e.y + 300 + i * 16
       this.t(e.x + 24, y, rotulo, 12, COR.dica).setOrigin(0, 0.5)
       this.t(e.x + e.largura - 24, y, valor, 12, COR.texto).setOrigin(1, 0.5)
     })

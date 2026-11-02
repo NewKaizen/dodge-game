@@ -98,6 +98,8 @@ export const textoMotivo = (codigo) => MOTIVOS[codigo] ?? ''
 // ---------- catálogo (espelho do seed em 0003_progresso.sql) ----------
 // id = '<tipo>.<nome>'; padrao: todo mundo tem (não precisa ganhar).
 // cor: só para desenhar (moldura em volta do avatar, verso da carta).
+import { trofeuDoId } from './semanal.js'
+
 export const TIPOS_ITEM = ['avatar', 'titulo', 'moldura', 'verso']
 export const NOME_TIPO = { avatar: 'avatar', titulo: 'título', moldura: 'moldura', verso: 'verso de carta' }
 
@@ -125,8 +127,9 @@ export const CATALOGO = [
 export const AVATARES_TRILHA = CATALOGO.filter((i) => i.tipo === 'avatar').map((i) => i.id.split('.')[1])
 
 const PORID = new Map(CATALOGO.map((i) => [i.id, i]))
-export const itemDoCatalogo = (id) => PORID.get(id) ?? null
-export const nomeDoItem = (id) => PORID.get(id)?.nome ?? null
+// (os TROFÉUS SEMANAIS ficam fora do CATALOGO: um por semana, para sempre; o id diz tudo, src/lib/semanal.js)
+export const itemDoCatalogo = (id) => PORID.get(id) ?? trofeuDoId(id)
+export const nomeDoItem = (id) => itemDoCatalogo(id)?.nome ?? null
 // os da trilha até o nível (os padrão não entram: todo mundo já tem)
 export const itensAte = (nivel) => CATALOGO.filter((i) => !i.padrao && i.nivel <= nivel)
 // o próximo item da trilha depois do nível atual (null: já tem todos)

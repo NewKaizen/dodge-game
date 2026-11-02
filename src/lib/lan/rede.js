@@ -1,6 +1,7 @@
 import { writable, get } from 'svelte/store'
 import { jogo } from '../estado.js'
-import { tokenConta, aoMudarConta, recarregarPerfil } from '../conta.js'
+import { tokenConta, aoMudarConta, recarregarPerfil, ganhouItem } from '../conta.js'
+import { lerInfoSemanal, ID_SEMANA, ehTrofeuSemanal } from '../semanal.js'
 import { codigoDaBusca, limparSalaDaUrl } from '../salaLink.js'
 import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 
@@ -59,7 +60,13 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 //   enviarAoParceiro(dados, para?)  para = id de um membro (só o host escolhe; o convidado
 //                    vai sempre ao host: o servidor repassa em estrela)
 //   estado: caidos [{ id, nome, ate }] (todos os que caíram; outroCaiu = o primeiro, como antes)
-export const PROTOCOLO = 13
+//
+// BOSS SEMANAL (PROTOCOLO 15, docs/boss-semanal.md): o servidor manda a semana dele no bemvindo
+// (estado.semanal = { semana, chefe, nome, mecanica, trofeu, ate }: `ate` no relógio DAQUI, só para a
+// contagem) e pedirSemanal() pede de novo na virada. criarSala({ semanal: true }) / mudarSemanal(v)
+// (dono): a sala do boss (CO-OP de 2 a 4); sala.semanal = a semana da sala. partyModo(modo, semanal).
+// O resultado do CO-OP leva `semana`; a recompensa pode trazer `trofeu` { id, semana, novo }.
+export const PROTOCOLO = 15
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
@@ -105,6 +112,8 @@ const INICIAL = {
   caidos: [],
   // 5A: o servidor elegeu ESTE PC como host da partida: o id da sala a começar (consumirComeco)
   comecar: null,
+  // BOSS SEMANAL: a semana do servidor { semana, chefe, nome, mecanica, trofeu, ate } | null
+  semanal: null,
 }
 export const lan = writable({ ...INICIAL })
 
@@ -232,6 +241,7 @@ function conectar(url, { retomar = null } = {}) {
           enderecos: url === casa ? m.enderecos ?? [] : s.enderecos,
           online: Boolean(m.online),
           ice: Array.isArray(m.ice) ? m.ice : [],
+          semanal: comAte(lerInfoSemanal(m.semanal)) ?? s.semanal,
         }))
         if (m.contaInvalida) mudar({ erro: MSG_CONTA_INVALIDA })
         comecarTimers()
@@ -378,8 +388,14 @@ aoMudarConta((token) => {
   if (estado().servidor === casa) enviar({ t: 'conta', token })
 })
 
+// a contagem até a próxima semana no relógio daqui (o servidor manda quanto falta)
+const comAte = (info) => info && { ...info, ate: Date.now() + info.restanteMs }
+
 function receber(m) {
   switch (m.t) {
+    case 'semanal':
+      mudar({ semanal: comAte(lerInfoSemanal(m)) ?? estado().semanal })
+      break
     case 'conta':
       lan.update((s) => ({ ...s, eu: comConta(s.eu, m.conta), ...(m.contaInvalida && { erro: MSG_CONTA_INVALIDA }) }))
       break
@@ -483,8 +499,11 @@ function receber(m) {
         nivelDepois: Number.isFinite(m.nivelDepois) ? m.nivelDepois : null,
         itensNovos: Array.isArray(m.itensNovos) ? m.itensNovos.filter((i) => typeof i === 'string') : [],
         motivo: typeof m.motivo === 'string' ? m.motivo : '',
+        // BOSS SEMANAL: o troféu exclusivo da semana (novo: ganhou agora; false: já tinha)
+        trofeu: m.trofeu && ehTrofeuSemanal(m.trofeu.id) && ID_SEMANA.test(m.trofeu.semana) ? { id: m.trofeu.id, semana: m.trofeu.semana, novo: Boolean(m.trofeu.novo) } : null,
       }
       mudar({ recompensa: r })
+      if (r.trofeu) ganhouItem(r.trofeu.id)
       // o nível, o XP, o inventário e as estatísticas mudaram no banco
       if (r.xpTotal != null) recarregarPerfil()
       break
@@ -590,9 +609,16 @@ export function manterLobby(valor) {
   }
 }
 
-export function criarSala() {
-  enviar({ t: 'criar' })
+export function criarSala({ semanal = false } = {}) {
+  enviar({ t: 'criar', ...(semanal && { semanal: true }) })
 }
+// BOSS SEMANAL: a semana de novo (na virada) · (dono) a sala vira (ou deixa de ser) a do boss
+export const pedirSemanal = () => enviar({ t: 'semanalInfo' })
+// a semana que o servidor mandou (null antes do bemvindo)
+export const semanalAtual = () => estado().semanal
+export const mudarSemanal = (valor) => souDono() && enviar({ t: 'salaSemanal', valor: Boolean(valor) })
+// a semana da sala em que estou (null: a sala não é a do boss semanal)
+export const salaSemanal = () => (estado().fase === 'sala' ? estado().sala?.semanal ?? null : null)
 
 export async function entrarSala(resumo) {
   if (!resumo) return
@@ -670,6 +696,18 @@ export function pedirPartida() {
   enviar({ t: 'partida', valor: true, eleicao: true })
 }
 
+// MODO PARTY (docs/online.md "Modo Party"): o COMEÇAR PARTY do dono (sala de amigos com 3 ou 4).
+// O servidor elege o host como sempre, mas não marca a partida: o eleito leva todos à votação
+export function pedirParty() {
+  if (!souDono() || estado().sala?.emPartida || estado().sala?.eleicao || estado().sala?.party) return
+  enviar({ t: 'partida', valor: true, eleicao: true, party: true })
+}
+export const partyAtiva = () => estado().fase === 'sala' && Boolean(estado().sala?.party)
+// (host da party) o modo que a votação escolheu · a tela CONTINUAR/SAIR aberta a quem chega · fim da party
+export const partyModo = (modo, semanal = false) => souHost() && enviar({ t: 'party', acao: 'modo', modo, ...(semanal && { semanal: true }) })
+export const partyAberta = (valor) => souHost() && enviar({ t: 'party', acao: 'aberta', valor: Boolean(valor) })
+export const encerrarParty = () => partyAtiva() && enviar({ t: 'party', acao: 'fim' })
+
 // (host eleito) a sala a começar agora, uma vez só
 export function consumirComeco() {
   const id = estado().comecar
@@ -738,12 +776,13 @@ export const limparRevanche = () => mudar({ revanche: null })
 // fim da partida: o que este PC viu; true se mandou agora (uma vez por partidaId).
 //   PVP:    { partidaId, vencedorLado: 0 | 1 | null, rodadas, duracao, personagem }
 //   CO-OP:  { partidaId, vitoria: true | false (o time venceu o chefe), rodadas, duracao, personagem }
-export function enviarResultado({ partidaId, vencedorLado, vitoria, colocacoes, vencedorTime, rodadas, duracao, personagem }) {
+//   (CO-OP do BOSS SEMANAL: + semana, a semana do chefe que este PC enfrentou)
+export function enviarResultado({ partidaId, vencedorLado, vitoria, colocacoes, vencedorTime, rodadas, duracao, personagem, semana }) {
   if (typeof partidaId !== 'string' || !partidaId || relatadas.has(partidaId)) return false
   // todos contra todos (5D): as vagas do 1º ao último
   // 2x2 (5E): o time vencedor (0 | 1 | null = empate)
   const resultado = vencedorTime !== undefined ? { vencedorTime: vencedorTime === 0 || vencedorTime === 1 ? vencedorTime : null } : Array.isArray(colocacoes) ? { colocacoes: [...colocacoes] } : typeof vitoria === 'boolean' ? { vitoria } : { vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null }
-  const relato = { partidaId, ...resultado, rodadas, duracao, personagem }
+  const relato = { partidaId, ...resultado, rodadas, duracao, personagem, ...(typeof vitoria === 'boolean' && ID_SEMANA.test(semana ?? '') && { semana }) }
   if (ws?.readyState !== WebSocket.OPEN) {
     // caiu e está voltando (2D): o relato sai na volta, uma vez só
     if (!estado().religando) return false

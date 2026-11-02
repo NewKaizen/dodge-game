@@ -424,6 +424,13 @@ Quem cai da rede é tratado como no todos contra todos (ausente, ataque inteiro,
 que no 2x2 é FORA, sem resgate). Testando: `node --test src/game/pvp/__tests__/dupla.test.js src/game/pvp/__tests__/redeDupla.test.js
 server/__tests__/duplaXp.test.js`.
 
+## Modo Party (salas de 3 e 4)
+
+O `PROTOCOLO` subiu para **14** (`server/lan.js` e `lib/lan/rede.js`): a sala ganhou `party`, o `partida` aceita `party: true`
+e há a mensagem `party {acao}`. Regras, fluxo e mensagens em [online.md](online.md#modo-party-salas-de-amigos-com-3-ou-4). O host
+da party é eleito uma vez e fica o ciclo inteiro; as cenas `PartyVoto` e `PartyFim` "só continuam" na volta de uma queda (2D),
+e quem entra na sala com a party aberta recebe a cena atual do host (`voltarVaga`).
+
 ## Escolha às cegas no online
 
 O `PROTOCOLO` subiu para **12** (`server/lan.js` e `lib/lan/rede.js`): a `resolucao` passou a levar as jogadas e as cartas de verdade. Regra em
