@@ -9,6 +9,7 @@ import { corDaVaga, textoDaVaga } from '../vagas.js'
 import { desenharForma, formaDaVaga, nomeNoCoracao } from '../coop/marcadores.js'
 import { FIM_MS, novoFim, marcarFim, fimDecidido, restanteFim, opcoesDeModo, partySegue } from '../party/regras.js'
 import { vigiarParty } from '../party/cliente.js'
+import Seletor from '../party/seletor.js'
 
 // MODO PARTY: depois do resultado de cada partida (docs/online.md "Modo Party"). CONTINUAR (quem aperta
 // continua; quando todos apertaram, ou em 15 s, a party segue para a votação do modo; quem não apertou
@@ -37,6 +38,7 @@ const estadoInicial = () => ({
   status: null,
   restanteGuest: 0,
   assinatura: '',
+  seletor: null,
 })
 
 export default class PartyFim extends Phaser.Scene {
@@ -73,8 +75,10 @@ export default class PartyFim extends Phaser.Scene {
     this.membrosGfx = this.add.graphics()
     this.rotulos = OPCOES.map((o, i) => t(LARGURA / 2 + (i === 0 ? -130 : 130), 360, o.rotulo, 22, TEXTO.normal))
     this.cursor = this.add.image(0, 360, 'coracao').setTint(corDaVaga(this.meu)).setScale(1.3)
-    t(LARGURA / 2, ALTURA - 14, '← → escolher     A: confirmar', 13, TEXTO.desabilitado, { strokeThickness: 0 })
+    t(LARGURA / 2, ALTURA - 14, '← → escolher     A: confirmar     ↑ ↓ personagem', 13, TEXTO.desabilitado, { strokeThickness: 0 })
     this.atualizarTela()
+    // a escolha de personagem da próxima partida (já começa no último usado): vale na espera
+    this.seletor = new Seletor(this, { y: 428 })
 
     this.ligarRede()
     vigiarParty(this)
@@ -193,6 +197,7 @@ export default class PartyFim extends Phaser.Scene {
     this.fundo?.atualizar(delta)
     if (this.saindo) return
     const d = this.controles.toque(meuLado())
+    if (d === 'cima' || d === 'baixo') this.seletor?.tratar(d)
     if (d === 'esquerda' || d === 'direita') {
       this.opcao = (this.opcao + 1) % OPCOES.length
       tocar(this, 'mover')
@@ -211,6 +216,6 @@ export default class PartyFim extends Phaser.Scene {
   }
 
   estadoDebug() {
-    return { escolhas: { ...this.fim.escolhas }, restante: Math.round(restanteFim(this.fim, Date.now())), presentes: this.presentes(), host: this.souHost }
+    return { escolhas: { ...this.fim.escolhas }, restante: Math.round(restanteFim(this.fim, Date.now())), presentes: this.presentes(), host: this.souHost, picks: this.seletor?.lista() }
   }
 }

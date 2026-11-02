@@ -17,6 +17,12 @@ import { desenharForma, formaDaVaga } from '../coop/marcadores.js'
 import { desenharIcone } from './PvpVoto.js'
 import { MODOS_PARTY, VOTO_MS, ehPvp, opcoesDeModo, sortearTres, novaVotacao, votar, votacaoAcabou, apurar, restanteVoto } from '../party/regras.js'
 import { vigiarParty } from '../party/cliente.js'
+import Seletor, { CHAVE_SALVA, ultimaParty } from '../party/seletor.js'
+import { montarInicio } from '../party/escolha.js'
+import { PERSONAGENS } from '../data/personagens.js'
+import { timesDoArranjo } from '../../lib/times2x2.js'
+import { get } from 'svelte/store'
+import { lan } from '../../lib/lan/rede.js'
 
 // MODO PARTY: a votação (docs/online.md "Modo Party"). A mesma cena serve às duas votações:
 //   { fase: 'modo', opcoes, id }          2x2 (só com 4) · TODOS CONTRA TODOS · CO-OP
@@ -47,6 +53,7 @@ const estadoInicial = () => ({
   status: null,
   dica: null,
   restanteGuest: 0,
+  seletor: null,
 })
 
 export default class PartyVoto extends Phaser.Scene {
@@ -82,11 +89,13 @@ export default class PartyVoto extends Phaser.Scene {
     this.barra = this.add.graphics().setDepth(2)
     this.montarCartoes()
     this.coracao = this.add.image(0, 0, 'coracao').setTint(corDaVaga(this.meu)).setScale(1.4).setDepth(8)
-    this.dica = this.texto(LARGURA / 2, ALTURA - 14, '← → escolher     A: votar (dá para trocar)', 13, TEXTO.desabilitado, { strokeThickness: 0 })
+    this.dica = this.texto(LARGURA / 2, ALTURA - 14, '← → escolher     A: votar (dá para trocar)     ↑ ↓ personagem', 13, TEXTO.desabilitado, { strokeThickness: 0 })
     this.trocarFundo()
     this.atualizarTela()
 
     this.ligarRede()
+    // o personagem da partida se escolhe aqui, na espera (party/seletor.js): depois do mapa a partida começa direto
+    this.seletor = new Seletor(this, { y: 408 })
     vigiarParty(this)
     if (import.meta.env.DEV) window.partyVoto = this
     this.events.once('shutdown', () => {
@@ -271,6 +280,7 @@ export default class PartyVoto extends Phaser.Scene {
       this.trocarFundo()
       this.atualizarTela()
     }
+    if (d === 'cima' || d === 'baixo') this.seletor?.tratar(d)
     const c = this.cartoes[this.cursor]
     this.coracao.setPosition(c.x, c.c.y - CARTAO.altura / 2 - 16 + Math.sin(time / 200) * 2)
     // o tempo: o do host vale (o convidado acerta o dele a cada partyVotos)
@@ -373,12 +383,35 @@ export default class PartyVoto extends Phaser.Scene {
     this.registry.set('partyAnterior', ehPvp(this.modo) ? { ...anterior, arena: vencedora } : { ...anterior, chefe: vencedora })
     this.registry.set('modo', this.modo)
     iniciarPartida() // a partida de verdade começa aqui (o servidor registra com o modo votado)
-    if (ehPvp(this.modo)) irParaCena(this, 'PvpEscolhaN', { arena: vencedora })
-    else irParaCena(this, 'EscolhaPartyN', { chefe: vencedora })
+    this.comecarPartida(vencedora)
+  }
+
+  // host: direto para a partida com os personagens escolhidos na espera (sem a cena de escolha de personagem);
+  // o nível do CO-OP vai pré-escolhido no último usado (a Dificuldade confirma sozinha em 3 s)
+  comecarPartida(vencedora) {
+    const ids = Object.keys(PERSONAGENS)
+    const ultima = ultimaParty(this.registry)
+    const { cena, dados, lista } = montarInicio({
+      modo: this.modo,
+      vencedora,
+      picks: this.seletor?.picks ?? {},
+      presentes: this.presentes(),
+      ids,
+      ultima,
+      times: this.modo === '2x2' ? timesDoArranjo(get(lan).sala?.arranjo) : null,
+      nivel: this.registry.get('nivel'),
+    })
+    this.registry.set('party', lista)
+    try {
+      localStorage.setItem(CHAVE_SALVA, JSON.stringify(lista))
+    } catch {
+      // sem armazenamento: fica só no registry
+    }
+    irParaCena(this, cena, dados)
   }
 
   // testes/console
   estadoDebug() {
-    return { fase: this.fase, modo: this.modo, opcoes: [...this.opcoes], votos: { ...this.votacao.votos }, eleitores: [...this.votacao.eleitores], apurando: this.apurando, cursor: this.opcoes[this.cursor], host: this.souHost }
+    return { fase: this.fase, modo: this.modo, opcoes: [...this.opcoes], votos: { ...this.votacao.votos }, eleitores: [...this.votacao.eleitores], apurando: this.apurando, cursor: this.opcoes[this.cursor], host: this.souHost, picks: this.seletor?.lista() }
   }
 }
