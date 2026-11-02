@@ -62,6 +62,7 @@ import { ENERGIA, hpInicial, aplicarDano, curar, motivoBloqueio } from '../pvp/r
 export { COMBO_PERFEITO, multiplicadorPerfeito, registrarPerfeitoCombo, quebrarSequencia } from '../pvp/regras.js'
 import { especialDaCarta, efeitosDaCarta, ehSuper } from '../pvp/cartas.js'
 import { CHEFES, nivelDoChefe } from './chefes/index.js'
+import { roubar, jogaRoubada, cartaDaLadra, devolver, largarRoubada } from './semanal/ladra.js'
 import { CARTAS_CHEFES, faseDoChefe, suporteDoChefe, danoDaCartaChefe, ritmoDaCartaChefe, inverteControles, poderDaCartaChefe } from './cartasChefe.js'
 
 
@@ -249,6 +250,8 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
       monte: embaralhar(CARTAS_CHEFES[chefe].fases[0].map((c) => ({ ...c })), rng),
       descarte: [],
       intencao: null, // a carta virada que o chefe vai jogar nesta rodada (no quadro, nos dois)
+      // BOSS SEMANAL · Ladra (coop/semanal/ladra.js): as cartas roubadas (viradas para cima) e o rodízio
+      ...(def.ladra && { roubadas: [], alvoRoubo: 0 }),
       mira: null, // (3+ jogadores) quem o chefe mira nesta rodada: índices dos jogadores (escolherMira)
     },
     vencedor: null,
@@ -364,8 +367,17 @@ export function iniciarRodadaCoop(estado) {
       c.carga = 0
       c.intencao = { ...CARTAS_CHEFES[c.id].super }
       eventos.push({ tipo: 'superChefe' })
+    } else if (c.roubadas && jogaRoubada(estado)) {
+      // a Ladra joga a roubada mais antiga contra o time
+      c.intencao = cartaDaLadra(estado)
+      eventos.push({ tipo: 'ladraJoga', dono: c.intencao.roubada.dono, carta: c.intencao.roubada.carta.id })
     } else c.intencao = comprarDoChefe(estado)
     if (estado.n > 2) c.mira = escolherMira(estado)
+    // a Ladra rouba uma carta do próximo do rodízio (sai da mão dele nesta rodada)
+    if (c.roubadas) {
+      const r = roubar(estado, emPe(estado))
+      if (r) eventos.push({ tipo: 'roubo', j: r.j, carta: r.carta.id })
+    }
   }
   estado.fase = 'escolha'
   return eventos
@@ -552,6 +564,17 @@ export function resolverRodadaCoop(estado, ...entradas) {
     }
   }
 
+  // a Ladra: cada ♣ (armadilha) de quem jogou pega ela e devolve a última roubada; um SUPER devolve todas
+  if (c.roubadas) {
+    for (const j of todos) {
+      const carta = cartas[j]
+      if (!carta) continue
+      if (ehSuper(carta)) efeitos[j].devolveu = devolver(estado, true).map((x) => ({ dono: x.dono, carta: x.carta.id }))
+      else if (carta.naipe === 'paus' && !especiais[j]) efeitos[j].devolveu = devolver(estado).map((x) => ({ dono: x.dono, carta: x.carta.id }))
+      if (efeitos[j].devolveu?.length) eventos.push(`${estado.jogadores[j].id} recuperou ${efeitos[j].devolveu.length} carta(s) da ladra`)
+    }
+  }
+
   // 4. ♥ do chefe que ficou na mesa
   let curaChefe = 0
   if (destino === 'quadro') {
@@ -584,7 +607,8 @@ export function resolverRodadaCoop(estado, ...entradas) {
   }
 
   // a carta do chefe vai para o descarte dele (o SUPER não)
-  if (intencao && !ehSuper(intencao)) c.descarte.push(intencao)
+  // (a roubada da Ladra volta ao descarte do DONO)
+  if (intencao && !ehSuper(intencao) && !largarRoubada(estado, intencao)) c.descarte.push(intencao)
   c.intencao = null
   estado.fase = 'esquiva'
   const resultado = {

@@ -3,6 +3,8 @@ import king from './king.js'
 import queen from './queen.js'
 import jevil from './jevil.js'
 import coronel from './coronel.js'
+import escuridao from './escuridao.js'
+import ladra from './ladra.js'
 import { FUNDOS_ARENAS } from './arenas/index.js'
 import { fatores } from '../acessibilidade.js'
 
@@ -13,7 +15,7 @@ import { fatores } from '../acessibilidade.js'
 //   estado.fase       fase atual do chefe (0, 1, 2...)
 //   estado.velocidade multiplicador de animação (sobe nas fases finais)
 //   estado.agito      multiplicador extra, do nível da luta (NIVEIS.fundo)
-const FUNDOS = { king, queen, jevil, coronel, ...FUNDOS_ARENAS } // arenas do PvP: 'arena-<id>'
+const FUNDOS = { king, queen, jevil, coronel, escuridao, ladra, ...FUNDOS_ARENAS } // arenas do PvP: 'arena-<id>'
 
 // Envolve o fundo: escurecer() põe um véu escuro por cima (telas de menu) e
 // `agito` acelera tudo (nível da luta).

@@ -2,6 +2,8 @@ import king from './king.js'
 import queen from './queen.js'
 import jevil from './jevil.js'
 import coronel from './coronel.js'
+import escuridao from './escuridao.js'
+import ladra from './ladra.js'
 import { NIVEIS } from '../../constants.js'
 
 // Chefes do CO-OP de cartas, na ordem da tela de seleção. Lógica pura: os
@@ -27,7 +29,11 @@ import { NIVEIS } from '../../constants.js'
 //                            ajuste deste chefe em cima de NIVEIS naquele nível (nivelDoChefe)
 //   super                    { nome, texto, criar: (A) => ataque } SUPER do chefe (barra de
 //                            carga, a cada COOP.cargaSuper rodadas): vai nas duas caixas
-export const CHEFES = { king, queen, jevil, coronel }
+//   semanal                  BOSS SEMANAL (docs/boss-semanal.md): fora da Selecao e da votação da
+//                            party; só aparece na semana dele (src/lib/semanal.js, AGENDA)
+//   escuro                   (Escuridão) a caixa no escuro e as pistas de som (coop/semanal/escuridao.js)
+//   ladra, roubadas          (Ladra) rouba e joga as cartas dos jogadores (coop/semanal/ladra.js)
+export const CHEFES = { king, queen, jevil, coronel, escuridao, ladra }
 
 const FATORES = ['velocidade', 'densidade', 'velocidadeMax', 'dano', 'hp']
 
@@ -39,4 +45,5 @@ export function nivelDoChefe(chefe, nivel) {
   const ajuste = CHEFES[chefe]?.niveis?.[nivel] ?? {}
   return { ...base, ...Object.fromEntries(FATORES.map((k) => [k, base[k] * (ajuste[k] ?? 1)])) }
 }
-export const ORDEM_CHEFES = ['king', 'queen', 'jevil', 'coronel']
+export const ORDEM_CHEFES = ['king', 'queen', 'jevil', 'coronel'] // (os semanais ficam fora: SEMANAIS)
+export const SEMANAIS = Object.keys(CHEFES).filter((id) => CHEFES[id].semanal)

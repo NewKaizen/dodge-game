@@ -6,6 +6,10 @@
 //   SUPER do chefe: valor 14, naipe 'espadas', id '<chefe>-super'
 import { CHEFES } from './chefes/index.js'
 import { ehSuper } from '../pvp/cartas.js'
+import { curaDaRoubada } from './semanal/ladra.js'
+
+// BOSS SEMANAL · Ladra: a carta virada dela pode ser uma ROUBADA de um jogador (carta.roubada =
+// { carta, dono }, coop/semanal/ladra.js); as funções daqui tratam essas pelo naipe e o valor da carta
 
 export const TIPOS_CHEFE = { espadas: 'ATAQUE', ouros: 'CONTROLE', paus: 'ARMADILHA', copas: 'SE CURA' }
 
@@ -55,12 +59,13 @@ function definicao(carta) {
 // { cura, guarda } de uma carta ♥ do chefe (null nas outras)
 export function suporteDoChefe(carta) {
   if (carta?.naipe !== 'copas' || ehSuper(carta)) return null
+  if (carta.roubada) return { cura: curaDaRoubada(carta), guarda: null }
   const extras = definicao(carta)[4] ?? {}
   return { cura: extras.cura ?? 0, guarda: extras.guarda ?? null }
 }
 
 export function inverteControles(carta) {
-  if (!carta || ehSuper(carta)) return false
+  if (!carta || ehSuper(carta) || carta.roubada) return false
   return Boolean(definicao(carta)[4]?.inverter)
 }
 
@@ -78,6 +83,8 @@ export function danoDaCartaChefe(carta, fatorNivel = 1) {
 // Multiplicadores de ritmo extras da carta (em cima do ritmo base da luta)
 export function ritmoDaCartaChefe(carta) {
   if (carta.naipe !== 'ouros' || ehSuper(carta)) return { velocidade: 1, densidade: 1 }
+  // o ♦ roubado ADIANTA as balas o dobro (o ♦ do jogador atrasava o chefe)
+  if (carta.roubada) return { velocidade: Math.round((1 + 2 * RITMO_OUROS * forcaChefe(carta.valor)) * 100) / 100, densidade: 1 }
   return { velocidade: Math.round((1 + RITMO_OUROS * forcaChefe(carta.valor)) * 100) / 100, densidade: 1 }
 }
 
@@ -94,6 +101,7 @@ export function ataqueDaCartaChefe(carta, contexto = {}) {
   const def = CHEFES[carta.chefe]
   if (ehSuper(carta)) return def.super.criar(A)
   if (carta.naipe === 'copas') return def.leve(A)
+  if (carta.roubada) return def.roubadas[carta.naipe](A, carta.valor)
   return definicao(carta)[3](A)
 }
 
