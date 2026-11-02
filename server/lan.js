@@ -91,6 +91,16 @@
 //   servidor -> cliente  eleicao {id, ms} · comecar {salaId}
 //                        sala {..., dono, eleicao: bool, eleito: {id, nome, motivo} | null,
 //                              membros: [{..., papel: 'host' | 'convidado', dono: bool}]}
+//
+// MODO PARTY (docs/online.md "Modo Party"): sala de amigos com 3 ou 4. O COMEÇAR PARTY do dono
+// (`partida {valor: true, eleicao: true, party: true}`) elege o host como sempre, mas NÃO marca a
+// partida: a sala ganha `party {aberta: false}` e o eleito recebe `comecar {salaId, party: true}`
+// (ele leva todos à votação do modo). O host continua o mesmo em todo o ciclo da party. Entre
+// uma partida e outra o host manda `party {acao}`:
+//   modo {modo}        o modo que a votação escolheu (cabe no número de membros)
+//   aberta {valor}     a tela CONTINUAR/SAIR: só com `aberta` alguém de fora entra (na próxima votação)
+//   fim                a party acaba (o host ou o dono; a sala volta ao lobby normal)
+// A party também acaba sozinha quando a sala fica com menos de 3 ou o host da party sai.
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
@@ -105,7 +115,7 @@ import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
 import { nomeSeguro } from '../src/lib/contaRegras.js'
 import { arranjoValido } from '../src/lib/times2x2.js'
 
-export const PROTOCOLO = 13
+export const PROTOCOLO = 14
 export const PORTA_DESCOBERTA = 47777
 // Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
 // aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")
@@ -302,6 +312,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
     eleicao: Boolean(sala.eleicao),
     eleito: sala.eleito ?? null,
     arranjo: sala.arranjo ?? 0, // 2x2: quem joga com quem (src/lib/times2x2.js)
+    party: sala.party ? { aberta: Boolean(sala.party.aberta) } : null,
     membros: membrosDaSala(sala).map((c) => ({ id: c.id, vaga: c.vaga, nome: c.nome, papel: c.id === sala.host ? 'host' : 'convidado', dono: c.id === sala.dono, pronto: c.pronto, ping: c.ping, conta: contaPublica(c), segundoPlano: Boolean(c.segundoPlano), caiu: c.caido ? Math.max(0, c.caido.desde + RETOMADA_MS - agora()) : null })),
   })
 
@@ -355,6 +366,8 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
     if (!sala) return
     if (!tirado) partidas.saiu(cliente, sala, saiuEm) // no meio da partida = abandono (server/partidas.js)
     sala.membros.delete(cliente.id)
+    // party: com menos de 3, ou sem o host da party, ela acaba (a sala segue, no lobby normal)
+    if (sala.party && (sala.membros.size < 3 || cliente.id === sala.host)) sala.party = null
     atualizarStatus(cliente)
     // sala casual (JOGAR RÁPIDO): sem o oponente não tem o que fazer nela. O dono saindo
     // fecha a sala; o host da partida saindo no meio dela também (a partida morre com ele)
@@ -748,10 +761,10 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
 
   // ---------- eleição do host da partida (5A, server/eleicao.js) ----------
 
-  function comecarEleicao(sala) {
+  function comecarEleicao(sala, { party = false } = {}) {
     const id = novoId()
     const ate = agora() + eleicaoMs
-    sala.eleicao = { id, ate, medidas: new Map(), cancelar: null }
+    sala.eleicao = { id, ate, medidas: new Map(), cancelar: null, party }
     if (eleicaoMs > 0) {
       sala.eleicao.cancelar = agendar(() => fecharEleicao(sala, id), eleicaoMs)
       avisarMembros(sala, { t: 'eleicao', id, ms: eleicaoMs })
@@ -774,7 +787,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
     sala.eleicao = null
     const dono = clientes.get(sala.dono)
     const membros = membrosDaSala(sala).filter((c) => !c.caido)
-    if (membros.length < 2 || sala.emPartida) {
+    if (membros.length < (e.party ? 3 : 2) || sala.emPartida) {
       avisarSala(sala)
       if (dono && !sala.emPartida) enviar(dono, { t: 'erro', msg: 'a partida não começou: falta gente na sala' })
       return
@@ -784,9 +797,19 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
     const host = clientes.get(r.host)
     sala.eleito = { id: r.host, nome: host?.nome ?? '?', motivo: r.motivo }
     log(`[lan] sala ${sala.codigo}: host da partida ${sala.eleito.nome} (${r.motivo}; pontos ${JSON.stringify(Object.fromEntries(membros.map((c) => [c.nome, r.pontos[c.id]])))})`)
+    // party: a votação vem antes da partida (o host marca a partida quando ela começa de verdade)
+    if (e.party) {
+      sala.party = { aberta: false }
+      avisarSala(sala)
+      if (host) enviar(host, { t: 'comecar', salaId: sala.id, party: true })
+      return
+    }
     marcarPartida(sala, true)
     if (host) enviar(host, { t: 'comecar', salaId: sala.id })
   }
+
+  // entrar agora não dá: partida rolando, ou a party no meio do ciclo (só entra na tela CONTINUAR/SAIR)
+  const fechadaParaEntrar = (sala) => sala.emPartida || Boolean(sala.party && !sala.party.aberta)
 
   // a partida começa / volta ao lobby (o registro do XP nasce quando começa)
   function marcarPartida(sala, valor) {
@@ -941,7 +964,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       if (!sala) return enviar(c, { t: 'erro', msg: codigo ? `não achei a sala ${codigo}: confira o código` : 'essa sala não existe mais' })
       if (sala.membros.has(c.id)) return avisarSala(sala)
       if (cheia(sala)) return enviar(c, { t: 'erro', msg: 'a sala está cheia: peça outro código ao seu amigo' })
-      if (sala.emPartida) return enviar(c, { t: 'erro', msg: 'a sala está no meio de uma partida: espere acabar e tente de novo' })
+      if (fechadaParaEntrar(sala)) return enviar(c, { t: 'erro', msg: 'a sala está no meio de uma partida: espere acabar e tente de novo' })
       if ([...sala.membros].some((id) => bloqueados(c, clientes.get(id)))) return enviar(c, { t: 'erro', msg: 'não deu para entrar nessa sala' })
       entrarNaSala(c, sala)
     },
@@ -956,7 +979,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
     },
     modo(c, m) {
       const sala = salas.get(c.sala)
-      if (!sala || sala.dono !== c.id || !MODOS.includes(m.modo) || sala.casual || sala.emPartida || sala.eleicao) return // a casual é PVP
+      if (!sala || sala.dono !== c.id || !MODOS.includes(m.modo) || sala.casual || sala.emPartida || sala.eleicao || sala.party) return // a casual é PVP (e a party muda o modo pelo host)
       // a sala tem mais gente do que o modo comporta: tire alguém antes (5A)
       if (sala.membros.size > maxDoModo(m.modo)) return enviar(c, { t: 'erro', msg: `esse modo é para até ${maxDoModo(m.modo)} jogadores: a sala tem ${sala.membros.size}` })
       sala.modo = m.modo
@@ -969,11 +992,38 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       const sala = salas.get(c.sala)
       if (!sala) return
       if (m.valor && m.eleicao === true) {
-        if (sala.dono !== c.id || sala.casual || sala.emPartida || sala.eleicao) return
+        if (sala.dono !== c.id || sala.casual || sala.emPartida || sala.eleicao || sala.party) return
+        if (m.party === true) {
+          // a party é para 3 ou 4 numa sala que comporta isso
+          if (maxDoModo(sala.modo) < 3 || sala.membros.size < 3) return enviar(c, { t: 'erro', msg: 'a party precisa de 3 ou 4 jogadores na sala' })
+          return comecarEleicao(sala, { party: true })
+        }
         return comecarEleicao(sala)
       }
       if (sala.host !== c.id || sala.eleicao) return
       marcarPartida(sala, m.valor)
+    },
+    // MODO PARTY: { acao: 'modo', modo } · { acao: 'aberta', valor } (só o host da party, fora da
+    // partida) · { acao: 'fim' } (o host ou o dono)
+    party(c, m) {
+      const sala = salas.get(c.sala)
+      if (!sala?.party) return
+      if (m.acao === 'fim') {
+        if (c.id !== sala.host && c.id !== sala.dono) return
+        sala.party = null
+        return avisarSala(sala)
+      }
+      if (c.id !== sala.host || sala.emPartida) return
+      if (m.acao === 'aberta') {
+        sala.party.aberta = Boolean(m.valor)
+        return avisarSala(sala)
+      }
+      if (m.acao === 'modo') {
+        const def = MODOS_SALA[m.modo]
+        if (!def || def.max < 3 || sala.membros.size < def.min || sala.membros.size > def.max) return enviar(c, { t: 'erro', msg: 'esse modo não cabe na party agora' })
+        sala.modo = m.modo
+        return avisarSala(sala)
+      }
     },
     // 2x2 (5E): o TROCAR TIME. O dono no lobby; o host da partida na revanche (antes de abrir a partida nova)
     times(c, m) {
@@ -1021,7 +1071,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       if (statusDe(alvo) === 'em_partida') return negar(`${alvo.nome} está numa partida`)
       let sala = salas.get(c.sala)
       if (sala && sala.dono !== c.id) return negar('só o dono da sala pode convidar')
-      if (sala?.emPartida) return negar('a sala está no meio de uma partida')
+      if (sala && fechadaParaEntrar(sala)) return negar('a sala está no meio de uma partida')
       if (sala?.membros.has(alvo.id)) return negar(`${alvo.nome} já está na sua sala`)
       if (sala && cheia(sala)) return negar('a sala está cheia')
       const doPar = [...convites.values()].filter((v) => v.para === alvo.usuario)
@@ -1047,7 +1097,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       const remetente = clientes.get(conv.de)
       if (m.aceitar !== true) return remetente && enviar(remetente, { t: 'conviteResposta', id: conv.id, para: conv.para, resultado: 'recusado' })
       const sala = salas.get(conv.salaId)
-      const vale = sala && remetente && remetente.usuario === conv.deUsuario && remetente.sala === sala.id && sala.dono === remetente.id && ehAmigoMutuo(remetente, c) && !sala.emPartida && statusDe(c) !== 'em_partida' && !cheia(sala)
+      const vale = sala && remetente && remetente.usuario === conv.deUsuario && remetente.sala === sala.id && sala.dono === remetente.id && ehAmigoMutuo(remetente, c) && !fechadaParaEntrar(sala) && statusDe(c) !== 'em_partida' && !cheia(sala)
       if (!vale) {
         enviar(c, { t: 'conviteFim', id: conv.id, motivo: 'a sala não está mais disponível' })
         if (remetente) enviar(remetente, { t: 'conviteResposta', id: conv.id, para: conv.para, resultado: 'falhou' })

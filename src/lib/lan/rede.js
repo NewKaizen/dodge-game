@@ -59,7 +59,7 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 //   enviarAoParceiro(dados, para?)  para = id de um membro (só o host escolhe; o convidado
 //                    vai sempre ao host: o servidor repassa em estrela)
 //   estado: caidos [{ id, nome, ate }] (todos os que caíram; outroCaiu = o primeiro, como antes)
-export const PROTOCOLO = 13
+export const PROTOCOLO = 14
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
@@ -669,6 +669,18 @@ export function pedirPartida() {
   if (!souDono() || estado().sala?.emPartida || estado().sala?.eleicao) return
   enviar({ t: 'partida', valor: true, eleicao: true })
 }
+
+// MODO PARTY (docs/online.md "Modo Party"): o COMEÇAR PARTY do dono (sala de amigos com 3 ou 4).
+// O servidor elege o host como sempre, mas não marca a partida: o eleito leva todos à votação
+export function pedirParty() {
+  if (!souDono() || estado().sala?.emPartida || estado().sala?.eleicao || estado().sala?.party) return
+  enviar({ t: 'partida', valor: true, eleicao: true, party: true })
+}
+export const partyAtiva = () => estado().fase === 'sala' && Boolean(estado().sala?.party)
+// (host da party) o modo que a votação escolheu · a tela CONTINUAR/SAIR aberta a quem chega · fim da party
+export const partyModo = (modo) => souHost() && enviar({ t: 'party', acao: 'modo', modo })
+export const partyAberta = (valor) => souHost() && enviar({ t: 'party', acao: 'aberta', valor: Boolean(valor) })
+export const encerrarParty = () => partyAtiva() && enviar({ t: 'party', acao: 'fim' })
 
 // (host eleito) a sala a começar agora, uma vez só
 export function consumirComeco() {
