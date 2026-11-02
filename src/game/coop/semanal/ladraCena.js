@@ -12,13 +12,15 @@ import { corDaVaga } from '../../vagas.js'
 //   - carta que saiu: volta voando para o dono (recuperada pela ♣ ou pelo SUPER) ou some no meio da mesa
 //     (ela jogou contra o time: a carta virada dela da rodada).
 //   const l = ligarLadra(cena, { chefe: {x, y}, jogadores: () => estado.jogadores, chefeEstado: () => estado.chefe, alvoDe: (j) => {x, y} })
-const CARTA = { l: 20, a: 28, passo: 24, y: -66 } // y: em relação ao chefe
+// a mão dela: uma coluna à direita do sprite (em cima ficam o HP e a carga do SUPER)
+const CARTA = { l: 20, a: 28, passo: 31, x: 62, y: -44 } // x, y: a 1ª carta, em relação ao chefe
 const NOME_VALOR = { 11: 'J', 12: 'Q', 13: 'K' }
 const COR_NAIPE = { espadas: '#1a1a2e', paus: '#1a1a2e', copas: '#c8283a', ouros: '#c8283a' }
 
 export function ligarLadra(cena, { chefe, jogadores, chefeEstado, alvoDe }) {
   const objetos = new Map() // id da carta -> { c (container), dono }
-  const rotulo = cena.add.text(chefe.x, chefe.y + CARTA.y - CARTA.a / 2 - 8, '', { fontFamily: FONTE, fontSize: '8px', color: '#ffb060', stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5).setDepth(31)
+  // (o rótulo fica do outro lado do sprite: à direita, na revelação, vem a carta do jogador)
+  const rotulo = cena.add.text(chefe.x - CARTA.x + CARTA.l / 2, chefe.y + CARTA.y - CARTA.a / 2, '', { fontFamily: FONTE, fontSize: '8px', color: '#ffb060', stroke: '#000000', strokeThickness: 3, lineSpacing: 2, align: 'right' }).setOrigin(1, 0).setDepth(31)
 
   function criarCarta(carta, dono, x, y) {
     const fundo = cena.add.rectangle(0, 0, CARTA.l, CARTA.a, 0xfbf6ea).setStrokeStyle(2, corDaVaga(dono))
@@ -46,7 +48,7 @@ export function ligarLadra(cena, { chefe, jogadores, chefeEstado, alvoDe }) {
     })
   }
 
-  const posicao = (i, total) => ({ x: chefe.x + (i - (total - 1) / 2) * CARTA.passo, y: chefe.y + CARTA.y })
+  const posicao = (i) => ({ x: chefe.x + CARTA.x, y: chefe.y + CARTA.y + i * CARTA.passo })
 
   function atualizar() {
     const c = chefeEstado()
@@ -63,7 +65,7 @@ export function ligarLadra(cena, { chefe, jogadores, chefeEstado, alvoDe }) {
     }
     // novas: o roubo (a mão vai até o dono e traz a carta)
     roubadas.forEach((r, i) => {
-      const alvo = posicao(i, roubadas.length)
+      const alvo = posicao(i)
       let o = objetos.get(r.carta.id)
       if (!o) {
         const origem = alvoDe(r.dono) ?? alvo
@@ -82,7 +84,7 @@ export function ligarLadra(cena, { chefe, jogadores, chefeEstado, alvoDe }) {
       o.c.x += (alvo.x - o.c.x) * 0.25
       o.c.y += (alvo.y - o.c.y) * 0.25
     })
-    rotulo.setText(roubadas.length ? `ROUBADAS (${roubadas.length}) · ♣ RECUPERA A ÚLTIMA` : '')
+    rotulo.setText(roubadas.length ? `ROUBADAS ${roubadas.length}\n♣ recupera\na última` : '')
   }
 
   cena.events.on('update', atualizar)
