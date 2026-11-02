@@ -94,10 +94,10 @@ export default class PartyVoto extends Phaser.Scene {
     this.dica = this.texto(LARGURA / 2, ALTURA - 14, '← → escolher     A: votar (dá para trocar)     ↑ ↓ personagem', 13, TEXTO.desabilitado, { strokeThickness: 0 })
     this.trocarFundo()
     this.atualizarTela()
-
-    this.ligarRede()
     // o personagem da partida se escolhe aqui, na espera (party/seletor.js): depois do mapa a partida começa direto
     this.seletor = new Seletor(this, { y: 408 })
+
+    this.ligarRede()
     vigiarParty(this)
     if (import.meta.env.DEV) window.partyVoto = this
     this.events.once('shutdown', () => {
@@ -280,13 +280,13 @@ export default class PartyVoto extends Phaser.Scene {
     this.fundo?.atualizar(delta)
     if (this.apurando || this.saindo) return
     const d = this.controles.toque(meuLado())
+    if (d === 'cima' || d === 'baixo') this.seletor?.tratar(d)
     if (d === 'esquerda' || d === 'direita') {
       this.cursor = (this.cursor + (d === 'direita' ? 1 : -1) + this.opcoes.length) % this.opcoes.length
       tocar(this, 'mover')
       this.trocarFundo()
       this.atualizarTela()
     }
-    if (d === 'cima' || d === 'baixo') this.seletor?.tratar(d)
     const c = this.cartoes[this.cursor]
     this.coracao.setPosition(c.x, c.c.y - CARTAO.altura / 2 - 16 + Math.sin(time / 200) * 2)
     // o tempo: o do host vale (o convidado acerta o dele a cada partyVotos)

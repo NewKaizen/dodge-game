@@ -21,8 +21,8 @@ const CHEFE = { x: 172, y: 200 }
 // Transição de entrada na batalha (ms desde o A). Cada nível soma `porNivel`
 // ao clímax: DIFÍCIL segura a tensão um pouco mais e explode mais forte.
 const ENTRADA = { climax: 900, porNivel: 100, depois: 360 }
-const CURSOR_MS = 300 // em rede: de quanto em quanto o host manda o cursor de novo
 const AUTO_PARTY_S = 3 // party: o host confirma o nível sozinho depois disto
+const CURSOR_MS = 300 // em rede: de quanto em quanto o host manda o cursor de novo
 
 // A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
 // deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do init().
@@ -114,8 +114,8 @@ export default class Dificuldade extends Phaser.Scene {
     const ultimo = ORDEM_NIVEIS.indexOf(this.nivelInicial ?? this.registry.get('nivel'))
     this.selecionar(Math.max(0, ultimo), false)
     if (this.rede) this.ligarRede()
-    musica('selecao')
     if (autoParty) this.time.delayedCall(AUTO_PARTY_S * 1000, () => this.confirmar())
+    musica('selecao')
     this.cameras.main.fadeIn(250)
   }
 
