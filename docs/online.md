@@ -215,6 +215,16 @@ Testando: `node --test src/game/party/__tests__/regras.test.js server/__tests__/
 abas na mesma sala de 3–4: o dono aperta COMEÇAR PARTY; `window.partyVoto.votar(id)` / `estadoDebug()` e
 `window.partyFim.escolher('continuar' | 'sair')`; `window.partySemente = 'x'` (no host) fixa o sorteio do empate.
 
+## Boss semanal (Fase 4E)
+
+Toda segunda 00:00 de São Paulo entra um chefe novo (a semana vem do relógio do servidor). O cartão **BOSS
+SEMANAL** fica na tela ONLINE (à direita do JOGAR) e o boss também é uma opção da votação do Modo Party (só
+CO-OP). Sala do boss: CO-OP de 2 a 4. Vencer dá o **troféu exclusivo da semana** (uma vez por conta), pela mesma
+validação do XP do CO-OP (host decide + maioria, 60 s e 2 rodadas, convidado nada), migration
+`0010_boss_semanal.sql`. PROTOCOLO **15**: `bemvindo.semanal`, `semanalInfo`/`semanal`, `criar {semanal}`,
+`salaSemanal {valor}`, `party {acao: 'modo', semanal}`, `sala.semanal`, `resultado.semana` e
+`recompensa.trofeu`. Tudo em [boss-semanal.md](boss-semanal.md).
+
 ## Jogar Rápido (fila casual de PVP 1x1)
 
 Menu → **ONLINE** → **JOGAR RÁPIDO** (a primeira opção). Vale para quem tem

@@ -11,7 +11,7 @@ import { claraoCamera } from '../effects/flash.js'
 import { fatores } from '../acessibilidade.js'
 import { CORES, DIFICULDADES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 import { canal, emRede, meuIndice, meuLado, souHostDaRede, irParaCena, participantesDaPartida } from '../rede.js'
-import { iniciarPartida, partyModo, encerrarParty } from '../../lib/lan/rede.js'
+import { iniciarPartida, partyModo, encerrarParty, semanalAtual } from '../../lib/lan/rede.js'
 import { corDaVaga } from '../vagas.js'
 import { desenharForma, formaDaVaga } from '../coop/marcadores.js'
 import { desenharIcone } from './PvpVoto.js'
@@ -71,6 +71,8 @@ export default class PartyVoto extends Phaser.Scene {
     this.fase = this.dados.fase === 'mapa' ? 'mapa' : 'modo'
     this.modo = this.dados.modo ?? null
     this.opcoes = this.dados.opcoes
+    // BOSS SEMANAL: entra como mais um modo (CO-OP) quando o servidor mandou a semana (todos recebem a mesma)
+    if (this.fase === 'modo' && semanalAtual() && !this.opcoes.includes('semanal') && this.opcoes.includes('coop4')) this.opcoes = [...this.opcoes, 'semanal']
     this.idVoto = String(this.dados.id ?? '')
     this.meu = meuIndice()
     this.souHost = souHostDaRede()
@@ -167,6 +169,7 @@ export default class PartyVoto extends Phaser.Scene {
   // ---------- montagem ----------
 
   infoDe(id) {
+    if (this.fase === 'modo' && id === 'semanal') return { nome: 'BOSS SEMANAL', sub: (semanalAtual()?.nome ?? '').toUpperCase(), cor: MODOS_PARTY.semanal.cor }
     if (this.fase === 'modo') {
       const m = MODOS_PARTY[id]
       return { nome: m.rotulo, sub: m.sub, cor: m.cor }
@@ -202,6 +205,9 @@ export default class PartyVoto extends Phaser.Scene {
 
   // o desenho do cartão: o ícone do modo, o da arena ou o chefe
   montarArte(id, cor) {
+    // BOSS SEMANAL: o chefe da semana no cartão
+    const semanal = this.fase === 'modo' && id === 'semanal' ? CHEFES[semanalAtual()?.chefe] : null
+    if (semanal && this.textures.exists(semanal.sprite)) return [this.add.image(0, -40, semanal.sprite).setScale(ESCALA.chefe * 0.62)]
     if (this.fase === 'mapa' && this.modo === 'coop4') {
       const def = CHEFES[id]
       return def && this.textures.exists(def.sprite) ? [this.add.image(0, -40, def.sprite).setScale(ESCALA.chefe * 0.62)] : []
@@ -365,6 +371,13 @@ export default class PartyVoto extends Phaser.Scene {
     this.saindo = true
     const n = this.presentes().length
     if (this.fase === 'modo') {
+      // BOSS SEMANAL: CO-OP contra o chefe da semana, sem a votação do chefe (segue como se o mapa tivesse saído)
+      const semanal = semanalAtual()
+      if (vencedora === 'semanal' && semanal) {
+        partyModo('coop4', true)
+        Object.assign(this, { fase: 'mapa', modo: 'coop4', saindo: false })
+        return this.seguir(semanal.chefe)
+      }
       partyModo(vencedora) // o servidor fica sabendo o modo (o XP e a sala do 2x2 dependem dele)
       const anterior = this.registry.get('partyAnterior') ?? {}
       const pool = vencedora === 'coop4' ? ORDEM_CHEFES : ARENAS.map((a) => a.id)

@@ -2,7 +2,8 @@
 // sem rede (testada em __tests__/regras.test.js). As cenas são PartyVoto (votação do modo e do mapa)
 // e PartyFim (CONTINUAR / SAIR DA PARTY); quem conta o tempo e apura é o HOST da partida.
 //
-//   opcoesDeModo(n)                os modos que a party oferece com n membros (2x2 só com 4)
+//   opcoesDeModo(n, {semanal})     os modos que a party oferece com n membros (2x2 só com 4; BOSS SEMANAL
+//                                  com a semana do servidor, CO-OP: pula a votação do chefe)
 //   sortearTres(pool, anterior, rng)   3 opções do pool, sem a do jogo anterior se o pool deixar
 //   novaVotacao / votar / todosVotaram / votacaoAcabou / apurar   a votação (10 s, voto muda até acabar)
 //   novoFim / marcarFim / fimDecidido                              a tela CONTINUAR / SAIR (15 s)
@@ -18,15 +19,20 @@ export const MODOS_PARTY = {
   '2x2': { rotulo: '2x2', sub: 'EQUIPES', cor: 0xffd23a, min: 4, max: 4 },
   ffa: { rotulo: 'TODOS', sub: 'CONTRA TODOS', cor: 0xff3d6e, min: 3, max: 4 },
   coop4: { rotulo: 'CO-OP', sub: 'CONTRA O CHEFE', cor: 0x6dd0ff, min: 3, max: 4 },
+  // BOSS SEMANAL (docs/boss-semanal.md): CO-OP contra o chefe da semana; ganhar pula a votação do chefe
+  semanal: { rotulo: 'BOSS', sub: 'SEMANAL', cor: 0xffb060, min: 3, max: 4, coop: true },
 }
+// o modo da sala para cada opção da votação (o boss semanal é um CO-OP)
+export const modoDaOpcao = (opcao) => (opcao === 'semanal' ? 'coop4' : opcao)
 export const ehPvp = (modo) => modo === '2x2' || modo === 'ffa'
 
 // a party continua com 3 ou 4 (com 2 ela acaba e todos voltam ao lobby)
 export const partySegue = (n) => n >= MIN_PARTY && n <= MAX_PARTY
 
-export function opcoesDeModo(n) {
+// semanal: o servidor mandou a semana (o BOSS SEMANAL entra no fim, só online)
+export function opcoesDeModo(n, { semanal = false } = {}) {
   if (!partySegue(n)) return []
-  return Object.keys(MODOS_PARTY).filter((id) => n >= MODOS_PARTY[id].min && n <= MODOS_PARTY[id].max)
+  return Object.keys(MODOS_PARTY).filter((id) => (id !== 'semanal' || semanal) && n >= MODOS_PARTY[id].min && n <= MODOS_PARTY[id].max)
 }
 
 // 3 opções distintas do pool, em ordem de sorteio. A do jogo anterior só entra se o pool não tiver

@@ -14,6 +14,7 @@ import { criarParty, avisoRepetido } from '../coop/partyN.js'
 import { desenharForma, formaDaVaga, nomeNoCoracao } from '../coop/marcadores.js'
 import { CHEFES } from '../coop/chefes/index.js'
 import { partyAtiva, vigiarParty } from '../party/cliente.js'
+import { salaSemanal } from '../../lib/lan/rede.js'
 
 // Area da grade de personagens e do painel de detalhes (px)
 const GRADE = { topo: 70, base: 262, esquerda: 40, direita: LARGURA - 40, espaco: 10, larguraMax: 188, alturaMax: 180 }
@@ -60,6 +61,9 @@ export default class EscolhaPartyN extends Phaser.Scene {
   // na party o chefe já foi votado (PartyVoto): pula a Selecao e vai ao nível (o host escolhe; o cursor
   // começa no último usado)
   irParaLuta(lista) {
+    // BOSS SEMANAL (sala do boss, ou a party votou nele): o chefe é o da semana, sem Selecao
+    const semanal = salaSemanal()
+    if (semanal && CHEFES[semanal.chefe]) return irParaCena(this, 'Dificuldade', { chefe: semanal.chefe, party: lista, nivel: this.registry.get('nivel') })
     const chefe = this.sys.settings.data?.chefe
     if (partyAtiva() && CHEFES[chefe]) return irParaCena(this, 'Dificuldade', { chefe, party: lista, nivel: this.registry.get('nivel') })
     irParaCena(this, 'Selecao', { party: lista, chefe: this.registry.get('chefe') })

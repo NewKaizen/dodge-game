@@ -31,6 +31,8 @@ export function prepararXpCoop(cena, { vitoria, estatisticas }) {
     duracao: Math.round((estatisticas?.tempoMs ?? 0) / 1000),
     // (3 ou 4 jogadores: o personagem da MINHA vaga; com 2, o lado de sempre)
     personagem: partyDe(cena.registry)[partyDe(cena.registry).length > 2 ? meuIndice() : meuLado()] ?? null,
+    // BOSS SEMANAL: a semana do chefe desta luta (a arena guarda; null fora do boss semanal)
+    semana: cena.registry.get('semanal') ?? null,
   })
   if (!s.eu.conta) xp.motivo = 'convidado'
   const parar = lan.subscribe((estado) => {
@@ -95,6 +97,8 @@ export function mostrarPainelXp(cena, xp, { x = LARGURA / 2, y, profundidade = 1
   const titulo = texto(cena, 0, y, '', 16, COR.ok).setOrigin(0, 0.5).setDepth(profundidade)
   const nota = texto(cena, 0, y, '', 12, COR.dica, { strokeThickness: 3 }).setOrigin(0, 0.5).setDepth(profundidade)
   const nivel = texto(cena, x - BARRA.w / 2 - 8, y + 17, '', 11, COR.descricao, { strokeThickness: 3 }).setOrigin(1, 0.5).setDepth(profundidade)
+  // BOSS SEMANAL: o troféu exclusivo da semana (a recompensa traz `trofeu`)
+  const trofeu = texto(cena, x, y + 31, '', 11, COR.gold, { strokeThickness: 3 }).setOrigin(0.5).setDepth(profundidade)
   const g = cena.add.graphics().setDepth(profundidade)
   let animacao = null
 
@@ -123,6 +127,7 @@ export function mostrarPainelXp(cena, xp, { x = LARGURA / 2, y, profundidade = 1
       nota.setText('')
       return centrar()
     }
+    if (r.trofeu) trofeu.setText(r.trofeu.novo ? `TROFÉU SEMANAL: ${itemDoCatalogo(r.trofeu.id)?.nome ?? r.trofeu.id}! (na Coleção)` : 'o troféu desta semana já é seu')
     if (!r.xpGanho || r.xpTotal == null) {
       semXp(r.motivo || 'sem_relato')
       if (r.xpTotal != null) barra(r.xpTotal)

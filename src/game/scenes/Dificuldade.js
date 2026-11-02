@@ -12,6 +12,7 @@ import { claraoCamera, alphaClarao } from '../effects/flash.js'
 import { partyDe } from '../data/batalha.js'
 import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
 import { partyAtiva } from '../party/cliente.js'
+import { salaSemanal } from '../../lib/lan/rede.js'
 
 // painel do chefe à esquerda (62..282) e as opções à direita (322..792): bloco centralizado em 854
 const OPCAO = { x: 557, largura: 470, altura: 100, y: 128, passo: 112 }
@@ -288,7 +289,8 @@ export default class Dificuldade extends Phaser.Scene {
 
   voltar() {
     if (this.saindo) return
-    if (!this.host || partyAtiva()) return this.soHost() // (na party o chefe foi votado: não volta)
+    // (na party o chefe foi votado; no BOSS SEMANAL o chefe é o da semana: não volta)
+    if (!this.host || partyAtiva() || (this.rede && salaSemanal())) return this.soHost()
     this.saindo = true
     tocar(this, 'mover')
     this.cameras.main.fadeOut(200, 0, 0, 0)

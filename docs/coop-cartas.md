@@ -406,6 +406,12 @@ derrota: perde quando todos os que ainda estão na luta caíram).
 - a CPU aliada (`bot.js`) já sabe escolher o aliado que mais precisa, mas o modo de 3–4 não tem CPU: dá para completar a
   sala com CPU depois.
 
+## Boss semanal
+
+Dois chefes fora da Selecao (`semanal: true`), um por semana, só no CO-OP online: a **Escuridão** (desvie pelo
+som) e a **Ladra de Cartas** (rouba e joga as suas cartas; ♣ recupera). Regras, acessibilidade e o troféu
+exclusivo em [boss-semanal.md](boss-semanal.md).
+
 ## Arquivos
 
 | Arquivo | O que faz |

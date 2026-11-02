@@ -243,7 +243,9 @@ export const trocarMdns = (texto, ip) => (typeof texto === 'string' ? texto.repl
 // sem ele as partidas não dão XP)
 // eleicaoMs: a janela de medição da eleição do host (anexarLan usa ELEICAO_MS; sem
 // ela, 0: decide na hora só com os pings que o servidor já tem)
-export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null, relacoes = null, registro = null, agendar = agendarPadrao, log = () => {}, metricas = METRICAS_NULA } = {}) {
+export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null, relacoes = null, registro = null, agendar = agendarPadrao, log = () => {}, metricas = METRICAS_NULA } = {}) {
+  // BOSS SEMANAL: a semana do relógio daqui (deslocarSemana: só no dev, DODGE_SEMANA=n semanas para a frente)
+  const semanaAgora = () => infoSemanal(agora() + deslocarSemana)
   const clientes = new Map() // id -> cliente
   const salas = new Map() // id -> sala
   const codigos = new Map() // código -> id da sala
@@ -357,7 +359,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
     if (!sala.semanal || sala.emPartida || sala.party) return
     sala.modo = sala.membros.size >= 3 ? 'coop4' : 'coop'
   }
-  const semanalDaSala = (sala) => (sala.semanal ? (sala.semanalFixo ?? infoSemanal(agora())) : null)
+  const semanalDaSala = (sala) => (sala.semanal ? (sala.semanalFixo ?? semanaAgora()) : null)
   // a menor vaga livre (o host é sempre a 0)
   const vagaLivre = (sala) => {
     const usadas = new Set(membrosDaSala(sala).map((c) => c.vaga))
@@ -683,7 +685,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       online,
       ice,
       conta: c.perfil,
-      semanal: infoSemanal(agora()),
+      semanal: semanaAgora(),
       retomada: darChave(c),
       ...(negada && { retomadaNegada: negada }),
       ...(tentouConta && !c.usuario && { contaInvalida: true }),
@@ -770,7 +772,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       online,
       ice,
       conta: velho.perfil,
-      semanal: infoSemanal(agora()),
+      semanal: semanaAgora(),
       retomada: darChave(velho),
       retomado: true,
     })
@@ -841,7 +843,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
       sala.esperaInicio = null
     }
     // BOSS SEMANAL: a semana da partida é a do relógio daqui agora (fica fixa até ela acabar)
-    if (sala.emPartida && !antes) sala.semanalFixo = sala.semanal ? infoSemanal(agora()) : null
+    if (sala.emPartida && !antes) sala.semanalFixo = sala.semanal ? semanaAgora() : null
     if (sala.emPartida && !antes) partidas.iniciar(sala, membrosDaPartida(sala))
     else if (!sala.emPartida && antes) partidas.encerrou(sala)
     if (!sala.emPartida) sala.semanalFixo = null
@@ -987,7 +989,7 @@ export function criarLobby({ eleicaoMs = 0, locais = enderecosLocais, salasRede 
     },
     // BOSS SEMANAL: a semana de agora (o lobby pede de novo na virada)
     semanalInfo(c) {
-      enviar(c, { t: 'semanal', ...infoSemanal(agora()) })
+      enviar(c, { t: 'semanal', ...semanaAgora() })
     },
     // (dono, no lobby) a sala vira (ou deixa de ser) a do boss semanal: CO-OP de 2 a 4
     salaSemanal(c, m) {
@@ -1386,10 +1388,10 @@ function criarDescoberta(lobby, porta, log) {
 
 // online: servidor na internet (sem descoberta UDP, salas por código)
 // ice: [{ urls, username?, credential? }] para o WebRTC dos navegadores
-export function anexarLan(httpServer, { log = console.log, descoberta = true, online = false, ice = [], maxClientes = MAX_CLIENTES, autenticar = null, relacoes = null, registro = null, metricas = METRICAS_NULA } = {}) {
+export function anexarLan(httpServer, { deslocarSemana = 0, log = console.log, descoberta = true, online = false, ice = [], maxClientes = MAX_CLIENTES, autenticar = null, relacoes = null, registro = null, metricas = METRICAS_NULA } = {}) {
   let rede = null
   const porta = () => httpServer.address()?.port
-  const lobby = criarLobby({ eleicaoMs: ELEICAO_MS, online, ice, autenticar, relacoes, registro, metricas, log, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
+  const lobby = criarLobby({ deslocarSemana, eleicaoMs: ELEICAO_MS, online, ice, autenticar, relacoes, registro, metricas, log, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 * 1024 })
   if (descoberta && !online) rede = criarDescoberta(lobby, porta, log)
 
