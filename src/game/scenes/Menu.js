@@ -24,7 +24,7 @@ import { montarAvisos } from '../conta/avisos.js'
 // DE TV (Config > Gráficos), uma sala aconchegante com a turma sentada no tapete
 // assistindo e a luz do telão iluminando tudo (menu/sala.js). Logo no canto de cima à esquerda, opções alinhadas à
 // esquerda. CO-OP (-> EscolhaParty) e PVP (-> PvpEscolha): a luz do telão engole
-// a sala. ONLINE (-> Lan: lobby para jogar com amigos, pela internet ou pela rede), GUIA (-> Grimorio:
+// a sala. ONLINE (-> Lan: lobby para jogar com amigos, pela internet ou pela rede), GUIA (-> GuiaEntrada: MANUAL DO RALSEI ou Grimorio:
 // todas as cartas com a prévia do ataque e as rodadas bônus de cada arena) e
 // CONFIGURAÇÕES (-> Config), JOGAR RÁPIDO (-> Lan, já entrando na fila) e PERFIL (-> Perfil, a conta
 // dentro do jogo) só escurecem a tela. JOGAR RÁPIDO e PERFIL só existem onde há conta ou internet
@@ -45,7 +45,7 @@ const CENA_PVP = 'PvpEscolha'
 const CO_OP = { id: 'coop', rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty', dica: 'cartas juntos contra um chefe' }
 const PVP = { id: 'pvp', rotulo: 'PVP', cor: '#ff3d6e', cena: CENA_PVP, dica: 'duelo de cartas: quem desvia, vence' }
 const ONLINE = { id: 'lan', rotulo: 'ONLINE', cor: '#3fd6c8', cena: 'Lan', dica: 'jogar com amigos (internet ou rede local)' }
-const GUIA = { id: 'cartas', rotulo: 'GUIA', cor: '#b48cff', cena: 'Grimorio', dica: 'todas as cartas e as rodadas bônus das arenas' }
+const GUIA = { id: 'cartas', rotulo: 'GUIA', cor: '#b48cff', cena: 'GuiaEntrada', dica: 'manual do Ralsei, cartas e rodadas bônus das arenas' }
 const CONFIG = { id: 'config', rotulo: 'CONFIGURAÇÕES', cor: '#f2c14e', cena: 'Config', dica: 'som, controles, acessibilidade e gráficos' }
 const RAPIDO = { id: 'rapido', rotulo: 'JOGAR RÁPIDO', cor: '#ffd23a', cena: 'Lan', dados: { rapido: true }, dica: 'PVP 1x1 contra alguém da fila, já!' }
 const PERFIL = { id: 'perfil', rotulo: 'PERFIL', cor: '#6dffb0', cena: 'Perfil', dica: '' }
