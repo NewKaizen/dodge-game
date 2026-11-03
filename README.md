@@ -13,6 +13,7 @@ Controle: teclado, controle físico (gamepad) ou joystick pela porta serial ([do
 npm install
 npm run dev     # http://localhost:5173
 npm test        # regras do PvP, do CO-OP, fichas do Guia e lobby LAN (node --test)
+npm run lint    # ESLint: nomes não declarados, chaves repetidas, código inalcançável (ver docs/contribuindo.md)
 npm run build
 npm run lan     # compila e serve o jogo para a rede (modo LAN): http://<ip>:5180
 npm run online  # compila e liga o servidor ONLINE (o que vai para a internet)
