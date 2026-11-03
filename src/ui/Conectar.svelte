@@ -1,5 +1,7 @@
 <script>
+  import { onDestroy } from 'svelte'
   import { jogo } from '../lib/estado.js'
+  import { conectarSerial, serialSuportado } from '../lib/serial.js'
   import { alternarTelaCheia } from '../lib/telaCheia.js'
   import { lan, sairSala } from '../lib/lan/rede.js'
   import { pingPartida, ROTAS, corDoPing } from '../lib/lan/transmissao.js'
@@ -13,6 +15,25 @@
   // controle ou o joystick serial já autorizado. Aqui só um resumo discreto.
   const NOMES = { teclado: 'teclado', gamepad: 'controle', serial: 'joystick serial' }
   let ligados = $derived(Object.keys(NOMES).filter((f) => $jogo.fontes[f]).map((f) => NOMES[f]))
+
+  // botão opcional do joystick USB: só onde o navegador tem Web Serial. O clique é o gesto que o
+  // navegador exige para mostrar a janela de escolha da porta (o mesmo pareamento de CONFIGURAÇÕES)
+  const podeSerial = serialSuportado()
+  let avisoUsb = $state('')
+  let tempoAviso
+  async function parearUsb() {
+    clearTimeout(tempoAviso)
+    try {
+      await conectarSerial()
+      avisoUsb = 'Joystick USB conectado.'
+    } catch (e) {
+      if (e?.name === 'NotFoundError' || e?.name === 'AbortError') avisoUsb = 'Nenhum joystick escolhido.'
+      else if (e?.name === 'SecurityError') avisoUsb = 'Clique de novo: o navegador exige um gesto.'
+      else avisoUsb = `Não abriu: ${e?.message ?? e}`
+    }
+    tempoAviso = setTimeout(() => (avisoUsb = ''), 4000)
+  }
+  onDestroy(() => clearTimeout(tempoAviso))
 </script>
 
 {#if naSala}
@@ -32,6 +53,10 @@
 
 <div class="conectar">
   <span class="dica">{ligados.length ? `controles: ${ligados.join(' · ')}${$jogo.numJogadores > 1 && !naSala ? ' · 2 jogadores' : ''}` : 'aperte uma tecla ou um botão do controle para jogar'}</span>
+  {#if podeSerial}
+    <button onclick={parearUsb} title="Pareia um joystick USB (porta serial)">🔌 Joystick USB</button>
+  {/if}
+  {#if avisoUsb}<span class="dica" role="status">{avisoUsb}</span>{/if}
   <button onclick={alternarTelaCheia}>⛶ Tela cheia (F)</button>
 </div>
 

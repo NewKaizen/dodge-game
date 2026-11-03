@@ -10,9 +10,10 @@ import { criarSala } from '../menu/sala.js'
 import { criarTelao } from '../menu/telao.js'
 import { criarLogo } from '../menu/logo.js'
 import { criarMesa } from '../menu/mesa.js'
-import { pref } from '../preferencias.js'
+import { pref, definirPref } from '../preferencias.js'
 import { souHost, salaDoLink, siteNaInternet } from '../../lib/lan/rede.js'
 import { conta } from '../../lib/conta.js'
+import { serialSuportado, listarJoysticks } from '../../lib/serial.js'
 import { avatarDoPerfil } from '../../lib/contaRegras.js'
 import { corDaMoldura, progressoDoXp } from '../../lib/progresso.js'
 import { criarAvatar } from '../conta/ui.js'
@@ -51,6 +52,12 @@ const PERFIL = { id: 'perfil', rotulo: 'PERFIL', cor: '#6dffb0', cena: 'Perfil',
 // cenas que não explodem a sala: só escurecem a tela e abrem
 const SO_ESCURECEM = ['config', 'cartas', 'lan', 'rapido', 'perfil']
 
+// Joystick USB: o caminho do pareamento (CONFIGURAÇÕES → GAMEPAD) não aparece em lugar nenhum, então uma
+// linha discreta no canto avisa. Só com Web Serial, sem joystick pareado nunca, e até o jogador abrir
+// CONFIGURAÇÕES daqui uma vez (aí ele já sabe onde fica).
+const dicaJoystickUsbVisivel = () =>
+  serialSuportado() && !pref('dicaJoystickUsb') && Object.keys(pref('joysticksSerial') ?? {}).length === 0 && listarJoysticks().length === 0
+
 // JOGAR RÁPIDO e PERFIL: onde há conta (ou o site está na internet, mesmo que as contas estejam fora do ar)
 const comConta = () => siteNaInternet() || get(conta).estado !== 'indisponivel'
 const montarLista = (comContas) => (comContas ? [RAPIDO, CO_OP, PVP, ONLINE, GUIA, PERFIL, CONFIG] : [CO_OP, PVP, ONLINE, GUIA, CONFIG])
@@ -67,6 +74,7 @@ const estadoInicial = () => ({
   aviso: null,
   miniatura: null,
   barras: null,
+  dicaUsb: null,
 })
 
 export default class Menu extends Phaser.Scene {
@@ -107,6 +115,7 @@ export default class Menu extends Phaser.Scene {
     this.logo = criarLogo(this, area, { titulo: TITULO, subtitulo: SUBTITULO, escala: area.escala ?? 1 })
     this.montarOpcoes()
     this.montarCantos()
+    this.montarDicaUsb()
     montarAvisos(this)
 
     musica('menu', 'jevil')
@@ -234,11 +243,21 @@ export default class Menu extends Phaser.Scene {
     this.add.text(LARGURA - 108, ALTURA - 18, '↑↓ MOVER', estilo(11, '#c8c8d8')).setOrigin(1, 0.5).setDepth(30)
   }
 
+  // o aviso do joystick USB, no canto de baixo à direita, acima da barra de botões
+  montarDicaUsb() {
+    if (!dicaJoystickUsbVisivel()) return
+    this.dicaUsb = this.add
+      .text(LARGURA - 14, ALTURA - 44, 'Joystick USB? CONFIGURAÇÕES → GAMEPAD', { fontFamily: FONTE, fontSize: '11px', color: '#c8c8d8', backgroundColor: 'rgba(0,0,0,0.45)', padding: { x: 6, y: 3 } })
+      .setOrigin(1, 0.5)
+      .setDepth(30)
+  }
+
   confirmar() {
     if (this.saindo || !this.pronto || !this.conectado) return
     this.saindo = true
     const opcao = this.opcoes[this.indice]
     this.registry.set('menuOpcao', opcao.id)
+    if (opcao.id === 'config') definirPref('dicaJoystickUsb', true) // quem abriu CONFIGURAÇÕES já viu o caminho
     if (SO_ESCURECEM.includes(opcao.id)) {
       tocar(this, 'confirmar')
       this.cameras.main.fadeOut(220, 0, 0, 0)
