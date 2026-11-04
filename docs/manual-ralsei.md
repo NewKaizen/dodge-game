@@ -1,19 +1,20 @@
-# O Manual Interativo do Ralsei (páginas 1 a 4)
+# O Manual Interativo do Ralsei (páginas 1 a 5)
 
 Tutorial em forma de caderno desenhado a giz de cera, jogável. O Ralsei entrega um manual feito à mão; ao virar
 a página os desenhos ganham vida e o jogador mexe no coração **dentro da ilustração**, com as regras reais do
 jogo. Começou como UMA página para validar a sensação (plano em
-[plano-fases-2-6.md](plano-fases-2-6.md#fase-3-manual-interativo-do-ralsei)); agora são quatro (coração, desvio, cartas e energia), com índice e progresso salvo.
+[plano-fases-2-6.md](plano-fases-2-6.md#fase-3-manual-interativo-do-ralsei)); agora são cinco (coração, desvio, cartas, energia e uma partida de verdade contra a CPU), com índice,
+progresso salvo e o adesivo de quem termina: MANUAL ESSENCIAL ✓.
 
 Entrada: **Menu → GUIA → MANUAL DO RALSEI** abre o **índice** (cena `GuiaEntrada`, modo `indice`): CONTINUAR
-(a primeira página que falta, só quando já há progresso), PÁGINA 1 a PÁGINA 4, com ✓ nas completas e os adesivos
-das páginas 2 a 4 na dica. Uma página completa abre do zero ("jogar de novo"); uma página pela metade retoma na
+(a primeira página que falta, só quando já há progresso), PÁGINA 1 a PÁGINA 5, com ✓ nas completas e os adesivos
+das páginas 2 a 4 na dica; quem terminou a página 5 ganha o selo "★ MANUAL ESSENCIAL ✓" embaixo do título. Uma página completa abre do zero ("jogar de novo"); uma página pela metade retoma na
 primeira mini-lição (ou passo) que falta. `B` sai do manual a qualquer momento (volta ao índice; `B` de novo, ao GUIA e ao Menu). O guia
 de antes, "CARTAS E ARENAS", continua intacto na outra opção do GUIA.
 
 Navegação: página 1 → (a folha vira e a página seguinte continua do mesmo papel, sem fade) → página 2
-(`ManualRalsei2`) → página 3 (`ManualRalsei3`) → página 4 (`ManualRalsei4`) → (vira) → página 5 "continua…" → `A`
-volta ao índice.
+(`ManualRalsei2`) → página 3 (`ManualRalsei3`) → página 4 (`ManualRalsei4`) → (vira) → página 5 (`ManualRalsei5`) →
+(a folha descola) → a partida de verdade (`ManualRalsei5Partida`) → (a folha volta) → parabéns → (vira) → "e agora?".
 
 ## A página 1, "Este é o seu coração"
 
@@ -98,6 +99,8 @@ Passo 3 `jogar`: o Coro agora cabe (o ★ continua `falta energia (5/10)`); ele 
 (a carta que dá mas não é a pedida, o ★, PASSAR fora de hora) só traz a fala; pular o PASSAR faz o Ralsei passar por
 você (a energia do passo 3 continua certa), e retomar no passo 3 também.
 
+**A virada da página 4** mostra a capa da página 5 (`montarCapaDaPagina5`) e troca para `ManualRalsei5` sem fade.
+
 ### Regras e ataques reais
 
 - **Cartas**: as do baralho (`pvp/cartas.js`), por id (`cartasDoManual.js`: `MAO_P3`, `MAO_P4`); nada inventado.
@@ -119,11 +122,64 @@ números, com uma biblioteca de ataques falsa); e, rodando os **ataques de verda
 o relógio da Pista e que **só a Estrela Gentil cai de cima** (a dica "faz chover" é verdade). `pagina3.test.js` e
 `pagina4.test.js` cobrem as máquinas (escolher, ataque, erro, ajuda, demonstração, pular, adesivos, retomar, gemas).
 
+## A página 5, "Uma partida de verdade"
+
+Uma partida **de verdade** contra a CPU, curta e mansa, com dicas só quando precisa. O caderno em volta é a
+cena `ManualRalsei5` (máquina pura em `manual/pagina5.js`); a partida é a cena `ManualRalsei5Partida`, que
+**estende a `PvpArena`** (as regras, as cartas, as Pistas, a CPU, o K.O. e o replay de sempre).
+
+| Etapa (`pagina5.js`) | O que acontece |
+| --- | --- |
+| `intro` | Ralsei fala em 3 balões. No cartão, a **arena do PvP desenhada a giz**, nas posições da arena de verdade (`rabiscoDaArena`: moldura, caixas com os corações, barras de vida, gemas, mãos, PASSAR, o céu, o morro e o canteiro do jardim). |
+| `enchendo` | (1,5 s) o desenho cresce até a tela inteira (o lugar exato da arena real) enquanto o resto da página sai, e o giz **ganha cor**. A arena real começa a carregar **por baixo** (`lancarArena`, com `{ cortina: true }`: ela espera). |
+| `descolando` | (0,9 s) a folha vira contra a espiral (`virarFolha`) e a mesa some: por baixo está a arena de verdade, onde o desenho estava. A arena abre (`abrir()`: a abertura "JOGADOR 1 vs CPU") e o caderno sai. |
+| `partida` | a arena joga (ver abaixo). |
+| `voltando` | (0,9 s) no fim, a arena relança o caderno com `{ resultado }`: a folha volta por cima da arena (`virarFolha` com `volta`). |
+| `parabens` | ganhando, perdendo ou empatando, o Ralsei comemora ("você aprendeu o básico!") e cola o adesivo dourado **MANUAL ESSENCIAL ✓** (com confete); o progresso salva na hora (`comPagina5`). |
+| `virando` / `eAgora` | a folha vira para a página **"e agora?"**: ↑/↓ e `A` entre **JOGAR CONTRA A CPU** (`PvpEscolha`), **ONLINE** (`Lan`), **CARTAS E ARENAS** (`Grimorio`, o guia de antes) e **VOLTAR AO ÍNDICE**. |
+
+"Reduzir animações": sem crescer, colorir, descolar e voltar (cortes; a arena começa sem cortina), balão inteiro,
+sem confete. `B` sai para o índice a qualquer hora; no meio da partida ele **pede confirmação** (a `Pausa` já abre no
+"TEM CERTEZA?" do SAIR, com `confirmarSaida`; SAIR vai ao índice do manual com `dadosSair`).
+
+### A partida mansa (`manual/partidaDoManual.js`)
+
+Você é a Kris; a CPU é o **Ralsei**, no nível mais fácil (`facil`, o primeiro de `NIVEIS_BOT`: escolha de carta e
+esquiva). As vidas ficam em 3/4 (`fatorHp`, por `ajustarPartida` no `criarEstado` da arena): uns 2 a 3 minutos.
+Sem relógio na escolha (`tempo: 0`), sem rodada bônus (`prepararBonus`) e sem morte súbita (`atualizarAceleracao`).
+A **semente é fixa** (`manual:p5:12`): na 1ª rodada a CPU joga a Estrela Gentil (chove na sua caixa) e a sua mão tem
+o SUPER, que ainda não cabe (as dicas têm onde aparecer; `partidaDoManual.test.js` confere com o `escolherJogada` e
+o `motivoBloqueio` de verdade). Ganchos novos na `PvpArena` (sem mudar a partida normal): `ladoDaCpu`, `nivelDaCpu`,
+`criarEstado` e `irParaResultado`.
+
+### As dicas (`manual/dicasDaPartida.js`)
+
+Um motorzinho puro que reage aos **eventos reais** da arena (nenhuma regra nova: os ganchos só olham):
+
+| Dica | Gatilho real | Máx. | Fases | Seta para |
+| --- | --- | --- | --- | --- |
+| "Falta energia: que tal PASSAR?" | `apertarA` numa carta com `motivoBloqueio` `sem-energia` | 2 | escolha | o PASSAR |
+| "Esse ataque vem de cima: fique embaixo!" | as balas que nascem na **sua** caixa entram por cima e descem (`criarLeitorDeChuva`, o critério do teste da página 3, decidido já na 1ª estrela) | 1 | esquiva | o alto da caixa |
+| "Você levou dano: olhe a sua vida aqui." | `aplicarAcerto` no seu coração | 1 | esquiva → escolha | a barra de vida |
+| "Calma, desvie com cuidado." | o acerto que deixa a vida em 35% ou menos | 1 | esquiva → escolha | — |
+| "A energia enche quando você passa e a cada rodada." | você passou (`escolher` com `null`) ou começou a 2ª rodada | 1 | início, escolha | as gemas |
+
+Uma dica de cada vez (3,8 s na tela, 1,2 s de respiro), a mais urgente primeiro; **nunca trava** o jogo. Nas fases
+cheias (abertura, revelação, SUPER, roleta, duelo, resultado) e com a câmera lenta do K.O. ou a pausa, nenhuma dica
+aparece: a que estava some e a que chegou espera a fase dela até a validade acabar (e então é esquecida, sem contar).
+No baralho todo do Ralsei, só a Estrela Gentil é "de cima" (testado rodando os ataques reais).
+
+O **treinador** (`manual/treinador.js`) é um Ralsei de giz pequenininho no canto de baixo à direita (o lado da CPU:
+a sua mão e a sua caixa ficam livres), com o balão do caderno (fonte clara) e uma seta amarela de giz cutucando o
+alvo. Calmo: sem deslizar, balão inteiro, seta parada.
+
 ## Progresso salvo
 
 Preferência `manual` em `preferencias.js`, validada por `manual/progresso.js` (lixo salvo vira "nada ainda", nunca
 erro): `{ p1: { completa }, p2: { completa, licoes: [null | 'feita' | 'pulada' x4] }, p3: { completa, passos: [x2] },
-p4: { completa, passos: [x3] } }`. `p3`/`p4` podem faltar (o progresso salvo antes delas continua valendo). A página 1
+p4: { completa, passos: [x3] }, p5: { completa }, essencial }`. `p3`/`p4`/`p5`/`essencial` podem faltar (o progresso
+salvo antes delas continua valendo); `essencial` só vale junto com `p5` (`comPagina5` marca os dois: a página 5
+conta ganhando ou perdendo, mesmo sem as outras completas; `essencialCompleto` alimenta o selo do índice). A página 1
 salva ao concluir; as outras salvam cada mini-lição/passo (pular nunca apaga um adesivo ganho, `comLicao`/`comPasso`)
 e a página ao concluir (`comPagina2`/`comPagina`). `paginaParaRetomar` e
 `resumoDoIndice` alimentam o índice.
@@ -186,6 +242,10 @@ Tudo puro (sem Phaser, determinístico por semente, testado em `__tests__/`), me
 | `vitrineNaTela.js` | a câmera da vitrine (Phaser): a região do mundo da vitrine desenhada em cima da lousa |
 | `licaoDeCartas.js` | a máquina de estados das páginas de cartas (escolher, atacando, enchendo, errou, ajuda, demo, adesivos) |
 | `pagina3.js` / `pagina4.js` | as cartas, os passos e as falas das páginas 3 e 4 |
+| `pagina5.js` | a máquina do caderno da página 5 (intro, encher, descolar, voltar, parabéns, "e agora?") |
+| `partidaDoManual.js` | a partida mansa da página 5 (CPU, vidas, semente, sem bônus) |
+| `dicasDaPartida.js` | o motor de dicas da partida e o leitor de "ataque de cima" |
+| `treinador.js` | o Ralsei do canto da arena, com o balão e as setas (Phaser) |
 
 Desempenho: tudo o que não muda é **assado uma vez** numa textura de canvas (sementes fixas: reabrir a cena
 reaproveita). Por quadro só se troca a textura das variantes (tremidinho a cada 170 ms, `VARIANTES = 3`) e se move
@@ -196,7 +256,8 @@ imagens; o "desenhando" repinta uma textura pequena (a área da caixa) por ~2,7 
 - "reduzir animações": giz parado, Ralsei parado (sem respirar/piscar/pular; as caras mudam), balão inteiro de uma
   vez, virada de página trocada na hora (corte), seta e brilhos parados, sem rastro das bolinhas, sem confete; nas
   páginas de cartas a carta não voa (só apaga quando o ataque começa), o boneco não balança e o coraçãozinho da
-  demonstração não pula.
+  demonstração não pula; na página 5 a transição para a arena e a volta são cortes, e o treinador entra e sai sem
+  deslizar (balão inteiro, seta parada).
   **A linha pontilhada da mira fica** (é informação, não enfeite) e é parada (nunca pisca).
 - Clarões desligados: sem confete. O confete segue o nível de "festa" dos gráficos.
 - Nenhum clarão (acerto = risquinhos parados). Jogabilidade igual em qualquer ajuste.
@@ -214,7 +275,8 @@ imagens; o "desenhando" repinta uma textura pequena (a área da caixa) por ~2,7 
    monta o que é dela (cartão, doodles da margem nos lugares livres do seu layout, a ilustração jogável) e
    escolhe a cara do Ralsei com `expressaoDoRalsei` (ou uma regra sua). A página anterior mostra a capa desta atrás da
    folha que vira (exporte um `montarCapaDaPaginaN`) e troca de cena sem fade.
-4. Registrar a cena em `config.js` e, se for cena de menu, em `rede.js` (`CENAS_DE_MENU`); somar a página em
+4. Registrar a cena em `config.js` e, se for cena de menu, em `rede.js` (`CENAS_DE_MENU`; a `ManualRalsei5Partida`
+   não é: no meio da partida, convite não entra); somar a página em
    `progresso.js` (`PAGINAS`, formato e validação) e no índice (`DICAS_PAGINA` em `GuiaEntrada`).
    Uma página de CARTAS nova: passos em `licaoDeCartas.js` (avaliar com `acao` 'atacar' | 'passar' | 'negar'), uma
    mesa de `criarMesa`, e uma entrada em `PAGINAS_CARTAS` de `ManualRalsei3.js`; ataque sempre por `planoDaVitrine`.
@@ -228,8 +290,10 @@ imagens; o "desenhando" repinta uma textura pequena (a área da caixa) por ~2,7 
 ## Testes e verificação
 
 `npm test` cobre `manual/__tests__/` (giz, cera, papel, Ralsei e caras, balão/doodles, confete, contraste, máquinas de
-estados das páginas 1 a 4, padrões com semente, "dá para passar" e "parado leva acerto", **paridade com Balas/Heart
-reais** e **paridade das cartas** (`paridadeCartas.test.js`), progresso das 4 páginas e a preferência salva, botões)
+estados das páginas 1 a 5, padrões com semente, "dá para passar" e "parado leva acerto", **paridade com Balas/Heart
+reais** e **paridade das cartas** (`paridadeCartas.test.js`), progresso das 5 páginas e do manual essencial e a
+preferência salva, botões, as **dicas da partida** (`dicasDaPartida.test.js`: cada gatilho, o máximo, as fases cheias,
+a validade, o "de cima" com os ataques reais) e a **partida mansa** (`partidaDoManual.test.js`))
 e `__tests__/musicaTutorial.test.js` (o MIDI).
 O fluxo completo foi jogado no navegador (Playwright + Chromium, software GL), normal e com "reduzir animações":
 GUIA → índice vazio → página 1 inteira → virada para a página 2 → as 4 mini-lições (um erro de propósito e o recomeço
@@ -242,3 +306,8 @@ estrela dourada → virada para a página 4 → o Bolinho (erro), o Coro bloquea
 → o ★ ainda bloqueado (5/10, erro) → o Coro paga 3 e ataca → estrela dourada → página 5 "continua…" → índice com ✓
 nas quatro. Noutra aba (normal e calma): 3 erros na página 3, ajuda, demonstração, "pular esta parte" e a estrela
 com o adesivo faltando. Nenhum erro de página.
+Página 5: CONTINUAR · PÁGINA 5 → intro → o desenho cresce, ganha cor e a folha descola → a arena real → o SUPER
+bloqueado (dica "falta energia") → PASSAR → a Estrela Gentil chovendo (dica "vem de cima") → os acertos (dicas da
+vida e "calma") → a rodada 2 (dica da energia) → (DEV: `pvpArena.setHp(1, 0)` para acabar) → a folha volta →
+parabéns com o adesivo → "e agora?" → índice com o selo MANUAL ESSENCIAL. Também com "reduzir animações". E uma
+partida PvP normal contra a CPU pelo Menu, sem dicas nem treinador. Nenhum erro de página.
