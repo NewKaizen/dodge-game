@@ -2,11 +2,12 @@ import Phaser from 'phaser'
 import { ATAQUE, CORES } from '../constants.js'
 import { RAIO_BALA } from '../arte/texturas.js'
 import { avisar } from '../attacks/validacao.js'
-
-const MARGEM = 160 // distância fora da caixa em que a bala é removida
+import { MARGEM_FORA as MARGEM, avisoDaBala, balaEntrando, andarBala, quicarNaCaixa, longeDaCaixa, foraDaCaixa, folgaDaBala, entrada, distanciaFora } from './fisica.js'
 const ESCALA_BARRA = 32 / 24 // textura bala-barra: miolo de 24px numa tela de 32px
 
 // Balas de uma Pista: aviso (telegrafo), movimento, colisão e graze.
+// As REGRAS (movimento, aviso, colisão) ficam em entities/fisica.js, sem Phaser: o Manual do Ralsei
+// usa as mesmas (manual/__tests__/paridade.test.js roda esta classe lado a lado com o manual).
 // As balas aparecem também na faixa de aproximação em volta da caixa
 // (BattleBox.aproximar): dá para ver a bala chegando de fora. Enquanto está
 // TODA fora da caixa ela não acerta nem dá graze (o coração nunca sai da caixa).
@@ -61,7 +62,7 @@ export default class Balas {
     if (!propria) sprite.setTint(o.cor ?? CORES.bala)
     else if (o.cor !== undefined) sprite.setTint(o.cor)
     const entrando = this.entrando(o)
-    const aviso = o.jaAvisada || entrando ? 0 : (o.aviso ?? ATAQUE.telegrafoMs)
+    const aviso = avisoDaBala(o, this.limites)
 
     if (!o.jaAvisada && !entrando && aviso < ATAQUE.telegrafoMs) {
       avisar(`telegrafo:${o.origem}`, `[telegrafo] ${o.origem}: bala com aviso de ${aviso}ms (mínimo ${ATAQUE.telegrafoMs}ms)`)
@@ -131,18 +132,12 @@ export default class Balas {
   entrando(o) {
     if (o.entrando === false || o.jaAvisada) return false
     const l = this.limites
-    const fora = !Phaser.Geom.Rectangle.Contains(l, o.x, o.y)
     if (o.entrando) {
+      const fora = !Phaser.Geom.Rectangle.Contains(l, o.x, o.y)
       if (!fora) avisar(`entrada:${o.origem}`, `[telegrafo] ${o.origem}: bala "entrando" nasceu dentro da caixa (vale na hora, sem aviso)`)
       else if (distanciaFora(l, o.x, o.y) > MARGEM) avisar(`entrada-longe:${o.origem}`, `[telegrafo] ${o.origem}: bala "entrando" nasceu a mais de ${MARGEM}px da caixa (some na hora)`)
-      return true
     }
-    if (o.aviso !== undefined || !fora) return false
-    const vx = o.vx || o.ax || 0
-    const vy = o.vy || o.ay || 0
-    if (!vx && !vy) return false
-    const ponto = entrada(l, o.x, o.y, vx, vy)
-    return ponto.x !== o.x || ponto.y !== o.y
+    return balaEntrando(o, l)
   }
 
   // Se a bala nasce fora da caixa, um "!" pisca na borda por onde ela vai entrar
@@ -164,7 +159,6 @@ export default class Balas {
 
   // aoAcertar(coracao, bala) deve devolver true se o acerto contou
   atualizar(dt, coracoes, aoAcertar, aoGrazear) {
-    const s = dt / 1000
     const l = this.limites
 
     for (const b of this.lista) {
@@ -178,33 +172,14 @@ export default class Balas {
         if (!b.inofensiva && !b.piscar) b.sprite.setAlpha(1) // piscando: animar() cuida do alpha
       }
 
-      if (b.arranque && b.idade - b.aviso >= b.arranque.ms) {
-        b.vx = b.arranque.vx
-        b.vy = b.arranque.vy
-        if (b.arranque.ax !== undefined) b.ax = b.arranque.ax
-        if (b.arranque.ay !== undefined) b.ay = b.arranque.ay
-        b.arranque = null
-      }
-      b.vx += b.ax * s
-      b.vy += b.ay * s
-      let vx = b.vx * this.fatorVelocidade
-      let vy = b.vy * this.fatorVelocidade
-      const v = Math.hypot(vx, vy)
-      if (v > this.velocidadeMax) {
-        vx *= this.velocidadeMax / v
-        vy *= this.velocidadeMax / v
-      }
-      b.x += vx * s
-      b.y += vy * s
-      if (b.tipo === 'segmento') b.angulo += b.girar * s
-      if (b.quicar > 0) this.quicar(b, l)
+      andarBala(b, dt, this.fatorVelocidade, this.velocidadeMax)
+      if (b.quicar > 0) quicarNaCaixa(b, l)
       b.vida -= dt
       b.atualizar?.(b, dt)
       b.sprite.setPosition(b.x, b.y)
       if (b.tipo === 'segmento') b.sprite.setRotation(b.angulo)
 
-      const alcance = MARGEM + (b.comprimento ?? 0) / 2
-      const fora = b.x < l.left - alcance || b.x > l.right + alcance || b.y < l.top - alcance || b.y > l.bottom + alcance
+      const fora = longeDaCaixa(b, l)
       if (b.morta || fora || b.vida <= 0) {
         b.morta = true
         continue
@@ -239,18 +214,7 @@ export default class Balas {
 
   // A bala inteira ainda está fora da caixa? (pela caixa que envolve a forma dela)
   foraDaCaixa(b) {
-    const l = this.limites
-    let mx
-    let my
-    if (b.tipo === 'circulo') mx = my = b.raio
-    else if (b.tipo === 'retangulo') {
-      mx = b.largura / 2
-      my = b.altura / 2
-    } else {
-      mx = (Math.abs(Math.cos(b.angulo)) * b.comprimento) / 2 + b.espessura / 2
-      my = (Math.abs(Math.sin(b.angulo)) * b.comprimento) / 2 + b.espessura / 2
-    }
-    return b.x + mx < l.left || b.x - mx > l.right || b.y + my < l.top || b.y - my > l.bottom
+    return foraDaCaixa(b, this.limites)
   }
 
   // tira da lista (e da tela) as balas mortas
@@ -278,35 +242,9 @@ export default class Balas {
     }
   }
 
-  quicar(b, l) {
-    const r = b.tipo === 'circulo' ? b.raio : 0
-    if (b.x - r < l.left && b.vx < 0) this.rebater(b, 'vx', l.left + r, 'x')
-    else if (b.x + r > l.right && b.vx > 0) this.rebater(b, 'vx', l.right - r, 'x')
-    if (b.quicar <= 0) return
-    if (b.y - r < l.top && b.vy < 0) this.rebater(b, 'vy', l.top + r, 'y')
-    else if (b.y + r > l.bottom && b.vy > 0) this.rebater(b, 'vy', l.bottom - r, 'y')
-  }
-
-  rebater(b, eixoV, limite, eixo) {
-    b[eixoV] = -b[eixoV]
-    b[eixo] = limite
-    b.quicar--
-  }
-
   // Distância entre um ponto e a borda da bala (negativa = dentro)
   folga(b, px, py) {
-    if (b.tipo === 'circulo') return Math.hypot(px - b.x, py - b.y) - b.raio
-    if (b.tipo === 'retangulo') {
-      const dx = Math.max(Math.abs(px - b.x) - b.largura / 2, 0)
-      const dy = Math.max(Math.abs(py - b.y) - b.altura / 2, 0)
-      return Math.hypot(dx, dy)
-    }
-    const cos = Math.cos(b.angulo)
-    const sin = Math.sin(b.angulo)
-    const rx = px - b.x
-    const ry = py - b.y
-    const t = Phaser.Math.Clamp(rx * cos + ry * sin, -b.comprimento / 2, b.comprimento / 2)
-    return Math.hypot(rx - t * cos, ry - t * sin) - b.espessura / 2
+    return folgaDaBala(b, px, py)
   }
 
   // Fim do ataque: nada mais causa dano e tudo some em `ms`
@@ -327,31 +265,4 @@ export default class Balas {
     }
     this.lista = []
   }
-}
-
-// Quanto (px) o ponto está fora do retângulo (0 = dentro ou na borda)
-function distanciaFora(l, x, y) {
-  return Math.max(l.left - x, x - l.right, l.top - y, y - l.bottom, 0)
-}
-
-// Ponto em que a reta (x, y) + t·(vx, vy) entra no retângulo
-function entrada(l, x, y, vx, vy) {
-  let tMin = 0
-  let tMax = Infinity
-  for (const [p, v, min, max] of [
-    [x, vx, l.left, l.right],
-    [y, vy, l.top, l.bottom],
-  ]) {
-    if (Math.abs(v) < 1e-6) {
-      if (p < min || p > max) return { x, y }
-      continue
-    }
-    let t1 = (min - p) / v
-    let t2 = (max - p) / v
-    if (t1 > t2) [t1, t2] = [t2, t1]
-    tMin = Math.max(tMin, t1)
-    tMax = Math.min(tMax, t2)
-  }
-  if (tMin > tMax) return { x, y }
-  return { x: x + vx * tMin, y: y + vy * tMin }
 }

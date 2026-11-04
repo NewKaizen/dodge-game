@@ -1,4 +1,6 @@
 import { CORACAO } from '../constants.js'
+import { criarOnda, moverCoracao, limitesDe } from './onda.js'
+import { folgaDaBala as folgaReal, foraDaCaixa } from '../entities/fisica.js'
 
 // Página 1 do Manual do Ralsei, "Este é o seu coração" (+ um gostinho da página 2):
 // a máquina de estados e as regras, SEM Phaser (testada em __tests__/pagina1.test.js). A cena
@@ -15,10 +17,10 @@ import { CORACAO } from '../constants.js'
 //   virando      a cena anima a virada e chama p.terminouDeVirar()
 //   fim          página 2 ainda não existe ("continua…")
 //
-// REGRAS REAIS: o movimento do coração é o de entities/Heart.js (vetor limitado a 1, velocidade em px/s,
-// preso à caixa) e o acerto é o de entities/Bullets.js (folga = distância ao centro - raio; acerta se
-// folga <= CORACAO.hitbox). O desenho de giz (manual/giz.js) NUNCA entra aqui: o tremor do traço não
-// muda onde a bala acerta.
+// REGRAS REAIS, de uma fonte só: o coração anda e as balas andam/acertam por entities/fisica.js, o mesmo
+// módulo que entities/Heart.js e entities/Bullets.js usam (manual/onda.js é a "Pista" de bolso; a
+// paridade com as classes reais é testada em __tests__/paridade.test.js). O desenho de giz
+// (manual/giz.js) NUNCA entra aqui: o tremor do traço não muda onde a bala acerta.
 
 export const ETAPAS = ['intro', 'desenhando', 'marcas', 'desviar', 'tentarDeNovo', 'concluida', 'virando', 'fim']
 
@@ -61,28 +63,19 @@ export const BALAS = [
   { t: 5700, lado: 'dir', f: 0.32, v: 80, mira: false },
 ]
 
-// Movimento do Heart.update: joy -100..100, vetor limitado a 1 (diagonal não é mais rápida), preso à caixa
-export function moverCoracao(coracao, joy, velocidade, dt, caixa, meio = CORACAO.tamanho / 2) {
-  let dx = (joy?.x ?? 0) / 100
-  let dy = (joy?.y ?? 0) / 100
-  const m = Math.hypot(dx, dy)
-  if (m > 1) {
-    dx /= m
-    dy /= m
-  }
-  const passo = velocidade * (dt / 1000)
-  coracao.x = Math.min(Math.max(coracao.x + dx * passo, caixa.esquerda + meio), caixa.direita - meio)
-  coracao.y = Math.min(Math.max(coracao.y + dy * passo, caixa.topo + meio), caixa.base - meio)
-}
+// Movimento do Heart.update (entities/fisica.js passoDoCoracao): joy -100..100, vetor limitado a 1, preso à caixa
+export { moverCoracao }
+
+const circulo = (b) => ({ tipo: 'circulo', ...b })
 
 // folga de uma bala redonda ao ponto (Balas.folga): negativa = o ponto está dentro dela
-export const folgaDaBala = (b, px, py) => Math.hypot(px - b.x, py - b.y) - b.raio
+export const folgaDaBala = (b, px, py) => folgaReal(circulo(b), px, py)
 
-// A bala acerta o miolo do coração? (Balas.tocar: só vale com a bala já na caixa)
+// A bala acerta o miolo do coração? (Balas.tocar, sem a checagem de "fora da caixa")
 export const balaAcerta = (b, coracao, hitbox = CORACAO.hitbox) => folgaDaBala(b, coracao.x, coracao.y) <= hitbox
 
 // A bala inteira ainda está fora da caixa? (Balas.foraDaCaixa, para o círculo)
-export const balaFora = (b, caixa) => b.x + b.raio < caixa.esquerda || b.x - b.raio > caixa.direita || b.y + b.raio < caixa.topo || b.y - b.raio > caixa.base
+export const balaFora = (b, caixa) => foraDaCaixa(circulo(b), limitesDe(caixa))
 
 // A marca foi alcançada pelo centro do coração?
 export const marcaAlcancada = (m, coracao, raio = RAIO_MARCA) => Math.hypot(coracao.x - m.x, coracao.y - m.y) <= raio
@@ -107,7 +100,7 @@ export function criarPagina1({ caixa, velocidade = CORACAO.velocidadePadrao, hit
     desenho: { caixa: 0, coracao: 0, marcas: 0 },
     coracao: { x: cx, y: cy },
     marcas: MARCAS.map((m) => ({ x: caixa.esquerda + m.fx * larg, y: caixa.topo + m.fy * alt, forma: m.forma, pega: false })),
-    balas: [],
+    onda: criarOnda(caixa),
     decorrido: 0, // ms de desvio já sobrevividos (depois do preparo)
     proxima: 0, // índice da próxima bala a nascer
     falhas: 0,
@@ -139,7 +132,7 @@ export function criarPagina1({ caixa, velocidade = CORACAO.velocidadePadrao, hit
     },
 
     reiniciarDesvio() {
-      p.balas = []
+      p.onda.limpar()
       p.decorrido = 0
       p.proxima = 0
       p.tentativa++
@@ -172,13 +165,13 @@ export function criarPagina1({ caixa, velocidade = CORACAO.velocidadePadrao, hit
           p.decorrido += dt
           while (p.proxima < BALAS.length && p.decorrido >= BALAS[p.proxima].t) nascer(BALAS[p.proxima++])
         }
-        andarBalas(dt)
-        if (emJogo && p.balas.some((b) => !balaFora(b, caixa) && balaAcerta(b, p.coracao, p.hitbox))) {
+        const acertou = p.onda.passo(dt, { x: p.coracao.x, y: p.coracao.y, hitbox: p.hitbox })
+        if (emJogo && acertou) {
           p.falhas++
           p.eventos.push({ tipo: 'acerto', falhas: p.falhas })
           irPara('tentarDeNovo')
         } else if (p.decorrido >= SOBREVIVER_MS) {
-          p.balas = []
+          p.onda.limpar()
           irPara('concluida')
         }
       } else if (p.etapa === 'tentarDeNovo') {
@@ -186,6 +179,10 @@ export function criarPagina1({ caixa, velocidade = CORACAO.velocidadePadrao, hit
       }
     },
 
+    // as balas vivas (as da onda: x, y, raio, vx, vy...)
+    get balas() {
+      return p.onda.lista
+    },
     // fração 0..1 do desvio já sobrevivido (a barra de progresso)
     get progressoDesvio() {
       return Math.min(1, p.decorrido / SOBREVIVER_MS)
@@ -236,16 +233,9 @@ export function criarPagina1({ caixa, velocidade = CORACAO.velocidadePadrao, hit
       dx = mx / m
       dy = my / m
     }
-    p.balas.push({ x, y, vx: dx * def.v * f, vy: dy * def.v * f, raio: RAIO_BALA, semente: p.balas.length + p.proxima * 7 })
-  }
-
-  function andarBalas(dt) {
-    for (const b of p.balas) {
-      b.x += b.vx * (dt / 1000)
-      b.y += b.vy * (dt / 1000)
-    }
-    // some quando passou bem do outro lado
-    p.balas = p.balas.filter((b) => b.x > caixa.esquerda - 60 && b.x < caixa.direita + 60 && b.y > caixa.topo - 60 && b.y < caixa.base + 60)
+    // nasce fora da caixa e entra voando: como no jogo, a entrada pela borda é o aviso (Balas.entrando)
+    const b = p.onda.bala({ x, y, vx: dx * def.v * f, vy: dy * def.v * f, raio: RAIO_BALA, origem: 'manual:p1' })
+    b.semente = p.onda.criadas + p.proxima * 7
   }
 
   return p

@@ -69,7 +69,7 @@ test('fluxo: intro -> desenhando -> marcas -> desviar -> concluida -> virando ->
   for (const m of p.marcas) ir(p, m.x, m.y)
   assert.equal(p.etapa, 'desviar')
   // coração parado no canto da última marca? as balas miram e precisamos de um jogador que desvia:
-  p.balas = []
+  p.onda.limpar()
   p.hitbox = -1e9 // só para este teste de fluxo: nada acerta
   rodar(p, PREPARO_MS + SOBREVIVER_MS + 100)
   assert.equal(p.etapa, 'concluida')

@@ -7,7 +7,7 @@ import { ATAQUE, CORACAO } from '../constants.js'
 
 export const LACUNA_MINIMA = CORACAO.tamanho * ATAQUE.lacunaMinima
 
-const DEV = import.meta.env.DEV
+const DEV = import.meta.env?.DEV // ?.: importável também no Node (testes)
 const jaAvisados = new Set()
 
 export function avisar(chave, mensagem) {
