@@ -1,5 +1,5 @@
 import { aleatorio } from '../pvp/baralho.js'
-import { circuloGiz, coracaoGiz, contornoDoCoracao, estrelaGiz, linhaGiz, poligonoGiz, preencherGiz, setaGiz, xGiz } from './giz.js'
+import { circuloGiz, coracaoGiz, contornoDoCoracao, estrelaGiz, linhaGiz, poligonoGiz, preencherGiz, retanguloGiz, setaGiz, xGiz } from './giz.js'
 import { PALETA } from './cera.js'
 import { elipse } from './ralsei.js'
 
@@ -420,4 +420,86 @@ export function iconeDoPasso(rng, id, r = 11) {
     return c
   }
   return []
+}
+
+// ---------- página 5: a arena desenhada a giz ----------
+
+// A ARENA DO PVP em giz, NO MESMO LUGAR da arena de verdade (a cena passa as posições da PvpArena): a
+// moldura, as duas caixas com os corações, as barras de vida e as gemas, as mãos e os PASSAR, a costura
+// do meio. Devolve duas listas de camadas: `contorno` (o desenho a giz) e `cor` (o colorido que "enche" o
+// desenho antes da folha descolar e mostrar a arena real por baixo).
+//   L = { moldura: { x, y, largura, altura, cor }, caixas: [{ x, y, largura, altura, cor }],
+//         barras: [{ x, y, largura, altura, cor }], gemas: [[{ x, y }]], maos: [{ x, y }], passar: [{ x, y }],
+//         paisagem?: { ceu: [cor, ...] (faixas de cima para baixo), horizonte, morro, terra, flores: [cor, ...] } }
+//   (a paisagem é a do fundo da arena: o jardim tem o céu do pôr do sol, o morro e o canteiro de flores)
+export function rabiscoDaArena(rng, L) {
+  const contorno = []
+  const cor = []
+  const r = (x, y, w, h, raio = 6) => retanguloRedondo(x, y, w, h, raio)
+  const fechar = (poli) => [[...poli, poli[0], poli[1]]]
+  const m = L.moldura
+  const borda = r(m.x, m.y, m.largura, m.altura, 16)
+  const pa = L.paisagem
+  cor.push({ tipo: 'mancha', poligono: r(0, 0, m.x + m.largura + m.x, m.y + 4, 1), cor: 0x14101e, alpha: 0.92 }) // a faixa escura do HUD
+  if (pa) {
+    // o céu em faixas de giz deitado, o morro ondulado e o canteiro com florzinhas
+    const x0 = m.x + 2
+    const x1 = m.x + m.largura - 2
+    const fim = pa.horizonte
+    const passo = (fim - m.y) / pa.ceu.length
+    pa.ceu.forEach((c, k) => {
+      const y = m.y + 2 + k * passo
+      const faixa = [{ x: x0, y }, { x: x1, y }, { x: x1, y: y + passo + 1 }, { x: x0, y: y + passo + 1 }]
+      cor.push({ tipo: 'mancha', poligono: faixa, cor: c, alpha: 0.85 })
+      cor.push({ tipo: 'preencher', poligono: faixa, cor: c, alpha: 0.5, espaco: 8, angulo: -0.2 })
+    })
+    const morro = [{ x: x0, y: fim + 40 }]
+    for (let x = x0; x <= x1; x += 34) morro.push({ x, y: fim - 6 - Math.abs(Math.sin(x / 90)) * 18 })
+    morro.push({ x: x1, y: fim - 6 }, { x: x1, y: fim + 40 })
+    cor.push({ tipo: 'mancha', poligono: morro, cor: pa.morro, alpha: 0.95 })
+    const terra = r(x0, fim + 38, x1 - x0, m.y + m.altura - fim - 40, 14)
+    cor.push({ tipo: 'mancha', poligono: terra, cor: pa.terra, alpha: 0.95 })
+    for (let k = 0; k < 46; k++) {
+      const fx = x0 + 14 + aleatorio(rng) * (x1 - x0 - 28)
+      const fy = fim + 52 + aleatorio(rng) * (m.y + m.altura - fim - 66)
+      cor.push({ tipo: 'mancha', poligono: elipse(fx, fy, 3.2, 3.2, 8), cor: pa.flores[k % pa.flores.length], alpha: 1 })
+    }
+  } else cor.push({ tipo: 'mancha', poligono: borda, cor: 0x172219, alpha: 0.92 })
+  contorno.push({ tipo: 'traco', tracos: fechar(borda), cor: m.cor, largura: 3.2, passadas: 2 })
+  // a costura do meio, tracejada
+  const meio = m.x + m.largura / 2
+  for (let y = m.y + 10; y < m.y + 270; y += 16) contorno.push({ tipo: 'traco', tracos: linhaGiz(rng, meio, y, meio, y + 7, { tracos: 1, excesso: 0.5, tremor: 0.5 }), cor: m.cor, largura: 1.8, passadas: 1 })
+  for (const c of L.caixas) {
+    contorno.push({ tipo: 'traco', tracos: retanguloGiz(rng, c.x, c.y, c.largura, c.altura, { tremor: 0.9, excesso: 3 }), cor: c.cor, largura: 3.6, passadas: 2 })
+    const cx = c.x + c.largura / 2
+    const cy = c.y + c.altura / 2
+    cor.push({ tipo: 'mancha', poligono: contornoDoCoracao(cx, cy, 16), cor: c.coracao ?? c.cor, alpha: 1 })
+    contorno.push({ tipo: 'traco', tracos: coracaoGiz(rng, cx, cy, 18, { tracos: 2, tremor: 0.5 }), cor: c.coracao ?? c.cor, largura: 2.4, passadas: 2 })
+  }
+  for (const b of L.barras) {
+    const poli = r(b.x, b.y, b.largura, b.altura, 2)
+    cor.push({ tipo: 'mancha', poligono: poli, cor: b.cor, alpha: 1 })
+    contorno.push({ tipo: 'traco', tracos: retanguloGiz(rng, b.x - 2, b.y - 2, b.largura + 4, b.altura + 4, { tremor: 0.6, excesso: 2, tracos: 1 }), cor: 0x5a4a7a, largura: 2, passadas: 2 })
+  }
+  for (const lado of L.gemas) {
+    for (const g of lado) {
+      const losango = [{ x: g.x, y: g.y - 5 }, { x: g.x + 4, y: g.y }, { x: g.x, y: g.y + 5 }, { x: g.x - 4, y: g.y }]
+      cor.push({ tipo: 'mancha', poligono: losango, cor: 0x3ab0ff, alpha: g.cheia ? 1 : 0.25 })
+      contorno.push({ tipo: 'traco', tracos: [[...losango, losango[0]]], cor: 0x7fd8ff, largura: 1.4, passadas: 1 })
+    }
+  }
+  for (const mao of L.maos) {
+    for (let k = 0; k < 5; k++) {
+      const x = mao.x + (k - 2) * 30 - 22
+      const poli = r(x, mao.y - 31, 44, 62, 5)
+      cor.push({ tipo: 'mancha', poligono: poli, cor: 0xf4ecff, alpha: 0.95 })
+      contorno.push({ tipo: 'traco', tracos: fechar(poli), cor: PALETA.lavanda, largura: 2.2, passadas: 2 })
+    }
+  }
+  for (const p of L.passar) {
+    const poli = r(p.x - 22, p.y - 32, 44, 64, 6)
+    cor.push({ tipo: 'mancha', poligono: poli, cor: 0x0b0914, alpha: 0.95 })
+    contorno.push({ tipo: 'traco', tracos: fechar(poli), cor: 0x5a4a7a, largura: 2.2, passadas: 2 })
+  }
+  return { contorno, cor }
 }
