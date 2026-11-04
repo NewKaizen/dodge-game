@@ -7,7 +7,7 @@ import { ARENA } from '../pvp/arenas.js'
 // de sempre (pvp/regras.js); aqui só se escolhe COMO a partida começa:
 //   p1 / p2      você é a Kris; o Ralsei é a CPU (as cartas mansas dele, com a Estrela Gentil que chove)
 //   nivel        o nível mais fácil da CPU (bot.js e botEsquiva.js: NIVEIS_BOT)
-//   fatorHp      as duas vidas pela metade: a partida dura uns 2 a 3 minutos
+//   fatorHp      as duas vidas menores (3/4): a partida dura uns 2 a 3 minutos
 //   semente      fixa: as mãos e as escolhas da CPU são sempre as mesmas (na 1ª rodada a CPU joga a
 //                Estrela Gentil, e na sua mão há uma carta que ainda não cabe: as dicas têm onde aparecer)
 //   tempo        0: sem relógio para escolher a carta (dá para pensar com calma)
@@ -18,7 +18,7 @@ export const PARTIDA_DO_MANUAL = {
   p1: 'kris',
   p2: 'ralsei',
   nivel: 'facil',
-  fatorHp: 0.5,
+  fatorHp: 0.75,
   semente: 'manual:p5:12',
   tempo: 0,
   bonus: false,

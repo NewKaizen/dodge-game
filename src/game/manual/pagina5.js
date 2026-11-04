@@ -34,7 +34,7 @@ export const FALAS_FIM = {
   perdeu: ['Essa foi por pouco! Ganhar ou perder faz parte.', 'O importante: você aprendeu o básico! Este adesivo é seu.'],
   empate: ['Empate! Ninguém caiu sozinho.', 'E você aprendeu o básico! Este adesivo é seu.'],
 }
-export const FALA_E_AGORA = 'E agora? Escolha a sua próxima aventura!'
+export const FALA_E_AGORA = 'Você terminou o manual essencial! Escolha a sua próxima aventura:'
 
 export const OPCOES_E_AGORA = [
   { id: 'cpu', rotulo: 'JOGAR CONTRA A CPU', dica: 'uma partida normal, com o nível que você quiser' },

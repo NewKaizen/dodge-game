@@ -140,7 +140,7 @@ function chuvaDoAtaque(id) {
 
 test('"esse ataque vem de cima": reconhece a Estrela Gentil (cedo) e não as de lado ou de estourar', () => {
   const t = chuvaDoAtaque(CHUVA_P3)
-  assert.ok(t !== null && t < 1500, `a chuva é vista logo no começo do ataque (${t} ms)`)
+  assert.ok(t !== null && t < 800, `a chuva é vista logo na 1ª estrela do ataque (${t} ms)`)
   for (const id of MAO_P3.filter((x) => x !== CHUVA_P3)) assert.equal(chuvaDoAtaque(id), null, id)
   // no baralho todo da CPU da página 5 (o Ralsei), só a Estrela Gentil chove: a dica nunca mente
   const ataquesDaCpu = CARTAS[PARTIDA_DO_MANUAL.p2].filter((c) => c.naipe !== 'copas' && c.valor !== 1)

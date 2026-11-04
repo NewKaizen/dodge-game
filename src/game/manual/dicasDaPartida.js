@@ -105,7 +105,10 @@ export function criarDicas({ duracaoMs = DICA_MS, intervaloMs = INTERVALO_MS, di
 // por cima da caixa e descem. O mesmo critério do teste da página 3 ("só a Estrela Gentil faz chover"),
 // aplicado às balas reais da Pista.
 //   const leitor = criarLeitorDeChuva()
-//   leitor.ver(balas.lista, caixa.limites)   true no quadro em que a chuva foi reconhecida (uma vez por ataque)
+//   leitor.ver(balas.lista, caixa.limites)   true no quadro em que a chuva foi reconhecida (uma vez por ataque):
+//                                            o leitor decide já pela 1ª estrela que nasce (minimo 1), para a
+//                                            dica chegar antes do primeiro acerto, e para de olhar depois das
+//                                            `olharAte` primeiras balas grandes
 //   leitor.reiniciar()                       ataque novo
 export function ehChuva(nascidas, { minimo = 2, fracao = 0.75 } = {}) {
   const grandes = nascidas.filter((b) => (b.raio ?? 6) >= 6)
@@ -114,7 +117,7 @@ export function ehChuva(nascidas, { minimo = 2, fracao = 0.75 } = {}) {
   return deCima.length >= grandes.length * fracao
 }
 
-export function criarLeitorDeChuva({ minimo = 2, fracao = 0.75, olharAte = 8 } = {}) {
+export function criarLeitorDeChuva({ minimo = 1, fracao = 0.75, olharAte = 8 } = {}) {
   let vistas = new WeakSet()
   let nascidas = []
   let decidiu = false
