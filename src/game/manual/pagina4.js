@@ -71,7 +71,7 @@ export const PASSOS4 = [
 export const TEXTOS4 = {
   concluida: 'Você entendeu energia, custo e passar! A página 4 está completa.',
   concluidaPulou: 'Página 4 completa! Volte quando quiser para pegar o adesivo que faltou.',
-  fim: 'A página 5 ainda está sendo desenhada… continua!',
+  fim: 'Vire a página: agora é uma partida de verdade!',
 }
 
 export const SLOTS4 = [...MAO_P4, PASSAR]
