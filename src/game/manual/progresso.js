@@ -1,32 +1,51 @@
 // O progresso do Manual do Ralsei (lógica pura; fica salvo em preferencias.js, chave 'manual').
 // Valida tudo o que vem do navegador: um valor estranho vira o progresso vazio, nunca um erro.
 //
-//   { p1: { completa: bool }, p2: { completa: bool, licoes: [null | 'feita' | 'pulada' x4] } }
+//   { p1: { completa: bool },
+//     p2: { completa: bool, licoes: [null | 'feita' | 'pulada' x4] },
+//     p3: { completa: bool, passos: [null | 'feita' | 'pulada' x2] },
+//     p4: { completa: bool, passos: [null | 'feita' | 'pulada' x3] } }
+//
+//   p3 e p4 podem faltar (progresso salvo antes das páginas 3 e 4 existirem): valem como "nada ainda".
 //
 //   progressoValido(v)             o valor pode ser salvo? (null também: "nada ainda")
 //   normalizarProgresso(v)         sempre um progresso completo e limpo
 //   comPagina1(prog) / comLicao(prog, i, resultado) / comPagina2(prog)   cópias atualizadas
-//   paginaParaRetomar(prog)        1 ou 2: a primeira página que falta (ou null: tudo pronto)
+//   comPasso(prog, pagina, i, resultado) / comPagina(prog, pagina)        idem, para as páginas 3 e 4
+//   paginaParaRetomar(prog)        1 a 4: a primeira página que falta (ou null: tudo pronto)
 //   resumoDoIndice(prog)           as linhas do índice: [{ pagina, titulo, completa, adesivos, total }]
 
 export const TOTAL_LICOES_P2 = 4
+export const TOTAL_PASSOS = { 3: 2, 4: 3 } // passos (adesivos) das páginas de cartas
 export const PAGINAS = [
   { pagina: 1, titulo: 'Este é o seu coração', cena: 'ManualRalsei' },
   { pagina: 2, titulo: 'Vamos desviar?', cena: 'ManualRalsei2' },
+  { pagina: 3, titulo: 'Sua primeira carta', cena: 'ManualRalsei3' },
+  { pagina: 4, titulo: 'Nem toda rodada pede ataque', cena: 'ManualRalsei4' },
 ]
 const RESULTADOS = [null, 'feita', 'pulada']
+const PAGINAS_DE_PASSOS = [3, 4]
 
-export const progressoVazio = () => ({ p1: { completa: false }, p2: { completa: false, licoes: Array(TOTAL_LICOES_P2).fill(null) } })
+const vazioDePassos = (n) => ({ completa: false, passos: Array(TOTAL_PASSOS[n]).fill(null) })
+export const progressoVazio = () => ({ p1: { completa: false }, p2: { completa: false, licoes: Array(TOTAL_LICOES_P2).fill(null) }, p3: vazioDePassos(3), p4: vazioDePassos(4) })
 
 const objeto = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
+const listaValida = (l, n) => Array.isArray(l) && l.length === n && l.every((x) => RESULTADOS.includes(x))
 
 export function progressoValido(v) {
   if (v === null) return true
   if (!objeto(v) || !objeto(v.p1) || !objeto(v.p2)) return false
   if (typeof v.p1.completa !== 'boolean' || typeof v.p2.completa !== 'boolean') return false
-  const l = v.p2.licoes
-  return Array.isArray(l) && l.length === TOTAL_LICOES_P2 && l.every((x) => RESULTADOS.includes(x))
+  if (!listaValida(v.p2.licoes, TOTAL_LICOES_P2)) return false
+  for (const n of PAGINAS_DE_PASSOS) {
+    const p = v[`p${n}`]
+    if (p === undefined) continue
+    if (!objeto(p) || typeof p.completa !== 'boolean' || !listaValida(p.passos, TOTAL_PASSOS[n])) return false
+  }
+  return true
 }
+
+const aproveitar = (lista, n) => Array.from({ length: n }, (_, i) => (Array.isArray(lista) && RESULTADOS.includes(lista[i]) ? lista[i] : null))
 
 // aproveita o que dá de um valor meio estragado (cada campo é conferido sozinho)
 export function normalizarProgresso(v) {
@@ -34,9 +53,16 @@ export function normalizarProgresso(v) {
   if (!objeto(v)) return p
   if (objeto(v.p1) && v.p1.completa === true) p.p1.completa = true
   if (objeto(v.p2)) {
-    if (Array.isArray(v.p2.licoes)) p.p2.licoes = p.p2.licoes.map((_, i) => (RESULTADOS.includes(v.p2.licoes[i]) ? v.p2.licoes[i] : null))
+    p.p2.licoes = aproveitar(v.p2.licoes, TOTAL_LICOES_P2)
     // completa só vale com todas as mini-lições resolvidas (feita ou pulada)
     p.p2.completa = v.p2.completa === true && p.p2.licoes.every(Boolean)
+  }
+  for (const n of PAGINAS_DE_PASSOS) {
+    const salvo = v[`p${n}`]
+    if (!objeto(salvo)) continue
+    const q = p[`p${n}`]
+    q.passos = aproveitar(salvo.passos, TOTAL_PASSOS[n])
+    q.completa = salvo.completa === true && q.passos.every(Boolean)
   }
   return p
 }
@@ -60,11 +86,31 @@ export function comPagina2(prog) {
   return p
 }
 
+// páginas 3 e 4: um passo resolvido (pular não apaga um adesivo já ganho)
+export function comPasso(prog, pagina, i, resultado) {
+  const p = normalizarProgresso(prog)
+  const q = p[`p${pagina}`]
+  if (!PAGINAS_DE_PASSOS.includes(pagina) || !Number.isInteger(i) || i < 0 || i >= TOTAL_PASSOS[pagina] || !RESULTADOS.includes(resultado) || !resultado) return p
+  if (q.passos[i] !== 'feita') q.passos[i] = resultado
+  return p
+}
+
+// páginas 3 e 4: completa só com todos os passos resolvidos
+export function comPagina(prog, pagina) {
+  if (pagina === 1) return comPagina1(prog)
+  if (pagina === 2) return comPagina2(prog)
+  const p = normalizarProgresso(prog)
+  const q = p[`p${pagina}`]
+  if (q && q.passos.every(Boolean)) q.completa = true
+  return p
+}
+
+const completaDe = (p, n) => p[`p${n}`].completa
+
 export function paginaParaRetomar(prog) {
   const p = normalizarProgresso(prog)
-  if (!p.p1.completa) return 1
-  if (!p.p2.completa) return 2
-  return null
+  const falta = PAGINAS.find(({ pagina }) => !completaDe(p, pagina))
+  return falta ? falta.pagina : null
 }
 
 export function resumoDoIndice(prog) {
@@ -72,5 +118,9 @@ export function resumoDoIndice(prog) {
   return [
     { ...PAGINAS[0], completa: p.p1.completa, adesivos: p.p1.completa ? 1 : 0, total: 1 },
     { ...PAGINAS[1], completa: p.p2.completa, adesivos: p.p2.licoes.filter((x) => x === 'feita').length, total: TOTAL_LICOES_P2, comecada: p.p2.licoes.some(Boolean) },
+    ...PAGINAS_DE_PASSOS.map((n) => {
+      const q = p[`p${n}`]
+      return { ...PAGINAS[n - 1], completa: q.completa, adesivos: q.passos.filter((x) => x === 'feita').length, total: TOTAL_PASSOS[n], comecada: q.passos.some(Boolean) }
+    }),
   ]
 }
