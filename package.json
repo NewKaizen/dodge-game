@@ -14,11 +14,16 @@
     "lan:servir": "node server/index.js",
     "start": "node server/index.js --online",
     "moderar": "node scripts/moderar.js",
+    "lint": "eslint .",
     "online": "vite build && node server/index.js --online",
-    "test": "node --test src/game/pvp/__tests__/*.test.js src/game/coop/__tests__/*.test.js src/game/grimorio/__tests__/*.test.js src/game/party/__tests__/*.test.js src/game/__tests__/*.test.js src/lib/__tests__/*.test.js server/__tests__/*.test.js"
+    "test": "node --test src/game/manual/__tests__/*.test.js src/game/pvp/__tests__/*.test.js src/game/coop/__tests__/*.test.js src/game/grimorio/__tests__/*.test.js src/game/party/__tests__/*.test.js src/game/__tests__/*.test.js src/lib/__tests__/*.test.js server/__tests__/*.test.js"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
+    "eslint": "^10.14.0",
+    "eslint-plugin-svelte": "^3.24.0",
+    "globals": "^17.14.0",
     "svelte": "^5.57.0",
     "vite": "^8.3.0"
   },

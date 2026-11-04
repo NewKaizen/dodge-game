@@ -1,5 +1,5 @@
 import Phaser from 'phaser'
-import { CORES, FONTE, corTexto } from '../constants.js'
+import { CENTRO_X, CORES, FONTE, corTexto } from '../constants.js'
 import { tocar } from '../audio.js'
 import Carta from './Carta.js'
 

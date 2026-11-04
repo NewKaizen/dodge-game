@@ -10,9 +10,10 @@ import { criarSala } from '../menu/sala.js'
 import { criarTelao } from '../menu/telao.js'
 import { criarLogo } from '../menu/logo.js'
 import { criarMesa } from '../menu/mesa.js'
-import { pref } from '../preferencias.js'
+import { pref, definirPref } from '../preferencias.js'
 import { souHost, salaDoLink, siteNaInternet } from '../../lib/lan/rede.js'
 import { conta } from '../../lib/conta.js'
+import { serialSuportado, listarJoysticks } from '../../lib/serial.js'
 import { avatarDoPerfil } from '../../lib/contaRegras.js'
 import { corDaMoldura, progressoDoXp } from '../../lib/progresso.js'
 import { criarAvatar } from '../conta/ui.js'
@@ -23,7 +24,7 @@ import { montarAvisos } from '../conta/avisos.js'
 // DE TV (Config > Gráficos), uma sala aconchegante com a turma sentada no tapete
 // assistindo e a luz do telão iluminando tudo (menu/sala.js). Logo no canto de cima à esquerda, opções alinhadas à
 // esquerda. CO-OP (-> EscolhaParty) e PVP (-> PvpEscolha): a luz do telão engole
-// a sala. ONLINE (-> Lan: lobby para jogar com amigos, pela internet ou pela rede), GUIA (-> Grimorio:
+// a sala. ONLINE (-> Lan: lobby para jogar com amigos, pela internet ou pela rede), GUIA (-> GuiaEntrada: MANUAL DO RALSEI ou Grimorio:
 // todas as cartas com a prévia do ataque e as rodadas bônus de cada arena) e
 // CONFIGURAÇÕES (-> Config), JOGAR RÁPIDO (-> Lan, já entrando na fila) e PERFIL (-> Perfil, a conta
 // dentro do jogo) só escurecem a tela. JOGAR RÁPIDO e PERFIL só existem onde há conta ou internet
@@ -44,12 +45,18 @@ const CENA_PVP = 'PvpEscolha'
 const CO_OP = { id: 'coop', rotulo: 'CO-OP', cor: '#6dd0ff', cena: 'EscolhaParty', dica: 'cartas juntos contra um chefe' }
 const PVP = { id: 'pvp', rotulo: 'PVP', cor: '#ff3d6e', cena: CENA_PVP, dica: 'duelo de cartas: quem desvia, vence' }
 const ONLINE = { id: 'lan', rotulo: 'ONLINE', cor: '#3fd6c8', cena: 'Lan', dica: 'jogar com amigos (internet ou rede local)' }
-const GUIA = { id: 'cartas', rotulo: 'GUIA', cor: '#b48cff', cena: 'Grimorio', dica: 'todas as cartas e as rodadas bônus das arenas' }
+const GUIA = { id: 'cartas', rotulo: 'GUIA', cor: '#b48cff', cena: 'GuiaEntrada', dica: 'manual do Ralsei, cartas e rodadas bônus das arenas' }
 const CONFIG = { id: 'config', rotulo: 'CONFIGURAÇÕES', cor: '#f2c14e', cena: 'Config', dica: 'som, controles, acessibilidade e gráficos' }
 const RAPIDO = { id: 'rapido', rotulo: 'JOGAR RÁPIDO', cor: '#ffd23a', cena: 'Lan', dados: { rapido: true }, dica: 'PVP 1x1 contra alguém da fila, já!' }
 const PERFIL = { id: 'perfil', rotulo: 'PERFIL', cor: '#6dffb0', cena: 'Perfil', dica: '' }
 // cenas que não explodem a sala: só escurecem a tela e abrem
 const SO_ESCURECEM = ['config', 'cartas', 'lan', 'rapido', 'perfil']
+
+// Joystick USB: o caminho do pareamento (CONFIGURAÇÕES → GAMEPAD) não aparece em lugar nenhum, então uma
+// linha discreta no canto avisa. Só com Web Serial, sem joystick pareado nunca, e até o jogador abrir
+// CONFIGURAÇÕES daqui uma vez (aí ele já sabe onde fica).
+const dicaJoystickUsbVisivel = () =>
+  serialSuportado() && !pref('dicaJoystickUsb') && Object.keys(pref('joysticksSerial') ?? {}).length === 0 && listarJoysticks().length === 0
 
 // JOGAR RÁPIDO e PERFIL: onde há conta (ou o site está na internet, mesmo que as contas estejam fora do ar)
 const comConta = () => siteNaInternet() || get(conta).estado !== 'indisponivel'
@@ -67,6 +74,8 @@ const estadoInicial = () => ({
   aviso: null,
   miniatura: null,
   barras: null,
+  dicaUsb: null,
+  ultimaDicaUsb: 0,
 })
 
 export default class Menu extends Phaser.Scene {
@@ -107,6 +116,7 @@ export default class Menu extends Phaser.Scene {
     this.logo = criarLogo(this, area, { titulo: TITULO, subtitulo: SUBTITULO, escala: area.escala ?? 1 })
     this.montarOpcoes()
     this.montarCantos()
+    this.montarDicaUsb()
     montarAvisos(this)
 
     musica('menu', 'jevil')
@@ -234,11 +244,21 @@ export default class Menu extends Phaser.Scene {
     this.add.text(LARGURA - 108, ALTURA - 18, '↑↓ MOVER', estilo(11, '#c8c8d8')).setOrigin(1, 0.5).setDepth(30)
   }
 
+  // o aviso do joystick USB, no canto de baixo à direita, acima da barra de botões
+  montarDicaUsb() {
+    if (!dicaJoystickUsbVisivel()) return
+    this.dicaUsb = this.add
+      .text(LARGURA - 14, ALTURA - 44, 'Joystick USB? CONFIGURAÇÕES → GAMEPAD', { fontFamily: FONTE, fontSize: '11px', color: '#c8c8d8', backgroundColor: 'rgba(0,0,0,0.45)', padding: { x: 6, y: 3 } })
+      .setOrigin(1, 0.5)
+      .setDepth(30)
+  }
+
   confirmar() {
     if (this.saindo || !this.pronto || !this.conectado) return
     this.saindo = true
     const opcao = this.opcoes[this.indice]
     this.registry.set('menuOpcao', opcao.id)
+    if (opcao.id === 'config') definirPref('dicaJoystickUsb', true) // quem abriu CONFIGURAÇÕES já viu o caminho
     if (SO_ESCURECEM.includes(opcao.id)) {
       tocar(this, 'confirmar')
       this.cameras.main.fadeOut(220, 0, 0, 0)
@@ -261,6 +281,14 @@ export default class Menu extends Phaser.Scene {
         const d = this.controles.toque(j)
         if (d === 'cima' || d === 'esquerda') this.selecionar(this.indice - 1)
         if (d === 'baixo' || d === 'direita') this.selecionar(this.indice + 1)
+      }
+    }
+    // pareou o joystick USB com o menu aberto (botão lá em cima): a dica some na hora
+    if (this.dicaUsb && time - (this.ultimaDicaUsb ?? 0) > 500) {
+      this.ultimaDicaUsb = time
+      if (!dicaJoystickUsbVisivel()) {
+        this.dicaUsb.destroy()
+        this.dicaUsb = null
       }
     }
     this.sala.iluminar(this.telao.cor())
