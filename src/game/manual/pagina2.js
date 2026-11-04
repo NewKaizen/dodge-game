@@ -20,7 +20,7 @@ import { expressaoDoRalsei } from './ralsei.js'
 //   acertou    adesivo da mini-lição; ACERTOU_MS (ou A) e vai para a próxima
 //   concluida  adesivo dourado "PÁGINA 2 ✓"; A vira a página
 //   virando    a cena anima a virada e chama p.terminouDeVirar()
-//   fim        a página 3 ainda não existe ("continua…")
+//   fim        a folha virou: a cena passa para a página 3 (ManualRalsei3)
 //
 // Progresso: p.licoes[i] é null | 'feita' | 'pulada'. Os eventos { tipo: 'licao', indice, resultado }
 // e { tipo: 'etapa', etapa: 'concluida' } dizem à cena o que salvar (manual/progresso.js).
@@ -72,7 +72,7 @@ export const TEXTOS = {
 export const FALA_ESCOLHA = 'Esta está difícil, né? Tudo bem! Quer tentar de novo ou pular esta parte?'
 export const FALA_CONCLUIDA = 'Você conseguiu! A página 2 está completa.'
 export const FALA_CONCLUIDA_PULOU = 'Página 2 completa! Volte quando quiser para pegar o adesivo que faltou.'
-export const FALA_FIM = 'A página 3 ainda está sendo desenhada… continua!'
+export const FALA_FIM = 'Vamos para a página 3!'
 
 const centro = (c) => ({ x: (c.esquerda + c.direita) / 2, y: (c.topo + c.base) / 2 })
 // onde o coração começa cada tentativa: no meio (na chuva, um pouco para baixo: dá tempo de ver as gotas)

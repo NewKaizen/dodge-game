@@ -233,16 +233,15 @@ export default class PvpArena extends Phaser.Scene {
     this.rede = emRede() ? new ArenaRede(this, { canal, meuLado: meuLado(), souHost: souHostDaRede() }) : null
     this.controles = new Controles(this)
     this.numJogadores = this.controles.numJogadores
-    // sozinho: o P2 é a CPU
-    this.cpu = this.numJogadores < 2 ? 1 : null
-    const nivel = this.registry.get('pvpNivelBot')
-    this.nivelBot = NIVEIS_BOT[nivel] ? nivel : NIVEL_BOT_PADRAO
+    // sozinho: o P2 é a CPU (a partida do Manual do Ralsei troca ladoDaCpu/nivelDaCpu)
+    this.cpu = this.ladoDaCpu()
+    this.nivelBot = this.nivelDaCpu()
     this.rngBot = criarRng(`${this.semente}:cpu`)
     this.esquivaBot = this.cpu === null ? null : new EsquivaBot({ nivel: this.nivelBot })
     this.tempoEscolha = this.tempoBase
     this.hpAvisado = [false, false]
     this.superNaPista = [false, false] // o golpe que cai em cada pista é de SUPER? (BUZZER)
-    this.estado = criarPartida({ p1: this.ids[0], p2: this.ids[1], semente: this.semente })
+    this.estado = this.criarEstado()
     this.rede?.esconderBaralhos?.(this.estado) // em rede o host embaralha com um sorteio só dele (pvp/sigilo.js)
     this.fase = 'abertura'
     this.saindo = false
@@ -330,6 +329,20 @@ export default class PvpArena extends Phaser.Scene {
     musica(this.arena.musica, 'pvp')
     this.cameras.main.fadeIn(300)
     this.partida()
+  }
+
+  // quem é a CPU (null: ninguém) e em que nível; o estado inicial das regras (subclasses trocam)
+  ladoDaCpu() {
+    return this.numJogadores < 2 ? 1 : null
+  }
+
+  nivelDaCpu() {
+    const nivel = this.registry.get('pvpNivelBot')
+    return NIVEIS_BOT[nivel] ? nivel : NIVEL_BOT_PADRAO
+  }
+
+  criarEstado() {
+    return criarPartida({ p1: this.ids[0], p2: this.ids[1], semente: this.semente })
   }
 
   // ---------- montagem da mesa ----------
@@ -1814,6 +1827,11 @@ export default class PvpArena extends Phaser.Scene {
     // em rede o host troca a cena nos dois (depois do replay do convidado acabar);
     // o convidado fica no "VENCEU!" até lá
     if (this.rede && !(await this.rede.prontoParaResultado())) return
+    await this.irParaResultado(v)
+  }
+
+  // a tela de resultado (a partida do Manual do Ralsei volta para o caderno)
+  async irParaResultado(v) {
     this.cameras.main.fadeOut(400, 0, 0, 0)
     await this.esperar(420)
     if (this.saindo) return

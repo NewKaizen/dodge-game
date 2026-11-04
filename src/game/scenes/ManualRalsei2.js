@@ -43,13 +43,14 @@ import {
   barraDeGiz,
   joyDeTodos,
 } from '../manual/paginaBase.js'
+import { montarCapaDasCartas } from './ManualRalsei3.js'
 
 // O MANUAL DO RALSEI, página 2: "Vamos desviar?" (docs/manual-ralsei.md). Ensina a LER os padrões,
 // uma ideia de cada vez: chuva de cima, linha de lado, mira em você e uma mistura curta. Em cada
 // mini-lição o Ralsei explica, o coração de giz VERDE dele mostra o movimento uma vez (A pula) e
 // então é a vez do jogador: sobreviver a onda curta. Acertou: incentivo e de novo só aquela parte;
 // 3 erros: ↑/↓ escolhe "tentar de novo" ou "pular esta parte". Cada mini-lição vale um adesivo;
-// no fim, estrela dourada "PÁGINA 2 ✓" e a folha vira para a página 3 ("continua…").
+// no fim, estrela dourada "PÁGINA 2 ✓" e a folha vira para a página 3 (cena ManualRalsei3).
 //
 // As balas e o coração são os do jogo (manual/onda.js + entities/fisica.js, testados contra Balas e
 // Heart reais); o giz é só desenho. Regras e estados: manual/pagina2.js (puro, testado).
@@ -170,7 +171,6 @@ const estadoInicial = () => ({
   adesivoFinal: null,
   confete: null,
   dicas: null,
-  proxDicas: null,
   infos: null,
   fase: 0,
   proximaTroca: 0,
@@ -242,23 +242,7 @@ export default class ManualRalsei2 extends Phaser.Scene {
       slotVazio: assarCamadas(this, 'manual-p2-slot', [{ tipo: 'traco', tracos: circuloGiz(r('slot'), 0, 0, 16, { tremor: 0.9, tracos: 1 }), cor: 0x9a8fb8, largura: 2.2, passadas: 2, alpha: 0.8 }], { grao: 0.35 }),
       adesivos: LICOES.map((l) => (l.id === 'mistura' ? assarEstrelaDourada(this, 'manual-adesivo-estrela-p2', 18, { giro: -0.06 }) : assarAdesivoDaLicao(this, l.id))),
       final: assarEstrelaDourada(this, 'manual-adesivo-final-p2', 96, { texto: 'PÁGINA 2', subtexto: '✓', giro: 0.12 }),
-      rotulo3: assarRotulo(this, 'manual-rotulo-p3', 'PÁGINA 3'),
-      continua: assarLetreiro(this, 'manual-p3-continua', 'continua…', { tamanho: 58 }),
     }
-    assar(this, 'manual-p3-fundo', LARGURA, ALTURA, {
-      camadas: [
-        ...rabiscosDaMargem(r('margem3'), [
-          { tipo: 'sol', x: 690, y: 120, r: 22 },
-          { tipo: 'nuvem', x: 600, y: 128 },
-          { tipo: 'coracao', x: 250, y: 140, r: 9, cor: PALETA.rosa },
-          { tipo: 'estrela', x: 330, y: 410, r: 8, cor: PALETA.lavanda },
-          { tipo: 'pata', x: 700, y: 380, r: 9, giro: -0.3, cor: PALETA.verde },
-          { tipo: 'pata', x: 730, y: 350, r: 9, giro: -0.4, cor: PALETA.verde },
-        ]),
-        { tipo: 'traco', tracos: sublinhado(r('sub3'), 290, 268, 580), cor: PALETA.rosa, largura: 4, passadas: 3 },
-      ],
-      grao: 0.4,
-    })
   }
 
   // ---------- montagem ----------
@@ -306,19 +290,10 @@ export default class ManualRalsei2 extends Phaser.Scene {
     this.redesenhar(true)
   }
 
-  // atrás da folha: a página 3, que ainda não existe ("continua…")
+  // atrás da folha: a página 3 como ela abre (a cena ManualRalsei3 continua dali, sem emenda)
   montarProxima() {
-    const c = (this.proxima = this.add.container(0, 0).setDepth(10).setVisible(false))
-    c.add(this.add.image(0, 0, PAPEL.papel).setOrigin(0))
-    c.add(this.add.image(0, 0, 'manual-p3-fundo').setOrigin(0))
-    c.add(imagemDeCera(this, 60, 6, this.infos.rotulo3))
-    c.add(this.add.image(LARGURA / 2 + 10, 214, this.infos.continua.chave).setOrigin(0.5))
-    c.add(this.texto(LARGURA / 2 + 10, 300, 'O Ralsei ainda está desenhando esta página.', 16, { color: TINTA_SUAVE }).setOrigin(0.5))
-    const r = new RalseiDesenhado(this, 150, 430, { calmo: true, escala: 0.9 })
-    r.setExpressao('concentrado')
-    c.add(r.container)
-    this.proxDicas = this.texto(LARGURA / 2 + 40, ALTURA - 24, '', 14, { color: TINTA_SUAVE, fontStyle: 'bold' }).setOrigin(0.5)
-    c.add(this.proxDicas)
+    this.proxima = this.add.container(0, 0).setDepth(10).setVisible(false)
+    montarCapaDasCartas(this, this.proxima, 3)
   }
 
   // ---------- desenho ----------
@@ -379,7 +354,6 @@ export default class ManualRalsei2 extends Phaser.Scene {
     if (linha === this.dicaAtual) return
     this.dicaAtual = linha
     this.dicas.setText(linha)
-    this.proxDicas.setText(linha)
   }
 
   // ---------- entrada ----------
@@ -527,7 +501,9 @@ export default class ManualRalsei2 extends Phaser.Scene {
         this.folha.setVisible(false)
         this.virando = false
         this.pagina.terminouDeVirar()
-        this.atualizarDicas()
+        // a página 3 começa do mesmo papel (a capa dela já está na tela): troca de cena sem fade
+        this.saindo = true
+        this.scene.start('ManualRalsei3', { deVirada: true })
       },
     })
   }

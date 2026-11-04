@@ -4,12 +4,13 @@ import { tocar, musica } from '../audio.js'
 import { irCarregando } from '../carregando.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 import { pref } from '../preferencias.js'
-import { resumoDoIndice, paginaParaRetomar, PAGINAS } from '../manual/progresso.js'
+import { resumoDoIndice, paginaParaRetomar, essencialCompleto, PAGINAS } from '../manual/progresso.js'
 
 // Menu -> GUIA: a porta de entrada dos dois guias, com a música do tutorial ("Caderno do Ralsei").
 //   modo 'guia'    MANUAL DO RALSEI (abre o índice) · CARTAS E ARENAS (cena Grimorio, o guia de antes)
 //   modo 'indice'  o índice do manual: CONTINUAR (a 1ª página que falta) e cada página, com ✓ nas
-//                  completas e os adesivos da página 2. O progresso vem de manual/progresso.js.
+//                  completas e os adesivos das páginas 2 a 4; quem terminou a página 5 (a partida de verdade)
+//                  ganha o selo "★ MANUAL ESSENCIAL ✓" embaixo do título. O progresso vem de manual/progresso.js.
 //   ↑/↓ escolhe · A abre · B volta (do índice para o guia, do guia para o Menu)
 // Dados: { modo: 'indice' } abre direto no índice (é para onde o B do manual volta).
 const GUIA = [
@@ -19,6 +20,9 @@ const GUIA = [
 const DICAS_PAGINA = {
   1: 'o seu coração, as marcas e um desvio curtinho',
   2: 'ler os ataques: chuva, linha, mira e uma mistura',
+  3: 'cada carta é um ataque: veja ela ganhar vida',
+  4: 'energia, custo e quando passar a vez',
+  5: 'uma partida de verdade contra a CPU, com dicas do Ralsei',
 }
 
 // as linhas do índice (lógica pura sobre o progresso salvo)
@@ -44,6 +48,7 @@ const estadoInicial = () => ({
   linhas: null,
   marcas: null,
   titulo: null,
+  selo: null,
   seta: null,
   dica: null,
   rodape: null,
@@ -66,6 +71,7 @@ export default class GuiaEntrada extends Phaser.Scene {
     this.controles.onBotao((j, botao) => (botao === 'A' ? this.abrir() : this.voltar()))
     this.controles.onPausa(() => this.voltar())
     this.titulo = this.add.text(LARGURA / 2, 70, '', estilo(34, '#b48cff')).setOrigin(0.5)
+    this.selo = this.add.text(LARGURA / 2, 104, '★ MANUAL ESSENCIAL ✓', { ...estilo(14, '#ffd23a'), strokeThickness: 4 }).setOrigin(0.5).setVisible(false)
     this.seta = this.add.image(0, 0, 'coracao').setTint(CORES.almas[0]).setScale(1.6)
     this.dica = this.add.text(LARGURA / 2, 390, '', { ...estilo(13, '#9a9ab0'), strokeThickness: 3 }).setOrigin(0.5)
     this.rodape = this.add.text(LARGURA / 2, ALTURA - 20, '', { ...estilo(12, '#c8c8d8'), strokeThickness: 3 }).setOrigin(0.5)
@@ -80,9 +86,10 @@ export default class GuiaEntrada extends Phaser.Scene {
     const indice = this.modo === 'indice'
     this.opcoes = indice ? opcoesDoIndice(pref('manual')) : GUIA
     this.titulo.setText(indice ? 'MANUAL DO RALSEI' : 'GUIA').setColor(indice ? '#ffd23a' : '#b48cff')
-    const passo = indice ? 56 : 64
-    const y0 = indice ? 170 : 190
-    this.linhas = this.opcoes.map((o, i) => this.add.text(LARGURA / 2, y0 + i * passo, o.rotulo, estilo(indice ? 22 : 26, o.cor)).setOrigin(0.5))
+    this.selo.setVisible(indice && essencialCompleto(pref('manual')))
+    const passo = indice ? 40 : 64
+    const y0 = indice ? 150 + (6 - this.opcoes.length) * 18 : 190
+    this.linhas = this.opcoes.map((o, i) => this.add.text(LARGURA / 2, y0 + i * passo, o.rotulo, estilo(indice ? 20 : 26, o.cor)).setOrigin(0.5))
     // ✓ verde nas páginas completas
     this.marcas = this.opcoes.flatMap((o, i) => (o.completa ? [this.add.text(this.linhas[i].x + this.linhas[i].width / 2 + 14, this.linhas[i].y, '✓', estilo(24, TEXTO.cura ?? '#7dffa0')).setOrigin(0, 0.5)] : []))
     this.rodape.setText(indice ? '↑↓ escolher      A: abrir a página      B: voltar' : '↑↓ escolher      A: abrir      B: voltar')

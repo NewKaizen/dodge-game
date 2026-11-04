@@ -23,3 +23,12 @@ export function linhaDeDicas(dicas, partes) {
     .map((p) => (typeof p === 'string' ? `${dicas[p]}: ${rotulo[p]}` : `${dicas[p.tecla]}: ${p.texto}`))
     .join('      ')
 }
+
+// as duas teclas de um eixo, para a linha de dicas: 'horizontal' (esquerda/direita) ou 'vertical'
+// (cima/baixo). Nome de tecla comprido (ou o controle) vira as setas.
+export function teclasDoEixo(dicas, eixo = 'horizontal') {
+  const m = dicas.mover
+  const curtas = m.length === 4
+  if (eixo === 'vertical') return curtas ? `${m[0]} ${m[2]}` : '↑ ↓'
+  return curtas ? `${m[1]} ${m[3]}` : '← →'
+}

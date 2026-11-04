@@ -8,7 +8,8 @@ import { tocar, pararMusica } from '../audio.js'
 // estava; "Continuar" devolve tudo exatamente de onde parou. Dados:
 //   cena        chave da cena pausada (CoopArena ou PvpArena; precisa de retomarDaPausa())
 //   recomecar   dados para reiniciar essa cena
-//   sair        cena de destino do "SAIR"
+//   sair        cena de destino do "SAIR" (dadosSair: os dados com que ela abre)
+//   confirmarSaida  já abre perguntando "TEM CERTEZA?" no SAIR (o B da partida do Manual do Ralsei)
 //   subtitulo   texto embaixo de PAUSA (padrão "contra <nome>")
 //   motivo      só quando o jogo pausou sozinho (janela sem foco, controle desconectado): vai no pé da caixa
 //
@@ -39,13 +40,16 @@ export default class Pausa extends Phaser.Scene {
     this.cenaPausada = dados.cena
     this.dadosRecomecar = dados.recomecar
     this.destinoSair = dados.sair
+    this.dadosSair = dados.dadosSair
+    this.confirmarSaida = Boolean(dados.confirmarSaida)
     this.subtitulo = dados.subtitulo ?? (this.nomeChefe ? `contra ${this.nomeChefe}` : '')
     this.motivo = typeof dados.motivo === 'string' ? dados.motivo : ''
   }
 
   create() {
-    this.indice = 0
-    this.confirmando = false // "SAIR" pede confirmação (segundo A)
+    // "SAIR" pede confirmação (segundo A); com confirmarSaida a pausa já abre nela
+    this.indice = this.confirmarSaida ? OPCOES.findIndex((o) => o.id === 'sair') : 0
+    this.confirmando = this.confirmarSaida
     this.fechando = false
 
     const cx = LARGURA / 2
@@ -126,7 +130,7 @@ export default class Pausa extends Phaser.Scene {
     this.scene.stop('Entrada')
     this.scene.stop(this.cenaPausada)
     if (opcao === 'recomecar') this.scene.start(this.cenaPausada, this.dadosRecomecar)
-    else this.scene.start(this.destinoSair)
+    else this.scene.start(this.destinoSair, this.dadosSair)
   }
 
   continuar() {

@@ -8,6 +8,11 @@ import {
   comPagina1,
   comLicao,
   comPagina2,
+  comPasso,
+  comPagina,
+  comPagina5,
+  essencialCompleto,
+  TOTAL_PASSOS,
   paginaParaRetomar,
   resumoDoIndice,
   PAGINAS,
@@ -36,7 +41,7 @@ test('normalizar aproveita o que dá e nunca quebra', () => {
   assert.deepEqual(normalizarProgresso(undefined), progressoVazio())
   assert.deepEqual(normalizarProgresso('lixo'), progressoVazio())
   const n = normalizarProgresso({ p1: { completa: true }, p2: { completa: true, licoes: ['feita', 'xx', 'pulada'] } })
-  assert.deepEqual(n, { p1: { completa: true }, p2: { completa: false, licoes: ['feita', null, 'pulada', null] } }, 'completa sem todas resolvidas não vale')
+  assert.deepEqual(n, { ...progressoVazio(), p1: { completa: true }, p2: { completa: false, licoes: ['feita', null, 'pulada', null] } }, 'completa sem todas resolvidas não vale')
   assert.ok(progressoValido(n))
 })
 
@@ -60,14 +65,68 @@ test('marcar: página 1, cada mini-lição (pular não apaga adesivo) e página 
 test('retomar e índice', () => {
   assert.equal(paginaParaRetomar(null), 1)
   assert.equal(paginaParaRetomar(comPagina1(null)), 2)
-  const tudo = comPagina2(['feita', 'feita', 'pulada', 'feita'].reduce((p, r, i) => comLicao(p, i, r), comPagina1(null)))
+  const ate2 = comPagina2(['feita', 'feita', 'pulada', 'feita'].reduce((p, r, i) => comLicao(p, i, r), comPagina1(null)))
+  assert.equal(paginaParaRetomar(ate2), 3)
+  const ate3 = comPagina(comPasso(comPasso(ate2, 3, 0, 'feita'), 3, 1, 'pulada'), 3)
+  assert.equal(paginaParaRetomar(ate3), 4)
+  const ate4 = comPagina(['feita', 'feita', 'feita'].reduce((p, r, i) => comPasso(p, 4, i, r), ate3), 4)
+  assert.equal(paginaParaRetomar(ate4), 5)
+  const tudo = comPagina5(ate4)
   assert.equal(paginaParaRetomar(tudo), null)
   const r = resumoDoIndice(tudo)
-  assert.deepEqual(r.map((x) => [x.pagina, x.completa, x.adesivos, x.total]), [[1, true, 1, 1], [2, true, 3, 4]])
+  assert.deepEqual(r.map((x) => [x.pagina, x.completa, x.adesivos, x.total]), [[1, true, 1, 1], [2, true, 3, 4], [3, true, 1, 2], [4, true, 3, 3], [5, true, 1, 1]])
   assert.deepEqual(r.map((x) => x.cena), PAGINAS.map((x) => x.cena))
   const meio = resumoDoIndice(comLicao(null, 0, 'feita'))
   assert.equal(meio[1].comecada, true)
   assert.equal(meio[1].completa, false)
+})
+
+test('páginas 3 e 4: passos salvos, validados e o progresso antigo (sem p3/p4) continua valendo', () => {
+  const antigo = { p1: { completa: true }, p2: { completa: true, licoes: ['feita', 'feita', 'feita', 'feita'] } }
+  assert.equal(progressoValido(antigo), true, 'o salvo de antes das páginas 3 e 4 não vira lixo')
+  assert.deepEqual(normalizarProgresso(antigo).p3, { completa: false, passos: [null, null] })
+  assert.deepEqual(TOTAL_PASSOS, { 3: 2, 4: 3 })
+  for (const ruim of [
+    { ...antigo, p3: { completa: false, passos: [null] } },
+    { ...antigo, p3: { completa: 'sim', passos: [null, null] } },
+    { ...antigo, p4: { completa: false, passos: ['ok', null, null] } },
+    { ...antigo, p4: [] },
+  ])
+    assert.equal(progressoValido(ruim), false, JSON.stringify(ruim))
+  let p = comPasso(antigo, 4, 0, 'feita')
+  p = comPasso(p, 4, 0, 'pulada')
+  assert.equal(p.p4.passos[0], 'feita', 'pular não apaga o adesivo')
+  p = comPasso(p, 4, 7, 'feita')
+  p = comPasso(p, 5, 0, 'feita')
+  p = comPasso(p, 4, 1, 'ganhei')
+  assert.deepEqual(p.p4.passos, ['feita', null, null])
+  assert.equal(comPagina(p, 4).p4.completa, false, 'só completa com tudo resolvido')
+  assert.equal(normalizarProgresso({ ...antigo, p3: { completa: true, passos: ['feita', null] } }).p3.completa, false)
+  assert.ok(progressoValido(p))
+  const meio = resumoDoIndice(comPasso(null, 3, 1, 'feita'))
+  assert.deepEqual([meio[2].comecada, meio[2].adesivos, meio[3].comecada], [true, 1, false])
+})
+
+test('página 5 e o manual essencial: 5 páginas, a flag vem só com a página 5, e o salvo antigo continua valendo', () => {
+  assert.equal(PAGINAS.length, 5)
+  assert.deepEqual(PAGINAS[4], { pagina: 5, titulo: 'Uma partida de verdade', cena: 'ManualRalsei5' })
+  const antigo = { p1: { completa: true }, p2: { completa: true, licoes: ['feita', 'feita', 'feita', 'feita'] }, p3: { completa: true, passos: ['feita', 'feita'] }, p4: { completa: true, passos: ['feita', 'feita', 'feita'] } }
+  assert.equal(progressoValido(antigo), true, 'o salvo de antes da página 5 não vira lixo')
+  assert.deepEqual(normalizarProgresso(antigo).p5, { completa: false })
+  assert.equal(essencialCompleto(antigo), false)
+  for (const ruim of [{ ...antigo, p5: { completa: 'sim' } }, { ...antigo, p5: [] }, { ...antigo, essencial: 1 }]) assert.equal(progressoValido(ruim), false, JSON.stringify(ruim))
+  // a flag sozinha (sem a página 5) não vale
+  assert.equal(normalizarProgresso({ ...antigo, essencial: true }).essencial, false)
+  const p = comPagina5(antigo)
+  assert.equal(p.p5.completa, true)
+  assert.equal(p.essencial, true)
+  assert.equal(essencialCompleto(p), true)
+  assert.ok(progressoValido(p))
+  assert.deepEqual(comPagina(antigo, 5), p, 'comPagina(5) = comPagina5')
+  // a página 5 conta mesmo sem as outras completas (o adesivo é de quem jogou a partida)
+  assert.equal(essencialCompleto(comPagina5(null)), true)
+  assert.equal(paginaParaRetomar(comPagina5(null)), 1)
+  assert.equal(resumoDoIndice(antigo)[4].completa, false)
 })
 
 test('preferencias.js guarda o progresso validado (chave "manual") e ignora lixo salvo', async () => {
