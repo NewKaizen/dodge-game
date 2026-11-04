@@ -10,6 +10,8 @@ import {
   comPagina2,
   comPasso,
   comPagina,
+  comPagina5,
+  essencialCompleto,
   TOTAL_PASSOS,
   paginaParaRetomar,
   resumoDoIndice,
@@ -67,10 +69,12 @@ test('retomar e índice', () => {
   assert.equal(paginaParaRetomar(ate2), 3)
   const ate3 = comPagina(comPasso(comPasso(ate2, 3, 0, 'feita'), 3, 1, 'pulada'), 3)
   assert.equal(paginaParaRetomar(ate3), 4)
-  const tudo = comPagina(['feita', 'feita', 'feita'].reduce((p, r, i) => comPasso(p, 4, i, r), ate3), 4)
+  const ate4 = comPagina(['feita', 'feita', 'feita'].reduce((p, r, i) => comPasso(p, 4, i, r), ate3), 4)
+  assert.equal(paginaParaRetomar(ate4), 5)
+  const tudo = comPagina5(ate4)
   assert.equal(paginaParaRetomar(tudo), null)
   const r = resumoDoIndice(tudo)
-  assert.deepEqual(r.map((x) => [x.pagina, x.completa, x.adesivos, x.total]), [[1, true, 1, 1], [2, true, 3, 4], [3, true, 1, 2], [4, true, 3, 3]])
+  assert.deepEqual(r.map((x) => [x.pagina, x.completa, x.adesivos, x.total]), [[1, true, 1, 1], [2, true, 3, 4], [3, true, 1, 2], [4, true, 3, 3], [5, true, 1, 1]])
   assert.deepEqual(r.map((x) => x.cena), PAGINAS.map((x) => x.cena))
   const meio = resumoDoIndice(comLicao(null, 0, 'feita'))
   assert.equal(meio[1].comecada, true)
@@ -101,6 +105,28 @@ test('páginas 3 e 4: passos salvos, validados e o progresso antigo (sem p3/p4) 
   assert.ok(progressoValido(p))
   const meio = resumoDoIndice(comPasso(null, 3, 1, 'feita'))
   assert.deepEqual([meio[2].comecada, meio[2].adesivos, meio[3].comecada], [true, 1, false])
+})
+
+test('página 5 e o manual essencial: 5 páginas, a flag vem só com a página 5, e o salvo antigo continua valendo', () => {
+  assert.equal(PAGINAS.length, 5)
+  assert.deepEqual(PAGINAS[4], { pagina: 5, titulo: 'Uma partida de verdade', cena: 'ManualRalsei5' })
+  const antigo = { p1: { completa: true }, p2: { completa: true, licoes: ['feita', 'feita', 'feita', 'feita'] }, p3: { completa: true, passos: ['feita', 'feita'] }, p4: { completa: true, passos: ['feita', 'feita', 'feita'] } }
+  assert.equal(progressoValido(antigo), true, 'o salvo de antes da página 5 não vira lixo')
+  assert.deepEqual(normalizarProgresso(antigo).p5, { completa: false })
+  assert.equal(essencialCompleto(antigo), false)
+  for (const ruim of [{ ...antigo, p5: { completa: 'sim' } }, { ...antigo, p5: [] }, { ...antigo, essencial: 1 }]) assert.equal(progressoValido(ruim), false, JSON.stringify(ruim))
+  // a flag sozinha (sem a página 5) não vale
+  assert.equal(normalizarProgresso({ ...antigo, essencial: true }).essencial, false)
+  const p = comPagina5(antigo)
+  assert.equal(p.p5.completa, true)
+  assert.equal(p.essencial, true)
+  assert.equal(essencialCompleto(p), true)
+  assert.ok(progressoValido(p))
+  assert.deepEqual(comPagina(antigo, 5), p, 'comPagina(5) = comPagina5')
+  // a página 5 conta mesmo sem as outras completas (o adesivo é de quem jogou a partida)
+  assert.equal(essencialCompleto(comPagina5(null)), true)
+  assert.equal(paginaParaRetomar(comPagina5(null)), 1)
+  assert.equal(resumoDoIndice(antigo)[4].completa, false)
 })
 
 test('preferencias.js guarda o progresso validado (chave "manual") e ignora lixo salvo', async () => {

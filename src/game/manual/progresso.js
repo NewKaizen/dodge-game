@@ -4,15 +4,19 @@
 //   { p1: { completa: bool },
 //     p2: { completa: bool, licoes: [null | 'feita' | 'pulada' x4] },
 //     p3: { completa: bool, passos: [null | 'feita' | 'pulada' x2] },
-//     p4: { completa: bool, passos: [null | 'feita' | 'pulada' x3] } }
+//     p4: { completa: bool, passos: [null | 'feita' | 'pulada' x3] },
+//     p5: { completa: bool },          a partida de verdade (página 5) chegou ao fim
+//     essencial: bool }                o MANUAL ESSENCIAL: o adesivo de quem terminou a página 5
 //
-//   p3 e p4 podem faltar (progresso salvo antes das páginas 3 e 4 existirem): valem como "nada ainda".
+//   p3, p4, p5 e essencial podem faltar (progresso salvo antes delas existirem): valem como "nada ainda".
 //
 //   progressoValido(v)             o valor pode ser salvo? (null também: "nada ainda")
 //   normalizarProgresso(v)         sempre um progresso completo e limpo
 //   comPagina1(prog) / comLicao(prog, i, resultado) / comPagina2(prog)   cópias atualizadas
 //   comPasso(prog, pagina, i, resultado) / comPagina(prog, pagina)        idem, para as páginas 3 e 4
-//   paginaParaRetomar(prog)        1 a 4: a primeira página que falta (ou null: tudo pronto)
+//   comPagina5(prog)               a página 5 completa e o manual essencial ganho
+//   paginaParaRetomar(prog)        1 a 5: a primeira página que falta (ou null: tudo pronto)
+//   essencialCompleto(prog)        o manual essencial já foi ganho?
 //   resumoDoIndice(prog)           as linhas do índice: [{ pagina, titulo, completa, adesivos, total }]
 
 export const TOTAL_LICOES_P2 = 4
@@ -22,12 +26,20 @@ export const PAGINAS = [
   { pagina: 2, titulo: 'Vamos desviar?', cena: 'ManualRalsei2' },
   { pagina: 3, titulo: 'Sua primeira carta', cena: 'ManualRalsei3' },
   { pagina: 4, titulo: 'Nem toda rodada pede ataque', cena: 'ManualRalsei4' },
+  { pagina: 5, titulo: 'Uma partida de verdade', cena: 'ManualRalsei5' },
 ]
 const RESULTADOS = [null, 'feita', 'pulada']
 const PAGINAS_DE_PASSOS = [3, 4]
 
 const vazioDePassos = (n) => ({ completa: false, passos: Array(TOTAL_PASSOS[n]).fill(null) })
-export const progressoVazio = () => ({ p1: { completa: false }, p2: { completa: false, licoes: Array(TOTAL_LICOES_P2).fill(null) }, p3: vazioDePassos(3), p4: vazioDePassos(4) })
+export const progressoVazio = () => ({
+  p1: { completa: false },
+  p2: { completa: false, licoes: Array(TOTAL_LICOES_P2).fill(null) },
+  p3: vazioDePassos(3),
+  p4: vazioDePassos(4),
+  p5: { completa: false },
+  essencial: false,
+})
 
 const objeto = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
 const listaValida = (l, n) => Array.isArray(l) && l.length === n && l.every((x) => RESULTADOS.includes(x))
@@ -42,6 +54,8 @@ export function progressoValido(v) {
     if (p === undefined) continue
     if (!objeto(p) || typeof p.completa !== 'boolean' || !listaValida(p.passos, TOTAL_PASSOS[n])) return false
   }
+  if (v.p5 !== undefined && (!objeto(v.p5) || typeof v.p5.completa !== 'boolean')) return false
+  if (v.essencial !== undefined && typeof v.essencial !== 'boolean') return false
   return true
 }
 
@@ -64,6 +78,9 @@ export function normalizarProgresso(v) {
     q.passos = aproveitar(salvo.passos, TOTAL_PASSOS[n])
     q.completa = salvo.completa === true && q.passos.every(Boolean)
   }
+  if (objeto(v.p5) && v.p5.completa === true) p.p5.completa = true
+  // o manual essencial vem da página 5 (sem ela, não vale)
+  p.essencial = v.essencial === true && p.p5.completa
   return p
 }
 
@@ -99,11 +116,22 @@ export function comPasso(prog, pagina, i, resultado) {
 export function comPagina(prog, pagina) {
   if (pagina === 1) return comPagina1(prog)
   if (pagina === 2) return comPagina2(prog)
+  if (pagina === 5) return comPagina5(prog)
   const p = normalizarProgresso(prog)
   const q = p[`p${pagina}`]
   if (q && q.passos.every(Boolean)) q.completa = true
   return p
 }
+
+// página 5: a partida de verdade acabou (ganhando ou perdendo): o manual essencial está completo
+export function comPagina5(prog) {
+  const p = normalizarProgresso(prog)
+  p.p5.completa = true
+  p.essencial = true
+  return p
+}
+
+export const essencialCompleto = (prog) => normalizarProgresso(prog).essencial
 
 const completaDe = (p, n) => p[`p${n}`].completa
 
@@ -122,5 +150,6 @@ export function resumoDoIndice(prog) {
       const q = p[`p${n}`]
       return { ...PAGINAS[n - 1], completa: q.completa, adesivos: q.passos.filter((x) => x === 'feita').length, total: TOTAL_PASSOS[n], comecada: q.passos.some(Boolean) }
     }),
+    { ...PAGINAS[4], completa: p.p5.completa, adesivos: p.p5.completa ? 1 : 0, total: 1 },
   ]
 }
