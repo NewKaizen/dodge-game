@@ -20,7 +20,16 @@ export function objetoDeTela() {
 
 export function cenaDeMentira() {
   const add = new Proxy({}, { get: () => () => objetoDeTela() })
-  return { add, tweens: { add() {}, addCounter() {}, killTweensOf() {} }, time: { delayedCall() {} } }
+  return {
+    add,
+    tweens: { add() {}, addCounter() {}, killTweensOf() {} },
+    time: { delayedCall() {}, now: 0 },
+    cache: { audio: { exists: () => false } },
+    sound: { play() {} },
+    registry: { get: () => undefined },
+    events: { on() {}, once() {}, off() {} },
+    cameras: { main: objetoDeTela() },
+  }
 }
 
 // limites no formato do Phaser (Rectangle): left/right/top/bottom + x/y/width/height
