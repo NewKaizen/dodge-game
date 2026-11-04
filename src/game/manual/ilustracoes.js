@@ -27,14 +27,15 @@ const preencher = (poligono, cor, extra = {}) => ({ tipo: 'preencher', poligono,
 // Uma variante de giz do coração do jogador, centrada na origem. `largura` = tamanho visual; a colisão é
 // o miolo CORACAO.hitbox (pintado à parte, exato), independente disto.
 //   contorno/preenchimento: traços (o "desenhando" corta pelo progresso); camadas: a versão assada
-export function rabiscoDoCoracao(rng, largura = 22) {
+// op: { cor, escura } (o coração de giz do Ralsei, na demonstração da página 2, é verde)
+export function rabiscoDoCoracao(rng, largura = 22, { cor = CORES_GIZ.coracao, escura = CORES_GIZ.coracaoEscuro } = {}) {
   const miolo = contornoDoCoracao(0, 0, largura - 3, 28)
   const contorno = coracaoGiz(rng, 0, 0, largura, { tremor: 0.55, passo: 3.2, rabo: 0.05 })
   const preenchimento = preencherGiz(rng, miolo, { espaco: 2.6, angulo: -0.7, tremor: 0.4, folga: 0.5 })
   return {
     contorno,
     preenchimento,
-    camadas: [preencher(miolo, CORES_GIZ.coracao, { espaco: 2.2, angulo: -0.7, mancha: 0.55 }), traco(contorno, CORES_GIZ.coracaoEscuro, 2.4, { passadas: 2 })],
+    camadas: [preencher(miolo, cor, { espaco: 2.2, angulo: -0.7, mancha: 0.55 }), traco(contorno, escura, 2.4, { passadas: 2 })],
   }
 }
 
@@ -194,4 +195,62 @@ export function rabiscosDaMargem(rng, pontos) {
     }
   }
   return c
+}
+
+// ---------- adesivos das mini-lições (página 2) ----------
+
+// a gota (polígono): a parte de baixo redonda e a ponta para cima
+export function contornoDaGota(cx, cy, r) {
+  const R = r * 0.62
+  const yc = cy + r * 0.22
+  const pts = []
+  for (let i = 0; i <= 18; i++) {
+    const a = -0.45 + (i / 18) * (Math.PI + 0.9)
+    pts.push({ x: cx + Math.cos(a) * R, y: yc + Math.sin(a) * R })
+  }
+  pts.push({ x: cx, y: cy - r })
+  return pts
+}
+
+// O desenho de giz do adesivo de cada mini-lição, centrado na origem (cabe num círculo de raio ~r):
+//   chuva: uma gota azul · linha: a fileira com o buraco · mira: o alvo com a linha pontilhada
+export function iconeDaLicao(rng, id, r = 11) {
+  if (id === 'chuva') {
+    const g = contornoDaGota(0, 0, r)
+    return [preencher(g, PALETA.azul, { espaco: 1.8, mancha: 0.7 }), traco([[...g, g[0]]], PALETA.azulEscuro, 1.8, { passadas: 2 }), traco([[{ x: -r * 0.28, y: r * 0.05 }, { x: -r * 0.18, y: r * 0.35 }]], 0xffffff, 1.6, { alpha: 0.8, passadas: 1 })]
+  }
+  if (id === 'linha') {
+    const c = []
+    for (const y of [-r * 0.85, -r * 0.35, r * 0.75]) {
+      const bola = elipse(0, y, r * 0.24, r * 0.24, 12)
+      c.push(preencher(bola, PALETA.lavanda, { espaco: 1.4, mancha: 0.8 }), traco([[...bola, bola[0]]], PALETA.bala, 1.4, { passadas: 1 }))
+    }
+    // a setinha passando pelo buraco
+    c.push(traco(linhaGiz(rng, -r * 0.9, r * 0.2, r * 0.9, r * 0.2, { tracos: 1, tremor: 0.3, excesso: 0 }), PALETA.coracao, 1.8, { passadas: 2 }))
+    c.push(traco([[{ x: r * 0.55, y: r * 0.02 }, { x: r * 0.9, y: r * 0.2 }, { x: r * 0.55, y: r * 0.38 }]], PALETA.coracao, 1.8, { passadas: 2 }))
+    return c
+  }
+  if (id === 'mira') {
+    const c = []
+    for (const [rr, cor] of [[r * 0.85, PALETA.rosa], [r * 0.5, PALETA.rosaEscuro]]) c.push(traco(circuloGiz(rng, 0, 0, rr, { tremor: 0.3, tracos: 1 }), cor, 1.8, { passadas: 2 }))
+    c.push({ tipo: 'mancha', poligono: elipse(0, 0, r * 0.18, r * 0.18, 10), cor: PALETA.coracao, alpha: 1 })
+    return c
+  }
+  return []
+}
+
+// a linha pontilhada de giz do aviso de um tiro: de onde a bala está até sair do outro lado da caixa
+// (só os pontos; o desenho é só informação, nunca entra na colisão)
+export function pontosDaMira(linha, caixa, { espaco = 11, alem = 6 } = {}) {
+  const { x, y, dx, dy } = linha
+  // até onde a reta vai dentro (e um tiquinho além) da caixa
+  let tSai = Infinity
+  if (dx > 0) tSai = Math.min(tSai, (caixa.direita - x) / dx)
+  if (dx < 0) tSai = Math.min(tSai, (caixa.esquerda - x) / dx)
+  if (dy > 0) tSai = Math.min(tSai, (caixa.base - y) / dy)
+  if (dy < 0) tSai = Math.min(tSai, (caixa.topo - y) / dy)
+  if (!Number.isFinite(tSai)) return []
+  const pts = []
+  for (let t = espaco; t <= tSai + alem; t += espaco) pts.push({ x: x + dx * t, y: y + dy * t })
+  return pts
 }

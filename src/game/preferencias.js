@@ -28,8 +28,11 @@
 //   pistasVisuais     true/false  BOSS SEMANAL · ESCURIDÃO: setas na borda da caixa no lugar das pistas de som
 //   dicaJoystickUsb   true/false  o aviso "Joystick USB? CONFIGURAÇÕES → GAMEPAD" do menu já foi visto (scenes/Menu.js)
 //                     (coop/semanal/escuridao.js; sugerido sozinho quando o volume dos efeitos está no 0)
+//   manual            null ou o progresso do Manual do Ralsei (páginas completas e mini-lições da página 2;
+//                     formato e validação em manual/progresso.js)
 import { problemasDosBotoes, zonaMortaValida, ZONA_MORTA_PADRAO } from './gamepad.js'
 import { intensidadeValida } from './vibracao.js'
+import { progressoValido } from './manual/progresso.js'
 
 const CHAVE = 'dodge-preferencias'
 
@@ -49,6 +52,7 @@ export const PREFERENCIAS_PADRAO = {
   buzzerJoystick: true,
   pistasVisuais: false,
   dicaJoystickUsb: false,
+  manual: null,
 }
 
 export const OPCOES = {
@@ -66,6 +70,7 @@ function valido(chave, valor) {
   if (chave === 'joysticksSerial') return valor === null || (typeof valor === 'object' && !Array.isArray(valor))
   if (chave === 'zonaMorta') return zonaMortaValida(valor)
   if (chave === 'vibracaoIntensidade') return intensidadeValida(valor)
+  if (chave === 'manual') return progressoValido(valor)
   return typeof valor === typeof PREFERENCIAS_PADRAO[chave]
 }
 

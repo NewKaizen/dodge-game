@@ -3,12 +3,12 @@ import { get } from 'svelte/store'
 import Controles from '../controles.js'
 import { jogo } from '../../lib/estado.js'
 import { criarRng } from '../pvp/baralho.js'
-import { tocar } from '../audio.js'
+import { tocar, musica } from '../audio.js'
 import { LARGURA, ALTURA, CORACAO } from '../constants.js'
 import { fatores } from '../acessibilidade.js'
-import { menosMovimento, pref } from '../preferencias.js'
+import { menosMovimento, pref, definirPref } from '../preferencias.js'
 import { normalizarTeclas } from '../teclas.js'
-import { desenharTracos, cortarTracos, circuloGiz, retanguloGiz } from '../manual/giz.js'
+import { cortarTracos, circuloGiz, retanguloGiz } from '../manual/giz.js'
 import { pintarDesenho, aplicarGrao, PALETA } from '../manual/cera.js'
 import { dicasDeBotoes } from '../manual/botoes.js'
 import { criarPagina1, SOBREVIVER_MS, RAIO_BALA } from '../manual/pagina1.js'
@@ -22,7 +22,6 @@ import {
   PAPEL,
   assar,
   assarCamadas,
-  assarAdesivo,
   assarEstrelaDourada,
   assarLetreiro,
   imagemDeCera,
@@ -35,19 +34,28 @@ import {
   virarFolha,
   somDePapel,
   padraoDeGraoPara,
+  assarRotulo,
+  joyDeTodos,
+  BalasDeGiz,
+  coracaoDeGiz,
+  riscosDeGolpe,
+  barraDeGiz,
 } from '../manual/paginaBase.js'
+import { comPagina1 } from '../manual/progresso.js'
+import { assarFundoDaPagina2, montarCapaDaPagina2 } from './ManualRalsei2.js'
 
-// O MANUAL INTERATIVO DO RALSEI, protótipo de UMA página (Fase 3A; conceito e como somar páginas em
-// docs/manual-ralsei.md). Menu -> GUIA -> "MANUAL DO RALSEI (prévia)".
+// O MANUAL INTERATIVO DO RALSEI, página 1 (conceito e como somar páginas em docs/manual-ralsei.md).
+// Menu -> GUIA -> MANUAL DO RALSEI -> PÁGINA 1 (ou CONTINUAR). A página 2 é a cena ManualRalsei2.
 //
 // Um caderno de espiral desenhado a giz de cera que ganha vida: o Ralsei fala num balão, o giz
 // desenha a caixa e o coração, o jogador leva o coração (de verdade: o mesmo movimento e a mesma
 // hitbox do jogo) até 3 marcas e depois desvia de 6 bolinhas lentas por 8 s. Acertou: incentivo e
 // recomeça só a parte das bolinhas. Terminou: estrela dourada "PÁGINA 1 ✓", confete de coraçõezinhos
-// e a folha vira para uma página "continua…". Regras e estados: manual/pagina1.js (puro, testado).
+// e a folha vira para a página 2 (a cena ManualRalsei2 continua do mesmo papel). O progresso fica salvo
+// (manual/progresso.js). Regras e estados: manual/pagina1.js (puro, testado).
 // Caderno, balão, Ralsei, adesivos, virada e sons: manual/paginaBase.js (a base de toda página).
 //
-//   mover: o coração (teclado/controle/joystick) · A: continuar / tentar já / virar · B: volta ao Menu
+//   mover: o coração (teclado/controle/joystick) · A: continuar / tentar já / virar · B: volta ao índice do manual
 //
 // "Reduzir animações": giz parado (sem o tremidinho), Ralsei parado, texto do balão inteiro de uma vez,
 // folha troca sem animação, sem confete. Nenhum clarão. A jogabilidade é a mesma em qualquer ajuste.
@@ -90,7 +98,6 @@ const estadoInicial = () => ({
   imgCaixa: null,
   imgCoracao: null,
   coracaoC: null,
-  gHitbox: null,
   imgMarcas: null,
   imgSlots: null,
   imgSeta: null,
@@ -117,7 +124,6 @@ const estadoInicial = () => ({
   rastros: false,
   setaVisivel: false,
   ultimoEvento: null,
-  proxDicas: null,
 })
 
 export default class ManualRalsei extends Phaser.Scene {
@@ -152,6 +158,7 @@ export default class ManualRalsei extends Phaser.Scene {
     })
     this.balao.dizer(this.pagina.fala)
     this.atualizarDicas()
+    musica('tutorial', 'menu')
   }
 
   // ---------- texturas (assadas UMA vez; sementes fixas: reabrir a cena reaproveita) ----------
@@ -178,9 +185,7 @@ export default class ManualRalsei extends Phaser.Scene {
       final: assarEstrelaDourada(this, 'manual-adesivo-final', 96, { texto: 'PÁGINA 1', subtexto: '✓', giro: -0.14 }),
       gizinho: assarGizinho(this),
       titulo: assarLetreiro(this, 'manual-p1-titulo', 'Este é o seu coração', { tamanho: 26 }),
-      continua: assarLetreiro(this, 'manual-p2-continua', 'continua…', { tamanho: 58 }),
       rotulo: assarRotulo(this, 'manual-rotulo-p1', 'PÁGINA 1'),
-      rotulo2: assarRotulo(this, 'manual-rotulo-p2', 'PÁGINA 2'),
     }
     // o que é só desta página e não muda: o cartão claro da caixa (com fitas), os rabiscos e o sublinhado
     assar(this, 'manual-p1-fundo', LARGURA, ALTURA, {
@@ -201,20 +206,7 @@ export default class ManualRalsei extends Phaser.Scene {
         desenharFita(ctx, c.direita + 6, c.base + 10, 52, 16, -0.6, PALETA.amarelo)
       },
     })
-    assar(this, 'manual-p2-fundo', LARGURA, ALTURA, {
-      camadas: [
-        ...rabiscosDaMargem(r('margem2'), [
-          { tipo: 'sol', x: 690, y: 120, r: 22 },
-          { tipo: 'nuvem', x: 600, y: 128 },
-          { tipo: 'coracao', x: 250, y: 140, r: 9, cor: PALETA.rosa },
-          { tipo: 'estrela', x: 330, y: 410, r: 8, cor: PALETA.lavanda },
-          { tipo: 'pata', x: 700, y: 380, r: 9, giro: -0.3, cor: PALETA.verde },
-          { tipo: 'pata', x: 730, y: 350, r: 9, giro: -0.4, cor: PALETA.verde },
-        ]),
-        { tipo: 'traco', tracos: sublinhado(r('sub2'), 290, 268, 580), cor: PALETA.rosa, largura: 4, passadas: 3 },
-      ],
-      grao: 0.4,
-    })
+    assarFundoDaPagina2(this) // o verso desta folha é a página 2 (a mesma textura que a cena dela usa)
   }
 
   // ---------- montagem ----------
@@ -259,22 +251,12 @@ export default class ManualRalsei extends Phaser.Scene {
     const n = this.pagina.marcas.length
     this.imgSlots = this.pagina.marcas.map((_, k) => add(imagemDeCera(this, slotX(k, n), SLOT_Y, i.slotVazio)))
     this.gBarra = add(this.g())
-    // bolinhas e o rastro apagadinho de cada uma
-    this.balas = Array.from({ length: 8 }, () => ({
-      rastro: Array.from({ length: RASTRO }, () => add(imagemDeCera(this, 0, 0, i.bala[0]).setVisible(false))),
-      img: add(imagemDeCera(this, 0, 0, i.bala[0]).setVisible(false)),
-      trilha: [],
-      dono: null,
-    }))
+    // bolinhas (e o rastro apagadinho de cada uma; sem rastro no modo calmo)
+    this.balas = new BalasDeGiz(this, { caixa: CAIXA, infos: i.bala, pai: folha, n: 8, rastro: this.rastros ? RASTRO : 0 })
     // o coração: giz por fora, miolo EXATO da hitbox por cima (sem tremor, sempre nítido)
-    this.coracaoC = add(this.add.container(this.pagina.coracao.x, this.pagina.coracao.y).setVisible(false))
-    this.imgCoracao = imagemDeCera(this, 0, 0, i.coracao[0])
-    this.gHitbox = this.g()
-    this.gHitbox.fillStyle(0xfff8f8, 1)
-    this.gHitbox.fillCircle(0, 0, CORACAO.hitbox)
-    this.gHitbox.lineStyle(1.2, 0x7a0f20, 1)
-    this.gHitbox.strokeCircle(0, 0, CORACAO.hitbox)
-    this.coracaoC.add([this.imgCoracao, this.gHitbox])
+    const cor = coracaoDeGiz(this, i.coracao[0])
+    this.coracaoC = add(cor.container.setPosition(this.pagina.coracao.x, this.pagina.coracao.y).setVisible(false))
+    this.imgCoracao = cor.img
     this.gGolpe = add(this.g())
     this.gizinho = add(imagemDeCera(this, 0, 0, i.gizinho).setVisible(false))
     this.contador = add(this.texto((CAIXA.esquerda + CAIXA.direita) / 2, CAIXA.base + 18, '', 13, { color: TINTA_SUAVE, fontStyle: 'bold' }).setOrigin(0.5, 0))
@@ -284,21 +266,10 @@ export default class ManualRalsei extends Phaser.Scene {
     this.redesenhar()
   }
 
-  // a "página 2": ainda não existe, só um recado
+  // atrás desta folha: a página 2 como ela abre (a cena ManualRalsei2 continua dali, sem emenda)
   montarProxima() {
-    const c = (this.proxima = this.add.container(0, 0).setDepth(10).setVisible(false))
-    c.add(this.add.image(0, 0, PAPEL.papel).setOrigin(0))
-    c.add(this.add.image(0, 0, 'manual-p2-fundo').setOrigin(0))
-    c.add(imagemDeCera(this, 60, 6, this.infos.rotulo2))
-    const ct = this.infos.continua
-    c.add(this.add.image(LARGURA / 2 + 10, 214, ct.chave).setOrigin(0.5))
-    c.add(this.texto(LARGURA / 2 + 10, 300, 'O Ralsei ainda está desenhando esta página.', 16, { color: TINTA_SUAVE }).setOrigin(0.5))
-    // o Ralsei de cara concentrada, ainda rabiscando (parado: a página de trás não anima)
-    const r2 = new RalseiDesenhado(this, 150, 430, { calmo: true, escala: 0.9 })
-    r2.setExpressao('concentrado')
-    c.add(r2.container)
-    this.proxDicas = this.texto(LARGURA / 2 + 40, ALTURA - 24, '', 14, { color: TINTA_SUAVE, fontStyle: 'bold' }).setOrigin(0.5)
-    c.add(this.proxDicas)
+    this.proxima = this.add.container(0, 0).setDepth(10).setVisible(false)
+    montarCapaDaPagina2(this, this.proxima)
   }
 
   // ---------- desenho ----------
@@ -361,39 +332,7 @@ export default class ManualRalsei extends Phaser.Scene {
   }
 
   redesenharBalas(trocar = false) {
-    const lista = this.pagina.balas
-    this.balas.forEach((s, k) => {
-      const b = lista[k]
-      s.img.setVisible(Boolean(b))
-      if (!b) {
-        s.trilha = []
-        s.dono = null
-        for (const r of s.rastro) r.setVisible(false)
-        return
-      }
-      if (s.dono !== b) {
-        s.dono = b
-        s.trilha = []
-      }
-      const info = this.infos.bala[(this.fase + b.semente) % VARIANTES]
-      if (trocar || s.img.texture.key !== info.chave) trocarImagem(s.img, info)
-      s.img.setPosition(b.x, b.y)
-      // ainda chegando (bala inteira fora da caixa): meio apagada, como a faixa de aproximação do jogo
-      const fora = b.x + b.raio < CAIXA.esquerda || b.x - b.raio > CAIXA.direita || b.y + b.raio < CAIXA.topo || b.y - b.raio > CAIXA.base
-      s.img.setAlpha(fora ? 0.5 : 1)
-      // rastro: as últimas posições, cada vez mais fraquinhas (sem rastro no modo calmo)
-      if (this.rastros) {
-        const ult = s.trilha[0]
-        if (!ult || Math.hypot(ult.x - b.x, ult.y - b.y) > 7) s.trilha = [{ x: b.x, y: b.y }, ...s.trilha].slice(0, RASTRO + 1)
-        s.rastro.forEach((r, j) => {
-          const q = s.trilha[j + 1]
-          r.setVisible(Boolean(q))
-          if (!q) return
-          trocarImagem(r, info)
-          r.setPosition(q.x, q.y).setAlpha((fora ? 0.5 : 1) * (0.22 - j * 0.06)).setScale(1 - (j + 1) * 0.12)
-        })
-      }
-    })
+    this.balas.atualizar(this.pagina.balas, this.fase, trocar)
   }
 
   // ---------- dicas ----------
@@ -407,14 +346,12 @@ export default class ManualRalsei extends Phaser.Scene {
     let linha
     if (p.etapa === 'intro') linha = `${d.A}: continuar      ${sair}`
     else if (p.etapa === 'concluida') linha = `${d.A}: virar a página      ${sair}`
-    else if (p.etapa === 'fim') linha = `${d.A}: ver a página 1 de novo      ${sair}`
     else if (p.etapa === 'tentarDeNovo') linha = `${d.A}: tentar já      ${sair}`
-    else if (p.etapa === 'desenhando' || p.etapa === 'virando') linha = sair
+    else if (p.etapa === 'desenhando' || p.etapa === 'virando' || p.etapa === 'fim') linha = sair
     else linha = `${d.mover}: mover o coração      ${sair}`
     if (linha === this.dicaAtual) return
     this.dicaAtual = linha
     this.dicas.setText(linha)
-    this.proxDicas?.setText(linha)
   }
 
   // ---------- entrada ----------
@@ -422,13 +359,6 @@ export default class ManualRalsei extends Phaser.Scene {
   apertarA() {
     if (this.saindo || this.virando) return
     if (this.balao.digitando) return this.balao.completar()
-    if (this.pagina.etapa === 'fim') {
-      tocar(this, 'confirmar')
-      this.saindo = true
-      this.cameras.main.fadeOut(200, 0, 0, 0)
-      this.time.delayedCall(220, () => this.scene.restart())
-      return
-    }
     if (this.pagina.avancar()) tocar(this, 'confirmar')
   }
 
@@ -437,7 +367,7 @@ export default class ManualRalsei extends Phaser.Scene {
     this.saindo = true
     tocar(this, 'cancelar')
     this.cameras.main.fadeOut(200, 0, 0, 0)
-    this.time.delayedCall(220, () => this.scene.start('Menu'))
+    this.time.delayedCall(220, () => this.scene.start('GuiaEntrada', { modo: 'indice' }))
   }
 
   // ---------- quadro a quadro ----------
@@ -511,12 +441,7 @@ export default class ManualRalsei extends Phaser.Scene {
 
   // o "aaai" de ter sido atingido: riscos de giz em volta do coração (parado, sem clarão)
   marcarGolpe() {
-    const p = this.pagina
-    const g = this.gGolpe.clear()
-    for (let k = 0; k < 8; k++) {
-      const a = (k / 8) * 6.2832 + 0.2
-      desenharTracos(g, [[{ x: p.coracao.x + Math.cos(a) * 18, y: p.coracao.y + Math.sin(a) * 18 }, { x: p.coracao.x + Math.cos(a) * 29, y: p.coracao.y + Math.sin(a) * 29 }]], { cor: CORES_GIZ.coracao, largura: 3, alpha: 0.9 })
-    }
+    riscosDeGolpe(this.gGolpe, this.pagina.coracao.x, this.pagina.coracao.y)
   }
 
   // a marca alcançada vira uma estrelinha dourada colada na fileira de cima (e brilha onde estava)
@@ -547,16 +472,12 @@ export default class ManualRalsei extends Phaser.Scene {
     const g = this.gBarra
     const mostrar = p.etapa === 'desviar' || p.etapa === 'tentarDeNovo'
     this.contador.setText(mostrar ? `sobreviva ${Math.ceil(Math.max(0, SOBREVIVER_MS - p.decorrido) / 1000)} s` : p.etapa === 'marcas' ? `marcas: ${p.marcasPegas} de ${p.marcas.length}` : '')
-    g.clear()
-    if (!mostrar) return
-    const x0 = CAIXA.esquerda + 10
-    const x1 = CAIXA.direita - 10
-    const y = CAIXA.base + 46
-    desenharTracos(g, [[{ x: x0, y }, { x: x1, y: y + 1 }]], { cor: 0x9a8fb8, largura: 6, alpha: 0.4, grao: 0.3 })
-    if (p.progressoDesvio > 0) desenharTracos(g, [[{ x: x0, y }, { x: x0 + (x1 - x0) * p.progressoDesvio, y: y + p.progressoDesvio }]], { cor: CORES_GIZ.certo, largura: 6.5, alpha: 0.95, grao: 0.3 })
+    if (mostrar) barraDeGiz(g, CAIXA, p.progressoDesvio)
+    else g.clear()
   }
 
   concluir() {
+    definirPref('manual', comPagina1(pref('manual')))
     tocar(this, 'cura')
     somDePapel('adesivo')
     const a = this.adesivoFinal
@@ -586,8 +507,9 @@ export default class ManualRalsei extends Phaser.Scene {
         this.folha.setVisible(false)
         this.virando = false
         this.pagina.terminouDeVirar()
-        this.balao.dizer(this.pagina.fala, true)
-        this.atualizarDicas()
+        // a página 2 começa do mesmo papel (a capa dela já está na tela): troca de cena sem fade
+        this.saindo = true
+        this.scene.start('ManualRalsei2', { deVirada: true })
       },
     })
   }
@@ -610,58 +532,3 @@ function assarGizinho(scene) {
     { tipo: 'traco', tracos: [[...corpo, corpo[0]]], cor: PALETA.rosaEscuro, largura: 1.6, passadas: 2 },
   ], { grao: 0.25 })
 }
-
-// etiqueta de papel lavanda presa com um clipe: "PÁGINA N"
-function assarRotulo(scene, chave, texto) {
-  const silhueta = [{ x: 0, y: 8 }, { x: 96, y: 6 }, { x: 98, y: 24 }, { x: 2, y: 26 }]
-  return assarAdesivo(scene, chave, {
-    silhueta,
-    borda: 1.5,
-    base: (ctx) => {
-      ctx.fillStyle = '#e4dcf6'
-      ctx.beginPath()
-      silhueta.forEach((q, k) => (k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)))
-      ctx.closePath()
-      ctx.fill()
-    },
-    frente: (ctx) => {
-      ctx.fillStyle = '#4b3a78'
-      ctx.font = `bold 12px ${FONTE_TEXTO}`
-      ctx.textBaseline = 'middle'
-      ctx.fillText(texto, 26, 17)
-      // o clipe
-      ctx.strokeStyle = '#8a8ea0'
-      ctx.lineWidth = 1.8
-      ctx.lineCap = 'round'
-      ctx.beginPath()
-      ctx.moveTo(10, 24)
-      ctx.lineTo(10, 4)
-      ctx.arc(14, 4, 4, Math.PI, 0)
-      ctx.lineTo(18, 20)
-      ctx.arc(15, 20, 3, 0, Math.PI)
-      ctx.lineTo(12, 7)
-      ctx.stroke()
-      ctx.strokeStyle = 'rgba(255,255,255,0.7)'
-      ctx.lineWidth = 0.7
-      ctx.beginPath()
-      ctx.moveTo(9.4, 20)
-      ctx.lineTo(9.4, 5)
-      ctx.stroke()
-    },
-    grao: 0,
-  })
-
-}
-
-// um coração só no tutorial: qualquer fonte local move (com 2 jogadores detectados, soma as duas)
-function joyDeTodos(controles) {
-  let x = 0
-  let y = 0
-  for (let j = 0; j < controles.numJogadores; j++) {
-    const d = controles.joy(j)
-    x += d.x
-    y += d.y
-  }
-  return { x: Math.max(-100, Math.min(100, x)), y: Math.max(-100, Math.min(100, y)) }
-}
-

@@ -23,6 +23,12 @@ Músicas em MIDI (.mid), com o nome da tela ou do chefe. O jogo procura
   lobby.mid        lobby do modo LAN (o que está aí é provisório, gerado por
                    scripts/lobby/gerar_lobby_mid.mjs: troque pelo seu). O nome
                    no canto do lobby fica em src/game/assets.js, tituloMusicaLobby.
+  tutorial.mid     GUIA e Manual do Ralsei (página 1): "Caderno do Ralsei", valsa de
+                   caixinha de música (celesta, pizzicato e piano). Original, gerada por
+                   scripts/musica/tutorial.mjs (o script escreve o MIDI à mão, sem
+                   dependências): mude a composição lá e rode de novo.
+  tutorial2.mid    Manual do Ralsei, página 2: o mesmo tema com um pouco mais de
+                   energia (mesmo script). Sem ele, toca o tutorial.mid.
   pvpResultado.mid resultado do PvP (ainda não existe: enquanto isso toca vitoria.mid)
 
   Cartas SUPER (música especial de cada personagem; toca em loop enquanto o

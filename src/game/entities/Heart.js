@@ -3,6 +3,7 @@ import { CORACAO, FONTE } from '../constants.js'
 import { ESCALA } from '../arte/texturas.js'
 import { flash } from '../effects/flash.js'
 import { desenharForma } from '../coop/marcadores.js'
+import { passoDoCoracao } from './fisica.js'
 
 // O coração (SOUL) de um jogador; a posição vem do JOY (-100..100 em cada eixo)
 //
@@ -124,15 +125,9 @@ export default class Heart {
   // velocidade em px/s, delta em ms
   update(joy, velocidade, delta) {
     if (!joy) return
-    // Limita o vetor a comprimento 1 para a diagonal não ser mais rápida
-    const dir = new Phaser.Math.Vector2(joy.x / 100, joy.y / 100)
-    if (dir.length() > 1) dir.normalize()
-
-    const passo = velocidade * (delta / 1000)
-    const r = this.caixa.limites
-    const meio = (CORACAO.tamanho * this.tamanho) / 2
-    this.x = Phaser.Math.Clamp(this.x + dir.x * passo, r.left + meio, r.right - meio)
-    this.y = Phaser.Math.Clamp(this.y + dir.y * passo, r.top + meio, r.bottom - meio)
+    // a regra (vetor limitado a 1: a diagonal não é mais rápida; preso à caixa) fica em entities/fisica.js,
+    // a mesma do Manual do Ralsei
+    passoDoCoracao(this, joy, velocidade, delta, this.caixa.limites, (CORACAO.tamanho * this.tamanho) / 2)
     this.posicionar()
   }
 
