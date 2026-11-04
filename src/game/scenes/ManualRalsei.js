@@ -445,7 +445,7 @@ export default class ManualRalsei extends Phaser.Scene {
   update(tempo, delta) {
     if (!this.pagina) return
     const p = this.pagina
-    if (!this.virando) p.tick(delta, this.controles.joy(0))
+    if (!this.virando) p.tick(delta, joyDeTodos(this.controles))
     this.balao.update(tempo, delta, ['intro', 'concluida', 'tentarDeNovo'].includes(p.etapa))
 
     const eventos = p.drenar()
@@ -650,5 +650,18 @@ function assarRotulo(scene, chave, texto) {
     },
     grao: 0,
   })
+
+}
+
+// um coração só no tutorial: qualquer fonte local move (com 2 jogadores detectados, soma as duas)
+function joyDeTodos(controles) {
+  let x = 0
+  let y = 0
+  for (let j = 0; j < controles.numJogadores; j++) {
+    const d = controles.joy(j)
+    x += d.x
+    y += d.y
+  }
+  return { x: Math.max(-100, Math.min(100, x)), y: Math.max(-100, Math.min(100, y)) }
 }
 

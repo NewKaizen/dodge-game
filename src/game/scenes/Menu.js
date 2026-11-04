@@ -75,6 +75,7 @@ const estadoInicial = () => ({
   miniatura: null,
   barras: null,
   dicaUsb: null,
+  ultimaDicaUsb: 0,
 })
 
 export default class Menu extends Phaser.Scene {
@@ -280,6 +281,14 @@ export default class Menu extends Phaser.Scene {
         const d = this.controles.toque(j)
         if (d === 'cima' || d === 'esquerda') this.selecionar(this.indice - 1)
         if (d === 'baixo' || d === 'direita') this.selecionar(this.indice + 1)
+      }
+    }
+    // pareou o joystick USB com o menu aberto (botão lá em cima): a dica some na hora
+    if (this.dicaUsb && time - (this.ultimaDicaUsb ?? 0) > 500) {
+      this.ultimaDicaUsb = time
+      if (!dicaJoystickUsbVisivel()) {
+        this.dicaUsb.destroy()
+        this.dicaUsb = null
       }
     }
     this.sala.iluminar(this.telao.cor())

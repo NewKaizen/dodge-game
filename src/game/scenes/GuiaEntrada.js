@@ -56,11 +56,15 @@ export default class GuiaEntrada extends Phaser.Scene {
   update() {
     this.controles.atualizar()
     if (this.saindo) return
-    const t = this.controles.toque(0)
-    if (t !== 'cima' && t !== 'baixo') return
-    this.indice = (this.indice + (t === 'baixo' ? 1 : OPCOES.length - 1)) % OPCOES.length
-    tocar(this, 'mover')
-    this.atualizar()
+    // qualquer jogador local navega (como no Menu)
+    for (let j = 0; j < this.controles.numJogadores; j++) {
+      const t = this.controles.toque(j)
+      if (t !== 'cima' && t !== 'baixo') continue
+      this.indice = (this.indice + (t === 'baixo' ? 1 : OPCOES.length - 1)) % OPCOES.length
+      tocar(this, 'mover')
+      this.atualizar()
+      break
+    }
   }
 
   abrir() {
