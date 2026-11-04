@@ -4,39 +4,79 @@ import Controles from '../controles.js'
 import { jogo } from '../../lib/estado.js'
 import { criarRng } from '../pvp/baralho.js'
 import { tocar } from '../audio.js'
-import { LARGURA, ALTURA, CORACAO, TEMPOS } from '../constants.js'
+import { LARGURA, ALTURA, CORACAO } from '../constants.js'
 import { fatores } from '../acessibilidade.js'
 import { menosMovimento, pref } from '../preferencias.js'
 import { normalizarTeclas } from '../teclas.js'
-import { desenharTracos, cortarTracos, coracaoGiz, retanguloGiz, circuloGiz, estrelaGiz } from '../manual/giz.js'
-import { gerarPapel } from '../manual/papel.js'
+import { desenharTracos, cortarTracos, circuloGiz, retanguloGiz } from '../manual/giz.js'
+import { pintarDesenho, aplicarGrao, PALETA } from '../manual/cera.js'
 import { dicasDeBotoes } from '../manual/botoes.js'
 import { criarPagina1, SOBREVIVER_MS, RAIO_BALA } from '../manual/pagina1.js'
-import { CORES_GIZ, rabiscoDoRalsei, rabiscoDoCoracao, rabiscoDaBala, rabiscoDaMarca, rabiscoDaSeta, sublinhado, rabiscosDaMargem } from '../manual/ilustracoes.js'
+import { CORES_GIZ, rabiscoDoCoracao, rabiscoDaBala, rabiscoDaMarca, rabiscoDaSeta, sublinhado, rabiscosDaMargem } from '../manual/ilustracoes.js'
+import { expressaoDoRalsei } from '../manual/ralsei.js'
+import {
+  FONTE_TEXTO,
+  TINTA,
+  TINTA_SUAVE,
+  garantirPapel,
+  PAPEL,
+  assar,
+  assarCamadas,
+  assarAdesivo,
+  assarEstrelaDourada,
+  assarLetreiro,
+  imagemDeCera,
+  trocarImagem,
+  desenharFita,
+  Balao,
+  RalseiDesenhado,
+  Confete,
+  brilhar,
+  virarFolha,
+  somDePapel,
+  padraoDeGraoPara,
+} from '../manual/paginaBase.js'
 
 // O MANUAL INTERATIVO DO RALSEI, protótipo de UMA página (Fase 3A; conceito e como somar páginas em
 // docs/manual-ralsei.md). Menu -> GUIA -> "MANUAL DO RALSEI (prévia)".
 //
-// Uma folha de papel com desenhos de giz de cera que ganham vida: o Ralsei fala num balão, o giz
+// Um caderno de espiral desenhado a giz de cera que ganha vida: o Ralsei fala num balão, o giz
 // desenha a caixa e o coração, o jogador leva o coração (de verdade: o mesmo movimento e a mesma
 // hitbox do jogo) até 3 marcas e depois desvia de 6 bolinhas lentas por 8 s. Acertou: incentivo e
-// recomeça só a parte das bolinhas. Terminou: adesivo "PÁGINA 1 ✓" e a folha vira para uma página
-// "continua…". Regras e estados: manual/pagina1.js (puro, testado). Traço de giz: manual/giz.js.
+// recomeça só a parte das bolinhas. Terminou: estrela dourada "PÁGINA 1 ✓", confete de coraçõezinhos
+// e a folha vira para uma página "continua…". Regras e estados: manual/pagina1.js (puro, testado).
+// Caderno, balão, Ralsei, adesivos, virada e sons: manual/paginaBase.js (a base de toda página).
 //
 //   mover: o coração (teclado/controle/joystick) · A: continuar / tentar já / virar · B: volta ao Menu
 //
-// "Reduzir animações": giz parado (sem o tremidinho de redesenho), texto do balão inteiro de uma vez,
-// folha troca sem animação. Nenhum clarão. A jogabilidade é a mesma em qualquer ajuste.
+// "Reduzir animações": giz parado (sem o tremidinho), Ralsei parado, texto do balão inteiro de uma vez,
+// folha troca sem animação, sem confete. Nenhum clarão. A jogabilidade é a mesma em qualquer ajuste.
 // No dev: window.manualRalsei.
 
 const CAIXA = { esquerda: 440, direita: 780, topo: 148, base: 348 }
 const VARIANTES = 3 // quantos "desenhos" diferentes de cada traço alternam (o tremidinho do giz)
 const TROCA_MS = 170 // de quanto em quanto tempo o giz troca de variante
-const BALAO = { x: 34, y: 88, largura: 340, altura: 128 }
-const RALSEI = { x: 150, y: 372 }
-const FONTE_TEXTO = 'Verdana, "DejaVu Sans", "Segoe UI", Arial, sans-serif' // fonte clara com acentos (não decorativa)
-const TINTA = '#2b2540'
-const VIRADA_MS = 900
+const BALAO = { x: 64, y: 92, largura: 334, altura: 120, cauda: { de: 112, x: 126, y: 262 } }
+const RALSEI = { x: 176, y: 438, escala: 1.12 }
+const SLOT_Y = CAIXA.topo - 30
+const RASTRO = 3 // cópias apagadinhas atrás de cada bolinha
+const DESENHO = { x: CAIXA.esquerda - 24, y: CAIXA.topo - 24, largura: CAIXA.direita - CAIXA.esquerda + 48, altura: CAIXA.base - CAIXA.topo + 48 }
+// onde ficam os rabiscos de margem desta página (longe do texto, da caixa e do Ralsei)
+const MARGEM_P1 = [
+  { tipo: 'sol', x: 806, y: 62, r: 14 },
+  { tipo: 'nuvem', x: 730, y: 66 },
+  { tipo: 'coracao', x: 412, y: 50, r: 6, cor: PALETA.rosa },
+  { tipo: 'estrela', x: 820, y: 190, r: 6, cor: PALETA.lavanda },
+  { tipo: 'coracao', x: 818, y: 262, r: 5, cor: PALETA.azul },
+  { tipo: 'estrela', x: 822, y: 330, r: 5, cor: PALETA.amarelo },
+  { tipo: 'pata', x: 818, y: 444, r: 8, giro: -0.4, cor: PALETA.verde },
+  { tipo: 'pata', x: 800, y: 412, r: 8, giro: -0.2, cor: PALETA.verde },
+  { tipo: 'pata', x: 824, y: 386, r: 7, giro: -0.5, cor: PALETA.verde },
+  { tipo: 'estrela', x: 330, y: 300, r: 6, cor: PALETA.amarelo },
+  { tipo: 'coracao', x: 300, y: 378, r: 5, cor: PALETA.rosa },
+  { tipo: 'estrela', x: 404, y: 404, r: 5, cor: PALETA.azul },
+  { tipo: 'coracao', x: 70, y: 254, r: 5, cor: PALETA.lavanda },
+]
 
 // A instância da cena é REAPROVEITADA pelo Phaser: o que a abertura anterior deixou aqui (objetos
 // destruídos, flags) volta ao inicial no começo do init(). Testado em __tests__/cenasReaproveitadas.test.js.
@@ -45,34 +85,38 @@ const estadoInicial = () => ({
   controles: null,
   folha: null,
   proxima: null,
-  sombraVirada: null,
-  gCaixa: null,
-  gCoracao: null,
-  gMarcas: null,
-  gSeta: null,
+  balao: null,
+  ralsei: null,
+  imgCaixa: null,
+  imgCoracao: null,
+  coracaoC: null,
+  gHitbox: null,
+  imgMarcas: null,
+  imgSlots: null,
+  imgSeta: null,
+  imgDesenho: null,
+  texDesenho: null,
+  gizinho: null,
   gGolpe: null,
   gBarra: null,
-  gSlots: null,
-  balaoTexto: null,
-  balaoSeta: null,
-  titulo: null,
+  balas: null,
   dicas: null,
   rotuloVoce: null,
   adesivoFinal: null,
+  confete: null,
   contador: null,
-  variantes: null,
+  infos: null,
+  formas: null,
   fase: 0,
   proximaTroca: 0,
-  digitado: 0,
-  textoAtual: '',
+  proximoRabisco: 0,
   dicaAtual: '',
   saindo: false,
   virando: false,
   calmo: false,
-  balasG: null,
+  rastros: false,
   setaVisivel: false,
-  piscaSeta: 0,
-  setaPintada: false,
+  ultimoEvento: null,
   proxDicas: null,
 })
 
@@ -87,288 +131,272 @@ export default class ManualRalsei extends Phaser.Scene {
 
   create() {
     this.calmo = menosMovimento() || fatores().tremor === 0 // "reduzir animações": giz parado
-    this.rng = criarRng(`manual:p1:${Date.now() % 100000}`)
+    this.rastros = !this.calmo && fatores().rastros
     this.pagina = criarPagina1({ caixa: CAIXA, velocidade: this.registry.get('velocidade') ?? CORACAO.velocidadePadrao })
     this.controles = new Controles(this)
     this.controles.onBotao((j, botao) => (botao === 'A' ? this.apertarA() : this.apertarB()))
     this.controles.onPausa(() => this.apertarB())
 
-    this.garantirPapel()
+    const papel = garantirPapel(this)
+    this.add.image(0, 0, papel.mesa).setOrigin(0).setDepth(0)
+    this.add.image(0, 0, papel.espiral).setOrigin(0).setDepth(30)
+    this.assarTudo()
     this.montarProxima()
     this.montarFolha()
-    this.sombraVirada = this.add.rectangle(0, 0, LARGURA, ALTURA, 0x1a1020, 0).setOrigin(0).setDepth(60)
 
     this.cameras.main.fadeIn(240)
     if (import.meta.env.DEV) window.manualRalsei = this
     this.events.once('shutdown', () => {
       if (window.manualRalsei === this) delete window.manualRalsei
+      this.confete?.destroy()
     })
-    this.dizer(this.pagina.fala)
+    this.balao.dizer(this.pagina.fala)
     this.atualizarDicas()
   }
 
-  // ---------- papel ----------
+  // ---------- texturas (assadas UMA vez; sementes fixas: reabrir a cena reaproveita) ----------
 
-  garantirPapel() {
-    if (this.textures.exists('manual-papel')) return
-    const tex = this.textures.createCanvas('manual-papel', LARGURA, ALTURA)
-    const ctx = tex.getContext()
-    const img = ctx.createImageData(LARGURA, ALTURA)
-    img.data.set(gerarPapel(LARGURA, ALTURA, 'manual'))
-    ctx.putImageData(img, 0, 0)
-    // pautas azuis bem fracas e a margem vermelha, como caderno
-    ctx.lineWidth = 1
-    ctx.strokeStyle = 'rgba(86,126,190,0.20)'
-    for (let y = 44; y < ALTURA; y += 26) {
-      ctx.beginPath()
-      ctx.moveTo(0, y + 0.5)
-      ctx.lineTo(LARGURA, y + 0.5)
-      ctx.stroke()
+  assarTudo() {
+    const c = CAIXA
+    const r = (s) => criarRng(`manual:p1:${s}`)
+    const variantes = (nome, gerar) => Array.from({ length: VARIANTES }, (_, v) => gerar(r(`${nome}${v}`), v))
+    this.formas = {
+      caixa: variantes('caixa', (g) => retanguloDuplo(g, c)),
+      coracao: variantes('coracao', (g) => rabiscoDoCoracao(g, 24)),
+      bala: variantes('bala', (g) => rabiscoDaBala(g, RAIO_BALA)),
+      marcas: this.pagina.marcas.map((m, i) => variantes(`marca${i}`, (g) => rabiscoDaMarca(g, m.forma))),
     }
-    ctx.strokeStyle = 'rgba(214,80,92,0.28)'
-    ctx.beginPath()
-    ctx.moveTo(28.5, 0)
-    ctx.lineTo(28.5, ALTURA)
-    ctx.stroke()
-    // fibras do papel
-    const r = criarRng('fibras')
-    ctx.lineWidth = 1
-    for (let i = 0; i < 520; i++) {
-      const x = (r.s = (r.s * 1664525 + 1013904223) >>> 0) % LARGURA
-      const y = (r.s = (r.s * 1664525 + 1013904223) >>> 0) % ALTURA
-      const a = ((r.s = (r.s * 1664525 + 1013904223) >>> 0) % 628) / 100
-      ctx.strokeStyle = i % 3 ? 'rgba(150,120,80,0.07)' : 'rgba(255,255,255,0.18)'
-      ctx.beginPath()
-      ctx.moveTo(x, y)
-      ctx.lineTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7)
-      ctx.stroke()
+    const caixaCamadas = (tracos) => [{ tipo: 'traco', tracos, cor: CORES_GIZ.grafite, largura: 3.4, passadas: 3 }]
+    this.infos = {
+      caixa: this.formas.caixa.map((t, v) => assarCamadas(this, `manual-p1-caixa-${v}`, caixaCamadas(t), { grao: 0.45 })),
+      coracao: this.formas.coracao.map((f, v) => assarCamadas(this, `manual-p1-coracao-${v}`, f.camadas, { grao: 0.25 })),
+      bala: this.formas.bala.map((f, v) => assarCamadas(this, `manual-p1-bala-${v}`, f.camadas, { grao: 0.2 })),
+      marcas: this.formas.marcas.map((vs, i) => vs.map((f, v) => assarCamadas(this, `manual-p1-marca-${i}-${v}`, f.camadas, { grao: 0.3 }))),
+      seta: assarCamadas(this, 'manual-p1-seta', [{ tipo: 'traco', tracos: rabiscoDaSeta(r('seta'), 672, 188, 628, 232), cor: PALETA.coracao, largura: 3.2 }], { grao: 0.35 }),
+      slotVazio: assarCamadas(this, 'manual-p1-slot', [{ tipo: 'traco', tracos: circuloGiz(r('slot'), 0, 0, 15, { tremor: 0.9, tracos: 1 }), cor: 0x9a8fb8, largura: 2.2, passadas: 2, alpha: 0.8 }], { grao: 0.35 }),
+      slotCheio: assarEstrelaDourada(this, 'manual-adesivo-estrela', 17, { giro: 0.08 }),
+      final: assarEstrelaDourada(this, 'manual-adesivo-final', 96, { texto: 'PÁGINA 1', subtexto: '✓', giro: -0.14 }),
+      gizinho: assarGizinho(this),
+      titulo: assarLetreiro(this, 'manual-p1-titulo', 'Este é o seu coração', { tamanho: 26 }),
+      continua: assarLetreiro(this, 'manual-p2-continua', 'continua…', { tamanho: 58 }),
+      rotulo: assarRotulo(this, 'manual-rotulo-p1', 'PÁGINA 1'),
+      rotulo2: assarRotulo(this, 'manual-rotulo-p2', 'PÁGINA 2'),
     }
-    tex.refresh()
+    // o que é só desta página e não muda: o cartão claro da caixa (com fitas), os rabiscos e o sublinhado
+    assar(this, 'manual-p1-fundo', LARGURA, ALTURA, {
+      camadas: [...rabiscosDaMargem(r('margem'), MARGEM_P1), { tipo: 'traco', tracos: sublinhado(r('sub'), 66, 76, 384), cor: PALETA.rosa, largura: 3.4, passadas: 3 }],
+      grao: 0.4,
+      fundo: (ctx) => {
+        ctx.save()
+        ctx.shadowColor = 'rgba(70,44,24,0.22)'
+        ctx.shadowBlur = 6
+        ctx.shadowOffsetY = 2
+        ctx.fillStyle = '#fffbf1'
+        ctx.fillRect(c.esquerda - 14, c.topo - 14, c.direita - c.esquerda + 28, c.base - c.topo + 28)
+        ctx.restore()
+      },
+      frente: (ctx) => {
+        desenharFita(ctx, c.esquerda - 8, c.topo - 10, 64, 18, -0.62, PALETA.azul)
+        desenharFita(ctx, c.direita + 8, c.topo - 10, 64, 18, 0.62, PALETA.rosa)
+        desenharFita(ctx, c.direita + 6, c.base + 10, 52, 16, -0.6, PALETA.amarelo)
+      },
+    })
+    assar(this, 'manual-p2-fundo', LARGURA, ALTURA, {
+      camadas: [
+        ...rabiscosDaMargem(r('margem2'), [
+          { tipo: 'sol', x: 690, y: 120, r: 22 },
+          { tipo: 'nuvem', x: 600, y: 128 },
+          { tipo: 'coracao', x: 250, y: 140, r: 9, cor: PALETA.rosa },
+          { tipo: 'estrela', x: 330, y: 410, r: 8, cor: PALETA.lavanda },
+          { tipo: 'pata', x: 700, y: 380, r: 9, giro: -0.3, cor: PALETA.verde },
+          { tipo: 'pata', x: 730, y: 350, r: 9, giro: -0.4, cor: PALETA.verde },
+        ]),
+        { tipo: 'traco', tracos: sublinhado(r('sub2'), 290, 268, 580), cor: PALETA.rosa, largura: 4, passadas: 3 },
+      ],
+      grao: 0.4,
+    })
   }
 
   // ---------- montagem ----------
 
-  g(depth = 5) {
-    return this.add.graphics().setDepth(depth)
+  g() {
+    return this.add.graphics()
   }
 
   texto(x, y, conteudo, tamanho, extra = {}) {
     return this.add.text(x, y, conteudo, { fontFamily: FONTE_TEXTO, fontSize: `${tamanho}px`, color: TINTA, ...extra })
   }
 
-  // tudo da página 1 vai no container `folha` (a virada de página encolhe ele contra a lombada)
+  // tudo da página 1 vai no container `folha` (a virada de página encolhe ele contra a lombada);
+  // a ordem do add é a ordem de pintura
   montarFolha() {
     const folha = (this.folha = this.add.container(0, 0).setDepth(20))
     const add = (...o) => {
       folha.add(o)
       return o[0]
     }
-    add(this.add.image(0, 0, 'manual-papel').setOrigin(0))
-    // margens rabiscadas a lápis
-    const margem = this.g(1)
-    desenharTracos(margem, rabiscosDaMargem(this.rng, LARGURA, ALTURA, { esquerda: 30, direita: 800, topo: 30, base: 440 }), { cor: 0x6a6a82, largura: 1.6, alpha: 0.45, grao: 0.5 })
-    add(margem)
+    const i = this.infos
+    add(this.add.image(0, 0, PAPEL.papel).setOrigin(0))
+    add(this.add.image(0, 0, 'manual-p1-fundo').setOrigin(0))
+    // etiqueta da página e o título em letras de giz
+    add(imagemDeCera(this, 60, 6, i.rotulo))
+    add(this.add.image(62, 30, i.titulo.chave).setOrigin(0))
 
-    // título
-    this.titulo = add(this.texto(52, 22, 'PÁGINA 1', 13, { fontStyle: 'bold', color: '#7a6a9a' }))
-    add(this.texto(52, 38, 'Este é o seu coração', 24, { fontStyle: 'bold' }))
-    const risco = this.g(2)
-    desenharTracos(risco, sublinhado(this.rng, 52, 72, 292), { cor: CORES_GIZ.coracao, largura: 3, alpha: 0.8 })
-    add(risco)
+    this.ralsei = new RalseiDesenhado(this, RALSEI.x, RALSEI.y, { calmo: this.calmo, escala: RALSEI.escala })
+    add(this.ralsei.container)
+    add(this.texto(RALSEI.x, RALSEI.y + 9, 'RALSEI', 11, { fontStyle: 'bold', color: TINTA_SUAVE }).setOrigin(0.5, 0))
+    this.balao = new Balao(this, { ...BALAO, chave: 'manual-p1-balao', calmo: this.calmo })
+    add(...this.balao.objetos)
 
-    this.montarRalsei(add)
-    this.montarBalao(add)
+    // a caixa: variantes de giz (a do "desenhando" é uma textura viva, repintada por quadro)
+    this.imgCaixa = add(imagemDeCera(this, 0, 0, i.caixa[0]).setVisible(false))
+    if (!this.textures.exists('manual-p1-desenho')) this.textures.createCanvas('manual-p1-desenho', DESENHO.largura, DESENHO.altura)
+    this.texDesenho = this.textures.get('manual-p1-desenho')
+    this.imgDesenho = add(this.add.image(DESENHO.x, DESENHO.y, 'manual-p1-desenho').setOrigin(0).setVisible(false))
+    this.imgMarcas = this.pagina.marcas.map((m, k) => add(imagemDeCera(this, m.x, m.y, i.marcas[k][0]).setVisible(false)))
+    this.imgSeta = add(imagemDeCera(this, 0, 0, i.seta).setVisible(false))
+    this.rotuloVoce = add(this.texto(652, 158, 'você!', 17, { fontStyle: 'bold', color: '#d01a33' }).setVisible(false))
+    const n = this.pagina.marcas.length
+    this.imgSlots = this.pagina.marcas.map((_, k) => add(imagemDeCera(this, slotX(k, n), SLOT_Y, i.slotVazio)))
+    this.gBarra = add(this.g())
+    // bolinhas e o rastro apagadinho de cada uma
+    this.balas = Array.from({ length: 8 }, () => ({
+      rastro: Array.from({ length: RASTRO }, () => add(imagemDeCera(this, 0, 0, i.bala[0]).setVisible(false))),
+      img: add(imagemDeCera(this, 0, 0, i.bala[0]).setVisible(false)),
+      trilha: [],
+      dono: null,
+    }))
+    // o coração: giz por fora, miolo EXATO da hitbox por cima (sem tremor, sempre nítido)
+    this.coracaoC = add(this.add.container(this.pagina.coracao.x, this.pagina.coracao.y).setVisible(false))
+    this.imgCoracao = imagemDeCera(this, 0, 0, i.coracao[0])
+    this.gHitbox = this.g()
+    this.gHitbox.fillStyle(0xfff8f8, 1)
+    this.gHitbox.fillCircle(0, 0, CORACAO.hitbox)
+    this.gHitbox.lineStyle(1.2, 0x7a0f20, 1)
+    this.gHitbox.strokeCircle(0, 0, CORACAO.hitbox)
+    this.coracaoC.add([this.imgCoracao, this.gHitbox])
+    this.gGolpe = add(this.g())
+    this.gizinho = add(imagemDeCera(this, 0, 0, i.gizinho).setVisible(false))
+    this.contador = add(this.texto((CAIXA.esquerda + CAIXA.direita) / 2, CAIXA.base + 18, '', 13, { color: TINTA_SUAVE, fontStyle: 'bold' }).setOrigin(0.5, 0))
 
-    // a caixa (papel mais claro por dentro: bolinhas e coração sempre legíveis) e as variantes de giz
-    const c = CAIXA
-    add(this.add.rectangle(c.esquerda, c.topo, c.direita - c.esquerda, c.base - c.topo, 0xfffbf0, 0.9).setOrigin(0).setDepth(2))
-    this.variantes = {
-      caixa: Array.from({ length: VARIANTES }, () => retanguloGiz(this.rng, c.esquerda, c.topo, c.direita - c.esquerda, c.base - c.topo, { tremor: 1.5, excesso: 5, tracos: 2 })),
-      coracao: Array.from({ length: VARIANTES }, () => rabiscoDoCoracao(this.rng, 22)),
-      bala: Array.from({ length: VARIANTES }, () => rabiscoDaBala(this.rng, RAIO_BALA)),
-      marcas: this.pagina.marcas.map((m) => Array.from({ length: VARIANTES }, () => rabiscoDaMarca(this.rng, m.forma))),
-      seta: rabiscoDaSeta(this.rng, 672, 188, 628, 232),
-    }
-    this.gCaixa = add(this.g(3))
-    this.gMarcas = add(this.g(4))
-    this.gSeta = add(this.g(4))
-    this.rotuloVoce = add(this.texto(654, 160, 'você!', 17, { fontStyle: 'bold', color: '#e5243b' }).setDepth(4).setVisible(false))
-    this.gSlots = add(this.g(4))
-    this.gBarra = add(this.g(4))
-    this.balasG = Array.from({ length: 8 }, () => add(this.g(7).setVisible(false)))
-    this.gCoracao = add(this.g(8).setVisible(false))
-    this.gGolpe = add(this.g(9))
-    this.contador = add(this.texto((c.esquerda + c.direita) / 2, c.base + 14, '', 13, { color: '#5a4a6a', fontStyle: 'bold' }).setOrigin(0.5, 0))
-
-    // adesivo de página concluída (escondido até o fim)
-    this.adesivoFinal = this.montarAdesivoFinal()
-    add(this.adesivoFinal)
-
-    this.dicas = add(this.texto(LARGURA / 2, ALTURA - 20, '', 14, { color: '#5a4a6a', fontStyle: 'bold' }).setOrigin(0.5).setDepth(10))
-    this.desenharSlots()
-    this.redesenhar(true)
-  }
-
-  montarRalsei(add) {
-    const g = this.g(3)
-    for (const l of rabiscoDoRalsei(criarRng('ralsei'))) desenharTracos(g, l.tracos, { cor: l.cor, largura: l.largura, alpha: l.alpha ?? 0.92, grao: 0.3 })
-    g.setPosition(RALSEI.x, RALSEI.y)
-    add(g)
-    add(this.texto(RALSEI.x, RALSEI.y + 90, 'RALSEI', 12, { fontStyle: 'bold', color: '#7a6a9a' }).setOrigin(0.5, 0))
-  }
-
-  montarBalao(add) {
-    const b = BALAO
-    const g = this.g(3)
-    g.fillStyle(0xffffff, 0.94)
-    g.fillRoundedRect(b.x, b.y, b.largura, b.altura, 18)
-    g.fillTriangle(b.x + 70, b.y + b.altura - 2, b.x + 110, b.y + b.altura - 2, b.x + 110, b.y + b.altura + 44)
-    const rng = criarRng('balao')
-    desenharTracos(g, retanguloGiz(rng, b.x, b.y, b.largura, b.altura, { tremor: 1.2, excesso: 5 }), { cor: CORES_GIZ.tinta, largura: 2.6, alpha: 0.85 })
-    desenharTracos(
-      g,
-      [
-        [{ x: b.x + 70, y: b.y + b.altura }, { x: b.x + 112, y: b.y + b.altura + 46 }, { x: b.x + 112, y: b.y + b.altura }],
-      ],
-      { cor: CORES_GIZ.tinta, largura: 2.4, alpha: 0.85 },
-    )
-    add(g)
-    this.balaoTexto = add(
-      this.texto(b.x + 18, b.y + 16, '', 17, { fontStyle: 'bold', wordWrap: { width: b.largura - 36 }, lineSpacing: 5 }).setDepth(6),
-    )
-    this.balaoSeta = add(this.texto(b.x + b.largura - 24, b.y + b.altura - 26, '▶', 16, { color: '#7a6a9a', fontStyle: 'bold' }).setDepth(6).setVisible(false))
-  }
-
-  montarAdesivoFinal() {
-    const c = this.add.container((CAIXA.esquerda + CAIXA.direita) / 2, (CAIXA.topo + CAIXA.base) / 2).setDepth(12).setVisible(false)
-    const g = this.g(1)
-    g.fillStyle(0x000000, 0.12)
-    g.fillCircle(4, 6, 88)
-    g.fillStyle(0xfff3b0, 1)
-    g.fillCircle(0, 0, 86)
-    const r = criarRng('adesivo')
-    desenharTracos(g, circuloGiz(r, 0, 0, 86, { tremor: 1.2 }), { cor: CORES_GIZ.marca, largura: 4, alpha: 0.95 })
-    desenharTracos(g, circuloGiz(r, 0, 0, 74, { tremor: 1, tracos: 1 }), { cor: CORES_GIZ.marca, largura: 2, alpha: 0.7 })
-    desenharTracos(g, estrelaGiz(r, 0, -44, 12, { tremor: 0.6 }), { cor: CORES_GIZ.marca, largura: 3 })
-    const a = this.texto(0, -8, 'PÁGINA 1', 28, { fontStyle: 'bold' }).setOrigin(0.5)
-    const b = this.texto(0, 30, '✓', 44, { fontStyle: 'bold', color: '#2da44e' }).setOrigin(0.5)
-    c.add([g, a, b])
-    c.setAngle(-9)
-    return c
+    this.adesivoFinal = add(imagemDeCera(this, (CAIXA.esquerda + CAIXA.direita) / 2, (CAIXA.topo + CAIXA.base) / 2 + 4, i.final).setVisible(false))
+    this.dicas = add(this.texto(LARGURA / 2 + 40, ALTURA - 24, '', 14, { color: TINTA_SUAVE, fontStyle: 'bold' }).setOrigin(0.5))
+    this.redesenhar()
   }
 
   // a "página 2": ainda não existe, só um recado
   montarProxima() {
     const c = (this.proxima = this.add.container(0, 0).setDepth(10).setVisible(false))
-    c.add(this.add.image(0, 0, 'manual-papel').setOrigin(0))
-    const g = this.g(1)
-    const r = criarRng('proxima')
-    desenharTracos(g, rabiscosDaMargem(r, LARGURA, ALTURA, { esquerda: 30, direita: 800, topo: 30, base: 440 }), { cor: 0x6a6a82, largura: 1.6, alpha: 0.45, grao: 0.5 })
-    desenharTracos(g, sublinhado(r, 250, 270, 600), { cor: CORES_GIZ.coracao, largura: 4, alpha: 0.85 })
-    desenharTracos(g, sublinhado(r, 258, 280, 560), { cor: CORES_GIZ.grafite, largura: 3, alpha: 0.6 })
-    desenharTracos(g, coracaoGiz(r, 640, 205, 40, { tremor: 1 }), { cor: CORES_GIZ.coracao, largura: 3.4 })
-    c.add(g)
-    c.add(this.texto(52, 22, 'PÁGINA 2', 13, { fontStyle: 'bold', color: '#7a6a9a' }))
-    c.add(this.texto(LARGURA / 2, 215, 'continua…', 64, { fontStyle: 'bold italic', color: '#2b2540' }).setOrigin(0.5))
-    c.add(this.texto(LARGURA / 2, 310, 'O Ralsei ainda está desenhando esta página.', 16, { color: '#5a4a6a' }).setOrigin(0.5))
-    this.proxDicas = this.texto(LARGURA / 2, ALTURA - 20, '', 14, { color: '#5a4a6a', fontStyle: 'bold' }).setOrigin(0.5)
+    c.add(this.add.image(0, 0, PAPEL.papel).setOrigin(0))
+    c.add(this.add.image(0, 0, 'manual-p2-fundo').setOrigin(0))
+    c.add(imagemDeCera(this, 60, 6, this.infos.rotulo2))
+    const ct = this.infos.continua
+    c.add(this.add.image(LARGURA / 2 + 10, 214, ct.chave).setOrigin(0.5))
+    c.add(this.texto(LARGURA / 2 + 10, 300, 'O Ralsei ainda está desenhando esta página.', 16, { color: TINTA_SUAVE }).setOrigin(0.5))
+    // o Ralsei de cara concentrada, ainda rabiscando (parado: a página de trás não anima)
+    const r2 = new RalseiDesenhado(this, 150, 430, { calmo: true, escala: 0.9 })
+    r2.setExpressao('concentrado')
+    c.add(r2.container)
+    this.proxDicas = this.texto(LARGURA / 2 + 40, ALTURA - 24, '', 14, { color: TINTA_SUAVE, fontStyle: 'bold' }).setOrigin(0.5)
     c.add(this.proxDicas)
   }
 
-  // ---------- desenho das variantes ----------
+  // ---------- desenho ----------
 
-  desenharSlots() {
-    const g = this.gSlots.clear()
-    const n = this.pagina.marcas.length
-    const cx = (CAIXA.esquerda + CAIXA.direita) / 2
-    for (let i = 0; i < n; i++) {
-      const x = cx + (i - (n - 1) / 2) * 44
-      const pega = this.pagina.marcas[i].pega
-      desenharTracos(g, circuloGiz(criarRng(`slot${i}`), x, CAIXA.topo - 28, 15, { tremor: 0.9, tracos: 1 }), { cor: pega ? CORES_GIZ.marca : 0x9a94ad, largura: pega ? 3 : 2, alpha: pega ? 0.95 : 0.7 })
-      if (pega) {
-        g.fillStyle(0xfff3b0, 1)
-        g.fillCircle(x, CAIXA.topo - 28, 13)
-        desenharTracos(g, estrelaGiz(criarRng(`st${i}`), x, CAIXA.topo - 28, 9, { tremor: 0.4 }), { cor: CORES_GIZ.marca, largura: 2.6 })
-      }
-    }
-  }
-
-  // repinta o que muda (a cada troca de variante do giz e a cada passo do desenho inicial)
-  redesenhar(forcar = false) {
+  // repinta o que muda (a cada troca de variante do giz e a cada evento)
+  redesenhar() {
     const p = this.pagina
     const v = this.fase
-    const d = p.desenho
-    if (p.etapa !== 'intro' || forcar) {
-      this.gCaixa.clear()
-      if (d.caixa > 0) desenharTracos(this.gCaixa, this.variantes.caixa[v], { cor: CORES_GIZ.grafite, largura: 3.2, progresso: d.caixa })
-    }
-    this.gMarcas.clear()
-    if (d.marcas > 0)
-      p.marcas.forEach((m, i) => {
-        const g = this.gMarcas
-        const tracos = this.variantes.marcas[i][v].map((t) => t.map((q) => ({ x: q.x + m.x, y: q.y + m.y })))
-        if (m.pega) {
-          g.fillStyle(0xfff3b0, 0.9)
-          g.fillCircle(m.x, m.y, 14)
-        }
-        desenharTracos(g, tracos, { cor: m.forma === 'x' ? CORES_GIZ.marcaX : CORES_GIZ.marca, largura: m.pega ? 3 : 3.4, progresso: d.marcas, alpha: m.pega ? 0.5 : 0.95 })
-      })
-    this.redesenharCoracao()
-    this.redesenharBalas()
+    const desenhando = p.etapa === 'desenhando'
+    const pronto = p.etapa !== 'intro' && !desenhando
+    this.imgDesenho.setVisible(desenhando)
+    this.imgCaixa.setVisible(pronto)
+    if (pronto) trocarImagem(this.imgCaixa, this.infos.caixa[v])
+    p.marcas.forEach((m, k) => {
+      const img = this.imgMarcas[k].setVisible(pronto)
+      trocarImagem(img, this.infos.marcas[k][v])
+      img.setAlpha(m.pega ? 0.28 : 1)
+    })
+    this.coracaoC.setVisible(pronto)
+    trocarImagem(this.imgCoracao, this.infos.coracao[v])
+    this.coracaoC.setAlpha(p.etapa === 'tentarDeNovo' ? 0.45 : 1)
+    this.coracaoC.setPosition(p.coracao.x, p.coracao.y)
+    if (desenhando) this.pintarDesenho()
+    else this.gizinho.setVisible(false)
+    this.redesenharBalas(true)
   }
 
-  redesenharCoracao() {
+  // o giz riscando: caixa, coração e marcas cortados pelo progresso, numa textura viva + o gizinho na ponta
+  pintarDesenho() {
     const p = this.pagina
-    const d = p.desenho.coracao
-    this.gCoracao.setVisible(d > 0)
-    if (d <= 0) return
-    const v = this.variantes.coracao[this.fase]
-    const g = this.gCoracao.clear()
-    const ferido = p.etapa === 'tentarDeNovo'
-    const alpha = ferido ? 0.45 : 1
-    desenharTracos(g, cortarTracos([...v.contorno, ...v.preenchimento], d), { cor: CORES_GIZ.coracao, largura: 2.6, alpha: 0.95 * alpha, grao: 0.2 })
-    // o miolo que leva dano (raio = CORACAO.hitbox): sempre o mesmo círculo exato, sem tremor
-    if (d >= 1) {
-      g.fillStyle(0xfff8f8, alpha)
-      g.fillCircle(0, 0, CORACAO.hitbox)
-      g.lineStyle(1.2, 0x7a0f20, alpha)
-      g.strokeCircle(0, 0, CORACAO.hitbox)
+    const d = p.desenho
+    const tex = this.texDesenho
+    const ctx = tex.getContext()
+    ctx.clearRect(0, 0, DESENHO.largura, DESENHO.altura)
+    ctx.save()
+    ctx.translate(-DESENHO.x, -DESENHO.y)
+    const f = this.formas
+    const cor = f.coracao[0]
+    const cx = (CAIXA.esquerda + CAIXA.direita) / 2
+    const cy = (CAIXA.topo + CAIXA.base) / 2
+    const mover = (tracos, x, y) => tracos.map((t) => t.map((q) => ({ x: q.x + x, y: q.y + y })))
+    const partes = [
+      { tracos: f.caixa[0], cor: CORES_GIZ.grafite, largura: 3.4, progresso: d.caixa },
+      { tracos: mover([...cor.contorno, ...cor.preenchimento], cx, cy), cor: CORES_GIZ.coracao, largura: 2.6, progresso: d.coracao },
+      ...p.marcas.map((m, k) => ({ tracos: mover(f.marcas[k][0].tracos, m.x, m.y), cor: m.forma === 'x' ? CORES_GIZ.marcaX : CORES_GIZ.marcaContorno, largura: 3, progresso: d.marcas })),
+    ]
+    pintarDesenho(ctx, partes.map((q) => ({ tipo: 'traco', passadas: 2, ...q })), { semente: 'desenho' })
+    ctx.restore()
+    aplicarGrao(ctx, padraoDeGraoPara(ctx), DESENHO.largura, DESENHO.altura, 0.4)
+    tex.refresh()
+    // a ponta do giz: o fim do traço que está sendo riscado agora
+    const ativo = partes.find((q) => q.progresso > 0 && q.progresso < 1)
+    this.gizinho.setVisible(Boolean(ativo))
+    if (ativo) {
+      const corte = cortarTracos(ativo.tracos, ativo.progresso)
+      const ult = corte[corte.length - 1]
+      const ponta = ult?.[ult.length - 1]
+      if (ponta) this.gizinho.setPosition(ponta.x, ponta.y)
     }
-    g.setPosition(p.coracao.x, p.coracao.y)
   }
 
-  redesenharBalas() {
+  redesenharBalas(trocar = false) {
     const lista = this.pagina.balas
-    this.balasG.forEach((g, i) => {
-      const b = lista[i]
-      g.setVisible(Boolean(b))
-      if (!b) return
-      if (g.variante !== this.fase || g.dono !== b) {
-        g.variante = this.fase
-        g.dono = b
-        g.clear()
-        const v = this.variantes.bala[(this.fase + b.semente) % VARIANTES]
-        desenharTracos(g, v.preenchimento, { cor: CORES_GIZ.balaMiolo, largura: 2, alpha: 0.9, grao: 0.25 })
-        desenharTracos(g, v.contorno, { cor: CORES_GIZ.bala, largura: 2.6, alpha: 0.98, grao: 0.2 })
+    this.balas.forEach((s, k) => {
+      const b = lista[k]
+      s.img.setVisible(Boolean(b))
+      if (!b) {
+        s.trilha = []
+        s.dono = null
+        for (const r of s.rastro) r.setVisible(false)
+        return
       }
-      g.setPosition(b.x, b.y)
+      if (s.dono !== b) {
+        s.dono = b
+        s.trilha = []
+      }
+      const info = this.infos.bala[(this.fase + b.semente) % VARIANTES]
+      if (trocar || s.img.texture.key !== info.chave) trocarImagem(s.img, info)
+      s.img.setPosition(b.x, b.y)
       // ainda chegando (bala inteira fora da caixa): meio apagada, como a faixa de aproximação do jogo
       const fora = b.x + b.raio < CAIXA.esquerda || b.x - b.raio > CAIXA.direita || b.y + b.raio < CAIXA.topo || b.y - b.raio > CAIXA.base
-      g.setAlpha(fora ? 0.5 : 1)
+      s.img.setAlpha(fora ? 0.5 : 1)
+      // rastro: as últimas posições, cada vez mais fraquinhas (sem rastro no modo calmo)
+      if (this.rastros) {
+        const ult = s.trilha[0]
+        if (!ult || Math.hypot(ult.x - b.x, ult.y - b.y) > 7) s.trilha = [{ x: b.x, y: b.y }, ...s.trilha].slice(0, RASTRO + 1)
+        s.rastro.forEach((r, j) => {
+          const q = s.trilha[j + 1]
+          r.setVisible(Boolean(q))
+          if (!q) return
+          trocarImagem(r, info)
+          r.setPosition(q.x, q.y).setAlpha((fora ? 0.5 : 1) * (0.22 - j * 0.06)).setScale(1 - (j + 1) * 0.12)
+        })
+      }
     })
   }
 
-  // ---------- texto e dicas ----------
-
-  dizer(texto, instantaneo = false) {
-    this.textoAtual = texto
-    this.digitado = this.calmo || instantaneo ? texto.length : 0
-    this.balaoTexto.setText(texto.slice(0, this.digitado))
-  }
-
-  get digitando() {
-    return this.digitado < this.textoAtual.length
-  }
+  // ---------- dicas ----------
 
   atualizarDicas() {
     const f = get(jogo).fonte
@@ -381,7 +409,7 @@ export default class ManualRalsei extends Phaser.Scene {
     else if (p.etapa === 'concluida') linha = `${d.A}: virar a página      ${sair}`
     else if (p.etapa === 'fim') linha = `${d.A}: ver a página 1 de novo      ${sair}`
     else if (p.etapa === 'tentarDeNovo') linha = `${d.A}: tentar já      ${sair}`
-    else if (p.etapa === 'desenhando') linha = sair
+    else if (p.etapa === 'desenhando' || p.etapa === 'virando') linha = sair
     else linha = `${d.mover}: mover o coração      ${sair}`
     if (linha === this.dicaAtual) return
     this.dicaAtual = linha
@@ -393,11 +421,7 @@ export default class ManualRalsei extends Phaser.Scene {
 
   apertarA() {
     if (this.saindo || this.virando) return
-    if (this.digitando) {
-      this.digitado = this.textoAtual.length
-      this.balaoTexto.setText(this.textoAtual)
-      return
-    }
+    if (this.balao.digitando) return this.balao.completar()
     if (this.pagina.etapa === 'fim') {
       tocar(this, 'confirmar')
       this.saindo = true
@@ -421,21 +445,16 @@ export default class ManualRalsei extends Phaser.Scene {
   update(tempo, delta) {
     if (!this.pagina) return
     const p = this.pagina
-    if (!this.virando) {
-      const joy = this.controles.joy(0)
-      p.tick(delta, joy)
-    }
-    // digitação do balão
-    if (this.digitando) {
-      const antes = this.digitado
-      this.digitado = Math.min(this.textoAtual.length, this.digitado + Math.max(1, Math.round(delta / TEMPOS.letraMs)))
-      this.balaoTexto.setText(this.textoAtual.slice(0, this.digitado))
-      if (Math.floor(antes / 4) !== Math.floor(this.digitado / 4)) tocar(this, 'texto')
-    }
-    this.balaoSeta.setVisible(!this.digitando && ['intro', 'concluida', 'tentarDeNovo'].includes(p.etapa) && (this.calmo || Math.floor(tempo / 450) % 2 === 0))
+    if (!this.virando) p.tick(delta, this.controles.joy(0))
+    this.balao.update(tempo, delta, ['intro', 'concluida', 'tentarDeNovo'].includes(p.etapa))
 
     const eventos = p.drenar()
-    for (const e of eventos) this.aoEvento(e)
+    for (const e of eventos) this.aoEvento(e, tempo)
+
+    // o Ralsei: cara conforme a etapa e o último evento; respira e pisca
+    const u = this.ultimoEvento
+    this.ralsei.setExpressao(expressaoDoRalsei(p.etapa, u && { tipo: u.tipo, ha: tempo - u.quando }))
+    this.ralsei.update(tempo)
 
     // tremidinho do giz
     let mudou = false
@@ -444,22 +463,28 @@ export default class ManualRalsei extends Phaser.Scene {
       this.proximaTroca = tempo + TROCA_MS
       mudou = true
     }
-    if (p.etapa === 'desenhando' || mudou || eventos.length) this.redesenhar()
+    if (p.etapa === 'desenhando') {
+      this.redesenhar()
+      if (tempo >= this.proximoRabisco) {
+        somDePapel('rabisco')
+        this.proximoRabisco = tempo + 150
+      }
+    } else if (mudou || eventos.length) this.redesenhar()
     else {
-      this.gCoracao.setPosition(p.coracao.x, p.coracao.y)
+      this.coracaoC.setPosition(p.coracao.x, p.coracao.y)
       this.redesenharBalas()
     }
-    this.atualizarSeta()
+    if (this.confete && !this.confete.update(delta)) this.confete = null
+    this.atualizarSeta(tempo)
     this.atualizarBarra()
     this.atualizarDicas()
   }
 
-  aoEvento(e) {
+  aoEvento(e, tempo) {
     const p = this.pagina
-    if (e.tipo === 'fala') this.dizer(p.fala)
+    if (e.tipo === 'fala') this.balao.dizer(p.fala)
     if (e.tipo === 'etapa') {
-      this.dizer(p.fala)
-      if (e.etapa === 'desenhando') tocar(this, 'mover')
+      this.balao.dizer(p.fala)
       if (e.etapa === 'marcas') {
         this.setaVisivel = true
         this.rotuloVoce.setVisible(true)
@@ -469,14 +494,16 @@ export default class ManualRalsei extends Phaser.Scene {
       if (e.etapa === 'virando') this.virarPagina()
     }
     if (e.tipo === 'marca') {
+      this.ultimoEvento = { tipo: 'marca', quando: tempo }
       tocar(this, 'graze')
-      this.dizer(p.fala, true)
+      somDePapel('adesivo')
+      this.balao.dizer(p.fala, true)
       this.setaVisivel = false
       this.rotuloVoce.setVisible(false)
-      this.desenharSlots()
-      this.surgirAdesivo(e.indice)
+      this.colarAdesivo(e.indice)
     }
     if (e.tipo === 'acerto') {
+      this.ultimoEvento = { tipo: 'acerto', quando: tempo }
       tocar(this, 'dano')
       this.marcarGolpe()
     }
@@ -486,34 +513,33 @@ export default class ManualRalsei extends Phaser.Scene {
   marcarGolpe() {
     const p = this.pagina
     const g = this.gGolpe.clear()
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * 6.2832 + 0.2
-      const x0 = p.coracao.x + Math.cos(a) * 17
-      const y0 = p.coracao.y + Math.sin(a) * 17
-      desenharTracos(g, [[{ x: x0, y: y0 }, { x: p.coracao.x + Math.cos(a) * 28, y: p.coracao.y + Math.sin(a) * 28 }]], { cor: CORES_GIZ.coracao, largura: 3, alpha: 0.9 })
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * 6.2832 + 0.2
+      desenharTracos(g, [[{ x: p.coracao.x + Math.cos(a) * 18, y: p.coracao.y + Math.sin(a) * 18 }, { x: p.coracao.x + Math.cos(a) * 29, y: p.coracao.y + Math.sin(a) * 29 }]], { cor: CORES_GIZ.coracao, largura: 3, alpha: 0.9 })
     }
   }
 
-  surgirAdesivo(i) {
+  // a marca alcançada vira uma estrelinha dourada colada na fileira de cima (e brilha onde estava)
+  colarAdesivo(k) {
     const n = this.pagina.marcas.length
-    const x = (CAIXA.esquerda + CAIXA.direita) / 2 + (i - (n - 1) / 2) * 44
-    const brilho = this.add.text(x, CAIXA.topo - 28, '★', { fontFamily: FONTE_TEXTO, fontSize: '26px', color: '#e0a000' }).setOrigin(0.5).setDepth(11)
-    this.folha.add(brilho)
-    if (this.calmo) return void this.time.delayedCall(500, () => brilho.destroy())
-    this.tweens.add({ targets: brilho, scale: { from: 0.2, to: 1.7 }, alpha: { from: 1, to: 0 }, duration: 520, ease: 'Cubic.easeOut', onComplete: () => brilho.destroy() })
+    const m = this.pagina.marcas[k]
+    const img = this.imgSlots[k]
+    trocarImagem(img, this.infos.slotCheio)
+    brilhar(this, m.x, m.y, { pai: this.folha, calmo: this.calmo })
+    if (this.calmo) return
+    brilhar(this, slotX(k, n), SLOT_Y, { pai: this.folha, n: 5, raio: 22 })
+    somDePapel('brilho')
+    img.setScale(1.8)
+    this.tweens.add({ targets: img, scale: 1, duration: 340, ease: 'Back.easeOut' })
   }
 
-  atualizarSeta() {
-    const g = this.gSeta
-    if (!this.setaVisivel) {
-      if (this.setaPintada) g.clear()
-      this.setaPintada = false
-      return
-    }
-    if (this.setaPintada) return
-    this.setaPintada = true
-    g.clear()
-    desenharTracos(g, this.variantes.seta, { cor: CORES_GIZ.coracao, largura: 3, alpha: 0.9 })
+  atualizarSeta(tempo) {
+    const ver = this.setaVisivel
+    this.imgSeta.setVisible(ver)
+    if (!ver || this.calmo) return
+    // a seta "chama" de leve na direção do coração
+    const s = Math.sin(tempo / 260) * 2
+    this.imgSeta.setPosition(s, -s)
   }
 
   atualizarBarra() {
@@ -523,56 +549,106 @@ export default class ManualRalsei extends Phaser.Scene {
     this.contador.setText(mostrar ? `sobreviva ${Math.ceil(Math.max(0, SOBREVIVER_MS - p.decorrido) / 1000)} s` : p.etapa === 'marcas' ? `marcas: ${p.marcasPegas} de ${p.marcas.length}` : '')
     g.clear()
     if (!mostrar) return
-    const x0 = CAIXA.esquerda
-    const x1 = CAIXA.direita
-    const y = CAIXA.base + 44
-    const fundo = [[{ x: x0, y }, { x: x1, y: y + 1 }]]
-    desenharTracos(g, fundo, { cor: 0x9a94ad, largura: 5, alpha: 0.5, grao: 0.2 })
-    if (p.progressoDesvio > 0) desenharTracos(g, [[{ x: x0, y }, { x: x0 + (x1 - x0) * p.progressoDesvio, y: y + p.progressoDesvio }]], { cor: CORES_GIZ.certo, largura: 5.5, alpha: 0.95, grao: 0.2 })
+    const x0 = CAIXA.esquerda + 10
+    const x1 = CAIXA.direita - 10
+    const y = CAIXA.base + 46
+    desenharTracos(g, [[{ x: x0, y }, { x: x1, y: y + 1 }]], { cor: 0x9a8fb8, largura: 6, alpha: 0.4, grao: 0.3 })
+    if (p.progressoDesvio > 0) desenharTracos(g, [[{ x: x0, y }, { x: x0 + (x1 - x0) * p.progressoDesvio, y: y + p.progressoDesvio }]], { cor: CORES_GIZ.certo, largura: 6.5, alpha: 0.95, grao: 0.3 })
   }
 
   concluir() {
     tocar(this, 'cura')
+    somDePapel('adesivo')
     const a = this.adesivoFinal
     a.setVisible(true)
     if (this.calmo) return
-    a.setScale(2.4).setAlpha(0)
-    this.tweens.add({ targets: a, scale: 1, alpha: 1, duration: 360, ease: 'Back.easeOut' })
+    a.setScale(2.2).setAlpha(0)
+    this.tweens.add({ targets: a, scale: 1, alpha: 1, duration: 420, ease: 'Back.easeOut' })
+    if (pref('flashes') !== false) {
+      const n = Math.max(6, Math.round(44 * fatores().festa))
+      this.time.delayedCall(260, () => {
+        if (this.virando || !this.folha) return
+        this.confete = new Confete(this, a.x, a.y - 20, { n, pai: this.folha })
+        somDePapel('brilho')
+      })
+    }
   }
 
-  // a folha encolhe contra a lombada (esquerda) e mostra a página de trás; sem animação, troca direto
+  // a folha encolhe contra a lombada (com a beirada curvando) e mostra a página de trás
   virarPagina() {
     this.virando = true
-    this.proxima.setVisible(true).setDepth(10)
-    const fim = () => {
-      this.folha.setVisible(false)
-      this.sombraVirada.setAlpha(0)
-      this.virando = false
-      this.pagina.terminouDeVirar()
-      this.dizer(this.pagina.fala, true)
-      this.atualizarDicas()
-    }
-    if (this.calmo) return fim()
-    tocar(this, 'mover')
-    const dobra = this.add.rectangle(0, 0, 16, ALTURA, 0xd9cdb0, 1).setOrigin(0).setDepth(25)
-    const sombra = this.add.rectangle(0, 0, 60, ALTURA, 0x2a1d10, 0.28).setOrigin(0).setDepth(24)
-    this.tweens.addCounter({
-      from: 0,
-      to: 1,
-      duration: VIRADA_MS,
-      ease: 'Sine.easeInOut',
-      onUpdate: (t) => {
-        const v = t.getValue()
-        this.folha.setScale(1 - v, 1 + v * 0.02)
-        dobra.setX(LARGURA * (1 - v) - 2).setAlpha(v < 0.97 ? 1 : 0)
-        sombra.setX(LARGURA * (1 - v)).setAlpha(0.28 * (1 - v))
-        this.sombraVirada.setAlpha(0.18 * Math.sin(v * Math.PI))
-      },
-      onComplete: () => {
-        dobra.destroy()
-        sombra.destroy()
-        fim()
+    this.confete?.destroy()
+    this.confete = null
+    this.proxima.setVisible(true)
+    virarFolha(this, this.folha, {
+      calmo: this.calmo,
+      aoTerminar: () => {
+        this.folha.setVisible(false)
+        this.virando = false
+        this.pagina.terminouDeVirar()
+        this.balao.dizer(this.pagina.fala, true)
+        this.atualizarDicas()
       },
     })
   }
 }
+
+const slotX = (k, n) => (CAIXA.esquerda + CAIXA.direita) / 2 + (k - (n - 1) / 2) * 46
+
+// a borda da caixa: o retângulo de giz (cada lado com 2 passadas e cantos que se cruzam)
+const retanguloDuplo = (rng, c) => retanguloGiz(rng, c.esquerda, c.topo, c.direita - c.esquerda, c.base - c.topo, { tremor: 1.4, excesso: 6, tracos: 2 })
+
+// o gizinho rosa que aparece riscando no "desenhando" (a ponta fica no (0,0))
+function assarGizinho(scene) {
+  const corpo = [{ x: 4, y: -6 }, { x: 30, y: -40 }, { x: 40, y: -32 }, { x: 13, y: 2 }]
+  const papel = [{ x: 16, y: -22 }, { x: 28, y: -38 }, { x: 38, y: -30 }, { x: 25, y: -15 }]
+  return assarCamadas(scene, 'manual-gizinho', [
+    { tipo: 'preencher', poligono: corpo, cor: PALETA.rosa, espaco: 2, mancha: 0.7 },
+    { tipo: 'mancha', poligono: papel, cor: 0xfff4d6, alpha: 0.95 },
+    { tipo: 'traco', tracos: [[...papel, papel[0]]], cor: PALETA.rosaEscuro, largura: 1.2, passadas: 1 },
+    { tipo: 'mancha', poligono: [{ x: 0, y: 0 }, { x: 4, y: -6 }, { x: 13, y: 2 }], cor: PALETA.rosaEscuro, alpha: 1 },
+    { tipo: 'traco', tracos: [[...corpo, corpo[0]]], cor: PALETA.rosaEscuro, largura: 1.6, passadas: 2 },
+  ], { grao: 0.25 })
+}
+
+// etiqueta de papel lavanda presa com um clipe: "PÁGINA N"
+function assarRotulo(scene, chave, texto) {
+  const silhueta = [{ x: 0, y: 8 }, { x: 96, y: 6 }, { x: 98, y: 24 }, { x: 2, y: 26 }]
+  return assarAdesivo(scene, chave, {
+    silhueta,
+    borda: 1.5,
+    base: (ctx) => {
+      ctx.fillStyle = '#e4dcf6'
+      ctx.beginPath()
+      silhueta.forEach((q, k) => (k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)))
+      ctx.closePath()
+      ctx.fill()
+    },
+    frente: (ctx) => {
+      ctx.fillStyle = '#4b3a78'
+      ctx.font = `bold 12px ${FONTE_TEXTO}`
+      ctx.textBaseline = 'middle'
+      ctx.fillText(texto, 26, 17)
+      // o clipe
+      ctx.strokeStyle = '#8a8ea0'
+      ctx.lineWidth = 1.8
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(10, 24)
+      ctx.lineTo(10, 4)
+      ctx.arc(14, 4, 4, Math.PI, 0)
+      ctx.lineTo(18, 20)
+      ctx.arc(15, 20, 3, 0, Math.PI)
+      ctx.lineTo(12, 7)
+      ctx.stroke()
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'
+      ctx.lineWidth = 0.7
+      ctx.beginPath()
+      ctx.moveTo(9.4, 20)
+      ctx.lineTo(9.4, 5)
+      ctx.stroke()
+    },
+    grao: 0,
+  })
+}
+

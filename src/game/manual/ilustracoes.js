@@ -1,107 +1,73 @@
 import { aleatorio } from '../pvp/baralho.js'
 import { circuloGiz, coracaoGiz, contornoDoCoracao, estrelaGiz, linhaGiz, poligonoGiz, preencherGiz, setaGiz, xGiz } from './giz.js'
+import { PALETA } from './cera.js'
+import { elipse } from './ralsei.js'
 
-// Os desenhos do manual (só dados: camadas de traços, sem Phaser). Cada camada é
-// { tracos, cor, largura, alpha? }; a cena pinta com giz.desenharTracos. O Ralsei é um rabisco
-// ORIGINAL (chapéu de feltro, orelhas caídas, cachecol): silhueta e fala próprias, sem arte copiada.
+// Os desenhos do manual (só DADOS, sem Phaser): traços (giz.js) e camadas para cera.pintarDesenho
+// ({ tipo: 'traco' | 'preencher' | 'mancha', ... }). O Ralsei fica em ralsei.js.
 
 export const CORES_GIZ = {
-  tinta: 0x2b2540, // texto e contornos escuros
-  grafite: 0x3b4a8a, // borda da caixa
-  coracao: 0xe5243b,
-  coracaoMiolo: 0xf4617a,
-  bala: 0x5b2fa8,
-  balaMiolo: 0x8f66dc,
-  marca: 0xe0a000,
-  marcaX: 0x138a7a,
-  adesivo: 0xffd23a,
-  certo: 0x2da44e,
+  tinta: PALETA.tinta,
+  grafite: PALETA.azulEscuro, // borda da caixa
+  coracao: PALETA.coracao,
+  coracaoEscuro: 0xa50e26,
+  bala: PALETA.bala,
+  balaMiolo: PALETA.balaMiolo,
+  marca: PALETA.amarelo,
+  marcaContorno: 0xc27c00,
+  marcaX: PALETA.marcaX,
+  certo: PALETA.certo,
 }
 
-// ---------- Ralsei ----------
-export function rabiscoDoRalsei(rng) {
-  const camadas = []
-  const camada = (tracos, cor, largura = 2.6, alpha) => camadas.push({ tracos, cor, largura, alpha })
+const traco = (tracos, cor, largura = 2.6, extra = {}) => ({ tipo: 'traco', tracos, cor, largura, ...extra })
+const preencher = (poligono, cor, extra = {}) => ({ tipo: 'preencher', poligono, cor, ...extra })
 
-  // cachecol (atrás do queixo)
-  const cachecol = [
-    { x: -34, y: 24 },
-    { x: 34, y: 24 },
-    { x: 40, y: 50 },
-    { x: 8, y: 58 },
-    { x: 12, y: 84 },
-    { x: -6, y: 86 },
-    { x: -8, y: 56 },
-    { x: -40, y: 48 },
-  ]
-  camada(preencherGiz(rng, cachecol, { espaco: 3.4, angulo: 0.7 }), 0xf08a2e, 2, 0.85)
-  camada(poligonoGiz(rng, cachecol, { tremor: 0.9 }), 0x9a4d10, 2.4)
+// ---------- coração, bala, marcas ----------
 
-  // orelhas caídas
-  for (const lado of [-1, 1]) {
-    const orelha = [
-      { x: lado * 26, y: -14 },
-      { x: lado * 56, y: -6 },
-      { x: lado * 60, y: 26 },
-      { x: lado * 34, y: 10 },
-    ]
-    camada(preencherGiz(rng, orelha, { espaco: 3.4, angulo: -0.5 }), 0x2f6f73, 2, 0.9)
-    camada(poligonoGiz(rng, orelha, { tremor: 0.8 }), 0x1d3f42, 2.4)
-  }
-
-  // rosto
-  const rosto = Array.from({ length: 24 }, (_, i) => ({ x: Math.cos((i / 24) * 6.2832) * 34, y: Math.sin((i / 24) * 6.2832) * 31 }))
-  camada(preencherGiz(rng, rosto, { espaco: 3.6, angulo: 0.5 }), 0xfbe6d3, 2.4, 0.95)
-  camada(circuloGiz(rng, 0, 0, 33, { tremor: 1.2 }), 0x2b2540, 2.8)
-  // olhos, bochechas e sorriso
-  for (const lado of [-1, 1]) {
-    camada(circuloGiz(rng, lado * 12, -3, 3.4, { tracos: 1, tremor: 0.3 }), 0x2b2540, 4.2)
-    camada(circuloGiz(rng, lado * 22, 9, 5, { tracos: 1, tremor: 0.5 }), 0xff8fa8, 3.2, 0.8)
-  }
-  camada(linhaGiz(rng, -8, 12, -2, 16, { tracos: 1, tremor: 0.3, excesso: 0 }), 0x2b2540, 2.4)
-  camada(linhaGiz(rng, -2, 16, 6, 14, { tracos: 1, tremor: 0.3, excesso: 0 }), 0x2b2540, 2.4)
-  camada(linhaGiz(rng, 6, 14, 10, 10, { tracos: 1, tremor: 0.3, excesso: 0 }), 0x2b2540, 2.4)
-
-  // chapéu mole e a aba
-  const chapeu = [
-    { x: -36, y: -26 },
-    { x: 36, y: -26 },
-    { x: 14, y: -78 },
-    { x: 36, y: -102 },
-    { x: 2, y: -98 },
-    { x: -20, y: -58 },
-  ]
-  camada(preencherGiz(rng, chapeu, { espaco: 3.2, angulo: -0.8 }), 0x37b36a, 2.2, 0.95)
-  camada(poligonoGiz(rng, chapeu, { tremor: 0.9 }), 0x1b6e3d, 2.6)
-  camada(linhaGiz(rng, -52, -26, 52, -26, { tracos: 2, tremor: 1.4 }), 0x1b6e3d, 4.2)
-  camada(linhaGiz(rng, -30, -40, 28, -40, { tracos: 1, tremor: 0.9 }), 0xffd23a, 5)
-  return camadas
-}
-
-// ---------- coração, bala, marcas, adesivos ----------
-
-// Uma variante de giz do coração do jogador, centrada na origem (a cena move o Graphics).
-// `largura` = tamanho visual; a colisão é o miolo CORACAO.hitbox, independente disto.
+// Uma variante de giz do coração do jogador, centrada na origem. `largura` = tamanho visual; a colisão é
+// o miolo CORACAO.hitbox (pintado à parte, exato), independente disto.
+//   contorno/preenchimento: traços (o "desenhando" corta pelo progresso); camadas: a versão assada
 export function rabiscoDoCoracao(rng, largura = 22) {
   const miolo = contornoDoCoracao(0, 0, largura - 3, 28)
+  const contorno = coracaoGiz(rng, 0, 0, largura, { tremor: 0.55, passo: 3.2, rabo: 0.05 })
+  const preenchimento = preencherGiz(rng, miolo, { espaco: 2.6, angulo: -0.7, tremor: 0.4, folga: 0.5 })
   return {
-    preenchimento: preencherGiz(rng, miolo, { espaco: 2.6, angulo: -0.7, tremor: 0.4, folga: 0.5 }),
-    contorno: coracaoGiz(rng, 0, 0, largura, { tremor: 0.55, passo: 3.2, rabo: 0.05 }),
+    contorno,
+    preenchimento,
+    camadas: [preencher(miolo, CORES_GIZ.coracao, { espaco: 2.2, angulo: -0.7, mancha: 0.55 }), traco(contorno, CORES_GIZ.coracaoEscuro, 2.4, { passadas: 2 })],
   }
 }
 
-// Bala de giz: círculo + hachura, centrado na origem. Tremor baixo: o desenho nunca passa
+// Bala de giz: bolinha cheia + contorno, centrada na origem. Tremor baixo: o desenho nunca passa
 // de ~1,5 px da forma exata da bala (a hitbox continua o círculo de raio `raio`).
 export function rabiscoDaBala(rng, raio) {
-  const poli = Array.from({ length: 16 }, (_, i) => ({ x: Math.cos((i / 16) * 6.2832) * (raio - 0.5), y: Math.sin((i / 16) * 6.2832) * (raio - 0.5) }))
+  const poli = elipse(0, 0, raio - 0.5, raio - 0.5, 16)
+  const contorno = circuloGiz(rng, 0, 0, raio, { tremor: 0.5, passo: 3.4, rabo: 0.06 })
   return {
+    contorno,
     preenchimento: preencherGiz(rng, poli, { espaco: 2.4, angulo: aleatorio(rng) * 3, tremor: 0.3, folga: 0.4 }),
-    contorno: circuloGiz(rng, 0, 0, raio, { tremor: 0.5, passo: 3.4, rabo: 0.06 }),
+    camadas: [preencher(poli, CORES_GIZ.balaMiolo, { espaco: 2, angulo: aleatorio(rng) * 3, mancha: 0.6 }), traco(contorno, CORES_GIZ.bala, 2.6, { passadas: 2 })],
   }
 }
 
+// estrela "gorda" (polígono de 2n pontos), a de adesivo e a de marca
+export function estrelaGorda(cx, cy, rExt, rInt = rExt * 0.5, n = 5, giro = 0) {
+  return Array.from({ length: n * 2 }, (_, i) => {
+    const a = -Math.PI / 2 + giro + (i * Math.PI) / n
+    const r = i % 2 ? rInt : rExt
+    return { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r }
+  })
+}
+
+// marca: estrela amarela cheia (contorno cor de mel) ou X verde-água; `tracos` é o que o giz risca no "desenhando"
 export function rabiscoDaMarca(rng, forma, r = 13) {
-  return forma === 'x' ? xGiz(rng, 0, 0, r, { tremor: 0.8 }) : estrelaGiz(rng, 0, 0, r, { tremor: 0.8 })
+  if (forma === 'x') {
+    const t = xGiz(rng, 0, 0, r, { tremor: 0.8 })
+    return { tracos: t, camadas: [traco(t, CORES_GIZ.marcaX, 4, { passadas: 3 })] }
+  }
+  const poli = estrelaGorda(0, 0, r, r * 0.48, 5, (aleatorio(rng) - 0.5) * 0.3)
+  const t = poligonoGiz(rng, poli, { tremor: 0.6, excesso: 1 })
+  return { tracos: t, camadas: [preencher(poli, CORES_GIZ.marca, { espaco: 2, mancha: 0.6 }), traco(t, CORES_GIZ.marcaContorno, 2.4, { passadas: 2 })] }
 }
 
 // a seta torta do "este é você" (em coordenadas absolutas)
@@ -110,25 +76,122 @@ export const rabiscoDaSeta = (rng, x0, y0, x1, y1) => setaGiz(rng, x0, y0, x1, y
 // o risco de baixo de um título
 export const sublinhado = (rng, x0, y, x1) => linhaGiz(rng, x0, y, x1, y + (aleatorio(rng) * 2 - 1) * 2, { tracos: 2, tremor: 1.3, excesso: 4 })
 
-// estrelinhas e espirais a lápis nas margens da folha (decoração, bem fraco)
-export function rabiscosDaMargem(rng, largura, altura, caixaLivre) {
-  const tracos = []
-  const livre = (x, y) => x > caixaLivre.esquerda && x < caixaLivre.direita && y > caixaLivre.topo && y < caixaLivre.base
-  const pontos = [
-    [24, 40], [832, 40], [826, 440], [28, 452], [418, 24], [730, 24], [832, 238], [20, 232],
-  ]
-  for (const [x, y] of pontos) {
-    if (livre(x, y)) continue
-    const k = aleatorio(rng)
-    if (k < 0.4) tracos.push(...estrelaGiz(rng, x, y, 7 + aleatorio(rng) * 3, { tremor: 0.6 }))
-    else if (k < 0.7) tracos.push(...circuloGiz(rng, x, y, 6 + aleatorio(rng) * 3, { tremor: 0.7, tracos: 1 }))
-    else tracos.push(...coracaoGiz(rng, x, y, 14, { tremor: 0.5, tracos: 1 }))
+// ---------- balão de fala ----------
+
+// Contorno de um balão: retângulo de cantos bem redondos, bordas que ondulam de leve e um rabinho
+// saindo da borda de baixo até `cauda` ({ x, y } = a ponta; { de } = x onde o rabinho começa).
+export function contornoDoBalao(rng, x, y, largura, altura, cauda, { raio = 22, onda = 1.6 } = {}) {
+  const pts = []
+  const canto = (cx, cy, a0) => {
+    for (let i = 0; i <= 6; i++) {
+      const a = a0 + (i / 6) * (Math.PI / 2)
+      pts.push({ x: cx + Math.cos(a) * raio, y: cy + Math.sin(a) * raio })
+    }
   }
-  // ondinhas soltas nos cantos
-  for (const [x, y] of [[60, 20], [790, 462], [800, 22], [48, 466]]) {
-    const onda = []
-    for (let i = 0; i <= 10; i++) onda.push({ x: x + i * 4, y: y + Math.sin(i * 1.3 + aleatorio(rng)) * 3 })
-    tracos.push(onda)
+  const lado = (x0, y0, x1, y1, n) => {
+    for (let i = 1; i < n; i++) pts.push({ x: x0 + ((x1 - x0) * i) / n, y: y0 + ((y1 - y0) * i) / n })
   }
-  return tracos
+  const r = raio
+  canto(x + r, y + r, Math.PI) // cima-esquerda
+  lado(x + r, y, x + largura - r, y, 8)
+  canto(x + largura - r, y + r, -Math.PI / 2)
+  lado(x + largura, y + r, x + largura, y + altura - r, 4)
+  canto(x + largura - r, y + altura - r, 0)
+  // embaixo, da direita para a esquerda, com o rabinho
+  const de = cauda?.de ?? x + largura * 0.3
+  const base = y + altura
+  const boca = cauda?.largura ?? 26 // a largura do rabinho onde ele sai do balão
+  lado(x + largura - r, base, de + boca, base, 6)
+  if (cauda) {
+    pts.push({ x: de + boca, y: base })
+    pts.push({ x: (de + boca + cauda.x) / 2 + 3, y: (base + cauda.y) / 2 })
+    pts.push({ x: cauda.x, y: cauda.y })
+    pts.push({ x: (de + cauda.x) / 2 - 2, y: (base + cauda.y) / 2 - 4 })
+    pts.push({ x: de, y: base })
+  }
+  lado(de, base, x + r, base, 4)
+  canto(x + r, y + altura - r, Math.PI / 2)
+  lado(x, y + altura - r, x, y + r, 4)
+  // ondinha suave (as bordas de quem desenha à mão), perpendicular ao centro
+  const cx = x + largura / 2
+  const cy = y + altura / 2
+  const fase = aleatorio(rng) * 6.28
+  return pts.map((p, i) => {
+    const dx = p.x - cx
+    const dy = p.y - cy
+    const m = Math.hypot(dx, dy) || 1
+    const d = onda * Math.sin(i * 0.45 + fase) + (aleatorio(rng) - 0.5) * 0.6
+    return { x: p.x + (dx / m) * d, y: p.y + (dy / m) * d }
+  })
+}
+
+// a borda dupla do balão: o contorno fechado duas vezes, começando em pontos diferentes (o giz que volta)
+export function bordaDoBalao(rng, poligono) {
+  const fechado = (inicio, j) => {
+    const n = poligono.length
+    const t = []
+    for (let i = 0; i <= n + 2; i++) {
+      const p = poligono[(inicio + i) % n]
+      t.push({ x: p.x + (aleatorio(rng) - 0.5) * j, y: p.y + (aleatorio(rng) - 0.5) * j })
+    }
+    return t
+  }
+  return [fechado(0, 0.6), fechado(Math.floor(poligono.length / 3), 1.6)]
+}
+
+// ---------- letras de título ----------
+
+// Cada letra um tiquinho torta (subida, giro e tamanho), como letra desenhada com cuidado. O texto em si
+// continua a fonte clara; só o título usa isto.
+export function letrasTortas(rng, texto) {
+  return [...texto].map((ch, i) => ({
+    ch,
+    dy: Math.sin(i * 1.7 + aleatorio(rng) * 2) * 1.6,
+    giro: (aleatorio(rng) - 0.5) * 0.12,
+    escala: 0.97 + aleatorio(rng) * 0.08,
+  }))
+}
+
+// ---------- rabiscos de margem ----------
+
+const COR_MARGEM = [PALETA.rosa, PALETA.azul, PALETA.lavanda, PALETA.amarelo]
+
+// Doodles coloridos nas sobras da folha: um sol sorrindo, uma nuvem, coraçõezinhos, estrelinhas e
+// uma trilha de patinhas. `pontos` = onde (o layout da página decide); cada um { tipo, x, y, r?, cor? }.
+export function rabiscosDaMargem(rng, pontos) {
+  const c = []
+  for (const [i, p] of pontos.entries()) {
+    const cor = p.cor ?? COR_MARGEM[i % COR_MARGEM.length]
+    const r = p.r ?? 7
+    if (p.tipo === 'sol') {
+      const disco = elipse(p.x, p.y, r, r, 20)
+      c.push(preencher(disco, PALETA.amarelo, { espaco: 2.6, mancha: 0.5, alpha: 0.9 }))
+      c.push(traco(circuloGiz(rng, p.x, p.y, r, { tremor: 0.6 }), PALETA.ouro, 2.2, { passadas: 2 }))
+      for (let k = 0; k < 9; k++) {
+        const a = (k / 9) * Math.PI * 2 + 0.2
+        c.push(traco(linhaGiz(rng, p.x + Math.cos(a) * (r + 4), p.y + Math.sin(a) * (r + 4), p.x + Math.cos(a) * (r + 10), p.y + Math.sin(a) * (r + 10), { tracos: 1, excesso: 0.5, tremor: 0.4 }), PALETA.amarelo, 2.6, { passadas: 2 }))
+      }
+      for (const l of [-1, 1]) c.push({ tipo: 'mancha', poligono: elipse(p.x + l * r * 0.35, p.y - r * 0.15, 1.5, 1.9, 8), cor: PALETA.tinta, alpha: 0.85 })
+      c.push(traco([[{ x: p.x - r * 0.4, y: p.y + r * 0.2 }, { x: p.x, y: p.y + r * 0.48 }, { x: p.x + r * 0.4, y: p.y + r * 0.2 }]], PALETA.tinta, 1.6, { passadas: 2 }))
+    } else if (p.tipo === 'nuvem') {
+      const nuvem = []
+      for (const [dx, dy, rr] of [[-14, 2, 9], [-4, -5, 11], [9, -2, 10], [17, 4, 7]]) nuvem.push(...circuloGiz(rng, p.x + dx, p.y + dy, rr, { tracos: 1, tremor: 0.4, rabo: 0.02 }))
+      c.push(traco(nuvem, PALETA.azul, 2, { alpha: 0.75, passadas: 2 }))
+    } else if (p.tipo === 'coracao') {
+      const poli = contornoDoCoracao(p.x, p.y, r * 2, 22)
+      c.push(preencher(poli, cor, { espaco: 2, alpha: 0.7 }))
+      c.push(traco(coracaoGiz(rng, p.x, p.y, r * 2, { tracos: 1, tremor: 0.4 }), cor, 1.8, { passadas: 2 }))
+    } else if (p.tipo === 'estrela') {
+      c.push(traco(estrelaGiz(rng, p.x, p.y, r, { tremor: 0.4 }), cor, 2, { passadas: 2, alpha: 0.85 }))
+    } else if (p.tipo === 'pata') {
+      const giro = p.giro ?? 0
+      const rot = (dx, dy) => ({ x: p.x + dx * Math.cos(giro) - dy * Math.sin(giro), y: p.y + dx * Math.sin(giro) + dy * Math.cos(giro) })
+      const almofada = elipse(0, 0, r * 0.62, r * 0.5, 14).map((q) => rot(q.x, q.y + r * 0.2))
+      c.push({ tipo: 'mancha', poligono: almofada, cor, alpha: 0.55 })
+      for (const [dx, dy] of [[-0.62, -0.42], [-0.22, -0.78], [0.22, -0.78], [0.62, -0.42]]) {
+        c.push({ tipo: 'mancha', poligono: elipse(0, 0, r * 0.2, r * 0.24, 10).map((q) => rot(q.x + dx * r, q.y + dy * r)), cor, alpha: 0.55 })
+      }
+    }
+  }
+  return c
 }

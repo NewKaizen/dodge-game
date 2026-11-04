@@ -17,8 +17,8 @@ o guia de antes, intacto). `B` volta ao Menu a qualquer momento.
 | `marcas` | O jogador leva o coração às 3 marcas (estrela, X, estrela), em qualquer ordem. Cada marca vira um adesivo na fileira de cima. Uma seta torta "você!" aponta o coração até a 1ª marca. |
 | `desviar` | 1,1 s de aviso e 6 bolinhas lentas (76 a 84 px/s, 3 mirando no coração) por 8 s. Barra de giz mostra o tempo. |
 | `tentarDeNovo` | Acertou: risquinhos em volta do coração, fala de incentivo ("Quase! Tenta de novo?") e recomeça **só o desvio** em 1 s (ou já, com A). Cada erro deixa as balas 10% mais lentas (piso 60%). |
-| `concluida` | Adesivo "PÁGINA 1 ✓". A vira a página. |
-| `virando` / `fim` | A folha encolhe contra a lombada (0,9 s) e mostra a página 2 placeholder, "continua…". A de novo refaz a página 1. |
+| `concluida` | Estrela dourada "PÁGINA 1 ✓" (adesivo metalizado) + confete de coraçõezinhos de papel. A vira a página. |
+| `virando` / `fim` | A folha encolhe contra a espiral (0,9 s) com o verso curvando e sombra na página de baixo, e mostra a página 2 placeholder, "continua…". A de novo refaz a página 1. |
 
 Uma instrução e uma ação de cada vez; botões na barra de baixo conforme o controle em uso (`botoes.js`:
 teclado mostra as teclas reais do jogador 1 já remapeadas, controle mostra A/B, joystick serial BOTÃO A/B).
@@ -34,31 +34,56 @@ giz nunca entra na colisão**: a bala acerta por `x/y/raio` e há teste provando
 Risco aceito: são cópias (pequenas) de regras do jogo. Se `Heart`/`Balas` mudarem, `pagina1.js` precisa acompanhar
 (a página 2+ deve, se possível, chamar as classes reais; ver "Antes de produzir mais páginas").
 
-## O ajudante de giz (`src/game/manual/giz.js`)
+## Direção de arte: um caderno que o Ralsei fez à mão
 
-Tudo é **traço**: `[{x, y}, ...]`; um desenho é uma lista de traços. Sem Phaser, determinístico por `criarRng(semente)`
-(`pvp/baralho.js`), testado em `__tests__/giz.test.js`.
+Caderno de espiral sobre uma mesa de feltro; papel creme quentinho (grão, fibras, vinheta, pautas, margem vermelha,
+dobrinha no canto); tudo desenhado com **giz de cera** de verdade (passadas sobrepostas, pressão variável, grão do
+papel "comendo" a cera); fita washi segurando o cartão da caixa; doodles nas sobras (sol sorrindo, nuvem,
+coraçõezinhos, estrelinhas, trilha de patinhas); adesivos recortados (borda branca + sombrinha). Paleta de giz
+(`cera.PALETA`): verde Ralsei, rosa, azul-céu, amarelo-girassol, lavanda, mais tinta, coração e a bolinha roxa.
+Texto de instrução sempre na fonte clara; só o título usa letras "tortinhas" (a mesma fonte, cada letra levemente
+girada, com o grão da cera). O miolo da hitbox do coração é pintado à parte, exato e nítido, por cima do giz.
 
-| Função | Faz |
+O Ralsei é um desenho original nas cores do sprite do jogo (chapéu e manto verdes, cachecol rosa, pelo branquinho,
+óculos redondos como na arte do menu), segurando o giz rosa com que fez o caderno. Faz 5 caras
+(`ralsei.expressaoDoRalsei`): **feliz** (padrão), **concentrado** (desenhando, com a pontinha da língua),
+**surpreso** (0,9 s depois de um acerto), **incentivo** (piscadinha, no "tenta de novo") e **animado** (1,1 s depois
+de cada marca e no fim). Respira, o chapéu balança e ele pisca a cada 2,6 a 5 s.
+
+Juice: o gizinho rosa aparece na ponta do traço no "desenhando", com som de giz arranhando; cada marca vira uma
+estrelinha dourada colada na fileira de cima, com brilhinhos; as bolinhas deixam um rastro apagadinho; a virada tem
+o "fshhh" de folha. Sons de papel sintetizados no contexto de áudio do jogo (`somDePapel`), no volume de efeitos.
+
+Cuidado técnico: **nenhuma imagem do manual gira** (no Chromium com GL de software, uma imagem girada de leve
+perdia triângulos inteiros). Balanço é posição/escala; inclinação (a da estrela final) vai assada no canvas.
+
+## Os módulos (`src/game/manual/`)
+
+Tudo puro (sem Phaser, determinístico por semente, testado em `__tests__/`), menos `paginaBase.js`.
+
+| Arquivo | Faz |
 | --- | --- |
-| `linhaGiz(rng, x0, y0, x1, y1, {tracos, tremor, passo, excesso})` | linha tremida, 2 passadas, passando um pouco do fim |
-| `retanguloGiz`, `poligonoGiz` | bordas de caixa/balão (cantos que se cruzam) e polígonos |
-| `circuloGiz`, `coracaoGiz`, `estrelaGiz`, `xGiz` | formas que não fecham direito (rabinho do giz) |
-| `setaGiz(rng, x0, y0, x1, y1)` | seta torta: barriga sorteada e ponta de 2 riscos |
-| `preencherGiz(rng, poligono, {espaco, angulo})` | hachura inclinada dentro de um polígono (o "rabisco de preencher") |
-| `cortarTracos(tracos, t)` | os primeiros `t` do comprimento: é o que anima o "desenhando" |
-| `desenharTracos(g, tracos, {cor, largura, alpha, progresso, grao})` | pinta num `Graphics`: corpo largo translúcido + pressão variável por segmento (`falhaDoGiz`, sem sorteio) |
-| `margemDeTremor(t)`, `margemDeLinha(t, e)` | quanto um traço pode sair da forma base (os testes usam isto como limite) |
+| `giz.js` | os TRAÇOS (`[{x, y}, ...]`): `linhaGiz`, `retanguloGiz`, `circuloGiz`, `coracaoGiz`, `estrelaGiz`, `xGiz`, `setaGiz`, `preencherGiz` (hachura), `cortarTracos` (o "desenhando"), `desenharTracos` (num `Graphics`: a barra e os risquinhos de acerto) |
+| `cera.js` | pinta traços num **canvas 2D** como giz de cera: `passadasDaCera` (2-3 passadas deslocadas, cor variando, pressão por trecho), `preencherCera` (mancha + hachura em 2 ângulos), `pintarDesenho(ctx, camadas)`, `graoDaCera` + `aplicarGrao` (destination-out), `PALETA` |
+| `ralsei.js` | o Ralsei em partes (`partesDoRalsei`: corpo, cabeça, chapéu), `rostoDoRalsei(rng, expressao, {piscando})`, `expressaoDoRalsei(etapa, ultimoEvento)`, `piscaEm` |
+| `ilustracoes.js` | coração, bala, marcas (traços + camadas assadas), seta, sublinhado, `contornoDoBalao`/`bordaDoBalao`, `letrasTortas`, `rabiscosDaMargem` (sol, nuvem, coração, estrela, pata) |
+| `papel.js` | `gerarPapel` (pixels: grão, fibras, manchas, vinheta), `vinheta`, `fibrasDoPapel`, `furosDaEspiral` |
+| `confete.js` | `gerarConfete`, `passoConfete` (gravidade, ar, vai-e-vem), `viradaDaPeca` |
+| `paginaBase.js` | **a base de toda página** (Phaser + canvas): `garantirPapel` (mesa/folha/espiral), `assar`/`assarCamadas`/`imagemDeCera`, `assarAdesivo`, `assarEstrelaDourada`, `assarLetreiro`, `desenharFita`, `Balao` (digitação pulável), `RalseiDesenhado`, `Confete`, `brilhar`, `virarFolha`, `somDePapel` |
+| `pagina1.js` | a máquina de estados e as regras da página 1 (inalterada pela direção de arte) |
 
-Tremidinho ("boil"): a cena gera `VARIANTES = 3` desenhos de cada elemento e alterna a cada 170 ms. Com "reduzir
-animações" fica só a variante 0 (giz parado).
-`papel.js` gera a textura do papel (ruído de valor + grão + bordas escuras; a cena soma pautas e fibras num `CanvasTexture`).
-`ilustracoes.js` guarda os desenhos (Ralsei original: chapéu, orelhas caídas, cachecol; coração; bala; marcas; margens).
+Desempenho: tudo o que não muda é **assado uma vez** numa textura de canvas (sementes fixas: reabrir a cena
+reaproveita). Por quadro só se troca a textura das variantes (tremidinho a cada 170 ms, `VARIANTES = 3`) e se move
+imagens; o "desenhando" repinta uma textura pequena (a área da caixa) por ~2,7 s.
 
 ## Acessibilidade
 
-- "reduzir animações": giz parado, balão inteiro de uma vez, virada de página trocada na hora (corte), seta sem animação.
+- "reduzir animações": giz parado, Ralsei parado (sem respirar/piscar/pular; as caras mudam), balão inteiro de uma
+  vez, virada de página trocada na hora (corte), seta e brilhos parados, sem rastro das bolinhas, sem confete.
+- Clarões desligados: sem confete. O confete segue o nível de "festa" dos gráficos.
 - Nenhum clarão (acerto = risquinhos parados). Jogabilidade igual em qualquer ajuste.
+- Contraste conferido em `__tests__/cera.test.js` (`contraste.js`): texto ≥ 4,5:1 no balão e no papel; bolinha e
+  coração ≥ 3:1 no cartão da caixa.
 - Texto em fonte clara com acentos (Verdana/DejaVu, negrito), nunca em letra "de mão".
 
 ## Como somar páginas
@@ -66,20 +91,23 @@ animações" fica só a variante 0 (giz parado).
 1. Lógica em `src/game/manual/paginaN.js`, puro, no formato de `criarPagina1`: `etapa`, `tick(dt, joy)`, `avancar()`,
    `fala`, `drenar()` (eventos), mais testes em `__tests__/`.
 2. Desenhos novos em `ilustracoes.js` (devolva camadas/traços; nada de Phaser).
-3. Cena: hoje `ManualRalsei.js` desenha a página 1 direto. Antes da 2ª página, extrair o que é comum (papel, balão do
-   Ralsei, barra de botões, virada de folha, tremidinho) para uma base e deixar cada página só com seu
-   `montar()`/`redesenhar()`.
+3. Cena: use `paginaBase.js` (papel, `Balao`, `RalseiDesenhado`, adesivos, `virarFolha`, `somDePapel`); a página só
+   monta o que é dela (cartão, doodles da margem nos lugares livres do seu layout, a ilustração jogável) e
+   escolhe a cara do Ralsei com `expressaoDoRalsei` (ou uma regra sua). Falta ainda tirar de `ManualRalsei.js` o
+   tremidinho e a barra de dicas para a base.
 4. Registrar a cena em `config.js` e, se for cena de menu, em `rede.js` (`CENAS_DE_MENU`).
 5. Cena nova segue o padrão `estadoInicial()` (`__tests__/cenasReaproveitadas.test.js` cobre).
 
 ## Antes de produzir mais páginas
 
 - Trocar as cópias de regras (`moverCoracao`, `balaAcerta`) por chamadas às classes reais, ou testes que comparem as duas.
-- Extrair a base de cena (acima). Índice, "retomar", pular e salvar progresso (3C) ainda não existem.
+- Terminar a base de cena (tremidinho e dicas, acima). Índice, "retomar", pular e salvar progresso (3C) ainda não existem.
 - Testar com 2 pessoas novas (teste de saída da 3A) e anotar onde perguntaram.
 
 ## Testes e verificação
 
-`npm test` cobre `manual/__tests__/` (giz, papel, máquina de estados, acerto, marcas, hitbox x tremor, botões).
+`npm test` cobre `manual/__tests__/` (giz, cera, papel, Ralsei e caras, balão/doodles, confete, contraste, máquina de
+estados, acerto, marcas, hitbox x tremor, botões).
 O fluxo completo foi jogado no navegador (Playwright + Chromium, software GL): menu → GUIA → manual → marcas → desvio
-(com um erro de propósito) → adesivo → virada, também com "reduzir animações" ligado.
+(com um erro de propósito) → adesivo → virada, também com "reduzir animações" ligado, antes e depois da direção de
+arte (capturas comparadas lado a lado).
