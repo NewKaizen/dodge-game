@@ -4,7 +4,7 @@ import { criarRng, aleatorio } from '../pvp/baralho.js'
 import { gerarPapel, fibrasDoPapel, furosDaEspiral } from './papel.js'
 import { pintarDesenho, graoDaCera, aplicarGrao, caixaDasCamadas, corCss, PALETA } from './cera.js'
 import { partesDoRalsei, rostoDoRalsei, EXPRESSOES, CABECA, piscaEm, PISCADA_MS } from './ralsei.js'
-import { contornoDoBalao, bordaDoBalao, estrelaGorda, letrasTortas, CORES_GIZ } from './ilustracoes.js'
+import { contornoDoBalao, bordaDoBalao, estrelaGorda, letrasTortas, retanguloRedondo as poligonoRedondo, CORES_GIZ } from './ilustracoes.js'
 import { gerarConfete, passoConfete, viradaDaPeca, CORES_CONFETE } from './confete.js'
 import { contornoDoCoracao, desenharTracos } from './giz.js'
 
@@ -25,6 +25,7 @@ import { contornoDoCoracao, desenharTracos } from './giz.js'
 //   virarFolha(scene, folha, op)          a virada de página (encolhe contra a lombada, com dobra e sombra)
 //   somDePapel(nome)                      'rabisco' | 'folha' | 'adesivo' | 'brilho' (WebAudio, volume de efeitos)
 //   assarRotulo(scene, chave, texto)      a etiqueta lavanda "PÁGINA N" presa com clipe
+//   assarPilula(scene, texto)             a pílula vermelha de giz "× falta energia (2/3)" (as páginas de cartas)
 //   new BalasDeGiz(scene, op)             as bolinhas de giz da caixa (com rastro apagadinho), por quadro
 //   coracaoDeGiz(scene, info)             o coração de giz com o miolo EXATO da hitbox por cima
 //   riscosDeGolpe(g, x, y, cor)           os risquinhos parados de "levou um acerto" (sem clarão)
@@ -822,6 +823,38 @@ export function assarRotulo(scene, chave, texto) {
       ctx.stroke()
     },
     grao: 0,
+  })
+}
+
+// A pílula de bloqueio das páginas de cartas, em giz: o mesmo recado da arena (PvpArena.mostrarStatus:
+// "× " + motivoBloqueio(...).curto em branco sobre vermelho), recortada em papel vermelho. Uma textura
+// por texto (assada na primeira vez). Devolve { chave, minX, minY, w, h } (a origem fica no centro).
+export const COR_PILULA = 0xb3162d // PILULA_BLOQUEIO da arena
+export function assarPilula(scene, texto) {
+  const chave = `manual-pilula:${texto}`
+  const fonte = `bold 12px ${FONTE_TEXTO}`
+  const medir = novoCanvas(4, 4).getContext('2d')
+  medir.font = fonte
+  const largura = Math.ceil(medir.measureText(texto).width) + 22
+  const altura = 22
+  const silhueta = poligonoRedondo(-largura / 2, -altura / 2, largura, altura, 10)
+  return assarAdesivo(scene, chave, {
+    silhueta,
+    borda: 2,
+    base: (ctx) => {
+      ctx.fillStyle = corCss(COR_PILULA)
+      caminhoDe(ctx, silhueta)
+      ctx.fill()
+    },
+    camadas: [{ tipo: 'traco', tracos: [[...silhueta, silhueta[0], silhueta[1]]], cor: 0x6e0a1a, largura: 1.6, passadas: 2 }],
+    frente: (ctx) => {
+      ctx.fillStyle = '#ffffff'
+      ctx.font = fonte
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(texto, 0, 1)
+    },
+    grao: 0.25,
   })
 }
 

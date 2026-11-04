@@ -254,3 +254,170 @@ export function pontosDaMira(linha, caixa, { espaco = 11, alem = 6 } = {}) {
   for (let t = espaco; t <= tSai + alem; t += espaco) pts.push({ x: x + dx * t, y: y + dy * t })
   return pts
 }
+
+// ---------- páginas de cartas (3 e 4) ----------
+
+// retângulo de cantos redondos (polígono), o formato das cartas e da pílula
+export function retanguloRedondo(x, y, largura, altura, raio = 8, n = 5) {
+  const r = Math.min(raio, largura / 2, altura / 2)
+  const pts = []
+  const canto = (cx, cy, a0) => {
+    for (let i = 0; i <= n; i++) {
+      const a = a0 + (i / n) * (Math.PI / 2)
+      pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r })
+    }
+  }
+  canto(x + largura - r, y + r, -Math.PI / 2)
+  canto(x + largura - r, y + altura - r, 0)
+  canto(x + r, y + altura - r, Math.PI / 2)
+  canto(x + r, y + r, Math.PI)
+  return pts
+}
+
+const fechar = (poli) => [[...poli, poli[0], poli[1]]]
+const estrelinha = (rng, x, y, r, cor, contorno) => {
+  const poli = estrelaGorda(x, y, r, r * 0.5, 5, (aleatorio(rng) - 0.5) * 0.4)
+  return [preencher(poli, cor, { espaco: 1.6, mancha: 0.7 }), traco(fechar(poli), contorno, 1.6, { passadas: 2 })]
+}
+
+// O desenho do miolo de cada carta (centrado na origem, cabe em ~r de raio), pelo ataque dela:
+//   estrela (Estrela Gentil): estrela cadente com rastro · ninar: duas notas na pauta · bolinho: cupcake
+//   coro: três estrelinhas cantando em arco · super: estrelona arco-íris · passar: seta que volta + gema
+export function desenhoDaCarta(rng, id, r = 20) {
+  if (id === 'estrela') {
+    const c = []
+    for (const k of [0, 1, 2]) c.push(traco(linhaGiz(rng, -r * 0.95 + k * 5, -r * 0.9 - k * 2, -r * 0.2 + k * 4, -r * 0.15 - k * 3, { tracos: 1, tremor: 0.3, excesso: 0 }), PALETA.amarelo, 2, { passadas: 1, alpha: 0.75 }))
+    c.push(...estrelinha(rng, r * 0.25, r * 0.25, r * 0.62, PALETA.amarelo, PALETA.ouro))
+    return c
+  }
+  if (id === 'ninar') {
+    const c = []
+    for (let k = 0; k < 3; k++) c.push(traco(linhaGiz(rng, -r, -r * 0.45 + k * r * 0.45, r, -r * 0.45 + k * r * 0.45, { tracos: 1, tremor: 0.3, excesso: 0 }), PALETA.lavanda, 1.3, { passadas: 1, alpha: 0.8 }))
+    for (const [x, y] of [[-r * 0.45, r * 0.2], [r * 0.4, -r * 0.2]]) {
+      c.push({ tipo: 'mancha', poligono: elipse(x, y, r * 0.24, r * 0.18, 12), cor: PALETA.azulEscuro, alpha: 1 })
+      c.push(traco([[{ x: x + r * 0.22, y }, { x: x + r * 0.22, y: y - r * 0.8 }, { x: x + r * 0.5, y: y - r * 0.55 }]], PALETA.azulEscuro, 2, { passadas: 2 }))
+    }
+    return c
+  }
+  if (id === 'bolinho') {
+    const forma = [{ x: -r * 0.55, y: 0 }, { x: r * 0.55, y: 0 }, { x: r * 0.4, y: r * 0.75 }, { x: -r * 0.4, y: r * 0.75 }]
+    const cobertura = elipse(0, -r * 0.05, r * 0.66, r * 0.42, 18).filter((q) => q.y <= r * 0.05)
+    return [
+      preencher(forma, PALETA.azul, { espaco: 1.6, mancha: 0.7 }),
+      traco(fechar(forma), PALETA.azulEscuro, 1.6, { passadas: 2 }),
+      preencher(cobertura, PALETA.rosa, { espaco: 1.5, mancha: 0.8 }),
+      traco([cobertura], PALETA.rosaEscuro, 1.6, { passadas: 2 }),
+      { tipo: 'mancha', poligono: elipse(0, -r * 0.55, r * 0.16, r * 0.16, 10), cor: PALETA.coracao, alpha: 1 },
+      traco([[{ x: r * 0.05, y: -r * 0.68 }, { x: r * 0.25, y: -r * 0.95 }]], PALETA.verdeEscuro, 1.4, { passadas: 1 }),
+      // as faíscas do estouro
+      ...[[-0.95, -0.6], [0.95, -0.55], [-0.85, 0.5], [0.9, 0.45]].map(([dx, dy]) => traco(xGiz(rng, dx * r, dy * r, r * 0.13, { tremor: 0.2 }), PALETA.amarelo, 1.6, { passadas: 1 })),
+    ]
+  }
+  if (id === 'coro') {
+    const c = [traco([[{ x: -r, y: r * 0.1 }, { x: -r * 0.5, y: -r * 0.5 }, { x: 0, y: -r * 0.7 }, { x: r * 0.5, y: -r * 0.5 }, { x: r, y: r * 0.1 }]], PALETA.lavanda, 1.4, { passadas: 1, alpha: 0.7 })]
+    for (const [x, y] of [[-r * 0.6, -r * 0.2], [0, -r * 0.5], [r * 0.6, -r * 0.2]]) c.push(...estrelinha(rng, x, y, r * 0.32, PALETA.amarelo, PALETA.ouro))
+    for (const x of [-r * 0.4, 0, r * 0.4]) c.push(traco(linhaGiz(rng, x, r * 0.15, x + r * 0.08, r * 0.75, { tracos: 1, tremor: 0.2, excesso: 0 }), PALETA.rosa, 1.6, { passadas: 1 }))
+    return c
+  }
+  if (id === 'super') {
+    const c = []
+    for (const [k, cor] of [PALETA.coracao, PALETA.amarelo, PALETA.verde, PALETA.azul].entries()) c.push(traco(circuloGiz(rng, 0, r * 0.15, r * (0.95 - k * 0.14), { tremor: 0.3, tracos: 1 }).map((t) => t.filter((q) => q.y <= r * 0.15)), cor, 1.8, { passadas: 1 }))
+    c.push(...estrelinha(rng, 0, -r * 0.05, r * 0.55, PALETA.amarelo, PALETA.ouro))
+    return c
+  }
+  if (id === 'passar') {
+    // a setinha que dá a volta (a vez passa) e uma gema embaixo
+    const arco = []
+    for (let i = 0; i <= 14; i++) {
+      const a = Math.PI * 1.05 - (i / 14) * Math.PI * 1.25
+      arco.push({ x: Math.cos(a) * r * 0.7, y: -r * 0.2 - Math.sin(a) * r * 0.5 })
+    }
+    const fim = arco[arco.length - 1]
+    return [
+      traco([arco], PALETA.verdeEscuro, 2.4, { passadas: 2 }),
+      traco([[{ x: fim.x - r * 0.3, y: fim.y - r * 0.12 }, fim, { x: fim.x - r * 0.05, y: fim.y - r * 0.4 }]], PALETA.verdeEscuro, 2.4, { passadas: 2 }),
+      ...rabiscoDaGema(rng, r * 0.4, { x: 0, y: r * 0.55 }).camadas,
+    ]
+  }
+  return []
+}
+
+export const CORES_GEMA = { cheia: 0x3cc8ff, escura: 0x0b4a72, clara: 0xc8f4ff, vazia: 0x8f9bb8, bloqueada: 0x8a2a3a, bloqueadaEscura: 0x3a0a14 }
+
+// a gema de energia (o losango do HUD real, em giz): cheia (azul), vazia (só o contorno) ou bloqueada (vermelha)
+export function losango(x, y, r) {
+  return [{ x, y: y - r }, { x: x + r * 0.86, y }, { x, y: y + r }, { x: x - r * 0.86, y }]
+}
+export function rabiscoDaGema(rng, r = 8, { x = 0, y = 0, estado = 'cheia' } = {}) {
+  const poli = losango(x, y, r)
+  const contorno = poligonoGiz(rng, poli, { tremor: 0.35, excesso: 0.6 })
+  if (estado === 'vazia') return { camadas: [traco(contorno, CORES_GEMA.vazia, 1.8, { passadas: 2, alpha: 0.9 })] }
+  const [cor, escura] = estado === 'bloqueada' ? [CORES_GEMA.bloqueada, CORES_GEMA.bloqueadaEscura] : [CORES_GEMA.cheia, CORES_GEMA.escura]
+  const brilho = [{ x, y: y - r * 0.72 }, { x: x + r * 0.28, y: y - r * 0.15 }, { x, y }, { x: x - r * 0.28, y: y - r * 0.15 }]
+  return { camadas: [preencher(poli, cor, { espaco: 1.5, mancha: 0.85 }), traco(contorno, escura, 1.8, { passadas: 2 }), { tipo: 'mancha', poligono: brilho, cor: 0xffffff, alpha: 0.65 }] }
+}
+
+// O boneco de treino do Ralsei (um espantalho fofinho), em pé sobre o ponto (0, 0) = o meio do peito
+// (é para lá que os ataques miram). ~70 px de altura.
+export function rabiscoDoBoneco(rng) {
+  const c = []
+  const madeira = 0x9a6a3c
+  const madeiraEscura = 0x5e3d1e
+  // a estaca e o pau dos braços
+  const estaca = [{ x: -3, y: -6 }, { x: 3, y: -6 }, { x: 3.5, y: 40 }, { x: -3.5, y: 40 }]
+  c.push(preencher(estaca, madeira, { espaco: 1.6, mancha: 0.8 }), traco(fechar(estaca), madeiraEscura, 1.6, { passadas: 2 }))
+  c.push(traco(linhaGiz(rng, -30, -4, 30, -6, { tracos: 2, tremor: 0.4, excesso: 1 }), madeiraEscura, 3.6, { passadas: 2 }))
+  // a camisa remendada
+  const camisa = [{ x: -15, y: -10 }, { x: 15, y: -10 }, { x: 18, y: 18 }, { x: -18, y: 18 }]
+  c.push(preencher(camisa, PALETA.rosa, { espaco: 1.8, mancha: 0.75 }), traco(fechar(camisa), PALETA.rosaEscuro, 2, { passadas: 2 }))
+  const remendo = retanguloRedondo(3, 2, 9, 8, 2)
+  c.push(preencher(remendo, PALETA.amarelo, { espaco: 1.4, mancha: 0.9 }), traco(fechar(remendo), PALETA.ouro, 1.2, { passadas: 1 }))
+  for (const [x0, y0] of [[4.5, 3.5], [9, 8]]) c.push(traco([[{ x: x0, y: y0 }, { x: x0 + 2, y: y0 + 2 }]], PALETA.tinta, 1, { passadas: 1 }))
+  // palhinhas saindo das mangas e da barra
+  for (const [x, y, dx, dy] of [[-30, -4, -6, -3], [-30, -4, -6, 3], [30, -6, 6, -4], [30, -6, 6, 2], [-10, 18, -2, 6], [0, 18, 0, 7], [10, 18, 2, 6]]) c.push(traco([[{ x, y }, { x: x + dx, y: y + dy }]], PALETA.amarelo, 2, { passadas: 2 }))
+  // a cabeça de saco, com olhos de botão e sorriso costurado
+  const cabeca = elipse(0, -24, 13, 12, 22)
+  c.push(preencher(cabeca, 0xe8cf9a, { espaco: 1.8, mancha: 0.8 }), traco(fechar(cabeca), 0x9a7a44, 2, { passadas: 2 }))
+  for (const lx of [-5, 5]) c.push({ tipo: 'mancha', poligono: elipse(lx, -26, 2.4, 2.4, 10), cor: PALETA.tinta, alpha: 1 })
+  c.push(traco([[{ x: -6, y: -19 }, { x: -3, y: -17 }, { x: 0, y: -16.5 }, { x: 3, y: -17 }, { x: 6, y: -19 }]], PALETA.tinta, 1.4, { passadas: 2 }))
+  for (const x of [-4, 0, 4]) c.push(traco([[{ x, y: -18.5 }, { x, y: -15.5 }]], PALETA.tinta, 1, { passadas: 1 }))
+  for (const lx of [-8, 8]) c.push({ tipo: 'mancha', poligono: elipse(lx, -21, 2.6, 1.6, 10), cor: PALETA.rosa, alpha: 0.6 })
+  // o chapéu de palha
+  const aba = elipse(0, -33, 19, 4, 20)
+  const copa = [{ x: -9, y: -33 }, { x: -7, y: -44 }, { x: 7, y: -44 }, { x: 9, y: -33 }]
+  c.push(preencher(copa, PALETA.amarelo, { espaco: 1.6, mancha: 0.8 }), traco(fechar(copa), PALETA.ouro, 1.8, { passadas: 2 }))
+  c.push(preencher(aba, PALETA.amarelo, { espaco: 1.6, mancha: 0.8 }), traco(fechar(aba), PALETA.ouro, 1.8, { passadas: 2 }))
+  c.push(traco([[{ x: -8.5, y: -36 }, { x: 8.5, y: -36 }]], PALETA.verde, 2.4, { passadas: 2 }))
+  return { camadas: c }
+}
+
+// O desenho de giz do adesivo de cada passo das páginas de cartas (centrado na origem, raio ~r):
+//   conhecer: uma cartinha com estrela · chuva: estrelinhas caindo · caro: gema vermelha com ×
+//   passar: a seta que volta · jogar: carta com brilhos
+export function iconeDoPasso(rng, id, r = 11) {
+  const carta = (cor) => {
+    const poli = retanguloRedondo(-r * 0.6, -r * 0.82, r * 1.2, r * 1.64, r * 0.22)
+    return [preencher(poli, 0xfffbf1, { espaco: 1.2, mancha: 1 }), traco(fechar(poli), cor, 1.6, { passadas: 2 })]
+  }
+  if (id === 'conhecer') return [...carta(PALETA.tinta), ...estrelinha(rng, 0, 0, r * 0.42, PALETA.amarelo, PALETA.ouro)]
+  if (id === 'chuva') {
+    const c = []
+    for (const [x, y] of [[-r * 0.5, -r * 0.45], [r * 0.45, -r * 0.1], [-r * 0.1, r * 0.5]]) {
+      c.push(traco([[{ x: x - r * 0.3, y: y - r * 0.42 }, { x, y }]], PALETA.amarelo, 1.4, { passadas: 1, alpha: 0.8 }))
+      c.push(...estrelinha(rng, x, y, r * 0.3, PALETA.amarelo, PALETA.ouro))
+    }
+    return c
+  }
+  if (id === 'caro') {
+    const g = rabiscoDaGema(rng, r * 0.85, { estado: 'bloqueada' }).camadas
+    return [...g, traco(xGiz(rng, r * 0.55, -r * 0.55, r * 0.28, { tremor: 0.2 }), 0xffffff, 2.2, { passadas: 2 })]
+  }
+  if (id === 'passar') return desenhoDaCarta(rng, 'passar', r * 1.05)
+  if (id === 'jogar') {
+    const c = carta(PALETA.verdeEscuro)
+    c.push(...estrelinha(rng, 0, 0, r * 0.36, PALETA.verde, PALETA.verdeEscuro))
+    for (const [x, y] of [[r * 0.85, -r * 0.75], [-r * 0.9, -r * 0.2], [r * 0.85, r * 0.55]]) c.push(traco(xGiz(rng, x, y, r * 0.18, { tremor: 0.2 }), PALETA.amarelo, 1.6, { passadas: 1 }))
+    return c
+  }
+  return []
+}

@@ -9,7 +9,7 @@ import { resumoDoIndice, paginaParaRetomar, PAGINAS } from '../manual/progresso.
 // Menu -> GUIA: a porta de entrada dos dois guias, com a música do tutorial ("Caderno do Ralsei").
 //   modo 'guia'    MANUAL DO RALSEI (abre o índice) · CARTAS E ARENAS (cena Grimorio, o guia de antes)
 //   modo 'indice'  o índice do manual: CONTINUAR (a 1ª página que falta) e cada página, com ✓ nas
-//                  completas e os adesivos da página 2. O progresso vem de manual/progresso.js.
+//                  completas e os adesivos das páginas 2 a 4. O progresso vem de manual/progresso.js.
 //   ↑/↓ escolhe · A abre · B volta (do índice para o guia, do guia para o Menu)
 // Dados: { modo: 'indice' } abre direto no índice (é para onde o B do manual volta).
 const GUIA = [
@@ -19,6 +19,8 @@ const GUIA = [
 const DICAS_PAGINA = {
   1: 'o seu coração, as marcas e um desvio curtinho',
   2: 'ler os ataques: chuva, linha, mira e uma mistura',
+  3: 'cada carta é um ataque: veja ela ganhar vida',
+  4: 'energia, custo e quando passar a vez',
 }
 
 // as linhas do índice (lógica pura sobre o progresso salvo)
@@ -80,9 +82,9 @@ export default class GuiaEntrada extends Phaser.Scene {
     const indice = this.modo === 'indice'
     this.opcoes = indice ? opcoesDoIndice(pref('manual')) : GUIA
     this.titulo.setText(indice ? 'MANUAL DO RALSEI' : 'GUIA').setColor(indice ? '#ffd23a' : '#b48cff')
-    const passo = indice ? 56 : 64
-    const y0 = indice ? 170 : 190
-    this.linhas = this.opcoes.map((o, i) => this.add.text(LARGURA / 2, y0 + i * passo, o.rotulo, estilo(indice ? 22 : 26, o.cor)).setOrigin(0.5))
+    const passo = indice ? 46 : 64
+    const y0 = indice ? 150 + (5 - this.opcoes.length) * 18 : 190
+    this.linhas = this.opcoes.map((o, i) => this.add.text(LARGURA / 2, y0 + i * passo, o.rotulo, estilo(indice ? 20 : 26, o.cor)).setOrigin(0.5))
     // ✓ verde nas páginas completas
     this.marcas = this.opcoes.flatMap((o, i) => (o.completa ? [this.add.text(this.linhas[i].x + this.linhas[i].width / 2 + 14, this.linhas[i].y, '✓', estilo(24, TEXTO.cura ?? '#7dffa0')).setOrigin(0, 0.5)] : []))
     this.rodape.setText(indice ? '↑↓ escolher      A: abrir a página      B: voltar' : '↑↓ escolher      A: abrir      B: voltar')

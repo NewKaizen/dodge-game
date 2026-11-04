@@ -28,6 +28,8 @@ import GuiaBonus from './scenes/GuiaBonus.js'
 import GuiaEntrada from './scenes/GuiaEntrada.js'
 import ManualRalsei from './scenes/ManualRalsei.js'
 import ManualRalsei2 from './scenes/ManualRalsei2.js'
+import ManualRalsei3 from './scenes/ManualRalsei3.js'
+import ManualRalsei4 from './scenes/ManualRalsei4.js'
 import Lan from './scenes/Lan.js'
 import Perfil from './scenes/Perfil.js'
 import Amigos from './scenes/Amigos.js'
@@ -48,6 +50,6 @@ export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCs
     scale: { mode: Phaser.Scale.NONE, zoom: zoomCss },
     // um contexto de áudio só para o jogo inteiro (a transmissão LAN copia o som dele)
     audio: { context: contextoAudio() ?? undefined },
-    scene: [Boot, Menu, EscolhaParty, EscolhaPartyN, PvpEscolha, PvpVoto, PvpArena, PvpResultado, PvpEscolhaN, PvpArenaN, PvpResultadoN, PartyVoto, PartyFim, Selecao, Dificuldade, CoopArena, CoopArenaN, Vitoria, GameOver, Entrada, Pausa, Config, Grimorio, GuiaBonus, GuiaEntrada, ManualRalsei, ManualRalsei2, Lan, Perfil, Amigos, Colecao, Carregando, Religando],
+    scene: [Boot, Menu, EscolhaParty, EscolhaPartyN, PvpEscolha, PvpVoto, PvpArena, PvpResultado, PvpEscolhaN, PvpArenaN, PvpResultadoN, PartyVoto, PartyFim, Selecao, Dificuldade, CoopArena, CoopArenaN, Vitoria, GameOver, Entrada, Pausa, Config, Grimorio, GuiaBonus, GuiaEntrada, ManualRalsei, ManualRalsei2, ManualRalsei3, ManualRalsei4, Lan, Perfil, Amigos, Colecao, Carregando, Religando],
   }
 }
