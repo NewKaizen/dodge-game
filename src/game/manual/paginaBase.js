@@ -329,8 +329,9 @@ export function assarAdesivo(scene, chave, { silhueta, camadas = [], base, frent
   return assarCamadas(scene, chave, [{ tipo: 'mancha', poligono: silhueta, cor: 0xffffff, alpha: 0 }, ...camadas], { margem, grao, fundo, frente })
 }
 
-// estrela dourada brilhante (o adesivo das marcas e o de página concluída)
-export function assarEstrelaDourada(scene, chave, raio, { texto, subtexto, giro = 0 } = {}) {
+// estrela dourada brilhante (o adesivo das marcas e o de página concluída); sobretexto: uma linha
+// menor em cima do texto (o "MANUAL" do MANUAL ESSENCIAL)
+export function assarEstrelaDourada(scene, chave, raio, { texto, subtexto, sobretexto, giro = 0 } = {}) {
   const silhueta = estrelaGorda(0, 0, raio, raio * 0.56, 5, giro)
   const contorno = silhueta.map((p) => ({ x: p.x * 0.97, y: p.y * 0.97 }))
   return assarAdesivo(scene, chave, {
@@ -367,6 +368,10 @@ export function assarEstrelaDourada(scene, chave, raio, { texto, subtexto, giro 
         ctx.fillStyle = TINTA
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
+        if (sobretexto) {
+          ctx.font = `bold ${Math.round(raio * 0.16)}px ${FONTE_TEXTO}`
+          ctx.fillText(sobretexto, 0, -raio * 0.24)
+        }
         ctx.font = `bold ${Math.round(raio * 0.24)}px ${FONTE_TEXTO}`
         ctx.fillText(texto, 0, -raio * 0.02)
         if (subtexto) {
@@ -678,8 +683,12 @@ function assarVirada(scene) {
 
 // A folha (container com a página inteira) encolhe contra a lombada; na beirada que vira aparece o
 // verso do papel curvando e uma sombra caindo na página de baixo. Calmo: troca na hora.
-export function virarFolha(scene, folha, { calmo = false, duracao = 900, profundidade = 25, aoTerminar }) {
-  if (calmo) return aoTerminar()
+// volta: o contrário (a folha vem da lombada e cobre o que estava embaixo: a volta da arena da página 5).
+export function virarFolha(scene, folha, { calmo = false, duracao = 900, profundidade = 25, volta = false, aoTerminar }) {
+  if (calmo) {
+    if (volta) folha.setScale(1).setX(0)
+    return aoTerminar()
+  }
   assarVirada(scene)
   somDePapel('folha')
   const L = FOLHA.x + FOLHA.lombada * 0.55
@@ -693,7 +702,7 @@ export function virarFolha(scene, folha, { calmo = false, duracao = 900, profund
     duration: duracao,
     ease: 'Sine.easeInOut',
     onUpdate: (t) => {
-      const v = t.getValue()
+      const v = volta ? 1 - t.getValue() : t.getValue()
       const s = Math.max(0.001, 1 - v)
       folha.setScale(s, 1).setX(L - L * s)
       const borda = L + (direita - L) * s
@@ -704,6 +713,7 @@ export function virarFolha(scene, folha, { calmo = false, duracao = 900, profund
     onComplete: () => {
       sombra.destroy()
       verso.destroy()
+      if (volta) folha.setScale(1).setX(0)
       aoTerminar()
     },
   })
