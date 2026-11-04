@@ -131,5 +131,7 @@ test('contraste: texto e bolinhas legíveis no papel e no cartão', () => {
   assert.ok(razaoContraste(0x4e3f63, papel) >= 4.5)
   assert.ok(razaoContraste(PALETA.bala, cartao) >= 3) // bolinha na caixa
   assert.ok(razaoContraste(PALETA.coracao, cartao) >= 3) // coração na caixa
-  assert.ok(razaoContraste(0xd01a33, cartao) >= 4.5) // "você!"
+  assert.ok(razaoContraste(0xd01a33, cartao) >= 4.5) // "você!" e a linha pontilhada da mira (página 2)
+  assert.ok(razaoContraste(PALETA.verdeEscuro, cartao) >= 4.5) // "o coração do Ralsei mostra:" (página 2)
+  assert.ok(razaoContraste(PALETA.verde, cartao) >= 2.2 && razaoContraste(PALETA.verdeEscuro, cartao) >= 3) // o coração verde da demo (contorno escuro)
 })

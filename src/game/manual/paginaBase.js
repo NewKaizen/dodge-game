@@ -1,12 +1,12 @@
-import { LARGURA, ALTURA, TEMPOS, AUDIO } from '../constants.js'
+import { LARGURA, ALTURA, TEMPOS, AUDIO, CORACAO } from '../constants.js'
 import { tocar, contextoAudio, volumeEfeitos } from '../audio.js'
 import { criarRng, aleatorio } from '../pvp/baralho.js'
 import { gerarPapel, fibrasDoPapel, furosDaEspiral } from './papel.js'
 import { pintarDesenho, graoDaCera, aplicarGrao, caixaDasCamadas, corCss, PALETA } from './cera.js'
 import { partesDoRalsei, rostoDoRalsei, EXPRESSOES, CABECA, piscaEm, PISCADA_MS } from './ralsei.js'
-import { contornoDoBalao, bordaDoBalao, estrelaGorda, letrasTortas } from './ilustracoes.js'
+import { contornoDoBalao, bordaDoBalao, estrelaGorda, letrasTortas, CORES_GIZ } from './ilustracoes.js'
 import { gerarConfete, passoConfete, viradaDaPeca, CORES_CONFETE } from './confete.js'
-import { contornoDoCoracao } from './giz.js'
+import { contornoDoCoracao, desenharTracos } from './giz.js'
 
 // A BASE das páginas do Manual do Ralsei (a parte com Phaser e canvas; o resto de manual/ é puro).
 // Toda página usa isto para não repetir o caderno:
@@ -24,6 +24,12 @@ import { contornoDoCoracao } from './giz.js'
 //   brilhar(scene, x, y, op)              brilhinhos de estrela
 //   virarFolha(scene, folha, op)          a virada de página (encolhe contra a lombada, com dobra e sombra)
 //   somDePapel(nome)                      'rabisco' | 'folha' | 'adesivo' | 'brilho' (WebAudio, volume de efeitos)
+//   assarRotulo(scene, chave, texto)      a etiqueta lavanda "PÁGINA N" presa com clipe
+//   new BalasDeGiz(scene, op)             as bolinhas de giz da caixa (com rastro apagadinho), por quadro
+//   coracaoDeGiz(scene, info)             o coração de giz com o miolo EXATO da hitbox por cima
+//   riscosDeGolpe(g, x, y, cor)           os risquinhos parados de "levou um acerto" (sem clarão)
+//   barraDeGiz(g, caixa, progresso)       a barra de tempo embaixo da caixa
+//   joyDeTodos(controles)                 o joystick somado de todos os jogadores locais (um coração só)
 //
 // "Reduzir animações" (op.calmo): sem respiração/piscada, balão inteiro, virada em corte, sem confete.
 
@@ -774,4 +780,145 @@ export function somDePapel(nome) {
     nota(0.14, 2350, 0.3, 0.05)
   } else return false
   return true
+}
+
+// ---------- pedaços das páginas jogáveis ----------
+
+// etiqueta de papel lavanda presa com um clipe: "PÁGINA N"
+export function assarRotulo(scene, chave, texto) {
+  const silhueta = [{ x: 0, y: 8 }, { x: 96, y: 6 }, { x: 98, y: 24 }, { x: 2, y: 26 }]
+  return assarAdesivo(scene, chave, {
+    silhueta,
+    borda: 1.5,
+    base: (ctx) => {
+      ctx.fillStyle = '#e4dcf6'
+      ctx.beginPath()
+      silhueta.forEach((q, k) => (k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)))
+      ctx.closePath()
+      ctx.fill()
+    },
+    frente: (ctx) => {
+      ctx.fillStyle = '#4b3a78'
+      ctx.font = `bold 12px ${FONTE_TEXTO}`
+      ctx.textBaseline = 'middle'
+      ctx.fillText(texto, 26, 17)
+      // o clipe
+      ctx.strokeStyle = '#8a8ea0'
+      ctx.lineWidth = 1.8
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(10, 24)
+      ctx.lineTo(10, 4)
+      ctx.arc(14, 4, 4, Math.PI, 0)
+      ctx.lineTo(18, 20)
+      ctx.arc(15, 20, 3, 0, Math.PI)
+      ctx.lineTo(12, 7)
+      ctx.stroke()
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'
+      ctx.lineWidth = 0.7
+      ctx.beginPath()
+      ctx.moveTo(9.4, 20)
+      ctx.lineTo(9.4, 5)
+      ctx.stroke()
+    },
+    grao: 0,
+  })
+}
+
+// um coração só no tutorial: qualquer fonte local move (com 2 jogadores detectados, soma as duas)
+export function joyDeTodos(controles) {
+  let x = 0
+  let y = 0
+  for (let j = 0; j < controles.numJogadores; j++) {
+    const d = controles.joy(j)
+    x += d.x
+    y += d.y
+  }
+  return { x: Math.max(-100, Math.min(100, x)), y: Math.max(-100, Math.min(100, y)) }
+}
+
+// As bolinhas de giz da caixa: um punhado de imagens reaproveitadas (uma por bala viva) e o rastro
+// apagadinho de cada uma. `infos` = as variantes assadas da bala; a variante de cada bala gira com o
+// tremidinho do giz (`fase`). Só desenho: a colisão é a da bala (x, y, raio), nunca o giz.
+//   op: { caixa, infos, pai (container), n (quantas no máximo), rastro (quantas cópias; 0 = sem) }
+export class BalasDeGiz {
+  constructor(scene, { caixa, infos, pai, n = 8, rastro = 3 }) {
+    this.caixa = caixa
+    this.infos = infos
+    this.rastro = rastro
+    const add = (o) => (pai?.add(o), o)
+    this.slots = Array.from({ length: n }, () => ({
+      rastro: Array.from({ length: rastro }, () => add(imagemDeCera(scene, 0, 0, infos[0]).setVisible(false))),
+      img: add(imagemDeCera(scene, 0, 0, infos[0]).setVisible(false)),
+      trilha: [],
+      dono: null,
+    }))
+  }
+
+  // lista: as balas vivas ({ x, y, raio, semente? | id }); trocar: forçar a troca de variante
+  atualizar(lista, fase, trocar = false, { alpha = 1 } = {}) {
+    const c = this.caixa
+    const n = this.infos.length
+    this.slots.forEach((s, k) => {
+      const b = lista[k]
+      s.img.setVisible(Boolean(b))
+      if (!b) {
+        s.trilha = []
+        s.dono = null
+        for (const r of s.rastro) r.setVisible(false)
+        return
+      }
+      if (s.dono !== b) {
+        s.dono = b
+        s.trilha = []
+      }
+      const info = this.infos[(fase + (b.semente ?? b.id ?? k)) % n]
+      if (trocar || s.img.texture.key !== info.chave) trocarImagem(s.img, info)
+      s.img.setPosition(b.x, b.y)
+      // ainda chegando (bala inteira fora da caixa): meio apagada, como a faixa de aproximação do jogo
+      const fora = b.x + b.raio < c.esquerda || b.x - b.raio > c.direita || b.y + b.raio < c.topo || b.y - b.raio > c.base
+      s.img.setAlpha((fora ? 0.5 : 1) * alpha)
+      if (!this.rastro) return
+      const ult = s.trilha[0]
+      if (!ult || Math.hypot(ult.x - b.x, ult.y - b.y) > 7) s.trilha = [{ x: b.x, y: b.y }, ...s.trilha].slice(0, this.rastro + 1)
+      s.rastro.forEach((r, j) => {
+        const q = s.trilha[j + 1]
+        r.setVisible(Boolean(q))
+        if (!q) return
+        trocarImagem(r, info)
+        r.setPosition(q.x, q.y).setAlpha((fora ? 0.5 : 1) * alpha * (0.22 - j * 0.06)).setScale(1 - (j + 1) * 0.12)
+      })
+    })
+  }
+}
+
+// o coração: giz por fora, miolo EXATO da hitbox por cima (sem tremor, sempre nítido)
+export function coracaoDeGiz(scene, info, { miolo = 0xfff8f8, borda = 0x7a0f20 } = {}) {
+  const c = scene.add.container(0, 0)
+  const img = imagemDeCera(scene, 0, 0, info)
+  const g = scene.add.graphics()
+  g.fillStyle(miolo, 1)
+  g.fillCircle(0, 0, CORACAO.hitbox)
+  g.lineStyle(1.2, borda, 1)
+  g.strokeCircle(0, 0, CORACAO.hitbox)
+  c.add([img, g])
+  return { container: c, img }
+}
+
+// o "aaai" de ter sido atingido: riscos de giz em volta do coração (parado, sem clarão)
+export function riscosDeGolpe(g, x, y, cor = CORES_GIZ.coracao) {
+  g.clear()
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * TAU + 0.2
+    desenharTracos(g, [[{ x: x + Math.cos(a) * 18, y: y + Math.sin(a) * 18 }, { x: x + Math.cos(a) * 29, y: y + Math.sin(a) * 29 }]], { cor, largura: 3, alpha: 0.9 })
+  }
+}
+
+// a barra de tempo de giz embaixo da caixa (progresso 0..1)
+export function barraDeGiz(g, caixa, progresso, { y = caixa.base + 46 } = {}) {
+  g.clear()
+  const x0 = caixa.esquerda + 10
+  const x1 = caixa.direita - 10
+  desenharTracos(g, [[{ x: x0, y }, { x: x1, y: y + 1 }]], { cor: 0x9a8fb8, largura: 6, alpha: 0.4, grao: 0.3 })
+  if (progresso > 0) desenharTracos(g, [[{ x: x0, y }, { x: x0 + (x1 - x0) * progresso, y: y + progresso }]], { cor: CORES_GIZ.certo, largura: 6.5, alpha: 0.95, grao: 0.3 })
 }
