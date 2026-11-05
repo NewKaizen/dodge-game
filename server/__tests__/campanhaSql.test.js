@@ -1,6 +1,6 @@
 // A 0011 (CAMPANHA) num Postgres de verdade (opcional): roda só com
 //   DODGE_PG="-h /caminho/do/socket -p 5432 -U postgres" npm test
-// (cria e apaga o banco dodge_teste_campanha). Sem a variável, pula. Roda 0001–0011 DUAS vezes e
+// (cria e apaga o banco dodge_teste_campanha). Sem a variável, pula. Roda 0001–0012 DUAS vezes e
 // confere: primeira vitória + estrelas, repetição, teto do dia, idempotência pela corrida, fase
 // bloqueada vira suspeita, os cosméticos do mundo (chefe e 3 estrelas), a trilha de níveis nunca os
 // entrega, e o navegador só lê o que é seu e não chama a concessão.
@@ -12,7 +12,7 @@ import { XP_PRIMEIRA, XP_PRIMEIRA_CHEFE, XP_ESTRELA, XP_REPETICAO, XP_CAMPANHA_D
 
 const ARGS = process.env.DODGE_PG ? process.env.DODGE_PG.split(/\s+/).filter(Boolean) : null
 const BANCO = 'dodge_teste_campanha'
-const MIGRATIONS = ['0001_contas', '0002_amigos', '0003_progresso', '0004_moderacao', '0005_pendencias', '0006_n_jogadores', '0007_ffa', '0008_filtro_palavras', '0009_2x2', '0010_boss_semanal', '0011_campanha']
+const MIGRATIONS = ['0001_contas', '0002_amigos', '0003_progresso', '0004_moderacao', '0005_pendencias', '0006_n_jogadores', '0007_ffa', '0008_filtro_palavras', '0009_2x2', '0010_boss_semanal', '0011_campanha', '0012_campanha_mundo1']
 const migration = (n) => fileURLToPath(new URL(`../../supabase/migrations/${n}.sql`, import.meta.url))
 const psql = (sql, banco = BANCO) => execFileSync('psql', [...ARGS, '-d', banco, '-v', 'ON_ERROR_STOP=1', '-qAt', '-c', sql], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const arquivo = (caminho) => execFileSync('psql', [...ARGS, '-d', BANCO, '-v', 'ON_ERROR_STOP=1', '-q', '-f', caminho], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
@@ -44,12 +44,14 @@ const conceder = (n, fase, estrelas, { user = A, resultado = 'vitoria' } = {}) =
   psql(`select (r ->> 'xp_ganho') || ':' || (r ->> 'motivo') || ':' || (r ->> 'resultado') from (select public.conceder_campanha('${corrida(n)}', '${user}', 1, ${fase}, '${resultado}', null, ${estrelas}, 6, 120) r) x`)
 const comoNavegador = (sql, uid = A) => `begin; set local role authenticated; set local "request.jwt.claim.sub" = '${uid}'; ${sql}; commit;`
 
-test('0011 no Postgres (duas vezes): progresso, XP, teto, idempotência e cosméticos da campanha', { skip: !ARGS && 'defina DODGE_PG para rodar no Postgres' }, () => {
+test('0011 + 0012 no Postgres (duas vezes): progresso, XP, teto, idempotência e cosméticos da campanha', { skip: !ARGS && 'defina DODGE_PG para rodar no Postgres' }, () => {
   psql(`drop database if exists ${BANCO}`, 'postgres')
   psql(`create database ${BANCO}`, 'postgres')
   try {
     psql(STUB)
     for (let vez = 0; vez < 2; vez++) for (const n of MIGRATIONS) arquivo(migration(n))
+    // a 0012: os cosméticos do Mundo 1 com os nomes de "A Casa Silenciosa" (mesmos ids e "quando")
+    assert.equal(psql(`select string_agg(id || '=' || nome || ':' || campanha_quando, '|' order by id) from public.catalogo_itens where campanha = 'mundo1'`), 'moldura.floresta_papel=Vitral Silencioso:mundo|titulo.andarilho_papel=Quem Deixou a Luz Acesa:mundo|verso.folha_dobrada=Porta Entreaberta:estrelas')
     psql(`insert into auth.users (id, raw_user_meta_data) values ('${A}', '{"full_name":"Ana"}'), ('${B}', '{"full_name":"Beto"}')`)
 
     // primeira vitória com 2 estrelas; de novo a mesma corrida: nada soma
