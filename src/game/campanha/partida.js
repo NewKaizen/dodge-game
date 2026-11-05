@@ -26,7 +26,7 @@ export const CAIXA_MINIMA = { largura: 130, altura: 104 }
 export const VELOCIDADE_CORACAO = CORACAO.velocidadePadrao // fixa na campanha (o painel não muda)
 export const MAX_RODADAS = 30
 export const HP_ESTRELA = 0.6 // a 2ª estrela: terminar com pelo menos 60% do HP
-export const CURA_VIRADA = 0.2 // o chefe, ao virar a página, cura isto do HP máximo
+export const CURA_VIRADA = 0.2 // o chefe, ao se refazer (a virada), cura isto do HP máximo
 // a CPU da campanha leva mais dano por acerto que a do PvP: as fases ficam curtas (5 a 9 rodadas)
 export const DANO_NA_CPU = 1.35
 
@@ -43,7 +43,7 @@ export function caixaDaRodada(fase, rodada, { virou = false } = {}) {
     altura = Math.max(CAIXA_MINIMA.altura, Math.round(altura * k))
   }
   if (virou) {
-    // a página virou: deitada (larga e baixa)
+    // a virada: deitada (larga e baixa)
     largura = Math.round((b.direita - b.esquerda) * 1.12)
     altura = Math.max(CAIXA_MINIMA.altura, Math.round((b.base - b.topo) * 0.66))
   }
@@ -58,7 +58,7 @@ export function descreverRegra(regra = {}) {
   if (regra.eco) return 'O ataque que você mandou volta na sua caixa na rodada seguinte.'
   if (regra.energiaInicial != null) return `Você começa com ${regra.energiaInicial} de energia.`
   if (regra.soDeCima) return 'Todo ataque na sua caixa vem de cima.'
-  if (regra.duplo) return 'O chefe manda dois ataques ao mesmo tempo e, na metade do HP, vira a página.'
+  if (regra.duplo) return 'O chefe manda dois ataques ao mesmo tempo e, na metade do HP, se refaz (cura e a caixa deita).'
   return ''
 }
 
@@ -222,7 +222,7 @@ export function concluirEsquiva(c, { amostras, acertosCliente = 0, decorridoMs =
     if (cpu.acertos === 0) registrarPerfeito(est, 1, cartaDoAtaque(c, ataqueCpu))
   }
 
-  // o chefe vira a página na metade do HP (uma vez)
+  // o chefe se refaz na metade do HP (uma vez): a virada
   let virou = false
   const chefe = est.jogadores[1]
   if (c.fase.regra?.virada && !c.virou && chefe.hp > 0 && chefe.hp <= chefe.hpMax / 2) {
@@ -231,7 +231,7 @@ export function concluirEsquiva(c, { amostras, acertosCliente = 0, decorridoMs =
   }
 
   let vencedor = fimDaRodada(est)
-  if (!vencedor && est.rodada >= MAX_RODADAS) vencedor = 'p2' // passou do limite: a floresta vence
+  if (!vencedor && est.rodada >= MAX_RODADAS) vencedor = 'p2' // passou do limite: o silêncio vence
   c.esquiva = null
   c.etapa = vencedor ? 'fim' : 'inicio'
   c.vencedor = vencedor

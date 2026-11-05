@@ -12,6 +12,8 @@ import { descreverRegra } from '../partida.js'
 
 const REGRAS = ['soNaipe', 'caixaEncolhe', 'eco', 'energiaInicial', 'soDeCima', 'duplo', 'virada']
 const sql = readFileSync(new URL('../../../../supabase/migrations/0011_campanha.sql', import.meta.url), 'utf8')
+// a 0012 renomeia os cosméticos do Mundo 1 (A Casa Silenciosa); os ids e o "quando" são os da 0011
+const sql12 = readFileSync(new URL('../../../../supabase/migrations/0012_campanha_mundo1.sql', import.meta.url), 'utf8')
 
 test('cada mundo: fases 1..n, oponentes do jogo, regras conhecidas, chefe por último', () => {
   for (const m of MUNDOS) {
@@ -33,7 +35,8 @@ test('cada mundo: fases 1..n, oponentes do jogo, regras conhecidas, chefe por ú
     // o banco sabe quantas fases cada mundo tem
     assert.match(sql, new RegExp(`when ${m.id} then ${m.fases.length}`))
   }
-  assert.equal(MUNDOS[0].nome, 'A Floresta de Papel')
+  assert.equal(MUNDOS[0].nome, 'A Casa Silenciosa')
+  assert.equal(TEXTOS[1].titulo, MUNDOS[0].nome)
   assert.equal(MUNDOS[0].personagem, 'kris')
   assert.equal(MUNDOS[0].fases.length, 6)
 })
@@ -62,7 +65,25 @@ test('textos: antes, depois e derrota de cada fase, com quem fala existindo e es
 
 test('o mundo 1 tem uma escolha que muda fala do chefe (sabor que atravessa o mundo)', () => {
   const chefe = textosDaFase(1, 6).antes
-  assert.ok(chefe.some((f) => f.se?.lapis === 'vermelho') && chefe.some((f) => f.se?.lapis === 'verde'))
+  assert.ok(chefe.some((f) => f.se?.bilhete === 'guardar') && chefe.some((f) => f.se?.bilhete === 'deixar'))
+})
+
+test('mundo 1, silêncio e ecos: a Kris quase não fala (só silêncios), escolhas são ações, cada fase tem cenário e tema', () => {
+  const t = TEXTOS[1]
+  assert.equal(t.ecos, true)
+  for (const f of MUNDOS[0].fases) {
+    const tf = textosDaFase(1, f.n)
+    assert.ok(['sala', 'corredor', 'ginasio', 'rua', 'chuva', 'quarto'].includes(tf.cenario), f.id)
+    assert.ok(tf.tema && tf.tema.length <= 90, `tema de ${f.id}`)
+    for (const cena of ['antes', 'depois', 'derrota'])
+      for (const fala of tf[cena]) {
+        if (fala.quem === 'kris') assert.match(fala.texto, /^\.{3}$/, 'a Kris só responde com silêncio')
+        for (const o of fala.escolha?.opcoes ?? []) assert.doesNotMatch(o.texto, /["“”]/, 'escolha é ação, não fala')
+      }
+  }
+  // nada do caderno de giz: a campanha não é no estilo do manual
+  const tudo = JSON.stringify(t).toLowerCase()
+  for (const palavra of ['lápis', 'caderno', 'giz de cera', 'rabisc']) assert.ok(!tudo.includes(palavra), palavra)
 })
 
 test('desbloqueio: a 1 sempre; as outras depois da anterior vencida', () => {
@@ -80,7 +101,10 @@ test('cosméticos da campanha: ids do catálogo, semeados no banco com o mesmo "
     assert.match(i.id, /^(titulo|moldura|verso)\.[a-z0-9_]{2,24}$/)
     assert.equal(i.id.split('.')[0], i.tipo)
     assert.ok(['mundo', 'estrelas'].includes(i.quando))
-    assert.match(sql, new RegExp(`\\('${i.id.replace('.', '\\.')}', '${i.tipo}', '${i.nome}', public\\.nivel_exclusivo\\(\\), false, false, '${i.campanha}', '${i.quando}'\\)`))
+    const id = i.id.replace('.', '\\.')
+    assert.match(sql, new RegExp(`\\('${id}', '${i.tipo}', '[^']+', public\\.nivel_exclusivo\\(\\), false, false, '${i.campanha}', '${i.quando}'\\)`))
+    assert.match(sql12, new RegExp(`\\('${id}', '${i.tipo}', '${i.nome}', public\\.nivel_exclusivo\\(\\), false, false, '${i.campanha}', '${i.quando}'\\)`))
+    assert.ok(i.nome.length <= 32 && i.descricao, i.id)
     if (i.tipo !== 'titulo') assert.match(i.cor, /^#[0-9a-f]{6}$/i)
   }
 })

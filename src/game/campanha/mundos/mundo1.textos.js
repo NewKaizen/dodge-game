@@ -1,108 +1,156 @@
-// Os TEXTOS do Mundo 1, "A Floresta de Papel" (história original da campanha; os personagens são
-// os do jogo). Separados das regras (mundo1.js) para editar à vontade: mudar uma fala aqui não
-// muda nada na partida. Formato de cada cena (campanha/dialogo.js):
+// Os TEXTOS do Mundo 1, "A Casa Silenciosa" (história original da campanha; os personagens são os do
+// jogo). Separados das regras (mundo1.js) para editar à vontade: mudar uma fala aqui não muda nada na
+// partida. Guia de tom e estilo: docs/campanha.md ("Silêncio e ecos").
+// Formato de cada cena (campanha/dialogo.js):
 //   { quem: 'ralsei', texto: '...' }              fala com retrato e nome ('narrador': sem retrato)
-//   { quem, texto, se: { lapis: 'verde' } }       só aparece se a escolha guardada bater
+//   { quem, texto, se: { bilhete: 'guardar' } }   só aparece se a escolha guardada bater
 //   { escolha: { chave, opcoes: [{ valor, texto }] } }   duas opções (só sabor: nunca muda a partida)
 // As escolhas ficam salvas na conta (o servidor guarda) e mudam falas mais adiante.
+// A Kris quase não fala: as "respostas" dela são silêncios ('...') ou gestos na voz do narrador, e
+// as escolhas são ações, nunca falas. Os outros aparecem como ECOS (ecos: true): não são bem eles,
+// são o que ficou deles — frases pela metade, coisas que não foram ditas.
 //
-// Resumo: Kris acha um caderno de desenho esquecido nos achados e perdidos da escola. Ao abrir, a
-// página vira uma floresta de papel dobrado, e um vento frio, o Vento da Borracha, vai apagando as
-// trilhas. Os amigos que entraram antes estão "rabiscados": sem cor, presos à regra escrita na
-// primeira página ("só quem desvia continua desenhado"). Cada duelo devolve a tinta de alguém. No
-// fim, quem segura o lápis é o Asriel: foi ele quem começou o caderno, anos atrás, e queria terminar
-// um desenho perfeito em que ninguém fosse embora.
+// Resumo (sem contar o fim): depois de uma noite que ninguém explica, a cidade fica quieta, e todas
+// as portas da casa de Kris passam a dar em lugares conhecidos — a sala de aula, o corredor da
+// escola, o ginásio, a rua, a sala de estar — vazios e tortos. Em cada um, um eco de alguém
+// repete o que não conseguiu terminar. No fim da escada fica o último quarto, onde mora a ausência
+// que fez a casa se calar.
 export const TEXTOS_MUNDO1 = {
-  titulo: 'A Floresta de Papel',
-  resumo: 'Um caderno esquecido vira floresta, e o Vento da Borracha apaga as trilhas. Devolva a tinta aos amigos.',
+  titulo: 'A Casa Silenciosa',
+  resumo: 'Depois daquela noite, toda porta da casa dá num lugar conhecido. Vazio. Só restaram ecos.',
+  // os ecos (quem não é a Kris nem o narrador): retrato apagado e com brilho, nome em tom frio
+  ecos: true,
+  cenarioMapa: 'mapa',
   fases: {
-    clareira: {
+    sala: {
+      cenario: 'sala',
+      tema: 'As cadeiras flutuam perto do teto. No baralho, só sobraram espadas.',
       antes: [
-        { quem: 'narrador', texto: 'Nos achados e perdidos da escola, embaixo de um guarda-chuva quebrado, tem um caderno de desenho com a capa verde.' },
-        { quem: 'narrador', texto: 'Kris abre na primeira página. O papel estala, cresce e dobra para cima. Árvores de papel. Um céu de folha pautada.' },
-        { quem: 'ralsei', texto: 'Kris! Que bom! Eu me perdi aqui faz um tempinho... E olha só: eu estou todo em lápis de cor clarinho.' },
-        { quem: 'ralsei', texto: 'Tem uma regra escrita na entrada: "só quem desvia continua desenhado". Acho que o caderno quer um duelo.' },
-        { escolha: { chave: 'lapis', opcoes: [{ valor: 'vermelho', texto: 'Pegar o lápis vermelho do chão' }, { valor: 'verde', texto: 'Pegar o lápis verde do chão' }] } },
-        { quem: 'ralsei', texto: 'Vermelho, como a sua alma! Combina com você.', se: { lapis: 'vermelho' } },
-        { quem: 'ralsei', texto: 'Verde, igual ao meu chapéu! Fico até sem graça.', se: { lapis: 'verde' } },
-        { quem: 'ralsei', texto: 'Aqui na clareira só valem as espadas (♠). Vamos com calma, eu prometo pegar leve!' },
+        { quem: 'narrador', texto: 'Depois daquela noite, a cidade ficou quieta demais.' },
+        { quem: 'narrador', texto: 'Na casa de Kris, as portas não dão mais nos mesmos cômodos.' },
+        { quem: 'narrador', texto: 'A primeira dá na sala de aula. As cadeiras flutuam perto do teto. O quadro guarda a lição de ontem, pela metade.' },
+        { quem: 'ralsei', texto: '...e por isso, quando alguém vai embora, a gente—' },
+        { quem: 'ralsei', texto: 'Ah. Kris. Você veio para a aula?' },
+        { quem: 'narrador', texto: 'A voz chega um instante atrasada. Como um eco.' },
+        { quem: 'ralsei', texto: 'Eu não lembro o fim da frase. Faz tempo que eu tento.' },
+        { quem: 'kris', texto: '...' },
+        { quem: 'narrador', texto: 'Na mesa, um bilhete dobrado. Uma letra que Kris conhece.' },
+        { escolha: { chave: 'bilhete', opcoes: [{ valor: 'guardar', texto: 'Guardar o bilhete no bolso, sem abrir' }, { valor: 'deixar', texto: 'Deixar o bilhete onde está' }] } },
+        { quem: 'narrador', texto: 'O papel é leve. Kris o guarda no bolso.', se: { bilhete: 'guardar' } },
+        { quem: 'narrador', texto: 'Kris não toca no bilhete. Ele continua ali, dobrado, esperando alguém.', se: { bilhete: 'deixar' } },
+        { quem: 'ralsei', texto: 'No baralho só sobraram espadas. As outras cartas... alguém levou.' },
+        { quem: 'ralsei', texto: 'Fica até o sinal tocar? Só um pouco.' },
       ],
       depois: [
-        { quem: 'ralsei', texto: 'Olha! A cor voltou! Meu cachecol está verdinho de novo!' },
-        { quem: 'ralsei', texto: 'Sinto um vento frio vindo da trilha... Ele apaga tudo por onde passa. Vamos achar os outros antes dele.' },
+        { quem: 'ralsei', texto: 'Ah. Eu lembrei.' },
+        { quem: 'ralsei', texto: '...quando alguém vai embora, a gente deixa uma luz acesa.' },
+        { quem: 'narrador', texto: 'O eco se desfaz como giz apagado. Lá embaixo, outra porta range.' },
       ],
-      derrota: [{ quem: 'ralsei', texto: 'Ops! Desculpa, Kris. De novo? Eu acredito em você.' }],
+      derrota: [{ quem: 'ralsei', texto: 'Tudo bem. A aula recomeça. Ela sempre recomeça.' }],
     },
-    trilha: {
+    corredor: {
+      cenario: 'corredor',
+      tema: 'Os armários respiram. A cada rodada, as paredes chegam mais perto.',
       antes: [
-        { quem: 'narrador', texto: 'A trilha é uma tira de papel que se enrola sozinha. A cada passo ela fica um pouco mais estreita.' },
-        { quem: 'noelle', texto: 'K-Kris? Eu entrei atrás de um passarinho de origami e agora a trilha não para de encolher...' },
-        { quem: 'noelle', texto: 'Se a gente duelar e eu ficar desenhada de novo, talvez ela pare. Mas cuidado: a caixa vai apertar a cada rodada!' },
+        { quem: 'narrador', texto: 'O corredor da escola está mais comprido do que era.' },
+        { quem: 'narrador', texto: 'A cada passo, as paredes chegam um pouco mais perto.' },
+        { quem: 'noelle', texto: 'Kris? Eu ia te entregar uma coisa. Estava aqui, no meu armário...' },
+        { quem: 'noelle', texto: 'Eu ensaiei tanto o que ia dizer. Agora não sobrou espaço para nada.' },
+        { quem: 'narrador', texto: 'Kris não diz nada. Mas fica.' },
+        { quem: 'noelle', texto: 'Se as paredes fecharem... fica perto? Só até passar.' },
       ],
       depois: [
-        { quem: 'noelle', texto: 'Ah! Minhas mãos têm cor de novo. E a trilha parou de se enrolar.' },
-        { quem: 'noelle', texto: 'Eu vi o Berdly perto do lago. Ele estava discutindo com o próprio eco...' },
+        { quem: 'noelle', texto: 'Achei. Era só um cartão. Eu nunca escrevi nada dentro.' },
+        { quem: 'noelle', texto: 'Acho que eu só queria que alguém soubesse que eu estava aqui.' },
+        { quem: 'narrador', texto: 'As paredes se afastam devagar. O cartão em branco fica no chão.' },
       ],
-      derrota: [{ quem: 'noelle', texto: 'Desculpa! Eu não queria apertar tanto. Tenta de novo?' }],
+      derrota: [{ quem: 'noelle', texto: 'Desculpa. Deixei apertar demais. De novo?' }],
     },
-    lago: {
+    ginasio: {
+      cenario: 'ginasio',
+      tema: 'Aqui tudo volta. O ataque que você manda volta para você.',
       antes: [
-        { quem: 'narrador', texto: 'O lago é uma folha de papel vegetal. Tudo o que se diz perto dele volta, um pouco atrasado.' },
-        { quem: 'berdly', texto: 'Kris! Eu descobri a regra deste lago. Ele DEVOLVE. Tudo. Até os ataques!' },
-        { quem: 'berdly', texto: 'O que você me mandar numa rodada volta para você na seguinte. É genial. É irritante. É genialmente irritante.' },
-        { escolha: { chave: 'eco', opcoes: [{ valor: 'responder', texto: 'Gritar "oi" para o lago' }, { valor: 'quieto', texto: 'Ficar em silêncio' }] } },
-        { quem: 'berdly', texto: '"...oi." Viu? Ele respondeu. Pense bem no que você joga.', se: { eco: 'responder' } },
-        { quem: 'berdly', texto: 'O silêncio também volta, sabia? Pense bem no que você joga.', se: { eco: 'quieto' } },
+        { quem: 'narrador', texto: 'No ginásio, cada passo volta duas vezes. A arquibancada está vazia.' },
+        { quem: 'berdly', texto: 'Kris! Bem na hora da premiação. Ninguém mais veio.' },
+        { quem: 'berdly', texto: 'Eu ensaiei o discurso. Agradeço a todos que... que...' },
+        { quem: 'berdly', texto: 'Aqui tudo volta. As palavras, os passos. O que você me mandar, volta para você.' },
+        { escolha: { chave: 'eco', opcoes: [{ valor: 'palmas', texto: 'Bater palmas, uma vez' }, { valor: 'quieto', texto: 'Ficar em silêncio' }] } },
+        { quem: 'narrador', texto: 'Uma palma. O ginásio devolve dez.', se: { eco: 'palmas' } },
+        { quem: 'berdly', texto: '...Obrigado. Foi o suficiente.', se: { eco: 'palmas' } },
+        { quem: 'narrador', texto: 'Kris não faz barulho. O silêncio volta também, mais pesado.', se: { eco: 'quieto' } },
+        { quem: 'berdly', texto: 'Tudo bem. Eu também nunca sei o que dizer.', se: { eco: 'quieto' } },
       ],
       depois: [
-        { quem: 'berdly', texto: 'A minha cor! E o lago se calou. Admito: você foi quase tão estratégico quanto eu.' },
-        { quem: 'berdly', texto: 'A Susie passou correndo para o bosque. Ela disse que ia "dar um soco no vento".' },
+        { quem: 'berdly', texto: 'Sabe o que eu nunca disse no discurso? Que eu tinha medo de ninguém aparecer.' },
+        { quem: 'berdly', texto: 'Você apareceu.' },
+        { quem: 'narrador', texto: 'As lâmpadas do teto se apagam, uma por uma, sem pressa.' },
       ],
-      derrota: [{ quem: 'berdly', texto: 'O eco venceu! Quer dizer... eu venci. Tecnicamente. Tente outra vez.' }],
+      derrota: [{ quem: 'berdly', texto: 'O eco ganhou. Ele sempre fala por último.' }],
     },
-    bosque: {
+    rua: {
+      cenario: 'rua',
+      tema: 'Você chega aqui sem forças: começa sem energia nenhuma.',
       antes: [
-        { quem: 'narrador', texto: 'No Bosque sem Tinta as árvores são só contorno. Até a energia parece ter sido apagada.' },
-        { quem: 'susie', texto: 'Kris. Esse vento apagou meu lápis inteiro. Eu tô sem cor e sem paciência.' },
-        { quem: 'susie', texto: 'Aqui a gente começa sem energia nenhuma. Zero. Então junta raspando nas balas e bate forte depois.' },
+        { quem: 'narrador', texto: 'A rua de casa não termina. Os postes só acendem quando Kris passa.' },
+        { quem: 'narrador', texto: 'As pernas pesam. É o cansaço de quem andou a noite toda.' },
+        { quem: 'susie', texto: 'Ei. Senta aí. Eu também não consigo mais andar.' },
+        { quem: 'susie', texto: 'Fiquei te esperando no ponto. Você não veio. Ninguém veio.' },
+        { quem: 'kris', texto: '...' },
+        { quem: 'susie', texto: 'Não precisa explicar. Eu só queria ter dito tchau direito.' },
+        { quem: 'susie', texto: 'A gente começa sem nada. Zero. Vai juntando no caminho.' },
       ],
       depois: [
-        { quem: 'susie', texto: 'Heh. Roxo de novo. Valeu, Kris.' },
-        { quem: 'susie', texto: 'O vento veio do céu. Tá chovendo papel picado lá na frente. A Dess tá no meio, achando lindo.' },
+        { quem: 'susie', texto: 'Heh. Ainda tá de pé.' },
+        { quem: 'susie', texto: 'Vai. Eu fico mais um pouco. Alguém tem que ficar.' },
+        { quem: 'narrador', texto: 'O poste atrás dela apaga. O da frente acende.' },
       ],
-      derrota: [{ quem: 'susie', texto: 'Levanta! A gente não vai deixar um vento ganhar, né?' }],
+      derrota: [{ quem: 'susie', texto: 'Levanta. Devagar. Eu espero.' }],
     },
-    recortes: {
+    chuva: {
+      cenario: 'chuva',
+      tema: 'Chove dentro de casa. Todo ataque na sua caixa cai do teto.',
       antes: [
-        { quem: 'narrador', texto: 'Do céu caem recortes: estrelas, luas, letras soltas. Tudo cai de cima, sem parar.' },
-        { quem: 'dess', texto: 'Ei, Kris! Não é a coisa mais bonita? Tudo caindo, tudo picadinho. Parece confete de fim de show.' },
-        { quem: 'dess', texto: 'Só que eu tô ficando transparente. Duela comigo? Aqui tudo vem de cima, então olha pro alto!' },
+        { quem: 'narrador', texto: 'Na sala de estar, chove. A água cai do teto e não molha nada.' },
+        { quem: 'narrador', texto: 'No sofá, alguém afina um violão que não faz som.' },
+        { quem: 'dess', texto: 'Oi, Kris. Faz tempo, né? Ou não faz. Perdi a conta.' },
+        { quem: 'dess', texto: 'Eu ia tocar uma última música no fim do show. Nunca deu tempo.' },
+        { quem: 'narrador', texto: 'Kris senta no braço do sofá e escuta a música que não toca.' },
+        { quem: 'dess', texto: 'Olha pro alto. Aqui tudo vem de cima. A chuva, as lembranças.' },
       ],
       depois: [
-        { quem: 'dess', texto: 'Voltei! Vermelho-vivo. A chuva parou também, que pena. Era bonita.' },
-        { quem: 'dess', texto: 'O vento sai da última página. Tem alguém lá, desenhando. Vai lá, que a gente segura as trilhas.' },
+        { quem: 'dess', texto: 'Lembra do refrão? Eu também não. Ficou bonito assim, sem.' },
+        { quem: 'dess', texto: 'Tem alguém no último quarto. Deixou a porta encostada.' },
+        { quem: 'narrador', texto: 'A chuva para. As gotas ficam suspensas no ar, esperando.' },
       ],
-      derrota: [{ quem: 'dess', texto: 'Hah! Os recortes te pegaram. Bis! Bis!' }],
+      derrota: [{ quem: 'dess', texto: 'Molhou? Não molha. Tenta de novo.' }],
     },
-    desenhista: {
+    quarto: {
+      cenario: 'quarto',
+      tema: 'A lembrança mais funda. Tudo o que ela manda chega duas vezes.',
       antes: [
-        { quem: 'narrador', texto: 'Na última página há uma mesa de papel e alguém de costas, com um lápis enorme na mão.' },
-        { quem: 'asriel', texto: 'Oi, Kris. Desculpa o vento. Ele é só a borracha... Eu estava tentando apagar os erros.' },
-        { quem: 'asriel', texto: 'Comecei este caderno faz muito tempo. Queria um desenho perfeito, em que ninguém fosse embora. Todo mundo junto, para sempre.' },
-        { quem: 'asriel', texto: 'Mas toda vez que alguém se mexia, saía da linha. Então eu apagava e começava de novo.' },
-        { quem: 'asriel', texto: 'Você trouxe um lápis vermelho? ...Igual ao que eu usava.', se: { lapis: 'vermelho' } },
-        { quem: 'asriel', texto: 'Você trouxe um lápis verde? ...Era a cor que eu nunca tinha coragem de usar.', se: { lapis: 'verde' } },
-        { quem: 'asriel', texto: 'Se você desviar de tudo, eu deixo a página virar. Mas eu não vou pegar leve. Cada traço meu vem em dobro.' },
+        { quem: 'narrador', texto: 'No fim da escada, a porta do quarto. Uma luz fina passa por baixo.' },
+        { quem: 'narrador', texto: 'Kris conhece este quarto. Ninguém dorme nele há muito tempo.' },
+        { quem: 'asriel', texto: 'Oi, Kris.' },
+        { quem: 'asriel', texto: '...oi, Kris.' },
+        { quem: 'asriel', texto: 'Você cresceu. Ou eu é que fiquei pequeno.' },
+        { quem: 'asriel', texto: 'Eu fui embora tão depressa. Nem acendi a luz para me despedir.' },
+        { quem: 'asriel', texto: 'Você guardou o bilhete. Eu escrevi correndo. Só dizia: volto logo.', se: { bilhete: 'guardar' } },
+        { quem: 'asriel', texto: 'Você deixou o bilhete na mesa. Tudo bem. Eu também deixei tanta coisa.', se: { bilhete: 'deixar' } },
+        { quem: 'asriel', texto: 'Eu sou só o que ficou. A parte que não sabe ir embora.' },
+        { quem: 'asriel', texto: 'Se você ficar, a casa continua assim. Quieta. Para sempre.' },
+        { quem: 'kris', texto: '...' },
+        { quem: 'narrador', texto: 'Kris dá um passo para dentro.' },
       ],
       depois: [
-        { quem: 'asriel', texto: '...Você saiu da linha um monte de vezes. E o desenho ficou mais bonito assim.' },
-        { quem: 'asriel', texto: 'Talvez um desenho bom seja um em que as pessoas podem se mexer.' },
-        { quem: 'narrador', texto: 'A página vira sozinha. Atrás dela, todos os amigos, coloridos, esperando na clareira.' },
-        { quem: 'ralsei', texto: 'Kris! Asriel! Vamos desenhar a próxima página juntos?' },
+        { quem: 'asriel', texto: '...Você não vai ficar. Eu sei.' },
+        { quem: 'asriel', texto: 'Mas você veio. Isso eu vou lembrar.' },
+        { quem: 'narrador', texto: 'O quarto escurece. O eco não diz mais nada.' },
+        { quem: 'narrador', texto: 'Kris volta pelo corredor. Antes de sair, acende a luz.' },
+        { quem: 'narrador', texto: 'E deixa acesa.' },
       ],
-      derrota: [{ quem: 'asriel', texto: 'Viu? Saiu da linha. Eu apago... e você tenta de novo, tá?' }],
+      derrota: [{ quem: 'asriel', texto: 'Fica. Só mais um pouco.' }],
     },
   },
-  // quando o Asriel vira a página no meio da luta (regra `virada`)
-  virada: 'A PÁGINA VIROU! A caixa deitou e o Desenhista refez o próprio traço.',
+  // quando o chefe se refaz no meio da luta (regra `virada`)
+  virada: 'A PORTA SE ABRIU POR INTEIRO. O teto desceu, e a lembrança se refez.',
 }

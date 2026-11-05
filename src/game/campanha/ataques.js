@@ -124,9 +124,9 @@ function papel(rng, l, k, { velocidade, giro }) {
 // ---------- os modelos ----------
 // eventos(rng, l, p) -> [{ t, gerar(rng, l, alvo) -> opções[] }]   p: { forca, duracao, soDeCima }
 const MODELOS = {
-  // folhas que caem acelerando; uma em cada três cai na faixa do coração
+  // cinzas que caem acelerando; uma em cada três cai na faixa do coração (por dentro: 'folha')
   chuva: {
-    nome: 'Chuva de folhas',
+    nome: 'Cinzas que caem',
     deCima: true,
     eventos(rng, l, p) {
       const ev = []
@@ -142,9 +142,9 @@ const MODELOS = {
       return ev
     },
   },
-  // paredes de galhos com um vão, da esquerda e da direita (de cima, com soDeCima)
+  // paredes com uma fresta, da esquerda e da direita (de cima, com soDeCima) (por dentro: 'galho')
   galhos: {
-    nome: 'Galhos de papel',
+    nome: 'Paredes com uma fresta',
     eventos(rng, l, p) {
       const ev = []
       const passo = 2500 - 900 * p.forca
@@ -164,9 +164,9 @@ const MODELOS = {
       return ev
     },
   },
-  // sementes que miram no coração (paradas com a linha antes de voar)
+  // olhares que miram no coração (parados com a linha antes de voar) (por dentro: 'semente')
   sementes: {
-    nome: 'Sementes miradas',
+    nome: 'Olhares',
     eventos(rng, l, p) {
       const ev = []
       const passo = 1450 - 600 * p.forca
@@ -175,9 +175,9 @@ const MODELOS = {
       return ev
     },
   },
-  // redemoinho de papéis pelas bordas
+  // mariposas girando pelas bordas, em volta da luz (por dentro: 'papel')
   redemoinho: {
-    nome: 'Redemoinho de papel',
+    nome: 'Mariposas',
     eventos(rng, l, p) {
       const ev = []
       const passo = 330 - 150 * p.forca

@@ -260,13 +260,13 @@ test('concessão idempotente, teto diário e os cosméticos do mundo (chefe e 3 
 test('escolhas dos diálogos: só as que existem nos textos ficam guardadas', async () => {
   const m = montar(['ana'])
   const ana = await m.entrar('ana')
-  ana.mandar({ t: 'campanha', acao: 'escolha', mundo: 1, chave: 'lapis', valor: 'verde' })
-  ana.mandar({ t: 'campanha', acao: 'escolha', mundo: 1, chave: 'lapis', valor: 'roxo' })
+  ana.mandar({ t: 'campanha', acao: 'escolha', mundo: 1, chave: 'bilhete', valor: 'guardar' })
+  ana.mandar({ t: 'campanha', acao: 'escolha', mundo: 1, chave: 'bilhete', valor: 'rasgar' })
   ana.mandar({ t: 'campanha', acao: 'escolha', mundo: 1, chave: 'inventada', valor: 'sim' })
   await esperar()
   ana.mandar({ t: 'campanha', acao: 'progresso' })
   await esperar()
-  assert.deepEqual(ana.ultima('campanhaProgresso').escolhas, { 1: { lapis: 'verde' } })
+  assert.deepEqual(ana.ultima('campanhaProgresso').escolhas, { 1: { bilhete: 'guardar' } })
 })
 
 test('mensagens tortas não derrubam nada', async () => {
