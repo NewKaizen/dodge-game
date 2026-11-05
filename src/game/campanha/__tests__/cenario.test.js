@@ -5,6 +5,7 @@ import assert from 'node:assert/strict'
 import { gerarCenario, moverParticula, TEMAS, tabuleiro, porta } from '../cenario.js'
 import { layoutDoMapa, PORTA, PORTA_CHEFE } from '../mapa.js'
 import { TEXTOS, MUNDOS, textosDaFase } from '../mundos/index.js'
+import { semLigaduras, ZWNJ } from '../texto.js'
 
 const L = 854
 const A = 480
@@ -91,4 +92,17 @@ test('mapa: uma escada que desce; patamares em ordem, dentro da tela, a porta do
   for (let i = 1; i < m.degraus.length; i++) assert.ok(m.degraus[i].x >= m.degraus[i - 1].x)
   assert.deepEqual(layoutDoMapa(6, { largura: L }), m)
   assert.equal(layoutDoMapa(1).degraus.length, 0)
+})
+
+test('textos sem a ligadura fi/fl da fonte (um ZWNJ invisível entre as letras)', () => {
+  assert.equal(semLigaduras('fim, flutuam, café'), `f${ZWNJ}im, f${ZWNJ}lutuam, café`)
+  assert.equal(semLigaduras('FIM'), 'FIM')
+  assert.equal(semLigaduras(null), '')
+})
+
+test('na partida, o cenário tira o que ficaria atrás do HUD (o quadro da sala) e continua determinístico', () => {
+  const dialogo = gerarCenario('sala')
+  const partida = gerarCenario('sala', { partida: true })
+  assert.ok(partida.formas.length < dialogo.formas.length)
+  assert.deepEqual(gerarCenario('sala', { partida: true }), partida)
 })

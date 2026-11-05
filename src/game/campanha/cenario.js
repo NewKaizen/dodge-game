@@ -4,7 +4,8 @@
 // soltas no ar, escadas que não levam a lugar nenhum, feixes finos de luz e poeira parada no ar.
 // Cores fortes e poucas (azul-petróleo, carmim, dourado, violeta) sempre sobre o preto.
 //
-//   const c = gerarCenario('sala', { largura, altura, semente })   determinístico (mesma semente, mesmo cenário)
+//   const c = gerarCenario('sala', { largura, altura, semente, partida })   determinístico (mesma semente, mesmo cenário)
+//                      partida: true tira (ou apaga) o que ficaria atrás da caixa e do HUD
 //   c.fundo            a cor do fundo (quase preto)
 //   c.formas           [{ tipo: 'poligono', pontos: [x, y, ...], cor, alpha, luz? }
 //                       | { tipo: 'linha', x1, y1, x2, y2, cor, alpha, largura, luz? }]
@@ -213,7 +214,7 @@ export function moverParticula(p, dt, largura, altura) {
 function mapa(rng, L, A, t) {
   const f = []
   // um vitral enorme e distante, quase apagado, e os feixes descendo na diagonal
-  f.push(...vitral(rng, { cx: L * 0.5, topo: 18, largura: 150, altura: 230, alpha: 0.22, feixe: { x: L * 0.62, y: A, largura: 380, alpha: 0.035 } }))
+  f.push(...vitral(rng, { cx: L * 0.5, topo: 18, largura: 150, altura: 230, alpha: 0.15, feixe: { x: L * 0.62, y: A, largura: 380, alpha: 0.035 } }))
   for (let k = 0; k < 4; k++) f.push(feixe(80 + k * 190 + aleatorio(rng) * 40, 0, 6 + aleatorio(rng) * 6, A, 0.35, t.luz, 0.03 + aleatorio(rng) * 0.025))
   // portas soltas no escuro, longe (pequenas, tortas, apagadas)
   for (let k = 0; k < 7; k++) {
@@ -228,13 +229,13 @@ function mapa(rng, L, A, t) {
   return { formas: f, particulas: particulas(rng, 34, { largura: L, altura: A, cor: t.luz, alpha: 0.35 }) }
 }
 
-function sala(rng, L, A, t) {
+function sala(rng, L, A, t, { partida } = {}) {
   const f = []
   const h = 258
   f.push(...tabuleiro({ horizonte: h, altura: A, fuga: L * 0.5, base: L * 1.9, cores: t.chao }))
-  // o quadro-negro com a lição pela metade
-  f.push(ret(L * 0.3, 84, L * 0.4, 92, 0x08140f, 1), ...contorno(L * 0.3, 84, L * 0.4, 92, 0x3a3550, 0.9, 2))
-  for (let k = 0; k < 4; k++) f.push(linha(L * 0.33, 104 + k * 16, L * 0.33 + (k === 3 ? 40 : 90 + aleatorio(rng) * 140), 104 + k * 16, COR.osso, 0.28, 1))
+  // o quadro-negro com a lição pela metade (na partida, a caixa e o HUD ficam na frente: sem quadro)
+  if (!partida) f.push(ret(L * 0.3, 84, L * 0.4, 92, 0x08140f, 1), ...contorno(L * 0.3, 84, L * 0.4, 92, 0x3a3550, 0.9, 2))
+  for (let k = 0; k < 4; k++) if (!partida) f.push(linha(L * 0.33, 104 + k * 16, L * 0.33 + (k === 3 ? 40 : 90 + aleatorio(rng) * 140), 104 + k * 16, COR.osso, 0.28, 1))
   // as cadeiras perto do teto (soltas, girando devagar no ar parado)
   for (let k = 0; k < 7; k++) {
     const x = 40 + k * 120 + (aleatorio(rng) - 0.5) * 40
@@ -282,7 +283,7 @@ function corredor(rng, L, A, t) {
   return { formas: f, particulas: particulas(rng, 26, { largura: L, altura: A, cor: t.luz, alpha: 0.3 }) }
 }
 
-function ginasio(rng, L, A, t) {
+function ginasio(rng, L, A, t, { partida } = {}) {
   const f = []
   const h = 238
   // a arquibancada vazia ao fundo
@@ -296,8 +297,10 @@ function ginasio(rng, L, A, t) {
     if (acesa) f.push(poli([x - 14, 66, x + 14, 66, x + 70, A, x - 70, A], t.luz, 0.05, true), ret(x - 12, 65, 24, 2, t.luz, 0.9, true))
   }
   // a tabela e o aro, tortos
-  f.push(poli(girado(L * 0.5, 112, 86, 56, 0.06), 0x0c0a14, 1), ...contorno(L * 0.5 - 22, 112, 44, 26, COR.osso, 0.4, 1))
-  f.push(linha(L * 0.5 - 14, 146, L * 0.5 + 14, 148, COR.carmim, 0.8, 2))
+  if (!partida) {
+    f.push(poli(girado(L * 0.5, 112, 86, 56, 0.06), 0x0c0a14, 1), ...contorno(L * 0.5 - 22, 112, 44, 26, COR.osso, 0.4, 1))
+    f.push(linha(L * 0.5 - 14, 146, L * 0.5 + 14, 148, COR.carmim, 0.8, 2))
+  }
   // o troféu esquecido no chão
   f.push(poli([L * 0.78 - 8, h + 40, L * 0.78 + 8, h + 40, L * 0.78 + 4, h + 28, L * 0.78 - 4, h + 28], COR.dourado, 0.7), ret(L * 0.78 - 2, h + 40, 4, 8, COR.dourado, 0.6))
   return { formas: f, particulas: particulas(rng, 30, { largura: L, altura: A, cor: t.luz, alpha: 0.32 }) }
@@ -331,7 +334,7 @@ function rua(rng, L, A, t) {
       const px = vx + lado * (12 + L * 0.5 * s)
       const base = h + (A - h) * s
       const alto = 30 + 150 * s
-      const acesa = k >= 3 && lado === -1
+      const acesa = (k >= 2 && lado === -1) || (k === 3 && lado === 1)
       f.push(linha(px, base, px, base - alto, 0x22202e, 1, Math.max(1, 3 * s)), linha(px, base - alto, px - lado * 14 * s, base - alto, 0x22202e, 1, Math.max(1, 2 * s)))
       if (acesa) f.push(poli([px - lado * 14 * s - 3, base - alto + 2, px - lado * 14 * s + 3, base - alto + 2, px - lado * 14 * s + 50 * s, base, px - lado * 14 * s - 50 * s, base], t.luz, 0.07, true), ret(px - lado * 14 * s - 4, base - alto, 8, 3, t.luz, 0.9, true))
     }
@@ -339,12 +342,12 @@ function rua(rng, L, A, t) {
   return { formas: f, particulas: particulas(rng, 22, { largura: L, altura: A, tipo: 'cinza', cor: COR.cinza, alpha: 0.3 }) }
 }
 
-function chuva(rng, L, A, t) {
+function chuva(rng, L, A, t, { partida } = {}) {
   const f = []
   const h = 250
   f.push(...tabuleiro({ horizonte: h, altura: A, fuga: L * 0.52, base: L * 1.8, cores: t.chao }))
   // a janela grande da sala, um vitral frio
-  f.push(...vitral(rng, { cx: L * 0.5, topo: 40, largura: 110, altura: 190, cores: [COR.violeta, COR.petroleo, 0x2a4a8a, COR.carmim], alpha: 0.5, feixe: { x: L * 0.5, y: A, largura: 260, cor: t.luz, alpha: 0.045 } }))
+  f.push(...vitral(rng, { cx: partida ? L * 0.66 : L * 0.5, topo: partida ? 120 : 40, largura: 110, altura: 190, cores: [COR.violeta, COR.petroleo, 0x2a4a8a, COR.carmim], alpha: 0.5, feixe: { x: L * 0.5, y: A, largura: 260, cor: t.luz, alpha: 0.045 } }))
   // quadros vazios na parede
   for (const [qx, qy, qw, qh] of [[L * 0.14, 80, 56, 40], [L * 0.24, 140, 34, 46], [L * 0.75, 90, 46, 60], [L * 0.86, 150, 40, 30]]) f.push(...contorno(qx, qy, qw, qh, COR.dourado, 0.35, 1.5))
   // o sofá e o violão encostado
@@ -353,18 +356,19 @@ function chuva(rng, L, A, t) {
   return { formas: f, particulas: [...particulas(rng, 60, { largura: L, altura: A, tipo: 'gota', cor: 0x8ab0e0, alpha: 0.35 }), ...particulas(rng, 12, { largura: L, altura: A, cor: t.luz, alpha: 0.25 })] }
 }
 
-function quarto(rng, L, A, t) {
+function quarto(rng, L, A, t, { partida } = {}) {
   const f = []
   const h = 236
   const vx = L * 0.5
-  // a rosácea lá em cima
+  // a rosácea lá em cima (na partida, mais apagada: o HUD fica na frente)
+  const ar = partida ? 0.22 : 0.5
   f.push(poli(circulo(vx, 70, 58, 24), 0x000000, 1))
   for (let k = 0; k < 12; k++) {
     const a0 = (Math.PI * 2 * k) / 12
     const a1 = (Math.PI * 2 * (k + 1)) / 12 - 0.06
-    f.push(poli([vx, 70, vx + Math.cos(a0) * 54, 70 + Math.sin(a0) * 54, vx + Math.cos(a1) * 54, 70 + Math.sin(a1) * 54], VITRAL[k % 4], 0.5))
+    f.push(poli([vx, 70, vx + Math.cos(a0) * 54, 70 + Math.sin(a0) * 54, vx + Math.cos(a1) * 54, 70 + Math.sin(a1) * 54], VITRAL[k % 4], ar))
   }
-  f.push(poli(circulo(vx, 70, 16, 12), COR.dourado, 0.8))
+  f.push(poli(circulo(vx, 70, 16, 12), COR.dourado, ar + 0.3))
   f.push(...tabuleiro({ horizonte: h, altura: A, fuga: vx, base: L * 1.6, linhas: 11, colunas: 10, cores: t.chao }))
   // as escadas impossíveis dos dois lados
   f.push(...escada({ x: 40, y: h - 4, degraus: 12, dx: 14, dy: -11, espessura: 9, cor: 0x0e0810, quina: COR.dourado, alphaQuina: 0.4 }))
@@ -385,10 +389,10 @@ function quarto(rng, L, A, t) {
 
 const LUGARES = { mapa, sala, corredor, ginasio, rua, chuva, quarto }
 
-export function gerarCenario(tema, { largura = 854, altura = 480, semente = null } = {}) {
+export function gerarCenario(tema, { largura = 854, altura = 480, semente = null, partida = false } = {}) {
   const nome = LUGARES[tema] ? tema : 'mapa'
   const t = TEMAS[nome]
   const rng = criarRng(`campanha:cenario:${semente ?? nome}`)
-  const { formas, particulas: ps } = LUGARES[nome](rng, largura, altura, t)
+  const { formas, particulas: ps } = LUGARES[nome](rng, largura, altura, t, { partida })
   return { tema: nome, fundo: t.fundo, acento: t.acento, luz: t.luz, formas: [...formas, ...vinheta(largura, altura)], particulas: ps }
 }
