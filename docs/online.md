@@ -225,6 +225,14 @@ validação do XP do CO-OP (host decide + maioria, 60 s e 2 rodadas, convidado n
 `salaSemanal {valor}`, `party {acao: 'modo', semanal}`, `sala.semanal`, `resultado.semana` e
 `recompensa.trofeu`. Tudo em [boss-semanal.md](boss-semanal.md).
 
+## Campanha (modo história, PROTOCOLO 16)
+
+Menu → **CAMPANHA**: história single-player com diálogos, um personagem por mundo (Mundo 1 "A Floresta
+de Papel", Kris). Só com conta e online: aqui o **servidor roda a partida** (mão, energia, CPU,
+sementes dos ataques e os acertos refeitos a partir das posições do coração), diferente do PVP em
+rede. XP e cosméticos da campanha só saem de `conceder_campanha` (migration 0011). Tudo em
+[campanha.md](campanha.md).
+
 ## Jogar Rápido (fila casual de PVP 1x1)
 
 Menu → **ONLINE** → **JOGAR RÁPIDO** (a primeira opção). Vale para quem tem

@@ -142,6 +142,16 @@ partidas dos modos novos (`MODOS_COM_XP` em `server/partidas.js`): rodar a 0006 
 da 5B é seguro e não muda nada para quem joga. `nJogadoresSql.test.js` roda a
 0001–0006 duas vezes e confere os modos de 2, uma partida de 4 lados e o 2x2.
 
+### 2.6 Migration 0011: campanha (modo história)
+
+Depois das anteriores (0007–0010 estão descritas em `docs/online.md` e `docs/boss-semanal.md`), rode
+`supabase/migrations/0011_campanha.sql` (depende da 0001, 0003 e 0010; roda de novo sem estragar).
+Ela cria `campanha_progresso`, `campanha_escolhas` e `campanha_corridas` (RLS: cada um lê só o seu),
+põe os cosméticos do Mundo 1 no catálogo (`campanha = 'mundo1'`, nível 1000) e as funções que **só o
+servidor** chama: `progresso_campanha`, `campanha_escolher` e `conceder_campanha` (idempotente pelo
+id da corrida, com o teto de 300 XP de campanha por dia). Detalhes e o modelo anti-trapaça em
+[campanha.md](campanha.md). `campanhaSql.test.js` roda a 0001–0011 duas vezes (com `DODGE_PG`).
+
 ## 3. Conferir o bucket
 
 Em **Storage** deve aparecer o bucket `avatares`, marcado como **Public**.
