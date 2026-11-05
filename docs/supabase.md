@@ -150,7 +150,13 @@ Ela cria `campanha_progresso`, `campanha_escolhas` e `campanha_corridas` (RLS: c
 põe os cosméticos do Mundo 1 no catálogo (`campanha = 'mundo1'`, nível 1000) e as funções que **só o
 servidor** chama: `progresso_campanha`, `campanha_escolher` e `conceder_campanha` (idempotente pelo
 id da corrida, com o teto de 300 XP de campanha por dia). Detalhes e o modelo anti-trapaça em
-[campanha.md](campanha.md). `campanhaSql.test.js` roda a 0001–0011 duas vezes (com `DODGE_PG`).
+[campanha.md](campanha.md). `campanhaSql.test.js` roda a 0001–0012 duas vezes (com `DODGE_PG`).
+
+### 2.7 Migration 0012: nomes do Mundo 1 da campanha
+
+`supabase/migrations/0012_campanha_mundo1.sql` (depende da 0011; idempotente). O Mundo 1 virou "A Casa
+Silenciosa": a 0012 só troca os **nomes** dos três cosméticos (Quem Deixou a Luz Acesa, Vitral
+Silencioso, Porta Entreaberta). Os ids e o `campanha_quando` continuam os da 0011.
 
 ## 3. Conferir o bucket
 

@@ -8,7 +8,10 @@ campanha!".
 | Peça | Onde |
 | --- | --- |
 | Regras dos mundos (fases, oponentes, regra especial, metas) | `src/game/campanha/mundos/mundoN.js` |
-| Textos (diálogos, escolhas) | `src/game/campanha/mundos/mundoN.textos.js` |
+| Textos (diálogos, escolhas, cenário e tema de cada fase) | `src/game/campanha/mundos/mundoN.textos.js` |
+| Cenário sombrio (puro, com semente) e o desenho em Phaser | `src/game/campanha/cenario.js`, `desenharCenario.js` |
+| Mapa da escada (puro) · ecos na tela · texto sem ligadura | `src/game/campanha/mapa.js` · `eco.js` · `texto.js` |
+| Música | `scripts/musica/campanha.mjs` → `public/assets/musicas/campanha.mid`, `campanha2.mid` |
 | Ataques puros (com semente) e o registro `atacavelNoServidor` | `src/game/campanha/ataques.js` |
 | Esquiva em passo fixo (navegador e servidor) | `src/game/campanha/simulacao.js` |
 | Posições do coração: formato e plausibilidade | `src/game/campanha/amostras.js` |
@@ -16,29 +19,65 @@ campanha!".
 | Motor dos diálogos | `src/game/campanha/dialogo.js` (a caixa: `CaixaDeDialogo.js`) |
 | XP (espelho do banco) | `src/game/campanha/recompensas.js` |
 | Servidor (roda a partida) | `server/campanha.js` (ligado em `server/lan.js`) |
-| Banco | `supabase/migrations/0011_campanha.sql` |
+| Banco | `supabase/migrations/0011_campanha.sql` (e `0012_campanha_mundo1.sql`: os nomes do Mundo 1) |
 | Navegador | `src/lib/campanha.js`, cenas `Campanha` (mapa), `CampanhaArena`, `CampanhaFim` |
 
-## Mundo 1: "A Floresta de Papel" (Kris)
+## Mundo 1: "A Casa Silenciosa" (Kris)
 
-Kris acha um caderno de desenho esquecido nos achados e perdidos da escola. Ao abrir, a página vira
-uma floresta de papel dobrado, e o **Vento da Borracha** vai apagando as trilhas. Os amigos que
-entraram antes estão "rabiscados", sem cor, presos à regra escrita na primeira página: "só quem
-desvia continua desenhado". Cada duelo devolve a tinta de alguém. No fim, quem segura o lápis é o
-Asriel: foi ele quem começou o caderno, anos atrás, e queria um desenho perfeito em que ninguém
-fosse embora. (História original; os personagens são os do jogo.)
+Depois de uma noite que ninguém explica, a cidade fica quieta, e as portas da casa de Kris passam a
+dar em lugares conhecidos: a sala de aula, o corredor da escola, o ginásio, a rua, a sala de estar.
+Estão vazios e um pouco tortos. Em cada um há o **eco** de alguém do elenco, que não é bem a pessoa:
+é o que sobrou dela, uma frase que ficou pela metade, uma coisa que não foi dita. No fim da escada
+fica o último quarto, onde mora a ausência que calou a casa (o eco do Asriel). O fim é ambíguo de
+propósito: a Kris não fica, mas volta pelo corredor e deixa a luz acesa. A história é original; os
+personagens são os do jogo.
 
-| Fase | Oponente | Regra especial | ★ rodadas |
-| --- | --- | --- | --- |
-| 1 Clareira de Rascunho | Ralsei | só cartas ♠ (o baralho da fase só tem espadas) | 9 |
-| 2 A Trilha que Encolhe | Noelle | a caixa perde 10% da largura e da altura a cada rodada | 7 |
-| 3 O Lago do Eco | Berdly | o ataque que você mandou volta na sua caixa na rodada seguinte | 8 |
-| 4 Bosque sem Tinta | Susie | você começa com 0 de energia | 7 |
-| 5 Chuva de Recortes | Dess | todo ataque na sua caixa vem de cima | 8 |
-| 6 O Desenhista (chefe) | Asriel | cada ataque do chefe vem em dobro; na metade do HP ele **vira a página**: cura 20% e a caixa deita (larga e baixa), uma vez | 12 |
+| Fase | Lugar (cenário) | Eco | Regra especial (o mesmo mecanismo de sempre, com outro sentido) | ★ rodadas |
+| --- | --- | --- | --- | --- |
+| 1 A Sala de Aula | `sala`: cadeiras no teto, a lição pela metade | Ralsei | só cartas ♠: "no baralho, só sobraram espadas" | 9 |
+| 2 O Corredor que Fecha | `corredor`: armários que respiram | Noelle | a caixa perde 10% por rodada: as paredes chegam mais perto | 7 |
+| 3 O Ginásio Vazio | `ginasio`: arquibancada vazia, duas lâmpadas | Berdly | o ataque que você mandou volta: o eco do ginásio | 8 |
+| 4 A Rua de Volta | `rua`: postes que só acendem quando Kris passa | Susie | começa com 0 de energia: o cansaço de quem andou a noite toda | 7 |
+| 5 A Sala Onde Chove | `chuva`: chove dentro de casa | Dess | todo ataque vem de cima: a chuva | 8 |
+| 6 O Último Quarto (chefe) | `quarto`: escadas impossíveis, portas soltas | Asriel | tudo chega duas vezes (`duplo`); na metade do HP **a porta se abre por inteiro** (`virada`: cura 20% e a caixa deita), uma vez | 12 |
 
-Escolhas (só sabor): na fase 1, o lápis **vermelho** ou **verde** (o Ralsei e o Asriel comentam);
-na fase 3, gritar "oi" para o lago ou ficar quieto. Ficam salvas na conta.
+Os ataques continuam os quatro modelos simuláveis, com nomes do mundo: **Cinzas que caem**
+(`chuva`), **Paredes com uma fresta** (`galhos`), **Olhares** (`sementes`) e **Mariposas**
+(`redemoinho`). Por dentro os ids e o `extra.tipo` das balas não mudaram (o servidor confere igual).
+
+Escolhas (só sabor; são ações, nunca falas): na fase 1, **guardar o bilhete** ou deixá-lo na mesa (o
+eco do chefe comenta); na fase 3, **bater palmas** uma vez ou ficar em silêncio. Ficam salvas na conta.
+
+### Tom e estilo (guia para os próximos mundos)
+
+- **Silêncio e ecos.** Poucas palavras, muita atmosfera. Lugares conhecidos que ficaram vazios e
+  deformados; o elenco aparece como ecos (frases pela metade, coisas não ditas). Nada de piada que
+  quebre o clima (um calor discreto pode). Final ambíguo, mas com sentido.
+- **Kris quase não fala.** As respostas dela são `{ quem: 'kris', texto: '...' }` ou gestos na voz do
+  narrador ("Kris não diz nada. Mas fica."). Escolhas são **ações** ("Guardar o bilhete no bolso"),
+  nunca falas entre aspas. O `mundos.test.js` confere.
+- **Narração** curta, literária, no presente. Uma imagem por linha.
+- **Visual "mundo sombrio estilizado"** (`campanha/cenario.js`, puro e com semente): preto com chão
+  xadrez fugindo para o escuro, vitrais, portas soltas no ar, escadas impossíveis, feixes finos de
+  luz, poeira parada. Cores fortes e poucas: azul-petróleo, carmim, dourado, violeta. **Nada de
+  papel ou giz** na campanha (o Manual do Ralsei tem o estilo dele). Na partida o cenário vai com
+  `partida: true` (sem o que ficaria atrás do HUD) e um véu escuro.
+- **Caixa de diálogo clássica** (`CaixaDeDialogo.js`): preta, borda branca fina, retrato à esquerda,
+  texto datilografado devagar (42 ms por letra) com um blip baixo e macio. Os ecos (`ecos: true` no
+  texto do mundo): retrato sem cor, brilho frio, nome azul-acinzentado. Na tela os ecos são
+  `campanha/eco.js` (sem cor, meio transparentes, com uma imagem dupla que se desencontra devagar).
+- **Mapa** (`campanha/mapa.js` + cena `Campanha`): uma escada que desce, uma porta por patamar;
+  bloqueada apagada, aberta com uma fresta de luz, a escolhida com um feixe por cima; as estrelas são
+  três luzinhas. A abre a porta: o lugar aparece com o eco e a conversa começa ali.
+- **Música** original (`scripts/musica/campanha.mjs`): `campanha.mid` no mapa, nos diálogos e no fim
+  da fase (piano esparso em Ré menor, cada frase com um eco uma oitava acima e mais baixo, cordas e
+  pad); `campanha2.mid` nas fases e no chefe (o mesmo tema com cordas em trêmolo e um tímpano como um
+  coração). Mude lá e rode `node scripts/musica/campanha.mjs`.
+- **Acessibilidade**: "reduzir animações" (ou gráficos no mínimo) para a poeira, os feixes que
+  respiram e as imagens duplas dos ecos, e mostra o texto inteiro; sem clarões, a virada do chefe não
+  pisca; o tremor segue o ajuste. Texto mínimo de 9–10 px só em dicas; falas a 18 px.
+- **A fonte** junta "fi"/"fl" numa ligadura que parece um "A": todo texto corrido da campanha passa
+  por `semLigaduras` (`campanha/texto.js`).
 
 **Estrelas** (calculadas no servidor): ★ vencer · ★ terminar com pelo menos 60% do HP · ★ vencer em
 até N rodadas (a coluna acima). A CPU da campanha é a do PvP (`pvp/bot.js` e `pvp/botEsquiva.js`),
@@ -57,8 +96,11 @@ confere a velocidade).
 | derrota, abandono, corrida suspeita | 0 |
 
 Cosméticos exclusivos do Mundo 1 (nível 1000 no catálogo: a trilha de níveis nunca entrega):
-vencer o chefe pela primeira vez dá o título **Andarilho de Papel** e a moldura **Floresta de Papel**;
-3 estrelas em todas as fases dão o verso **Folha Dobrada**. A tela de recompensa mostra o que o
+vencer o chefe pela primeira vez dá o título **Quem Deixou a Luz Acesa** e a moldura **Vitral
+Silencioso**; 3 estrelas em todas as fases dão o verso **Porta Entreaberta**. Os ids são os da 0011
+(`titulo.andarilho_papel`, `moldura.floresta_papel`, `verso.folha_dobrada`: o inventário guarda o id);
+os nomes de agora vêm da **0012** (`0012_campanha_mundo1.sql`, idempotente). O catálogo do banco não
+tem descrição: o texto de cada item fica em `mundo1.js` (`descricao`) e aparece na Coleção. A tela de recompensa mostra o que o
 servidor concedeu; a Coleção lista os três (aba do tipo, "CAMPANHA, MUNDO 1").
 
 ## Anti-trapaça: o servidor vê a partida
@@ -139,15 +181,15 @@ efeitos, ataque, ataqueCpu, cpuAmostras, eu, cpu}` · `posicoes {corrida, rodada
 melhorEstrelas, primeira}` · `escolha {mundo, chave, valor}` · `desistir {corrida}`. Sem a carta em
 3 minutos, ou sem o fim da esquiva até 20 s depois da duração: `abandono`.
 
-## Banco (0011)
+## Banco (0011, 0012)
 
 `campanha_progresso` (conta, mundo, fase: melhor estrela, vencida, vitórias, melhor nº de rodadas),
 `campanha_escolhas` (jsonb por mundo), `campanha_corridas` (cada corrida que terminou: resultado,
 motivo, estrelas, XP concedido, itens). RLS: cada conta lê só as suas linhas; ninguém do navegador
 escreve nem chama as funções. `progresso_campanha(conta)` (o servidor manda ao mapa),
 `campanha_escolher(...)`, `conceder_campanha(...)`. `catalogo_itens` ganha `campanha` ('mundo1') e
-`campanha_quando` ('mundo' | 'estrelas'). Teste no Postgres: `DODGE_PG=... node --test
-server/__tests__/campanhaSql.test.js`.
+`campanha_quando` ('mundo' | 'estrelas'). A 0012 só renomeia os três cosméticos do Mundo 1 (mesmos
+ids). Teste no Postgres (0001–0012, duas vezes): `DODGE_PG=... node --test server/__tests__/campanhaSql.test.js`.
 
 ## Testar
 
@@ -164,7 +206,9 @@ server/__tests__/campanhaSql.test.js`.
    (formato no topo de `mundo1.js`; a última fase é o chefe). Use as regras que já existem
    (`soNaipe`, `caixaEncolhe`, `eco`, `energiaInicial`, `soDeCima`, `duplo`, `virada`) ou crie uma em
    `campanha/partida.js` (com teste).
-2. `mundo2.textos.js` com `antes`, `depois` e `derrota` de cada fase (e `titulo`, `resumo`, `virada`).
+2. `mundo2.textos.js` com `antes`, `depois` e `derrota` de cada fase, o `cenario` (um tema de
+   `campanha/cenario.js`, ou um novo lá, com teste) e o `tema` (a regra dita no tom do mundo); e
+   `titulo`, `resumo`, `virada`, `ecos`, `cenarioMapa`. Siga o guia de tom e estilo acima.
 3. Registre os dois em `mundos/index.js`.
 4. Prefira ataques simuláveis (`ataques.js`); um modelo novo entra no registro com teste de
    paridade e de justiça (`simulacao.test.js`).

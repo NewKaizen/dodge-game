@@ -227,10 +227,10 @@ validação do XP do CO-OP (host decide + maioria, 60 s e 2 rodadas, convidado n
 
 ## Campanha (modo história, PROTOCOLO 16)
 
-Menu → **CAMPANHA**: história single-player com diálogos, um personagem por mundo (Mundo 1 "A Floresta
-de Papel", Kris). Só com conta e online: aqui o **servidor roda a partida** (mão, energia, CPU,
+Menu → **CAMPANHA**: história single-player com diálogos, um personagem por mundo (Mundo 1 "A Casa
+Silenciosa", Kris). Só com conta e online: aqui o **servidor roda a partida** (mão, energia, CPU,
 sementes dos ataques e os acertos refeitos a partir das posições do coração), diferente do PVP em
-rede. XP e cosméticos da campanha só saem de `conceder_campanha` (migration 0011). Tudo em
+rede. XP e cosméticos da campanha só saem de `conceder_campanha` (migration 0011; a 0012 renomeia os cosméticos do Mundo 1). Tudo em
 [campanha.md](campanha.md).
 
 ## Jogar Rápido (fila casual de PVP 1x1)
