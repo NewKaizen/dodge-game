@@ -139,6 +139,16 @@ export function criarRegistro(supabase) {
     conceder: async (id) => (await chamar('conceder_recompensa', { p_partida: id })) ?? [],
     // BOSS SEMANAL (0010): o troféu exclusivo da semana, depois do XP (o banco confere tudo de novo)
     concederTrofeu: async (id, t) => (await chamar('conceder_trofeu_semanal', { p_partida: id, p_semana: t.semana, p_item: t.id, p_tipo: t.tipo, p_nome: t.nome })) ?? [],
+    // CAMPANHA (0011, server/campanha.js): o progresso, a concessão de uma corrida e as escolhas dos diálogos
+    progressoCampanha: async (usuario) => {
+      const d = (await chamar('progresso_campanha', { p_user: usuario })) ?? {}
+      return { fases: Array.isArray(d.fases) ? d.fases : [], escolhas: d.escolhas && typeof d.escolhas === 'object' ? d.escolhas : {}, xpHoje: Number(d.xp_hoje) || 0 }
+    },
+    concederCampanha: async (x) => {
+      const d = (await chamar('conceder_campanha', { p_corrida: x.corrida, p_user: x.usuario, p_mundo: x.mundo, p_fase: x.fase, p_resultado: x.resultado, p_motivo: x.motivo ?? null, p_estrelas: x.estrelas ?? 0, p_rodadas: x.rodadas ?? null, p_duracao_s: x.duracaoS ?? null })) ?? {}
+      return { xpGanho: d.xp_ganho ?? 0, xpTotal: d.xp_total ?? null, nivelAntes: d.nivel_antes ?? null, nivelDepois: d.nivel_depois ?? null, itensNovos: Array.isArray(d.itens_novos) ? d.itens_novos : [], motivo: d.motivo ?? null, estrelas: d.estrelas ?? 0, melhorEstrelas: d.melhor_estrelas ?? null, primeira: Boolean(d.primeira), resultado: d.resultado ?? x.resultado }
+    },
+    escolherCampanha: (x) => chamar('campanha_escolher', { p_user: x.usuario, p_mundo: x.mundo, p_chave: x.chave, p_valor: x.valor }),
   }
 }
 

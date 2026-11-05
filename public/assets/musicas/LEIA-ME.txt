@@ -29,6 +29,12 @@ Músicas em MIDI (.mid), com o nome da tela ou do chefe. O jogo procura
                    dependências): mude a composição lá e rode de novo.
   tutorial2.mid    Manual do Ralsei, página 2: o mesmo tema com um pouco mais de
                    energia (mesmo script). Sem ele, toca o tutorial.mid.
+  campanha.mid     CAMPANHA, Mundo 1 "A Casa Silenciosa" (mapa, diálogos e fim de fase):
+                   piano esparso em Ré menor com o eco de cada frase, cordas lentas e
+                   um pad grave. Original, gerada por scripts/musica/campanha.mjs.
+  campanha2.mid    CAMPANHA, as fases e o chefe: o mesmo tema um pouco mais tenso
+                   (cordas em trêmolo, um tímpano como um coração). Mesmo script.
+                   Sem ele, toca o campanha.mid.
   pvpResultado.mid resultado do PvP (ainda não existe: enquanto isso toca vitoria.mid)
 
   Cartas SUPER (música especial de cada personagem; toca em loop enquanto o

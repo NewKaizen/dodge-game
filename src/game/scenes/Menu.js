@@ -28,7 +28,7 @@ import { montarAvisos } from '../conta/avisos.js'
 // todas as cartas com a prévia do ataque e as rodadas bônus de cada arena) e
 // CONFIGURAÇÕES (-> Config), JOGAR RÁPIDO (-> Lan, já entrando na fila) e PERFIL (-> Perfil, a conta
 // dentro do jogo) só escurecem a tela. JOGAR RÁPIDO e PERFIL só existem onde há conta ou internet
-// (LAN sem internet não tem nenhum dos dois). O host de uma sala LAN que
+// (LAN sem internet não tem nenhum dos dois). CAMPANHA (-> Campanha, o modo história) aparece junto deles. O host de uma sala LAN que
 // volta ao menu (fim da partida, SAIR da pausa) cai direto no lobby. Embaixo da lista, uma linha diz o que a
 // opção escolhida faz; até alguém apertar uma tecla ou um botão do controle (ou o
 // joystick serial já autorizado abrir), as opções ficam apagadas e a linha pede isso.
@@ -49,8 +49,10 @@ const GUIA = { id: 'cartas', rotulo: 'GUIA', cor: '#b48cff', cena: 'GuiaEntrada'
 const CONFIG = { id: 'config', rotulo: 'CONFIGURAÇÕES', cor: '#f2c14e', cena: 'Config', dica: 'som, controles, acessibilidade e gráficos' }
 const RAPIDO = { id: 'rapido', rotulo: 'JOGAR RÁPIDO', cor: '#ffd23a', cena: 'Lan', dados: { rapido: true }, dica: 'PVP 1x1 contra alguém da fila, já!' }
 const PERFIL = { id: 'perfil', rotulo: 'PERFIL', cor: '#6dffb0', cena: 'Perfil', dica: '' }
+// CAMPANHA (docs/campanha.md): o modo história, com conta e online (a cena avisa quem não está logado)
+const CAMPANHA = { id: 'campanha', rotulo: 'CAMPANHA', cor: '#5fb8b0', cena: 'Campanha', dica: 'história com a Kris: A Casa Silenciosa' }
 // cenas que não explodem a sala: só escurecem a tela e abrem
-const SO_ESCURECEM = ['config', 'cartas', 'lan', 'rapido', 'perfil']
+const SO_ESCURECEM = ['config', 'cartas', 'lan', 'rapido', 'perfil', 'campanha']
 
 // Joystick USB: o caminho do pareamento (CONFIGURAÇÕES → GAMEPAD) não aparece em lugar nenhum, então uma
 // linha discreta no canto avisa. Só com Web Serial, sem joystick pareado nunca, e até o jogador abrir
@@ -60,7 +62,7 @@ const dicaJoystickUsbVisivel = () =>
 
 // JOGAR RÁPIDO e PERFIL: onde há conta (ou o site está na internet, mesmo que as contas estejam fora do ar)
 const comConta = () => siteNaInternet() || get(conta).estado !== 'indisponivel'
-const montarLista = (comContas) => (comContas ? [RAPIDO, CO_OP, PVP, ONLINE, GUIA, PERFIL, CONFIG] : [CO_OP, PVP, ONLINE, GUIA, CONFIG])
+const montarLista = (comContas) => (comContas ? [RAPIDO, CAMPANHA, CO_OP, PVP, ONLINE, GUIA, PERFIL, CONFIG] : [CO_OP, PVP, ONLINE, GUIA, CONFIG])
 
 // A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
 // deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do create().
@@ -105,6 +107,8 @@ export default class Menu extends Phaser.Scene {
     // o cenário: a MESA DE CARTAS (padrão) ou a SALA DE TV (Config > Gráficos > MENU INICIAL)
     const mesa = pref('menu') === 'mesa'
     this.pos = mesa ? OPCOES_MESA : POS_SALA
+    // 8 linhas (com CAMPANHA): um pouco mais juntas e subindo, para a dica de baixo caber na tela
+    if (this.opcoes.length > 7) this.pos = { ...this.pos, y: this.pos.y - 24, passo: 25 }
     if (mesa) {
       this.sala = criarMesa(this)
       this.telao = this.sala.telao
@@ -168,7 +172,7 @@ export default class Menu extends Phaser.Scene {
   montarOpcoes() {
     this.painel = this.add.container(-40, 0).setDepth(30).setAlpha(0)
     const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 5 })
-    const tamanho = this.opcoes.length > 5 ? 24 : 26 // com JOGAR RÁPIDO e PERFIL são 7 linhas na mesma tinta da mesa
+    const tamanho = this.opcoes.length > 7 ? 22 : this.opcoes.length > 5 ? 24 : 26 // com JOGAR RÁPIDO, CAMPANHA e PERFIL são 8 linhas na mesma tinta da mesa
     this.linhas = this.opcoes.map((o, i) => this.add.text(this.pos.x, this.pos.y + i * this.pos.passo, o.rotulo, estilo(tamanho, o.cor)).setOrigin(0, 0.5))
     this.seta = this.add.text(0, 0, '◀', estilo(22, '#ffffff')).setOrigin(0, 0.5)
     this.aviso = this.add.text(this.pos.x, this.pos.y + this.opcoes.length * this.pos.passo - 6, '', { ...estilo(12, TEXTO.desabilitado), lineSpacing: 4 }).setOrigin(0, 0)

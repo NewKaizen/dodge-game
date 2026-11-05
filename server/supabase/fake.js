@@ -17,6 +17,8 @@
 // upload: true, conceder_recompensa: true, ... } faz a operação devolver erro.
 
 import { xpDaPartida, nivelDoXp, itensAte, RESULTADOS_JOGADOS, CONVIDADOS_LIMITE_DIA, REPETICAO_LIMITE, DURACAO_MINIMA_S, RODADAS_MINIMAS } from '../../src/lib/progresso.js'
+import { xpDaCorrida } from '../../src/game/campanha/recompensas.js'
+import { mundoDe, ITENS_CAMPANHA } from '../../src/game/campanha/mundos/index.js'
 
 const erro = (message) => ({ message })
 
@@ -137,6 +139,69 @@ function rpcs(sb) {
       }
       return linhas
     },
+    // CAMPANHA (0011): os espelhos de progresso_campanha, campanha_escolher e conceder_campanha
+    progresso_campanha({ p_user }) {
+      const dia = sb.diaDe(sb.agora())
+      const escolhas = {}
+      for (const e of t.campanha_escolhas.filter((x) => x.user_id === p_user)) escolhas[String(e.mundo)] = { ...e.escolhas }
+      return {
+        fases: t.campanha_progresso.filter((p) => p.user_id === p_user).sort((a, b) => a.mundo - b.mundo || a.fase - b.fase).map((p) => ({ mundo: p.mundo, fase: p.fase, estrelas: p.estrelas, concluida: p.concluida })),
+        escolhas,
+        xp_hoje: t.campanha_corridas.filter((c) => c.user_id === p_user && sb.diaDe(c.criada_em) === dia).reduce((s, c) => s + c.xp, 0),
+      }
+    },
+    campanha_escolher({ p_user, p_mundo, p_chave, p_valor }) {
+      if (!/^[a-z_]{1,24}$/.test(p_chave ?? '') || !/^[a-z_]{1,24}$/.test(p_valor ?? '') || !mundoDe(p_mundo)) throw new Error('escolha inválida')
+      if (!t.perfis.some((p) => p.id === p_user)) return null
+      let e = t.campanha_escolhas.find((x) => x.user_id === p_user && x.mundo === p_mundo)
+      if (!e) t.campanha_escolhas.push((e = { user_id: p_user, mundo: p_mundo, escolhas: {} }))
+      if (p_chave in e.escolhas || Object.keys(e.escolhas).length < 32) e.escolhas[p_chave] = p_valor
+      return null
+    },
+    conceder_campanha({ p_corrida, p_user, p_mundo, p_fase, p_resultado, p_motivo, p_estrelas, p_rodadas, p_duracao_s }) {
+      if (!['vitoria', 'derrota', 'suspeita', 'abandono'].includes(p_resultado)) throw new Error('resultado inválido')
+      const fases = mundoDe(p_mundo)?.fases.length ?? 0
+      if (!fases || !(p_fase >= 1 && p_fase <= fases)) throw new Error('fase inválida')
+      const ja = t.campanha_corridas.find((c) => c.id === p_corrida)
+      if (ja) return { xp_ganho: ja.xp, xp_total: ja.xp_total, nivel_antes: ja.nivel_antes, nivel_depois: ja.nivel_depois, itens_novos: ja.itens, motivo: ja.xp_motivo ?? ja.resultado, estrelas: ja.estrelas, melhor_estrelas: ja.melhor_estrelas, primeira: ja.primeira, resultado: ja.resultado, repetida: true }
+      const perfil = t.perfis.find((p) => p.id === p_user)
+      if (!perfil) throw new Error('perfil não encontrado')
+      perfil.xp ??= 0
+      perfil.nivel ??= 1
+      let resultado = p_resultado
+      let motivo = p_motivo ? String(p_motivo).slice(0, 32) : null
+      const prog = (f) => t.campanha_progresso.find((p) => p.user_id === p_user && p.mundo === p_mundo && p.fase === f)
+      if (resultado === 'vitoria' && p_fase > 1 && !prog(p_fase - 1)?.concluida) {
+        resultado = 'suspeita'
+        motivo = 'bloqueada'
+      }
+      const base = { id: p_corrida, user_id: p_user, mundo: p_mundo, fase: p_fase, resultado, motivo, rodadas: p_rodadas, duracao_s: p_duracao_s, criada_em: sb.agora() }
+      if (resultado !== 'vitoria') {
+        t.campanha_corridas.push({ ...base, estrelas: 0, xp: 0, xp_motivo: resultado, itens: [], xp_total: perfil.xp, nivel_antes: perfil.nivel, nivel_depois: perfil.nivel, primeira: false, melhor_estrelas: null })
+        return { xp_ganho: 0, xp_total: perfil.xp, nivel_antes: perfil.nivel, nivel_depois: perfil.nivel, itens_novos: [], motivo: resultado, estrelas: 0, melhor_estrelas: null, primeira: false, resultado }
+      }
+      const estrelas = Math.min(3, Math.max(0, Number(p_estrelas) || 0))
+      let p = prog(p_fase)
+      const primeira = !p?.concluida
+      const antes = p?.estrelas ?? 0
+      const dia = sb.diaDe(sb.agora())
+      const xpHoje = t.campanha_corridas.filter((c) => c.user_id === p_user && sb.diaDe(c.criada_em) === dia).reduce((s, c) => s + c.xp, 0)
+      const { xp, motivo: xpMotivo } = xpDaCorrida({ primeira, chefe: p_fase === fases, estrelasAntes: antes, estrelas, xpHoje })
+      if (!p) t.campanha_progresso.push((p = { user_id: p_user, mundo: p_mundo, fase: p_fase, estrelas: 0, concluida: false, vitorias: 0, melhor_rodadas: null }))
+      Object.assign(p, { estrelas: Math.max(p.estrelas, estrelas), concluida: true, vitorias: p.vitorias + 1, melhor_rodadas: p.melhor_rodadas == null ? p_rodadas : Math.min(p.melhor_rodadas, p_rodadas) })
+      const nivelAntes = perfil.nivel
+      const total = perfil.xp + xp
+      const nivel = nivelDoXp(total)
+      Object.assign(perfil, { xp: total, nivel })
+      const tem = new Set(t.inventario.filter((i) => i.user_id === p_user).map((i) => i.item_id))
+      const trilha = itensAte(nivel).filter((i) => !tem.has(i.id)).map((i) => i.id).sort()
+      const tresEstrelas = t.campanha_progresso.filter((x) => x.user_id === p_user && x.mundo === p_mundo && x.estrelas === 3).length >= fases
+      const doMundo = ITENS_CAMPANHA.filter((i) => i.mundo === p_mundo && !tem.has(i.id) && ((i.quando === 'mundo' && p_fase === fases) || (i.quando === 'estrelas' && tresEstrelas))).map((i) => i.id).sort()
+      const itens = [...trilha, ...doMundo]
+      for (const item_id of itens) t.inventario.push({ user_id: p_user, item_id, obtido_em: new Date(sb.agora()).toISOString() })
+      t.campanha_corridas.push({ ...base, estrelas, xp, xp_motivo: xpMotivo, itens, xp_total: total, nivel_antes: nivelAntes, nivel_depois: nivel, primeira, melhor_estrelas: Math.max(antes, estrelas) })
+      return { xp_ganho: xp, xp_total: total, nivel_antes: nivelAntes, nivel_depois: nivel, itens_novos: itens, motivo: xpMotivo, estrelas, melhor_estrelas: Math.max(antes, estrelas), primeira, resultado: 'vitoria' }
+    },
     conceder_recompensa({ p_partida }) {
       sb.concederChamadas++
       const p = t.partidas.find((x) => x.id === p_partida)
@@ -203,7 +268,7 @@ function rpcs(sb) {
 
 export function criarSupabaseFalso({ usuarios = {}, perfis = [], url = 'https://falso.supabase.co', agora = Date.now } = {}) {
   const sb = {
-    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [], denuncias: [], catalogo_itens: [], trofeus_semanais: [] },
+    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [], denuncias: [], catalogo_itens: [], trofeus_semanais: [], campanha_progresso: [], campanha_escolhas: [], campanha_corridas: [] },
     agora,
     diaDe: (ms) => Math.floor((ms - 3 * 3600_000) / 86_400_000), // dia em São Paulo (UTC−3)
     concederChamadas: 0,

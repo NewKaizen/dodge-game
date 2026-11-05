@@ -66,7 +66,8 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 // contagem) e pedirSemanal() pede de novo na virada. criarSala({ semanal: true }) / mudarSemanal(v)
 // (dono): a sala do boss (CO-OP de 2 a 4); sala.semanal = a semana da sala. partyModo(modo, semanal).
 // O resultado do CO-OP leva `semana`; a recompensa pode trazer `trofeu` { id, semana, novo }.
-export const PROTOCOLO = 15
+// CAMPANHA (PROTOCOLO 16, docs/campanha.md): `campanha {acao}` e as respostas campanha* (lib/campanha.js)
+export const PROTOCOLO = 16
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
