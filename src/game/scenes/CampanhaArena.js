@@ -8,7 +8,11 @@ import { ESCALA } from '../arte/texturas.js'
 import { SIMBOLOS } from '../pvp/cartas.js'
 import { ENERGIA } from '../pvp/regras.js'
 import Mao from '../entities/Mao.js'
-import { garantirPapel, PAPEL, TINTA, joyDeTodos } from '../manual/paginaBase.js'
+import { joyDeTodos } from '../manual/paginaBase.js'
+import { fatores } from '../acessibilidade.js'
+import { desenharCenario } from '../campanha/desenharCenario.js'
+import { criarEco } from '../campanha/eco.js'
+import { semLigaduras } from '../campanha/texto.js'
 import { mundoDe, faseDe, TEXTOS } from '../campanha/mundos/index.js'
 import { descreverRegra, CAIXA_CAMPANHA, VELOCIDADE_CORACAO } from '../campanha/partida.js'
 import { criarEsquivaLocal, criarSimulacao, inicioDaCaixa } from '../campanha/simulacao.js'
@@ -21,7 +25,8 @@ import { aoCampanha, comecarFase, jogarCarta, enviarPosicoes, terminarEsquiva, d
 // energia, a jogada da CPU, a semente dos ataques e o dano chegam de lá. A esquiva roda aqui com o
 // MESMO modelo puro que o servidor refaz (campanha/simulacao.js): os acertos que você sente na hora
 // são confirmados (ou corrigidos) pelo servidor no fim da rodada. A caixa pequena à direita repete a
-// esquiva da CPU que o servidor já decidiu.
+// esquiva da CPU que o servidor já decidiu. O fundo é o lugar da fase (campanha/cenario.js) e o
+// oponente é um ECO (campanha/eco.js): apagado, com a imagem dupla.
 //
 //   escolha: ←→ carta · A jogar · B passar a vez · esquiva: mover o coração · Esc: desistir (2×)
 //   scene.start('CampanhaArena', { mundo: 1, fase: 1, escolhas })
@@ -29,7 +34,10 @@ const MINI = { escala: 0.5, x: 598, y: 112 }
 const MAO_POS = { x: 362, y: 424 }
 const FRASE_Y = 128
 const PEDACO_MS = 250
-const COR_BALA = { folha: 0x4cb878, galho: 0x8a5a3a, semente: 0xd01a33, papel: 0xfff8e8 }
+// as balas, por dentro com os nomes antigos: cinzas (folha), paredes (galho), olhares (semente), mariposas (papel)
+const COR_BALA = { folha: 0xc8c4d8, galho: 0x3fb3a8, semente: 0xe03048, papel: 0xe0b84a }
+const TINTA = '#e8e4f4'
+const COR_TEXTO = { tema: '#8fb8c0', apagado: '#8a86a0', dica: '#6a6680' }
 
 const estadoInicial = () => ({
   mundo: null,
@@ -67,6 +75,8 @@ const estadoInicial = () => ({
   oponente: null,
   aviso: null,
   hudTextos: null,
+  cenario: null,
+  eco: null,
 })
 
 export default class CampanhaArena extends Phaser.Scene {
@@ -82,16 +92,16 @@ export default class CampanhaArena extends Phaser.Scene {
     this.controles = new Controles(this)
     this.controles.onBotao((_, botao) => this.botao(botao))
     this.controles.onPausa(() => this.pausa())
-    garantirPapel(this)
-    this.add.image(0, 0, PAPEL.mesa).setOrigin(0)
-    this.add.image(0, 0, PAPEL.papel).setOrigin(0)
+    this.cenario = desenharCenario(this, TEXTOS[this.mundo.id].fases[this.fase.id]?.cenario ?? 'mapa', { profundidade: -10, brilho: 0.8, veu: 0.3, partida: true })
+    // o escuro descendo de cima, atrás do HUD (em degradê): o texto fica legível sobre qualquer lugar
+    for (let k = 0; k < 8; k++) this.add.rectangle(0, 0, LARGURA, 40 + k * 12, 0x000000, 0.09).setOrigin(0).setDepth(1)
     this.montarCena()
     this.pararCampanha = aoCampanha((m) => this.aoServidor(m))
     this.events.once('shutdown', () => {
       this.pararCampanha?.()
       this.mao?.destroy()
     })
-    musica(this.fase.chefe ? 'pvp_b' : 'pvp', 'jevil')
+    musica('campanha2', 'campanha')
     this.cameras.main.fadeIn(260)
     comecarFase(this.mundo.id, this.fase.n)
   }
@@ -103,12 +113,12 @@ export default class CampanhaArena extends Phaser.Scene {
     this.hud = this.add.graphics().setDepth(20)
     this.hpMostrado = { eu: null, cpu: null }
     this.add.text(LARGURA / 2, 10, `${this.fase.chefe ? 'CHEFE' : `FASE ${this.fase.n}`} · ${this.fase.nome}`, estilo(14)).setOrigin(0.5, 0).setDepth(21)
-    this.regra = this.add.text(LARGURA / 2, 30, descreverRegra(this.fase.regra), { ...estilo(11, '#2f6b3a'), align: 'center', wordWrap: { width: 380 } }).setOrigin(0.5, 0).setDepth(21)
+    this.regra = this.add.text(LARGURA / 2, 30, semLigaduras(TEXTOS[this.mundo.id].fases[this.fase.id]?.tema ?? descreverRegra(this.fase.regra)), { ...estilo(11, COR_TEXTO.tema), align: 'center', wordWrap: { width: 400 } }).setOrigin(0.5, 0).setDepth(21)
     this.frase = this.add.text(MAO_POS.x, FRASE_Y, '', { ...estilo(13), align: 'center', wordWrap: { width: 420 } }).setOrigin(0.5, 1).setDepth(25)
     this.aviso = this.add.text(LARGURA / 2, ALTURA / 2, 'conectando ao servidor da campanha…', estilo(15)).setOrigin(0.5).setDepth(40)
     this.infoCarta = this.add.text(566, 230, '', { ...estilo(12), wordWrap: { width: 262 }, lineSpacing: 3 }).setDepth(21)
-    this.rotuloAtaque = this.add.text((CAIXA_CAMPANHA.esquerda + CAIXA_CAMPANHA.direita) / 2, CAIXA_CAMPANHA.base + 8, '', estilo(11, '#4e3f63')).setOrigin(0.5, 0).setDepth(21)
-    this.add.text(LARGURA - 14, ALTURA - 10, 'ESC 2×: DESISTIR', estilo(10, '#6a5a80')).setOrigin(1, 1).setDepth(21)
+    this.rotuloAtaque = this.add.text((CAIXA_CAMPANHA.esquerda + CAIXA_CAMPANHA.direita) / 2, CAIXA_CAMPANHA.base + 8, '', estilo(11, COR_TEXTO.apagado)).setOrigin(0.5, 0).setDepth(21)
+    this.add.text(LARGURA - 14, ALTURA - 10, 'ESC 2×: DESISTIR', estilo(10, COR_TEXTO.dica)).setOrigin(1, 1).setDepth(21)
     // as duas caixas: a sua (grande) e a da CPU (pequena, só o replay do que o servidor decidiu)
     this.caixaG = this.add.graphics().setDepth(5)
     this.balas = this.add.graphics().setDepth(8)
@@ -121,17 +131,18 @@ export default class CampanhaArena extends Phaser.Scene {
     this.desenharCaixa(this.caixaG, CAIXA_CAMPANHA)
     this.desenharCaixa(this.miniG, CAIXA_CAMPANHA)
     const larguraMini = (CAIXA_CAMPANHA.direita - CAIXA_CAMPANHA.esquerda) * MINI.escala
-    this.add.text(MINI.x + larguraMini / 2, MINI.y - 6, `a caixa de ${PERSONAGENS[this.fase.oponente].nome}`, estilo(10, '#4e3f63')).setOrigin(0.5, 1).setDepth(21)
+    this.add.text(MINI.x + larguraMini / 2, MINI.y - 6, `a caixa do eco de ${PERSONAGENS[this.fase.oponente].nome}`, estilo(10, COR_TEXTO.apagado)).setOrigin(0.5, 1).setDepth(21)
     this.kris = this.add.image(150, CAIXA_CAMPANHA.base, this.mundo.personagem).setOrigin(0.5, 1).setScale(ESCALA.personagem).setDepth(4)
-    this.oponente = this.add.image(800, 214, this.fase.oponente).setOrigin(0.5, 1).setScale(ESCALA.personagem).setFlipX(true).setDepth(4)
+    this.eco = criarEco(this, 800, 214, this.fase.oponente, { escala: ESCALA.personagem, profundidade: 4, alpha: 0.62, flipX: true })
+    this.oponente = this.eco.corpo
     this.mao = new Mao(this, { jogador: 0, x: MAO_POS.x, y: MAO_POS.y, rotulo: '', largura: 60, espacamento: 50, larguraMax: 300, profundidade: 30 })
     this.mao.setAtiva(false)
   }
 
   desenharCaixa(g, c) {
     g.clear()
-    g.fillStyle(0x10101c, 1).fillRect(c.esquerda, c.topo, c.direita - c.esquerda, c.base - c.topo)
-    g.lineStyle(4, 0xffffff, 1).strokeRect(c.esquerda - 2, c.topo - 2, c.direita - c.esquerda + 4, c.base - c.topo + 4)
+    g.fillStyle(0x000000, 1).fillRect(c.esquerda, c.topo, c.direita - c.esquerda, c.base - c.topo)
+    g.lineStyle(2, 0xffffff, 1).strokeRect(c.esquerda - 1, c.topo - 1, c.direita - c.esquerda + 2, c.base - c.topo + 2)
   }
 
   desenharHud() {
@@ -140,18 +151,18 @@ export default class CampanhaArena extends Phaser.Scene {
     const g = this.hud
     g.clear()
     const barra = (x, y, w, hp, max, cor, direita = false) => {
-      g.fillStyle(0x2b2540, 0.85).fillRect(x, y, w, 12)
+      g.fillStyle(0x14121e, 0.95).fillRect(x, y, w, 10)
       const k = Math.max(0, Math.min(1, hp / max))
-      g.fillStyle(cor, 1).fillRect(direita ? x + w * (1 - k) : x, y, w * k, 12)
-      g.lineStyle(2, 0x2b2540, 1).strokeRect(x, y, w, 12)
+      g.fillStyle(cor, 0.9).fillRect(direita ? x + w * (1 - k) : x, y, w * k, 10)
+      g.lineStyle(1, 0xffffff, 0.6).strokeRect(x, y, w, 10)
     }
     const eu = this.hpMostrado.eu ?? v.eu
     const cpu = this.hpMostrado.cpu ?? v.cpu
     barra(24, 72, 190, eu.hp, eu.hpMax, PERSONAGENS[this.mundo.personagem].cor)
-    barra(LARGURA - 214, 72, 190, cpu.hp, cpu.hpMax, PERSONAGENS[this.fase.oponente].cor, true)
+    barra(LARGURA - 214, 72, 190, cpu.hp, cpu.hpMax, 0x8fb8c0, true)
     for (let k = 0; k < ENERGIA.maxima; k++) {
-      g.fillStyle(k < eu.energia ? 0xffd34d : 0xc8c0b0, 1).fillCircle(30 + k * 18, 98, 6)
-      g.lineStyle(1.5, 0x2b2540, 1).strokeCircle(30 + k * 18, 98, 6)
+      g.fillStyle(k < eu.energia ? 0xe0b84a : 0x2a2838, 1).fillCircle(30 + k * 18, 98, 5)
+      if (k < eu.energia) g.lineStyle(1, 0xf2e2b0, 0.8).strokeCircle(30 + k * 18, 98, 5)
     }
     if (!this.hudTextos) {
       const estilo = { fontFamily: FONTE, fontSize: '12px', color: TINTA }
@@ -206,7 +217,7 @@ export default class CampanhaArena extends Phaser.Scene {
       this.mostrarCarta()
     })
     this.frase.setText(v.eu.jogaveis.length ? 'escolha uma carta (A) ou passe a vez (B)' : 'nenhuma carta cabe na energia: B passa a vez (+1 de energia)')
-    if (v.virou) this.regra.setText(`${TEXTOS[this.mundo.id].virada}`)
+    if (v.virou) this.regra.setText(semLigaduras(TEXTOS[this.mundo.id].virada))
     tocar(this, 'rodada')
   }
 
@@ -262,7 +273,7 @@ export default class CampanhaArena extends Phaser.Scene {
       if (r.acertos) {
         this.acertosLocais += r.acertos
         tocar(this, 'dano')
-        if (!menosMovimento()) this.cameras.main.shake(120, 0.004)
+        if (!menosMovimento() && fatores().tremor > 0) this.cameras.main.shake(120, 0.004 * fatores().tremor)
         const eu = this.hpMostrado.eu
         eu.hp = Math.max(0, eu.hp - r.acertos * this.rodadaAtual.ataque.dano)
         this.desenharHud()
@@ -316,9 +327,9 @@ export default class CampanhaArena extends Phaser.Scene {
     this.frase.setText(partes.join(' · '))
     if (r.cpu.acertos) tocar(this, 'impacto')
     if (r.virou) {
-      this.regra.setText(TEXTOS[this.mundo.id].virada)
+      this.regra.setText(semLigaduras(TEXTOS[this.mundo.id].virada))
       tocar(this, 'superAtivar')
-      if (!menosMovimento()) this.cameras.main.flash(260, 255, 255, 255)
+      if (!menosMovimento() && fatores().clarao >= 1) this.cameras.main.flash(420, 110, 90, 50)
     }
     this.hpMostrado = { eu: r.eu, cpu: r.adversario }
     this.visao = { ...this.visao, eu: { ...this.visao.eu, ...r.eu }, cpu: { ...this.visao.cpu, ...r.adversario } }
@@ -372,11 +383,11 @@ export default class CampanhaArena extends Phaser.Scene {
       const cor = COR_BALA[b.extra?.tipo] ?? 0xffffff
       if (avisando && b.extra?.linha) {
         const { x, y, dx, dy } = b.extra.linha
-        g.lineStyle(1.5, 0xd01a33, Math.sin(b.idade / 45) > 0 ? 0.8 : 0.35)
+        g.lineStyle(1, 0xe03048, Math.sin(b.idade / (45 * fatores().pulso)) > 0 ? 0.8 : 0.35)
         for (let k = 0; k < 12; k++) g.lineBetween(x + dx * k * 22, y + dy * k * 22, x + dx * (k * 22 + 11), y + dy * (k * 22 + 11))
       }
+      g.fillStyle(cor, avisando ? 0.08 : 0.18).fillCircle(b.x, b.y, b.raio + 3)
       g.fillStyle(cor, avisando ? 0.5 : 1).fillCircle(b.x, b.y, b.raio)
-      g.lineStyle(1.5, 0x2b2540, 1).strokeCircle(b.x, b.y, b.raio)
     }
   }
 
@@ -420,9 +431,11 @@ export default class CampanhaArena extends Phaser.Scene {
     this.time.delayedCall(240, () => this.scene.start('Campanha', { mundo: this.mundo.id, fase: this.fase.n }))
   }
 
-  update(_, delta) {
+  update(tempo, delta) {
     if (!this.controles) return
     this.controles.atualizar()
+    this.cenario?.atualizar(delta)
+    this.eco?.atualizar(tempo)
     if (this.etapa === 'esquiva') return this.atualizarEsquiva(delta)
     if (this.etapa === 'escolha') {
       for (let j = 0; j < this.controles.numJogadores; j++) {
