@@ -109,6 +109,11 @@
 // tamanho (coop com 2, coop4 com 3–4) e a sala mostra `semanal` (a semana fica fixa enquanto a
 // partida roda). Na party, o host manda `party {acao: 'modo', modo: 'coop4', semanal: true}`. A
 // partida nasce marcada com a semana (server/partidas.js: o troféu exclusivo, 0010).
+//
+// CAMPANHA (PROTOCOLO 16, docs/campanha.md, server/campanha.js): o modo história single-player é
+// rodado AQUI, no servidor (mão, energia, CPU, sementes e acertos refeitos pelas posições do coração).
+// Só com conta. `campanha {acao, ...}` vai para o campanha.js; quem cai, sai ou troca de conta
+// abandona a corrida (sem recompensa).
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
@@ -117,6 +122,7 @@ import { criarLimite } from './contas.js'
 import { CONVITE_MS, CONVITES_POR_MINUTO, MAX_CONVITES_RECEBIDOS } from './amigos.js'
 import { criarFila, agendarPadrao, ACOES_FILA_POR_MINUTO, REVANCHE_MS, FOLGA_PING_MS, CASUAL_INICIO_MS, EVITAR_PAR_MS } from './fila.js'
 import { criarPartidas } from './partidas.js'
+import { criarCampanha } from './campanha.js'
 import { elegerHost, lerDiretos, ELEICAO_MS } from './eleicao.js'
 import { METRICAS_NULA } from './metricas.js'
 import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
@@ -124,7 +130,7 @@ import { nomeSeguro } from '../src/lib/contaRegras.js'
 import { arranjoValido } from '../src/lib/times2x2.js'
 import { infoSemanal } from '../src/lib/semanal.js'
 
-export const PROTOCOLO = 15
+export const PROTOCOLO = 16
 export const PORTA_DESCOBERTA = 47777
 // Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
 // aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")
@@ -262,6 +268,8 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
     if (outro) enviar(outro, msg)
   }
   const partidas = criarPartidas({ registro, agora, agendar, entregar, log, versao: PROTOCOLO, metricas })
+  // CAMPANHA: a partida single-player que o servidor roda (o envio é direto para a conexão)
+  const campanha = criarCampanha({ registro, agora, agendar, enviar: (c, msg) => c && enviar(c, msg), log })
   const saiuDaConta = new Map() // conta -> quando caiu (só para contar reconexões; nada por jogador sai daqui)
   const retomadas = new Map() // chave de retomada -> cliente
   const limiteRetomada = criarLimite({ max: RETOMADAS_POR_MINUTO, agora })
@@ -882,6 +890,7 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
     const antes = c.usuario
     const depois = conta?.id ?? null
     if (antes !== depois) removerDaFila(c, 'conta') // a fila olha a conta (mesma conta, bloqueios)
+    if (antes !== depois) campanha.saiu(c, 'conta') // a corrida da campanha é da conta de antes
     if (antes && antes !== depois) {
       desregistrar(c, antes)
       Object.assign(c, { amigos: new Set(), bloqueios: new Set(), pedidos: new Set(), statusPub: 'offline' })
@@ -1214,6 +1223,10 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
       }
       avisarMembros(sala, { t: 'revanche', estado: 'pedida', de: c.id, expiraEm: r.expira, restanteMs: Math.max(0, r.expira - agora()) })
     },
+    // CAMPANHA: a partida single-player rodada aqui (server/campanha.js)
+    campanha(c, m) {
+      campanha.receber(c, m)
+    },
     // fim da partida: o que este cliente viu (uma vez por partida; server/partidas.js decide)
     resultado(c, m) {
       partidas.relatar(c, m)
@@ -1314,10 +1327,13 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
     fila,
     // registro das partidas (os testes conferem a política)
     partidas,
+    // a campanha (os testes conferem as corridas)
+    campanha,
     // ws: a conexão que fechou (a velha de uma vaga já retomada não derruba a nova)
     desconectar(c, ws = c.ws) {
       const cliente = atual(c)
       if (ws !== cliente.ws || cliente.caido || !clientes.has(cliente.id)) return
+      campanha.saiu(cliente, 'caiu') // a campanha não espera a volta: a corrida é abandonada
       const sala = salas.get(cliente.sala)
       // no meio da partida: a vaga espera a volta (RETOMADA_MS)
       if (cliente.ok && sala?.emPartida) return segurar(cliente, sala)
@@ -1431,6 +1447,7 @@ export function anexarLan(httpServer, { deslocarSemana = 0, log = console.log, d
     fechar() {
       clearInterval(batimento)
       lobby.partidas.fechar()
+      lobby.campanha.fechar()
       rede?.fechar()
       httpServer.off('upgrade', aoUpgrade)
       for (const ws of wss.clients) ws.terminate()

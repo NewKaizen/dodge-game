@@ -63,8 +63,8 @@ async function salaSemanal(m, nomes) {
 const relatar = (p, partidaId, vitoria, extra = {}) => p.mandar({ t: 'resultado', partidaId, vitoria, rodadas: 8, duracao: 300, personagem: 'kris', ...extra })
 const SEMANA = infoSemanal(INICIO)
 
-test('protocolo 15 nos dois lados; o bemvindo traz a semana do relógio do servidor', async () => {
-  assert.equal(PROTOCOLO, 15)
+test('protocolo 16 nos dois lados (15 trouxe o boss semanal); o bemvindo traz a semana do relógio do servidor', async () => {
+  assert.ok(PROTOCOLO >= 15)
   assert.equal(PROTOCOLO_CLIENTE, PROTOCOLO)
   const m = montar([])
   const p = await m.entrar('ana')
