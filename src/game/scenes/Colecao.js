@@ -7,6 +7,7 @@ import { abaVizinha, escondidas, janela, moverNaGrade } from '../conta/lista.js'
 import { conta, carregarInventario, equipar, entrarComGoogle } from '../../lib/conta.js'
 import { avatarDoPerfil } from '../../lib/contaRegras.js'
 import { CATALOGO, TIPOS_ITEM, corDaMoldura, progressoDoXp } from '../../lib/progresso.js'
+import { ITENS_CAMPANHA, mundoDe } from '../campanha/mundos/index.js'
 import { trofeuDoId, ehTrofeuSemanal, SEMANAIS } from '../../lib/semanal.js'
 import { lan } from '../../lib/lan/rede.js'
 
@@ -66,7 +67,8 @@ export default class Colecao extends CenaConta {
   }
 
   itensDe(tipo) {
-    if (tipo !== 'semanal') return CATALOGO.filter((i) => i.tipo === tipo)
+    // os da CAMPANHA (docs/campanha.md) entram no fim da aba do tipo deles
+    if (tipo !== 'semanal') return [...CATALOGO.filter((i) => i.tipo === tipo), ...ITENS_CAMPANHA.filter((i) => i.tipo === tipo)]
     // os ganhos (a semana mais nova primeiro) e o desta semana, se ainda não tem
     const ganhos = [...(get(conta).inventario ?? [])].filter(ehTrofeuSemanal).map(trofeuDoId).filter(Boolean)
     const atual = get(lan).semanal?.trofeu
@@ -269,14 +271,16 @@ export default class Colecao extends CenaConta {
     this.amostra(item, p, cx, d.y + (item.tipo === 'titulo' ? 140 : 96), 2.2)
     if (item.tipo !== 'titulo') caber(this.t(cx, d.y + 176, item.nome, 20, COR.texto, { strokeThickness: 4 }).setOrigin(0.5), item.nome, d.largura - 24)
     const tipo = { avatar: 'AVATAR', titulo: 'TÍTULO', moldura: 'MOLDURA', verso: 'VERSO DE CARTA' }[item.tipo]
-    this.t(cx, d.y + 200, item.exclusivo ? `${tipo} · TROFÉU SEMANAL ${item.semana}` : tipo, 11, item.exclusivo ? '#ffb060' : COR.dica).setOrigin(0.5)
+    this.t(cx, d.y + 200, item.campanha ? `${tipo} · CAMPANHA, MUNDO ${item.mundo}` : item.exclusivo ? `${tipo} · TROFÉU SEMANAL ${item.semana}` : tipo, 11, item.campanha ? '#7fc46b' : item.exclusivo ? '#ffb060' : COR.dica).setOrigin(0.5)
     let estado
     if (this.equipado(item)) estado = { texto: item.tipo === 'titulo' ? 'EQUIPADO  ·  A tira o título' : 'EQUIPADO', cor: COR.ok }
     else if (tem) estado = { texto: 'A: EQUIPAR', cor: COR.gold }
+    else if (item.campanha) estado = { texto: item.quando === 'mundo' ? `vença o chefe de ${mundoDe(item.mundo)?.nome}` : `3 estrelas em todas as fases de ${mundoDe(item.mundo)?.nome}`, cor: COR.aviso }
     else if (item.exclusivo) estado = { texto: `vença: ${SEMANAIS[item.chefe]?.nome ?? 'o boss semanal'}`, cor: COR.aviso }
     else estado = { texto: `libera no nível ${item.nivel}`, cor: COR.aviso }
     this.t(cx, d.y + 232, estado.texto, 14, estado.cor).setOrigin(0.5)
-    if (!tem && item.exclusivo) this.t(cx, d.y + 254, 'ONLINE · BOSS SEMANAL · só até domingo, nunca volta', 11, COR.dica).setOrigin(0.5)
+    if (!tem && item.campanha) this.t(cx, d.y + 254, 'menu → CAMPANHA (com conta)', 11, COR.dica).setOrigin(0.5)
+    else if (!tem && item.exclusivo) this.t(cx, d.y + 254, 'ONLINE · BOSS SEMANAL · só até domingo, nunca volta', 11, COR.dica).setOrigin(0.5)
     else if (!tem) this.t(cx, d.y + 254, nivel >= item.nivel ? 'jogue uma partida para receber' : `faltam ${item.nivel - nivel} nível${item.nivel - nivel > 1 ? 'is' : ''}`, 11, COR.dica).setOrigin(0.5)
     if (item.tipo === 'verso') this.t(cx, d.y + 282, 'equipado, este verso aparece nas suas\ncartas nas partidas (online, o\noutro jogador também vê)', 10, COR.apagado, { align: 'center' }).setOrigin(0.5, 0)
     else this.t(cx, d.y + 290, 'cosméticos não mudam nada no jogo', 10, COR.apagado).setOrigin(0.5)
