@@ -50,7 +50,7 @@ const CONFIG = { id: 'config', rotulo: 'CONFIGURAÇÕES', cor: '#f2c14e', cena: 
 const RAPIDO = { id: 'rapido', rotulo: 'JOGAR RÁPIDO', cor: '#ffd23a', cena: 'Lan', dados: { rapido: true }, dica: 'PVP 1x1 contra alguém da fila, já!' }
 const PERFIL = { id: 'perfil', rotulo: 'PERFIL', cor: '#6dffb0', cena: 'Perfil', dica: '' }
 // CAMPANHA (docs/campanha.md): o modo história, com conta e online (a cena avisa quem não está logado)
-const CAMPANHA = { id: 'campanha', rotulo: 'CAMPANHA', cor: '#7fc46b', cena: 'Campanha', dica: 'história com a Kris: A Floresta de Papel' }
+const CAMPANHA = { id: 'campanha', rotulo: 'CAMPANHA', cor: '#5fb8b0', cena: 'Campanha', dica: 'história com a Kris: A Casa Silenciosa' }
 // cenas que não explodem a sala: só escurecem a tela e abrem
 const SO_ESCURECEM = ['config', 'cartas', 'lan', 'rapido', 'perfil', 'campanha']
 

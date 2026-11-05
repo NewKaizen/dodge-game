@@ -11,6 +11,8 @@ import { ITENS_CAMPANHA, mundoDe } from '../campanha/mundos/index.js'
 import { trofeuDoId, ehTrofeuSemanal, SEMANAIS } from '../../lib/semanal.js'
 import { lan } from '../../lib/lan/rede.js'
 
+const corDoMundo = (id) => `#${(mundoDe(id)?.cor ?? 0x7fc46b).toString(16).padStart(6, '0')}`
+
 // COLEÇÃO, dentro do jogo (antes era o painel Svelte por cima dele): os
 // cosméticos da trilha de níveis, o que a conta já tem e o que falta (com o
 // nível que libera), e equipar. Uma aba por tipo (AVATARES / TÍTULOS /
@@ -271,7 +273,7 @@ export default class Colecao extends CenaConta {
     this.amostra(item, p, cx, d.y + (item.tipo === 'titulo' ? 140 : 96), 2.2)
     if (item.tipo !== 'titulo') caber(this.t(cx, d.y + 176, item.nome, 20, COR.texto, { strokeThickness: 4 }).setOrigin(0.5), item.nome, d.largura - 24)
     const tipo = { avatar: 'AVATAR', titulo: 'TÍTULO', moldura: 'MOLDURA', verso: 'VERSO DE CARTA' }[item.tipo]
-    this.t(cx, d.y + 200, item.campanha ? `${tipo} · CAMPANHA, MUNDO ${item.mundo}` : item.exclusivo ? `${tipo} · TROFÉU SEMANAL ${item.semana}` : tipo, 11, item.campanha ? '#7fc46b' : item.exclusivo ? '#ffb060' : COR.dica).setOrigin(0.5)
+    this.t(cx, d.y + 200, item.campanha ? `${tipo} · CAMPANHA, MUNDO ${item.mundo}` : item.exclusivo ? `${tipo} · TROFÉU SEMANAL ${item.semana}` : tipo, 11, item.campanha ? corDoMundo(item.mundo) : item.exclusivo ? '#ffb060' : COR.dica).setOrigin(0.5)
     let estado
     if (this.equipado(item)) estado = { texto: item.tipo === 'titulo' ? 'EQUIPADO  ·  A tira o título' : 'EQUIPADO', cor: COR.ok }
     else if (tem) estado = { texto: 'A: EQUIPAR', cor: COR.gold }
@@ -284,6 +286,8 @@ export default class Colecao extends CenaConta {
     else if (!tem) this.t(cx, d.y + 254, nivel >= item.nivel ? 'jogue uma partida para receber' : `faltam ${item.nivel - nivel} nível${item.nivel - nivel > 1 ? 'is' : ''}`, 11, COR.dica).setOrigin(0.5)
     if (item.tipo === 'verso') this.t(cx, d.y + 282, 'equipado, este verso aparece nas suas\ncartas nas partidas (online, o\noutro jogador também vê)', 10, COR.apagado, { align: 'center' }).setOrigin(0.5, 0)
     else this.t(cx, d.y + 290, 'cosméticos não mudam nada no jogo', 10, COR.apagado).setOrigin(0.5)
+    // os da campanha têm um texto (o catálogo do banco não tem descrição: fica em mundos/mundoN.js)
+    if (item.descricao) this.t(cx, d.y + 306, item.descricao, 10, COR.dica, { align: 'center', wordWrap: { width: d.largura - 40 } }).setOrigin(0.5, 0)
     const m = this.ocupado ? { texto: 'equipando…', cor: COR.aviso } : this.mensagem ?? (get(conta).inventario === null ? { texto: 'carregando o inventário…', cor: COR.dica } : null)
     if (m) this.t(cx, d.y + d.altura - 24, m.texto, 12, m.cor, { wordWrap: { width: d.largura - 28 }, align: 'center' }).setOrigin(0.5)
   }
