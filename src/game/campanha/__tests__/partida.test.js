@@ -221,3 +221,58 @@ test('estrelas: vencer, HP >= 60% e rodadas <= meta', () => {
   c.estado.rodada = 99
   assert.equal(estrelasDaCorrida(c), 1)
 })
+
+test('assinatura: o que a CPU manda na SUA caixa usa o golpe do oponente (rodízio por rodada)', () => {
+  const vistos = new Set()
+  for (let k = 0; k < 8; k++) {
+    const c = criarCorrida({ mundo: 1, fase: 4, semente: `as${k}` })
+    for (let n = 0; n < 4; n++) {
+      const { r, fim } = rodada(c)
+      const at = r.rodada.ataque
+      if (at && !r.rodada.jogadas[0].anulada) {
+        vistos.add(at.modelos[0])
+        assert.equal(at.verificado, true)
+      }
+      if (fim.vencedor) break
+    }
+  }
+  // a Susie (fase 4): faróis (feixes) e investidas (galhos)
+  assert.ok(vistos.has('feixes'), [...vistos].join())
+})
+
+test('fúria do chefe: depois da virada, com 30% do HP, uma vez só; o ataque dele fica mais forte', () => {
+  let achou = false
+  for (let k = 0; k < 12 && !achou; k++) {
+    const c = criarCorrida({ mundo: 1, fase: 6, semente: `fu${k}` })
+    let furias = 0
+    let viradaAntes = false
+    let depois = null
+    while (c.etapa !== 'fim') {
+      const { r, fim } = rodada(c)
+      if (c.furia && r.rodada.ataque && !r.rodada.jogadas[0].anulada && furias) depois = r.rodada.ataque
+      if (fim.virou) viradaAntes = true
+      if (fim.furia) {
+        furias++
+        assert.ok(viradaAntes, 'fúria antes da virada')
+        assert.ok(fim.adversario.hp <= fim.adversario.hpMax * 0.3)
+        assert.equal(visaoDaRodada(c).furia, true)
+      }
+    }
+    assert.ok(furias <= 1)
+    if (furias && depois) {
+      achou = true
+      assert.ok(depois.duracao >= 4000 + 500, `duração ${depois.duracao}`)
+      assert.ok(depois.forca >= 0.3, `força ${depois.forca}`)
+    }
+  }
+  assert.ok(achou, 'nenhuma luta chegou à fúria com um ataque depois')
+})
+
+test('fúria: só com a regra e só depois da virada', () => {
+  const c = criarCorrida({ mundo: 1, fase: 5, semente: 'semfuria' })
+  for (let n = 0; n < 12 && c.etapa !== 'fim'; n++) {
+    const { fim } = rodada(c)
+    assert.ok(!fim.furia)
+  }
+  assert.equal(c.furia, false)
+})

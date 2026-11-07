@@ -13,7 +13,8 @@ import { fatores } from '../acessibilidade.js'
 import { desenharCenario } from '../campanha/desenharCenario.js'
 import { criarEco } from '../campanha/eco.js'
 import { semLigaduras } from '../campanha/texto.js'
-import { mundoDe, faseDe, TEXTOS } from '../campanha/mundos/index.js'
+import { NOME_SILENCIO } from '../campanha/CaixaDeDialogo.js'
+import { mundoDe, faseDe, TEXTOS, libertosAte } from '../campanha/mundos/index.js'
 import { descreverRegra, CAIXA_CAMPANHA, VELOCIDADE_CORACAO } from '../campanha/partida.js'
 import { criarEsquivaLocal, criarSimulacao, inicioDaCaixa } from '../campanha/simulacao.js'
 import { ler, posicaoNoTempo, alvoNoTempo, PASSO_MS } from '../campanha/amostras.js'
@@ -35,7 +36,11 @@ const MAO_POS = { x: 362, y: 424 }
 const FRASE_Y = 128
 const PEDACO_MS = 250
 // as balas, por dentro com os nomes antigos: cinzas (folha), paredes (galho), olhares (semente), mariposas (papel)
-const COR_BALA = { folha: 0xc8c4d8, galho: 0x3fb3a8, semente: 0xe03048, papel: 0xe0b84a }
+// e os novos: feixes de luz (feixe) e estilhaços de cristal (estilhaco)
+const COR_BALA = { folha: 0xc8c4d8, galho: 0x3fb3a8, semente: 0xe03048, papel: 0xe0b84a, feixe: 0xf2e2b0, estilhaco: 0x9fe0ff }
+// os balões das falas durante a luta: o lado do oponente (e do Silêncio) e o lado da Kris (os amigos)
+const BALAO = { oponente: { x: LARGURA - 16, y: ALTURA - 26, largura: 240 }, amigos: { x: 16, y: ALTURA - 26, largura: 186 } }
+const BALAO_MS = 2600
 const TINTA = '#e8e4f4'
 const COR_TEXTO = { tema: '#8fb8c0', apagado: '#8a86a0', dica: '#6a6680' }
 
@@ -77,6 +82,11 @@ const estadoInicial = () => ({
   hudTextos: null,
   cenario: null,
   eco: null,
+  turma: null,
+  baloes: null,
+  ditas: null,
+  perfeitos: 0,
+  furia: false,
 })
 
 export default class CampanhaArena extends Phaser.Scene {
@@ -118,7 +128,7 @@ export default class CampanhaArena extends Phaser.Scene {
     this.aviso = this.add.text(LARGURA / 2, ALTURA / 2, 'conectando ao servidor da campanha…', estilo(15)).setOrigin(0.5).setDepth(40)
     this.infoCarta = this.add.text(566, 230, '', { ...estilo(12), wordWrap: { width: 262 }, lineSpacing: 3 }).setDepth(21)
     this.rotuloAtaque = this.add.text((CAIXA_CAMPANHA.esquerda + CAIXA_CAMPANHA.direita) / 2, CAIXA_CAMPANHA.base + 8, '', estilo(11, COR_TEXTO.apagado)).setOrigin(0.5, 0).setDepth(21)
-    this.add.text(LARGURA - 14, ALTURA - 10, 'ESC 2×: DESISTIR', estilo(10, COR_TEXTO.dica)).setOrigin(1, 1).setDepth(21)
+    this.add.text(LARGURA - 14, ALTURA - 6, 'ESC 2×: DESISTIR', estilo(10, COR_TEXTO.dica)).setOrigin(1, 1).setDepth(21)
     // as duas caixas: a sua (grande) e a da CPU (pequena, só o replay do que o servidor decidiu)
     this.caixaG = this.add.graphics().setDepth(5)
     this.balas = this.add.graphics().setDepth(8)
@@ -133,10 +143,82 @@ export default class CampanhaArena extends Phaser.Scene {
     const larguraMini = (CAIXA_CAMPANHA.direita - CAIXA_CAMPANHA.esquerda) * MINI.escala
     this.add.text(MINI.x + larguraMini / 2, MINI.y - 6, `a caixa do eco de ${PERSONAGENS[this.fase.oponente].nome}`, estilo(10, COR_TEXTO.apagado)).setOrigin(0.5, 1).setDepth(21)
     this.kris = this.add.image(150, CAIXA_CAMPANHA.base, this.mundo.personagem).setOrigin(0.5, 1).setScale(ESCALA.personagem).setDepth(4)
+    // a torcida: quem já foi libertado fica atrás da Kris, com cor, e pula quando você manda bem
+    this.turma = libertosAte(this.mundo.id, this.fase.n).map((p, i) => this.add.image(104 - (i % 3) * 30, CAIXA_CAMPANHA.base - 4 - Math.floor(i / 3) * 10, p).setOrigin(0.5, 1).setScale(ESCALA.personagem * 0.62).setDepth(3.9 - Math.floor(i / 3) * 0.1))
+    this.baloes = { oponente: null, amigos: null }
+    this.ditas = new Set()
     this.eco = criarEco(this, 800, 214, this.fase.oponente, { escala: ESCALA.personagem, profundidade: 4, alpha: 0.62, flipX: true })
     this.oponente = this.eco.corpo
     this.mao = new Mao(this, { jogador: 0, x: MAO_POS.x, y: MAO_POS.y, rotulo: '', largura: 60, espacamento: 50, larguraMax: 300, profundidade: 30 })
     this.mao.setAtiva(false)
+  }
+
+  // ---------- falas durante a luta (só sabor) ----------
+
+  // um balão de fala: o oponente e o Silêncio à direita, os amigos à esquerda
+  falar(fala, { atraso = 0 } = {}) {
+    if (!fala) return
+    const mostrar = () => {
+      if (this.saindo || !this.scene.isActive()) return
+      const silencio = fala.quem === 'silencio'
+      const lado = silencio || fala.quem === this.fase.oponente ? 'oponente' : 'amigos'
+      const b = BALAO[lado]
+      this.baloes[lado]?.destroy()
+      const nome = silencio ? NOME_SILENCIO : (PERSONAGENS[fala.quem]?.nome ?? fala.quem).toUpperCase()
+      const preso = !silencio && fala.quem === this.fase.oponente
+      const cor = silencio ? '#d8b8ff' : preso ? '#bcd4dc' : TINTA
+      const t = this.add
+        .text(b.x, b.y, `${nome}\n${semLigaduras(fala.texto)}`, { fontFamily: FONTE, fontSize: silencio ? '13px' : '12px', color: cor, backgroundColor: silencio ? '#160a24' : '#000000', padding: { x: 8, y: 6 }, wordWrap: { width: b.largura - 16 }, lineSpacing: 3, align: lado === 'oponente' ? 'right' : 'left' })
+        .setOrigin(lado === 'oponente' ? 1 : 0, 1)
+        .setDepth(26)
+      this.baloes[lado] = t
+      if (!menosMovimento()) {
+        t.setAlpha(0).setY(b.y + 6)
+        this.tweens.add({ targets: t, alpha: 1, y: b.y, duration: 180 })
+      }
+      if (silencio && !menosMovimento() && fatores().tremor > 0) this.cameras.main.shake(160, 0.002 * fatores().tremor)
+      if (lado === 'amigos') this.pularTurma(fala.quem)
+      this.time.delayedCall(BALAO_MS, () => {
+        if (this.baloes[lado] !== t) return
+        this.baloes[lado] = null
+        if (menosMovimento()) return t.destroy()
+        this.tweens.add({ targets: t, alpha: 0, duration: 250, onComplete: () => t.destroy() })
+      })
+    }
+    if (atraso) this.time.delayedCall(atraso, mostrar)
+    else mostrar()
+  }
+
+  // a fala da luta de um momento (inicio, ferido, quase, voceMal, perfeito), uma vez por partida
+  // (o perfeito pode voltar, mas não seguido)
+  falaDaLuta(momento, op = {}) {
+    if (this.ditas.has(momento)) return
+    const falas = TEXTOS[this.mundo.id].fases[this.fase.id]?.luta?.[momento]
+    if (!falas?.length) return
+    this.ditas.add(momento)
+    // o amigo que torce precisa estar livre (senão, fala o próprio oponente)
+    const fala = falas[0]
+    if (fala.quem !== 'silencio' && fala.quem !== this.fase.oponente && !this.turma.some((o) => o.texture.key === fala.quem)) return
+    this.falar(fala, op)
+  }
+
+  // os amigos libertados pulam (todos, ou só quem falou)
+  pularTurma(quem = null) {
+    if (menosMovimento()) return
+    for (const o of this.turma ?? []) {
+      if (quem && o.texture.key !== quem) continue
+      if (o.getData('pulando')) continue
+      o.setData('pulando', true)
+      const y = o.y
+      this.tweens.add({ targets: o, y: y - 10, duration: 140, yoyo: true, ease: 'Quad.easeOut', onComplete: () => (o.setY(y), o.setData('pulando', false)) })
+    }
+  }
+
+  // um texto que sobe e some (PERFEITO!, dano no oponente)
+  subir(x, y, texto, cor, tamanho = 16) {
+    const t = this.add.text(x, y, texto, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5).setDepth(27)
+    if (menosMovimento()) return this.time.delayedCall(900, () => t.destroy())
+    this.tweens.add({ targets: t, y: y - 26, alpha: 0, duration: 1000, delay: 250, ease: 'Quad.easeOut', onComplete: () => t.destroy() })
   }
 
   desenharCaixa(g, c) {
@@ -159,7 +241,7 @@ export default class CampanhaArena extends Phaser.Scene {
     const eu = this.hpMostrado.eu ?? v.eu
     const cpu = this.hpMostrado.cpu ?? v.cpu
     barra(24, 72, 190, eu.hp, eu.hpMax, PERSONAGENS[this.mundo.personagem].cor)
-    barra(LARGURA - 214, 72, 190, cpu.hp, cpu.hpMax, 0x8fb8c0, true)
+    barra(LARGURA - 214, 72, 190, cpu.hp, cpu.hpMax, this.furia ? 0xd0485a : this.visao?.virou ? 0xb070e8 : 0x8fb8c0, true)
     for (let k = 0; k < ENERGIA.maxima; k++) {
       g.fillStyle(k < eu.energia ? 0xe0b84a : 0x2a2838, 1).fillCircle(30 + k * 18, 98, 5)
       if (k < eu.energia) g.lineStyle(1, 0xf2e2b0, 0.8).strokeCircle(30 + k * 18, 98, 5)
@@ -218,6 +300,8 @@ export default class CampanhaArena extends Phaser.Scene {
     })
     this.frase.setText(v.eu.jogaveis.length ? 'escolha uma carta (A) ou passe a vez (B)' : 'nenhuma carta cabe na energia: B passa a vez (+1 de energia)')
     if (v.virou) this.regra.setText(semLigaduras(TEXTOS[this.mundo.id].virada))
+    if (v.furia) this.regra.setText(semLigaduras(TEXTOS[this.mundo.id].furia ?? ''))
+    if (v.rodada === 1) this.falaDaLuta('inicio', { atraso: 500 })
     tocar(this, 'rodada')
   }
 
@@ -325,11 +409,50 @@ export default class CampanhaArena extends Phaser.Scene {
     const partes = [`você levou ${r.acertos} acerto${r.acertos === 1 ? '' : 's'}`, `${nome} levou ${r.cpu.acertos}`]
     if (r.acertos > this.acertosLocais) partes.push(`(o servidor contou ${r.acertos - this.acertosLocais} a mais)`)
     this.frase.setText(partes.join(' · '))
-    if (r.cpu.acertos) tocar(this, 'impacto')
+    const textos = TEXTOS[this.mundo.id]
+    if (r.cpu.acertos) {
+      tocar(this, 'impacto')
+      this.subir(this.oponente.x, this.oponente.y - 90, `-${r.cpu.dano}`, '#f2e2b0', 18)
+      this.pularTurma()
+      if (!menosMovimento()) this.tweens.add({ targets: this.oponente, x: this.oponente.x + 6, duration: 50, yoyo: true, repeat: 2 })
+    }
+    // desviou de tudo: PERFEITO! (a torcida comemora)
+    if (this.rodadaAtual?.ataque && r.acertos === 0) {
+      const cx = this.rodadaAtual.ataque.caixa
+      this.subir((cx.esquerda + cx.direita) / 2, (cx.topo + cx.base) / 2, 'PERFEITO!', '#f2e2b0', 20)
+      tocar(this, 'brilhoRank')
+      this.pularTurma()
+      this.perfeitos++
+      if (this.perfeitos === 2 || this.perfeitos === 5) {
+        this.ditas.delete('perfeito')
+        this.falaDaLuta('perfeito', { atraso: 300 })
+      }
+    }
     if (r.virou) {
-      this.regra.setText(semLigaduras(TEXTOS[this.mundo.id].virada))
+      this.regra.setText(semLigaduras(textos.virada))
       tocar(this, 'superAtivar')
       if (!menosMovimento() && fatores().clarao >= 1) this.cameras.main.flash(420, 110, 90, 50)
+      // a porta se abre: os amigos libertados gritam, um de cada vez
+      const gritos = (textos.viradaFalas ?? []).filter((f) => this.turma.some((o) => o.texture.key === f.quem))
+      gritos.forEach((f, i) => this.falar(f, { atraso: 200 + i * 650 }))
+      this.ditas.add('ferido')
+    }
+    if (r.furia) {
+      this.furia = true
+      this.regra.setText(semLigaduras(textos.furia ?? ''))
+      tocar(this, 'superAtivar')
+      if (!menosMovimento() && fatores().clarao >= 1) this.cameras.main.flash(380, 140, 30, 50)
+      if (!menosMovimento() && fatores().tremor > 0) this.cameras.main.shake(420, 0.006 * fatores().tremor)
+      this.oponente.setTint(0xd07090)
+      this.falar(textos.furiaFala, { atraso: 300 })
+      this.ditas.add('quase')
+    }
+    const cpuHp = r.adversario
+    const euHp = r.eu
+    if (!r.vencedor) {
+      if (cpuHp.hp > 0 && cpuHp.hp <= cpuHp.hpMax * 0.25) this.falaDaLuta('quase', { atraso: 350 })
+      else if (cpuHp.hp > 0 && cpuHp.hp <= cpuHp.hpMax * 0.5 && !this.fase.regra?.virada) this.falaDaLuta('ferido', { atraso: 350 })
+      if (euHp.hp > 0 && euHp.hp <= euHp.hpMax * 0.35) this.falaDaLuta('voceMal', { atraso: 900 })
     }
     this.hpMostrado = { eu: r.eu, cpu: r.adversario }
     this.visao = { ...this.visao, eu: { ...this.visao.eu, ...r.eu }, cpu: { ...this.visao.cpu, ...r.adversario } }
@@ -378,6 +501,31 @@ export default class CampanhaArena extends Phaser.Scene {
   pintar(g, lista, caixa) {
     for (const b of lista) {
       const avisando = b.idade < b.aviso
+      // o feixe de luz: contorno piscando enquanto avisa; depois aceso, com brilho
+      if (b.tipo === 'retangulo') {
+        const x = b.x - b.largura / 2
+        const y = b.y - b.altura / 2
+        const cor = COR_BALA[b.extra?.tipo] ?? 0xffffff
+        if (avisando) {
+          const k = b.idade / b.aviso
+          g.fillStyle(cor, 0.05 + 0.12 * k).fillRect(x, y, b.largura, b.altura)
+          g.lineStyle(1, cor, Math.sin(b.idade / (40 * fatores().pulso)) > 0 ? 0.9 : 0.35).strokeRect(x, y, b.largura, b.altura)
+        } else {
+          const v = b.extra?.vertical
+          g.fillStyle(cor, 0.25).fillRect(v ? x - 4 : x, v ? y : y - 4, b.largura + (v ? 8 : 0), b.altura + (v ? 0 : 8))
+          g.fillStyle(cor, 1).fillRect(x, y, b.largura, b.altura)
+          g.fillStyle(0xffffff, 0.9).fillRect(v ? b.x - 3 : x, v ? y : b.y - 3, v ? 6 : b.largura, v ? b.altura : 6)
+        }
+        continue
+      }
+      // o cristal que vai estourar: um losango que cresce enquanto avisa
+      if (avisando && b.extra?.tipo === 'estilhaco' && b.extra.centro) {
+        const r = 4 + 9 * (b.idade / b.aviso)
+        const { x, y } = b.extra.centro
+        g.fillStyle(COR_BALA.estilhaco, 0.12).fillCircle(x, y, r + 6)
+        g.fillStyle(COR_BALA.estilhaco, Math.sin(b.idade / (50 * fatores().pulso)) > 0 ? 0.9 : 0.55).fillTriangle(x, y - r, x + r * 0.6, y, x - r * 0.6, y).fillTriangle(x, y + r, x + r * 0.6, y, x - r * 0.6, y)
+        continue
+      }
       const fora = b.x + b.raio < caixa.esquerda || b.x - b.raio > caixa.direita || b.y + b.raio < caixa.topo || b.y - b.raio > caixa.base
       if (fora) continue
       const cor = COR_BALA[b.extra?.tipo] ?? 0xffffff

@@ -20,9 +20,11 @@ const CAIXA = { x: 36, y: 324, largura: LARGURA - 72, altura: 138 }
 const RETRATO = { x: CAIXA.x + 16, y: CAIXA.y + 16, lado: 106 }
 const LETRA_MS = 42 // mais devagar que o resto do jogo: a campanha respira
 // o tom do blip (Hz): baixo, para não cortar o silêncio
-const TOM = { kris: 196, ralsei: 262, noelle: 294, berdly: 220, susie: 175, dess: 233, asriel: 247, narrador: 147 }
-const COR_NOME = { eco: '#8fb8c0', kris: '#ffffff' }
-const COR_TEXTO = { narrador: '#bdb8d0', fala: '#ffffff' }
+const TOM = { kris: 196, ralsei: 262, noelle: 294, berdly: 220, susie: 175, dess: 233, asriel: 247, narrador: 147, silencio: 98 }
+const COR_NOME = { eco: '#8fb8c0', kris: '#ffffff', silencio: '#b070e8' }
+const COR_TEXTO = { narrador: '#bdb8d0', fala: '#ffffff', silencio: '#d8b8ff' }
+// o vilão (quem: 'silencio'): sem rosto, nome violeta, voz grave e áspera
+export const NOME_SILENCIO = 'O SILÊNCIO'
 
 // um "blip" baixinho por algumas letras: seno com um ataque macio (o tom muda com quem fala)
 export function blip(quem) {
@@ -33,9 +35,9 @@ export function blip(quem) {
   const t = c.currentTime
   const o = c.createOscillator()
   const g = c.createGain()
-  o.type = quem === 'narrador' ? 'sine' : 'triangle'
+  o.type = quem === 'narrador' ? 'sine' : quem === 'silencio' ? 'sawtooth' : 'triangle'
   o.frequency.setValueAtTime((TOM[quem] ?? 220) * (0.98 + Math.random() * 0.04), t)
-  const pico = (quem === 'narrador' ? 0.025 : 0.04) * AUDIO.volume * vol
+  const pico = (quem === 'narrador' ? 0.025 : quem === 'silencio' ? 0.022 : 0.04) * AUDIO.volume * vol
   g.gain.setValueAtTime(0.0001, t)
   g.gain.linearRampToValueAtTime(pico, t + 0.008)
   g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09)
@@ -46,11 +48,12 @@ export function blip(quem) {
 }
 
 export default class CaixaDeDialogo {
-  constructor(scene, falas, { escolhas = {}, ecos = false, aoEscolher = () => {}, aoAcabar = () => {}, profundidade = 80 } = {}) {
+  constructor(scene, falas, { escolhas = {}, ecos = false, livres = [], aoEscolher = () => {}, aoAcabar = () => {}, profundidade = 80 } = {}) {
     this.scene = scene
     this.aoEscolher = aoEscolher
     this.aoAcabar = aoAcabar
     this.ecos = ecos
+    this.livres = new Set(livres) // quem já foi libertado: com cor, não eco
     this.d = criarDialogo(falas, { escolhas, instantaneo: menosMovimento(), letraMs: LETRA_MS })
     this.acabou = false
     this.letras = 0
@@ -86,9 +89,10 @@ export default class CaixaDeDialogo {
     return this.d.atual?.quem ?? null
   }
 
-  // quem fala é um eco? (todo mundo menos a Kris e o narrador, quando o mundo diz ecos: true)
+  // quem fala é um eco? (todo mundo menos a Kris, o narrador, o Silêncio e quem já foi libertado,
+  // quando o mundo diz ecos: true)
   eco(quem) {
-    return Boolean(this.ecos) && quem !== 'kris' && quem !== 'narrador'
+    return Boolean(this.ecos) && quem !== 'kris' && quem !== 'narrador' && quem !== 'silencio' && !this.livres.has(quem)
   }
 
   mostrar() {
@@ -115,10 +119,12 @@ export default class CaixaDeDialogo {
     }
     const x = comRetrato ? RETRATO.x + RETRATO.lado + 22 : CAIXA.x + 30
     const largura = CAIXA.x + CAIXA.largura - 34 - x
-    const nome = escolha ? 'KRIS' : quem === 'narrador' ? '' : (PERSONAGENS[quem]?.nome ?? quem).toUpperCase()
-    this.nome.setText(nome).setVisible(Boolean(nome)).setColor(eco ? COR_NOME.eco : COR_NOME.kris)
+    const silencio = quem === 'silencio'
+    if (silencio) for (let k = 0; k < 5; k++) this.brilho.fillStyle(0x6a2aa8, 0.07).fillRect(CAIXA.x + 6 + k * 3, CAIXA.y + 6 + k * 3, CAIXA.largura - 12 - k * 6, CAIXA.altura - 12 - k * 6)
+    const nome = escolha ? 'KRIS' : quem === 'narrador' ? '' : silencio ? NOME_SILENCIO : (PERSONAGENS[quem]?.nome ?? quem).toUpperCase()
+    this.nome.setText(nome).setVisible(Boolean(nome)).setColor(silencio ? COR_NOME.silencio : eco ? COR_NOME.eco : COR_NOME.kris)
     this.texto.setPosition(x, CAIXA.y + 24).setWordWrapWidth(largura)
-    this.texto.setColor(quem === 'narrador' ? COR_TEXTO.narrador : COR_TEXTO.fala)
+    this.texto.setColor(quem === 'narrador' ? COR_TEXTO.narrador : silencio ? COR_TEXTO.silencio : COR_TEXTO.fala)
     this.texto.setText(escolha ? '' : semLigaduras(a.visivel))
     this.opcoes.forEach((o, i) => {
       o.setVisible(escolha)

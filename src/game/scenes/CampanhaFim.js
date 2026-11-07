@@ -7,7 +7,8 @@ import { menosMovimento } from '../preferencias.js'
 import { desenharCenario } from '../campanha/desenharCenario.js'
 import { criarEco } from '../campanha/eco.js'
 import { semLigaduras } from '../campanha/texto.js'
-import { mundoDe, faseDe, TEXTOS } from '../campanha/mundos/index.js'
+import { PERSONAGENS } from '../data/personagens.js'
+import { mundoDe, faseDe, TEXTOS, libertosAte } from '../campanha/mundos/index.js'
 import { textoMotivoCampanha } from '../campanha/recompensas.js'
 import CaixaDeDialogo from '../campanha/CaixaDeDialogo.js'
 import { progressoDoXp, nomeDoItem, itemDoCatalogo, NOME_TIPO } from '../../lib/progresso.js'
@@ -57,6 +58,7 @@ const estadoInicial = () => ({
   saindo: false,
   eco: null,
   kris: null,
+  livre: null,
 })
 
 export default class CampanhaFim extends Phaser.Scene {
@@ -80,10 +82,12 @@ export default class CampanhaFim extends Phaser.Scene {
     musica('campanha', 'menu')
     const falas = venceu ? textos.depois : this.fim.resultado === 'derrota' ? textos.derrota : []
     if (!falas.length) return this.mostrarRecompensa()
-    this.eco = criarEco(this, 600, 312, this.fase.oponente, { escala: 3, profundidade: 5, alpha: venceu ? 0.45 : 0.65, flipX: true })
     this.kris = this.add.image(250, 312, this.mundo.personagem).setOrigin(0.5, 1).setScale(3).setDepth(5)
+    if (venceu) this.libertar()
+    else this.eco = criarEco(this, 600, 312, this.fase.oponente, { escala: 3, profundidade: 5, alpha: 0.65, flipX: true })
     this.caixa = new CaixaDeDialogo(this, falas, {
       ecos: TEXTOS[this.mundo.id].ecos,
+      livres: libertosAte(this.mundo.id, this.fase.n, { comEsta: venceu }),
       escolhas: { ...(dados.escolhas ?? {}), ...(get(campanha).escolhas[this.mundo.id] ?? {}) },
       aoEscolher: (chave, valor) => escolherNoDialogo(this.mundo.id, chave, valor),
       aoAcabar: () => {
@@ -98,6 +102,23 @@ export default class CampanhaFim extends Phaser.Scene {
     })
   }
 
+  // venceu: o eco se desfaz num clarão suave e quem estava preso volta com cor (libertado)
+  libertar() {
+    const x = 600
+    const y = 312
+    const livre = this.add.image(x, y, this.fase.oponente).setOrigin(0.5, 1).setScale(3).setFlipX(true).setDepth(5)
+    this.livre = livre
+    tocar(this, 'brilhoRank')
+    if (menosMovimento()) return
+    const eco = criarEco(this, x, y, this.fase.oponente, { escala: 3, profundidade: 6, alpha: 0.7, flipX: true })
+    livre.setAlpha(0)
+    const luz = this.add.circle(x, y - 40, 14, 0xf2e2b0, 0.9).setDepth(7).setBlendMode(Phaser.BlendModes.ADD)
+    this.tweens.add({ targets: luz, scale: 7, alpha: 0, duration: 900, ease: 'Cubic.easeOut', onComplete: () => luz.destroy() })
+    this.tweens.add({ targets: eco.objetos, alpha: 0, duration: 700, onComplete: () => eco.destruir() })
+    this.tweens.add({ targets: livre, alpha: 1, duration: 900, delay: 200 })
+    this.tweens.add({ targets: livre, y: y - 6, duration: 260, yoyo: true, delay: 1100, ease: 'Quad.easeOut' })
+  }
+
   mostrarRecompensa() {
     this.etapa = 'recompensa'
     const f = this.fim
@@ -106,17 +127,18 @@ export default class CampanhaFim extends Phaser.Scene {
     const estilo = (t, cor = TINTA) => ({ fontFamily: FONTE, fontSize: `${t}px`, color: cor, align: 'center' })
     const add = (o) => (this.painel.add(o), o)
     const cx = LARGURA / 2
-    // a Kris fica num canto, sozinha; um véu sobre o lugar vazio deixa o painel legível
+    // a Kris fica num canto (com quem acabou de voltar); um véu deixa o painel legível
     this.kris?.setX(110)
+    this.livre?.setX(170)
     // um véu sobre o lugar vazio: o painel fica legível
     const veu = add(this.add.rectangle(0, 0, LARGURA, ALTURA, 0x000000, 0.78).setOrigin(0))
     if (!menosMovimento()) {
       veu.setAlpha(0)
       this.tweens.add({ targets: veu, alpha: 1, duration: 700 })
     }
-    const titulo = venceu ? (this.fase.chefe ? this.mundo.nome.toUpperCase() : 'O ECO SE DESFEZ') : f.resultado === 'derrota' ? 'O SILÊNCIO VENCEU…' : f.resultado === 'suspeita' ? 'PARTIDA NÃO CONFIRMADA' : 'PARTIDA ABANDONADA'
+    const titulo = venceu ? (this.fase.chefe ? 'AS LUZES VOLTARAM' : `${(PERSONAGENS[this.fase.oponente]?.nome ?? 'O ECO').toUpperCase()} ESTÁ LIVRE!`) : f.resultado === 'derrota' ? 'O SILÊNCIO VENCEU…' : f.resultado === 'suspeita' ? 'PARTIDA NÃO CONFIRMADA' : 'PARTIDA ABANDONADA'
     add(texto(cx, 38, titulo, estilo(24, venceu ? COR_TEXTO.ouro : COR_TEXTO.aviso)).setOrigin(0.5, 0))
-    const sub = venceu && this.fase.chefe ? 'a luz ficou acesa  ·  fim do mundo 1' : `${this.fase.chefe ? 'a última porta' : `porta ${this.fase.n}`}  ·  ${this.fase.nome}`
+    const sub = venceu && this.fase.chefe ? `${this.mundo.nome}  ·  a luz ficou acesa  ·  fim do mundo 1` : venceu ? `luz ${this.fase.n} de ${this.mundo.fases.length} acesa  ·  ${this.fase.nome}` : `${this.fase.chefe ? 'a última porta' : `porta ${this.fase.n}`}  ·  ${this.fase.nome}`
     add(texto(cx, 72, `${sub}${f.rodadas ? `  ·  ${f.rodadas} rodada${f.rodadas > 1 ? 's' : ''}` : ''}`, estilo(12, COR_TEXTO.claro)).setOrigin(0.5, 0))
     // as estrelas (do servidor): três luzinhas que acendem uma a uma
     const g = add(this.add.graphics())

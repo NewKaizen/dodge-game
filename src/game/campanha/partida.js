@@ -16,7 +16,7 @@ import { cartaNaMao, criarRng, criarBaralho } from '../pvp/baralho.js'
 import { SIMBOLOS, cartasDoPersonagem } from '../pvp/cartas.js'
 import { TEMPOS, CORACAO } from '../constants.js'
 import { mundoDe, faseDe } from './mundos/index.js'
-import { ataqueDaCartaNaCampanha, atacavelNoServidor } from './ataques.js'
+import { ataqueDaCartaNaCampanha, atacavelNoServidor, comAssinatura, comFuria } from './ataques.js'
 import { validarAmostras } from './amostras.js'
 import { simularComAmostras, simularCpu, inicioDaCaixa } from './simulacao.js'
 
@@ -27,6 +27,7 @@ export const VELOCIDADE_CORACAO = CORACAO.velocidadePadrao // fixa na campanha (
 export const MAX_RODADAS = 30
 export const HP_ESTRELA = 0.6 // a 2ª estrela: terminar com pelo menos 60% do HP
 export const CURA_VIRADA = 0.2 // o chefe, ao se refazer (a virada), cura isto do HP máximo
+export const LIMIAR_FURIA = 0.3 // o chefe, depois da virada, entra em fúria com até isto do HP
 // a CPU da campanha leva mais dano por acerto que a do PvP: as fases ficam curtas (5 a 9 rodadas)
 export const DANO_NA_CPU = 1.35
 
@@ -58,7 +59,7 @@ export function descreverRegra(regra = {}) {
   if (regra.eco) return 'O ataque que você mandou volta na sua caixa na rodada seguinte.'
   if (regra.energiaInicial != null) return `Você começa com ${regra.energiaInicial} de energia.`
   if (regra.soDeCima) return 'Todo ataque na sua caixa vem de cima.'
-  if (regra.duplo) return 'O chefe manda dois ataques ao mesmo tempo e, na metade do HP, se refaz (cura e a caixa deita).'
+  if (regra.duplo) return `O chefe manda dois ataques ao mesmo tempo e, na metade do HP, se refaz (cura e a caixa deita)${regra.furia ? '; no fim, entra em fúria (ataques mais fortes)' : ''}.`
   return ''
 }
 
@@ -83,6 +84,7 @@ export function criarCorrida({ mundo, fase: n, semente }) {
     rngCpu: criarRng(`campanha:${semente}:cpu`),
     etapa: 'inicio', // inicio | escolha | esquiva | fim
     virou: false,
+    furia: false, // o chefe, quase vencido, ataca com tudo (regra.furia)
     ultimoAtaqueJogador: null, // o ataque da carta que você mandou (o eco devolve)
     esquiva: null,
     danoLevado: 0,
@@ -107,6 +109,7 @@ export function visaoDaRodada(c) {
     eu: { hp: eu.hp, hpMax: eu.hpMax, energia: eu.energia, sequencia: eu.sequencia, mao: eu.baralho.mao.map(publicaCarta), jogaveis: cartasPermitidas(c).map((x) => x.id) },
     cpu: { personagem: cpu.personagem, hp: cpu.hp, hpMax: cpu.hpMax, energia: cpu.energia, nMao: cpu.baralho.mao.length },
     virou: c.virou,
+    furia: c.furia,
   }
 }
 
@@ -126,6 +129,9 @@ function montarAtaque(c, caixa, lado) {
   // ECO: na sua caixa, o ataque que a CPU manda é o que você mandou na rodada passada
   let base = ataqueDaCartaNaCampanha(carta, regraDoLado)
   if (lado === 0 && c.fase.regra?.eco && caixa.de === 1 && c.ultimoAtaqueJogador) base = { ...c.ultimoAtaqueJogador, soDeCima: Boolean(regraDoLado.soDeCima) }
+  // o golpe de quem está do outro lado (fase.assinatura) e a fúria do chefe: só no que a CPU manda
+  else if (lado === 0 && caixa.de === 1 && c.fase.assinatura) base = comAssinatura(base, c.virou && c.fase.assinaturaVirada ? c.fase.assinaturaVirada : c.fase.assinatura, c.estado.rodada)
+  if (lado === 0 && caixa.de === 1 && c.furia) base = comFuria(base)
   if (!base) return null
   return {
     ...base,
@@ -229,6 +235,9 @@ export function concluirEsquiva(c, { amostras, acertosCliente = 0, decorridoMs =
     c.virou = virou = true
     curar(est, 1, Math.round(chefe.hpMax * CURA_VIRADA))
   }
+  // depois da virada, quase vencido: a fúria (uma vez; vale até o fim)
+  let furia = false
+  if (c.fase.regra?.furia && c.virou && !c.furia && chefe.hp > 0 && chefe.hp <= chefe.hpMax * LIMIAR_FURIA) c.furia = furia = true
 
   let vencedor = fimDaRodada(est)
   if (!vencedor && est.rodada >= MAX_RODADAS) vencedor = 'p2' // passou do limite: o silêncio vence
@@ -244,6 +253,7 @@ export function concluirEsquiva(c, { amostras, acertosCliente = 0, decorridoMs =
     dano,
     cpu: { acertos: cpu?.acertos ?? 0, dano: danoCpu },
     virou,
+    furia,
     vencedor,
     eu: { hp: a.hp, hpMax: a.hpMax, energia: a.energia, sequencia: a.sequencia },
     adversario: { hp: b.hp, hpMax: b.hpMax, energia: b.energia },

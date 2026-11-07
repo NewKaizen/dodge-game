@@ -6,7 +6,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { criarSimulacao, simularComAmostras, simularCpu, inicioDaCaixa } from '../simulacao.js'
-import { criarRoteiro, ATACAVEL_NO_SERVIDOR, atacavelNoServidor, limitesDaCaixa, VELOCIDADE_MAX, BURACO, RAIO, ataqueDaCartaNaCampanha, LACUNA_MINIMA } from '../ataques.js'
+import { criarRoteiro, ATACAVEL_NO_SERVIDOR, atacavelNoServidor, limitesDaCaixa, VELOCIDADE_MAX, BURACO, RAIO, ataqueDaCartaNaCampanha, LACUNA_MINIMA, comAssinatura, comFuria, AVISO_FEIXE, AVISO_ESTILHACO, DISTANCIA_FEIXES, LARGURA_FEIXE } from '../ataques.js'
 import { ler, PASSO_MS } from '../amostras.js'
 import { CAIXA_CAMPANHA, caixaDaRodada } from '../partida.js'
 import { criarOnda } from '../../manual/onda.js'
@@ -19,7 +19,7 @@ const caixa = CAIXA_CAMPANHA
 const at = (modelos, extra = {}) => ({ modelos, forca: 0.7, duracao: 6000, caixa, semente: 'paridade', ...extra })
 
 test('o registro: todo modelo da campanha é simulável no servidor', () => {
-  assert.deepEqual([...ATACAVEL_NO_SERVIDOR].sort(), ['chuva', 'galhos', 'redemoinho', 'sementes'])
+  assert.deepEqual([...ATACAVEL_NO_SERVIDOR].sort(), ['chuva', 'estilhacos', 'feixes', 'galhos', 'redemoinho', 'sementes'])
   assert.equal(atacavelNoServidor('rain'), false) // os ataques do PvP (Phaser) não são
   for (const carta of cartasDoPersonagem('asriel')) {
     const a = ataqueDaCartaNaCampanha(carta, { duplo: true })
@@ -134,4 +134,56 @@ test('a CPU desvia de forma determinística (mesma semente, mesmo resultado) e �
   assert.ok(total > 0)
   // as amostras da CPU também passam na conferência de plausibilidade
   assert.ok(ler(x.amostras).length > 50)
+})
+
+test('feixes: avisam (parados) antes de acender, cruzam a caixa, e dois da mesma leva deixam passagem', () => {
+  for (const cx of [CAIXA_CAMPANHA, caixaDaRodada(faseDe(1, 2), 8)]) {
+    const l = limitesDaCaixa(cx)
+    const r = criarRoteiro({ modelos: ['feixes'], forca: 1, duracao: 7000, caixa: cx, semente: 'fx' })
+    let levas = 0
+    for (let t = 0; t <= 7000; t += 16) {
+      const nascidas = r.gerar(t, { x: l.left + 40, y: l.bottom - 30 })
+      if (!nascidas.length) continue
+      levas++
+      for (const o of nascidas) {
+        assert.ok(o.aviso >= AVISO_FEIXE && AVISO_FEIXE >= ATAQUE.telegrafoMs)
+        assert.ok(!o.vx && !o.vy && Number.isFinite(o.vida))
+        assert.ok(o.x - o.largura / 2 >= l.left - 3 && o.x + o.largura / 2 <= l.right + 3 && o.y - o.altura / 2 >= l.top - 3 && o.y + o.altura / 2 <= l.bottom + 3)
+      }
+      const eixo = nascidas[0].extra.vertical ? 'x' : 'y'
+      const ps = nascidas.map((o) => o[eixo]).sort((a, b) => a - b)
+      for (let i = 1; i < ps.length; i++) assert.ok(ps[i] - ps[i - 1] >= DISTANCIA_FEIXES && ps[i] - ps[i - 1] - LARGURA_FEIXE >= LACUNA_MINIMA - 12)
+    }
+    assert.ok(levas >= 3, `levas ${levas}`)
+  }
+})
+
+test('estilhaços: o cristal nasce longe do coração (quando cabe) e avisa antes de estourar', () => {
+  const l = limitesDaCaixa(CAIXA_CAMPANHA)
+  const r = criarRoteiro({ modelos: ['estilhacos'], forca: 0.8, duracao: 7000, caixa: CAIXA_CAMPANHA, semente: 'es' })
+  const alvo = { x: (l.left + l.right) / 2, y: l.bottom - 30 }
+  let levas = 0
+  for (let t = 0; t <= 7000; t += 16) {
+    const nascidas = r.gerar(t, alvo)
+    if (!nascidas.length) continue
+    levas++
+    assert.ok(nascidas.length >= 7)
+    for (const o of nascidas) {
+      assert.ok(o.aviso >= AVISO_ESTILHACO && AVISO_ESTILHACO >= ATAQUE.telegrafoMs)
+      assert.ok(Math.hypot(o.x - alvo.x, o.y - alvo.y) >= 80, 'cristal em cima do coração')
+    }
+  }
+  assert.ok(levas >= 3)
+})
+
+test('assinatura: o golpe do oponente troca o modelo do naipe (em rodízio), mas não o SUPER; a fúria fortalece', () => {
+  const base = { modelos: ['galhos'], forca: 0.5, duracao: 5500, dano: 4 }
+  assert.deepEqual(comAssinatura(base, ['feixes', 'estilhacos'], 1).modelos, ['feixes'])
+  assert.deepEqual(comAssinatura(base, ['feixes', 'estilhacos'], 2).modelos, ['estilhacos'])
+  assert.deepEqual(comAssinatura({ ...base, modelos: ['galhos', 'chuva'] }, ['chuva'], 1).modelos, ['chuva', 'sementes'])
+  const sup = { modelos: ['galhos', 'sementes'], forca: 1, duracao: 8000, dano: 9, super: true }
+  assert.equal(comAssinatura(sup, ['feixes'], 1), sup)
+  assert.equal(comAssinatura(base, null, 1), base)
+  const f = comFuria(base)
+  assert.ok(f.forca > base.forca && f.duracao > base.duracao && f.forca <= 1)
 })

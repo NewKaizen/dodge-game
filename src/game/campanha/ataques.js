@@ -25,6 +25,12 @@ export const ESPACO = 22 // centro a centro numa parede (o coração não passa 
 export const BURACO = 64 // o vão de cada parede (px livres, >= LACUNA_MINIMA)
 export const AVISO_MIRA = 700 // a semente mirada fica parada (com a linha) antes de voar
 export const VELOCIDADE_MAX = 230 // px/s: teto de qualquer bala da campanha
+export const LARGURA_FEIXE = 26 // a espessura de um feixe de luz
+export const AVISO_FEIXE = 760 // o feixe pisca (inofensivo) antes de acender
+export const VIDA_FEIXE = 420 // e fica aceso por isto
+export const DISTANCIA_FEIXES = 74 // dois feixes da mesma leva ficam pelo menos isto longe (centro a centro)
+export const AVISO_ESTILHACO = 650 // o cristal brilha antes de estourar
+export const DISTANCIA_ESTILHACO = 96 // e nasce (se couber) pelo menos isto longe do coração
 
 // força 0..1 -> duração em ms (4 a 7 s, como as cartas do PvP)
 export const duracaoDaForca = (f) => Math.round(4000 + 3000 * Math.max(0, Math.min(1, f)))
@@ -121,6 +127,39 @@ function papel(rng, l, k, { velocidade, giro }) {
   return { x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, raio: RAIO - 1, entrando: true, extra: { tipo: 'papel' } }
 }
 
+// um feixe de luz: um retângulo que cruza a caixa inteira, parado e AVISANDO (contorno piscando)
+// por AVISO_FEIXE ms e depois aceso por VIDA_FEIXE ms (por dentro: 'feixe')
+function feixe(l, { vertical, pos }) {
+  const meio = LARGURA_FEIXE / 2
+  if (vertical) {
+    const x = Math.min(l.right - meio, Math.max(l.left + meio, pos))
+    return { x, y: l.top + l.height / 2, largura: LARGURA_FEIXE, altura: l.height + 4, aviso: AVISO_FEIXE, vida: VIDA_FEIXE, extra: { tipo: 'feixe', vertical: true } }
+  }
+  const y = Math.min(l.bottom - meio, Math.max(l.top + meio, pos))
+  return { x: l.left + l.width / 2, y, largura: l.width + 4, altura: LARGURA_FEIXE, aviso: AVISO_FEIXE, vida: VIDA_FEIXE, extra: { tipo: 'feixe', vertical: false } }
+}
+
+// os estilhaços: um cristal aparece LONGE do coração, brilha (aviso) e estoura em leque
+function estilhacos(rng, l, alvo, { velocidade, n }) {
+  const m = 26
+  let melhor = null
+  for (let k = 0; k < 14; k++) {
+    const x = l.left + m + aleatorio(rng) * Math.max(1, l.width - 2 * m)
+    const y = l.top + m + aleatorio(rng) * Math.max(1, l.height - 2 * m)
+    const d = Math.hypot(x - alvo.x, y - alvo.y)
+    if (!melhor || d > melhor.d) melhor = { x, y, d }
+    if (d >= DISTANCIA_ESTILHACO) break
+  }
+  const giro = aleatorio(rng) * Math.PI * 2
+  const v = lim(velocidade)
+  const out = []
+  for (let k = 0; k < n; k++) {
+    const a = giro + (k * Math.PI * 2) / n
+    out.push({ x: melhor.x, y: melhor.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, raio: RAIO - 1, aviso: AVISO_ESTILHACO, extra: { tipo: 'estilhaco', centro: { x: melhor.x, y: melhor.y } } })
+  }
+  return out
+}
+
 // ---------- os modelos ----------
 // eventos(rng, l, p) -> [{ t, gerar(rng, l, alvo) -> opções[] }]   p: { forca, duracao, soDeCima }
 const MODELOS = {
@@ -191,6 +230,49 @@ const MODELOS = {
       return ev
     },
   },
+  // feixes de luz que cruzam a caixa: o primeiro cai na linha do coração (com aviso), os outros
+  // longe dele; alternam de pé e deitados (por dentro: 'feixe')
+  feixes: {
+    nome: 'Feixes de luz',
+    eventos(rng, l, p) {
+      const ev = []
+      const passo = 1350 - 420 * p.forca
+      const quantos = p.forca >= 0.6 ? 2 : 1
+      let n = 0
+      for (let t = 300; t < p.duracao - AVISO_FEIXE - VIDA_FEIXE; t += passo, n++) {
+        const vertical = n % 2 === 0
+        ev.push({
+          t,
+          gerar: (r, ll, alvo) => {
+            const [de, ate, mira] = vertical ? [ll.left, ll.right, alvo.x] : [ll.top, ll.bottom, alvo.y]
+            const pos = [mira]
+            for (let k = 1; k < quantos; k++) {
+              let q = null
+              for (let j = 0; j < 10 && q === null; j++) {
+                const c = de + LARGURA_FEIXE / 2 + aleatorio(r) * Math.max(1, ate - de - LARGURA_FEIXE)
+                if (pos.every((x) => Math.abs(x - c) >= DISTANCIA_FEIXES)) q = c
+              }
+              if (q !== null) pos.push(q)
+            }
+            return pos.map((x) => feixe(ll, { vertical, pos: x }))
+          },
+        })
+      }
+      return ev
+    },
+  },
+  // cristais que estouram em leque, longe do coração (por dentro: 'estilhaco')
+  estilhacos: {
+    nome: 'Estilhaços',
+    eventos(rng, l, p) {
+      const ev = []
+      const passo = 1600 - 550 * p.forca
+      const velocidade = 105 + 70 * p.forca
+      const n = 7 + Math.round(3 * p.forca)
+      for (let t = 300; t < p.duracao - 1500; t += passo) ev.push({ t, gerar: (r, ll, alvo) => estilhacos(r, ll, alvo, { velocidade, n }) })
+      return ev
+    },
+  },
 }
 
 // os modelos que o servidor simula sozinho (todos os da campanha, hoje): docs/campanha.md
@@ -199,7 +281,8 @@ export const atacavelNoServidor = (id) => ATACAVEL_NO_SERVIDOR.includes(id)
 export const nomeDoModelo = (id) => MODELOS[id]?.nome ?? id
 
 // soDeCima: troca o modelo por um que só vem de cima
-const deCimaDe = (id) => (id === 'redemoinho' ? 'chuva' : id)
+const DE_CIMA = { redemoinho: 'chuva', estilhacos: 'chuva', feixes: 'galhos' }
+const deCimaDe = (id) => DE_CIMA[id] ?? id
 
 // ataque = { modelos: [id, ...], forca, duracao, semente, caixa, soDeCima? }
 //   vários modelos = todos ao mesmo tempo (o chefe), cada um com a sua semente derivada
@@ -251,7 +334,27 @@ export function ataqueDaCartaNaCampanha(carta, regra = {}) {
     f = forcaDoValor(carta.valor)
   }
   if (regra.duplo && modelos.length === 1) modelos = [...modelos, modelos[0] === 'chuva' ? 'sementes' : 'chuva']
-  return { modelos, forca: Math.round(f * 1000) / 1000, duracao: duracaoDaForca(f) + (modelos.length > 1 ? 1000 : 0), dano: danoDaCarta(carta), soDeCima: Boolean(regra.soDeCima) }
+  return { modelos, forca: Math.round(f * 1000) / 1000, duracao: duracaoDaForca(f) + (modelos.length > 1 ? 1000 : 0), dano: danoDaCarta(carta), soDeCima: Boolean(regra.soDeCima), ...(ehSuper(carta) ? { super: true } : {}) }
+}
+
+// A ASSINATURA do oponente (fase.assinatura): o ataque que a CPU manda na SUA caixa troca o modelo
+// do naipe pelo golpe de quem está do outro lado (um por rodada, em rodízio, se for uma lista). O
+// SUPER e os modelos extras (duplo) continuam. Mesma força; a duração é refeita.
+export function comAssinatura(ataque, assinatura, rodada = 1) {
+  if (!ataque || !assinatura) return ataque
+  const lista = Array.isArray(assinatura) ? assinatura : [assinatura]
+  if (!lista.length || ataque.super) return ataque
+  const m = lista[(Math.max(1, rodada) - 1) % lista.length]
+  const modelos = [m, ...ataque.modelos.slice(1)]
+  if (modelos[1] === m) modelos[1] = m === 'chuva' ? 'sementes' : 'chuva'
+  return { ...ataque, modelos, duracao: duracaoDaForca(ataque.forca) + (modelos.length > 1 ? 1000 : 0) }
+}
+
+// A FÚRIA do chefe (regra.furia): mais forte e mais longo
+export function comFuria(ataque) {
+  if (!ataque) return ataque
+  const forca = Math.min(1, Math.round((ataque.forca + 0.3) * 1000) / 1000)
+  return { ...ataque, forca, duracao: duracaoDaForca(forca) + (ataque.modelos.length > 1 ? 1000 : 0) + 500 }
 }
 
 export { LACUNA_MINIMA }
