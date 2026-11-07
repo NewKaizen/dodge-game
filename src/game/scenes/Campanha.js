@@ -7,7 +7,8 @@ import { irCarregando } from '../carregando.js'
 import { menosMovimento } from '../preferencias.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { mundoDe, TEXTOS, faseLiberada, libertosAte } from '../campanha/mundos/index.js'
-import { descreverRegra } from '../campanha/partida.js'
+import { descreverRegra } from '../campanha/luta.js'
+import { CHEFES } from '../coop/chefes/index.js'
 import CaixaDeDialogo from '../campanha/CaixaDeDialogo.js'
 import { desenharCenario, pintarFormas } from '../campanha/desenharCenario.js'
 import { porta, escada, feixe, COR } from '../campanha/cenario.js'
@@ -207,7 +208,7 @@ export default class Campanha extends Phaser.Scene {
     txt(x, PAINEL.y + 12, `${f.chefe ? 'A ÚLTIMA PORTA' : `PORTA ${ROMANOS[f.n - 1]}`}  ·  ${f.nome}`, 15, liberada ? COR_TEXTO.titulo : COR_TEXTO.apagado)
     txt(x, PAINEL.y + 34, liberada ? tf.tema : 'A porta não abre. Ainda.', 11, liberada ? COR_TEXTO.claro : COR_TEXTO.apagado, { wordWrap: { width: 560 } })
     const estado = !liberada ? 'vença a porta anterior primeiro' : melhor?.concluida ? `atravessada  ·  ${melhor.estrelas} de 3 luzes` : 'nunca aberta'
-    txt(x, PAINEL.y + 56, `eco de ${PERSONAGENS[f.oponente].nome.toUpperCase()}  ·  ${estado}`, 10, liberada ? COR_TEXTO.ouro : COR_TEXTO.apagado)
+    txt(x, PAINEL.y + 56, `${(CHEFES[f.inimigo]?.nome ?? `eco de ${PERSONAGENS[f.oponente].nome}`).toUpperCase()}  ·  ${f.aliado ? `com ${PERSONAGENS[f.aliado].nome}` : 'sozinha'}  ·  ${estado}`, 10, liberada ? COR_TEXTO.ouro : COR_TEXTO.apagado)
     // a regra mecânica e as três estrelas, à direita, bem pequenas
     txt(PAINEL.x + PAINEL.largura - 18, PAINEL.y + 14, `${descreverRegra(f.regra)}\n\nluzes: vencer · 60% do HP · até ${f.metaRodadas} rodadas`, 9, COR_TEXTO.apagado, { align: 'right', wordWrap: { width: 200 }, lineSpacing: 2 }).setOrigin(1, 0)
   }

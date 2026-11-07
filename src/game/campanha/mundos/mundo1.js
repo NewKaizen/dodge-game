@@ -4,23 +4,18 @@
 //
 // Cada fase:
 //   n, id, nome          ordem (1..), id dos textos (o progresso no banco usa o n, não o id)
-//   oponente             a CPU (personagem do jogo, com o baralho de sempre)
-//   nivel                nível da CPU (pvp/bot.js e botEsquiva.js)
-//   fatorHpCpu           o HP da CPU = o do PvP × isto
+//   oponente             quem está preso ali (o personagem; os textos e o eco)
+//   inimigo              o CHEFE da luta (campanha/chefes.js, no formato do CO-OP)
+//   nivel                o nível da luta (NIVEIS: facil | medio | dificil)
+//   aliado               a CPU aliada (a última pessoa libertada) ou null (sozinha)
 //   metaRodadas          a 3ª estrela: vencer em até tantas rodadas
-//   regra                a regra especial da fase (campanha/partida.js):
-//     soNaipe            só cartas desse naipe podem ser jogadas (e passar a vez)
-//     caixaEncolhe       a caixa perde esta fração da largura e da altura a cada rodada
-//     eco                o ataque que você mandou na rodada passada volta na sua caixa
-//     energiaInicial     a energia da 1ª rodada (a sua)
-//     soDeCima           todo ataque na sua caixa vem de cima
-//     duplo              o chefe manda dois ataques juntos
-//     virada             o chefe, na metade do HP, se refaz (a porta se abre): cura e a caixa fica deitada
-//     furia              o chefe, depois da virada e com 30% do HP, ataca mais forte e mais longo
-//     titan              o chefe é um TITÃ: as cartas que você não jogou são arremessadas em você antes do ataque dele
-//   pressao              0..0.5: somado à força do que vem na SUA caixa (a escada fica mais funda)
-//   assinatura           o golpe do oponente: o ataque que a CPU manda na SUA caixa usa estes modelos
-//                        (campanha/ataques.js), um por rodada em rodízio; um item pode ser um combo ['garras', 'chuva'] · assinaturaVirada: depois da virada
+//   regra                a regra especial da fase (campanha/luta.js):
+//     soNaipe            só cartas desse naipe no seu baralho
+//     caixaEncolhe       o quadro perde esta fração da largura e da altura a cada rodada
+//     eco                o ataque do chefe vem com o ataque leve dele junto (o ginásio ecoa)
+//     energiaInicial     a sua energia na 1ª rodada
+//     soDeCima           todo ataque do chefe vem de cima (as cartas dele: campanha/chefes.js)
+//     titan              o chefe é um TITÃ: as cartas que você não jogou são arremessadas em você
 //   chefe                true na fase do chefe (a última)
 export const MUNDO1 = {
   id: 1,
@@ -29,12 +24,12 @@ export const MUNDO1 = {
   personagem: 'kris',
   cor: 0x5fb8b0,
   fases: [
-    { n: 1, id: 'sala', nome: 'A Sala de Aula', oponente: 'ralsei', nivel: 'facil', fatorHpCpu: 0.7, metaRodadas: 8, pressao: 0.1, regra: { soNaipe: 'espadas' }, assinatura: ['redemoinho', 'garras'] },
-    { n: 2, id: 'corredor', nome: 'O Corredor que Fecha', oponente: 'noelle', nivel: 'facil', fatorHpCpu: 0.75, metaRodadas: 8, pressao: 0.15, regra: { caixaEncolhe: 0.1 }, assinatura: ['estilhacos', 'garras', 'sementes'] },
-    { n: 3, id: 'ginasio', nome: 'O Ginásio Vazio', oponente: 'berdly', nivel: 'facil', fatorHpCpu: 0.8, metaRodadas: 8, pressao: 0.2, regra: { eco: true }, assinatura: ['feixes', ['sementes', 'garras']] },
-    { n: 4, id: 'rua', nome: 'A Rua de Volta', oponente: 'susie', nivel: 'facil', fatorHpCpu: 0.8, metaRodadas: 9, pressao: 0.25, regra: { energiaInicial: 0 }, assinatura: ['mandibula', 'feixes', ['galhos', 'garras']] },
-    { n: 5, id: 'chuva', nome: 'A Sala Onde Chove', oponente: 'dess', nivel: 'facil', fatorHpCpu: 0.85, metaRodadas: 9, pressao: 0.3, regra: { soDeCima: true }, assinatura: ['chuva', ['chuva', 'sementes'], 'garras'] },
-    { n: 6, id: 'quarto', nome: 'O Último Quarto', oponente: 'asriel', nivel: 'facil', fatorHpCpu: 1, metaRodadas: 12, pressao: 0.3, regra: { duplo: true, virada: true, furia: true, titan: true }, assinatura: ['mandibula', 'feixes', 'garras', 'estilhacos'], assinaturaVirada: [['mandibula', 'garras'], ['feixes', 'estilhacos']], chefe: true },
+    { n: 1, id: 'sala', nome: 'A Sala de Aula', oponente: 'ralsei', inimigo: 'c_ralsei', nivel: 'facil', aliado: null, metaRodadas: 9, regra: { soNaipe: 'espadas' } },
+    { n: 2, id: 'corredor', nome: 'O Corredor que Fecha', oponente: 'noelle', inimigo: 'c_noelle', nivel: 'facil', aliado: 'ralsei', metaRodadas: 9, regra: { caixaEncolhe: 0.06 } },
+    { n: 3, id: 'ginasio', nome: 'O Ginásio Vazio', oponente: 'berdly', inimigo: 'c_berdly', nivel: 'facil', aliado: 'noelle', metaRodadas: 9, regra: { eco: true } },
+    { n: 4, id: 'rua', nome: 'A Rua de Volta', oponente: 'susie', inimigo: 'c_susie', nivel: 'facil', aliado: 'berdly', metaRodadas: 10, regra: { energiaInicial: 0 } },
+    { n: 5, id: 'chuva', nome: 'A Sala Onde Chove', oponente: 'dess', inimigo: 'c_dess', nivel: 'facil', aliado: 'susie', metaRodadas: 10, regra: { soDeCima: true } },
+    { n: 6, id: 'quarto', nome: 'O Último Quarto', oponente: 'asriel', inimigo: 'c_tita', nivel: 'medio', aliado: 'susie', metaRodadas: 14, regra: { titan: true }, chefe: true },
   ],
   // os cosméticos exclusivos deste mundo (o banco concede: 0011_campanha.sql; os nomes de agora: 0012)
   //   quando: 'mundo'  vencer o chefe pela primeira vez · 'estrelas'  3 estrelas em todas as fases

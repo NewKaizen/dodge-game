@@ -4,14 +4,14 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { MUNDOS, TEXTOS, faseDe, faseLiberada, ITENS_CAMPANHA, textosDaFase, libertosAte } from '../mundos/index.js'
-import { ATACAVEL_NO_SERVIDOR } from '../ataques.js'
+import { CHEFES } from '../../coop/chefes/index.js'
+import { NIVEIS } from '../../constants.js'
 import { falasValidas } from '../dialogo.js'
 import { PERSONAGENS } from '../../data/personagens.js'
 import { CARTAS } from '../../pvp/cartas.js'
-import { NIVEIS_BOT } from '../../pvp/bot.js'
-import { descreverRegra } from '../partida.js'
+import { descreverRegra } from '../luta.js'
 
-const REGRAS = ['soNaipe', 'caixaEncolhe', 'eco', 'energiaInicial', 'soDeCima', 'duplo', 'virada', 'furia', 'titan']
+const REGRAS = ['soNaipe', 'caixaEncolhe', 'eco', 'energiaInicial', 'soDeCima', 'titan']
 const MOMENTOS = ['inicio', 'ferido', 'quase', 'voceMal', 'perfeito']
 // quem pode falar: o elenco, o narrador e o vilão (o Silêncio, sem retrato)
 const falante = (q) => q === 'narrador' || q === 'silencio' || Boolean(PERSONAGENS[q])
@@ -26,17 +26,18 @@ test('cada mundo: fases 1..n, oponentes do jogo, regras conhecidas, chefe por ú
       assert.equal(f.n, i + 1)
       assert.match(f.id, /^[a-z]{3,16}$/)
       assert.ok(PERSONAGENS[f.oponente] && CARTAS[f.oponente], f.oponente)
-      assert.ok(NIVEIS_BOT[f.nivel], f.nivel)
-      assert.ok(f.fatorHpCpu > 0 && f.fatorHpCpu <= 1)
-      assert.ok(f.pressao === undefined || (f.pressao >= 0 && f.pressao <= 0.5))
+      assert.ok(NIVEIS[f.nivel], f.nivel)
+      // o chefe da luta (formato do CO-OP, campanha/chefes.js) e a aliada (um personagem do jogo ou ninguém)
+      assert.ok(CHEFES[f.inimigo]?.campanha, `${f.id}: inimigo ${f.inimigo}`)
+      assert.ok(f.aliado === null || (PERSONAGENS[f.aliado] && CARTAS[f.aliado]), `${f.id}: aliado ${f.aliado}`)
       assert.ok(Number.isInteger(f.metaRodadas) && f.metaRodadas >= 3)
       const chaves = Object.keys(f.regra ?? {})
       assert.ok(chaves.length >= 1, `fase ${f.n} sem regra especial`)
       assert.ok(chaves.every((k) => REGRAS.includes(k)), chaves.join())
       assert.ok(descreverRegra(f.regra))
       assert.equal(Boolean(f.chefe), i === m.fases.length - 1)
-      // o golpe de quem está do outro lado: modelos que o servidor simula
-      for (const a of [...(f.assinatura ?? []), ...(f.assinaturaVirada ?? [])].flat()) assert.ok(ATACAVEL_NO_SERVIDOR.includes(a), `${f.id}: assinatura ${a}`)
+      // o titã é o chefe do último quarto
+      assert.equal(Boolean(CHEFES[f.inimigo].titan), Boolean(f.regra?.titan))
     })
     assert.equal(new Set(m.fases.map((f) => f.id)).size, m.fases.length)
     // o banco sabe quantas fases cada mundo tem

@@ -1,60 +1,29 @@
 // As POSIÇÕES DO CORAÇÃO que o navegador manda ao servidor durante a esquiva da campanha
 // (docs/campanha.md "Anti-trapaça"). Compactas: uma lista plana de inteiros [t, x, y, t, x, y, ...],
-// t em ms desde o começo da esquiva (relógio da simulação) e x/y em décimos de px.
+// t em ms desde o começo da esquiva (relógio da simulação) e x/y em décimos de px. O quadro
+// (campanha/quadro.js) grava UMA por passo fixo: o servidor refaz a esquiva com exatamente elas.
 //
 //   PASSO_MS          o passo fixo da simulação (cliente e servidor andam igual)
-//   AMOSTRA_MS        de quanto em quanto tempo sai uma amostra (~20 Hz)
-//   criarGravador()   { registrar(t, x, y) -> true se gravou · lista · tirar() (o pedaço novo) }
-//   ler(lista)        [{ t, x, y }] (px) ou null se o formato não presta
-//   alvoNoTempo(amostras, t, inicio)   a última amostra com t' <= t (o que os ataques miram)
+//   ler(lista, max)   [{ t, x, y }] (px) ou null se o formato não presta
 //   posicaoNoTempo(amostras, t, inicio) posição interpolada (o coração no servidor)
 //   validarAmostras(amostras, op)      { ok, motivo } a plausibilidade (velocidade, caixa, tempo)
 import { CORACAO } from '../constants.js'
 
 export const PASSO_MS = 16
-export const AMOSTRA_MS = 50
 export const MAX_INTERVALO_MS = 260 // buraco máximo entre duas amostras (uma travadinha do navegador)
 export const MIN_INTERVALO_MS = 10
 export const FOLGA_VELOCIDADE = 1.03 // 3% além da velocidade do coração
 export const FOLGA_PX = 0.8 // arredondamento de décimos de px + ponto flutuante
 export const FOLGA_FIM_MS = 160 // a última amostra pode ficar até isto antes do fim da esquiva
 export const MAX_AMOSTRAS = 400 // ~20 s a 20 Hz: nenhuma esquiva da campanha passa disso
+export const MAX_AMOSTRAS_QUADRO = 1400 // o quadro dos chefes: uma por passo (16 ms), ~22 s
 export const MEIO = CORACAO.tamanho / 2 // o centro do coração não chega mais perto da parede
-
-const q = (v) => Math.round(v * 10)
-
-// grava no passo da simulação: a primeira amostra em t=0 e depois a cada AMOSTRA_MS (no primeiro
-// passo que passa da marca). Os ataques miram a última amostra gravada.
-export function criarGravador() {
-  const lista = []
-  let enviados = 0
-  let proxima = 0
-  return {
-    lista,
-    registrar(t, x, y) {
-      if (t < proxima) return false
-      lista.push(Math.round(t), q(x), q(y))
-      proxima = Math.floor(t / AMOSTRA_MS) * AMOSTRA_MS + AMOSTRA_MS
-      return true
-    },
-    // a última amostra gravada ({ x, y } em px)
-    ultima() {
-      const n = lista.length
-      return n ? { x: lista[n - 2] / 10, y: lista[n - 1] / 10 } : null
-    },
-    // o pedaço ainda não enviado
-    tirar() {
-      const pedaco = lista.slice(enviados)
-      enviados = lista.length
-      return pedaco
-    },
-  }
-}
 
 const inteiroSeguro = (v) => Number.isInteger(v) && Math.abs(v) < 1e7
 
-export function ler(lista) {
-  if (!Array.isArray(lista) || lista.length % 3 !== 0 || lista.length / 3 > MAX_AMOSTRAS) return null
+//   max: quantas amostras cabem (o quadro dos chefes manda uma por passo: MAX_AMOSTRAS_QUADRO)
+export function ler(lista, max = MAX_AMOSTRAS) {
+  if (!Array.isArray(lista) || lista.length % 3 !== 0 || lista.length / 3 > max) return null
   const saida = []
   for (let i = 0; i < lista.length; i += 3) {
     const [t, x, y] = [lista[i], lista[i + 1], lista[i + 2]]
@@ -62,16 +31,6 @@ export function ler(lista) {
     saida.push({ t, x: x / 10, y: y / 10 })
   }
   return saida
-}
-
-// a última amostra com t' <= t (antes da primeira: o lugar onde o coração começa)
-export function alvoNoTempo(amostras, t, inicio) {
-  let a = null
-  for (const s of amostras) {
-    if (s.t > t) break
-    a = s
-  }
-  return a ? { x: a.x, y: a.y } : { x: inicio.x, y: inicio.y }
 }
 
 // posição interpolada entre as amostras vizinhas (depois da última: parado nela)

@@ -5,6 +5,7 @@ import coronel from './coronel.js'
 import escuridao from './escuridao.js'
 import ladra from './ladra.js'
 import { NIVEIS } from '../../constants.js'
+import { CHEFES_CAMPANHA } from '../../campanha/chefes.js'
 
 // Chefes do CO-OP de cartas, na ordem da tela de seleção. Lógica pura: os
 // ataques recebem a biblioteca attacks/ como parâmetro A (como no PvP).
@@ -33,7 +34,9 @@ import { NIVEIS } from '../../constants.js'
 //                            party; só aparece na semana dele (src/lib/semanal.js, AGENDA)
 //   escuro                   (Escuridão) a caixa no escuro e as pistas de som (coop/semanal/escuridao.js)
 //   ladra, roubadas          (Ladra) rouba e joga as cartas dos jogadores (coop/semanal/ladra.js)
-export const CHEFES = { king, queen, jevil, coronel, escuridao, ladra }
+// os da campanha (campanha/chefes.js, `campanha: true`) também moram aqui: a luta da campanha usa as
+// regras do CO-OP. Ficam fora da Selecao (ORDEM_CHEFES) e do semanal (SEMANAIS)
+export const CHEFES = { king, queen, jevil, coronel, escuridao, ladra, ...CHEFES_CAMPANHA }
 
 const FATORES = ['velocidade', 'densidade', 'velocidadeMax', 'dano', 'hp']
 
@@ -47,3 +50,4 @@ export function nivelDoChefe(chefe, nivel) {
 }
 export const ORDEM_CHEFES = ['king', 'queen', 'jevil', 'coronel'] // (os semanais ficam fora: SEMANAIS)
 export const SEMANAIS = Object.keys(CHEFES).filter((id) => CHEFES[id].semanal)
+export const CHEFES_DA_CAMPANHA = Object.keys(CHEFES).filter((id) => CHEFES[id].campanha)
