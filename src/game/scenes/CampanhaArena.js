@@ -8,6 +8,7 @@ import { ESCALA } from '../arte/texturas.js'
 import { SIMBOLOS, ehSuper } from '../pvp/cartas.js'
 import { ENERGIA } from '../pvp/regras.js'
 import Mao from '../entities/Mao.js'
+import Carta from '../entities/Carta.js'
 import { joyDeTodos } from '../manual/paginaBase.js'
 import { fatores } from '../acessibilidade.js'
 import { desenharCenario } from '../campanha/desenharCenario.js'
@@ -21,6 +22,8 @@ import { ler, posicaoNoTempo, PASSO_MS } from '../campanha/amostras.js'
 import { nomeDoModelo } from '../campanha/ataques.js'
 import { criarAtaqueReal, limitesReais, inicioReal, ataqueRealDaCarta } from '../campanha/ataqueReal.js'
 import { criarMedo } from '../campanha/medo.js'
+import { criarTita } from '../campanha/tita.js'
+import { CARTA_BALA } from '../campanha/ataques.js'
 import { ajustarCamera, RES } from '../resolucao.js'
 import { aoCampanha, comecarFase, jogarCarta, enviarPosicoes, terminarEsquiva, desistirDaCorrida, trapacaDev } from '../../lib/campanha.js'
 
@@ -102,6 +105,9 @@ const estadoInicial = () => ({
   ditas: null,
   perfeitos: 0,
   furia: false,
+  tita: null,
+  arremesso: null,
+  falasTita: 0,
 })
 
 export default class CampanhaArena extends Phaser.Scene {
@@ -128,6 +134,7 @@ export default class CampanhaArena extends Phaser.Scene {
       if (this.cpu && !this.cpu.e.acabou) this.cpu.e.parar()
       this.medo?.destruir()
       if (this.musicaEspecial) voltarMusicaNormal()
+      this.limparArremesso()
     })
     // as fases: tensa e com bateria; o chefe: órgão e coro (scripts/musica/trilhas.mjs)
     musica(this.fase.chefe ? 'campanha_chefe' : 'campanha_luta', 'campanha2')
@@ -166,14 +173,21 @@ export default class CampanhaArena extends Phaser.Scene {
     this.ajustarCamCpu()
     this.desenharCaixa(this.caixaG, CAIXA_CAMPANHA)
     this.medo = criarMedo(this, { profundidade: 3 })
-    this.add.text(MINI.x + larguraMini / 2, MINI.y - 6, `a caixa do eco de ${PERSONAGENS[this.fase.oponente].nome}`, estilo(10, COR_TEXTO.apagado)).setOrigin(0.5, 1).setDepth(21)
+    this.add.text(MINI.x + larguraMini / 2, MINI.y - 6, this.fase.regra?.titan ? 'a caixa do titã' : `a caixa do eco de ${PERSONAGENS[this.fase.oponente].nome}`, estilo(10, COR_TEXTO.apagado)).setOrigin(0.5, 1).setDepth(21)
     this.kris = this.add.image(150, CAIXA_CAMPANHA.base, this.mundo.personagem).setOrigin(0.5, 1).setScale(ESCALA.personagem).setDepth(4)
     // a torcida: quem já foi libertado fica atrás da Kris, com cor, e pula quando você manda bem
     this.turma = libertosAte(this.mundo.id, this.fase.n).map((p, i) => this.add.image(104 - (i % 3) * 30, CAIXA_CAMPANHA.base - 4 - Math.floor(i / 3) * 10, p).setOrigin(0.5, 1).setScale(ESCALA.personagem * 0.62).setDepth(3.9 - Math.floor(i / 3) * 0.1))
     this.baloes = { oponente: null, amigos: null }
     this.ditas = new Set()
-    this.eco = criarEco(this, 800, 214, this.fase.oponente, { escala: ESCALA.personagem, profundidade: 4, alpha: 0.62, flipX: true })
-    this.oponente = this.eco.corpo
+    if (this.fase.regra?.titan) {
+      // o TITÃ: o oponente gigante, em silhueta, atrás da caixa (campanha/tita.js)
+      this.tita = criarTita(this, this.fase.oponente, { x: (CAIXA_CAMPANHA.esquerda + CAIXA_CAMPANHA.direita) / 2, topo: -60, escala: 24, profundidade: -5 })
+      const o = this.tita.centroDosOlhos
+      this.oponente = this.add.zone(o.x, o.y + 90, 1, 1) // onde aparecem os números de dano (perto dos olhos)
+    } else {
+      this.eco = criarEco(this, 800, 214, this.fase.oponente, { escala: ESCALA.personagem, profundidade: 4, alpha: 0.62, flipX: true })
+      this.oponente = this.eco.corpo
+    }
     this.mao = new Mao(this, { jogador: 0, x: MAO_POS.x, y: MAO_POS.y, rotulo: '', largura: 60, espacamento: 50, larguraMax: 300, profundidade: 30 })
     this.mao.setAtiva(false)
   }
@@ -290,7 +304,7 @@ export default class CampanhaArena extends Phaser.Scene {
     }
     const [a, b, r] = this.hudTextos
     a.setText(`${PERSONAGENS[this.mundo.personagem].nome.toUpperCase()}  ${eu.hp}/${eu.hpMax}`)
-    b.setText(`${PERSONAGENS[this.fase.oponente].nome.toUpperCase()}  ${cpu.hp}/${cpu.hpMax}`)
+    b.setText(`${this.tita ? TEXTOS[this.mundo.id].titan?.nome ?? 'O TITÃ' : PERSONAGENS[this.fase.oponente].nome.toUpperCase()}  ${cpu.hp}/${cpu.hpMax}`)
     r.setText(`RODADA ${v.rodada}`)
   }
 
@@ -339,7 +353,8 @@ export default class CampanhaArena extends Phaser.Scene {
     this.frase.setText(v.eu.jogaveis.length ? 'escolha uma carta (A) ou passe a vez (B)' : 'nenhuma carta cabe na energia: B passa a vez (+1 de energia)')
     if (v.virou) this.regra.setText(semLigaduras(TEXTOS[this.mundo.id].virada))
     if (v.furia) this.regra.setText(semLigaduras(TEXTOS[this.mundo.id].furia ?? ''))
-    if (v.rodada === 1) this.falaDaLuta('inicio', { atraso: 500 })
+    if (v.rodada === 1 && this.tita) this.apresentarTita()
+    else if (v.rodada === 1) this.falaDaLuta('inicio', { atraso: 500 })
     tocar(this, 'rodada')
   }
 
@@ -357,11 +372,13 @@ export default class CampanhaArena extends Phaser.Scene {
     this.rodadaAtual = m
     this.etapa = 'revelacao'
     this.mao.setAtiva(false)
+    // o TITÃ pega as cartas que você não jogou: elas saem da SUA mão e vão para baixo da caixa
+    if (m.ataque?.cartas?.length) this.prepararArremesso(m.ataque, m.jogadas[0].passou)
     this.mao.limpar()
     this.infoCarta.setText('')
     const [eu, cpu] = m.jogadas
     const nome = (j, quem) => (j.passou ? `${quem} passou a vez` : `${quem}: ${j.carta.nome} ${SIMBOLOS[j.carta.naipe]}${j.anulada ? ' (anulada)' : ''}`)
-    this.frase.setText(`${nome(eu, 'você')}\n${nome(cpu, PERSONAGENS[this.fase.oponente].nome)}`)
+    this.frase.setText(`${nome(eu, 'você')}\n${nome(cpu, this.tita ? 'o titã' : PERSONAGENS[this.fase.oponente].nome)}`)
     this.hpMostrado = { eu: { ...m.eu }, cpu: { ...m.cpu } }
     this.desenharHud()
     const at = m.ataque
@@ -460,8 +477,100 @@ export default class CampanhaArena extends Phaser.Scene {
     voltarMusicaNormal()
   }
 
+  // ---------- o TITÃ ----------
+
+  // a entrada: o nome enorme, a tela treme, os olhos acendem
+  apresentarTita() {
+    const t = TEXTOS[this.mundo.id].titan
+    this.tita.olhar(1.8)
+    tocar(this, 'superAtivar')
+    if (!menosMovimento() && fatores().tremor > 0) this.cameras.main.shake(700, 0.01 * fatores().tremor)
+    const titulo = this.add.text(LARGURA / 2, ALTURA / 2 - 40, semLigaduras(t?.apresentacao ?? 'O TITÃ'), { fontFamily: FONTE, fontSize: '40px', color: '#d8b8ff', stroke: '#160a24', strokeThickness: 8 }).setOrigin(0.5).setDepth(45)
+    if (menosMovimento()) return this.time.delayedCall(1600, () => titulo.destroy())
+    titulo.setScale(2.4).setAlpha(0)
+    this.tweens.add({ targets: titulo, scale: 1, alpha: 1, duration: 420, ease: 'Back.easeOut' })
+    this.tweens.add({ targets: titulo, alpha: 0, y: titulo.y - 20, delay: 1700, duration: 500, onComplete: () => titulo.destroy() })
+    this.falaDaLuta('inicio', { atraso: 2300 })
+  }
+
+  // as cartas que você NÃO jogou saem da mão (as Cartas de verdade, na tela) e ficam tremendo embaixo da
+  // caixa, cada uma onde a bala dela nasce (campanha/ataques.js: cartaArremessada)
+  prepararArremesso(at, passou) {
+    this.limparArremesso()
+    this.arremesso = new Map()
+    const cx = at.caixa
+    const n = at.cartas.length
+    at.cartas.forEach((d, i) => {
+      let carta = this.mao.cartas.find((c) => c.dados.id === d.id)
+      if (carta) this.mao.retirar(carta)
+      else carta = new Carta(this, MAO_POS.x, MAO_POS.y, { ...d, nome: '', custo: 0 }, { largura: 60 })
+      this.tweens.killTweensOf(carta)
+      carta.pararTweensCorpo?.()
+      carta.focar?.(false)
+      carta.setDepth(12)
+      const x = cx.esquerda + ((cx.direita - cx.esquerda) * (i + 1)) / (n + 1)
+      const y = cx.base + CARTA_BALA.altura / 2 + 3
+      const escala = (CARTA_BALA.largura / (carta.largura || 60)) * 1.15
+      const a = { carta, bala: null, x, y, escala, voando: false, foi: false }
+      this.arremesso.set(String(d.id), a)
+      if (menosMovimento()) carta.setPosition(x, y).setScale(escala).setAngle(0)
+      else this.tweens.add({ targets: carta, x, y, scale: escala, angle: 0, duration: 420, delay: i * 90, ease: 'Cubic.easeOut' })
+    })
+    const t = TEXTOS[this.mundo.id].titan
+    this.tita?.olhar(1.6)
+    if (!menosMovimento() && fatores().tremor > 0) this.cameras.main.shake(260, 0.004 * fatores().tremor)
+    const fala = passou ? t?.passou : t?.arremesso?.[this.falasTita++ % (t?.arremesso?.length || 1)]
+    this.falar(fala)
+  }
+
+  // a cada quadro: cada Carta segue a bala dela; quando a bala some, a carta se desfaz
+  moverArremesso(lista) {
+    if (!this.arremesso) return
+    const vivas = new Set()
+    for (const b of lista) {
+      if (b.extra?.tipo !== 'carta') continue
+      const a = this.arremesso.get(b.extra.carta)
+      if (!a || a.foi) continue
+      vivas.add(a)
+      a.bala = b
+      this.tweens.killTweensOf(a.carta)
+      a.carta.setScale(a.escala)
+      if (b.idade < b.aviso) {
+        // tremendo na mão do titã
+        const k = menosMovimento() ? 0 : Math.sin(b.idade / 25) * 2
+        a.carta.setPosition(b.x + k, b.y).setAngle(k * 2)
+      } else {
+        if (!a.voando) {
+          a.voando = true
+          tocar(this, 'cartaSelecionar')
+          this.tita?.olhar(1.2)
+        }
+        a.carta.setPosition(b.x, b.y).setAngle(menosMovimento() ? 0 : Math.sin(b.idade / 60) * 10)
+      }
+    }
+    for (const a of this.arremesso.values()) {
+      if (!a.bala || a.foi || vivas.has(a)) continue
+      a.foi = true
+      this.desfazerCarta(a.carta)
+    }
+  }
+
+  desfazerCarta(carta) {
+    if (!carta?.active) return
+    if (menosMovimento()) return carta.destroy()
+    this.tweens.add({ targets: carta, alpha: 0, scale: carta.scale * 1.7, angle: carta.angle + 40, duration: 260, onComplete: () => carta.destroy() })
+  }
+
+  limparArremesso() {
+    if (!this.arremesso) return
+    for (const a of this.arremesso.values()) if (!a.foi) a.carta?.active && a.carta.destroy()
+    this.arremesso = null
+  }
+
   terminarEsquiva() {
     this.etapa = 'conferindo'
+    if (this.arremesso) for (const a of this.arremesso.values()) if (!a.foi) ((a.foi = true), this.desfazerCarta(a.carta))
+    this.arremesso = null
     this.voltarDaSuper()
     if (this.esquiva) this.mandarPedaco()
     this.coracao.setVisible(false)
@@ -483,9 +592,10 @@ export default class CampanhaArena extends Phaser.Scene {
     const textos = TEXTOS[this.mundo.id]
     if (r.cpu.acertos) {
       tocar(this, 'impacto')
-      this.subir(this.oponente.x, this.oponente.y - 90, `-${r.cpu.dano}`, '#f2e2b0', 18)
+      this.subir(this.oponente.x, this.oponente.y - 90, `-${r.cpu.dano}`, '#f2e2b0', this.tita ? 26 : 18)
+      this.tita?.apanhar()
       this.pularTurma()
-      if (!menosMovimento()) this.tweens.add({ targets: this.oponente, x: this.oponente.x + 6, duration: 50, yoyo: true, repeat: 2 })
+      if (!menosMovimento() && !this.tita) this.tweens.add({ targets: this.oponente, x: this.oponente.x + 6, duration: 50, yoyo: true, repeat: 2 })
     }
     // desviou de tudo: PERFEITO! (a torcida comemora)
     if (this.rodadaAtual?.ataque && r.acertos === 0) {
@@ -500,6 +610,7 @@ export default class CampanhaArena extends Phaser.Scene {
       }
     }
     if (r.virou) {
+      this.tita?.rachar()
       this.regra.setText(semLigaduras(textos.virada))
       tocar(this, 'superAtivar')
       if (!menosMovimento() && fatores().clarao >= 1) this.cameras.main.flash(420, 110, 90, 50)
@@ -515,7 +626,8 @@ export default class CampanhaArena extends Phaser.Scene {
       tocar(this, 'superAtivar')
       if (!menosMovimento() && fatores().clarao >= 1) this.cameras.main.flash(380, 140, 30, 50)
       if (!menosMovimento() && fatores().tremor > 0) this.cameras.main.shake(420, 0.006 * fatores().tremor)
-      this.oponente.setTint(0xd07090)
+      if (this.tita) this.tita.furia()
+      else this.oponente.setTint(0xd07090)
       this.falar(textos.furiaFala, { atraso: 300 })
       this.ditas.add('quase')
     }
@@ -559,6 +671,7 @@ export default class CampanhaArena extends Phaser.Scene {
     const e = this.esquiva
     if (e) {
       this.pintar(g, e.sim.lista, this.rodadaAtual.ataque.caixa, e.coracao)
+      this.moverArremesso(e.sim.lista)
       this.coracao.setPosition(e.coracao.x, e.coracao.y).setAlpha(e.sim.invencivel > 0 && Math.floor(this.time.now / 80) % 2 ? 0.35 : 1)
     }
     const c = this.cpu
@@ -578,6 +691,15 @@ export default class CampanhaArena extends Phaser.Scene {
       const avisando = b.idade < b.aviso
       const tipo = b.extra?.tipo
       const cor = COR_BALA[tipo] ?? 0xffffff
+      // as SUAS cartas (o titã arremessa): a Carta de verdade é desenhada por moverArremesso; aqui só a linha
+      if (tipo === 'carta') {
+        if (avisando && b.extra.linha) {
+          const { x, y, dx, dy } = b.extra.linha
+          g.lineStyle(2, 0xb070e8, piscar(b) ? 0.9 : 0.3)
+          for (let k = 0; k < 12; k++) g.lineBetween(x + dx * k * 22, y + dy * k * 22, x + dx * (k * 22 + 11), y + dy * (k * 22 + 11))
+        }
+        continue
+      }
       // o feixe de luz: contorno piscando enquanto avisa; depois aceso, branco-rosado com brilho
       if (b.tipo === 'retangulo') {
         const x = b.x - b.largura / 2
@@ -721,6 +843,7 @@ export default class CampanhaArena extends Phaser.Scene {
     this.controles.atualizar()
     this.cenario?.atualizar(delta)
     this.eco?.atualizar(tempo)
+    this.tita?.atualizar(tempo)
     if (this.etapa === 'esquiva') return this.atualizarEsquiva(delta)
     if (this.etapa === 'escolha') {
       for (let j = 0; j < this.controles.numJogadores; j++) {

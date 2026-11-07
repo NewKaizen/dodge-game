@@ -36,6 +36,16 @@ export const ABERTURA_GARRA = 0.24 // rad entre os dedos da garra (três balas e
 export const AVISO_MANDIBULA = 950 // os dentes piscam fora da caixa (com a garganta marcada) antes de fechar
 export const GARGANTA = 50 // a faixa livre entre as duas fileiras de dentes (px)
 export const MORDIDA_MS = 380 // quanto tempo a boca fica fechada antes de sumir
+// o TITÃ (regra.titan): as cartas da SUA mão que você não jogou voam na sua caixa, uma a uma
+export const CARTA_BALA = Object.freeze({ largura: 20, altura: 28 }) // a carta inteira machuca
+export const AVISO_CARTA = 650 // a carta treme parada embaixo da caixa (com a linha) antes de voar
+export const INTERVALO_CARTA = 420 // uma carta a cada tanto
+export const VOO_CARTAS = 1100 // depois da última sair, o ataque do titã ainda espera isto
+export const DANO_CARTA = 6 // o dano de uma carta quando o titã não jogou nada
+// as cartas de mentira dos testes (sem a mão de verdade)
+const CARTAS_PADRAO = [1, 2, 3, 4].map((k) => ({ id: `teste-${k}` }))
+// quanto o ataque do titã espera as n cartas
+export const atrasoDasCartas = (n) => (n > 0 ? 300 + (n - 1) * INTERVALO_CARTA + AVISO_CARTA + VOO_CARTAS : 0)
 
 // força 0..1 -> duração em ms (4 a 7 s, como as cartas do PvP)
 export const duracaoDaForca = (f) => Math.round(4000 + 3000 * Math.max(0, Math.min(1, f)))
@@ -207,6 +217,18 @@ function mandibula(rng, l, { velocidade }) {
   return saida
 }
 
+// uma carta da sua mão: parada embaixo da caixa (o lado da mão, na tela), tremendo; depois voa no
+// lugar onde o coração estava e quica uma vez nas paredes (por dentro: 'carta')
+function cartaArremessada(rng, l, alvo, { i, n, id, velocidade }) {
+  const x = l.left + (l.width * (i + 1)) / (n + 1)
+  const y = l.bottom + CARTA_BALA.altura / 2 + 3
+  const a = Math.atan2(alvo.y - y, alvo.x - x) + (aleatorio(rng) - 0.5) * 0.22
+  const v = lim(velocidade)
+  const dx = Math.cos(a)
+  const dy = Math.sin(a)
+  return { x, y, vx: dx * v, vy: dy * v, largura: CARTA_BALA.largura, altura: CARTA_BALA.altura, aviso: AVISO_CARTA, entrando: false, quicar: 1, extra: { tipo: 'carta', carta: id, i, linha: { x, y, dx, dy } } }
+}
+
 // ---------- os modelos ----------
 // eventos(rng, l, p) -> [{ t, gerar(rng, l, alvo) -> opções[] }]   p: { forca, duracao, soDeCima }
 const MODELOS = {
@@ -341,6 +363,15 @@ const MODELOS = {
       return ev
     },
   },
+  // o titã arremessa as SUAS cartas (as que ficaram na mão), uma a uma, de baixo (por dentro: 'carta')
+  cartas: {
+    nome: 'Suas cartas',
+    eventos(rng, l, p) {
+      const lista = p.cartas?.length ? p.cartas : CARTAS_PADRAO
+      const velocidade = 170 + 45 * p.forca
+      return lista.map((c, i) => ({ t: 300 + i * INTERVALO_CARTA, gerar: (r, ll, alvo) => [cartaArremessada(r, ll, alvo, { i, n: lista.length, id: String(c.id), velocidade })] }))
+    },
+  },
   // a boca do Silêncio: fecha de cima e de baixo; só a garganta fica livre (por dentro: 'dente')
   mandibula: {
     nome: 'Mandíbula',
@@ -360,19 +391,23 @@ export const atacavelNoServidor = (id) => ATACAVEL_NO_SERVIDOR.includes(id)
 export const nomeDoModelo = (id) => MODELOS[id]?.nome ?? id
 
 // soDeCima: troca o modelo por um que só vem de cima
-const DE_CIMA = { redemoinho: 'chuva', estilhacos: 'chuva', feixes: 'galhos', garras: 'chuva', mandibula: 'galhos' }
+const DE_CIMA = { redemoinho: 'chuva', estilhacos: 'chuva', feixes: 'galhos', garras: 'chuva', mandibula: 'galhos', cartas: 'chuva' }
 const deCimaDe = (id) => DE_CIMA[id] ?? id
 
 // ataque = { modelos: [id, ...], forca, duracao, semente, caixa, soDeCima? }
 //   vários modelos = todos ao mesmo tempo (o chefe), cada um com a sua semente derivada
+//   ataque.cartas: as cartas arremessadas pelo titã (modelo 'cartas'); os outros modelos esperam elas
 export function criarRoteiro(ataque) {
   const l = limitesDaCaixa(ataque.caixa)
-  const p = { forca: Number(ataque.forca) || 0, duracao: ataque.duracao, soDeCima: Boolean(ataque.soDeCima) }
+  const p = { forca: Number(ataque.forca) || 0, duracao: ataque.duracao, soDeCima: Boolean(ataque.soDeCima), cartas: ataque.cartas ?? null }
+  const comCartas = !p.soDeCima && ataque.modelos.includes('cartas')
+  const atraso = comCartas ? atrasoDasCartas(p.cartas?.length || CARTAS_PADRAO.length) : 0
   const listas = ataque.modelos.map((id, i) => {
     const m = MODELOS[ataque.soDeCima ? deCimaDe(id) : id]
     if (!m) throw new Error(`modelo de ataque desconhecido: ${id}`)
     const rng = criarRng(`${ataque.semente}:${i}:${id}`)
-    return { rng, eventos: m.eventos(rng, l, p).sort((a, b) => a.t - b.t), prox: 0 }
+    const eventos = m.eventos(rng, l, p).map((e) => (id === 'cartas' || !atraso ? e : { ...e, t: e.t + atraso }))
+    return { rng, eventos: eventos.sort((a, b) => a.t - b.t), prox: 0 }
   })
   return {
     duracao: ataque.duracao,
@@ -430,6 +465,17 @@ export function comAssinatura(ataque, assinatura, rodada = 1) {
   modelos = modelos.filter((x, i) => modelos.indexOf(x) === i).slice(0, 3)
   if (modelos.length === 1 && ataque.modelos.length > 1) modelos.push(proprios[0] === 'chuva' ? 'sementes' : 'chuva')
   return { ...ataque, modelos, duracao: duracaoDaForca(ataque.forca) + (modelos.length > 1 ? 1000 : 0) }
+}
+
+// O ARREMESSO do titã: as cartas que ficaram na sua mão vêm antes do ataque dele (que espera por elas).
+// Sem ataque do titã nesta rodada, só as cartas.
+//   cartas: [{ id, ... }] (as que você NÃO jogou) · base: { caixa, semente, dano? }
+export function comArremesso(ataque, cartas, base) {
+  if (!cartas?.length) return ataque
+  const lista = cartas.map((c) => ({ id: String(c.id), personagem: c.personagem, naipe: c.naipe, valor: c.valor }))
+  const atraso = atrasoDasCartas(lista.length)
+  if (!ataque) return { modelos: ['cartas'], forca: 0.5, duracao: atraso + 700, dano: base.dano ?? DANO_CARTA, soDeCima: false, cartas: lista }
+  return { ...ataque, modelos: ['cartas', ...ataque.modelos.filter((m) => m !== 'cartas')], cartas: lista, duracao: ataque.duracao + atraso }
 }
 
 // A PRESSÃO da fase (fase.pressao, 0..0.5): o que vem na sua caixa fica mais forte (mais denso e

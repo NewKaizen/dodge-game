@@ -11,7 +11,7 @@ import { CARTAS } from '../../pvp/cartas.js'
 import { NIVEIS_BOT } from '../../pvp/bot.js'
 import { descreverRegra } from '../partida.js'
 
-const REGRAS = ['soNaipe', 'caixaEncolhe', 'eco', 'energiaInicial', 'soDeCima', 'duplo', 'virada', 'furia']
+const REGRAS = ['soNaipe', 'caixaEncolhe', 'eco', 'energiaInicial', 'soDeCima', 'duplo', 'virada', 'furia', 'titan']
 const MOMENTOS = ['inicio', 'ferido', 'quase', 'voceMal', 'perfeito']
 // quem pode falar: o elenco, o narrador e o vilão (o Silêncio, sem retrato)
 const falante = (q) => q === 'narrador' || q === 'silencio' || Boolean(PERSONAGENS[q])
@@ -146,4 +146,18 @@ test('libertos: quem já voltou antes de cada fase (e a própria, depois de venc
   assert.deepEqual(libertosAte(1, 3), ['ralsei', 'noelle'])
   assert.deepEqual(libertosAte(1, 3, { comEsta: true }), ['ralsei', 'noelle', 'berdly'])
   assert.deepEqual(libertosAte(9, 2), [])
+})
+
+test('o titã: o chefe do mundo 1 é um TITÃ, com nome, apresentação e falas de arremesso (curtas, do Silêncio)', () => {
+  const chefe = MUNDOS[0].fases.at(-1)
+  assert.equal(chefe.regra.titan, true)
+  const t = TEXTOS[1].titan
+  assert.ok(t.nome && t.apresentacao)
+  assert.ok(falasValidas(t.arremesso) && t.arremesso.length >= 4)
+  for (const f of [...t.arremesso, t.passou]) {
+    assert.equal(f.quem, 'silencio')
+    assert.ok(f.texto.length <= 70, f.texto)
+  }
+  // ele fala com quem joga (a quarta parede) antes da luta
+  assert.ok(textosDaFase(1, 6).antes.some((f) => f.quem === 'silencio' && /TELA/.test(f.texto)))
 })

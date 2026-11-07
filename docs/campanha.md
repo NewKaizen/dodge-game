@@ -43,7 +43,24 @@ toca. A história é original; os personagens são os do jogo.
 | 3 O Ginásio Vazio | `ginasio` | Berdly | o ataque que você mandou volta (`eco`) | Feixes de luz (holofotes) | 8 |
 | 4 A Rua de Volta | `rua` | Susie | começa com 0 de energia | Feixes (faróis) / Paredes | 8 |
 | 5 A Sala Onde Chove | `chuva` | Dess | todo ataque vem de cima | Cinzas / Olhares | 9 |
-| 6 O Último Quarto (chefe) | `quarto` | Asriel | `duplo`; `virada` na metade do HP (cura 20%, caixa deita, a turma grita); **`furia`** com 30% do HP depois da virada (ataques mais fortes e longos), uma vez | Mariposas / Feixes / Estilhaços (depois da virada: Estilhaços / Feixes) | 12 |
+| 6 O Último Quarto (chefe) | `quarto` | Asriel (o **Titã do Silêncio**) | **`titan`** (as cartas que você não jogou voam em você antes do ataque dele); `duplo`; `virada` na metade do HP (cura 20%, caixa deita, a turma grita); **`furia`** com 30% do HP depois da virada (ataques mais fortes e longos), uma vez | Mariposas / Feixes / Estilhaços (depois da virada: Estilhaços / Feixes) | 12 |
+
+### O chefe é um TITÃ (regra `titan`)
+
+No último quarto o Silêncio engole Asriel e cresce até atravessar o teto: na arena ele é o sprite do
+oponente **gigante** (`campanha/tita.js`), em silhueta violeta atrás da caixa, respirando, com dois
+olhos que brilham (acendem quando ele ataca, ficam vermelhos na fúria; na virada, rachaduras de luz).
+Ele entra com o nome enorme na tela e fala com **quem joga**, não com a Kris (a quarta parede: "É
+VOCÊ. DO OUTRO LADO DA TELA. EU ESTOU VENDO A SUA MÃO.").
+
+**O arremesso**: a cada rodada, as cartas da sua mão que você **não jogou** (a mão inteira, se passou
+a vez) são arremessadas em você ANTES do ataque do titã. São as cartas em si, não as habilidades:
+na tela, as Cartas de verdade saem da sua mão, ficam tremendo embaixo da caixa (o lado da mão) com a
+linha de mira e voam onde o coração estava, quicando uma vez nas paredes. O ataque do titã espera
+elas (`atrasoDasCartas`). Por dentro é o modelo `cartas` (`campanha/ataques.js`: retângulos de
+20×28, verificados pelo servidor como os outros); quem decide quais cartas voam é o servidor
+(`partida.js`, a mão dele antes da jogada). Sem carta do titã na rodada, só as suas cartas voam
+(`DANO_CARTA`). Guardar cartas boas tem preço: quanto mais carta na mão, mais coisa voando.
 
 ### Dois lados da caixa: as cartas do jogo e o que dá medo
 
@@ -203,6 +220,7 @@ cliente: quem **roda a partida é o servidor** (`server/campanha.js` + `campanha
 | `estilhacos` (cristal que avisa e estoura em leque) | **sim** |
 | `garras` (três dedos em leque, aviso com a linha, bote rápido) | **sim** |
 | `mandibula` (dentes que fecham de cima e de baixo; a garganta marcada fica livre) | **sim** |
+| `cartas` (o titã arremessa as cartas que você não jogou; quicam uma vez) | **sim** |
 | ataques do PvP (`attacks/*`) na SUA caixa | a campanha não usa: na sua caixa só vêm os modelos acima. O caminho existe em `concluirEsquiva` (`verificado: false`): vale o relato do navegador, conferido |
 | ataques do PvP na caixa da CPU (a sua carta) | **o servidor roda** (`ataqueReal.js`) e decide os acertos na CPU; o navegador só repete para desenhar |
 

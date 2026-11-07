@@ -19,7 +19,7 @@ const caixa = CAIXA_CAMPANHA
 const at = (modelos, extra = {}) => ({ modelos, forca: 0.7, duracao: 6000, caixa, semente: 'paridade', ...extra })
 
 test('o registro: todo modelo da campanha é simulável no servidor', () => {
-  assert.deepEqual([...ATACAVEL_NO_SERVIDOR].sort(), ['chuva', 'estilhacos', 'feixes', 'galhos', 'garras', 'mandibula', 'redemoinho', 'sementes'])
+  assert.deepEqual([...ATACAVEL_NO_SERVIDOR].sort(), ['cartas', 'chuva', 'estilhacos', 'feixes', 'galhos', 'garras', 'mandibula', 'redemoinho', 'sementes'])
   assert.equal(atacavelNoServidor('rain'), false) // os ataques do PvP (Phaser) não são
   for (const carta of cartasDoPersonagem('asriel')) {
     const a = ataqueDaCartaNaCampanha(carta, { duplo: true })

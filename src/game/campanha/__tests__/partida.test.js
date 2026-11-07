@@ -112,8 +112,11 @@ test('ataques só de cima na Chuva de Recortes; o chefe manda dois juntos', () =
   let viu = false
   for (let i = 0; i < 4 && b.etapa !== 'fim'; i++) {
     const { r } = rodada(b)
-    if (r.rodada.ataque && r.rodada.jogadas[1].carta) {
-      assert.equal(r.rodada.ataque.modelos.length, 2)
+    // (a carta do titã pode ser de suporte: aí só as suas cartas voam)
+    if (r.rodada.ataque && r.rodada.jogadas[1].carta && r.rodada.ataque.modelos.length > 1) {
+      // o titã: as cartas arremessadas primeiro, e depois os dois ataques dele juntos
+      assert.equal(r.rodada.ataque.modelos[0], 'cartas')
+      assert.equal(r.rodada.ataque.modelos.filter((m) => m !== 'cartas').length, 2)
       viu = true
     }
   }
@@ -310,4 +313,37 @@ test('pressão: o que vem na sua caixa fica mais forte quanto mais funda a fase'
     return out.reduce((a, b) => a + b, 0) / out.length
   }
   assert.ok(forcas(5) > forcas(1))
+})
+
+test('o TITÃ arremessa as cartas que você NÃO jogou (todas, se passou a vez), antes do ataque dele', () => {
+  const c = criarCorrida({ mundo: 1, fase: 6, semente: 'tita' })
+  const v = comecarRodada(c)
+  const jogada = melhorAtaque(v)
+  const maoAntes = v.eu.mao.map((x) => x.id)
+  const r = jogar(c, jogada)
+  const at = r.rodada.ataque
+  assert.ok(at, 'sempre há ataque na sua caixa: no mínimo as suas cartas')
+  assert.equal(at.modelos[0], 'cartas')
+  assert.deepEqual(at.cartas.map((x) => x.id), maoAntes.filter((id) => id !== jogada))
+  assert.equal(at.verificado, true)
+  // as cartas são as de verdade (naipe e valor), mas só voam: o ataque delas não acontece
+  for (const x of at.cartas) assert.ok(x.naipe && x.valor)
+  // a esquiva inteira passa pelo servidor (as cartas também contam acerto)
+  const e = desviar(at, { piloto: 'parado' })
+  const fim = concluirEsquiva(c, { amostras: ler(e.amostras), acertosCliente: e.acertos, decorridoMs: 60_000 })
+  assert.ok(fim.ok && fim.acertos >= 1, 'parado no meio das cartas, alguma acerta')
+  // passou a vez: a mão inteira voa
+  if (c.etapa !== 'fim') {
+    const v2 = comecarRodada(c)
+    const r2 = jogar(c, null)
+    assert.deepEqual(r2.rodada.ataque.cartas.map((x) => x.id), v2.eu.mao.map((x) => x.id))
+  }
+})
+
+test('as outras fases não arremessam cartas', () => {
+  const c = criarCorrida({ mundo: 1, fase: 5, semente: 'semcartas' })
+  for (let i = 0; i < 3 && c.etapa !== 'fim'; i++) {
+    const { r } = rodada(c)
+    if (r.rodada.ataque) assert.ok(!r.rodada.ataque.cartas && !r.rodada.ataque.modelos.includes('cartas'))
+  }
 })
