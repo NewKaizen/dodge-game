@@ -7,109 +7,96 @@ campanha!".
 
 | Peça | Onde |
 | --- | --- |
-| Regras dos mundos (fases, oponentes, regra especial, metas) | `src/game/campanha/mundos/mundoN.js` |
-| Textos (diálogos, escolhas, cenário e tema de cada fase) | `src/game/campanha/mundos/mundoN.textos.js` |
+| Regras dos mundos (fases, chefe, aliada, regra especial, metas) | `src/game/campanha/mundos/mundoN.js` |
+| Textos (diálogos, escolhas, cenário, tema e falas da luta de cada fase) | `src/game/campanha/mundos/mundoN.textos.js` |
+| Os CHEFES (formato do CO-OP) | `src/game/campanha/chefes.js` (registrados em `coop/chefes/index.js`, fora da seleção do CO-OP) |
+| A luta (regras do CO-OP + as da fase), estrelas | `src/game/campanha/luta.js` (sobre `coop/regras.js`) |
+| O quadro em passo fixo (navegador e servidor) | `src/game/campanha/quadro.js` (a cena sem tela do servidor: `cenaSemTela.js`) |
+| Ataques novos da biblioteca | `src/game/attacks/garras.js`, `mandibula.js`, `arremesso.js` (attacks/ sem Phaser: `src/game/phaserPuro.js`) |
+| Posições do coração: formato e plausibilidade | `src/game/campanha/amostras.js` |
 | Cenário sombrio (puro, com semente) e o desenho em Phaser | `src/game/campanha/cenario.js`, `desenharCenario.js` |
 | Mapa da escada (puro) · ecos na tela · texto sem ligadura | `src/game/campanha/mapa.js` · `eco.js` · `texto.js` |
+| O titã · o medo (véu, batida de coração, sussurros) | `src/game/campanha/tita.js` · `medo.js` |
 | Música | `scripts/musica/campanha.mjs` → `campanha.mid`, `campanha2.mid`; `scripts/musica/trilhas.mjs` → `campanha_luta`, `_chefe`, `_virada`, `_libertado`, `_final` |
-| O ataque DE VERDADE da sua carta na caixa da CPU (servidor e navegador) | `src/game/campanha/ataqueReal.js` (attacks/ sem Phaser: `src/game/phaserPuro.js`) |
-| O medo na sua caixa (véu, batida de coração, sussurros) | `src/game/campanha/medo.js` |
-| Ataques puros (com semente) e o registro `atacavelNoServidor` | `src/game/campanha/ataques.js` |
-| Esquiva em passo fixo (navegador e servidor) | `src/game/campanha/simulacao.js` |
-| Posições do coração: formato e plausibilidade | `src/game/campanha/amostras.js` |
-| A partida (sobre `pvp/regras.js`), estrelas | `src/game/campanha/partida.js` |
 | Motor dos diálogos | `src/game/campanha/dialogo.js` (a caixa: `CaixaDeDialogo.js`) |
 | XP (espelho do banco) | `src/game/campanha/recompensas.js` |
-| Servidor (roda a partida) | `server/campanha.js` (ligado em `server/lan.js`) |
+| Servidor (roda a luta) | `server/campanha.js` (ligado em `server/lan.js`) |
 | Banco | `supabase/migrations/0011_campanha.sql` (e `0012_campanha_mundo1.sql`: os nomes do Mundo 1) |
-| Navegador | `src/lib/campanha.js`, cenas `Campanha` (mapa), `CampanhaArena`, `CampanhaFim` |
+| Navegador | `src/lib/campanha.js`, cenas `Campanha` (mapa), `CampanhaArena` (a luta), `CampanhaFim` |
 
 ## Mundo 1: "A Casa Silenciosa" (Kris)
 
 Na noite do Festival das Luzes, a cidade apaga de uma vez e as vozes somem. Uma sombra, **o
 Silêncio** (feita de tudo o que ninguém teve coragem de dizer), prende os amigos de Kris dentro das
 próprias lembranças: a sala de aula, o corredor, o ginásio, a rua, a sala de estar. As portas da casa
-levam até eles. Cada luta é contra um amigo **possuído** (o eco, apagado) e o Silêncio fala por ele;
-vencer **liberta** o amigo, que volta com cor, entra na turma e **sobe a escada junto** (aparece atrás
-da Kris no diálogo e na partida, torce durante a luta e grita na virada do chefe). No último quarto,
-o do irmão que foi embora sem se despedir, o Silêncio está grudado em Asriel. O clímax: Kris, que não
-fala o mundo inteiro, diz **uma** frase ("Volta pra casa."), as luzes da cidade voltam e o telefone
-toca. A história é original; os personagens são os do jogo.
+levam até eles. Cada luta é contra um amigo **possuído** (o eco, um CHEFE) e o Silêncio fala por ele;
+vencer **liberta** o amigo, que volta com cor e **luta do seu lado na próxima porta** (a CPU aliada).
+No último quarto, o do irmão que foi embora sem se despedir, o Silêncio engole Asriel e vira um
+**titã**. O clímax: Kris, que não fala o mundo inteiro, diz **uma** frase ("Volta pra casa."), as luzes
+da cidade voltam e o telefone toca. A história é original; os personagens são os do jogo.
 
-| Fase | Lugar (cenário) | Preso | Regra especial | Golpe do oponente (`assinatura`) | ★ rodadas |
+| Fase | Lugar | Chefe (`inimigo`) | Aliada | Regra especial | ★ rodadas |
 | --- | --- | --- | --- | --- | --- |
-| 1 A Sala de Aula | `sala` | Ralsei | só cartas ♠ | Mariposas | 9 |
-| 2 O Corredor que Fecha | `corredor` | Noelle | a caixa perde 10% por rodada | Estilhaços (gelo) / Olhares | 7 |
-| 3 O Ginásio Vazio | `ginasio` | Berdly | o ataque que você mandou volta (`eco`) | Feixes de luz (holofotes) | 8 |
-| 4 A Rua de Volta | `rua` | Susie | começa com 0 de energia | Feixes (faróis) / Paredes | 8 |
-| 5 A Sala Onde Chove | `chuva` | Dess | todo ataque vem de cima | Cinzas / Olhares | 9 |
-| 6 O Último Quarto (chefe) | `quarto` | Asriel (o **Titã do Silêncio**) | **`titan`** (as cartas que você não jogou voam em você antes do ataque dele); `duplo`; `virada` na metade do HP (cura 20%, caixa deita, a turma grita); **`furia`** com 30% do HP depois da virada (ataques mais fortes e longos), uma vez | Mariposas / Feixes / Estilhaços (depois da virada: Estilhaços / Feixes) | 12 |
+| 1 A Sala de Aula | `sala` | Eco do Ralsei (`c_ralsei`) | — (sozinha) | só cartas ♠ | 9 |
+| 2 O Corredor que Fecha | `corredor` | Eco da Noelle (`c_noelle`) | Ralsei | o quadro perde 6% por rodada | 9 |
+| 3 O Ginásio Vazio | `ginasio` | Eco do Berdly (`c_berdly`) | Noelle | `eco`: o ataque leve do chefe vem junto | 9 |
+| 4 A Rua de Volta | `rua` | Eco da Susie (`c_susie`) | Berdly | começa com 0 de energia | 10 |
+| 5 A Sala Onde Chove | `chuva` | Eco da Dess (`c_dess`) | Susie | todo ataque vem de cima | 10 |
+| 6 O Último Quarto | `quarto` | **O Titã do Silêncio** (`c_tita`, nível MÉDIO) | Susie | **`titan`**: as cartas que você não jogou voam em você | 14 |
+
+### A luta é um CHEFE do CO-OP
+
+Cada fase é uma luta de chefe com **as regras do CO-OP** (`docs/coop-cartas.md`; as mesmas funções de
+`coop/regras.js`): o chefe joga UMA carta por rodada (a **intenção**, virada, com o naipe à vista:
+♠ ataque, ♦ controle, ♣ armadilha, ♥ ele se cura), o ataque dela roda no **quadro** grande (336×180),
+você (e a aliada) desviam, e depois as cartas jogadas viram **golpes** no chefe (♠ golpe forte, ♦ golpe
+que atrasa o chefe, ♣ armadilha que cresce com os grazes, ♥ cura e escudo para os dois, Ases, SUPER,
+CRÍTICO no desvio perfeito, COMBO/PAR quando você e a aliada combinam). O chefe tem **fases** (troca
+de baralho com uma fala de entrada) e a barra de **SUPER**. Quem cai fica fora 2 rodadas e volta;
+derrota só quando todo mundo caiu.
+
+- **A aliada** é a CPU do CO-OP (`coop/bot.js` para as cartas, `pvp/botEsquiva.js` no quadro). Na fase 1
+  a vaga dela fica fora da luta (`definirPresenca(saiu: [1])`): você está sozinha.
+- **Os ataques** são os da biblioteca do jogo (`attacks/`), rodando no quadro com o `ContextoAtaque` e
+  a `Balas` de verdade. Três são novos, feitos para o Silêncio e válidos em qualquer modo:
+  **Garras** (`garras`: três dedos em leque que avisam parados fora da caixa e dão o bote), **Mandíbula**
+  (`mandibula`: a caixa fica vermelha em cima e embaixo, só a garganta fica livre, e os dentes fecham)
+  e o **arremesso** do titã (`arremesso`).
+- **A tela** (`scenes/CampanhaArena.js`) segue o CO-OP: o chefe no alto (um eco violeta, ou o titã
+  gigante), a intenção ao lado dele, os placares nos cantos (`HudPvp`), a mão grande embaixo (cartas
+  de 82 px), as cartas de cada um carregando em cima do personagem e voando no chefe no
+  contra-ataque, o quadro na `BattleBox` de verdade (recorte e faixa de aproximação). Enquanto o
+  chefe ataca: a borda do quadro pulsa em carmim, as bordas da tela fecham, um coração bate grave e
+  sussurros aparecem (`medo.js`; "reduzir animações" tira os sussurros).
+
+Medição (8 lutas por fase; o "jogador" é a CPU de cartas do CO-OP + o `EsquivaBot`): com o desvio
+FÁCIL ele vence tudo das fases 1–5 terminando com 50–80% do HP, e o titã o deixa com ~7% (perde 1 em 8);
+com o desvio NORMAL, 75–90% nas fases e ~35% no titã. Lutas de 6 a 10 rodadas.
 
 ### O chefe é um TITÃ (regra `titan`)
 
 No último quarto o Silêncio engole Asriel e cresce até atravessar o teto: na arena ele é o sprite do
-oponente **gigante** (`campanha/tita.js`), em silhueta violeta atrás da caixa, respirando, com dois
-olhos que brilham (acendem quando ele ataca, ficam vermelhos na fúria; na virada, rachaduras de luz).
-Ele entra com o nome enorme na tela e fala com **quem joga**, não com a Kris (a quarta parede: "É
-VOCÊ. DO OUTRO LADO DA TELA. EU ESTOU VENDO A SUA MÃO.").
+chefe **gigante** (`campanha/tita.js`), em silhueta violeta atrás de tudo, respirando, com dois olhos
+que brilham (acendem quando ele ataca; na 2ª fase, rachaduras de luz e a música vira a heroica; na 3ª,
+a **fúria**: olhos vermelhos). Ele entra com o nome enorme na tela e fala com **quem joga**, não com a
+Kris (a quarta parede: "É VOCÊ. DO OUTRO LADO DA TELA. EU ESTOU VENDO A SUA MÃO.").
 
 **O arremesso**: a cada rodada, as cartas da sua mão que você **não jogou** (a mão inteira, se passou
-a vez) são arremessadas em você ANTES do ataque do titã. São as cartas em si, não as habilidades:
-na tela, as Cartas de verdade saem da sua mão, ficam tremendo embaixo da caixa (o lado da mão) com a
-linha de mira e voam onde o coração estava, quicando uma vez nas paredes. O ataque do titã espera
-elas (`atrasoDasCartas`). Por dentro é o modelo `cartas` (`campanha/ataques.js`: retângulos de
-20×28, verificados pelo servidor como os outros); quem decide quais cartas voam é o servidor
-(`partida.js`, a mão dele antes da jogada). Sem carta do titã na rodada, só as suas cartas voam
-(`DANO_CARTA`). Guardar cartas boas tem preço: quanto mais carta na mão, mais coisa voando.
+a vez) são arremessadas em você ANTES do ataque do titã. São as cartas em si, não as habilidades: na
+tela, as Cartas de verdade saem da sua mão, ficam tremendo embaixo do quadro com a linha de mira e voam
+onde o coração estava, quicando uma vez nas paredes. Por dentro é o ataque `arremesso` (retângulos de
+20×28 com `cartaId`, em `A.sequencia` antes do ataque do titã); quem decide quais cartas voam é o
+servidor (a mão dele antes da jogada). Se a carta do titã saiu da mesa (Espelho, Anular, Roubo, SUPER),
+as cartas voam assim mesmo, com o ataque leve dele. Guardar cartas boas tem preço.
 
-### Dois lados da caixa: as cartas do jogo e o que dá medo
+**Música**: `campanha_luta` nas fases, `campanha_chefe` no titã, `campanha_virada` quando ele racha (o
+mesmo motivo das fases em maior), `campanha_libertado` quando um amigo volta e `campanha_final` no fim
+do mundo (a melodia do mapa em Ré maior). Todas originais, geradas por `scripts/musica/trilhas.mjs`;
+`__tests__/musicaTrilhas.test.js` confere loop, andamento e escala. A sua carta SUPER toca a música dela.
 
-- **A sua carta é a do jogo original.** O ataque que ela solta na caixa da CPU é o MESMO do PvP
-  (`ataqueDaCarta` + a biblioteca `attacks/`, com o `ContextoAtaque` e a classe `Balas` reais): a
-  Estocada Dupla da Kris, as habilidades, a SUPER (com a música dela). O dano na CPU é o do PvP
-  (`DANO_NA_CPU = 1`), e o HP da CPU sobe para compensar (`fatorHpCpu` 0,7 a 1). Quem roda é o
-  **servidor** (`campanha/ataqueReal.js`): a biblioteca `attacks/` não usa mais o Phaser (o pouco que
-  usava está em `phaserPuro.js`, uma cópia fiel conferida contra o Phaser em
-  `__tests__/phaserPuro.test.js`, inclusive o gerador aleatório: o PvP não muda). A CPU desvia
-  (`botEsquiva.js`) e o servidor conta os acertos nela; o navegador repete o ataque com a mesma
-  semente e as amostras da CPU numa região longe da tela (`CAIXA_REAL`), mostrada por uma câmera só
-  dela (como a vitrine do Manual do Ralsei). Ataques que empurram o coração usam o mesmo objeto
-  (`coracao.ajustar()`, como `Heart.js`).
-- **O que vem na SUA caixa é do Silêncio**: os modelos da campanha (verificados pelo servidor), mais
-  duros a cada fase (`fase.pressao`, 0,1 a 0,3, somado à força) e desenhados para assustar: brasas,
-  espinhos, **olhos** que seguem o coração, mariposas que batem as asas, feixes, cristais, **Garras**
-  (`garras`: três dedos em leque que avisam com a linha e dão o bote rápido) e a **Mandíbula**
-  (`mandibula`: uma fileira de dentes em cima e outra embaixo fecham; só a garganta marcada fica
-  livre). Enquanto o Silêncio ataca: a borda da caixa pulsa em carmim, as bordas da tela fecham
-  (mais quanto menos HP), um coração bate grave (mais rápido quanto menos HP) e sussurros aparecem
-  em volta (`campanha/medo.js`; "reduzir animações" tira os sussurros).
-
-Medição (10 lutas por fase, `piloto 'bom'` = desvia de tudo o que vê; `'zigue'` = anda sem olhar):
-o piloto bom vence quase tudo, mas chega ao fim da Rua com ~60% do HP e ao fim do chefe com ~27%
-(e perde 2 em 10); andar sem olhar perde a partir da fase 2. Lutas de 5 a 9 rodadas.
-
-**Música**: `campanha_luta` nas fases, `campanha_chefe` no chefe, `campanha_virada` quando a porta se
-abre (o mesmo motivo das fases em maior), `campanha_libertado` quando um amigo volta e
-`campanha_final` no fim do mundo (a melodia do mapa em Ré maior). Todas originais, geradas por
-`scripts/musica/trilhas.mjs`; `__tests__/musicaTrilhas.test.js` confere loop, andamento e escala.
-
-**Golpe do oponente** (`fase.assinatura`, `campanha/ataques.js` `comAssinatura`): o ataque que a CPU
-manda na **sua** caixa troca o modelo do naipe pelo golpe de quem está do outro lado, um por rodada em
-rodízio; o SUPER e o segundo modelo do `duplo` continuam; na fase do `eco`, o eco tem a vez. Cada
-fase fica com cara própria.
-
-Os ataques são seis modelos simuláveis: **Cinzas que caem** (`chuva`), **Paredes com uma fresta**
-(`galhos`), **Olhares** (`sementes`), **Mariposas** (`redemoinho`) e os novos **Feixes de luz**
-(`feixes`: retângulos que cruzam a caixa, o primeiro na linha do coração, piscando 760 ms antes de
-acender por 420 ms; dois da mesma leva a pelo menos 74 px) e **Estilhaços** (`estilhacos`: um cristal
-que brilha 650 ms longe do coração e estoura em leque). Com `soDeCima`, feixes viram paredes e
-estilhaços viram cinzas.
-
-**Falas durante a luta** (`luta` nos textos, só sabor, no navegador): `inicio`, `ferido` (oponente com
+**Falas durante a luta** (`luta` nos textos, só sabor, no navegador): `inicio`, `ferido` (chefe com
 metade do HP), `quase` (1/4), `voceMal` (você com 35%), `perfeito` (desviou de tudo). Balões nos cantos
-de baixo: o oponente e o Silêncio à direita, os amigos libertados à esquerda (só fala quem já está
-livre). Na tela ainda: "PERFEITO!" ao zerar os acertos, o dano no oponente subindo, a turma pulando, a
-barra do chefe violeta depois da virada e vermelha na fúria.
+de baixo: o chefe e o Silêncio à direita, os amigos à esquerda (só fala quem está na luta ou já livre).
 
 Escolhas (só sabor; são ações, nunca falas): na fase 1, **guardar o bilhete** ou deixá-lo na mesa (o
 chefe comenta); na fase 3, **bater palmas** uma vez ou ficar em silêncio (o Silêncio provoca). Ficam
@@ -150,10 +137,8 @@ salvas na conta.
   por `semLigaduras` (`campanha/texto.js`).
 
 **Estrelas** (calculadas no servidor): ★ vencer · ★ terminar com pelo menos 60% do HP · ★ vencer em
-até N rodadas (a coluna acima). A CPU da campanha é a do PvP (`pvp/bot.js` e `pvp/botEsquiva.js`),
-com o HP da fase (`fatorHpCpu`) e levando o dano do PvP por acerto (fases de 5 a 9 rodadas). O
-coração anda sempre a 180 px/s na campanha (o ajuste de velocidade do painel não vale: o servidor
-confere a velocidade).
+até N rodadas (a coluna acima). O coração anda sempre a 180 px/s na campanha (o ajuste de velocidade
+do painel não vale: o servidor confere a velocidade).
 
 ## Recompensas (só o servidor concede)
 
@@ -173,34 +158,35 @@ os nomes de agora vêm da **0012** (`0012_campanha_mundo1.sql`, idempotente). O 
 tem descrição: o texto de cada item fica em `mundo1.js` (`descricao`) e aparece na Coleção. A tela de recompensa mostra o que o
 servidor concedeu; a Coleção lista os três (aba do tipo, "CAMPANHA, MUNDO 1").
 
-## Anti-trapaça: o servidor vê a partida
+## Anti-trapaça: o servidor vê a luta
 
 No PVP em rede o host decide e o servidor só compara relatos (`docs/rede-pvp.md`, `server/partidas.js`);
 como o plano da Fase 6 lembra, "acordo entre clientes não comprova" nada. Na campanha não há outro
-cliente: quem **roda a partida é o servidor** (`server/campanha.js` + `campanha/partida.js`):
+cliente: quem **roda a luta é o servidor** (`server/campanha.js` + `campanha/luta.js`):
 
-1. **Mão, energia, HP e CPU no servidor.** O baralho, a compra, a energia, a jogada da CPU, a
-   resolução da rodada (Ases, escudo, roubo) e o dano usam `pvp/regras.js` no servidor. A carta que o
-   navegador manda é conferida com a mão e a energia **do servidor** e com a regra da fase; carta
-   fora da mão, sem energia ou fora da regra é recusada (`campanhaErro {motivo: 'carta'}`) e a rodada
-   continua.
-2. **Semente dos ataques no servidor.** Cada caixa recebe `{ modelos, forca, duracao, semente, caixa,
-   dano }`; o navegador monta o mesmo roteiro (`campanha/ataques.js`) para desenhar.
-3. **Posições do coração.** Durante a esquiva o navegador manda as posições (~20 Hz: uma amostra a
-   cada 50 ms do relógio da simulação, em pedaços de 250 ms; lista plana `[t, x, y, ...]`, x/y em
-   décimos de px). O servidor confere **toda** esquiva (`validarAmostras`): formato; tempo crescente;
-   primeira amostra no ponto de partida; intervalo máximo de 260 ms e mínimo de 10 ms; taxa média
-   entre ~4 e 100 Hz; dentro da caixa (com a metade do coração); velocidade até 180 px/s + 3% (+0,8 px);
-   salto muito acima disso = **teleporte**; a última amostra perto do fim do ataque (`curta`); e o
-   **relógio do servidor**: nenhuma amostra pode ser de um instante que ele ainda não viu
-   (`futuro`, folga de 400 ms) e a esquiva não pode terminar antes da duração (`rapida_demais`).
-4. **Acertos refeitos no servidor.** Com as amostras (posição interpolada; o alvo das balas miradas
-   é a última amostra, que o navegador também usa), o servidor roda a mesma simulação
-   (`simularComAmostras`) e conta os acertos com uma hitbox 1,2 px mais generosa (só acerto claro).
-   O dano é `max(acertos do servidor, acertos relatados)`: o relato do navegador **só pode piorar
-   para ele**, então mandar "não levei nada" não salva ninguém. Relato acima do possível (um acerto a
-   cada 850 ms de invencibilidade) é suspeito. A esquiva da **CPU** é decidida inteira no servidor
-   (`simularCpu`, com sorteio de semente) e vai para o navegador só para desenhar.
+1. **Mão, energia, HP, chefe e aliada no servidor.** O baralho, a compra, a energia, a carta do chefe,
+   a jogada da aliada, a resolução da rodada (Ases, escudo, roubo, SUPER) e os golpes usam
+   `coop/regras.js` no servidor. A carta que o navegador manda é conferida com a mão e a energia
+   **do servidor** e com a regra da fase; carta fora da mão, sem energia ou fora da regra é recusada
+   (`campanhaErro {motivo: 'carta'}`) e a rodada continua.
+2. **A esquiva vem pronta do servidor.** `esquiva = { chefe, carta, cartas?, danos, hp, jogadores,
+   caixa, ritmo, velocidadeMax, inverter, semente, duracao }`: o navegador roda o MESMO quadro
+   (`campanha/quadro.js`) a partir disso.
+3. **Posições do coração, uma por passo.** O quadro anda em passo fixo (16 ms) e o navegador manda a
+   sua posição de **cada passo** (lista plana `[t, x, y, ...]`, x/y em décimos de px, em pedaços de
+   250 ms). O servidor confere **toda** esquiva (`validarAmostras`): formato; tempo crescente;
+   primeira amostra perto do ponto de partida; intervalo máximo de 260 ms e mínimo de 10 ms; taxa
+   média; dentro do quadro (com a metade do coração); velocidade até 180 px/s + 3% (+0,8 px); salto
+   muito acima disso = **teleporte**; a última amostra perto do fim (`curta`; quem cai no meio
+   continua mandando a posição, parada); e o **relógio do servidor**: nenhuma amostra pode ser de um
+   instante que ele ainda não viu (`futuro`, folga de 400 ms) e a esquiva não pode terminar antes da
+   duração (`rapida_demais`).
+4. **O quadro refeito no servidor, exatamente.** Com as posições de cada passo, o servidor roda o
+   mesmo quadro (`simularQuadro`: o ataque de verdade, numa cena sem tela) com a aliada desviando
+   pelo mesmo sorteio, e conta os acertos e os grazes dos dois. Como as posições são as de cada passo,
+   o resultado é **o mesmo** do navegador (`luta.test.js` confere carta por carta). O dano é
+   `max(acertos do servidor, acertos relatados)`: o relato só pode piorar para quem relata. Relato
+   acima do possível (um acerto a cada 850 ms de invencibilidade) é suspeito.
 5. **Suspeita = sem recompensa.** Qualquer falha acima encerra a corrida como `suspeita`, com o
    motivo no log do servidor (`[campanha] corrida … suspeita (teleporte)`) e no banco
    (`campanha_corridas.motivo`). Nada cai: erro interno também vira `suspeita` ('erro').
@@ -208,50 +194,31 @@ cliente: quem **roda a partida é o servidor** (`server/campanha.js` + `campanha
    a âncora da idempotência), confere de novo o desbloqueio (fase anterior vencida; senão vira
    `suspeita`/'bloqueada') e aplica o teto do dia.
 
-### O que é verificado e o que não é
-
-| Ataque | Verificado no servidor? |
-| --- | --- |
-| `chuva` (folhas que caem acelerando, 1 em 3 na coluna do coração) | **sim**: acertos refeitos |
-| `galhos` (paredes com um vão, de lado ou de cima) | **sim** |
-| `sementes` (miradas, paradas com a linha por 700 ms) | **sim** |
-| `redemoinho` (papéis pelas bordas, girando) | **sim** |
-| `feixes` (retângulos parados que avisam e acendem) | **sim** |
-| `estilhacos` (cristal que avisa e estoura em leque) | **sim** |
-| `garras` (três dedos em leque, aviso com a linha, bote rápido) | **sim** |
-| `mandibula` (dentes que fecham de cima e de baixo; a garganta marcada fica livre) | **sim** |
-| `cartas` (o titã arremessa as cartas que você não jogou; quicam uma vez) | **sim** |
-| ataques do PvP (`attacks/*`) na SUA caixa | a campanha não usa: na sua caixa só vêm os modelos acima. O caminho existe em `concluirEsquiva` (`verificado: false`): vale o relato do navegador, conferido |
-| ataques do PvP na caixa da CPU (a sua carta) | **o servidor roda** (`ataqueReal.js`) e decide os acertos na CPU; o navegador só repete para desenhar |
-
-Todas as cartas de todos os baralhos viram um desses quatro modelos na campanha (♠ galhos, ♦
-sementes, ♣ redemoinho, ♥ chuva fraca, SUPER galhos + sementes); o chefe junta dois. O teste
-`campanha/__tests__/simulacao.test.js` confere que as balas andam igual às do jogo (`manual/onda.js`,
-que já é conferido contra as classes `Balas`/`Heart` reais) e a **paridade**: o servidor, só com as
-amostras, refaz os acertos do navegador (em 60 de 64 esquivas de teste exatamente iguais, nunca mais
-que o navegador; exato quando o coração anda em linha reta).
+**Por que dá para refazer igual**: a biblioteca `attacks/` e `entities/Bullets.js` não usam o Phaser (o
+pouco que usavam está em `phaserPuro.js`, uma cópia fiel conferida contra o Phaser em
+`__tests__/phaserPuro.test.js`, inclusive o gerador aleatório: o PvP e o CO-OP não mudam), nenhum
+ataque cria bala em animação, e o quadro do navegador é a `BattleBox` com os mesmos limites
+arredondados de `limitesDoQuadro`. Todo ataque dos chefes da campanha roda no servidor (`luta.test.js`).
 
 ### Limites (o que isto não resolve)
 
-- **Bot no navegador.** A semente e o roteiro são conhecidos pelo navegador (ele precisa desenhar):
+- **Bot no navegador.** A semente e o ataque são conhecidos pelo navegador (ele precisa desenhar):
   um cliente adulterado pode calcular um caminho perfeito e mandá-lo em tempo real. As posições são
   plausíveis e o servidor aceita. Isso dá estrelas e XP de campanha, que têm teto diário; não dá
   vantagem sobre outra pessoa. Para o ranqueado (Fase 6) isto continua sendo a hipótese a medir.
-- **Coração invulnerável não existe mais aqui**: o dano é do servidor. Mas um cliente pode
-  "desviar" melhor que um humano (acima).
-- **Diferença de amostragem.** A 20 Hz o servidor não vê cada curva: por isso a hitbox mais
-  generosa e o "vale o maior". Num caso raro o servidor conta um acerto a menos que a tela (nunca a
-  mais, na medição).
+- **Outro navegador, outra matemática.** `Math.sin`/`Math.cos` podem diferir no último bit entre
+  motores (Chrome x Firefox): aí a aliada (e um tiro mirado nela) pode sair um pouco diferente do
+  servidor. O dano da aliada é sempre o do servidor; o seu é o maior dos dois.
 - **Queda de conexão**: a corrida é **abandonada** na hora (sem recompensa, registrada como
   `abandono`). Retomar uma esquiva no meio exigiria confiar no relógio do navegador; é
-  single-player e curta, então a opção simples e segura é recomeçar a fase.
+  single-player, então a opção simples e segura é recomeçar a fase.
 
 ## Protocolo (versão 16)
 
 `campanha {acao}` do navegador; respostas `campanha*` do servidor (ver o topo de `server/campanha.js`):
 `progresso` → `campanhaProgresso {fases, escolhas, xpHoje, teto}` · `comecar {mundo, fase}` →
-`campanhaInicio {corrida, rodada}` · `carta {corrida, carta|null}` → `campanhaEsquiva {jogadas,
-efeitos, ataque, ataqueCpu, cpuAmostras, eu, cpu}` · `posicoes {corrida, rodada, seq, a}` ·
+`campanhaInicio {corrida, rodada}` · `carta {corrida, carta|null}` → `campanhaEsquiva {rodada, jogadas,
+intencao, destino, efeitos, chefeEfeito, esquiva, arremessadas, eu, aliado, chefe}` · `posicoes {corrida, rodada, seq, a}` ·
 `fimEsquiva {corrida, rodada, acertos}` → `campanhaRodada {resumo, proxima}` e, no fim,
 `campanhaFim {resultado, motivo, estrelas, xpGanho, xpTotal, nivelAntes, nivelDepois, itensNovos,
 melhorEstrelas, primeira}` · `escolha {mundo, chave, valor}` · `desistir {corrida}`. Sem a carta em
@@ -278,16 +245,18 @@ ids). Teste no Postgres (0001–0012, duas vezes): `DODGE_PG=... node --test ser
 
 ## Como acrescentar um mundo
 
-1. `src/game/campanha/mundos/mundo2.js` com `{ id: 2, nome, personagem, fases: [...], recompensas }`
-   (formato no topo de `mundo1.js`; a última fase é o chefe). Use as regras que já existem
-   (`soNaipe`, `caixaEncolhe`, `eco`, `energiaInicial`, `soDeCima`, `duplo`, `virada`, `furia`) e dê a cada fase uma `assinatura` ou crie uma em
-   `campanha/partida.js` (com teste).
-2. `mundo2.textos.js` com `antes`, `depois`, `derrota` e `luta` de cada fase, o `cenario` (um tema de
+1. Os chefes em `src/game/campanha/chefes.js` (formato do CO-OP, `campanha: true`; os testes do CO-OP
+   conferem todos). Prefira os ataques da biblioteca `attacks/` (rodam no servidor); um ataque novo
+   não pode criar bala dentro de animação (tween/onComplete): o servidor não anima.
+2. `src/game/campanha/mundos/mundo2.js` com `{ id: 2, nome, personagem, fases: [...], recompensas }`
+   (formato no topo de `mundo1.js`: `inimigo`, `nivel`, `aliado`, `regra`; a última fase é o chefe).
+   As regras que existem: `soNaipe`, `caixaEncolhe`, `eco`, `energiaInicial`, `soDeCima`, `titan`; uma
+   nova entra em `campanha/luta.js` (com teste).
+3. `mundo2.textos.js` com `antes`, `depois`, `derrota` e `luta` de cada fase, o `cenario` (um tema de
    `campanha/cenario.js`, ou um novo lá, com teste) e o `tema` (a regra dita no tom do mundo); e
-   `titulo`, `resumo`, `virada`, `viradaFalas`, `furia`, `furiaFala`, `ecos`, `cenarioMapa`. Siga o guia de tom e estilo acima.
-3. Registre os dois em `mundos/index.js`.
-4. Prefira ataques simuláveis (`ataques.js`); um modelo novo entra no registro com teste de
-   paridade e de justiça (`simulacao.test.js`).
+   `titulo`, `resumo`, `virada`, `viradaFalas`, `furia`, `furiaFala`, `ecos`, `cenarioMapa`. Siga o guia
+   de tom e estilo acima.
+4. Registre os dois em `mundos/index.js`.
 5. Migration nova (não edite a 0011): `campanha_fases(2)` e os cosméticos no catálogo com
    `campanha = 'mundo2'`. O `mundos.test.js` confere o número de fases e os itens.
 6. O mapa (`scenes/Campanha.js`) recebe `{ mundo: 2 }`; o desbloqueio do mundo 2 depende do chefe do

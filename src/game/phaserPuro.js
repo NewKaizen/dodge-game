@@ -1,6 +1,6 @@
 // O pouco do Phaser que os ATAQUES e as BALAS usam (attacks/*, entities/Bullets.js), em JavaScript
-// puro: assim a biblioteca de ataques roda no Node sem Phaser (o servidor da campanha simula os ataques
-// reais das cartas: campanha/ataqueReal.js). Tudo aqui faz EXATAMENTE o que o Phaser faz
+// puro: assim a biblioteca de ataques roda no Node sem Phaser (o servidor da campanha refaz o quadro dos
+// chefes com os ataques de verdade: campanha/quadro.js). Tudo aqui faz EXATAMENTE o que o Phaser faz
 // (__tests__/phaserPuro.test.js confere contra o Phaser de verdade).
 //
 //   limitar(v, min, max)        Phaser.Math.Clamp

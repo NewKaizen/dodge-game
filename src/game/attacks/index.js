@@ -17,6 +17,9 @@ import brasas from './brasas.js'
 import forcado from './forcado.js'
 import rachaduras from './rachaduras.js'
 import caosFinal from './caosFinal.js'
+import garras from './garras.js'
+import mandibula from './mandibula.js'
+import arremesso from './arremesso.js'
 import { ataquesSuper } from './super/index.js'
 import { ataquesHabilidades } from './habilidades/index.js'
 
@@ -55,6 +58,9 @@ export const ataques = {
   forcado,
   rachaduras,
   caosFinal,
+  garras, // (campanha) garras do Silêncio
+  mandibula, // (campanha) a boca que fecha
+  arremesso, // (campanha) o titã joga as cartas da sua mão
   ...ataquesSuper, // superKris, superSusie... (cartas SUPER)
   ...ataquesHabilidades, // krisEstocadaDupla, susieCabecada... (cartas normais, ver habilidades/)
   juntos,

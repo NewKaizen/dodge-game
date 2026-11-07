@@ -1,12 +1,13 @@
 // A CAMPANHA no servidor (server/campanha.js pelo lobby de server/lan.js, com o Supabase falso):
-// só com conta; o servidor roda a partida, recusa carta ilegal, confere as posições, decide o dano
+// só com conta; o servidor roda a luta (as regras do CO-OP contra o chefe), recusa carta ilegal, confere as posições, decide o dano
 // e concede uma vez só; corrida suspeita (teleporte, relato falso, relógio adiantado) não ganha nada.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { criarLobby, PROTOCOLO } from '../lan.js'
 import { criarRegistro } from '../partidas.js'
 import { criarSupabaseFalso } from '../supabase/fake.js'
-import { desviar } from '../../src/game/campanha/__tests__/apoio.js'
+import { desviarNoQuadro } from '../../src/game/campanha/__tests__/apoioQuadro.js'
+import { limitesDoQuadro } from '../../src/game/campanha/quadro.js'
 import { XP_PRIMEIRA, XP_ESTRELA, XP_CAMPANHA_DIA, XP_PRIMEIRA_CHEFE } from '../../src/game/campanha/recompensas.js'
 import { MUNDO1 } from '../../src/game/campanha/mundos/mundo1.js'
 import { PROTOCOLO as PROTOCOLO_CLIENTE } from '../../src/lib/lan/rede.js'
@@ -69,16 +70,18 @@ async function rodada(m, p, { carta, piloto = 'bom', mexer, acertos, adiantar = 
   if (!e) return { erro: p.ultima('campanhaErro') }
   let seq = 0
   let relogio = 0
-  const r = e.ataque
-    ? desviar(e.ataque, {
-        piloto,
-        aoPedaco(pedaco, t) {
-          if (!adiantar) m.relogio.andar(t - relogio)
-          relogio = t
-          p.mandar({ t: 'campanha', acao: 'posicoes', corrida, rodada: e.rodada, seq: seq++, a: mexer ? mexer(pedaco, t, e.ataque) : pedaco })
-        },
-      })
-    : { acertos: 0 }
+  const esq = e.esquiva
+  const r =
+    esq && esq.jogadores[0]
+      ? desviarNoQuadro(esq, {
+          piloto,
+          aoPedaco(pedaco, t) {
+            if (!adiantar) m.relogio.andar(t - relogio)
+            relogio = t
+            if (pedaco.length) p.mandar({ t: 'campanha', acao: 'posicoes', corrida, rodada: e.rodada, seq: seq++, a: mexer ? mexer(pedaco, t, esq) : pedaco })
+          },
+        })
+      : { acertos: 0 }
   if (!adiantar) m.relogio.andar(200)
   p.mandar({ t: 'campanha', acao: 'fimEsquiva', corrida, rodada: e.rodada, acertos: acertos ?? r.acertos })
   await esperar()
@@ -166,11 +169,12 @@ test('trapaça: posições teletransportadas -> suspeita, sem XP, com o motivo n
   const ana = await m.entrar('ana')
   await comecar(m, ana)
   let feito = false
-  const tp = (pedaco, t, at) => {
+  const tp = (pedaco, t, esq) => {
     if (feito || pedaco.length < 9) return pedaco
     feito = true
+    const l = limitesDoQuadro(esq.caixa)
     const a = [...pedaco]
-    a[4] = a[4] > ((at.caixa.esquerda + at.caixa.direita) / 2) * 10 ? (at.caixa.esquerda + 10) * 10 : (at.caixa.direita - 10) * 10
+    a[4] = a[4] > ((l.left + l.right) / 2) * 10 ? (l.left + 12) * 10 : (l.right - 12) * 10
     return a
   }
   for (let i = 0; i < 6 && !ana.ultima('campanhaFim'); i++) await rodada(m, ana, { mexer: tp })
@@ -184,20 +188,20 @@ test('trapaça: posições teletransportadas -> suspeita, sem XP, com o motivo n
   assert.equal(m.sb.tabelas.campanha_progresso.length, 0)
 })
 
-test('trapaça: relato "não levei nenhum acerto" parado no meio da chuva -> o servidor acha os acertos', async () => {
+test('trapaça: relato "não levei nenhum acerto" parado no meio do ataque -> o servidor acha os acertos', async () => {
   const m = montar(['ana'])
   const ana = await m.entrar('ana')
   await comecar(m, ana, 1)
   m.sb.tabelas.campanha_progresso.push(...[1, 2, 3, 4].map((fase) => ({ user_id: m.id('ana'), mundo: 1, fase, estrelas: 1, concluida: true, vitorias: 1 })))
-  await comecar(m, ana, 5) // Chuva de Recortes: tudo de cima
+  await comecar(m, ana, 5) // a chuva: tudo de cima
   let acertosServidor = 0
   const fins = ana.todas('campanhaFim').length // a corrida da fase 1 foi abandonada ao começar a 5
   for (let i = 0; i < 5 && ana.todas('campanhaFim').length === fins; i++) {
     await rodada(m, ana, { piloto: 'parado', acertos: 0 })
-    acertosServidor += ana.ultima('campanhaRodada')?.resumo?.acertosServidor ?? 0
+    acertosServidor += ana.ultima('campanhaRodada')?.resumo?.acertos?.[0] ?? 0
   }
-  assert.ok(acertosServidor > 0)
-  assert.ok(ana.ultima('campanhaRodada').resumo.eu.hp < 90)
+  assert.ok(acertosServidor > 0, 'o servidor achou os acertos que o relato escondeu')
+  assert.ok(ana.ultima('campanhaRodada').resumo.eu.hp < ana.ultima('campanhaRodada').resumo.eu.hpMax)
 })
 
 test('trapaça: esquiva mais rápida que o relógio do servidor -> suspeita (futuro)', async () => {

@@ -1,13 +1,13 @@
 // CAMPANHA (modo história, single-player): o SERVIDOR roda a partida (docs/campanha.md).
 //
 // Diferente do PVP em rede (o host decide e o servidor só compara relatos, server/partidas.js), aqui
-// o servidor é a autoridade: guarda a mão e a energia, escolhe a jogada da CPU, sorteia a semente
-// dos ataques, faz a CPU desviar e aplica o dano dos dois lados (src/game/campanha/partida.js, sobre
-// as regras puras de pvp/regras.js). O navegador só manda:
+// o servidor é a autoridade: a luta é contra um CHEFE com as regras do CO-OP (src/game/campanha/luta.js
+// sobre coop/regras.js): ele guarda a mão e a energia, tira a carta do chefe, escolhe a jogada da CPU
+// aliada, sorteia a semente do ataque e aplica o dano e os golpes. O navegador só manda:
 //   * a carta de cada rodada (conferida com a mão e a energia que o SERVIDOR tem), e
-//   * as posições do coração durante a esquiva (~20 Hz, campanha/amostras.js), em pedaços.
+//   * a posição do coração a CADA PASSO da esquiva (campanha/amostras.js), em pedaços.
 // Com as posições o servidor confere a plausibilidade (velocidade, caixa, teleporte, tempo) e REFAZ
-// os acertos (campanha/simulacao.js). O dano é o maior entre o que ele achou e o que o navegador
+// o quadro inteiro (campanha/quadro.js: o ataque de verdade da carta do chefe, você e a aliada). O dano é o maior entre o que ele achou e o que o navegador
 // relatou (o relato só pode piorar para quem relata). Corrida suspeita: sem recompensa, com o motivo
 // no log (e no banco), e o servidor segue de pé.
 //
@@ -20,7 +20,7 @@
 //                        campanha {acao: 'desistir', corrida}
 //   servidor -> cliente  campanhaProgresso {fases, escolhas, xpHoje, teto}
 //                        campanhaInicio {corrida, mundo, fase, rodada}
-//                        campanhaEsquiva {corrida, ...jogadas, ataque, ataqueCpu, cpuAmostras}
+//                        campanhaEsquiva {corrida, rodada, jogadas, intencao, destino, efeitos, esquiva, ...}
 //                        campanhaRodada {corrida, resumo, proxima}
 //                        campanhaFim {corrida, resultado, motivo, estrelas, xpGanho, ..., progresso}
 //                        campanhaErro {motivo, msg, corrida?}
@@ -32,15 +32,15 @@
 //   campanha.receber(cliente, m) · campanha.saiu(cliente, motivo) · campanha.fechar()
 import crypto from 'node:crypto'
 import { agendarPadrao } from './fila.js'
-import { criarCorrida, comecarRodada, jogar, concluirEsquiva, estrelasDaCorrida } from '../src/game/campanha/partida.js'
-import { ler, MAX_AMOSTRAS } from '../src/game/campanha/amostras.js'
+import { criarLuta, comecarRodada, jogar, concluirEsquiva, estrelasDaLuta } from '../src/game/campanha/luta.js'
+import { ler, MAX_AMOSTRAS_QUADRO } from '../src/game/campanha/amostras.js'
 import { mundoDe, faseDe, faseLiberada, TEXTOS } from '../src/game/campanha/mundos/index.js'
 import { XP_CAMPANHA_DIA } from '../src/game/campanha/recompensas.js'
 
 export const ESCOLHA_MS = 3 * 60_000 // sem carta nesse tempo: a corrida é abandonada
 export const FOLGA_ESQUIVA_MS = 20_000 // além da duração do ataque, para o fim da esquiva chegar
 export const FOLGA_CHEGADA_MS = 400 // uma amostra não pode ser do "futuro" do relógio do servidor
-export const MAX_PEDACO = 3 * 40 // inteiros por pedaço de posições (~2 s a 20 Hz)
+export const MAX_PEDACO = 3 * 160 // inteiros por pedaço de posições (~2,5 s a uma por passo de 16 ms)
 export const MAX_CORRIDAS = 2000
 
 const ID = /^[A-Za-z0-9_-]{8,40}$/
@@ -84,7 +84,7 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
     cancelarTimer(k)
     corridas.delete(k.id)
     if (porConta.get(k.usuario) === k.id) porConta.delete(k.usuario)
-    const estrelas = resultado === 'vitoria' ? estrelasDaCorrida(k.c) : 0
+    const estrelas = resultado === 'vitoria' ? estrelasDaLuta(k.c) : 0
     const duracaoS = Math.round((agora() - k.inicio) / 1000)
     if (resultado === 'suspeita') log(`[campanha] corrida ${k.id} suspeita (${motivo}): conta ${k.usuario}, fase ${k.mundo}-${k.fase}, rodada ${k.c.estado.rodada}`)
     const fim = { t: 'campanhaFim', corrida: k.id, mundo: k.mundo, fase: k.fase, resultado, motivo, estrelas, rodadas: k.c.estado.rodada, xpGanho: 0 }
@@ -142,7 +142,7 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
     // uma corrida por conta (a de outra aba é abandonada)
     const velha = corridas.get(porConta.get(c.usuario))
     if (velha) encerrar(velha, 'abandono', 'outra_corrida')
-    const k = { id: novoId(), cliente: c, usuario: c.usuario, mundo, fase: n, inicio: agora(), c: criarCorrida({ mundo, fase: n, semente: semente() }), esquiva: null, timer: null, encerrada: false }
+    const k = { id: novoId(), cliente: c, usuario: c.usuario, mundo, fase: n, inicio: agora(), c: criarLuta({ mundo, fase: n, semente: semente() }), esquiva: null, timer: null, encerrada: false }
     corridas.set(k.id, k)
     porConta.set(c.usuario, k.id)
     const rodada = comecarRodada(k.c)
@@ -158,8 +158,7 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
     const r = jogar(k.c, id)
     // carta que não pode (fora da mão, sem energia, fora da regra): recusada, a rodada continua
     if (!r.ok) return erro(c, 'carta', { fora_da_mao: 'essa carta não está na sua mão', sem_energia: 'falta energia para essa carta', regra: 'a regra desta fase não deixa essa carta', fora_de_hora: 'agora não é hora de escolher carta' }[r.motivo] ?? 'carta inválida', { corrida: k.id, codigo: r.motivo })
-    // o navegador espera a sua esquiva e a repetição da CPU (o ataque real pode ser mais longo)
-    const duracao = Math.max(r.rodada.ataque?.duracao ?? 0, r.rodada.ataqueCpu?.duracao ?? 0)
+    const duracao = r.rodada.esquiva?.duracao ?? 0
     k.esquiva = { rodada: k.c.estado.rodada, entregue: agora(), duracao, pedacos: 0, lista: [], ultimoT: -1 }
     prazo(k, duracao + FOLGA_ESQUIVA_MS, 'sem_esquiva')
     enviar(c, { t: 'campanhaEsquiva', corrida: k.id, ...r.rodada })
@@ -170,7 +169,7 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
     const e = k?.esquiva
     if (!e || m.rodada !== e.rodada) return
     if (m.seq !== e.pedacos || !Array.isArray(m.a) || m.a.length > MAX_PEDACO || m.a.length % 3 !== 0) return suspeita(k, 'pedaco')
-    if (e.lista.length + m.a.length > MAX_AMOSTRAS * 3) return suspeita(k, 'amostras_demais')
+    if (e.lista.length + m.a.length > MAX_AMOSTRAS_QUADRO * 3) return suspeita(k, 'amostras_demais')
     const decorrido = agora() - e.entregue
     for (let i = 0; i < m.a.length; i += 3) {
       const t = m.a[i]
@@ -187,7 +186,7 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
     const k = deDono(c, m)
     const e = k?.esquiva
     if (!e || m.rodada !== e.rodada) return
-    const amostras = ler(e.lista)
+    const amostras = ler(e.lista, MAX_AMOSTRAS_QUADRO)
     let r
     try {
       r = concluirEsquiva(k.c, { amostras, acertosCliente: m.acertos, decorridoMs: agora() - e.entregue })
