@@ -31,6 +31,11 @@ export const VIDA_FEIXE = 420 // e fica aceso por isto
 export const DISTANCIA_FEIXES = 74 // dois feixes da mesma leva ficam pelo menos isto longe (centro a centro)
 export const AVISO_ESTILHACO = 650 // o cristal brilha antes de estourar
 export const DISTANCIA_ESTILHACO = 96 // e nasce (se couber) pelo menos isto longe do coração
+export const AVISO_GARRA = 560 // a garra fica parada, com a linha do bote, antes de avançar
+export const ABERTURA_GARRA = 0.24 // rad entre os dedos da garra (três balas em leque)
+export const AVISO_MANDIBULA = 950 // os dentes piscam fora da caixa (com a garganta marcada) antes de fechar
+export const GARGANTA = 50 // a faixa livre entre as duas fileiras de dentes (px)
+export const MORDIDA_MS = 380 // quanto tempo a boca fica fechada antes de sumir
 
 // força 0..1 -> duração em ms (4 a 7 s, como as cartas do PvP)
 export const duracaoDaForca = (f) => Math.round(4000 + 3000 * Math.max(0, Math.min(1, f)))
@@ -160,6 +165,48 @@ function estilhacos(rng, l, alvo, { velocidade, n }) {
   return out
 }
 
+// a garra: três dedos em leque, parados fora da caixa (com a linha do bote) e depois avançando rápido
+// no lugar onde o coração ESTAVA quando ela apareceu (por dentro: 'garra')
+function garra(rng, l, alvo, { velocidade, lado }) {
+  const recuo = RAIO + 5
+  const t = 0.12 + aleatorio(rng) * 0.76
+  const o = {
+    top: { x: l.left + t * l.width, y: l.top - recuo },
+    bottom: { x: l.left + t * l.width, y: l.bottom + recuo },
+    left: { x: l.left - recuo, y: l.top + t * l.height },
+    right: { x: l.right + recuo, y: l.top + t * l.height },
+  }[lado]
+  const a = Math.atan2(alvo.y - o.y, alvo.x - o.x)
+  const v = lim(velocidade)
+  return [-1, 0, 1].map((k) => {
+    const ang = a + k * ABERTURA_GARRA
+    return { x: o.x, y: o.y, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v, raio: RAIO - 1, aviso: AVISO_GARRA, entrando: false, extra: { tipo: 'garra', linha: { x: o.x, y: o.y, dx: Math.cos(ang), dy: Math.sin(ang) }, dedo: k } }
+  })
+}
+
+// a mandíbula: uma fileira de dentes em cima e outra embaixo (fora da caixa, piscando, com a garganta
+// marcada); depois fecham até a garganta, ficam fechadas MORDIDA_MS e somem (por dentro: 'dente')
+function mandibula(rng, l, { velocidade }) {
+  const v = lim(velocidade)
+  const g = Math.min(GARGANTA, Math.max(26, l.height - 40))
+  const topoG = l.top + 10 + aleatorio(rng) * Math.max(0, l.height - g - 20)
+  const baseG = topoG + g
+  const faixa = { topo: topoG, base: baseG, esquerda: l.left, direita: l.right }
+  const xs = []
+  for (let x = l.left + RAIO; x <= l.right - RAIO + 0.01; x += ESPACO) xs.push(x)
+  const saida = []
+  // de cima: o centro do dente para a RAIO da garganta; de baixo, igual
+  const y0 = l.top - RAIO - 2
+  const y1 = l.bottom + RAIO + 2
+  const tCima = Math.max(0, (topoG - RAIO - y0) / v) * 1000
+  const tBaixo = Math.max(0, (y1 - (baseG + RAIO)) / v) * 1000
+  for (const x of xs) {
+    saida.push({ x, y: y0, vy: v, raio: RAIO, aviso: AVISO_MANDIBULA, entrando: false, arranque: { ms: tCima, vx: 0, vy: 0 }, vida: tCima + MORDIDA_MS, extra: { tipo: 'dente', de: 'cima', faixa } })
+    saida.push({ x, y: y1, vy: -v, raio: RAIO, aviso: AVISO_MANDIBULA, entrando: false, arranque: { ms: tBaixo, vx: 0, vy: 0 }, vida: tBaixo + MORDIDA_MS, extra: { tipo: 'dente', de: 'baixo', faixa } })
+  }
+  return saida
+}
+
 // ---------- os modelos ----------
 // eventos(rng, l, p) -> [{ t, gerar(rng, l, alvo) -> opções[] }]   p: { forca, duracao, soDeCima }
 const MODELOS = {
@@ -273,6 +320,38 @@ const MODELOS = {
       return ev
     },
   },
+  // garras que dão o bote em leque, de lados diferentes (por dentro: 'garra')
+  garras: {
+    nome: 'Garras',
+    eventos(rng, l, p) {
+      const ev = []
+      const passo = 1250 - 430 * p.forca
+      const velocidade = 175 + 55 * p.forca
+      const lados = ['left', 'top', 'right', 'bottom']
+      let n = inteiro(rng, 0, 3)
+      for (let t = 300; t < p.duracao - AVISO_GARRA - 900; t += passo) {
+        const lado = lados[n++ % 4]
+        ev.push({ t, gerar: (r, ll, alvo) => garra(r, ll, alvo, { velocidade, lado }) })
+        // forte: uma segunda garra logo depois, do lado oposto
+        if (p.forca >= 0.55) {
+          const oposto = lados[(n + 1) % 4]
+          ev.push({ t: t + 260, gerar: (r, ll, alvo) => garra(r, ll, alvo, { velocidade, lado: oposto }) })
+        }
+      }
+      return ev
+    },
+  },
+  // a boca do Silêncio: fecha de cima e de baixo; só a garganta fica livre (por dentro: 'dente')
+  mandibula: {
+    nome: 'Mandíbula',
+    eventos(rng, l, p) {
+      const ev = []
+      const passo = 2300 - 650 * p.forca
+      const velocidade = 120 + 70 * p.forca
+      for (let t = 300; t < p.duracao - AVISO_MANDIBULA - 1100; t += passo) ev.push({ t, gerar: (r, ll) => mandibula(r, ll, { velocidade }) })
+      return ev
+    },
+  },
 }
 
 // os modelos que o servidor simula sozinho (todos os da campanha, hoje): docs/campanha.md
@@ -281,7 +360,7 @@ export const atacavelNoServidor = (id) => ATACAVEL_NO_SERVIDOR.includes(id)
 export const nomeDoModelo = (id) => MODELOS[id]?.nome ?? id
 
 // soDeCima: troca o modelo por um que só vem de cima
-const DE_CIMA = { redemoinho: 'chuva', estilhacos: 'chuva', feixes: 'galhos' }
+const DE_CIMA = { redemoinho: 'chuva', estilhacos: 'chuva', feixes: 'galhos', garras: 'chuva', mandibula: 'galhos' }
 const deCimaDe = (id) => DE_CIMA[id] ?? id
 
 // ataque = { modelos: [id, ...], forca, duracao, semente, caixa, soDeCima? }
@@ -344,10 +423,21 @@ export function comAssinatura(ataque, assinatura, rodada = 1) {
   if (!ataque || !assinatura) return ataque
   const lista = Array.isArray(assinatura) ? assinatura : [assinatura]
   if (!lista.length || ataque.super) return ataque
+  // um item da lista pode ser um combo: ['garras', 'chuva'] = os dois juntos
   const m = lista[(Math.max(1, rodada) - 1) % lista.length]
-  const modelos = [m, ...ataque.modelos.slice(1)]
-  if (modelos[1] === m) modelos[1] = m === 'chuva' ? 'sementes' : 'chuva'
+  const proprios = Array.isArray(m) ? m : [m]
+  let modelos = [...proprios, ...ataque.modelos.slice(1)]
+  modelos = modelos.filter((x, i) => modelos.indexOf(x) === i).slice(0, 3)
+  if (modelos.length === 1 && ataque.modelos.length > 1) modelos.push(proprios[0] === 'chuva' ? 'sementes' : 'chuva')
   return { ...ataque, modelos, duracao: duracaoDaForca(ataque.forca) + (modelos.length > 1 ? 1000 : 0) }
+}
+
+// A PRESSÃO da fase (fase.pressao, 0..0.5): o que vem na sua caixa fica mais forte (mais denso e
+// rápido) quanto mais funda a escada
+export function comPressao(ataque, pressao = 0) {
+  if (!ataque || !pressao) return ataque
+  const forca = Math.min(1, Math.round((ataque.forca + pressao) * 1000) / 1000)
+  return { ...ataque, forca, duracao: duracaoDaForca(forca) + (ataque.modelos.length > 1 ? 1000 : 0) }
 }
 
 // A FÚRIA do chefe (regra.furia): mais forte e mais longo

@@ -29,7 +29,7 @@ test('a rodada: energia do servidor, mão de 5, CPU joga, ataques com semente', 
   assert.equal(v.eu.energia, ENERGIA.inicial)
   assert.equal(v.eu.mao.length, 5)
   assert.equal(v.cpu.personagem, 'noelle')
-  assert.equal(v.cpu.hpMax, Math.round(85 * 0.5))
+  assert.equal(v.cpu.hpMax, Math.round(85 * MUNDO1.fases[1].fatorHpCpu))
   const r = jogar(c, melhorAtaque(v))
   assert.ok(r.ok)
   assert.equal(r.rodada.jogadas.length, 2)
@@ -95,7 +95,8 @@ test('eco: o ataque que você mandou volta na rodada seguinte', () => {
     const x = rodada(c)
     if (x.r.rodada.ataque && x.r.rodada.jogadas[1].carta && !x.r.rodada.jogadas[1].anulada) {
       assert.deepEqual(x.r.rodada.ataque.modelos, antes.modelos)
-      assert.equal(x.r.rodada.ataque.forca, antes.forca)
+      // o eco volta com a pressão da fase (a escada mais funda pesa)
+      assert.equal(x.r.rodada.ataque.forca, Math.min(1, Math.round((antes.forca + (c.fase.pressao ?? 0)) * 1000) / 1000))
     }
   }
   assert.ok(r)
@@ -275,4 +276,38 @@ test('fúria: só com a regra e só depois da virada', () => {
     assert.ok(!fim.furia)
   }
   assert.equal(c.furia, false)
+})
+
+test('a sua carta solta o ataque DE VERDADE dela (o do PvP) na caixa da CPU; o servidor conta os acertos', () => {
+  const c = criarCorrida({ mundo: 1, fase: 2, semente: 'real' })
+  let viu = 0
+  for (let i = 0; i < 6 && c.etapa !== 'fim'; i++) {
+    const { r, fim } = rodada(c)
+    const a = r.rodada.ataqueCpu
+    if (!a) continue
+    viu++
+    assert.equal(a.real, true)
+    assert.equal(a.carta.personagem, 'kris')
+    assert.match(a.nome, /^[a-zA-Z]+$/)
+    assert.ok(a.duracao > 3000 && r.rodada.cpuAmostras.length >= 3 * 30)
+    assert.ok(Number.isInteger(fim.cpu.acertos))
+    // o dano na CPU é o do jogo: acertos × dano da caixa
+    assert.equal(fim.cpu.dano >= 0, true)
+  }
+  assert.ok(viu >= 2)
+})
+
+test('pressão: o que vem na sua caixa fica mais forte quanto mais funda a fase', () => {
+  const forcas = (fase) => {
+    const out = []
+    for (let k = 0; k < 4; k++) {
+      const c = criarCorrida({ mundo: 1, fase, semente: `pr${k}` })
+      for (let i = 0; i < 3 && c.etapa !== 'fim'; i++) {
+        const { r } = rodada(c)
+        if (r.rodada.ataque && r.rodada.jogadas[1].carta) out.push(r.rodada.ataque.forca)
+      }
+    }
+    return out.reduce((a, b) => a + b, 0) / out.length
+  }
+  assert.ok(forcas(5) > forcas(1))
 })

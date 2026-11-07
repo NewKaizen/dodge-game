@@ -11,7 +11,9 @@ campanha!".
 | Textos (diálogos, escolhas, cenário e tema de cada fase) | `src/game/campanha/mundos/mundoN.textos.js` |
 | Cenário sombrio (puro, com semente) e o desenho em Phaser | `src/game/campanha/cenario.js`, `desenharCenario.js` |
 | Mapa da escada (puro) · ecos na tela · texto sem ligadura | `src/game/campanha/mapa.js` · `eco.js` · `texto.js` |
-| Música | `scripts/musica/campanha.mjs` → `public/assets/musicas/campanha.mid`, `campanha2.mid` |
+| Música | `scripts/musica/campanha.mjs` → `campanha.mid`, `campanha2.mid`; `scripts/musica/trilhas.mjs` → `campanha_luta`, `_chefe`, `_virada`, `_libertado`, `_final` |
+| O ataque DE VERDADE da sua carta na caixa da CPU (servidor e navegador) | `src/game/campanha/ataqueReal.js` (attacks/ sem Phaser: `src/game/phaserPuro.js`) |
+| O medo na sua caixa (véu, batida de coração, sussurros) | `src/game/campanha/medo.js` |
 | Ataques puros (com semente) e o registro `atacavelNoServidor` | `src/game/campanha/ataques.js` |
 | Esquiva em passo fixo (navegador e servidor) | `src/game/campanha/simulacao.js` |
 | Posições do coração: formato e plausibilidade | `src/game/campanha/amostras.js` |
@@ -42,6 +44,37 @@ toca. A história é original; os personagens são os do jogo.
 | 4 A Rua de Volta | `rua` | Susie | começa com 0 de energia | Feixes (faróis) / Paredes | 8 |
 | 5 A Sala Onde Chove | `chuva` | Dess | todo ataque vem de cima | Cinzas / Olhares | 9 |
 | 6 O Último Quarto (chefe) | `quarto` | Asriel | `duplo`; `virada` na metade do HP (cura 20%, caixa deita, a turma grita); **`furia`** com 30% do HP depois da virada (ataques mais fortes e longos), uma vez | Mariposas / Feixes / Estilhaços (depois da virada: Estilhaços / Feixes) | 12 |
+
+### Dois lados da caixa: as cartas do jogo e o que dá medo
+
+- **A sua carta é a do jogo original.** O ataque que ela solta na caixa da CPU é o MESMO do PvP
+  (`ataqueDaCarta` + a biblioteca `attacks/`, com o `ContextoAtaque` e a classe `Balas` reais): a
+  Estocada Dupla da Kris, as habilidades, a SUPER (com a música dela). O dano na CPU é o do PvP
+  (`DANO_NA_CPU = 1`), e o HP da CPU sobe para compensar (`fatorHpCpu` 0,7 a 1). Quem roda é o
+  **servidor** (`campanha/ataqueReal.js`): a biblioteca `attacks/` não usa mais o Phaser (o pouco que
+  usava está em `phaserPuro.js`, uma cópia fiel conferida contra o Phaser em
+  `__tests__/phaserPuro.test.js`, inclusive o gerador aleatório: o PvP não muda). A CPU desvia
+  (`botEsquiva.js`) e o servidor conta os acertos nela; o navegador repete o ataque com a mesma
+  semente e as amostras da CPU numa região longe da tela (`CAIXA_REAL`), mostrada por uma câmera só
+  dela (como a vitrine do Manual do Ralsei). Ataques que empurram o coração usam o mesmo objeto
+  (`coracao.ajustar()`, como `Heart.js`).
+- **O que vem na SUA caixa é do Silêncio**: os modelos da campanha (verificados pelo servidor), mais
+  duros a cada fase (`fase.pressao`, 0,1 a 0,3, somado à força) e desenhados para assustar: brasas,
+  espinhos, **olhos** que seguem o coração, mariposas que batem as asas, feixes, cristais, **Garras**
+  (`garras`: três dedos em leque que avisam com a linha e dão o bote rápido) e a **Mandíbula**
+  (`mandibula`: uma fileira de dentes em cima e outra embaixo fecham; só a garganta marcada fica
+  livre). Enquanto o Silêncio ataca: a borda da caixa pulsa em carmim, as bordas da tela fecham
+  (mais quanto menos HP), um coração bate grave (mais rápido quanto menos HP) e sussurros aparecem
+  em volta (`campanha/medo.js`; "reduzir animações" tira os sussurros).
+
+Medição (10 lutas por fase, `piloto 'bom'` = desvia de tudo o que vê; `'zigue'` = anda sem olhar):
+o piloto bom vence quase tudo, mas chega ao fim da Rua com ~60% do HP e ao fim do chefe com ~27%
+(e perde 2 em 10); andar sem olhar perde a partir da fase 2. Lutas de 5 a 9 rodadas.
+
+**Música**: `campanha_luta` nas fases, `campanha_chefe` no chefe, `campanha_virada` quando a porta se
+abre (o mesmo motivo das fases em maior), `campanha_libertado` quando um amigo volta e
+`campanha_final` no fim do mundo (a melodia do mapa em Ré maior). Todas originais, geradas por
+`scripts/musica/trilhas.mjs`; `__tests__/musicaTrilhas.test.js` confere loop, andamento e escala.
 
 **Golpe do oponente** (`fase.assinatura`, `campanha/ataques.js` `comAssinatura`): o ataque que a CPU
 manda na **sua** caixa troca o modelo do naipe pelo golpe de quem está do outro lado, um por rodada em
@@ -101,7 +134,7 @@ salvas na conta.
 
 **Estrelas** (calculadas no servidor): ★ vencer · ★ terminar com pelo menos 60% do HP · ★ vencer em
 até N rodadas (a coluna acima). A CPU da campanha é a do PvP (`pvp/bot.js` e `pvp/botEsquiva.js`),
-com o HP da fase (`fatorHpCpu`) e levando 1,35× o dano por acerto (fases de 5 a 9 rodadas). O
+com o HP da fase (`fatorHpCpu`) e levando o dano do PvP por acerto (fases de 5 a 9 rodadas). O
 coração anda sempre a 180 px/s na campanha (o ajuste de velocidade do painel não vale: o servidor
 confere a velocidade).
 
@@ -168,7 +201,10 @@ cliente: quem **roda a partida é o servidor** (`server/campanha.js` + `campanha
 | `redemoinho` (papéis pelas bordas, girando) | **sim** |
 | `feixes` (retângulos parados que avisam e acendem) | **sim** |
 | `estilhacos` (cristal que avisa e estoura em leque) | **sim** |
-| ataques do PvP (`attacks/*`, com Phaser) | não simuláveis no servidor hoje: a campanha **não usa nenhum**. O caminho existe em `concluirEsquiva` (`verificado: false`): vale o relato do navegador, conferido (formato, plausibilidade das posições, teto de acertos) |
+| `garras` (três dedos em leque, aviso com a linha, bote rápido) | **sim** |
+| `mandibula` (dentes que fecham de cima e de baixo; a garganta marcada fica livre) | **sim** |
+| ataques do PvP (`attacks/*`) na SUA caixa | a campanha não usa: na sua caixa só vêm os modelos acima. O caminho existe em `concluirEsquiva` (`verificado: false`): vale o relato do navegador, conferido |
+| ataques do PvP na caixa da CPU (a sua carta) | **o servidor roda** (`ataqueReal.js`) e decide os acertos na CPU; o navegador só repete para desenhar |
 
 Todas as cartas de todos os baralhos viram um desses quatro modelos na campanha (♠ galhos, ♦
 sementes, ♣ redemoinho, ♥ chuva fraca, SUPER galhos + sementes); o chefe junta dois. O teste

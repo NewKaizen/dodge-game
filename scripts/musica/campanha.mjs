@@ -25,7 +25,7 @@ export const ATRASO_ECO = TEMPO * 1.5 // o eco chega um tempo e meio depois
 export const GM = { piano: 0, contrabaixo: 43, tremolo: 44, timpano: 47, cordas: 49, pad: 89 }
 
 // acordes: baixo (grave) e a posição das cordas (região média, fechada)
-const ACORDES = {
+export const ACORDES = {
   Dm: { baixo: 38, notas: [57, 62, 65] },
   Bb: { baixo: 34, notas: [58, 62, 65] },
   Gm: { baixo: 43, notas: [58, 62, 67] },

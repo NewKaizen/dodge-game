@@ -17,8 +17,9 @@
 //     duplo              o chefe manda dois ataques juntos
 //     virada             o chefe, na metade do HP, se refaz (a porta se abre): cura e a caixa fica deitada
 //     furia              o chefe, depois da virada e com 30% do HP, ataca mais forte e mais longo
+//   pressao              0..0.5: somado à força do que vem na SUA caixa (a escada fica mais funda)
 //   assinatura           o golpe do oponente: o ataque que a CPU manda na SUA caixa usa estes modelos
-//                        (campanha/ataques.js), um por rodada em rodízio · assinaturaVirada: depois da virada
+//                        (campanha/ataques.js), um por rodada em rodízio; um item pode ser um combo ['garras', 'chuva'] · assinaturaVirada: depois da virada
 //   chefe                true na fase do chefe (a última)
 export const MUNDO1 = {
   id: 1,
@@ -27,12 +28,12 @@ export const MUNDO1 = {
   personagem: 'kris',
   cor: 0x5fb8b0,
   fases: [
-    { n: 1, id: 'sala', nome: 'A Sala de Aula', oponente: 'ralsei', nivel: 'facil', fatorHpCpu: 0.45, metaRodadas: 9, regra: { soNaipe: 'espadas' }, assinatura: ['redemoinho'] },
-    { n: 2, id: 'corredor', nome: 'O Corredor que Fecha', oponente: 'noelle', nivel: 'facil', fatorHpCpu: 0.5, metaRodadas: 7, regra: { caixaEncolhe: 0.1 }, assinatura: ['estilhacos', 'sementes'] },
-    { n: 3, id: 'ginasio', nome: 'O Ginásio Vazio', oponente: 'berdly', nivel: 'facil', fatorHpCpu: 0.55, metaRodadas: 8, regra: { eco: true }, assinatura: ['feixes'] },
-    { n: 4, id: 'rua', nome: 'A Rua de Volta', oponente: 'susie', nivel: 'facil', fatorHpCpu: 0.5, metaRodadas: 8, regra: { energiaInicial: 0 }, assinatura: ['feixes', 'galhos'] },
-    { n: 5, id: 'chuva', nome: 'A Sala Onde Chove', oponente: 'dess', nivel: 'facil', fatorHpCpu: 0.55, metaRodadas: 9, regra: { soDeCima: true }, assinatura: ['chuva', 'sementes'] },
-    { n: 6, id: 'quarto', nome: 'O Último Quarto', oponente: 'asriel', nivel: 'facil', fatorHpCpu: 0.6, metaRodadas: 12, regra: { duplo: true, virada: true, furia: true }, assinatura: ['redemoinho', 'feixes', 'estilhacos'], assinaturaVirada: ['estilhacos', 'feixes'], chefe: true },
+    { n: 1, id: 'sala', nome: 'A Sala de Aula', oponente: 'ralsei', nivel: 'facil', fatorHpCpu: 0.7, metaRodadas: 8, pressao: 0.1, regra: { soNaipe: 'espadas' }, assinatura: ['redemoinho', 'garras'] },
+    { n: 2, id: 'corredor', nome: 'O Corredor que Fecha', oponente: 'noelle', nivel: 'facil', fatorHpCpu: 0.75, metaRodadas: 8, pressao: 0.15, regra: { caixaEncolhe: 0.1 }, assinatura: ['estilhacos', 'garras', 'sementes'] },
+    { n: 3, id: 'ginasio', nome: 'O Ginásio Vazio', oponente: 'berdly', nivel: 'facil', fatorHpCpu: 0.8, metaRodadas: 8, pressao: 0.2, regra: { eco: true }, assinatura: ['feixes', ['sementes', 'garras']] },
+    { n: 4, id: 'rua', nome: 'A Rua de Volta', oponente: 'susie', nivel: 'facil', fatorHpCpu: 0.8, metaRodadas: 9, pressao: 0.25, regra: { energiaInicial: 0 }, assinatura: ['mandibula', 'feixes', ['galhos', 'garras']] },
+    { n: 5, id: 'chuva', nome: 'A Sala Onde Chove', oponente: 'dess', nivel: 'facil', fatorHpCpu: 0.85, metaRodadas: 9, pressao: 0.3, regra: { soDeCima: true }, assinatura: ['chuva', ['chuva', 'sementes'], 'garras'] },
+    { n: 6, id: 'quarto', nome: 'O Último Quarto', oponente: 'asriel', nivel: 'facil', fatorHpCpu: 1, metaRodadas: 12, pressao: 0.3, regra: { duplo: true, virada: true, furia: true }, assinatura: ['mandibula', 'feixes', 'garras', 'estilhacos'], assinaturaVirada: [['mandibula', 'garras'], ['feixes', 'estilhacos']], chefe: true },
   ],
   // os cosméticos exclusivos deste mundo (o banco concede: 0011_campanha.sql; os nomes de agora: 0012)
   //   quando: 'mundo'  vencer o chefe pela primeira vez · 'estrelas'  3 estrelas em todas as fases

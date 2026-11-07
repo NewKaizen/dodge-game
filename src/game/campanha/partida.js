@@ -16,9 +16,10 @@ import { cartaNaMao, criarRng, criarBaralho } from '../pvp/baralho.js'
 import { SIMBOLOS, cartasDoPersonagem } from '../pvp/cartas.js'
 import { TEMPOS, CORACAO } from '../constants.js'
 import { mundoDe, faseDe } from './mundos/index.js'
-import { ataqueDaCartaNaCampanha, atacavelNoServidor, comAssinatura, comFuria } from './ataques.js'
+import { ataqueDaCartaNaCampanha, atacavelNoServidor, comAssinatura, comFuria, comPressao } from './ataques.js'
 import { validarAmostras } from './amostras.js'
-import { simularComAmostras, simularCpu, inicioDaCaixa } from './simulacao.js'
+import { simularComAmostras, inicioDaCaixa } from './simulacao.js'
+import { simularCpuReal, ataqueRealDaCarta } from './ataqueReal.js'
 
 // a caixa da campanha (mundo de 854×480): um pouco maior que a das pistas do PvP
 export const CAIXA_CAMPANHA = Object.freeze({ esquerda: 232, direita: 492, topo: 150, base: 320 })
@@ -28,8 +29,8 @@ export const MAX_RODADAS = 30
 export const HP_ESTRELA = 0.6 // a 2ª estrela: terminar com pelo menos 60% do HP
 export const CURA_VIRADA = 0.2 // o chefe, ao se refazer (a virada), cura isto do HP máximo
 export const LIMIAR_FURIA = 0.3 // o chefe, depois da virada, entra em fúria com até isto do HP
-// a CPU da campanha leva mais dano por acerto que a do PvP: as fases ficam curtas (5 a 9 rodadas)
-export const DANO_NA_CPU = 1.35
+// a CPU leva o dano do PvP (a carta e o ataque são os do jogo original); o HP dela é o da fase
+export const DANO_NA_CPU = 1
 
 // ---------- a caixa de cada rodada ----------
 
@@ -121,7 +122,16 @@ export function comecarRodada(c) {
   return visaoDaRodada(c)
 }
 
-// o ataque que cai numa caixa (lado 0 = a sua, 1 = a da CPU), pronto para simular
+// o ataque DE VERDADE (o do PvP) que a sua carta solta na caixa da CPU: o servidor roda e a CPU desvia
+// (campanha/ataqueReal.js); o navegador repete com a mesma semente e as amostras da CPU
+function montarAtaqueReal(c, caixa) {
+  if (!caixa?.carta) return null
+  const at = ataqueRealDaCarta(caixa.carta)
+  if (!at) return null
+  return { real: true, nome: at.nome, carta: caixa.carta.id, cartaPublica: publicaCarta(caixa.carta), dano: caixa.dano, ritmo: { ...(caixa.ritmo ?? {}) }, semente: `${c.semente}:r${c.estado.rodada}:1` }
+}
+
+// o ataque que cai na SUA caixa: os modelos da campanha (o servidor refaz a sua esquiva)
 function montarAtaque(c, caixa, lado) {
   if (!caixa) return null
   const regraDoLado = lado === 0 ? { soDeCima: c.fase.regra?.soDeCima, duplo: c.fase.regra?.duplo && caixa.de === 1 } : {}
@@ -131,6 +141,7 @@ function montarAtaque(c, caixa, lado) {
   if (lado === 0 && c.fase.regra?.eco && caixa.de === 1 && c.ultimoAtaqueJogador) base = { ...c.ultimoAtaqueJogador, soDeCima: Boolean(regraDoLado.soDeCima) }
   // o golpe de quem está do outro lado (fase.assinatura) e a fúria do chefe: só no que a CPU manda
   else if (lado === 0 && caixa.de === 1 && c.fase.assinatura) base = comAssinatura(base, c.virou && c.fase.assinaturaVirada ? c.fase.assinaturaVirada : c.fase.assinatura, c.estado.rodada)
+  if (lado === 0 && caixa.de === 1) base = comPressao(base, c.fase.pressao)
   if (lado === 0 && caixa.de === 1 && c.furia) base = comFuria(base)
   if (!base) return null
   return {
@@ -157,8 +168,9 @@ export function jogar(c, cartaId) {
   const cartaCpu = escolherJogada(c.estado, 1, { nivel: c.fase.nivel, rng: c.rngCpu })
   const r = resolverRodada(c.estado, cartaId, cartaCpu)
   const ataque = montarAtaque(c, r.caixas[0], 0)
-  const ataqueCpu = montarAtaque(c, r.caixas[1], 1)
-  const cpu = ataqueCpu ? simularCpu(ataqueCpu, { nivel: c.fase.nivel, semente: ataqueCpu.semente, velocidade: VELOCIDADE_CORACAO }) : null
+  const ataqueCpu = montarAtaqueReal(c, r.caixas[1])
+  const cpu = ataqueCpu ? simularCpuReal({ ...ataqueCpu, carta: r.caixas[1].carta }, { nivel: c.fase.nivel, velocidade: VELOCIDADE_CORACAO }) : null
+  if (ataqueCpu && cpu) ataqueCpu.duracao = cpu.duracao
   // o eco guarda o ataque que a SUA carta mandou (refletido ou não)
   const minha = r.jogadas[0].carta
   const meuAtaque = minha && !r.jogadas[0].anulada ? ataqueDaCartaNaCampanha(minha) : null
@@ -174,7 +186,7 @@ export function jogar(c, cartaId) {
       efeitos: r.efeitos,
       eventos: r.eventos,
       ataque: semInterno(ataque),
-      ataqueCpu: semInterno(ataqueCpu),
+      ataqueCpu: ataqueCpu ? { real: true, nome: ataqueCpu.nome, carta: ataqueCpu.cartaPublica, dano: ataqueCpu.dano, ritmo: ataqueCpu.ritmo, semente: ataqueCpu.semente, duracao: ataqueCpu.duracao } : null,
       cpuAmostras: cpu?.amostras ?? [],
       eu: { hp: a.hp, hpMax: a.hpMax, energia: a.energia },
       cpu: { hp: b.hp, hpMax: b.hpMax, energia: b.energia },

@@ -28,6 +28,7 @@ test('cada mundo: fases 1..n, oponentes do jogo, regras conhecidas, chefe por ú
       assert.ok(PERSONAGENS[f.oponente] && CARTAS[f.oponente], f.oponente)
       assert.ok(NIVEIS_BOT[f.nivel], f.nivel)
       assert.ok(f.fatorHpCpu > 0 && f.fatorHpCpu <= 1)
+      assert.ok(f.pressao === undefined || (f.pressao >= 0 && f.pressao <= 0.5))
       assert.ok(Number.isInteger(f.metaRodadas) && f.metaRodadas >= 3)
       const chaves = Object.keys(f.regra ?? {})
       assert.ok(chaves.length >= 1, `fase ${f.n} sem regra especial`)
@@ -35,7 +36,7 @@ test('cada mundo: fases 1..n, oponentes do jogo, regras conhecidas, chefe por ú
       assert.ok(descreverRegra(f.regra))
       assert.equal(Boolean(f.chefe), i === m.fases.length - 1)
       // o golpe de quem está do outro lado: modelos que o servidor simula
-      for (const a of [...(f.assinatura ?? []), ...(f.assinaturaVirada ?? [])]) assert.ok(ATACAVEL_NO_SERVIDOR.includes(a), `${f.id}: assinatura ${a}`)
+      for (const a of [...(f.assinatura ?? []), ...(f.assinaturaVirada ?? [])].flat()) assert.ok(ATACAVEL_NO_SERVIDOR.includes(a), `${f.id}: assinatura ${a}`)
     })
     assert.equal(new Set(m.fases.map((f) => f.id)).size, m.fases.length)
     // o banco sabe quantas fases cada mundo tem

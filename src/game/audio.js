@@ -244,6 +244,7 @@ export function pistaSonora({ pan = 0, freq = 440, timbre = 'sino', volume = 0.5
 // a transmissão do modo LAN pegar todo o som num lugar só (lib/lan/audioTap.js)
 export function contextoAudio() {
   if (!contexto) {
+    if (typeof window === 'undefined') return null // no Node (o servidor roda os ataques: campanha/ataqueReal.js)
     const AC = window.AudioContext || window.webkitAudioContext
     if (AC) contexto = new AC()
   }

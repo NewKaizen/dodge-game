@@ -79,7 +79,8 @@ export default class CampanhaFim extends Phaser.Scene {
     this.events.once('shutdown', () => this.caixa?.destroy())
     this.cameras.main.fadeIn(500)
     const venceu = this.fim.resultado === 'vitoria'
-    musica('campanha', 'menu')
+    // venceu: a música do amigo que voltou (no chefe, o fim do mundo: a casa fala de novo)
+    musica(venceu ? (this.fase.chefe ? 'campanha_final' : 'campanha_libertado') : 'campanha', 'campanha')
     const falas = venceu ? textos.depois : this.fim.resultado === 'derrota' ? textos.derrota : []
     if (!falas.length) return this.mostrarRecompensa()
     this.kris = this.add.image(250, 312, this.mundo.personagem).setOrigin(0.5, 1).setScale(3).setDepth(5)

@@ -1,4 +1,4 @@
-import Phaser from 'phaser'
+import { contem, limitar } from '../phaserPuro.js'
 import { ATAQUE, CORES } from '../constants.js'
 import { RAIO_BALA } from '../arte/texturas.js'
 import { avisar } from '../attacks/validacao.js'
@@ -133,7 +133,7 @@ export default class Balas {
     if (o.entrando === false || o.jaAvisada) return false
     const l = this.limites
     if (o.entrando) {
-      const fora = !Phaser.Geom.Rectangle.Contains(l, o.x, o.y)
+      const fora = !contem(l, o.x, o.y)
       if (!fora) avisar(`entrada:${o.origem}`, `[telegrafo] ${o.origem}: bala "entrando" nasceu dentro da caixa (vale na hora, sem aviso)`)
       else if (distanciaFora(l, o.x, o.y) > MARGEM) avisar(`entrada-longe:${o.origem}`, `[telegrafo] ${o.origem}: bala "entrando" nasceu a mais de ${MARGEM}px da caixa (some na hora)`)
     }
@@ -143,10 +143,10 @@ export default class Balas {
   // Se a bala nasce fora da caixa, um "!" pisca na borda por onde ela vai entrar
   criarMarcador(b) {
     const l = this.limites
-    if (Phaser.Geom.Rectangle.Contains(l, b.x, b.y)) return null
+    if (contem(l, b.x, b.y)) return null
     const ponto = entrada(l, b.x, b.y, b.vx, b.vy)
     const m = this.scene.add
-      .image(Phaser.Math.Clamp(ponto.x, l.left + 8, l.right - 8), Phaser.Math.Clamp(ponto.y, l.top + 8, l.bottom - 8), 'aviso')
+      .image(limitar(ponto.x, l.left + 8, l.right - 8), limitar(ponto.y, l.top + 8, l.bottom - 8), 'aviso')
       .setTint(CORES.aviso)
       .setDepth(6)
     this.caixa.recortar(m)

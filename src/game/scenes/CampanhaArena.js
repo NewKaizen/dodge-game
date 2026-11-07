@@ -1,11 +1,11 @@
 import Phaser from 'phaser'
 import Controles from '../controles.js'
-import { tocar, musica } from '../audio.js'
+import { tocar, musica, tocarMusicaEspecial, voltarMusicaNormal } from '../audio.js'
 import { FONTE, LARGURA, ALTURA } from '../constants.js'
 import { menosMovimento } from '../preferencias.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { ESCALA } from '../arte/texturas.js'
-import { SIMBOLOS } from '../pvp/cartas.js'
+import { SIMBOLOS, ehSuper } from '../pvp/cartas.js'
 import { ENERGIA } from '../pvp/regras.js'
 import Mao from '../entities/Mao.js'
 import { joyDeTodos } from '../manual/paginaBase.js'
@@ -16,12 +16,17 @@ import { semLigaduras } from '../campanha/texto.js'
 import { NOME_SILENCIO } from '../campanha/CaixaDeDialogo.js'
 import { mundoDe, faseDe, TEXTOS, libertosAte } from '../campanha/mundos/index.js'
 import { descreverRegra, CAIXA_CAMPANHA, VELOCIDADE_CORACAO } from '../campanha/partida.js'
-import { criarEsquivaLocal, criarSimulacao, inicioDaCaixa } from '../campanha/simulacao.js'
-import { ler, posicaoNoTempo, alvoNoTempo, PASSO_MS } from '../campanha/amostras.js'
-import { nomeDoModelo, ataqueDaCartaNaCampanha } from '../campanha/ataques.js'
+import { criarEsquivaLocal } from '../campanha/simulacao.js'
+import { ler, posicaoNoTempo, PASSO_MS } from '../campanha/amostras.js'
+import { nomeDoModelo } from '../campanha/ataques.js'
+import { criarAtaqueReal, limitesReais, inicioReal, ataqueRealDaCarta } from '../campanha/ataqueReal.js'
+import { criarMedo } from '../campanha/medo.js'
+import { ajustarCamera, RES } from '../resolucao.js'
 import { aoCampanha, comecarFase, jogarCarta, enviarPosicoes, terminarEsquiva, desistirDaCorrida, trapacaDev } from '../../lib/campanha.js'
 
 // CAMPANHA: a PARTIDA de uma fase (docs/campanha.md). Quem manda é o SERVIDOR (server/campanha.js):
+// (a SUA carta solta o ataque de verdade dela, o mesmo do PvP, na caixa da CPU: campanha/ataqueReal.js;
+// o que vem na SUA caixa são os ataques do Silêncio, mais duros e mais assustadores: campanha/ataques.js)
 // daqui sai só a carta escolhida e as posições do coração (~20 Hz, em pedaços de 250 ms); a mão, a
 // energia, a jogada da CPU, a semente dos ataques e o dano chegam de lá. A esquiva roda aqui com o
 // MESMO modelo puro que o servidor refaz (campanha/simulacao.js): os acertos que você sente na hora
@@ -31,13 +36,21 @@ import { aoCampanha, comecarFase, jogarCarta, enviarPosicoes, terminarEsquiva, d
 //
 //   escolha: ←→ carta · A jogar · B passar a vez · esquiva: mover o coração · Esc: desistir (2×)
 //   scene.start('CampanhaArena', { mundo: 1, fase: 1, escolhas })
-const MINI = { escala: 0.5, x: 598, y: 112 }
+const MINI = { escala: 0.6, x: 598, y: 112 } // a caixa da CPU (a do PvP, 220×170) reduzida
 const MAO_POS = { x: 362, y: 424 }
 const FRASE_Y = 128
 const PEDACO_MS = 250
 // as balas, por dentro com os nomes antigos: cinzas (folha), paredes (galho), olhares (semente), mariposas (papel)
 // e os novos: feixes de luz (feixe) e estilhaços de cristal (estilhaco)
-const COR_BALA = { folha: 0xc8c4d8, galho: 0x3fb3a8, semente: 0xe03048, papel: 0xe0b84a, feixe: 0xf2e2b0, estilhaco: 0x9fe0ff }
+// e os do medo: garras (garra) e a mandíbula (dente)
+const COR_BALA = { folha: 0xff6a3a, galho: 0x2a0a14, semente: 0xe03048, papel: 0xd8c8a0, feixe: 0xffd8de, estilhaco: 0x9fe0ff, garra: 0xd01838, dente: 0xece4d4 }
+const BORDA_MEDO = 0x8a1028 // a borda da sua caixa pulsa nesta cor enquanto o Silêncio ataca
+// mistura duas cores 0xRRGGBB (k = 0: a primeira, 1: a segunda)
+const misturar = (a, b, k) => {
+  const c = (s) => [(s >> 16) & 255, (s >> 8) & 255, s & 255]
+  const [x, y] = [c(a), c(b)]
+  return x.reduce((acc, v, i) => (acc << 8) | Math.round(v + (y[i] - v) * k), 0)
+}
 // os balões das falas durante a luta: o lado do oponente (e do Silêncio) e o lado da Kris (os amigos)
 const BALAO = { oponente: { x: LARGURA - 16, y: ALTURA - 26, largura: 240 }, amigos: { x: 16, y: ALTURA - 26, largura: 186 } }
 const BALAO_MS = 2600
@@ -57,7 +70,6 @@ const estadoInicial = () => ({
   frase: null,
   infoCarta: null,
   balas: null,
-  miniBalas: null,
   coracao: null,
   miniCoracao: null,
   esquiva: null,
@@ -75,6 +87,9 @@ const estadoInicial = () => ({
   regra: null,
   caixaG: null,
   miniG: null,
+  camCpu: null,
+  medo: null,
+  musicaEspecial: false,
   rotuloAtaque: null,
   kris: null,
   oponente: null,
@@ -110,8 +125,12 @@ export default class CampanhaArena extends Phaser.Scene {
     this.events.once('shutdown', () => {
       this.pararCampanha?.()
       this.mao?.destroy()
+      if (this.cpu && !this.cpu.e.acabou) this.cpu.e.parar()
+      this.medo?.destruir()
+      if (this.musicaEspecial) voltarMusicaNormal()
     })
-    musica('campanha2', 'campanha')
+    // as fases: tensa e com bateria; o chefe: órgão e coro (scripts/musica/trilhas.mjs)
+    musica(this.fase.chefe ? 'campanha_chefe' : 'campanha_luta', 'campanha2')
     this.cameras.main.fadeIn(260)
     comecarFase(this.mundo.id, this.fase.n)
   }
@@ -133,14 +152,20 @@ export default class CampanhaArena extends Phaser.Scene {
     this.caixaG = this.add.graphics().setDepth(5)
     this.balas = this.add.graphics().setDepth(8)
     this.coracao = this.add.image(0, 0, 'coracao').setTint(0xff2a3a).setScale(ESCALA.coracao).setDepth(9).setVisible(false)
-    const mini = this.add.container(MINI.x - CAIXA_CAMPANHA.esquerda * MINI.escala, MINI.y - CAIXA_CAMPANHA.topo * MINI.escala).setScale(MINI.escala).setDepth(6)
-    this.miniG = this.add.graphics()
-    this.miniBalas = this.add.graphics()
-    this.miniCoracao = this.add.image(0, 0, 'coracao').setTint(PERSONAGENS[this.fase.oponente].cor).setScale(ESCALA.coracao).setVisible(false)
-    mini.add([this.miniG, this.miniBalas, this.miniCoracao])
+    // a caixa da CPU: o ataque DE VERDADE da sua carta roda numa região longe da tela (CAIXA_REAL) e
+    // uma câmera só dela mostra a região aqui, reduzida (como a vitrine do Manual do Ralsei)
+    const lr = limitesReais()
+    const larguraMini = lr.width * MINI.escala
+    const alturaMini = lr.height * MINI.escala
+    this.miniG = this.add.graphics().setDepth(6)
+    this.miniG.fillStyle(0x000000, 1).fillRect(MINI.x, MINI.y, larguraMini, alturaMini)
+    this.miniG.lineStyle(2, 0xffffff, 1).strokeRect(MINI.x - 1, MINI.y - 1, larguraMini + 2, alturaMini + 2)
+    const ini = inicioReal(lr)
+    this.miniCoracao = this.add.image(ini.x, ini.y, 'coracao').setTint(PERSONAGENS[this.fase.oponente].cor).setScale(ESCALA.coracao).setDepth(9).setVisible(false)
+    this.camCpu = this.cameras.add().setVisible(false)
+    this.ajustarCamCpu()
     this.desenharCaixa(this.caixaG, CAIXA_CAMPANHA)
-    this.desenharCaixa(this.miniG, CAIXA_CAMPANHA)
-    const larguraMini = (CAIXA_CAMPANHA.direita - CAIXA_CAMPANHA.esquerda) * MINI.escala
+    this.medo = criarMedo(this, { profundidade: 3 })
     this.add.text(MINI.x + larguraMini / 2, MINI.y - 6, `a caixa do eco de ${PERSONAGENS[this.fase.oponente].nome}`, estilo(10, COR_TEXTO.apagado)).setOrigin(0.5, 1).setDepth(21)
     this.kris = this.add.image(150, CAIXA_CAMPANHA.base, this.mundo.personagem).setOrigin(0.5, 1).setScale(ESCALA.personagem).setDepth(4)
     // a torcida: quem já foi libertado fica atrás da Kris, com cor, e pula quando você manda bem
@@ -221,10 +246,23 @@ export default class CampanhaArena extends Phaser.Scene {
     this.tweens.add({ targets: t, y: y - 26, alpha: 0, duration: 1000, delay: 250, ease: 'Quad.easeOut', onComplete: () => t.destroy() })
   }
 
-  desenharCaixa(g, c) {
+  // a câmera da caixa da CPU (refeita todo quadro: a janela pode mudar de tamanho, resolucao.js)
+  ajustarCamCpu() {
+    const l = limitesReais()
+    ajustarCamera(this.camCpu, MINI.x, MINI.y, l.width * MINI.escala, l.height * MINI.escala).setZoom(RES.escala * MINI.escala)
+    this.camCpu.setScroll(l.left, l.top)
+  }
+
+  // medo: 0..1, a borda pulsa em carmim (o Silêncio atacando)
+  desenharCaixa(g, c, medo = 0) {
     g.clear()
     g.fillStyle(0x000000, 1).fillRect(c.esquerda, c.topo, c.direita - c.esquerda, c.base - c.topo)
-    g.lineStyle(2, 0xffffff, 1).strokeRect(c.esquerda - 1, c.topo - 1, c.direita - c.esquerda + 2, c.base - c.topo + 2)
+    if (medo > 0) {
+      for (let k = 1; k <= 3; k++) g.lineStyle(2, BORDA_MEDO, 0.18 * medo).strokeRect(c.esquerda - 1 - k * 3, c.topo - 1 - k * 3, c.direita - c.esquerda + 2 + k * 6, c.base - c.topo + 2 + k * 6)
+      // por dentro, um escuro avermelhado nas bordas
+      for (let k = 0; k < 4; k++) g.lineStyle(3, 0x3a0010, 0.22 * medo).strokeRect(c.esquerda + 2 + k * 3, c.topo + 2 + k * 3, c.direita - c.esquerda - 4 - k * 6, c.base - c.topo - 4 - k * 6)
+    }
+    g.lineStyle(2, misturar(0xffffff, BORDA_MEDO, medo), 1).strokeRect(c.esquerda - 1, c.topo - 1, c.direita - c.esquerda + 2, c.base - c.topo + 2)
   }
 
   desenharHud() {
@@ -310,9 +348,8 @@ export default class CampanhaArena extends Phaser.Scene {
     if (!c || this.etapa !== 'escolha') return this.infoCarta.setText('')
     const pode = this.visao.eu.jogaveis.includes(c.id)
     // na campanha o ataque é o modelo da floresta (o efeito de suporte e o dos Ases continua o do jogo)
-    const at = ataqueDaCartaNaCampanha(c)
-    const efeito = c.naipe === 'copas' || c.valor === 1 ? `\n${c.descricao}` : ''
-    this.infoCarta.setText(`${c.nome}  ${SIMBOLOS[c.naipe]}  (custa ${c.custo})\n${at ? `ataque: ${at.modelos.map(nomeDoModelo).join(' + ')} · ${at.dano} por acerto` : 'não manda ataque'}${efeito}${pode ? '' : '\n— falta energia'}`)
+    // a carta é a do jogo: o ataque dela na caixa da CPU é o de verdade (o mesmo do PvP)
+    this.infoCarta.setText(`${c.nome}  ${SIMBOLOS[c.naipe]}  (custa ${c.custo})\n${c.descricao}${ataqueRealDaCarta(c) ? '' : '\n(não ataca)'}${pode ? '' : '\n— falta energia'}`)
   }
 
   // as cartas reveladas: o servidor já resolveu a rodada; agora a esquiva começa
@@ -336,6 +373,14 @@ export default class CampanhaArena extends Phaser.Scene {
   comecarEsquiva() {
     if (this.saindo || this.etapa !== 'revelacao') return
     const m = this.rodadaAtual
+    // a SUA carta SUPER: a música da SUPER (a mesma do PvP) enquanto o ataque dela acontece
+    const minha = m.jogadas[0]?.carta
+    if (ehSuper(minha) && !m.jogadas[0].anulada)
+      tocarMusicaEspecial(`super_${minha.personagem}`).then((ok) => {
+        if (!ok) return
+        this.musicaEspecial = true
+        if (this.saindo || this.etapa !== 'esquiva') this.voltarDaSuper()
+      })
     this.etapa = 'esquiva'
     this.tempoEsquiva = 0
     this.acertosLocais = 0
@@ -343,9 +388,17 @@ export default class CampanhaArena extends Phaser.Scene {
     this.ultimoPedaco = 0
     this.esquiva = m.ataque ? criarEsquivaLocal(m.ataque, { velocidade: VELOCIDADE_CORACAO }) : null
     this.coracao.setVisible(Boolean(this.esquiva))
-    // a CPU: o servidor mandou o caminho dela; a caixa pequena refaz as balas com ele
-    this.cpu = m.ataqueCpu ? { sim: criarSimulacao(m.ataqueCpu), amostras: ler(m.cpuAmostras) ?? [], inicio: inicioDaCaixa(m.ataqueCpu.caixa), duracao: m.ataqueCpu.duracao, real: 0 } : null
+    // a CPU: o servidor mandou o caminho dela; a caixa pequena repete o ataque DE VERDADE da sua carta
+    if (this.cpu && !this.cpu.e.acabou) this.cpu.e.parar()
+    this.cpu = null
+    const ac = m.ataqueCpu
+    if (ac?.real && ac.carta) {
+      const coracao = { ...inicioReal() }
+      const e = criarAtaqueReal(this, { carta: ac.carta, dano: ac.dano, ritmo: ac.ritmo, semente: ac.semente, limites: limitesReais(), coracao })
+      if (e) this.cpu = { e, coracao, amostras: ler(m.cpuAmostras) ?? [], real: 0 }
+    }
     this.miniCoracao.setVisible(Boolean(this.cpu))
+    this.camCpu.setVisible(Boolean(this.cpu))
     if (this.esquiva) this.frase.setText('desvie!')
     else this.frase.setText(this.cpu ? `${PERSONAGENS[this.fase.oponente].nome} desvia do seu ataque…` : 'ninguém atacou nesta rodada')
   }
@@ -367,16 +420,25 @@ export default class CampanhaArena extends Phaser.Scene {
       if (this.tempoEsquiva - this.ultimoPedaco >= PEDACO_MS) this.mandarPedaco()
     }
     const c = this.cpu
-    if (c && c.sim.t < c.duracao) {
+    if (c && !c.e.acabou) {
       c.real += delta
-      while (c.sim.t + PASSO_MS <= c.real && c.sim.t < c.duracao) {
-        const t = c.sim.t + PASSO_MS
-        c.sim.passo(posicaoNoTempo(c.amostras, t, c.inicio), alvoNoTempo(c.amostras, t, c.inicio))
+      const ini = inicioReal()
+      while (c.e.t + PASSO_MS <= c.real && !c.e.acabou) {
+        const p = posicaoNoTempo(c.amostras, c.e.t + PASSO_MS, ini)
+        c.coracao.x = p.x
+        c.coracao.y = p.y
+        c.e.passo()
       }
+      if (c.e.acabou) this.camCpu.setVisible(false)
     }
+    // o medo: o Silêncio atacando na sua caixa (a borda pulsa, as bordas da tela fecham, o coração bate)
+    const hp = this.hpMostrado?.eu ? this.hpMostrado.eu.hp / this.hpMostrado.eu.hpMax : 1
+    const atacando = Boolean(e && !e.acabou)
+    this.medo.atualizar(delta, { ativo: atacando, hp, caixa: this.rodadaAtual?.ataque?.caixa })
+    if (atacando) this.desenharCaixa(this.caixaG, this.rodadaAtual.ataque.caixa, 0.55 + 0.45 * Math.sin(this.time.now / (110 + 200 * hp)))
     this.desenharBalas()
     const fimEu = !e || e.acabou
-    const fimCpu = !c || c.sim.t >= c.duracao
+    const fimCpu = !c || c.e.acabou
     if (fimEu && fimCpu) this.terminarEsquiva()
   }
 
@@ -392,13 +454,22 @@ export default class CampanhaArena extends Phaser.Scene {
     enviarPosicoes(this.corrida, this.rodadaAtual.rodada, this.pedacos++, a)
   }
 
+  voltarDaSuper() {
+    if (!this.musicaEspecial) return
+    this.musicaEspecial = false
+    voltarMusicaNormal()
+  }
+
   terminarEsquiva() {
     this.etapa = 'conferindo'
+    this.voltarDaSuper()
     if (this.esquiva) this.mandarPedaco()
     this.coracao.setVisible(false)
     this.miniCoracao.setVisible(false)
+    this.camCpu.setVisible(false)
     this.balas.clear()
-    this.miniBalas.clear()
+    this.medo.parar()
+    if (this.rodadaAtual?.ataque) this.desenharCaixa(this.caixaG, this.rodadaAtual.ataque.caixa)
     this.frase.setText('o servidor está conferindo a rodada…')
     terminarEsquiva(this.corrida, this.rodadaAtual.rodada, trapacaDev() === 'semAcertos' ? 0 : this.acertosLocais)
   }
@@ -432,7 +503,8 @@ export default class CampanhaArena extends Phaser.Scene {
       this.regra.setText(semLigaduras(textos.virada))
       tocar(this, 'superAtivar')
       if (!menosMovimento() && fatores().clarao >= 1) this.cameras.main.flash(420, 110, 90, 50)
-      // a porta se abre: os amigos libertados gritam, um de cada vez
+      // a porta se abre: o tema vira maior e heroico, e os amigos libertados gritam, um de cada vez
+      musica('campanha_virada', 'campanha_chefe')
       const gritos = (textos.viradaFalas ?? []).filter((f) => this.turma.some((o) => o.texture.key === f.quem))
       gritos.forEach((f, i) => this.falar(f, { atraso: 200 + i * 650 }))
       this.ditas.add('ferido')
@@ -486,53 +558,118 @@ export default class CampanhaArena extends Phaser.Scene {
     g.clear()
     const e = this.esquiva
     if (e) {
-      this.pintar(g, e.sim.lista, this.rodadaAtual.ataque.caixa)
+      this.pintar(g, e.sim.lista, this.rodadaAtual.ataque.caixa, e.coracao)
       this.coracao.setPosition(e.coracao.x, e.coracao.y).setAlpha(e.sim.invencivel > 0 && Math.floor(this.time.now / 80) % 2 ? 0.35 : 1)
     }
     const c = this.cpu
-    this.miniBalas.clear()
     if (c) {
-      this.pintar(this.miniBalas, c.sim.lista, this.rodadaAtual.ataqueCpu.caixa)
-      const p = posicaoNoTempo(c.amostras, c.sim.t, c.inicio)
-      this.miniCoracao.setPosition(p.x, p.y)
+      this.miniCoracao.setPosition(c.coracao.x, c.coracao.y).setAlpha(c.coracao.invencivel > 0 && Math.floor(this.time.now / 80) % 2 ? 0.35 : 1)
+      this.ajustarCamCpu()
     }
   }
 
-  pintar(g, lista, caixa) {
+  // as balas do Silêncio na sua caixa: brasas, espinhos, OLHOS que te seguem, mariposas, feixes,
+  // cristais, garras e dentes. O aviso (o que ainda não machuca) é sempre desenhado, mesmo fora da caixa.
+  pintar(g, lista, caixa, coracao) {
+    const pulso = fatores().pulso
+    const piscar = (b, ms = 45) => Math.sin(b.idade / (ms * pulso)) > 0
+    const gargantas = new Set()
     for (const b of lista) {
       const avisando = b.idade < b.aviso
-      // o feixe de luz: contorno piscando enquanto avisa; depois aceso, com brilho
+      const tipo = b.extra?.tipo
+      const cor = COR_BALA[tipo] ?? 0xffffff
+      // o feixe de luz: contorno piscando enquanto avisa; depois aceso, branco-rosado com brilho
       if (b.tipo === 'retangulo') {
         const x = b.x - b.largura / 2
         const y = b.y - b.altura / 2
-        const cor = COR_BALA[b.extra?.tipo] ?? 0xffffff
         if (avisando) {
           const k = b.idade / b.aviso
-          g.fillStyle(cor, 0.05 + 0.12 * k).fillRect(x, y, b.largura, b.altura)
-          g.lineStyle(1, cor, Math.sin(b.idade / (40 * fatores().pulso)) > 0 ? 0.9 : 0.35).strokeRect(x, y, b.largura, b.altura)
+          g.fillStyle(0xd01838, 0.05 + 0.14 * k).fillRect(x, y, b.largura, b.altura)
+          g.lineStyle(1, 0xff4060, piscar(b, 40) ? 0.95 : 0.35).strokeRect(x, y, b.largura, b.altura)
         } else {
           const v = b.extra?.vertical
-          g.fillStyle(cor, 0.25).fillRect(v ? x - 4 : x, v ? y : y - 4, b.largura + (v ? 8 : 0), b.altura + (v ? 0 : 8))
+          g.fillStyle(0xd01838, 0.3).fillRect(v ? x - 5 : x, v ? y : y - 5, b.largura + (v ? 10 : 0), b.altura + (v ? 0 : 10))
           g.fillStyle(cor, 1).fillRect(x, y, b.largura, b.altura)
-          g.fillStyle(0xffffff, 0.9).fillRect(v ? b.x - 3 : x, v ? y : b.y - 3, v ? 6 : b.largura, v ? b.altura : 6)
+          g.fillStyle(0xffffff, 1).fillRect(v ? b.x - 3 : x, v ? y : b.y - 3, v ? 6 : b.largura, v ? b.altura : 6)
         }
         continue
       }
+      // a mandíbula: enquanto avisa, a GARGANTA (a única faixa livre) pisca marcada; os dentes apontam para ela
+      if (tipo === 'dente') {
+        const f = b.extra.faixa
+        if (avisando && !gargantas.has(f)) {
+          gargantas.add(f)
+          const k = b.idade / b.aviso
+          g.fillStyle(0x3a0010, 0.35 * k).fillRect(f.esquerda, caixa.topo, f.direita - f.esquerda, f.topo - caixa.topo).fillRect(f.esquerda, f.base, f.direita - f.esquerda, caixa.base - f.base)
+          g.lineStyle(1, 0xf2e2b0, piscar(b, 60) ? 0.9 : 0.3).strokeRect(f.esquerda + 1, f.topo, f.direita - f.esquerda - 2, f.base - f.topo)
+        }
+        const r = b.raio + 2
+        const d = b.extra.de === 'cima' ? 1 : -1
+        g.fillStyle(cor, avisando ? (piscar(b) ? 0.7 : 0.3) : 1).fillTriangle(b.x - r, b.y - d * r, b.x + r, b.y - d * r, b.x, b.y + d * (r + 3))
+        if (!avisando) g.fillStyle(0x5a0818, 1).fillRect(b.x - r, b.y - d * r - (d > 0 ? 3 : 0), r * 2, 3)
+        continue
+      }
       // o cristal que vai estourar: um losango que cresce enquanto avisa
-      if (avisando && b.extra?.tipo === 'estilhaco' && b.extra.centro) {
+      if (avisando && tipo === 'estilhaco' && b.extra.centro) {
         const r = 4 + 9 * (b.idade / b.aviso)
         const { x, y } = b.extra.centro
-        g.fillStyle(COR_BALA.estilhaco, 0.12).fillCircle(x, y, r + 6)
-        g.fillStyle(COR_BALA.estilhaco, Math.sin(b.idade / (50 * fatores().pulso)) > 0 ? 0.9 : 0.55).fillTriangle(x, y - r, x + r * 0.6, y, x - r * 0.6, y).fillTriangle(x, y + r, x + r * 0.6, y, x - r * 0.6, y)
+        g.fillStyle(cor, 0.12).fillCircle(x, y, r + 6)
+        g.fillStyle(cor, piscar(b, 50) ? 0.9 : 0.55).fillTriangle(x, y - r, x + r * 0.6, y, x - r * 0.6, y).fillTriangle(x, y + r, x + r * 0.6, y, x - r * 0.6, y)
         continue
+      }
+      // a linha do bote (olhares e garras): desenhada mesmo com a bala ainda fora da caixa
+      if (avisando && b.extra?.linha) {
+        const { x, y, dx, dy } = b.extra.linha
+        const garra = tipo === 'garra'
+        g.lineStyle(garra ? 2 : 1, 0xe03048, piscar(b) ? 0.85 : 0.3)
+        for (let k = 0; k < 12; k++) g.lineBetween(x + dx * k * 22, y + dy * k * 22, x + dx * (k * 22 + 11), y + dy * (k * 22 + 11))
       }
       const fora = b.x + b.raio < caixa.esquerda || b.x - b.raio > caixa.direita || b.y + b.raio < caixa.topo || b.y - b.raio > caixa.base
       if (fora) continue
-      const cor = COR_BALA[b.extra?.tipo] ?? 0xffffff
-      if (avisando && b.extra?.linha) {
-        const { x, y, dx, dy } = b.extra.linha
-        g.lineStyle(1, 0xe03048, Math.sin(b.idade / (45 * fatores().pulso)) > 0 ? 0.8 : 0.35)
-        for (let k = 0; k < 12; k++) g.lineBetween(x + dx * k * 22, y + dy * k * 22, x + dx * (k * 22 + 11), y + dy * (k * 22 + 11))
+      if (tipo === 'semente') {
+        // um OLHO: abre enquanto avisa; a íris segue o coração
+        const abre = avisando ? Math.min(1, b.idade / b.aviso) : 1
+        const rx = b.raio + 3
+        const ry = Math.max(1.5, (b.raio + 1) * abre)
+        g.fillStyle(0xe03048, 0.18).fillEllipse(b.x, b.y, rx * 2 + 8, ry * 2 + 8)
+        g.fillStyle(0xf4eee8, 1).fillEllipse(b.x, b.y, rx * 2, ry * 2)
+        if (abre > 0.35 && coracao) {
+          const a = Math.atan2(coracao.y - b.y, coracao.x - b.x)
+          g.fillStyle(0xd01030, 1).fillCircle(b.x + Math.cos(a) * 3, b.y + Math.sin(a) * Math.min(2, ry - 1), Math.min(4, ry))
+          g.fillStyle(0x000000, 1).fillCircle(b.x + Math.cos(a) * 3.5, b.y + Math.sin(a) * Math.min(2, ry - 1), Math.min(1.8, ry))
+        }
+        continue
+      }
+      if (tipo === 'garra') {
+        // um corte: um traço grosso na direção do bote, com a ponta clara
+        const v = Math.hypot(b.vx, b.vy) || 1
+        const dx = b.vx / v
+        const dy = b.vy / v
+        const comp = avisando ? 6 : 16
+        g.lineStyle(5, cor, avisando ? (piscar(b) ? 0.8 : 0.35) : 1).lineBetween(b.x - dx * comp, b.y - dy * comp, b.x + dx * 4, b.y + dy * 4)
+        g.fillStyle(0xffe0e0, avisando ? 0.5 : 1).fillCircle(b.x + dx * 4, b.y + dy * 4, 2.5)
+        continue
+      }
+      if (tipo === 'papel') {
+        // uma mariposa: duas asas que batem
+        const bate = 0.4 + 0.6 * Math.abs(Math.sin(b.idade / 70))
+        const r = b.raio + 2
+        g.fillStyle(cor, avisando ? 0.4 : 0.95).fillTriangle(b.x, b.y, b.x - r * 1.4, b.y - r * bate, b.x - r * 1.1, b.y + r * bate * 0.7).fillTriangle(b.x, b.y, b.x + r * 1.4, b.y - r * bate, b.x + r * 1.1, b.y + r * bate * 0.7)
+        g.fillStyle(0x2a1a10, 1).fillCircle(b.x, b.y, 2)
+        continue
+      }
+      if (tipo === 'folha') {
+        // uma brasa caindo: rastro para cima, miolo claro
+        g.lineStyle(3, cor, 0.35).lineBetween(b.x, b.y, b.x - b.vx * 0.06, b.y - b.vy * 0.06)
+        g.fillStyle(cor, avisando ? 0.5 : 1).fillCircle(b.x, b.y, b.raio)
+        g.fillStyle(0xffe0a0, 0.9).fillCircle(b.x, b.y, b.raio * 0.45)
+        continue
+      }
+      if (tipo === 'galho') {
+        // um espinho: bola escura com a borda em carmim
+        g.fillStyle(cor, 1).fillCircle(b.x, b.y, b.raio)
+        g.lineStyle(2, 0xd01838, 1).strokeCircle(b.x, b.y, b.raio)
+        continue
       }
       g.fillStyle(cor, avisando ? 0.08 : 0.18).fillCircle(b.x, b.y, b.raio + 3)
       g.fillStyle(cor, avisando ? 0.5 : 1).fillCircle(b.x, b.y, b.raio)

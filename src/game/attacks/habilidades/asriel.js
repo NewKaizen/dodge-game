@@ -1,4 +1,4 @@
-import Phaser from 'phaser'
+import { embrulharAngulo, MISTURA_ADD } from '../../phaserPuro.js'
 import { definirAtaque } from '../definir.js'
 import { ATAQUE } from '../../constants.js'
 import { tocar } from '../../audio.js'
@@ -354,7 +354,7 @@ const asrielChaosBuster = definirAtaque({
         if (c.rastrear) {
           const alvo = a.alvo()
           const alvoAng = Math.atan2(alvo.y - c.img.y, alvo.x - c.img.x)
-          const dif = Phaser.Math.Angle.Wrap(alvoAng - c.ang)
+          const dif = embrulharAngulo(alvoAng - c.ang)
           c.ang += dif * Math.min(1, dt / 90)
         }
         c.img.setRotation(c.ang)
@@ -1004,7 +1004,7 @@ function explodir(a, cfg, e, estrelas, i) {
   const R = cfg.raioExplosao
   tocar(a.cena, S('nova'))
   particulas(a.cena, e.x, e.y, { cor: 0xffffff, quantidade: 18, velocidade: 170, vida: 380 })
-  const clarao = a.decoracao(a.cena.add.image(e.x, e.y, S('clarao')).setDepth(6).setScale(0.2).setBlendMode(Phaser.BlendModes.ADD))
+  const clarao = a.decoracao(a.cena.add.image(e.x, e.y, S('clarao')).setDepth(6).setScale(0.2).setBlendMode(MISTURA_ADD))
   a.cena.tweens.add({ targets: clarao, scale: (R * 2) / 64, duration: 140, ease: 'Cubic.easeOut' })
   a.cena.tweens.add({ targets: clarao, alpha: 0, delay: 140, duration: 320, onComplete: () => clarao.setVisible(false) })
   const golpe = a.bala({ x: e.x, y: e.y, raio: R, jaAvisada: true, atravessa: true, vida: 220 })
