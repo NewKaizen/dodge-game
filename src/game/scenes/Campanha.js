@@ -6,7 +6,7 @@ import { FONTE, LARGURA, ALTURA } from '../constants.js'
 import { irCarregando } from '../carregando.js'
 import { menosMovimento } from '../preferencias.js'
 import { PERSONAGENS } from '../data/personagens.js'
-import { mundoDe, TEXTOS, faseLiberada } from '../campanha/mundos/index.js'
+import { mundoDe, TEXTOS, faseLiberada, libertosAte } from '../campanha/mundos/index.js'
 import { descreverRegra } from '../campanha/partida.js'
 import CaixaDeDialogo from '../campanha/CaixaDeDialogo.js'
 import { desenharCenario, pintarFormas } from '../campanha/desenharCenario.js'
@@ -248,10 +248,14 @@ export default class Campanha extends Phaser.Scene {
       const palco = desenharCenario(this, tf.cenario, { profundidade: 50 })
       const kris = this.add.image(250, 316, this.mundo.personagem).setOrigin(0.5, 1).setScale(3).setDepth(52)
       const eco = criarEco(this, 590, 316, f.oponente, { escala: 3, profundidade: 52, alpha: 0.6, flipX: true })
-      this.palco = { cenario: palco, kris, eco }
+      // os amigos já libertados sobem a escada junto: com cor, atrás da Kris
+      const livres = libertosAte(this.mundo.id, f.n)
+      const turma = livres.map((p, i) => this.add.image(196 - (i % 3) * 46 - Math.floor(i / 3) * 22, 316 - Math.floor(i / 3) * 14, p).setOrigin(0.5, 1).setScale(2).setDepth(51 - Math.floor(i / 3) * 0.1))
+      this.palco = { cenario: palco, kris, eco, turma }
       this.cameras.main.fadeIn(menosMovimento() ? 200 : 500)
       this.caixa = new CaixaDeDialogo(this, tf.antes, {
         ecos: textos.ecos,
+        livres,
         escolhas: get(campanha).escolhas[this.mundo.id] ?? {},
         aoEscolher: (chave, valor) => escolherNoDialogo(this.mundo.id, chave, valor),
         aoAcabar: (escolhas) => {

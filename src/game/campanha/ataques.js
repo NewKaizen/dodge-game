@@ -25,6 +25,27 @@ export const ESPACO = 22 // centro a centro numa parede (o coração não passa 
 export const BURACO = 64 // o vão de cada parede (px livres, >= LACUNA_MINIMA)
 export const AVISO_MIRA = 700 // a semente mirada fica parada (com a linha) antes de voar
 export const VELOCIDADE_MAX = 230 // px/s: teto de qualquer bala da campanha
+export const LARGURA_FEIXE = 26 // a espessura de um feixe de luz
+export const AVISO_FEIXE = 760 // o feixe pisca (inofensivo) antes de acender
+export const VIDA_FEIXE = 420 // e fica aceso por isto
+export const DISTANCIA_FEIXES = 74 // dois feixes da mesma leva ficam pelo menos isto longe (centro a centro)
+export const AVISO_ESTILHACO = 650 // o cristal brilha antes de estourar
+export const DISTANCIA_ESTILHACO = 96 // e nasce (se couber) pelo menos isto longe do coração
+export const AVISO_GARRA = 560 // a garra fica parada, com a linha do bote, antes de avançar
+export const ABERTURA_GARRA = 0.24 // rad entre os dedos da garra (três balas em leque)
+export const AVISO_MANDIBULA = 950 // os dentes piscam fora da caixa (com a garganta marcada) antes de fechar
+export const GARGANTA = 50 // a faixa livre entre as duas fileiras de dentes (px)
+export const MORDIDA_MS = 380 // quanto tempo a boca fica fechada antes de sumir
+// o TITÃ (regra.titan): as cartas da SUA mão que você não jogou voam na sua caixa, uma a uma
+export const CARTA_BALA = Object.freeze({ largura: 20, altura: 28 }) // a carta inteira machuca
+export const AVISO_CARTA = 650 // a carta treme parada embaixo da caixa (com a linha) antes de voar
+export const INTERVALO_CARTA = 420 // uma carta a cada tanto
+export const VOO_CARTAS = 1100 // depois da última sair, o ataque do titã ainda espera isto
+export const DANO_CARTA = 6 // o dano de uma carta quando o titã não jogou nada
+// as cartas de mentira dos testes (sem a mão de verdade)
+const CARTAS_PADRAO = [1, 2, 3, 4].map((k) => ({ id: `teste-${k}` }))
+// quanto o ataque do titã espera as n cartas
+export const atrasoDasCartas = (n) => (n > 0 ? 300 + (n - 1) * INTERVALO_CARTA + AVISO_CARTA + VOO_CARTAS : 0)
 
 // força 0..1 -> duração em ms (4 a 7 s, como as cartas do PvP)
 export const duracaoDaForca = (f) => Math.round(4000 + 3000 * Math.max(0, Math.min(1, f)))
@@ -121,6 +142,93 @@ function papel(rng, l, k, { velocidade, giro }) {
   return { x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, raio: RAIO - 1, entrando: true, extra: { tipo: 'papel' } }
 }
 
+// um feixe de luz: um retângulo que cruza a caixa inteira, parado e AVISANDO (contorno piscando)
+// por AVISO_FEIXE ms e depois aceso por VIDA_FEIXE ms (por dentro: 'feixe')
+function feixe(l, { vertical, pos }) {
+  const meio = LARGURA_FEIXE / 2
+  if (vertical) {
+    const x = Math.min(l.right - meio, Math.max(l.left + meio, pos))
+    return { x, y: l.top + l.height / 2, largura: LARGURA_FEIXE, altura: l.height + 4, aviso: AVISO_FEIXE, vida: VIDA_FEIXE, extra: { tipo: 'feixe', vertical: true } }
+  }
+  const y = Math.min(l.bottom - meio, Math.max(l.top + meio, pos))
+  return { x: l.left + l.width / 2, y, largura: l.width + 4, altura: LARGURA_FEIXE, aviso: AVISO_FEIXE, vida: VIDA_FEIXE, extra: { tipo: 'feixe', vertical: false } }
+}
+
+// os estilhaços: um cristal aparece LONGE do coração, brilha (aviso) e estoura em leque
+function estilhacos(rng, l, alvo, { velocidade, n }) {
+  const m = 26
+  let melhor = null
+  for (let k = 0; k < 14; k++) {
+    const x = l.left + m + aleatorio(rng) * Math.max(1, l.width - 2 * m)
+    const y = l.top + m + aleatorio(rng) * Math.max(1, l.height - 2 * m)
+    const d = Math.hypot(x - alvo.x, y - alvo.y)
+    if (!melhor || d > melhor.d) melhor = { x, y, d }
+    if (d >= DISTANCIA_ESTILHACO) break
+  }
+  const giro = aleatorio(rng) * Math.PI * 2
+  const v = lim(velocidade)
+  const out = []
+  for (let k = 0; k < n; k++) {
+    const a = giro + (k * Math.PI * 2) / n
+    out.push({ x: melhor.x, y: melhor.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, raio: RAIO - 1, aviso: AVISO_ESTILHACO, extra: { tipo: 'estilhaco', centro: { x: melhor.x, y: melhor.y } } })
+  }
+  return out
+}
+
+// a garra: três dedos em leque, parados fora da caixa (com a linha do bote) e depois avançando rápido
+// no lugar onde o coração ESTAVA quando ela apareceu (por dentro: 'garra')
+function garra(rng, l, alvo, { velocidade, lado }) {
+  const recuo = RAIO + 5
+  const t = 0.12 + aleatorio(rng) * 0.76
+  const o = {
+    top: { x: l.left + t * l.width, y: l.top - recuo },
+    bottom: { x: l.left + t * l.width, y: l.bottom + recuo },
+    left: { x: l.left - recuo, y: l.top + t * l.height },
+    right: { x: l.right + recuo, y: l.top + t * l.height },
+  }[lado]
+  const a = Math.atan2(alvo.y - o.y, alvo.x - o.x)
+  const v = lim(velocidade)
+  return [-1, 0, 1].map((k) => {
+    const ang = a + k * ABERTURA_GARRA
+    return { x: o.x, y: o.y, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v, raio: RAIO - 1, aviso: AVISO_GARRA, entrando: false, extra: { tipo: 'garra', linha: { x: o.x, y: o.y, dx: Math.cos(ang), dy: Math.sin(ang) }, dedo: k } }
+  })
+}
+
+// a mandíbula: uma fileira de dentes em cima e outra embaixo (fora da caixa, piscando, com a garganta
+// marcada); depois fecham até a garganta, ficam fechadas MORDIDA_MS e somem (por dentro: 'dente')
+function mandibula(rng, l, { velocidade }) {
+  const v = lim(velocidade)
+  const g = Math.min(GARGANTA, Math.max(26, l.height - 40))
+  const topoG = l.top + 10 + aleatorio(rng) * Math.max(0, l.height - g - 20)
+  const baseG = topoG + g
+  const faixa = { topo: topoG, base: baseG, esquerda: l.left, direita: l.right }
+  const xs = []
+  for (let x = l.left + RAIO; x <= l.right - RAIO + 0.01; x += ESPACO) xs.push(x)
+  const saida = []
+  // de cima: o centro do dente para a RAIO da garganta; de baixo, igual
+  const y0 = l.top - RAIO - 2
+  const y1 = l.bottom + RAIO + 2
+  const tCima = Math.max(0, (topoG - RAIO - y0) / v) * 1000
+  const tBaixo = Math.max(0, (y1 - (baseG + RAIO)) / v) * 1000
+  for (const x of xs) {
+    saida.push({ x, y: y0, vy: v, raio: RAIO, aviso: AVISO_MANDIBULA, entrando: false, arranque: { ms: tCima, vx: 0, vy: 0 }, vida: tCima + MORDIDA_MS, extra: { tipo: 'dente', de: 'cima', faixa } })
+    saida.push({ x, y: y1, vy: -v, raio: RAIO, aviso: AVISO_MANDIBULA, entrando: false, arranque: { ms: tBaixo, vx: 0, vy: 0 }, vida: tBaixo + MORDIDA_MS, extra: { tipo: 'dente', de: 'baixo', faixa } })
+  }
+  return saida
+}
+
+// uma carta da sua mão: parada embaixo da caixa (o lado da mão, na tela), tremendo; depois voa no
+// lugar onde o coração estava e quica uma vez nas paredes (por dentro: 'carta')
+function cartaArremessada(rng, l, alvo, { i, n, id, velocidade }) {
+  const x = l.left + (l.width * (i + 1)) / (n + 1)
+  const y = l.bottom + CARTA_BALA.altura / 2 + 3
+  const a = Math.atan2(alvo.y - y, alvo.x - x) + (aleatorio(rng) - 0.5) * 0.22
+  const v = lim(velocidade)
+  const dx = Math.cos(a)
+  const dy = Math.sin(a)
+  return { x, y, vx: dx * v, vy: dy * v, largura: CARTA_BALA.largura, altura: CARTA_BALA.altura, aviso: AVISO_CARTA, entrando: false, quicar: 1, extra: { tipo: 'carta', carta: id, i, linha: { x, y, dx, dy } } }
+}
+
 // ---------- os modelos ----------
 // eventos(rng, l, p) -> [{ t, gerar(rng, l, alvo) -> opções[] }]   p: { forca, duracao, soDeCima }
 const MODELOS = {
@@ -191,6 +299,90 @@ const MODELOS = {
       return ev
     },
   },
+  // feixes de luz que cruzam a caixa: o primeiro cai na linha do coração (com aviso), os outros
+  // longe dele; alternam de pé e deitados (por dentro: 'feixe')
+  feixes: {
+    nome: 'Feixes de luz',
+    eventos(rng, l, p) {
+      const ev = []
+      const passo = 1350 - 420 * p.forca
+      const quantos = p.forca >= 0.6 ? 2 : 1
+      let n = 0
+      for (let t = 300; t < p.duracao - AVISO_FEIXE - VIDA_FEIXE; t += passo, n++) {
+        const vertical = n % 2 === 0
+        ev.push({
+          t,
+          gerar: (r, ll, alvo) => {
+            const [de, ate, mira] = vertical ? [ll.left, ll.right, alvo.x] : [ll.top, ll.bottom, alvo.y]
+            const pos = [mira]
+            for (let k = 1; k < quantos; k++) {
+              let q = null
+              for (let j = 0; j < 10 && q === null; j++) {
+                const c = de + LARGURA_FEIXE / 2 + aleatorio(r) * Math.max(1, ate - de - LARGURA_FEIXE)
+                if (pos.every((x) => Math.abs(x - c) >= DISTANCIA_FEIXES)) q = c
+              }
+              if (q !== null) pos.push(q)
+            }
+            return pos.map((x) => feixe(ll, { vertical, pos: x }))
+          },
+        })
+      }
+      return ev
+    },
+  },
+  // cristais que estouram em leque, longe do coração (por dentro: 'estilhaco')
+  estilhacos: {
+    nome: 'Estilhaços',
+    eventos(rng, l, p) {
+      const ev = []
+      const passo = 1600 - 550 * p.forca
+      const velocidade = 105 + 70 * p.forca
+      const n = 7 + Math.round(3 * p.forca)
+      for (let t = 300; t < p.duracao - 1500; t += passo) ev.push({ t, gerar: (r, ll, alvo) => estilhacos(r, ll, alvo, { velocidade, n }) })
+      return ev
+    },
+  },
+  // garras que dão o bote em leque, de lados diferentes (por dentro: 'garra')
+  garras: {
+    nome: 'Garras',
+    eventos(rng, l, p) {
+      const ev = []
+      const passo = 1250 - 430 * p.forca
+      const velocidade = 175 + 55 * p.forca
+      const lados = ['left', 'top', 'right', 'bottom']
+      let n = inteiro(rng, 0, 3)
+      for (let t = 300; t < p.duracao - AVISO_GARRA - 900; t += passo) {
+        const lado = lados[n++ % 4]
+        ev.push({ t, gerar: (r, ll, alvo) => garra(r, ll, alvo, { velocidade, lado }) })
+        // forte: uma segunda garra logo depois, do lado oposto
+        if (p.forca >= 0.55) {
+          const oposto = lados[(n + 1) % 4]
+          ev.push({ t: t + 260, gerar: (r, ll, alvo) => garra(r, ll, alvo, { velocidade, lado: oposto }) })
+        }
+      }
+      return ev
+    },
+  },
+  // o titã arremessa as SUAS cartas (as que ficaram na mão), uma a uma, de baixo (por dentro: 'carta')
+  cartas: {
+    nome: 'Suas cartas',
+    eventos(rng, l, p) {
+      const lista = p.cartas?.length ? p.cartas : CARTAS_PADRAO
+      const velocidade = 170 + 45 * p.forca
+      return lista.map((c, i) => ({ t: 300 + i * INTERVALO_CARTA, gerar: (r, ll, alvo) => [cartaArremessada(r, ll, alvo, { i, n: lista.length, id: String(c.id), velocidade })] }))
+    },
+  },
+  // a boca do Silêncio: fecha de cima e de baixo; só a garganta fica livre (por dentro: 'dente')
+  mandibula: {
+    nome: 'Mandíbula',
+    eventos(rng, l, p) {
+      const ev = []
+      const passo = 2300 - 650 * p.forca
+      const velocidade = 120 + 70 * p.forca
+      for (let t = 300; t < p.duracao - AVISO_MANDIBULA - 1100; t += passo) ev.push({ t, gerar: (r, ll) => mandibula(r, ll, { velocidade }) })
+      return ev
+    },
+  },
 }
 
 // os modelos que o servidor simula sozinho (todos os da campanha, hoje): docs/campanha.md
@@ -199,18 +391,23 @@ export const atacavelNoServidor = (id) => ATACAVEL_NO_SERVIDOR.includes(id)
 export const nomeDoModelo = (id) => MODELOS[id]?.nome ?? id
 
 // soDeCima: troca o modelo por um que só vem de cima
-const deCimaDe = (id) => (id === 'redemoinho' ? 'chuva' : id)
+const DE_CIMA = { redemoinho: 'chuva', estilhacos: 'chuva', feixes: 'galhos', garras: 'chuva', mandibula: 'galhos', cartas: 'chuva' }
+const deCimaDe = (id) => DE_CIMA[id] ?? id
 
 // ataque = { modelos: [id, ...], forca, duracao, semente, caixa, soDeCima? }
 //   vários modelos = todos ao mesmo tempo (o chefe), cada um com a sua semente derivada
+//   ataque.cartas: as cartas arremessadas pelo titã (modelo 'cartas'); os outros modelos esperam elas
 export function criarRoteiro(ataque) {
   const l = limitesDaCaixa(ataque.caixa)
-  const p = { forca: Number(ataque.forca) || 0, duracao: ataque.duracao, soDeCima: Boolean(ataque.soDeCima) }
+  const p = { forca: Number(ataque.forca) || 0, duracao: ataque.duracao, soDeCima: Boolean(ataque.soDeCima), cartas: ataque.cartas ?? null }
+  const comCartas = !p.soDeCima && ataque.modelos.includes('cartas')
+  const atraso = comCartas ? atrasoDasCartas(p.cartas?.length || CARTAS_PADRAO.length) : 0
   const listas = ataque.modelos.map((id, i) => {
     const m = MODELOS[ataque.soDeCima ? deCimaDe(id) : id]
     if (!m) throw new Error(`modelo de ataque desconhecido: ${id}`)
     const rng = criarRng(`${ataque.semente}:${i}:${id}`)
-    return { rng, eventos: m.eventos(rng, l, p).sort((a, b) => a.t - b.t), prox: 0 }
+    const eventos = m.eventos(rng, l, p).map((e) => (id === 'cartas' || !atraso ? e : { ...e, t: e.t + atraso }))
+    return { rng, eventos: eventos.sort((a, b) => a.t - b.t), prox: 0 }
   })
   return {
     duracao: ataque.duracao,
@@ -251,7 +448,49 @@ export function ataqueDaCartaNaCampanha(carta, regra = {}) {
     f = forcaDoValor(carta.valor)
   }
   if (regra.duplo && modelos.length === 1) modelos = [...modelos, modelos[0] === 'chuva' ? 'sementes' : 'chuva']
-  return { modelos, forca: Math.round(f * 1000) / 1000, duracao: duracaoDaForca(f) + (modelos.length > 1 ? 1000 : 0), dano: danoDaCarta(carta), soDeCima: Boolean(regra.soDeCima) }
+  return { modelos, forca: Math.round(f * 1000) / 1000, duracao: duracaoDaForca(f) + (modelos.length > 1 ? 1000 : 0), dano: danoDaCarta(carta), soDeCima: Boolean(regra.soDeCima), ...(ehSuper(carta) ? { super: true } : {}) }
+}
+
+// A ASSINATURA do oponente (fase.assinatura): o ataque que a CPU manda na SUA caixa troca o modelo
+// do naipe pelo golpe de quem está do outro lado (um por rodada, em rodízio, se for uma lista). O
+// SUPER e os modelos extras (duplo) continuam. Mesma força; a duração é refeita.
+export function comAssinatura(ataque, assinatura, rodada = 1) {
+  if (!ataque || !assinatura) return ataque
+  const lista = Array.isArray(assinatura) ? assinatura : [assinatura]
+  if (!lista.length || ataque.super) return ataque
+  // um item da lista pode ser um combo: ['garras', 'chuva'] = os dois juntos
+  const m = lista[(Math.max(1, rodada) - 1) % lista.length]
+  const proprios = Array.isArray(m) ? m : [m]
+  let modelos = [...proprios, ...ataque.modelos.slice(1)]
+  modelos = modelos.filter((x, i) => modelos.indexOf(x) === i).slice(0, 3)
+  if (modelos.length === 1 && ataque.modelos.length > 1) modelos.push(proprios[0] === 'chuva' ? 'sementes' : 'chuva')
+  return { ...ataque, modelos, duracao: duracaoDaForca(ataque.forca) + (modelos.length > 1 ? 1000 : 0) }
+}
+
+// O ARREMESSO do titã: as cartas que ficaram na sua mão vêm antes do ataque dele (que espera por elas).
+// Sem ataque do titã nesta rodada, só as cartas.
+//   cartas: [{ id, ... }] (as que você NÃO jogou) · base: { caixa, semente, dano? }
+export function comArremesso(ataque, cartas, base) {
+  if (!cartas?.length) return ataque
+  const lista = cartas.map((c) => ({ id: String(c.id), personagem: c.personagem, naipe: c.naipe, valor: c.valor }))
+  const atraso = atrasoDasCartas(lista.length)
+  if (!ataque) return { modelos: ['cartas'], forca: 0.5, duracao: atraso + 700, dano: base.dano ?? DANO_CARTA, soDeCima: false, cartas: lista }
+  return { ...ataque, modelos: ['cartas', ...ataque.modelos.filter((m) => m !== 'cartas')], cartas: lista, duracao: ataque.duracao + atraso }
+}
+
+// A PRESSÃO da fase (fase.pressao, 0..0.5): o que vem na sua caixa fica mais forte (mais denso e
+// rápido) quanto mais funda a escada
+export function comPressao(ataque, pressao = 0) {
+  if (!ataque || !pressao) return ataque
+  const forca = Math.min(1, Math.round((ataque.forca + pressao) * 1000) / 1000)
+  return { ...ataque, forca, duracao: duracaoDaForca(forca) + (ataque.modelos.length > 1 ? 1000 : 0) }
+}
+
+// A FÚRIA do chefe (regra.furia): mais forte e mais longo
+export function comFuria(ataque) {
+  if (!ataque) return ataque
+  const forca = Math.min(1, Math.round((ataque.forca + 0.3) * 1000) / 1000)
+  return { ...ataque, forca, duracao: duracaoDaForca(forca) + (ataque.modelos.length > 1 ? 1000 : 0) + 500 }
 }
 
 export { LACUNA_MINIMA }

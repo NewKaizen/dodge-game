@@ -158,7 +158,8 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
     const r = jogar(k.c, id)
     // carta que não pode (fora da mão, sem energia, fora da regra): recusada, a rodada continua
     if (!r.ok) return erro(c, 'carta', { fora_da_mao: 'essa carta não está na sua mão', sem_energia: 'falta energia para essa carta', regra: 'a regra desta fase não deixa essa carta', fora_de_hora: 'agora não é hora de escolher carta' }[r.motivo] ?? 'carta inválida', { corrida: k.id, codigo: r.motivo })
-    const duracao = r.rodada.ataque?.duracao ?? 0
+    // o navegador espera a sua esquiva e a repetição da CPU (o ataque real pode ser mais longo)
+    const duracao = Math.max(r.rodada.ataque?.duracao ?? 0, r.rodada.ataqueCpu?.duracao ?? 0)
     k.esquiva = { rodada: k.c.estado.rodada, entregue: agora(), duracao, pedacos: 0, lista: [], ultimoT: -1 }
     prazo(k, duracao + FOLGA_ESQUIVA_MS, 'sem_esquiva')
     enviar(c, { t: 'campanhaEsquiva', corrida: k.id, ...r.rodada })

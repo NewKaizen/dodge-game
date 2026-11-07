@@ -16,9 +16,10 @@ import { cartaNaMao, criarRng, criarBaralho } from '../pvp/baralho.js'
 import { SIMBOLOS, cartasDoPersonagem } from '../pvp/cartas.js'
 import { TEMPOS, CORACAO } from '../constants.js'
 import { mundoDe, faseDe } from './mundos/index.js'
-import { ataqueDaCartaNaCampanha, atacavelNoServidor } from './ataques.js'
+import { ataqueDaCartaNaCampanha, atacavelNoServidor, comAssinatura, comFuria, comPressao, comArremesso } from './ataques.js'
 import { validarAmostras } from './amostras.js'
-import { simularComAmostras, simularCpu, inicioDaCaixa } from './simulacao.js'
+import { simularComAmostras, inicioDaCaixa } from './simulacao.js'
+import { simularCpuReal, ataqueRealDaCarta } from './ataqueReal.js'
 
 // a caixa da campanha (mundo de 854×480): um pouco maior que a das pistas do PvP
 export const CAIXA_CAMPANHA = Object.freeze({ esquerda: 232, direita: 492, topo: 150, base: 320 })
@@ -27,8 +28,9 @@ export const VELOCIDADE_CORACAO = CORACAO.velocidadePadrao // fixa na campanha (
 export const MAX_RODADAS = 30
 export const HP_ESTRELA = 0.6 // a 2ª estrela: terminar com pelo menos 60% do HP
 export const CURA_VIRADA = 0.2 // o chefe, ao se refazer (a virada), cura isto do HP máximo
-// a CPU da campanha leva mais dano por acerto que a do PvP: as fases ficam curtas (5 a 9 rodadas)
-export const DANO_NA_CPU = 1.35
+export const LIMIAR_FURIA = 0.3 // o chefe, depois da virada, entra em fúria com até isto do HP
+// a CPU leva o dano do PvP (a carta e o ataque são os do jogo original); o HP dela é o da fase
+export const DANO_NA_CPU = 1
 
 // ---------- a caixa de cada rodada ----------
 
@@ -58,7 +60,8 @@ export function descreverRegra(regra = {}) {
   if (regra.eco) return 'O ataque que você mandou volta na sua caixa na rodada seguinte.'
   if (regra.energiaInicial != null) return `Você começa com ${regra.energiaInicial} de energia.`
   if (regra.soDeCima) return 'Todo ataque na sua caixa vem de cima.'
-  if (regra.duplo) return 'O chefe manda dois ataques ao mesmo tempo e, na metade do HP, se refaz (cura e a caixa deita).'
+  if (regra.titan) return `O TITÃ: as cartas que você não jogar são arremessadas em você antes do ataque dele. Ele manda dois ataques juntos e, na metade do HP, se refaz${regra.furia ? '; no fim, entra em fúria' : ''}.`
+  if (regra.duplo) return `O chefe manda dois ataques ao mesmo tempo e, na metade do HP, se refaz (cura e a caixa deita)${regra.furia ? '; no fim, entra em fúria (ataques mais fortes)' : ''}.`
   return ''
 }
 
@@ -83,6 +86,7 @@ export function criarCorrida({ mundo, fase: n, semente }) {
     rngCpu: criarRng(`campanha:${semente}:cpu`),
     etapa: 'inicio', // inicio | escolha | esquiva | fim
     virou: false,
+    furia: false, // o chefe, quase vencido, ataca com tudo (regra.furia)
     ultimoAtaqueJogador: null, // o ataque da carta que você mandou (o eco devolve)
     esquiva: null,
     danoLevado: 0,
@@ -107,6 +111,7 @@ export function visaoDaRodada(c) {
     eu: { hp: eu.hp, hpMax: eu.hpMax, energia: eu.energia, sequencia: eu.sequencia, mao: eu.baralho.mao.map(publicaCarta), jogaveis: cartasPermitidas(c).map((x) => x.id) },
     cpu: { personagem: cpu.personagem, hp: cpu.hp, hpMax: cpu.hpMax, energia: cpu.energia, nMao: cpu.baralho.mao.length },
     virou: c.virou,
+    furia: c.furia,
   }
 }
 
@@ -118,7 +123,16 @@ export function comecarRodada(c) {
   return visaoDaRodada(c)
 }
 
-// o ataque que cai numa caixa (lado 0 = a sua, 1 = a da CPU), pronto para simular
+// o ataque DE VERDADE (o do PvP) que a sua carta solta na caixa da CPU: o servidor roda e a CPU desvia
+// (campanha/ataqueReal.js); o navegador repete com a mesma semente e as amostras da CPU
+function montarAtaqueReal(c, caixa) {
+  if (!caixa?.carta) return null
+  const at = ataqueRealDaCarta(caixa.carta)
+  if (!at) return null
+  return { real: true, nome: at.nome, carta: caixa.carta.id, cartaPublica: publicaCarta(caixa.carta), dano: caixa.dano, ritmo: { ...(caixa.ritmo ?? {}) }, semente: `${c.semente}:r${c.estado.rodada}:1` }
+}
+
+// o ataque que cai na SUA caixa: os modelos da campanha (o servidor refaz a sua esquiva)
 function montarAtaque(c, caixa, lado) {
   if (!caixa) return null
   const regraDoLado = lado === 0 ? { soDeCima: c.fase.regra?.soDeCima, duplo: c.fase.regra?.duplo && caixa.de === 1 } : {}
@@ -126,6 +140,10 @@ function montarAtaque(c, caixa, lado) {
   // ECO: na sua caixa, o ataque que a CPU manda é o que você mandou na rodada passada
   let base = ataqueDaCartaNaCampanha(carta, regraDoLado)
   if (lado === 0 && c.fase.regra?.eco && caixa.de === 1 && c.ultimoAtaqueJogador) base = { ...c.ultimoAtaqueJogador, soDeCima: Boolean(regraDoLado.soDeCima) }
+  // o golpe de quem está do outro lado (fase.assinatura) e a fúria do chefe: só no que a CPU manda
+  else if (lado === 0 && caixa.de === 1 && c.fase.assinatura) base = comAssinatura(base, c.virou && c.fase.assinaturaVirada ? c.fase.assinaturaVirada : c.fase.assinatura, c.estado.rodada)
+  if (lado === 0 && caixa.de === 1) base = comPressao(base, c.fase.pressao)
+  if (lado === 0 && caixa.de === 1 && c.furia) base = comFuria(base)
   if (!base) return null
   return {
     ...base,
@@ -148,11 +166,20 @@ export function jogar(c, cartaId) {
     const v = podeJogar(c.estado, 0, cartaId)
     if (!v.ok) return { ok: false, motivo: v.bloqueio?.codigo === 'sem-energia' ? 'sem_energia' : 'carta_invalida' }
   }
+  // o TITÃ: as cartas que você NÃO jogou (a mão inteira, se passou) vão ser arremessadas em você
+  const arremessadas = c.fase.regra?.titan ? eu.baralho.mao.filter((x) => x.id !== cartaId).map(publicaCarta) : null
   const cartaCpu = escolherJogada(c.estado, 1, { nivel: c.fase.nivel, rng: c.rngCpu })
   const r = resolverRodada(c.estado, cartaId, cartaCpu)
-  const ataque = montarAtaque(c, r.caixas[0], 0)
-  const ataqueCpu = montarAtaque(c, r.caixas[1], 1)
-  const cpu = ataqueCpu ? simularCpu(ataqueCpu, { nivel: c.fase.nivel, semente: ataqueCpu.semente, velocidade: VELOCIDADE_CORACAO }) : null
+  let ataque = montarAtaque(c, r.caixas[0], 0)
+  if (arremessadas?.length) {
+    const caixa = caixaDaRodada(c.fase, c.estado.rodada, { virou: c.virou })
+    const semente = `${c.semente}:r${c.estado.rodada}:0`
+    const comCartas = comArremesso(ataque, arremessadas, {})
+    ataque = ataque ? { ...ataque, ...comCartas } : { ...comCartas, carta: null, caixa, semente, verificado: true }
+  }
+  const ataqueCpu = montarAtaqueReal(c, r.caixas[1])
+  const cpu = ataqueCpu ? simularCpuReal({ ...ataqueCpu, carta: r.caixas[1].carta }, { nivel: c.fase.nivel, velocidade: VELOCIDADE_CORACAO }) : null
+  if (ataqueCpu && cpu) ataqueCpu.duracao = cpu.duracao
   // o eco guarda o ataque que a SUA carta mandou (refletido ou não)
   const minha = r.jogadas[0].carta
   const meuAtaque = minha && !r.jogadas[0].anulada ? ataqueDaCartaNaCampanha(minha) : null
@@ -168,7 +195,7 @@ export function jogar(c, cartaId) {
       efeitos: r.efeitos,
       eventos: r.eventos,
       ataque: semInterno(ataque),
-      ataqueCpu: semInterno(ataqueCpu),
+      ataqueCpu: ataqueCpu ? { real: true, nome: ataqueCpu.nome, carta: ataqueCpu.cartaPublica, dano: ataqueCpu.dano, ritmo: ataqueCpu.ritmo, semente: ataqueCpu.semente, duracao: ataqueCpu.duracao } : null,
       cpuAmostras: cpu?.amostras ?? [],
       eu: { hp: a.hp, hpMax: a.hpMax, energia: a.energia },
       cpu: { hp: b.hp, hpMax: b.hpMax, energia: b.energia },
@@ -176,7 +203,7 @@ export function jogar(c, cartaId) {
   }
 }
 
-const semInterno = (at) => (at ? { modelos: at.modelos, forca: at.forca, duracao: at.duracao, dano: at.dano, caixa: at.caixa, semente: at.semente, soDeCima: at.soDeCima, verificado: at.verificado } : null)
+const semInterno = (at) => (at ? { modelos: at.modelos, forca: at.forca, duracao: at.duracao, dano: at.dano, caixa: at.caixa, semente: at.semente, soDeCima: at.soDeCima, verificado: at.verificado, ...(at.cartas ? { cartas: at.cartas } : {}) } : null)
 
 // no máximo quantos acertos cabem numa esquiva (um a cada TEMPOS.invencivelMs)
 export const maxAcertos = (duracao) => Math.ceil(Math.max(0, duracao) / TEMPOS.invencivelMs) + 1
@@ -208,7 +235,8 @@ export function concluirEsquiva(c, { amostras, acertosCliente = 0, decorridoMs =
   for (let i = 0; i < acertos; i++) dano += aplicarDano(est, 0, ataque.dano)
   registrarGrazes(est, 0, grazes)
   if (ataque && acertos === 0) {
-    registrarPerfeito(est, 0, cartaDoAtaque(c, ataque))
+    // (só as cartas arremessadas, sem carta do titã: o desvio perfeito não tem carta para dar energia)
+    if (ataque.carta) registrarPerfeito(est, 0, cartaDoAtaque(c, ataque))
     c.perfeitos++
   }
   c.danoLevado += dano
@@ -229,6 +257,9 @@ export function concluirEsquiva(c, { amostras, acertosCliente = 0, decorridoMs =
     c.virou = virou = true
     curar(est, 1, Math.round(chefe.hpMax * CURA_VIRADA))
   }
+  // depois da virada, quase vencido: a fúria (uma vez; vale até o fim)
+  let furia = false
+  if (c.fase.regra?.furia && c.virou && !c.furia && chefe.hp > 0 && chefe.hp <= chefe.hpMax * LIMIAR_FURIA) c.furia = furia = true
 
   let vencedor = fimDaRodada(est)
   if (!vencedor && est.rodada >= MAX_RODADAS) vencedor = 'p2' // passou do limite: o silêncio vence
@@ -244,6 +275,7 @@ export function concluirEsquiva(c, { amostras, acertosCliente = 0, decorridoMs =
     dano,
     cpu: { acertos: cpu?.acertos ?? 0, dano: danoCpu },
     virou,
+    furia,
     vencedor,
     eu: { hp: a.hp, hpMax: a.hpMax, energia: a.energia, sequencia: a.sequencia },
     adversario: { hp: b.hp, hpMax: b.hpMax, energia: b.energia },

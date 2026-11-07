@@ -35,12 +35,22 @@ Músicas em MIDI (.mid), com o nome da tela ou do chefe. O jogo procura
   campanha2.mid    CAMPANHA, as fases e o chefe: o mesmo tema um pouco mais tenso
                    (cordas em trêmolo, um tímpano como um coração). Mesmo script.
                    Sem ele, toca o campanha.mid.
-  pvpResultado.mid resultado do PvP (ainda não existe: enquanto isso toca vitoria.mid)
+  campanha_luta.mid      CAMPANHA, as fases (Ré menor, com bateria e o motivo da casa).
+  campanha_chefe.mid     CAMPANHA, o chefe (órgão, coro, bumbo duplo).
+  campanha_virada.mid    CAMPANHA, a virada do chefe: o mesmo motivo em Ré MAIOR, heroico.
+  campanha_libertado.mid CAMPANHA, um amigo libertado (caixinha de música, Fá maior).
+  campanha_final.mid     CAMPANHA, o fim do Mundo 1: "Casa Silenciosa" inteira em Ré maior.
+                   As cinco são originais, geradas por scripts/musica/trilhas.mjs (rode
+                   `node scripts/musica/trilhas.mjs` depois de mudar). Sem elas, toca o
+                   campanha2.mid / campanha.mid.
+  pvpResultado.mid resultado do PvP (Dó maior, leve). Mesmo script. Sem ele, toca o vitoria.mid.
 
   Cartas SUPER (música especial de cada personagem; toca em loop enquanto o
   SUPER acontece e depois a música da luta volta do ponto onde parou). Sem o
-  arquivo, a música da luta simplesmente continua (falta o da Kris):
+  arquivo, a música da luta simplesmente continua:
   super_kris.mid  super_susie.mid  super_ralsei.mid  super_noelle.mid
   super_berdly.mid  super_dess.mid  super_asriel.mid
+  (o super_kris.mid é gerado por scripts/musica/trilhas.mjs; na campanha, a sua
+  carta SUPER também toca a música dela)
 
 Volume da música: AUDIO.musica em src/game/constants.js.

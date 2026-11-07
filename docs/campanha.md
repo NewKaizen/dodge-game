@@ -11,7 +11,9 @@ campanha!".
 | Textos (diálogos, escolhas, cenário e tema de cada fase) | `src/game/campanha/mundos/mundoN.textos.js` |
 | Cenário sombrio (puro, com semente) e o desenho em Phaser | `src/game/campanha/cenario.js`, `desenharCenario.js` |
 | Mapa da escada (puro) · ecos na tela · texto sem ligadura | `src/game/campanha/mapa.js` · `eco.js` · `texto.js` |
-| Música | `scripts/musica/campanha.mjs` → `public/assets/musicas/campanha.mid`, `campanha2.mid` |
+| Música | `scripts/musica/campanha.mjs` → `campanha.mid`, `campanha2.mid`; `scripts/musica/trilhas.mjs` → `campanha_luta`, `_chefe`, `_virada`, `_libertado`, `_final` |
+| O ataque DE VERDADE da sua carta na caixa da CPU (servidor e navegador) | `src/game/campanha/ataqueReal.js` (attacks/ sem Phaser: `src/game/phaserPuro.js`) |
+| O medo na sua caixa (véu, batida de coração, sussurros) | `src/game/campanha/medo.js` |
 | Ataques puros (com semente) e o registro `atacavelNoServidor` | `src/game/campanha/ataques.js` |
 | Esquiva em passo fixo (navegador e servidor) | `src/game/campanha/simulacao.js` |
 | Posições do coração: formato e plausibilidade | `src/game/campanha/amostras.js` |
@@ -24,39 +26,107 @@ campanha!".
 
 ## Mundo 1: "A Casa Silenciosa" (Kris)
 
-Depois de uma noite que ninguém explica, a cidade fica quieta, e as portas da casa de Kris passam a
-dar em lugares conhecidos: a sala de aula, o corredor da escola, o ginásio, a rua, a sala de estar.
-Estão vazios e um pouco tortos. Em cada um há o **eco** de alguém do elenco, que não é bem a pessoa:
-é o que sobrou dela, uma frase que ficou pela metade, uma coisa que não foi dita. No fim da escada
-fica o último quarto, onde mora a ausência que calou a casa (o eco do Asriel). O fim é ambíguo de
-propósito: a Kris não fica, mas volta pelo corredor e deixa a luz acesa. A história é original; os
-personagens são os do jogo.
+Na noite do Festival das Luzes, a cidade apaga de uma vez e as vozes somem. Uma sombra, **o
+Silêncio** (feita de tudo o que ninguém teve coragem de dizer), prende os amigos de Kris dentro das
+próprias lembranças: a sala de aula, o corredor, o ginásio, a rua, a sala de estar. As portas da casa
+levam até eles. Cada luta é contra um amigo **possuído** (o eco, apagado) e o Silêncio fala por ele;
+vencer **liberta** o amigo, que volta com cor, entra na turma e **sobe a escada junto** (aparece atrás
+da Kris no diálogo e na partida, torce durante a luta e grita na virada do chefe). No último quarto,
+o do irmão que foi embora sem se despedir, o Silêncio está grudado em Asriel. O clímax: Kris, que não
+fala o mundo inteiro, diz **uma** frase ("Volta pra casa."), as luzes da cidade voltam e o telefone
+toca. A história é original; os personagens são os do jogo.
 
-| Fase | Lugar (cenário) | Eco | Regra especial (o mesmo mecanismo de sempre, com outro sentido) | ★ rodadas |
-| --- | --- | --- | --- | --- |
-| 1 A Sala de Aula | `sala`: cadeiras no teto, a lição pela metade | Ralsei | só cartas ♠: "no baralho, só sobraram espadas" | 9 |
-| 2 O Corredor que Fecha | `corredor`: armários que respiram | Noelle | a caixa perde 10% por rodada: as paredes chegam mais perto | 7 |
-| 3 O Ginásio Vazio | `ginasio`: arquibancada vazia, duas lâmpadas | Berdly | o ataque que você mandou volta: o eco do ginásio | 8 |
-| 4 A Rua de Volta | `rua`: postes que só acendem quando Kris passa | Susie | começa com 0 de energia: o cansaço de quem andou a noite toda | 7 |
-| 5 A Sala Onde Chove | `chuva`: chove dentro de casa | Dess | todo ataque vem de cima: a chuva | 8 |
-| 6 O Último Quarto (chefe) | `quarto`: escadas impossíveis, portas soltas | Asriel | tudo chega duas vezes (`duplo`); na metade do HP **a porta se abre por inteiro** (`virada`: cura 20% e a caixa deita), uma vez | 12 |
+| Fase | Lugar (cenário) | Preso | Regra especial | Golpe do oponente (`assinatura`) | ★ rodadas |
+| --- | --- | --- | --- | --- | --- |
+| 1 A Sala de Aula | `sala` | Ralsei | só cartas ♠ | Mariposas | 9 |
+| 2 O Corredor que Fecha | `corredor` | Noelle | a caixa perde 10% por rodada | Estilhaços (gelo) / Olhares | 7 |
+| 3 O Ginásio Vazio | `ginasio` | Berdly | o ataque que você mandou volta (`eco`) | Feixes de luz (holofotes) | 8 |
+| 4 A Rua de Volta | `rua` | Susie | começa com 0 de energia | Feixes (faróis) / Paredes | 8 |
+| 5 A Sala Onde Chove | `chuva` | Dess | todo ataque vem de cima | Cinzas / Olhares | 9 |
+| 6 O Último Quarto (chefe) | `quarto` | Asriel (o **Titã do Silêncio**) | **`titan`** (as cartas que você não jogou voam em você antes do ataque dele); `duplo`; `virada` na metade do HP (cura 20%, caixa deita, a turma grita); **`furia`** com 30% do HP depois da virada (ataques mais fortes e longos), uma vez | Mariposas / Feixes / Estilhaços (depois da virada: Estilhaços / Feixes) | 12 |
 
-Os ataques continuam os quatro modelos simuláveis, com nomes do mundo: **Cinzas que caem**
-(`chuva`), **Paredes com uma fresta** (`galhos`), **Olhares** (`sementes`) e **Mariposas**
-(`redemoinho`). Por dentro os ids e o `extra.tipo` das balas não mudaram (o servidor confere igual).
+### O chefe é um TITÃ (regra `titan`)
+
+No último quarto o Silêncio engole Asriel e cresce até atravessar o teto: na arena ele é o sprite do
+oponente **gigante** (`campanha/tita.js`), em silhueta violeta atrás da caixa, respirando, com dois
+olhos que brilham (acendem quando ele ataca, ficam vermelhos na fúria; na virada, rachaduras de luz).
+Ele entra com o nome enorme na tela e fala com **quem joga**, não com a Kris (a quarta parede: "É
+VOCÊ. DO OUTRO LADO DA TELA. EU ESTOU VENDO A SUA MÃO.").
+
+**O arremesso**: a cada rodada, as cartas da sua mão que você **não jogou** (a mão inteira, se passou
+a vez) são arremessadas em você ANTES do ataque do titã. São as cartas em si, não as habilidades:
+na tela, as Cartas de verdade saem da sua mão, ficam tremendo embaixo da caixa (o lado da mão) com a
+linha de mira e voam onde o coração estava, quicando uma vez nas paredes. O ataque do titã espera
+elas (`atrasoDasCartas`). Por dentro é o modelo `cartas` (`campanha/ataques.js`: retângulos de
+20×28, verificados pelo servidor como os outros); quem decide quais cartas voam é o servidor
+(`partida.js`, a mão dele antes da jogada). Sem carta do titã na rodada, só as suas cartas voam
+(`DANO_CARTA`). Guardar cartas boas tem preço: quanto mais carta na mão, mais coisa voando.
+
+### Dois lados da caixa: as cartas do jogo e o que dá medo
+
+- **A sua carta é a do jogo original.** O ataque que ela solta na caixa da CPU é o MESMO do PvP
+  (`ataqueDaCarta` + a biblioteca `attacks/`, com o `ContextoAtaque` e a classe `Balas` reais): a
+  Estocada Dupla da Kris, as habilidades, a SUPER (com a música dela). O dano na CPU é o do PvP
+  (`DANO_NA_CPU = 1`), e o HP da CPU sobe para compensar (`fatorHpCpu` 0,7 a 1). Quem roda é o
+  **servidor** (`campanha/ataqueReal.js`): a biblioteca `attacks/` não usa mais o Phaser (o pouco que
+  usava está em `phaserPuro.js`, uma cópia fiel conferida contra o Phaser em
+  `__tests__/phaserPuro.test.js`, inclusive o gerador aleatório: o PvP não muda). A CPU desvia
+  (`botEsquiva.js`) e o servidor conta os acertos nela; o navegador repete o ataque com a mesma
+  semente e as amostras da CPU numa região longe da tela (`CAIXA_REAL`), mostrada por uma câmera só
+  dela (como a vitrine do Manual do Ralsei). Ataques que empurram o coração usam o mesmo objeto
+  (`coracao.ajustar()`, como `Heart.js`).
+- **O que vem na SUA caixa é do Silêncio**: os modelos da campanha (verificados pelo servidor), mais
+  duros a cada fase (`fase.pressao`, 0,1 a 0,3, somado à força) e desenhados para assustar: brasas,
+  espinhos, **olhos** que seguem o coração, mariposas que batem as asas, feixes, cristais, **Garras**
+  (`garras`: três dedos em leque que avisam com a linha e dão o bote rápido) e a **Mandíbula**
+  (`mandibula`: uma fileira de dentes em cima e outra embaixo fecham; só a garganta marcada fica
+  livre). Enquanto o Silêncio ataca: a borda da caixa pulsa em carmim, as bordas da tela fecham
+  (mais quanto menos HP), um coração bate grave (mais rápido quanto menos HP) e sussurros aparecem
+  em volta (`campanha/medo.js`; "reduzir animações" tira os sussurros).
+
+Medição (10 lutas por fase, `piloto 'bom'` = desvia de tudo o que vê; `'zigue'` = anda sem olhar):
+o piloto bom vence quase tudo, mas chega ao fim da Rua com ~60% do HP e ao fim do chefe com ~27%
+(e perde 2 em 10); andar sem olhar perde a partir da fase 2. Lutas de 5 a 9 rodadas.
+
+**Música**: `campanha_luta` nas fases, `campanha_chefe` no chefe, `campanha_virada` quando a porta se
+abre (o mesmo motivo das fases em maior), `campanha_libertado` quando um amigo volta e
+`campanha_final` no fim do mundo (a melodia do mapa em Ré maior). Todas originais, geradas por
+`scripts/musica/trilhas.mjs`; `__tests__/musicaTrilhas.test.js` confere loop, andamento e escala.
+
+**Golpe do oponente** (`fase.assinatura`, `campanha/ataques.js` `comAssinatura`): o ataque que a CPU
+manda na **sua** caixa troca o modelo do naipe pelo golpe de quem está do outro lado, um por rodada em
+rodízio; o SUPER e o segundo modelo do `duplo` continuam; na fase do `eco`, o eco tem a vez. Cada
+fase fica com cara própria.
+
+Os ataques são seis modelos simuláveis: **Cinzas que caem** (`chuva`), **Paredes com uma fresta**
+(`galhos`), **Olhares** (`sementes`), **Mariposas** (`redemoinho`) e os novos **Feixes de luz**
+(`feixes`: retângulos que cruzam a caixa, o primeiro na linha do coração, piscando 760 ms antes de
+acender por 420 ms; dois da mesma leva a pelo menos 74 px) e **Estilhaços** (`estilhacos`: um cristal
+que brilha 650 ms longe do coração e estoura em leque). Com `soDeCima`, feixes viram paredes e
+estilhaços viram cinzas.
+
+**Falas durante a luta** (`luta` nos textos, só sabor, no navegador): `inicio`, `ferido` (oponente com
+metade do HP), `quase` (1/4), `voceMal` (você com 35%), `perfeito` (desviou de tudo). Balões nos cantos
+de baixo: o oponente e o Silêncio à direita, os amigos libertados à esquerda (só fala quem já está
+livre). Na tela ainda: "PERFEITO!" ao zerar os acertos, o dano no oponente subindo, a turma pulando, a
+barra do chefe violeta depois da virada e vermelha na fúria.
 
 Escolhas (só sabor; são ações, nunca falas): na fase 1, **guardar o bilhete** ou deixá-lo na mesa (o
-eco do chefe comenta); na fase 3, **bater palmas** uma vez ou ficar em silêncio. Ficam salvas na conta.
+chefe comenta); na fase 3, **bater palmas** uma vez ou ficar em silêncio (o Silêncio provoca). Ficam
+salvas na conta.
 
 ### Tom e estilo (guia para os próximos mundos)
 
-- **Silêncio e ecos.** Poucas palavras, muita atmosfera. Lugares conhecidos que ficaram vazios e
-  deformados; o elenco aparece como ecos (frases pela metade, coisas não ditas). Nada de piada que
-  quebre o clima (um calor discreto pode). Final ambíguo, mas com sentido.
+- **Vozes roubadas.** Lugares conhecidos que ficaram vazios e tortos, mas com **algo em jogo**: um
+  vilão com voz (`quem: 'silencio'`: sem retrato, nome violeta, LETRAS GRANDES, voz grave), amigos
+  presos que pedem ajuda e voltam quando você vence. Melancolia no começo, esperança crescendo a cada
+  luz acesa. Humor de personagem cabe (Susie e Berdly), sem quebrar o clima. Final que resolve.
 - **Kris quase não fala.** As respostas dela são `{ quem: 'kris', texto: '...' }` ou gestos na voz do
-  narrador ("Kris não diz nada. Mas fica."). Escolhas são **ações** ("Guardar o bilhete no bolso"),
-  nunca falas entre aspas. O `mundos.test.js` confere.
-- **Narração** curta, literária, no presente. Uma imagem por linha.
+  narrador. Escolhas são **ações**, nunca falas entre aspas. Ela fala **uma vez** no mundo, no fim do
+  chefe (o clímax). O `mundos.test.js` confere.
+- **Narração** curta, no presente. Uma imagem por linha.
+- **Ecos e libertos**: quem ainda está preso é eco (apagado); quem já foi libertado (`libertosAte` em
+  `mundos/index.js`) fala com cor (`livres` na `CaixaDeDialogo`) e aparece atrás da Kris.
 - **Visual "mundo sombrio estilizado"** (`campanha/cenario.js`, puro e com semente): preto com chão
   xadrez fugindo para o escuro, vitrais, portas soltas no ar, escadas impossíveis, feixes finos de
   luz, poeira parada. Cores fortes e poucas: azul-petróleo, carmim, dourado, violeta. **Nada de
@@ -81,7 +151,7 @@ eco do chefe comenta); na fase 3, **bater palmas** uma vez ou ficar em silêncio
 
 **Estrelas** (calculadas no servidor): ★ vencer · ★ terminar com pelo menos 60% do HP · ★ vencer em
 até N rodadas (a coluna acima). A CPU da campanha é a do PvP (`pvp/bot.js` e `pvp/botEsquiva.js`),
-com o HP da fase (`fatorHpCpu`) e levando 1,35× o dano por acerto (fases de 5 a 9 rodadas). O
+com o HP da fase (`fatorHpCpu`) e levando o dano do PvP por acerto (fases de 5 a 9 rodadas). O
 coração anda sempre a 180 px/s na campanha (o ajuste de velocidade do painel não vale: o servidor
 confere a velocidade).
 
@@ -146,7 +216,13 @@ cliente: quem **roda a partida é o servidor** (`server/campanha.js` + `campanha
 | `galhos` (paredes com um vão, de lado ou de cima) | **sim** |
 | `sementes` (miradas, paradas com a linha por 700 ms) | **sim** |
 | `redemoinho` (papéis pelas bordas, girando) | **sim** |
-| ataques do PvP (`attacks/*`, com Phaser) | não simuláveis no servidor hoje: a campanha **não usa nenhum**. O caminho existe em `concluirEsquiva` (`verificado: false`): vale o relato do navegador, conferido (formato, plausibilidade das posições, teto de acertos) |
+| `feixes` (retângulos parados que avisam e acendem) | **sim** |
+| `estilhacos` (cristal que avisa e estoura em leque) | **sim** |
+| `garras` (três dedos em leque, aviso com a linha, bote rápido) | **sim** |
+| `mandibula` (dentes que fecham de cima e de baixo; a garganta marcada fica livre) | **sim** |
+| `cartas` (o titã arremessa as cartas que você não jogou; quicam uma vez) | **sim** |
+| ataques do PvP (`attacks/*`) na SUA caixa | a campanha não usa: na sua caixa só vêm os modelos acima. O caminho existe em `concluirEsquiva` (`verificado: false`): vale o relato do navegador, conferido |
+| ataques do PvP na caixa da CPU (a sua carta) | **o servidor roda** (`ataqueReal.js`) e decide os acertos na CPU; o navegador só repete para desenhar |
 
 Todas as cartas de todos os baralhos viram um desses quatro modelos na campanha (♠ galhos, ♦
 sementes, ♣ redemoinho, ♥ chuva fraca, SUPER galhos + sementes); o chefe junta dois. O teste
@@ -204,11 +280,11 @@ ids). Teste no Postgres (0001–0012, duas vezes): `DODGE_PG=... node --test ser
 
 1. `src/game/campanha/mundos/mundo2.js` com `{ id: 2, nome, personagem, fases: [...], recompensas }`
    (formato no topo de `mundo1.js`; a última fase é o chefe). Use as regras que já existem
-   (`soNaipe`, `caixaEncolhe`, `eco`, `energiaInicial`, `soDeCima`, `duplo`, `virada`) ou crie uma em
+   (`soNaipe`, `caixaEncolhe`, `eco`, `energiaInicial`, `soDeCima`, `duplo`, `virada`, `furia`) e dê a cada fase uma `assinatura` ou crie uma em
    `campanha/partida.js` (com teste).
-2. `mundo2.textos.js` com `antes`, `depois` e `derrota` de cada fase, o `cenario` (um tema de
+2. `mundo2.textos.js` com `antes`, `depois`, `derrota` e `luta` de cada fase, o `cenario` (um tema de
    `campanha/cenario.js`, ou um novo lá, com teste) e o `tema` (a regra dita no tom do mundo); e
-   `titulo`, `resumo`, `virada`, `ecos`, `cenarioMapa`. Siga o guia de tom e estilo acima.
+   `titulo`, `resumo`, `virada`, `viradaFalas`, `furia`, `furiaFala`, `ecos`, `cenarioMapa`. Siga o guia de tom e estilo acima.
 3. Registre os dois em `mundos/index.js`.
 4. Prefira ataques simuláveis (`ataques.js`); um modelo novo entra no registro com teste de
    paridade e de justiça (`simulacao.test.js`).

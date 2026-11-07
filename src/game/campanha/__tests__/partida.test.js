@@ -29,7 +29,7 @@ test('a rodada: energia do servidor, mão de 5, CPU joga, ataques com semente', 
   assert.equal(v.eu.energia, ENERGIA.inicial)
   assert.equal(v.eu.mao.length, 5)
   assert.equal(v.cpu.personagem, 'noelle')
-  assert.equal(v.cpu.hpMax, Math.round(85 * 0.5))
+  assert.equal(v.cpu.hpMax, Math.round(85 * MUNDO1.fases[1].fatorHpCpu))
   const r = jogar(c, melhorAtaque(v))
   assert.ok(r.ok)
   assert.equal(r.rodada.jogadas.length, 2)
@@ -95,7 +95,8 @@ test('eco: o ataque que você mandou volta na rodada seguinte', () => {
     const x = rodada(c)
     if (x.r.rodada.ataque && x.r.rodada.jogadas[1].carta && !x.r.rodada.jogadas[1].anulada) {
       assert.deepEqual(x.r.rodada.ataque.modelos, antes.modelos)
-      assert.equal(x.r.rodada.ataque.forca, antes.forca)
+      // o eco volta com a pressão da fase (a escada mais funda pesa)
+      assert.equal(x.r.rodada.ataque.forca, Math.min(1, Math.round((antes.forca + (c.fase.pressao ?? 0)) * 1000) / 1000))
     }
   }
   assert.ok(r)
@@ -111,8 +112,11 @@ test('ataques só de cima na Chuva de Recortes; o chefe manda dois juntos', () =
   let viu = false
   for (let i = 0; i < 4 && b.etapa !== 'fim'; i++) {
     const { r } = rodada(b)
-    if (r.rodada.ataque && r.rodada.jogadas[1].carta) {
-      assert.equal(r.rodada.ataque.modelos.length, 2)
+    // (a carta do titã pode ser de suporte: aí só as suas cartas voam)
+    if (r.rodada.ataque && r.rodada.jogadas[1].carta && r.rodada.ataque.modelos.length > 1) {
+      // o titã: as cartas arremessadas primeiro, e depois os dois ataques dele juntos
+      assert.equal(r.rodada.ataque.modelos[0], 'cartas')
+      assert.equal(r.rodada.ataque.modelos.filter((m) => m !== 'cartas').length, 2)
       viu = true
     }
   }
@@ -220,4 +224,126 @@ test('estrelas: vencer, HP >= 60% e rodadas <= meta', () => {
   assert.equal(estrelasDaCorrida(c), 2)
   c.estado.rodada = 99
   assert.equal(estrelasDaCorrida(c), 1)
+})
+
+test('assinatura: o que a CPU manda na SUA caixa usa o golpe do oponente (rodízio por rodada)', () => {
+  const vistos = new Set()
+  for (let k = 0; k < 8; k++) {
+    const c = criarCorrida({ mundo: 1, fase: 4, semente: `as${k}` })
+    for (let n = 0; n < 4; n++) {
+      const { r, fim } = rodada(c)
+      const at = r.rodada.ataque
+      if (at && !r.rodada.jogadas[0].anulada) {
+        vistos.add(at.modelos[0])
+        assert.equal(at.verificado, true)
+      }
+      if (fim.vencedor) break
+    }
+  }
+  // a Susie (fase 4): faróis (feixes) e investidas (galhos)
+  assert.ok(vistos.has('feixes'), [...vistos].join())
+})
+
+test('fúria do chefe: depois da virada, com 30% do HP, uma vez só; o ataque dele fica mais forte', () => {
+  let achou = false
+  for (let k = 0; k < 12 && !achou; k++) {
+    const c = criarCorrida({ mundo: 1, fase: 6, semente: `fu${k}` })
+    let furias = 0
+    let viradaAntes = false
+    let depois = null
+    while (c.etapa !== 'fim') {
+      const { r, fim } = rodada(c)
+      if (c.furia && r.rodada.ataque && !r.rodada.jogadas[0].anulada && furias) depois = r.rodada.ataque
+      if (fim.virou) viradaAntes = true
+      if (fim.furia) {
+        furias++
+        assert.ok(viradaAntes, 'fúria antes da virada')
+        assert.ok(fim.adversario.hp <= fim.adversario.hpMax * 0.3)
+        assert.equal(visaoDaRodada(c).furia, true)
+      }
+    }
+    assert.ok(furias <= 1)
+    if (furias && depois) {
+      achou = true
+      assert.ok(depois.duracao >= 4000 + 500, `duração ${depois.duracao}`)
+      assert.ok(depois.forca >= 0.3, `força ${depois.forca}`)
+    }
+  }
+  assert.ok(achou, 'nenhuma luta chegou à fúria com um ataque depois')
+})
+
+test('fúria: só com a regra e só depois da virada', () => {
+  const c = criarCorrida({ mundo: 1, fase: 5, semente: 'semfuria' })
+  for (let n = 0; n < 12 && c.etapa !== 'fim'; n++) {
+    const { fim } = rodada(c)
+    assert.ok(!fim.furia)
+  }
+  assert.equal(c.furia, false)
+})
+
+test('a sua carta solta o ataque DE VERDADE dela (o do PvP) na caixa da CPU; o servidor conta os acertos', () => {
+  const c = criarCorrida({ mundo: 1, fase: 2, semente: 'real' })
+  let viu = 0
+  for (let i = 0; i < 6 && c.etapa !== 'fim'; i++) {
+    const { r, fim } = rodada(c)
+    const a = r.rodada.ataqueCpu
+    if (!a) continue
+    viu++
+    assert.equal(a.real, true)
+    assert.equal(a.carta.personagem, 'kris')
+    assert.match(a.nome, /^[a-zA-Z]+$/)
+    assert.ok(a.duracao > 3000 && r.rodada.cpuAmostras.length >= 3 * 30)
+    assert.ok(Number.isInteger(fim.cpu.acertos))
+    // o dano na CPU é o do jogo: acertos × dano da caixa
+    assert.equal(fim.cpu.dano >= 0, true)
+  }
+  assert.ok(viu >= 2)
+})
+
+test('pressão: o que vem na sua caixa fica mais forte quanto mais funda a fase', () => {
+  const forcas = (fase) => {
+    const out = []
+    for (let k = 0; k < 4; k++) {
+      const c = criarCorrida({ mundo: 1, fase, semente: `pr${k}` })
+      for (let i = 0; i < 3 && c.etapa !== 'fim'; i++) {
+        const { r } = rodada(c)
+        if (r.rodada.ataque && r.rodada.jogadas[1].carta) out.push(r.rodada.ataque.forca)
+      }
+    }
+    return out.reduce((a, b) => a + b, 0) / out.length
+  }
+  assert.ok(forcas(5) > forcas(1))
+})
+
+test('o TITÃ arremessa as cartas que você NÃO jogou (todas, se passou a vez), antes do ataque dele', () => {
+  const c = criarCorrida({ mundo: 1, fase: 6, semente: 'tita' })
+  const v = comecarRodada(c)
+  const jogada = melhorAtaque(v)
+  const maoAntes = v.eu.mao.map((x) => x.id)
+  const r = jogar(c, jogada)
+  const at = r.rodada.ataque
+  assert.ok(at, 'sempre há ataque na sua caixa: no mínimo as suas cartas')
+  assert.equal(at.modelos[0], 'cartas')
+  assert.deepEqual(at.cartas.map((x) => x.id), maoAntes.filter((id) => id !== jogada))
+  assert.equal(at.verificado, true)
+  // as cartas são as de verdade (naipe e valor), mas só voam: o ataque delas não acontece
+  for (const x of at.cartas) assert.ok(x.naipe && x.valor)
+  // a esquiva inteira passa pelo servidor (as cartas também contam acerto)
+  const e = desviar(at, { piloto: 'parado' })
+  const fim = concluirEsquiva(c, { amostras: ler(e.amostras), acertosCliente: e.acertos, decorridoMs: 60_000 })
+  assert.ok(fim.ok && fim.acertos >= 1, 'parado no meio das cartas, alguma acerta')
+  // passou a vez: a mão inteira voa
+  if (c.etapa !== 'fim') {
+    const v2 = comecarRodada(c)
+    const r2 = jogar(c, null)
+    assert.deepEqual(r2.rodada.ataque.cartas.map((x) => x.id), v2.eu.mao.map((x) => x.id))
+  }
+})
+
+test('as outras fases não arremessam cartas', () => {
+  const c = criarCorrida({ mundo: 1, fase: 5, semente: 'semcartas' })
+  for (let i = 0; i < 3 && c.etapa !== 'fim'; i++) {
+    const { r } = rodada(c)
+    if (r.rodada.ataque) assert.ok(!r.rodada.ataque.cartas && !r.rodada.ataque.modelos.includes('cartas'))
+  }
 })

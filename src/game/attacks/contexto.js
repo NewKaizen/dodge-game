@@ -1,4 +1,4 @@
-import Phaser from 'phaser'
+import { Aleatorio, contem } from '../phaserPuro.js'
 import { ATAQUE, CORES, CORACAO, LARGURA, tetoDeFuga } from '../constants.js'
 import { LACUNA_MINIMA, avisar, validarParede, validarLacuna } from './validacao.js'
 import { registrarZona, envelhecerZonas, limparZonas } from './zonas.js'
@@ -72,7 +72,7 @@ export default class ContextoAtaque {
     this.tema = { formas: ['bola'], cores: {}, cor: CORES.bala, ...tema }
     this.dano = dano
     this.ritmo = { velocidade: 1, densidade: 1, ...ritmo }
-    this.rng = new Phaser.Math.RandomDataGenerator([String(semente ?? ATAQUE.semente)])
+    this.rng = new Aleatorio([String(semente ?? ATAQUE.semente)])
     this.nome = nome
     this.lacunaMinima = LACUNA_MINIMA
     this.timers = []
@@ -178,8 +178,9 @@ export default class ContextoAtaque {
   }
 
   decoracao(objeto) {
-    const imagem = objeto instanceof Phaser.GameObjects.Image || objeto instanceof Phaser.GameObjects.Sprite
-    const vemDeFora = imagem && !Phaser.Geom.Rectangle.Contains(this.caixa, objeto.x, objeto.y)
+    // (só imagens e sprites vêm de fora: o `type` do objeto do Phaser)
+    const imagem = objeto?.type === 'Image' || objeto?.type === 'Sprite'
+    const vemDeFora = imagem && !contem(this.caixa, objeto.x, objeto.y)
     if (vemDeFora) this.caixaDeBatalha.aproximar(objeto)
     else this.caixaDeBatalha.recortar(objeto)
     this.objetos.push(objeto)
@@ -286,7 +287,7 @@ export default class ContextoAtaque {
   // fn() com um RNG próprio, semeado por UM número do RNG do ataque (ver o topo)
   isolado(fn) {
     const principal = this.rng
-    this.rng = new Phaser.Math.RandomDataGenerator([String(principal.integer())])
+    this.rng = new Aleatorio([String(principal.integer())])
     try {
       return fn()
     } finally {

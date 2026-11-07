@@ -22,3 +22,11 @@ export function faseLiberada(progresso, mundo, n) {
   if (Number(n) === 1) return true
   return (progresso ?? []).some((p) => p.mundo === Number(mundo) && p.fase === Number(n) - 1 && p.concluida)
 }
+
+// quem já foi LIBERTADO antes da fase n (os oponentes das fases anteriores): aparecem com cor, não
+// como eco. comEsta: inclui o oponente da própria fase (depois de vencer)
+export function libertosAte(mundo, n, { comEsta = false } = {}) {
+  const m = mundoDe(mundo)
+  if (!m) return []
+  return m.fases.filter((f) => f.n < Number(n) || (comEsta && f.n === Number(n))).map((f) => f.oponente)
+}

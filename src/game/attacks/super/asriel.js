@@ -1,4 +1,4 @@
-import Phaser from 'phaser'
+import { limitar, MISTURA_ADD } from '../../phaserPuro.js'
 import { definirAtaque } from '../definir.js'
 import { tocar } from '../../audio.js'
 import { particulas } from '../../effects/particulas.js'
@@ -66,7 +66,7 @@ export default definirAtaque({
     // e nunca passa de PUXAO_MAX da velocidade do coração de verdade (painel lento, eventos)
     a.aoAtualizar((dt) => {
       const teto = Math.min(forcaMax, a.tetoPerseguidor(PUXAO_MAX))
-      puxar(a, g, cx, cy, Phaser.Math.Clamp(g.forca, -teto, teto), dt)
+      puxar(a, g, cx, cy, limitar(g.forca, -teto, teto), dt)
     })
 
     // ---------- I. o vazio cresce e puxa ----------
@@ -234,7 +234,7 @@ function colapsar(a, estado, buraco, disco, cx, cy, g) {
   a.tremer(260, 0.015)
   a.cena.tweens.killTweensOf(buraco)
   a.cena.tweens.add({ targets: buraco, scale: 0, angle: 280, duration: 260, ease: 'Cubic.easeIn', onComplete: () => buraco.setVisible(false) })
-  const nova = a.decoracao(a.cena.add.image(cx, cy, 'super-asriel-nova').setDepth(3).setScale(0).setAlpha(0.95).setBlendMode(Phaser.BlendModes.ADD))
+  const nova = a.decoracao(a.cena.add.image(cx, cy, 'super-asriel-nova').setDepth(3).setScale(0).setAlpha(0.95).setBlendMode(MISTURA_ADD))
   a.cena.tweens.add({ targets: nova, scale: 1.6, duration: 260, delay: 180, ease: 'Back.Out' })
   a.cena.tweens.add({ targets: nova, scale: 1.25, duration: 600, delay: 440, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
   a.depois(380, () => tocar(a.cena, 'super-asriel-estoura'))
