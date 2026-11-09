@@ -145,7 +145,7 @@ Com 3 ou 4 na sala, o dono tem, além do COMEÇAR PARTIDA de sempre (o modo que 
 cada partida o grupo vota o modo e o mapa. A sala 1x1 e o JOGAR RÁPIDO não mudam. O dono continua com os poderes de
 sempre no lobby (modo, tirar, convidar, fechar).
 
-**O ciclo:** lobby → COMEÇAR PARTY → **votação do modo** → **votação do mapa** → partida (direto, sem tela de
+**O ciclo:** lobby → COMEÇAR PARTY → **votação do modo** → **votação do mapa** → **apresentação** → partida (sem tela de
 escolha de personagem) → resultado (A: **CONTINUAR**) → tela **CONTINUAR / SAIR DA PARTY** → votação do modo → …
 
 | Votação | Opções |
@@ -195,6 +195,25 @@ quando abre a tela CONTINUAR/SAIR.
 
 **Tela CONTINUAR / SAIR DA PARTY** (`scenes/PartyFim.js`): **15 s**. CONTINUAR marca o ✓ no cartão; quando todos
 apertaram (ou o tempo acabou) a party segue. Quem não apertou nada **continua**; SAIR DA PARTY sai da sala na hora.
+Os cartões ficam na ordem do **placar** (1º à esquerda), com os pontos, o "+N" da partida que acabou subindo, a coroa do
+líder e a sequência de vitórias; no topo, a frase da rivalidade ("FULANO está EM CHAMAS", "lidera por 1: dá para virar!").
+
+**Placar da party** (`party/placar.js`, testado em `party/__tests__/placar.test.js`): só o host guarda (registry
+`partyPlacar`, zerado no COMEÇAR PARTY). Todos contra todos: 1º **3**, 2º **2**, 3º **1**, 4º 0. 2x2: **3** para cada um do
+time vencedor, empate **1** para todos. CO-OP: chefe derrotado **2** para todos. Quem vence soma uma vitória e aumenta a
+sequência; quem perde zera a sua. A cena de resultado (`PvpResultadoN`, `Vitoria`, `GameOver`) registra ao abrir
+(`registrarNoPlacar`; o id da partida que a votação deu, `partyPartida`, impede somar duas vezes) e o placar vai nos dados
+da `PartyFim` e da `PartyIntro`, então chega a todos com a cena. Líder = o único com mais pontos (empate no topo: sem coroa).
+
+**Apresentação** (`scenes/PartyIntro.js`): depois da votação do mapa, o host abre esta cena com o destino de verdade nos
+dados (`destino: { cena, dados }`). Topo: PARTIDA N, o modo e a arena (ou o chefe). Os lutadores entram um por um com a
+arte grande (`arte/elenco.js`, pose de guarda), cada um no painel da cor da vaga (2x2: TIME A à esquerda, TIME B à direita,
+olhando para o meio; CO-OP: o grupo à esquerda e o chefe caindo à direita), com os pontos, a coroa do líder e a sequência.
+Depois o **VS**, a contagem **3, 2, 1, LUTEM!** (CO-OP: AO CHEFE!) e o host leva todos ao destino (~5 s). Com "reduzir
+animações": sem tremer, sem clarão, sem linhas de velocidade.
+
+**Votação, os últimos 3 s:** o número grande aparece no meio com um tique por segundo; para quem ainda não votou ele fica
+vermelho e o topo diz **VOTA LOGO!**.
 
 **Mensagens** (servidor, `server/lan.js`, PROTOCOLO **14**):
 

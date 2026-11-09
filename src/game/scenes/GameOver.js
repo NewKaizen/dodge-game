@@ -8,8 +8,9 @@ import { formatarTempo } from '../coop/nota.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, NIVEIS } from '../constants.js'
 import { tremerCamera } from '../effects/shake.js'
 import { partidaOnline, voltarAoLobbyOnline } from '../online.js'
-import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
-import { partyAtiva, destinoDoFim } from '../party/cliente.js'
+import { canal, emRede, souHostDaRede, irParaCena, participantesDaPartida } from '../rede.js'
+import { partyAtiva, destinoDoFim, dadosDoFim, registrarNoPlacar } from '../party/cliente.js'
+import { registrarCoop } from '../party/placar.js'
 import { prepararXpCoop, mostrarPainelXp } from '../conta/painelXp.js'
 import { partyDe } from '../data/batalha.js'
 
@@ -141,6 +142,8 @@ export default class GameOver extends Phaser.Scene {
     this.controles = new Controles(this)
     this.controles.onBotao((_, botao) => this.aoBotao(botao))
     this.rede = emRede()
+    // o placar da party: o chefe caiu (ou não) para todos da sala
+    if (this.rede) registrarNoPlacar(this, registrarCoop, { vagas: participantesDaPartida().map((p) => p.indice), venceu: false })
     this.xp = prepararXpCoop(this, { vitoria: false, estatisticas: this.stats }) // XP do CO-OP em rede (2F); null fora dela
     this.naSala = this.rede || partidaOnline() // sem revanche: só voltar ao lobby
     // em rede, o host volta com os dois quando o convidado pede (mesmo no meio da animação)
@@ -252,7 +255,7 @@ export default class GameOver extends Phaser.Scene {
     this.cameras.main.fadeOut(300, 0, 0, 0)
     // convidado em rede: pede ao host, que traz os dois (a cena Lan chega pelo canal)
     if (this.rede && !souHostDaRede()) return canal.enviar('voltarLobby', null, {})
-    this.time.delayedCall(320, () => (this.rede ? irParaCena(this, destinoDoFim()) : voltarAoLobbyOnline(this)))
+    this.time.delayedCall(320, () => (this.rede ? irParaCena(this, destinoDoFim(), dadosDoFim(this)) : voltarAoLobbyOnline(this)))
   }
 
   // ---------- título ----------

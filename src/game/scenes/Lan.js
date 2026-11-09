@@ -46,6 +46,7 @@ import { timesDoArranjo, proximoArranjo, ROTULO_TIME } from '../../lib/times2x2.
 import { pingPartida, ligacoes, ROTAS, corDoPing } from '../../lib/lan/transmissao.js'
 import { encerrarRede, irParaCena } from '../rede.js'
 import { opcoesDeModo } from '../party/regras.js'
+import { novoPlacar } from '../party/placar.js'
 import { criarAvatar } from '../conta/ui.js'
 import { corDaVaga, textoDaVaga } from '../vagas.js'
 
@@ -983,6 +984,9 @@ export default class Lan extends Phaser.Scene {
       const n = this.s.sala?.membros.length ?? 0
       const opcoes = opcoesDeModo(n)
       if (!opcoes.length || !this.s.sala?.party) return this.scene.restart()
+      // uma party nova: o placar começa zerado
+      this.registry.set('partyPlacar', novoPlacar())
+      this.registry.set('partyPartida', null)
       irParaCena(this, 'PartyVoto', { fase: 'modo', opcoes, id: `v${Date.now()}` })
     })
   }

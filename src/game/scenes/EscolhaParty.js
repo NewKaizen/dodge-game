@@ -17,7 +17,7 @@ import { montarAvisos } from '../conta/avisos.js'
 import { pedirP2, dicaDoP2 } from '../jogadoresLocais.js'
 
 // Área da grade de personagens e dos painéis de detalhes (px)
-const GRADE = { topo: 72, base: 282, esquerda: 304, direita: LARGURA - 40, espaco: 10, larguraMax: 188, alturaMax: 200 }
+const GRADE = { topo: 72, base: 282, esquerda: 300, direita: LARGURA - 40, espaco: 10, larguraMax: 188, alturaMax: 200 }
 const DETALHE = { y: 290, altura: 150, espaco: 8, linha: 17, linhasPorColuna: 5 }
 const TAMANHO_PARTY = 2 // com 1 jogador ele escolhe todos; com 2, cada um escolhe 1
 const CHAVE_SALVA = 'dodge-party' // última party (também fica no registry)
@@ -76,12 +76,15 @@ export default class EscolhaParty extends Phaser.Scene {
     this.fundo = criarFundo(this, 'king')
     this.fundo.escurecer()
 
-    this.texto(LARGURA / 2, 28, 'FORME SUA EQUIPE', 28, TEXTO.normal, { strokeThickness: 4 })
-    this.status = this.texto(LARGURA / 2, 56, '', 14, TEXTO.selecionado)
+    this.texto(LARGURA / 2, 24, 'FORME SUA EQUIPE', 28, TEXTO.normal, { strokeThickness: 4 })
+    this.status = this.texto(LARGURA / 2, 48, '', 14, TEXTO.selecionado)
 
-    this.add.rectangle(154, 177, 280, 210, UI.painel, 0.9).setStrokeStyle(1, UI.linha)
-    this.texto(154, 86, 'CO-OP   /   SUA FORMAÇÃO', 13, UI.destaque)
-    this.palcos = [vagaNoPalco(this,84,248,145,'ALIADO 01'), vagaNoPalco(this,220,248,145,'ALIADO 02')]
+    // o palco da formação: da margem de 40 até a grade (mesma altura dela)
+    const palco = { x: 40, largura: GRADE.esquerda - 10 - 40 }
+    const meio = palco.x + palco.largura / 2
+    this.add.rectangle(meio, (GRADE.topo + GRADE.base) / 2, palco.largura, GRADE.base - GRADE.topo, UI.painel, 0.9).setStrokeStyle(1, UI.linha)
+    this.texto(meio, GRADE.topo + 14, 'CO-OP  /  SUA FORMAÇÃO', 12, UI.destaque)
+    this.palcos = [vagaNoPalco(this, meio - palco.largura / 4, 238, 136, 'ALIADO 01'), vagaNoPalco(this, meio + palco.largura / 4, 238, 136, 'ALIADO 02', true)]
     this.montarGrade()
 
     // 1 jogador: um cursor e a lista de escolhidos; 2 jogadores: um cursor e uma escolha por jogador

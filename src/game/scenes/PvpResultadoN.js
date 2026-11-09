@@ -6,7 +6,8 @@ import { tocar, musica } from '../audio.js'
 import { FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 import { get } from 'svelte/store'
 import { canal, emRede, meuIndice, meuLado, souHostDaRede, irParaCena, participantesDaPartida } from '../rede.js'
-import { partyAtiva, destinoDoFim } from '../party/cliente.js'
+import { partyAtiva, destinoDoFim, dadosDoFim, registrarNoPlacar } from '../party/cliente.js'
+import { registrarFfa, registrarDupla } from '../party/placar.js'
 import { iniciarPartida, encerrarPartida, mudarTimes, lan } from '../../lib/lan/rede.js'
 import { timesDoArranjo, proximoArranjo, ROTULO_TIME } from '../../lib/times2x2.js'
 import { corDaVaga, textoDaVaga } from '../vagas.js'
@@ -67,6 +68,8 @@ export default class PvpResultadoN extends Phaser.Scene {
     this.dupla = dados.modo === '2x2'
     this.party = partyAtiva() // na party o fim é só CONTINUAR (a tela PartyFim decide quem segue)
     this.listaOpcoes = this.party ? ['lobby'] : this.dupla ? OPCOES_2X2 : OPCOES_N
+    // o placar da party (só o host guarda; vai para todos na PartyFim)
+    if (this.party) registrarNoPlacar(this, this.dupla ? registrarDupla : registrarFfa, this.dupla ? { times: dados.times, vencedorTime: dados.vencedorTime } : { classificacao: dados.classificacao })
     this.n = dados.jogadores.length
     this.meu = meuIndice()
     this.souHost = souHostDaRede()
@@ -254,7 +257,7 @@ export default class PvpResultadoN extends Phaser.Scene {
     this.saindo = true
     tocar(this, 'cancelar')
     this.cameras.main.fadeOut(250, 0, 0, 0)
-    this.time.delayedCall(260, () => irParaCena(this, destinoDoFim()))
+    this.time.delayedCall(260, () => irParaCena(this, destinoDoFim(), dadosDoFim(this)))
   }
 
   atualizarOpcoes() {

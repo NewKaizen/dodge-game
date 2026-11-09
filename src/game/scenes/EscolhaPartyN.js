@@ -18,7 +18,7 @@ import { partyAtiva, vigiarParty } from '../party/cliente.js'
 import { salaSemanal } from '../../lib/lan/rede.js'
 
 // Area da grade de personagens e do painel de detalhes (px)
-const GRADE = { topo: 70, base: 262, esquerda: 40, direita: LARGURA - 40, espaco: 10, larguraMax: 188, alturaMax: 180 }
+const GRADE = { topo: 78, base: 264, esquerda: 40, direita: LARGURA - 40, espaco: 10, larguraMax: 188, alturaMax: 180 }
 const DETALHE = { x: 40, y: 272, largura: 440, altura: 170, linha: 17 }
 const LISTA = { x: 496, y: 272, largura: LARGURA - 40 - 496, linha: 40 }
 const CURSOR_MS = 300 // de quanto em quanto o meu cursor vai de novo para o host
@@ -88,8 +88,8 @@ export default class EscolhaPartyN extends Phaser.Scene {
 
     this.fundo = criarFundo(this, 'king')
     this.fundo.escurecer()
-    this.texto(LARGURA / 2, 26, this.tituloDaTela(), 26, TEXTO.normal, { strokeThickness: 4 })
-    this.status = this.texto(LARGURA / 2, 52, '', 13, TEXTO.selecionado)
+    this.texto(LARGURA / 2, 24, this.tituloDaTela(), 26, TEXTO.normal, { strokeThickness: 4 })
+    this.status = this.texto(LARGURA / 2, 48, '', 13, TEXTO.selecionado)
     this.montarGrade()
     this.montarPainel()
     this.texto(LARGURA / 2, ALTURA - 10, '← → ↑ ↓ escolher     A: confirmar (definitivo)     B: voltar ao lobby', 12, TEXTO.desabilitado, { strokeThickness: 0 })

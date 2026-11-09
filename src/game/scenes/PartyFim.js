@@ -10,6 +10,8 @@ import { desenharForma, formaDaVaga, nomeNoCoracao } from '../coop/marcadores.js
 import { FIM_MS, novoFim, marcarFim, fimDecidido, restanteFim, opcoesDeModo, partySegue } from '../party/regras.js'
 import { vigiarParty } from '../party/cliente.js'
 import Seletor from '../party/seletor.js'
+import { normalizarPlacar, ranking, lider, manchete, rotuloPontos } from '../party/placar.js'
+import { desenharCoroa } from '../party/coroa.js'
 
 // MODO PARTY: depois do resultado de cada partida (docs/online.md "Modo Party"). CONTINUAR (quem aperta
 // continua; quando todos apertaram, ou em 15 s, a party segue para a votação do modo; quem não apertou
@@ -34,6 +36,7 @@ const estadoInicial = () => ({
   cursor: null,
   membrosGfx: null,
   nomes: [],
+  posDaVaga: {},
   barra: null,
   status: null,
   restanteGuest: 0,
@@ -69,16 +72,21 @@ export default class PartyFim extends Phaser.Scene {
     this.fundo = criarFundo(this, 'king')
     this.fundo.escurecer()
     const t = (x, y, conteudo, tamanho, cor = TEXTO.normal, extra = {}) => this.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 4, ...extra }).setOrigin(0.5)
-    this.titulo = t(LARGURA / 2, 70, 'PARTY', 44, TEXTO.selecionado, { strokeThickness: 6 })
-    this.status = t(LARGURA / 2, 112, 'PRÓXIMA PARTIDA', 14, TEXTO.normal, { strokeThickness: 3 })
+    // o placar da party (o host manda junto com esta cena: party/placar.js)
+    this.placar = normalizarPlacar(this.sys.settings.data?.placar)
+    this.titulo = t(LARGURA / 2, 22, this.placar.partidas ? `PARTY · ${this.placar.partidas} PARTIDA${this.placar.partidas > 1 ? 'S' : ''}` : 'PARTY', 26, TEXTO.selecionado, { strokeThickness: 5 })
+    const nomeDe = (v) => nomeNoCoracao(participantesDaPartida().find((p) => p.indice === v)?.nome ?? `P${v + 1}`, 10)
+    this.manchete = t(LARGURA / 2, 48, manchete(this.placar, this.presentes(), nomeDe), 13, '#ffd27a', { strokeThickness: 3 })
+    this.status = t(LARGURA / 2, 86, 'PRÓXIMA PARTIDA', 14, TEXTO.normal, { strokeThickness: 3 })
     this.barra = this.add.graphics()
     this.membrosGfx = this.add.graphics()
-    this.rotulos = OPCOES.map((o, i) => t(LARGURA / 2 + (i === 0 ? -130 : 130), 360, o.rotulo, 22, TEXTO.normal))
-    this.cursor = this.add.image(0, 360, 'coracao').setTint(corDaVaga(this.meu)).setScale(1.3)
+    this.rotulos = OPCOES.map((o, i) => t(LARGURA / 2 + (i === 0 ? -130 : 130), 300, o.rotulo, 22, TEXTO.normal))
+    this.cursor = this.add.image(0, 300, 'coracao').setTint(corDaVaga(this.meu)).setScale(1.3)
     t(LARGURA / 2, ALTURA - 14, '← → escolher     A: confirmar     ↑ ↓ personagem', 13, TEXTO.desabilitado, { strokeThickness: 0 })
     this.atualizarTela()
+    this.mostrarGanhos()
     // a escolha de personagem da próxima partida (já começa no último usado): vale na espera
-    this.seletor = new Seletor(this, { y: 428 })
+    this.seletor = new Seletor(this, { y: 396 })
 
     this.ligarRede()
     vigiarParty(this)
@@ -180,16 +188,46 @@ export default class PartyFim extends Phaser.Scene {
     this.nomes.forEach((n) => n.destroy())
     this.nomes = []
     const g = this.membrosGfx.clear()
-    ps.forEach((p, k) => {
-      const x = LARGURA / 2 + (k - (ps.length - 1) / 2) * 150
-      const y = 210
-      const ok = this.fim.escolhas[p.indice] === 'continuar'
-      g.fillStyle(0x0b0914, 0.85).fillRoundedRect(x - 62, y - 44, 124, 104, 8)
-      g.lineStyle(p.indice === this.meu ? 3 : 1.5, corDaVaga(p.indice), ok ? 1 : 0.5).strokeRoundedRect(x - 62, y - 44, 124, 104, 8)
-      desenharForma(g, formaDaVaga(p.indice), x, y - 10, 16, corDaVaga(p.indice))
-      this.nomes.push(this.add.text(x, y + 26, nomeNoCoracao(p.nome, 10), { fontFamily: FONTE, fontSize: '13px', color: textoDaVaga(p.indice), stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5))
-      if (ok) this.nomes.push(this.add.text(x + 44, y - 30, '✓', { fontFamily: FONTE, fontSize: '20px', color: TEXTO.cura, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5))
+    // na ordem do placar (o 1º à esquerda); sem partida jogada, na ordem das vagas
+    const placar = this.placar
+    const comPlacar = placar.partidas > 0
+    const ordem = comPlacar ? ranking(placar, ps.map((p) => p.indice)) : ps.map((p) => p.indice)
+    const coroa = lider(placar, ordem)
+    this.posDaVaga = {}
+    ordem.forEach((v, k) => {
+      const p = ps.find((q) => q.indice === v)
+      const x = LARGURA / 2 + (k - (ordem.length - 1) / 2) * 150
+      const y = 190
+      this.posDaVaga[v] = { x, y }
+      const ok = this.fim.escolhas[v] === 'continuar'
+      const texto = (dx, dy, s, tam, cor, origem = 0.5) => this.nomes.push(this.add.text(x + dx, y + dy, s, { fontFamily: FONTE, fontSize: `${tam}px`, color: cor, stroke: '#000000', strokeThickness: 3 }).setOrigin(origem, 0.5))
+      g.fillStyle(0x0b0914, 0.85).fillRoundedRect(x - 62, y - 58, 124, 124, 8)
+      g.lineStyle(v === this.meu ? 3 : 1.5, coroa === v ? 0xffd23a : corDaVaga(v), ok ? 1 : 0.5).strokeRoundedRect(x - 62, y - 58, 124, 124, 8)
+      desenharForma(g, formaDaVaga(v), x, y - 26, 13, corDaVaga(v))
+      texto(0, 0, nomeNoCoracao(p.nome, 10), 13, textoDaVaga(v))
+      if (comPlacar) {
+        texto(-52, -46, `${k + 1}º`, 13, k === 0 && coroa != null ? '#ffd23a' : '#c8c8d8', 0)
+        texto(0, 24, rotuloPontos(placar.pontos[v] ?? 0), 19, '#ffffff')
+        const seq = placar.sequencia[v] ?? 0
+        if (seq >= 2) texto(0, 48, `${seq} SEGUIDAS`, 11, '#ff8a3a')
+        else if (placar.vitorias[v]) texto(0, 48, `${placar.vitorias[v]} VITÓRIA${placar.vitorias[v] > 1 ? 'S' : ''}`, 11, '#a8a8c0')
+      }
+      if (coroa === v) {
+        desenharCoroa(g, x, y - 64, 20)
+      }
+      if (ok) texto(44, -44, '✓', 20, TEXTO.cura)
     })
+  }
+
+  // o que cada um ganhou na partida que acabou: "+3" subindo do placar dele
+  mostrarGanhos() {
+    for (const [v, g] of Object.entries(this.placar.ganho ?? {})) {
+      const pos = this.posDaVaga?.[v]
+      if (!pos || !g) continue
+      const t = this.add.text(pos.x + 46, pos.y + 24, `+${g}`, { fontFamily: FONTE, fontSize: '16px', color: TEXTO.cura, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5).setDepth(5).setAlpha(0)
+      this.tweens.add({ targets: t, alpha: 1, y: pos.y + 6, delay: 350 + Number(v) * 120, duration: 300, ease: 'Back.easeOut', onStart: () => tocar(this, 'brilhoRank') })
+      this.tweens.add({ targets: t, alpha: 0, delay: 2200 + Number(v) * 120, duration: 500, onComplete: () => t.destroy() })
+    }
   }
 
   update(_, delta) {
@@ -207,8 +245,8 @@ export default class PartyFim extends Phaser.Scene {
     if (this.souHost) restante = restanteFim(this.fim, Date.now())
     else restante = this.restanteGuest = Math.max(0, this.restanteGuest - delta)
     const p = restante / FIM_MS
-    this.barra.clear().fillStyle(0xffffff, 0.15).fillRect(LARGURA / 2 - 160, 130, 320, 5)
-    this.barra.fillStyle(p < 0.3 ? 0xff5050 : 0xffe040, 1).fillRect(LARGURA / 2 - 160, 130, 320 * p, 5)
+    this.barra.clear().fillStyle(0xffffff, 0.15).fillRect(LARGURA / 2 - 160, 102, 320, 5)
+    this.barra.fillStyle(p < 0.3 ? 0xff5050 : 0xffe040, 1).fillRect(LARGURA / 2 - 160, 102, 320 * p, 5)
     this.status.setText(`PRÓXIMA PARTIDA  ·  ${Math.ceil(restante / 1000)}s`)
     // alguém entrou ou saiu: redesenha os cartões dos membros
     this.atualizarTela()

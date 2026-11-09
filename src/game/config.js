@@ -9,6 +9,7 @@ import PvpArena from './scenes/PvpArena.js'
 import PvpVoto from './scenes/PvpVoto.js'
 import PartyVoto from './scenes/PartyVoto.js'
 import PartyFim from './scenes/PartyFim.js'
+import PartyIntro from './scenes/PartyIntro.js'
 import CoopArena from './scenes/CoopArena.js'
 import CoopArenaN from './scenes/CoopArenaN.js'
 import EscolhaPartyN from './scenes/EscolhaPartyN.js'
@@ -55,6 +56,6 @@ export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCs
     scale: { mode: Phaser.Scale.NONE, zoom: zoomCss },
     // um contexto de áudio só para o jogo inteiro (a transmissão LAN copia o som dele)
     audio: { context: contextoAudio() ?? undefined },
-    scene: [Boot, Menu, EscolhaParty, EscolhaPartyN, PvpEscolha, PvpVoto, PvpArena, PvpResultado, PvpEscolhaN, PvpArenaN, PvpResultadoN, PartyVoto, PartyFim, Selecao, Dificuldade, CoopArena, CoopArenaN, Vitoria, GameOver, Entrada, Pausa, Config, Grimorio, GuiaBonus, GuiaEntrada, ManualRalsei, ManualRalsei2, ManualRalsei3, ManualRalsei4, ManualRalsei5, ManualRalsei5Partida, Lan, Perfil, Amigos, Colecao, Campanha, CampanhaArena, CampanhaFim, Carregando, Religando],
+    scene: [Boot, Menu, EscolhaParty, EscolhaPartyN, PvpEscolha, PvpVoto, PvpArena, PvpResultado, PvpEscolhaN, PvpArenaN, PvpResultadoN, PartyVoto, PartyFim, PartyIntro, Selecao, Dificuldade, CoopArena, CoopArenaN, Vitoria, GameOver, Entrada, Pausa, Config, Grimorio, GuiaBonus, GuiaEntrada, ManualRalsei, ManualRalsei2, ManualRalsei3, ManualRalsei4, ManualRalsei5, ManualRalsei5Partida, Lan, Perfil, Amigos, Colecao, Campanha, CampanhaArena, CampanhaFim, Carregando, Religando],
   }
 }
