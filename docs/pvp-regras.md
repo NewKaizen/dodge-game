@@ -531,8 +531,11 @@ escolha às cegas. O 1x1 e o todos contra todos não mudam.
 
 **Times.** Por vaga da sala, num de 3 arranjos (`src/lib/times2x2.js`): **A = vagas 0+2, B = 1+3** (padrão), A = 0+1 / B = 2+3,
 A = 0+3 / B = 1+2. No lobby o **dono** passa ao próximo com **TROCAR TIME** (o servidor guarda `sala.arranjo`; cada cartão do lobby
-mostra o time). Na arena cada célula tem a **borda e a etiqueta da cor do time** (A azul, B laranja); a forma e o nome continuam
-na cor da vaga.
+mostra o time). Na arena os times ficam **juntos em qualquer arranjo** (`lugaresDoTime`): o **TIME A na coluna da esquerda** (células
+de cima e de baixo, e os dois cartões do placar à esquerda do relógio) e o **TIME B na da direita**, como no anúncio dos duelos; dentro
+do time, a vaga menor em cima. A célula tem o fundo e a borda grossa da cor do time (A azul, B laranja) e a etiqueta
+"TIME A · VOCÊ / PARCEIRO / RIVAL" (o papel é de quem olha); o cartão do placar tem a borda do time, um filete na cor dele junta os dois
+de cada lado e o relógio mostra "◀ A  B ▶". As cartas reveladas na mesa seguem a mesma ordem. A forma e o nome continuam na cor da vaga.
 
 **Duelos cruzados (anunciados antes da escolha: "DUELOS DA RODADA").** Com os 4 de pé: rodada ímpar **A1×B1 e A2×B2**, rodada
 par **A1×B2 e A2×B1** (A1/A2 = os do time em ordem de vaga). Cada duelo é um 1x1: os dois do par atacam um ao outro, com todas as

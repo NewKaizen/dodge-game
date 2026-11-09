@@ -187,18 +187,21 @@ export default class PartyVoto extends Phaser.Scene {
 
   montarCartoes() {
     const n = this.opcoes.length
-    const total = n * CARTAO.largura + (n - 1) * CARTAO.espaco
+    // 4 opções (com o BOSS SEMANAL) não cabem na largura cheia: o cartão estreita e o espaço diminui, com margem
+    const espaco = n > 3 ? 16 : CARTAO.espaco
+    const largura = Math.min(CARTAO.largura, (LARGURA - 48 - espaco * (n - 1)) / n)
+    const total = n * largura + (n - 1) * espaco
     this.cartoes = this.opcoes.map((id, i) => {
       const info = this.infoDe(id)
-      const x = (LARGURA - total) / 2 + CARTAO.largura / 2 + i * (CARTAO.largura + CARTAO.espaco)
+      const x = (LARGURA - total) / 2 + largura / 2 + i * (largura + espaco)
       const c = this.add.container(x, CARTAO.y).setDepth(3)
-      const brilho = this.add.rectangle(0, 0, CARTAO.largura + 12, CARTAO.altura + 12, info.cor, 0).setStrokeStyle(3, info.cor, 0)
-      const moldura = this.add.rectangle(0, 0, CARTAO.largura, CARTAO.altura, CORES.painel, 0.9).setStrokeStyle(2, info.cor, 0.6)
-      const faixa = this.add.rectangle(0, CARTAO.altura / 2 - 34, CARTAO.largura - 8, 52, info.cor, 0.18)
+      const brilho = this.add.rectangle(0, 0, largura + 12, CARTAO.altura + 12, info.cor, 0).setStrokeStyle(3, info.cor, 0)
+      const moldura = this.add.rectangle(0, 0, largura, CARTAO.altura, CORES.painel, 0.9).setStrokeStyle(2, info.cor, 0.6)
+      const faixa = this.add.rectangle(0, CARTAO.altura / 2 - 34, largura - 8, 52, info.cor, 0.18)
       const arte = this.montarArte(id, info.cor)
       const nome = this.add.text(0, CARTAO.altura / 2 - 44, info.nome, { fontFamily: FONTE, fontSize: info.nome.length > 12 ? '15px' : '20px', color: corTexto(info.cor), stroke: '#000000', strokeThickness: 4 }).setOrigin(0.5)
       const sub = this.add.text(0, CARTAO.altura / 2 - 20, info.sub, { fontFamily: FONTE, fontSize: '11px', color: '#d8d8e8', stroke: '#000000', strokeThickness: 2 }).setOrigin(0.5)
-      if (sub.width > CARTAO.largura - 12) sub.setFontSize(9)
+      if (sub.width > largura - 12) sub.setFontSize(9)
       const votos = this.add.graphics()
       c.add([brilho, moldura, faixa, ...arte, nome, sub, votos])
       return { id, x, c, brilho, moldura, votos, cor: info.cor }
