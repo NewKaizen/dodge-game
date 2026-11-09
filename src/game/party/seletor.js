@@ -1,5 +1,5 @@
 import { PERSONAGENS } from '../data/personagens.js'
-import { FONTE, TEXTO, corTexto } from '../constants.js'
+import { FONTE, LARGURA, TEXTO, corTexto } from '../constants.js'
 import { tocar } from '../audio.js'
 import { canal, meuIndice, souHostDaRede, participantesDaPartida } from '../rede.js'
 import { corDaVaga, textoDaVaga } from '../vagas.js'
@@ -128,7 +128,7 @@ export default class Seletor {
   montar() {
     const c = this.cena
     this.gfx = c.add.graphics().setDepth(6)
-    this.legenda = c.add.text(c.scale.width / 2, this.y - CHIP.altura / 2 - 12, 'PERSONAGEM DA PRÓXIMA PARTIDA   ▲ ▼ troca o seu', { fontFamily: FONTE, fontSize: '11px', color: TEXTO.desabilitado, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5).setDepth(6)
+    this.legenda = c.add.text(LARGURA / 2, this.y - CHIP.altura / 2 - 12, 'PERSONAGEM DA PRÓXIMA PARTIDA   ▲ ▼ troca o seu', { fontFamily: FONTE, fontSize: '11px', color: TEXTO.desabilitado, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5).setDepth(6)
     this.chips = Array.from({ length: 4 }, () => ({
       retrato: c.add.image(0, 0, 'coracao').setDepth(7).setVisible(false),
       jogador: c.add.text(0, 0, '', { fontFamily: FONTE, fontSize: '10px', stroke: '#000000', strokeThickness: 3 }).setDepth(7),
@@ -151,13 +151,12 @@ export default class Seletor {
     const g = this.gfx.clear()
     const n = ps.length
     const total = n * CHIP.largura + (n - 1) * CHIP.espaco
-    const largTela = this.cena.scale.width
     this.chips.forEach((chip, k) => {
       const p = ps[k]
       const visivel = Boolean(p)
       for (const o of Object.values(chip)) o.setVisible(visivel)
       if (!p) return
-      const x = (largTela - total) / 2 + k * (CHIP.largura + CHIP.espaco)
+      const x = (LARGURA - total) / 2 + k * (CHIP.largura + CHIP.espaco)
       const meu = p.indice === this.meu
       const id = this.picks[p.indice]
       const def = PERSONAGENS[id]

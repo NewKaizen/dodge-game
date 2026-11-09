@@ -69,16 +69,16 @@ export default class PartyFim extends Phaser.Scene {
     this.fundo = criarFundo(this, 'king')
     this.fundo.escurecer()
     const t = (x, y, conteudo, tamanho, cor = TEXTO.normal, extra = {}) => this.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 4, ...extra }).setOrigin(0.5)
-    this.titulo = t(LARGURA / 2, 70, 'PARTY', 44, TEXTO.selecionado, { strokeThickness: 6 })
-    this.status = t(LARGURA / 2, 112, 'PRÓXIMA PARTIDA', 14, TEXTO.normal, { strokeThickness: 3 })
+    this.titulo = t(LARGURA / 2, 30, 'PARTY', 34, TEXTO.selecionado, { strokeThickness: 5 })
+    this.status = t(LARGURA / 2, 86, 'PRÓXIMA PARTIDA', 14, TEXTO.normal, { strokeThickness: 3 })
     this.barra = this.add.graphics()
     this.membrosGfx = this.add.graphics()
-    this.rotulos = OPCOES.map((o, i) => t(LARGURA / 2 + (i === 0 ? -130 : 130), 360, o.rotulo, 22, TEXTO.normal))
-    this.cursor = this.add.image(0, 360, 'coracao').setTint(corDaVaga(this.meu)).setScale(1.3)
+    this.rotulos = OPCOES.map((o, i) => t(LARGURA / 2 + (i === 0 ? -130 : 130), 300, o.rotulo, 22, TEXTO.normal))
+    this.cursor = this.add.image(0, 300, 'coracao').setTint(corDaVaga(this.meu)).setScale(1.3)
     t(LARGURA / 2, ALTURA - 14, '← → escolher     A: confirmar     ↑ ↓ personagem', 13, TEXTO.desabilitado, { strokeThickness: 0 })
     this.atualizarTela()
     // a escolha de personagem da próxima partida (já começa no último usado): vale na espera
-    this.seletor = new Seletor(this, { y: 428 })
+    this.seletor = new Seletor(this, { y: 396 })
 
     this.ligarRede()
     vigiarParty(this)
@@ -182,7 +182,7 @@ export default class PartyFim extends Phaser.Scene {
     const g = this.membrosGfx.clear()
     ps.forEach((p, k) => {
       const x = LARGURA / 2 + (k - (ps.length - 1) / 2) * 150
-      const y = 210
+      const y = 184
       const ok = this.fim.escolhas[p.indice] === 'continuar'
       g.fillStyle(0x0b0914, 0.85).fillRoundedRect(x - 62, y - 44, 124, 104, 8)
       g.lineStyle(p.indice === this.meu ? 3 : 1.5, corDaVaga(p.indice), ok ? 1 : 0.5).strokeRoundedRect(x - 62, y - 44, 124, 104, 8)
@@ -207,8 +207,8 @@ export default class PartyFim extends Phaser.Scene {
     if (this.souHost) restante = restanteFim(this.fim, Date.now())
     else restante = this.restanteGuest = Math.max(0, this.restanteGuest - delta)
     const p = restante / FIM_MS
-    this.barra.clear().fillStyle(0xffffff, 0.15).fillRect(LARGURA / 2 - 160, 130, 320, 5)
-    this.barra.fillStyle(p < 0.3 ? 0xff5050 : 0xffe040, 1).fillRect(LARGURA / 2 - 160, 130, 320 * p, 5)
+    this.barra.clear().fillStyle(0xffffff, 0.15).fillRect(LARGURA / 2 - 160, 102, 320, 5)
+    this.barra.fillStyle(p < 0.3 ? 0xff5050 : 0xffe040, 1).fillRect(LARGURA / 2 - 160, 102, 320 * p, 5)
     this.status.setText(`PRÓXIMA PARTIDA  ·  ${Math.ceil(restante / 1000)}s`)
     // alguém entrou ou saiu: redesenha os cartões dos membros
     this.atualizarTela()

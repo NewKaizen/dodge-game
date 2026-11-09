@@ -36,7 +36,7 @@ import { lan } from '../../lib/lan/rede.js'
 //   host -> todos       partyVotos {id, votos: {vaga: opcao}, restante} · partyApuracao {id, ...apurar()}
 // No dev: window.partyVoto (votar(opcao), estadoDebug()).
 
-const CARTAO = { y: 196, largura: 210, altura: 224, espaco: 34 }
+const CARTAO = { y: 212, largura: 210, altura: 224, espaco: 34 }
 const ESTADO_MS = 1000 // de quanto em quanto o host manda os votos (e o tempo) de novo
 const FUNDO_MODO = 'queen'
 
@@ -86,8 +86,8 @@ export default class PartyVoto extends Phaser.Scene {
     this.texto = (x, y, conteudo, tamanho, cor = TEXTO.normal, extra = {}) =>
       this.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra }).setOrigin(0.5)
     const titulo = this.fase === 'modo' ? 'PARTY  ·  VOTE NO MODO' : this.modo === 'coop4' ? 'PARTY  ·  VOTE NO CHEFE' : 'PARTY  ·  VOTE NA ARENA'
-    this.titulo = this.texto(LARGURA / 2, 22, titulo, 24, TEXTO.normal, { strokeThickness: 4 })
-    this.status = this.texto(LARGURA / 2, 46, '', 12, TEXTO.selecionado)
+    this.titulo = this.texto(LARGURA / 2, 20, titulo, 24, TEXTO.normal, { strokeThickness: 4 })
+    this.status = this.texto(LARGURA / 2, 40, '', 12, TEXTO.selecionado)
     this.barra = this.add.graphics().setDepth(2)
     this.montarCartoes()
     this.coracao = this.add.image(0, 0, 'coracao').setTint(corDaVaga(this.meu)).setScale(1.4).setDepth(8)
@@ -294,8 +294,8 @@ export default class PartyVoto extends Phaser.Scene {
     if (this.souHost) restante = restanteVoto(this.votacao, Date.now())
     else restante = this.restanteGuest = Math.max(0, this.restanteGuest - delta)
     const p = restante / VOTO_MS
-    this.barra.clear().fillStyle(0xffffff, 0.15).fillRect(LARGURA / 2 - 160, 60, 320, 5)
-    this.barra.fillStyle(p < 0.3 ? 0xff5050 : 0xffe040, 1).fillRect(LARGURA / 2 - 160, 60, 320 * p, 5)
+    this.barra.clear().fillStyle(0xffffff, 0.15).fillRect(LARGURA / 2 - 160, 54, 320, 4)
+    this.barra.fillStyle(p < 0.3 ? 0xff5050 : 0xffe040, 1).fillRect(LARGURA / 2 - 160, 54, 320 * p, 4)
     if (this.souHost && votacaoAcabou(this.votacao, this.presentes(), Date.now())) this.apurarHost()
   }
 
