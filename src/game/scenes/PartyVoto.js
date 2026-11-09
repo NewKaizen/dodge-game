@@ -19,6 +19,7 @@ import { MODOS_PARTY, VOTO_MS, ehPvp, opcoesDeModo, sortearTres, novaVotacao, vo
 import { vigiarParty } from '../party/cliente.js'
 import Seletor, { CHAVE_SALVA, ultimaParty } from '../party/seletor.js'
 import { montarInicio } from '../party/escolha.js'
+import { normalizarPlacar } from '../party/placar.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { timesDoArranjo } from '../../lib/times2x2.js'
 import { get } from 'svelte/store'
@@ -54,6 +55,7 @@ const estadoInicial = () => ({
   dica: null,
   restanteGuest: 0,
   seletor: null,
+  ultimoTique: null,
 })
 
 export default class PartyVoto extends Phaser.Scene {
@@ -272,7 +274,7 @@ export default class PartyVoto extends Phaser.Scene {
     if (this.apurando) return
     const total = this.votacao.eleitores.length
     const votaram = Object.keys(this.votacao.votos).length
-    this.status.setText(`${votaram}/${total} votaram`)
+    this.status.setText(`${votaram}/${total} votaram`).setColor(TEXTO.selecionado)
   }
 
   update(time, delta) {
@@ -294,9 +296,25 @@ export default class PartyVoto extends Phaser.Scene {
     if (this.souHost) restante = restanteVoto(this.votacao, Date.now())
     else restante = this.restanteGuest = Math.max(0, this.restanteGuest - delta)
     const p = restante / VOTO_MS
+    this.contagemFinal(restante)
     this.barra.clear().fillStyle(0xffffff, 0.15).fillRect(LARGURA / 2 - 160, 54, 320, 4)
     this.barra.fillStyle(p < 0.3 ? 0xff5050 : 0xffe040, 1).fillRect(LARGURA / 2 - 160, 54, 320 * p, 4)
     if (this.souHost && votacaoAcabou(this.votacao, this.presentes(), Date.now())) this.apurarHost()
+  }
+
+  // os 3 últimos segundos: o número grande no meio da tela, um tique por segundo (quem não votou corre)
+  contagemFinal(restante) {
+    const s = Math.ceil(restante / 1000)
+    if (s > 3 || s < 1 || s === this.ultimoTique) return
+    this.ultimoTique = s
+    tocar(this, 'contador')
+    const faltou = !this.votacao.votos[this.meu]
+    const t = this.texto(LARGURA / 2, CARTAO.y, String(s), 120, faltou ? '#ff5a6e' : '#ffe14a', { strokeThickness: 10 }).setDepth(12).setAlpha(0.9)
+    if (faltou) this.status.setText('VOTA LOGO!').setColor('#ff5a6e')
+    if (this.calmo) return this.time.delayedCall(700, () => t.destroy())
+    this.tweens.add({ targets: t, scale: { from: 1.8, to: 1 }, duration: 160, ease: 'Back.easeOut' })
+    this.tweens.add({ targets: t, alpha: 0, delay: 520, duration: 260, onComplete: () => t.destroy() })
+    this.cameras.main.shake(90, 0.003)
   }
 
   // ---------- apuração ----------
@@ -420,7 +438,11 @@ export default class PartyVoto extends Phaser.Scene {
     } catch {
       // sem armazenamento: fica só no registry
     }
-    irParaCena(this, cena, dados)
+    // a partida ganha um número e um id (o placar soma cada uma uma vez) e abre com a apresentação
+    const placar = normalizarPlacar(this.registry.get('partyPlacar'))
+    const numero = placar.partidas + 1
+    this.registry.set('partyPartida', { id: `p${Date.now()}`, numero })
+    irParaCena(this, 'PartyIntro', { modo: this.modo, vencedora, lista, times: this.modo === '2x2' ? (dados.times ?? null) : null, numero, placar, destino: { cena, dados } })
   }
 
   // testes/console
