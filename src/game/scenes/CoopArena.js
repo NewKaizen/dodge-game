@@ -255,7 +255,9 @@ export default class CoopArena extends PvpArena {
     this.events.on('postupdate', this.filtrarCaixas, this)
 
     if (import.meta.env.DEV) window.coopArena = this
-    entrarNoJogo() // joystick: GAME e o HP no OLED
+    // joystick: GAME e o HP no OLED. Online ou solo, todos os controles comandam o jogador 1: o buzzer e o HP
+    // dele vão a todo joystick do PC (um joystick salvo como JOGADOR 2 também apita)
+    entrarNoJogo({ umJogador: Boolean(this.rede) || this.numJogadores === 1 })
     this.events.once('shutdown', () => {
       this.saindo = true
       voltarAoMenu()

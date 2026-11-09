@@ -28,6 +28,7 @@ import { PASSO_MS } from '../campanha/amostras.js'
 import { criarMedo } from '../campanha/medo.js'
 import { criarTita } from '../campanha/tita.js'
 import { aoCampanha, comecarFase, jogarCarta, enviarPosicoes, terminarEsquiva, desistirDaCorrida, trapacaDev } from '../../lib/campanha.js'
+import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe, venceu } from '../../lib/saida.js'
 
 // CAMPANHA: a LUTA de uma fase (docs/campanha.md), no jeito do CO-OP: o CHEFE no alto, a carta dele
 // (a intenção, com o naipe à vista) embaixo, o QUADRO grande onde você (e a CPU aliada) desviam do
@@ -134,7 +135,11 @@ export default class CampanhaArena extends Phaser.Scene {
     for (let k = 0; k < 6; k++) this.add.rectangle(0, 0, LARGURA, 30 + k * 14, 0x000000, 0.1).setOrigin(0).setDepth(-6)
     this.montar()
     this.pararCampanha = aoCampanha((m) => this.aoServidor(m))
+    // joystick serial: GAME, o meu HP no OLED e o BUZZER (HP baixo, K.O., SUPER do chefe, vitória), em todo
+    // joystick deste PC (a campanha é de um jogador só)
+    entrarNoJogo({ umJogador: true })
     this.events.once('shutdown', () => {
+      voltarAoMenu()
       this.pararCampanha?.()
       this.mao?.destroy()
       this.limparArremesso()
@@ -416,6 +421,7 @@ export default class CampanhaArena extends Phaser.Scene {
     const h = this.huds[j]
     if (j === 0) {
       this.acertosLocais++
+      levouGolpe(0, { super: Boolean(this.rodadaAtual?.intencao?.super) }) // vibração; BUZZER só no SUPER do chefe
       tocar(this, 'dano')
       if (!menosMovimento() && fatores().tremor > 0) this.cameras.main.shake(120, 0.004 * fatores().tremor)
     }
@@ -567,6 +573,7 @@ export default class CampanhaArena extends Phaser.Scene {
     this.saindo = true
     this.etapa = 'fim'
     if (m.resultado === 'vitoria') {
+      venceu(0) // BUZZER da vitória
       this.inimigo?.sumir?.()
       if (this.ecoChefe) this.tweens.add({ targets: this.ecoChefe.objetos, alpha: 0, duration: 600 })
     }
@@ -812,6 +819,8 @@ export default class CampanhaArena extends Phaser.Scene {
   update(tempo, delta) {
     if (!this.controles) return
     this.controles.atualizar()
+    // (saida.js só manda VIDA quando o número muda, e decide o BUZZER de HP baixo e K.O.)
+    if (this.huds?.[0]) informarVida(0, this.huds[0].hp, this.huds[0].hpMax)
     this.cenario?.atualizar(delta)
     this.ecoChefe?.atualizar(tempo)
     this.tita?.atualizar(tempo)
