@@ -137,3 +137,20 @@ test('rotearSaida: uma placa sozinha que virou P2 só recebe o que é do P2, com
   assert.deepEqual(rotearSaida('2 VIDA 5 10', uma), [{ porta: 'A', linha: '1 VIDA 5 10' }])
   assert.deepEqual(rotearSaida('1 VIDA 5 10', uma), [])
 })
+
+test('jogador único (online / solo): o "1 ..." vai a todo joystick aberto, com o número de cada um', async () => {
+  const { linhasDoJogadorUnico } = await import('../joysticks.js')
+  // o caso do bug: o joystick deste PC está salvo como JOGADOR 2
+  assert.deepEqual(linhasDoJogadorUnico('1 BUZZER', [2], true), ['2 BUZZER'])
+  assert.deepEqual(rotearSaida(linhasDoJogadorUnico('1 BUZZER', [2], true)[0], [{ porta: 'A', jogador: 2 }]), [{ porta: 'A', linha: '1 BUZZER' }])
+  assert.deepEqual(linhasDoJogadorUnico('1 VIDA 40 90', [1, 2], true), ['1 VIDA 40 90', '2 VIDA 40 90'])
+  assert.deepEqual(linhasDoJogadorUnico('1 BUZZER', [1], true), ['1 BUZZER'])
+})
+
+test('jogador único: fora do modo, outros jogadores e linhas de estado passam como vieram', async () => {
+  const { linhasDoJogadorUnico } = await import('../joysticks.js')
+  assert.deepEqual(linhasDoJogadorUnico('1 BUZZER', [2], false), ['1 BUZZER']) // dois jogadores locais: por número
+  assert.deepEqual(linhasDoJogadorUnico('2 BUZZER', [1, 2], true), ['2 BUZZER'])
+  assert.deepEqual(linhasDoJogadorUnico('GAME', [2], true), ['GAME'])
+  assert.deepEqual(linhasDoJogadorUnico('1 BUZZER', [], true), ['1 BUZZER'])
+})

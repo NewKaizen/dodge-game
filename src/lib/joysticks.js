@@ -12,6 +12,7 @@
 //       .lista()                    [{ porta, chave, jogador, aberta }] na ordem de registro
 //   reescreverLinha(linha, jogador, { rele })   JOY/BTN recebidos: o número da linha é trocado pelo da porta
 //   rotearSaida(linha, abertas)     para quais portas vai uma linha do jogo: [{ porta, linha }]
+//   linhasDoJogadorUnico(linha, jogadores, umJogador)   online/solo: o "1 ..." vai a todo joystick do PC
 //   modoRele(abertas)               uma porta só, jogador 1: a placa principal pode ter uma secundária
 //   rotulo(item, indice)            texto para a lista da tela de configurações
 
@@ -131,6 +132,20 @@ export function rotearSaida(linha, abertas) {
   if (abertas.length === 1 && abertas[0].jogador === 1) return n === 1 || n === 2 ? [{ porta: abertas[0].porta, linha: texto }] : []
   const alvo = abertas.find((a) => a.jogador === n)
   return alvo ? [{ porta: alvo.porta, linha: texto.replace(COM_PREFIXO, '1 ') }] : []
+}
+
+// Quando TODOS os controles comandam um jogador só (partida online, ou solo contra a CPU: game/controles.js),
+// o "jogador 1" da cena é quem está com QUALQUER joystick deste PC. Uma linha "1 VIDA/BUZZER/LED" vira uma
+// por joystick aberto, com o número de cada um (um joystick salvo como JOGADOR 2 também recebe: antes o
+// "1 ..." não achava porta e sumia). Outras linhas, ou fora desse modo, passam como vieram.
+//   jogadores: os números dos joysticks abertos (listarJoysticks)
+export function linhasDoJogadorUnico(linha, jogadores, umJogador) {
+  const texto = String(linha).trim()
+  const m = POR_JOGADOR.exec(texto)
+  if (!umJogador || !m || Number(m[1]) !== 1) return [texto]
+  const numeros = [...new Set(jogadores.filter((n) => Number.isInteger(n) && n > 0))].sort((a, b) => a - b)
+  if (!numeros.length) return [texto]
+  return numeros.map((n) => texto.replace(COM_PREFIXO, `${n} `))
 }
 
 // a placa está sozinha na porta e é o jogador 1: pode haver uma secundária atrás dela

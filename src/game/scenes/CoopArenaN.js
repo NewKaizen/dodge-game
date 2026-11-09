@@ -219,7 +219,7 @@ export default class CoopArenaN extends Phaser.Scene {
     })
     this.events.on('postupdate', this.filtrarCaixas, this)
     if (import.meta.env.DEV) window.coopArena = this
-    entrarNoJogo()
+    entrarNoJogo({ umJogador: true }) // sempre online: o meu buzzer e o meu HP vão a todo joystick deste PC
     this.events.once('shutdown', () => {
       this.saindo = true
       voltarAoMenu()

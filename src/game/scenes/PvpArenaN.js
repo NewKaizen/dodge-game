@@ -12,7 +12,7 @@ import { ataqueDaCartaNoJogo } from '../pvp/ataquesDasCartas.js'
 import { podeJogar, registrarGrazes, registrarPerfeitoCombo, energiaPerfeito, ENERGIA } from '../pvp/regras.js'
 import { FFA, criarPartidaFfa, resolverRodadaFfa, aplicarDanoFfa, danoAusente, classificacao, colocacoes, vivos } from '../pvp/ffa.js'
 import { DUPLA, criarPartidaDupla, resolverRodadaDupla, podeJogarDupla, parceiroDe, membros, dePe, alvosDeApoio, classificacaoDupla } from '../pvp/dupla.js'
-import { timesDoArranjo, ROTULO_TIME } from '../../lib/times2x2.js'
+import { timesDoArranjo, lugaresDoTime, ROTULO_TIME } from '../../lib/times2x2.js'
 import { ARENA, ARENA_PADRAO } from '../pvp/arenas.js'
 import { criarFundo } from '../backgrounds/index.js'
 import AnuncioAlvos from '../pvp/AnuncioAlvos.js'
@@ -20,7 +20,7 @@ import { estadoDoNo, quemDestacar } from '../pvp/anuncioAlvos.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
 import FimDePartida from '../pvp/fimDePartida/index.js'
 import ArenaRedeN from '../pvp/rede/ArenaRedeN.js'
-import HudCoopN from '../coop/HudCoopN.js'
+import HudCoopN, { CARTAO as CARTAO_HUD } from '../coop/HudCoopN.js'
 import { marcadorDaVaga, nomeNoCoracao, desenharForma, formaDaVaga } from '../coop/marcadores.js'
 import { canal, emRede, meuLado, meuIndice, souHostDaRede, irParaCena, participantesDaPartida } from '../rede.js'
 import { corDaVaga, textoDaVaga } from '../vagas.js'
@@ -80,13 +80,14 @@ const PISTA = { largura: 220, altura: 170 }
 const TOPO_GRADE = 66
 const CELULA = { largura: LARGURA / 2, altura: (ALTURA - TOPO_GRADE) / 2 }
 const LADO = 92 // largura das colunas de texto ao lado da caixa
-const celula = (k) => {
+// (por LUGAR na tela; a cena traduz vaga -> lugar em this.celula(vaga): no 2x2 os times ficam juntos)
+const celulaDoLugar = (k) => {
   const x0 = (k % 2) * CELULA.largura
   const y0 = TOPO_GRADE + Math.floor(k / 2) * CELULA.altura
   return { x0, y0, x: x0 + CELULA.largura / 2, y: y0 + CELULA.altura / 2 }
 }
-const campoDe = (k) => {
-  const c = celula(k)
+const campoDoLugar = (k) => {
+  const c = celulaDoLugar(k)
   return { esquerda: c.x0 + LADO + 4, direita: c.x0 + CELULA.largura - LADO - 4, topo: c.y0 + 4, base: c.y0 + CELULA.altura - 4 }
 }
 const MAO = { x: CENTRO_X - 20, y: 426, monte: { x: 62, y: 404 } }
@@ -133,6 +134,7 @@ const estadoInicial = () => ({
   fundoGrade: null,
   alphaGrade: 1,
   vistas: null,
+  lugares: null,
   transicao: null,
   selecao: null,
   emFoco: false,
@@ -172,6 +174,8 @@ export default class PvpArenaN extends Phaser.Scene {
     this.meu = meuIndice()
     this.dupla = this.modo === '2x2' && this.n === DUPLA.jogadores
     this.estado = this.dupla ? criarPartidaDupla({ personagens: this.ids, times: this.timesDados ?? timesDoArranjo(0), semente: this.semente }) : criarPartidaFfa({ personagens: this.ids, semente: this.semente })
+    // 2x2: o TIME A à esquerda, o TIME B à direita (células e placar), em qualquer arranjo
+    this.lugares = this.dupla ? lugaresDoTime(this.estado.times) : null
     this.nomes = Array.from({ length: this.n }, (_, j) => participantesDaPartida().find((p) => p.indice === j)?.nome ?? `P${j + 1}`)
     this.nomesJog = this.nomes.map((nome) => nomeNoCoracao(nome, 10))
     this.controles = new Controles(this)
@@ -205,11 +209,11 @@ export default class PvpArenaN extends Phaser.Scene {
     this.desenharFundo()
     this.criarCelulas()
     this.criarPistas()
-    this.huds = Array.from({ length: this.n }, (_, j) => new HudCoopN(this, { vaga: j, n: this.n, nome: this.nomes[j], personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, meu: j === this.meu }))
+    this.huds = Array.from({ length: this.n }, (_, j) => new HudCoopN(this, { vaga: j, n: this.n, nome: this.nomes[j], personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, meu: j === this.meu, coluna: this.lugares?.coluna[j], corTime: this.dupla ? COR_TIME[this.estado.times[j]] : null }))
     this.criarTopo()
     this.criarMao()
     this.criarTextos()
-    this.fimDePartida = new FimDePartida(this, { campos: Array.from({ length: this.n }, (_, k) => campoDe(k)) })
+    this.fimDePartida = new FimDePartida(this, { campos: Array.from({ length: this.n }, (_, k) => this.campoDe(k)) })
     this.vistas = vistasDaGrade(this.n)
     this.criarFoco()
 
@@ -222,7 +226,7 @@ export default class PvpArenaN extends Phaser.Scene {
     })
     this.events.on('postupdate', this.filtrarCaixas, this)
     if (import.meta.env.DEV) window.pvpArenaN = this
-    entrarNoJogo()
+    entrarNoJogo({ umJogador: true }) // sempre online: o meu buzzer e o meu HP vão a todo joystick deste PC
     this.events.once('shutdown', () => {
       this.saindo = true
       voltarAoMenu()
@@ -241,6 +245,20 @@ export default class PvpArenaN extends Phaser.Scene {
 
   // ---------- montagem ----------
 
+  // a célula e o campo de ataque da vaga k (no 2x2 pelo lugar do time; no todos contra todos, a própria vaga)
+  celula(k) {
+    return celulaDoLugar(this.lugares?.celula[k] ?? k)
+  }
+
+  campoDe(k) {
+    return campoDoLugar(this.lugares?.celula[k] ?? k)
+  }
+
+  // onde a carta revelada da vaga k fica na mesa (2x2: na ordem do placar, o TIME A à esquerda)
+  mesa(k) {
+    return mesaDe(this.lugares?.coluna[k] ?? k, this.n)
+  }
+
   desenharFundo() {
     this.fundoArena = criarFundo(this, `arena-${this.arena.id}`)
     this.events.once('shutdown', () => this.fundoArena?.destruir())
@@ -258,14 +276,15 @@ export default class PvpArenaN extends Phaser.Scene {
     this.objetosGrade = []
     this.celulas = []
     for (let k = 0; k < 4; k++) {
-      const c = celula(k)
+      const c = this.celula(k)
       g.lineStyle(1, this.arena.moldura?.cor ?? 0x5a4a7a, 0.6)
       g.strokeRect(c.x0 + 2, c.y0 + 2, CELULA.largura - 4, CELULA.altura - 4)
       if (k >= this.n) {
         continue
       }
       const cor = corDaVaga(k)
-      g.fillStyle(cor, 0.07)
+      // (2x2: o fundo é da cor do TIME, para as duas células do time parecerem uma só; a forma e o nome seguem na cor da vaga)
+      g.fillStyle(this.dupla ? COR_TIME[this.estado.times[k]] : cor, this.dupla ? 0.13 : 0.07)
       g.fillRect(c.x0 + 3, c.y0 + 3, CELULA.largura - 6, CELULA.altura - 6)
       const forma = this.add.graphics().setDepth(5)
       desenharForma(forma, formaDaVaga(k), c.x0 + 14, c.y0 + 20, 6, cor)
@@ -278,15 +297,18 @@ export default class PvpArenaN extends Phaser.Scene {
       const marca = this.add.graphics().setDepth(5)
       const ataque = this.add.text(c.x0 + CELULA.largura - LADO, c.y0 + 14, '', { ...estilo(9, TEXTO.normal), wordWrap: { width: LADO - 6 } }).setDepth(5)
       const destaque = this.add.rectangle(c.x, c.y, CELULA.largura - 6, CELULA.altura - 6).setStrokeStyle(3, 0xffe14a).setDepth(6).setVisible(false)
-      // 2x2: a borda e a etiqueta do time (embaixo à esquerda da célula)
+      // 2x2: a borda grossa e a etiqueta do time (embaixo à esquerda), com o papel de quem está ali para MIM:
+      // VOCÊ, PARCEIRO (o mesmo time) ou RIVAL
       if (this.dupla) {
         const t = this.estado.times[k]
-        g.lineStyle(2, COR_TIME[t], 0.85)
+        g.lineStyle(3, COR_TIME[t], 0.95)
         g.strokeRect(c.x0 + 4, c.y0 + 4, CELULA.largura - 8, CELULA.altura - 8)
-        const parceiro = parceiroDe(this.estado, this.meu)
-        const rot = this.add.text(c.x0 + 8, c.y0 + CELULA.altura - 14, `${ROTULO_TIME[t]}${k === parceiro ? ' · PARCEIRO' : ''}`, estilo(9, TEXTO_TIME[t])).setOrigin(0, 0.5).setDepth(5)
+        const papel = k === this.meu ? 'VOCÊ' : t === this.estado.times[this.meu] ? 'PARCEIRO' : 'RIVAL'
+        const rot = this.add.text(c.x0 + 16, c.y0 + CELULA.altura - 17, `${ROTULO_TIME[t]} · ${papel}`, { fontFamily: FONTE, fontSize: '11px', color: '#0b0914' }).setOrigin(0, 0.5).setDepth(5)
+        const pilula = this.add.graphics().setDepth(4)
+        pilula.fillStyle(COR_TIME[t], 0.95).fillRoundedRect(c.x0 + 9, rot.y - 9, rot.width + 14, 18, 9)
         this.rotulosTime.push(rot)
-        this.objetosGrade.push(rot)
+        this.objetosGrade.push(pilula, rot)
       }
       this.celulas.push({ ...c, forma, nome, voce, personagem, estado, ataque, marca, destaque })
       this.objetosGrade.push(estado, ataque, marca, ...(voce ? [voce] : []))
@@ -297,7 +319,7 @@ export default class PvpArenaN extends Phaser.Scene {
     this.avisoPista = []
     this.infoPista = []
     this.pistas = Array.from({ length: this.n }, (_, k) => {
-      const c = celula(k)
+      const c = this.celula(k)
       const pista = new Pista(this, {
         x: c.x,
         y: c.y,
@@ -307,7 +329,7 @@ export default class PvpArenaN extends Phaser.Scene {
         cor: corDaVaga(k),
         tema: TEMAS[this.ids[k]],
         velocidadeMax: 300,
-        dinamica: { campo: campoDe(k) },
+        dinamica: { campo: this.campoDe(k) },
         marcadores: { [k]: marcadorDaVaga(k, this.nomes[k]) },
       })
       pista.aoAcertar = (dano) => this.acertou(k, dano)
@@ -323,7 +345,18 @@ export default class PvpArenaN extends Phaser.Scene {
     const texto = (y, tamanho, cor) => this.add.text(CENTRO_X, y, '', { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(70)
     this.textoRodada = texto(5, 8, TEXTO.normal)
     this.textoRelogio = texto(18, 22, TEXTO.selecionado)
-    this.textoModo = texto(46, 7, '#ff7a9a').setText(this.dupla ? '2x2 · EQUIPES' : `TODOS x TODOS · ${this.n}`)
+    this.textoModo = texto(46, 7, '#ff7a9a').setText(this.dupla ? '' : `TODOS x TODOS · ${this.n}`)
+    if (!this.dupla) return
+    // 2x2: cada metade do placar é um time (lugaresDoTime): o filete na cor dele embaixo dos dois cartões e
+    // "◀ A  B ▶" no relógio, apontando para o lado de cada um
+    const { colunas, largura, altura, y } = CARTAO_HUD
+    const g = this.add.graphics().setDepth(70)
+    ;[0, 1].forEach((t) => {
+      const x0 = colunas[t * 2]
+      g.fillStyle(COR_TIME[t], 1).fillRect(x0, y + altura, colunas[t * 2 + 1] + largura - x0, 3)
+    })
+    const lado = (t) => this.add.text(CENTRO_X + (t ? 4 : -4), 46, t ? 'B ▶' : '◀ A', { fontFamily: FONTE, fontSize: '10px', color: TEXTO_TIME[t], stroke: '#000000', strokeThickness: 3 }).setOrigin(t ? 0 : 1, 0).setDepth(70)
+    this.textoModo = [lado(0), lado(1)]
   }
 
   criarMao() {
@@ -515,7 +548,7 @@ export default class PvpArenaN extends Phaser.Scene {
       this.huds[j].setApagado(Boolean(jog.eliminado) || this.rede.fora(j))
       const cel = this.celulas[j]
       if (!cel) return
-      const c = celula(j)
+      const c = this.celula(j)
       const atacante = this.estado.alvos.indexOf(j)
       const textoCel = this.dupla && jog.eliminado ? 'FORA\n(saiu)' : jog.eliminado ? `ELIMINADO\n${this.posicaoDe(j)}º LUGAR` : this.rede.fora(j) ? 'SEM CONEXÃO\n(leva o ataque\ninteiro)' : this.dupla && jog.caido ? 'CAÍDO\n(o parceiro\nresgata)' : this.semAlvo(j) ? 'SEM ALVO\n+1 energia\nsó ♥' : ''
       cel.estado.setText(textoCel).setColor(jog.eliminado || (this.dupla && jog.caido) ? TEXTO.caido : this.semAlvo(j) && !this.rede.fora(j) ? '#7fd8ff' : '#ff9a3a')
@@ -624,8 +657,8 @@ export default class PvpArenaN extends Phaser.Scene {
     this.fase = 'abertura'
     const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 5, align: 'center' })
     const titulo = this.add.text(CENTRO_X, 150, this.dupla ? '2x2 · EQUIPES' : 'TODOS CONTRA TODOS', estilo(30, this.dupla ? '#ffd23a' : '#ff7a9a')).setOrigin(0.5).setDepth(96).setScale(0)
-    const nomes = this.nomes.map((nome, j) => this.add.text(mesaDe(j, this.n).x, 230, nomeNoCoracao(nome, 9), estilo(this.n === 4 ? 16 : 20, textoDaVaga(j))).setOrigin(0.5).setDepth(96).setAlpha(0))
-    const pers = this.ids.map((id, j) => this.add.text(mesaDe(j, this.n).x, 256, (PERSONAGENS[id]?.nome ?? id).toUpperCase(), estilo(10, '#b8b8c8')).setOrigin(0.5).setDepth(96).setAlpha(0))
+    const nomes = this.nomes.map((nome, j) => this.add.text(this.mesa(j).x, 230, nomeNoCoracao(nome, 9), estilo(this.n === 4 ? 16 : 20, textoDaVaga(j))).setOrigin(0.5).setDepth(96).setAlpha(0))
+    const pers = this.ids.map((id, j) => this.add.text(this.mesa(j).x, 256, (PERSONAGENS[id]?.nome ?? id).toUpperCase(), estilo(10, '#b8b8c8')).setOrigin(0.5).setDepth(96).setAlpha(0))
     const regra = this.add.text(CENTRO_X, 300, this.dupla ? 'derrube os DOIS adversários · o parceiro caído volta com uma rodada limpa ou um ♥' : 'o último de pé vence · o alvo de cada um é anunciado a cada rodada', estilo(10, TEXTO.normal)).setOrigin(0.5).setDepth(96).setAlpha(0)
     // 2x2: os times
     if (this.dupla) {
@@ -1015,10 +1048,10 @@ export default class PvpArenaN extends Phaser.Scene {
     })
     this.mao.setTravada(false)
     tocar(this, 'cartaDeslizar')
-    await Promise.all(this.reveladas.map((c, j) => c && this.tween({ targets: c, ...mesaDe(j, this.n), rotation: 0, scaleX: ESCALA_MESA, scaleY: ESCALA_MESA, duration: 320, ease: 'Cubic.easeOut' })))
+    await Promise.all(this.reveladas.map((c, j) => c && this.tween({ targets: c, ...this.mesa(j), rotation: 0, scaleX: ESCALA_MESA, scaleY: ESCALA_MESA, duration: 320, ease: 'Cubic.easeOut' })))
     for (let j = 0; j < this.n; j++) {
       if (!this.reveladas[j]) continue
-      const m = mesaDe(j, this.n)
+      const m = this.mesa(j)
       this.etiquetasMesa.push(this.etiquetaEm(m.x, m.y - 62, this.nomeDe(j), textoDaVaga(j), { tamanho: 10, ms: 2400 }))
     }
     this.mostrarBanner('REVELAR!', TEXTO.selecionado, { y: 110 })
@@ -1033,7 +1066,7 @@ export default class PvpArenaN extends Phaser.Scene {
         tocar(this, jog.especial === 'espelho' ? 'espelho' : jog.especial === 'roubo' ? 'roubo' : 'brilhoRank')
         particulas(this, carta.x, carta.y, { cor: 0xfff0a8, quantidade: 22, velocidade: 160 })
       }
-      const m = mesaDe(j, this.n)
+      const m = this.mesa(j)
       this.textosDoEfeito(r, j).forEach(([texto, cor], k) => this.etiquetasMesa.push(this.etiquetaEm(m.x, m.y + 62 + k * 14, texto, cor, { atraso: 120 + k * 150, tamanho: 10, ms: 1700 })))
       const ef = r.efeitos[j]
       const hud = this.huds[j]
@@ -1047,7 +1080,7 @@ export default class PvpArenaN extends Phaser.Scene {
     }
     // 2x2: o ♥ levantou o parceiro caído; os dois SUPER do time
     for (const { j, por } of r.levantados ?? []) {
-      const c = celula(j)
+      const c = this.celula(j)
       this.etiquetaEm(c.x, c.y, `${this.nomeDe(j)} LEVANTOU!\n♥ de ${this.nomeDe(por)}`, TEXTO.cura, { tamanho: 13, ms: 1800 })
       tocar(this, 'cura')
       if (j === this.meu) this.mostrarBanner('RESGATADO!\nvocê volta na próxima rodada', TEXTO.cura, { y: 236, tamanho: 18, ms: 1800 })
@@ -1208,7 +1241,7 @@ export default class PvpArenaN extends Phaser.Scene {
   festejarPerfeitos(perfeitos) {
     tocar(this, 'aplausos')
     for (const { dono, ganho, multiplicador = 1 } of perfeitos) {
-      const c = celula(dono)
+      const c = this.celula(dono)
       this.etiquetaEm(c.x, c.y - 10, multiplicador > 1 ? `PERFEITO x${multiplicador}!` : 'PERFEITO!', '#ffe14a', { tamanho: 16 + 2 * (multiplicador - 1), ms: 1100 })
       if (ganho) this.etiquetaEm(c.x, c.y + 14, `+${ganho} ENERGIA`, '#7fd8ff', { atraso: 150, tamanho: 11, ms: 900 })
       for (let i = 0; i < 2 + multiplicador; i++) this.time.delayedCall(i * 120, () => !this.saindo && fogoArtificio(this, c.x - 60 + i * 40, c.y - 30, undefined, { quantidade: 22, profundidade: 97 }))
@@ -1327,7 +1360,7 @@ export default class PvpArenaN extends Phaser.Scene {
     const fim = await this.rede.fimDaRodada(ausentes, { limpas })
     if (this.saindo || !fim) return null
     for (const { j, dano } of fim.ausentes) {
-      const c = celula(j)
+      const c = this.celula(j)
       this.etiquetaEm(c.x, c.y, `SEM CONEXÃO: -${dano}`, '#ff9a3a', { tamanho: 13, ms: 1400 })
       numero(this, this.huds[j].pontoHp.x, this.huds[j].pontoHp.y, `-${dano}`, TEXTO.caido, { tamanho: 13 })
     }
@@ -1337,7 +1370,7 @@ export default class PvpArenaN extends Phaser.Scene {
     })
     this.atualizarHuds()
     for (const j of fim.eliminados) {
-      const c = celula(j)
+      const c = this.celula(j)
       this.etiquetaEm(c.x, c.y, `ELIMINADO!\n${this.posicaoDe(j)}º LUGAR`, TEXTO.caido, { tamanho: 16, ms: 1700 })
       tocar(this, 'quebrar')
     }
@@ -1359,9 +1392,9 @@ export default class PvpArenaN extends Phaser.Scene {
   // 2x2: quem caiu nesta rodada e quem voltou pela rodada limpa do parceiro
   mostrarQuedas(fim) {
     for (const { j, por } of fim.resgatados ?? []) {
-      const c = celula(j)
+      const c = this.celula(j)
       this.etiquetaEm(c.x, c.y - 8, `RODADA LIMPA!\n${this.nomeDe(j)} VOLTA`, TEXTO.cura, { tamanho: 14, ms: 1900 })
-      this.etiquetaEm(celula(por).x, celula(por).y + 20, 'RESGATOU O PARCEIRO!', TEXTO.cura, { atraso: 200, tamanho: 11, ms: 1600 })
+      this.etiquetaEm(this.celula(por).x, this.celula(por).y + 20, 'RESGATOU O PARCEIRO!', TEXTO.cura, { atraso: 200, tamanho: 11, ms: 1600 })
       tocar(this, 'cura')
       particulas(this, c.x, c.y, { cor: corDaVaga(j), quantidade: 24, velocidade: 140 })
       if (j === this.meu) {
@@ -1370,7 +1403,7 @@ export default class PvpArenaN extends Phaser.Scene {
       }
     }
     for (const j of fim.caidos ?? []) {
-      const c = celula(j)
+      const c = this.celula(j)
       this.etiquetaEm(c.x, c.y, `${this.nomeDe(j)} CAIU!${fim.fim ? '' : '\no parceiro pode resgatar'}`, TEXTO.caido, { tamanho: 14, ms: 1800 })
       tocar(this, 'quebrar')
     }
@@ -1404,7 +1437,7 @@ export default class PvpArenaN extends Phaser.Scene {
 
   // onde o centro da caixa k aparece agora (e com que escala)
   centroNaTela(k) {
-    const v = this.pistas[k]?.caixa.vista ?? { ...celula(k), escala: 1 }
+    const v = this.pistas[k]?.caixa.vista ?? { ...this.celula(k), escala: 1 }
     return { x: v.x, y: v.y, escala: v.escala }
   }
 
@@ -1412,7 +1445,7 @@ export default class PvpArenaN extends Phaser.Scene {
   pontoNaTela(x, y) {
     if (!this.emFoco || this.fase !== 'esquiva' || !this.pistas) return undefined
     for (let k = 0; k < this.n; k++) {
-      const c = campoDe(k)
+      const c = this.campoDe(k)
       if (x < c.esquerda - 60 || x > c.direita + 60 || y < c.topo - 60 || y > c.base + 60) continue
       const caixa = this.pistas[k].caixa
       if (caixa.oculta) return null
@@ -1495,7 +1528,7 @@ export default class PvpArenaN extends Phaser.Scene {
     r.caixas.forEach((caixa, k) => caixa && (causado[caixa.de] += this.danoRodada[k] ?? 0))
     for (let k = 0; k < this.n; k++) {
       if (this.eliminado(k)) continue
-      const c = celula(k)
+      const c = this.celula(k)
       const levou = this.danoRodada[k] ?? 0
       this.etiquetaEm(c.x, c.y - 8, levou ? `-${levou} HP` : r.caixas[k] ? 'SEM DANO' : '', levou ? TEXTO.caido : TEXTO.cura, { tamanho: levou ? 16 : 12, ms: 1500 })
       if (causado[k]) this.etiquetaEm(c.x, c.y + 14, `causou ${causado[k]}`, textoDaVaga(k), { atraso: 120, tamanho: 10, ms: 1400 })

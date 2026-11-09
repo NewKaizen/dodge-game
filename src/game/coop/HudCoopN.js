@@ -16,7 +16,8 @@ import { fatores } from '../acessibilidade.js'
 //   linha 4  o combo de perfeitos, o escudo / 2ª chance e as cartas da mão (5 retângulos)
 // O cartão do jogador deste PC tem borda grossa na cor dele e "VOCÊ". Só visual: a cena passa os números.
 //
-//   const hud = new HudCoopN(cena, { vaga, n, nome, personagem, hpMax, meu })
+//   const hud = new HudCoopN(cena, { vaga, n, nome, personagem, hpMax, meu, coluna?, corTime? })
+//     coluna: em que cartão do alto (0..3; padrão a vaga) · corTime: 2x2, a borda na cor do time
 //   hud.setHp(70) · setEnergia(5) · setSequencia(3) · comboQuebrou() · setEscudo(0.6) · setProtegido(true)
 //   hud.setMao(5)                  quantas cartas na mão (retângulos acesos)
 //   hud.setEstado('PRONTO', cor)   o estado da mão (linha 1, à direita); null apaga
@@ -29,7 +30,7 @@ const BARRA = { largura: 122, altura: 8 }
 const GEMA = { passo: 9, raio: 3.4 }
 
 export default class HudCoopN {
-  constructor(cena, { vaga, n, nome, personagem, hpMax, meu = false }) {
+  constructor(cena, { vaga, n, nome, personagem, hpMax, meu = false, coluna = null, corTime = null }) {
     this.cena = cena
     this.vaga = vaga
     this.n = n
@@ -45,7 +46,7 @@ export default class HudCoopN {
     const def = PERSONAGENS[personagem]
     this.corBarra = def?.cor ?? 0xffffff
     // três jogadores: o terceiro vai para o lado direito (a metade esquerda tem dois, a direita um)
-    const x0 = CARTAO.colunas[vaga] ?? CARTAO.colunas[3]
+    const x0 = CARTAO.colunas[coluna ?? vaga] ?? CARTAO.colunas[3]
     const y0 = CARTAO.y
     this.x0 = x0
     this.y0 = y0
@@ -56,7 +57,9 @@ export default class HudCoopN {
     const moldura = cena.add.graphics()
     moldura.fillStyle(UI.painel, 0.9)
     moldura.fillRoundedRect(x0, y0, CARTAO.largura, CARTAO.altura, 5)
-    moldura.lineStyle(meu ? 2 : 1, meu ? cor : UI.linha, 1)
+    // (2x2: a borda é do time, mais grossa no meu cartão; fora dele, só o meu tem borda na cor da vaga)
+    if (corTime != null) moldura.lineStyle(meu ? 3 : 1.5, corTime, 1)
+    else moldura.lineStyle(meu ? 2 : 1, meu ? cor : UI.linha, 1)
     moldura.strokeRoundedRect(x0, y0, CARTAO.largura, CARTAO.altura, 5)
     moldura.fillStyle(cor).fillRect(x0 + 1, y0 + 8, 2, CARTAO.altura - 16)
     this.moldura = moldura

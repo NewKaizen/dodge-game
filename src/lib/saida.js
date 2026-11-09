@@ -1,5 +1,6 @@
 import { jogo, MAX_JOGADORES } from './estado.js'
 import { enviarSerial, aoMudarJoysticks, listarJoysticks } from './serial.js'
+import { linhasDoJogadorUnico } from './joysticks.js'
 import { linhaVida } from './conversao.js'
 import { vibrarJogador, pararVibracao } from './vibracao.js'
 import { pref } from '../game/preferencias.js'
@@ -12,7 +13,8 @@ import { criarBuzzer, linhasDeTeste } from '../game/buzzer.js'
 // As cenas só avisam o que aconteceu; aqui decide o que mandar e evita repetir
 // linha (a serial é 9600 baud). Sem joystick conectado, nada sai.
 //
-//   entrarNoJogo()            começou uma luta: GAME
+//   entrarNoJogo({ umJogador })  começou uma luta: GAME. umJogador: todos os controles comandam o jogador 1
+//                             (online ou solo): o que é dele vai a TODO joystick do PC (joysticks.js)
 //   voltarAoMenu()            saiu da luta: MENU
 //   informarVida(j, hp, max)  pode chamar todo frame: só manda VIDA quando o HP muda
 //   levouGolpe(j, { super })  vibração do controle a cada golpe; BUZZER só se foi golpe de SUPER
@@ -36,12 +38,17 @@ let estadoEnviado = null
 let timerEstado = null
 let timerPing = null
 let vidasEnviadas = []
+let umJogador = false // a luta é de um jogador só neste PC (online / solo): "1 ..." vai a todos os joysticks
 const hpVisto = [] // último HP de cada jogador (detecta o K.O. para a vibração)
 
 function enviar(linha) {
   if (fonte !== 'serial') return Promise.resolve()
-  if (import.meta.env?.DEV && !linha.endsWith('PING')) console.debug('[joystick] <-', linha)
-  return enviarSerial(linha)
+  const abertos = listarJoysticks()
+    .filter((j) => j.aberta)
+    .map((j) => j.jogador)
+  const linhas = linhasDoJogadorUnico(linha, abertos, umJogador)
+  if (import.meta.env?.DEV && !linha.endsWith('PING')) console.debug('[joystick] <-', linhas.join(' | '))
+  return Promise.all(linhas.map((l) => enviarSerial(l)))
 }
 
 const buzzer = criarBuzzer({ enviar: (linha) => enviar(linha), ativo: () => pref('buzzerJoystick') })
@@ -63,11 +70,13 @@ function mudarEstado(novo) {
   timerEstado = setTimeout(mandarEstado, ESPERA_ESTADO)
 }
 
-export function entrarNoJogo() {
+export function entrarNoJogo({ umJogador: so = false } = {}) {
+  umJogador = Boolean(so)
   mudarEstado('GAME')
 }
 
 export function voltarAoMenu() {
+  umJogador = false
   mudarEstado('MENU')
 }
 

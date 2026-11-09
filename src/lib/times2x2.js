@@ -18,3 +18,22 @@ export const timesDoArranjo = (a) => [...ARRANJOS[arranjoValido(a) ? a : 0]]
 export const proximoArranjo = (a) => ((arranjoValido(a) ? a : 0) + 1) % ARRANJOS.length
 
 export const ROTULO_TIME = ['TIME A', 'TIME B']
+
+// Onde cada vaga senta na tela do 2x2, para os times ficarem JUNTOS (qualquer arranjo): o TIME A à esquerda e
+// o TIME B à direita, como no anúncio dos duelos. Dentro do time, a vaga menor primeiro.
+//   celula[vaga]  0 alto-esq · 1 alto-dir · 2 baixo-esq · 3 baixo-dir   (TIME A: 0 e 2 · TIME B: 1 e 3)
+//   coluna[vaga]  o cartão do placar no alto: 0 1 | relógio | 2 3        (TIME A: 0 e 1 · TIME B: 2 e 3)
+export function lugaresDoTime(times) {
+  const celula = []
+  const coluna = []
+  for (const t of [0, 1]) {
+    times
+      .map((x, v) => (x === t ? v : -1))
+      .filter((v) => v >= 0)
+      .forEach((v, i) => {
+        celula[v] = t + i * 2
+        coluna[v] = t * 2 + i
+      })
+  }
+  return { celula, coluna }
+}
