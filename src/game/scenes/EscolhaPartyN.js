@@ -1,3 +1,4 @@
+import { iconeDoPersonagem } from '../arte/icones.js'
 import Phaser from 'phaser'
 import Controles from '../controles.js'
 import { PERSONAGENS } from '../data/personagens.js'
@@ -234,8 +235,8 @@ export default class EscolhaPartyN extends Phaser.Scene {
       const x = LARGURA / 2 + (coluna - (naLinha - 1) / 2) * (largura + g.espaco)
       const y = topo + linha * (altura + g.espaco) + altura / 2
       const moldura = this.add.rectangle(x, y, largura, altura, CORES.painel, 0.88).setStrokeStyle(2, def.cor, 0.55)
-      const sprite = this.add.image(x, y - 14, id)
-      const escala = Math.max(1, Math.floor(Math.min((largura - 20) / sprite.width, (altura - 50) / sprite.height)))
+      const sprite = this.add.image(x, y - 14, iconeDoPersonagem(id))
+      const escala = Math.min((largura - 20) / sprite.width, (altura - 43) / sprite.height)
       sprite.setScale(escala)
       sprite.escalaBase = escala
       this.add.text(x, y + altura / 2 - 28, def.nome.toUpperCase(), { fontFamily: FONTE, fontSize: def.nome.length <= 8 ? '15px' : '12px', color: corTexto(def.cor), stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5)
@@ -342,7 +343,7 @@ export default class EscolhaPartyN extends Phaser.Scene {
       c.seloTexto.setText(escolhido ? nomeNoCoracao(this.nomeDe(dono), 8) : '').setColor(escolhido ? textoDaVaga(dono) : '#ffffff')
       if (escolhido) desenharForma(c.selo, formaDaVaga(dono), c.x - c.seloTexto.width / 2 - 9, c.seloTexto.y, 5, cor)
       const emFoco = this.cursorDe.some((k, v) => this.ids[k] === c.id && this.presentes().includes(v))
-      c.sprite.setAlpha(emFoco || escolhido ? 1 : 0.55)
+      c.sprite.setAlpha(emFoco || escolhido ? 1 : 0.8)
     })
     // cursores: cada vaga num canto do card em que está; só quem está na sala
     const presentes = this.presentes()

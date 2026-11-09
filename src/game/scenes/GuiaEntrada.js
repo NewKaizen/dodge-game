@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { molduraArcade } from '../tema.js'
 import Controles from '../controles.js'
 import { tocar, musica } from '../audio.js'
 import { irCarregando } from '../carregando.js'
@@ -67,6 +68,7 @@ export default class GuiaEntrada extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor(CORES.fundo)
+    molduraArcade(this)
     this.controles = new Controles(this)
     this.controles.onBotao((j, botao) => (botao === 'A' ? this.abrir() : this.voltar()))
     this.controles.onPausa(() => this.voltar())

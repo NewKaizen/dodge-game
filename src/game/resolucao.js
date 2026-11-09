@@ -24,7 +24,7 @@ function medir() {
   const cheia = Boolean(document.fullscreenElement)
   const zoomLivre = cheia
     ? Math.min(window.innerWidth / LARGURA, window.innerHeight / ALTURA)
-    : Math.min((window.innerWidth - 32) / LARGURA, (window.innerHeight - MARGEM_VERTICAL) / ALTURA)
+    : Math.min((window.innerWidth - 36) / LARGURA, (window.innerHeight - (window.innerWidth <= 700 ? 180 : MARGEM_VERTICAL)) / ALTURA)
   // fora da tela cheia: passos de 5%, para não recriar tudo a cada pixel de resize.
   // Janela estreita (menos que os 854 do mundo): encolhe em vez de vazar para o lado
   const zoom = cheia ? zoomLivre : Math.max(ZOOM_MIN, Math.floor(zoomLivre * 20) / 20)

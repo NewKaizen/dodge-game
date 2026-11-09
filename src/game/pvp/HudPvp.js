@@ -1,4 +1,6 @@
 import Phaser from 'phaser'
+import { UI } from '../tema.js'
+import { iconeDoPersonagem } from '../arte/icones.js'
 import { CORES, FONTE, TEXTO, LARGURA, corTexto } from '../constants.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { CORES_CARTA } from '../entities/Carta.js'
@@ -48,18 +50,26 @@ export default class HudPvp {
     const texto = (x, y, conteudo, tamanho, cor, extra = {}) =>
       cena.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra })
 
+    // A faixa permanece dentro do espaço já reservado ao placar, fora das pistas.
+    const larguraPlaca = 262
+    const esquerda = direita ? LARGURA - larguraPlaca - 4 : 4
+    const placa = cena.add.graphics()
+    placa.fillStyle(UI.painel, 0.88).fillRoundedRect(esquerda, 2, larguraPlaca, 59, 4)
+    placa.lineStyle(1, UI.linha, 0.9).strokeRoundedRect(esquerda, 2, larguraPlaca, 59, 4)
+    placa.fillStyle(corPersonagem).fillRect(direita ? esquerda + larguraPlaca - 3 : esquerda, 8, 3, 45)
+    const icone = def ? cena.add.image(x0 + s * 237, 50, iconeDoPersonagem(personagem)).setDisplaySize(20, 20) : null
     const tag = texto(x0, 6, rotulo ?? `P${jogador + 1}`, 13, corTexto(CORES.almas[jogador])).setOrigin(origem, 0)
     const coracao = cena.add.image(x0 + s * (tag.width + 10), 13, 'coracao').setTint(CORES.almas[jogador]).setScale(0.9)
     // o NOME DO JOGADOR identifica o lado (pvp/nomes.js); o personagem fica pequeno ao lado
     this.nome = texto(x0 + s * (tag.width + 20), 4, nomeJogador ?? (def?.nome ?? personagem).toUpperCase(), 16, corTexto(corPersonagem)).setOrigin(origem, 0)
-    this.personagemNome = nomeJogador ? texto(this.nome.x + s * (this.nome.width + 8), 10, (def?.nome ?? personagem).toUpperCase(), 9, '#9a9ab0', { strokeThickness: 2 }).setOrigin(origem, 0) : null
+    this.personagemNome = nomeJogador ? texto(this.nome.x + s * (this.nome.width + 8), 10, (def?.nome ?? personagem).toUpperCase(), 9, UI.secundario, { strokeThickness: 2 }).setOrigin(origem, 0) : null
     const ultimo = this.personagemNome ?? this.nome
     this.estado = texto(ultimo.x + s * (ultimo.width + 10), 8, '', 10, TEXTO.guarda).setOrigin(origem, 0)
 
     // barra de HP (fundo, rastro do dano e a barra em si)
     const yb = 28
     this.xBarra = direita ? x0 - BARRA.largura : x0
-    const fundo = cena.add.rectangle(this.xBarra - 2, yb - 2, BARRA.largura + 4, BARRA.altura + 4, 0x000000).setOrigin(0).setStrokeStyle(1, 0x5a4a7a)
+    const fundo = cena.add.rectangle(this.xBarra - 2, yb - 2, BARRA.largura + 4, BARRA.altura + 4, 0x000000).setOrigin(0).setStrokeStyle(1, UI.linha)
     const vazio = cena.add.rectangle(this.xBarra, yb, BARRA.largura, BARRA.altura, CORES.hpFundo).setOrigin(0)
     this.rastro = cena.add.rectangle(this.xBarra, yb, BARRA.largura, BARRA.altura, 0xffffff).setOrigin(0)
     this.barra = cena.add.rectangle(this.xBarra, yb, BARRA.largura, BARRA.altura, corPersonagem).setOrigin(0)
@@ -72,14 +82,14 @@ export default class HudPvp {
     // gemas de energia (ENERGIA.maxima espaços)
     this.yGemas = 52
     this.gemas = cena.add.graphics()
-    this.textoEnergia = texto(x0 + s * (ENERGIA.maxima * GEMA.passo + 6), this.yGemas - 7, '', 11, '#7fd8ff').setOrigin(origem, 0)
+    this.textoEnergia = texto(x0 + s * (ENERGIA.maxima * GEMA.passo + 6), this.yGemas - 7, '', 11, UI.destaque).setOrigin(origem, 0)
 
     // combo de perfeitos (rodadas seguidas com desvio perfeito), discreto embaixo das gemas
     this.yCombo = this.yGemas + 9
     this.sequencia = 0
     this.textoCombo = texto(x0, this.yCombo, '', 10, '#ffd23c', { strokeThickness: 2 }).setOrigin(origem, 0).setVisible(false)
 
-    this.container.add([fundo, vazio, this.rastro, this.barra, tag, coracao, this.nome, ...(this.personagemNome ? [this.personagemNome] : []), this.estado, this.textoHp, this.gemas, this.textoEnergia, this.textoCombo])
+    this.container.add([placa, ...(icone ? [icone] : []), fundo, vazio, this.rastro, this.barra, tag, coracao, this.nome, ...(this.personagemNome ? [this.personagemNome] : []), this.estado, this.textoHp, this.gemas, this.textoEnergia, this.textoCombo])
     this.escudo = null
     this.protegido = false
     this.setHp(hpMax, false)
@@ -144,7 +154,7 @@ export default class HudPvp {
         g.strokePoints(losango(r), true)
       }
     }
-    this.textoEnergia.setText(String(energia))
+    this.textoEnergia.setText(`EN ${energia}/${ENERGIA.maxima}`)
     if (animado && energia !== antes) {
       this.cena.tweens.add({ targets: this.textoEnergia, scale: { from: 1.6, to: 1 }, duration: 260, ease: 'Back.easeOut' })
       // brilho nas gemas novas

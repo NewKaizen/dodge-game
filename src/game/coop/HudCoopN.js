@@ -1,3 +1,4 @@
+import { UI } from '../tema.js'
 import { CORES, FONTE, TEXTO, corTexto } from '../constants.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { CORES_CARTA } from '../entities/Carta.js'
@@ -53,10 +54,11 @@ export default class HudCoopN {
     const texto = (x, y, conteudo, tamanho, corT, extra = {}) => cena.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: corT, stroke: '#000000', strokeThickness: 3, ...extra })
 
     const moldura = cena.add.graphics()
-    moldura.fillStyle(0x0b0914, 0.82)
+    moldura.fillStyle(UI.painel, 0.9)
     moldura.fillRoundedRect(x0, y0, CARTAO.largura, CARTAO.altura, 5)
-    moldura.lineStyle(meu ? 3 : 1.5, cor, meu ? 1 : 0.7)
+    moldura.lineStyle(meu ? 2 : 1, meu ? cor : UI.linha, 1)
     moldura.strokeRoundedRect(x0, y0, CARTAO.largura, CARTAO.altura, 5)
+    moldura.fillStyle(cor).fillRect(x0 + 1, y0 + 8, 2, CARTAO.altura - 16)
     this.moldura = moldura
 
     // linha 1: forma + nome (+ "você") e o estado da mão
@@ -71,7 +73,7 @@ export default class HudCoopN {
     // linha 2: HP
     const yb = y0 + 22
     this.xBarra = x0 + 6
-    const fundo = cena.add.rectangle(this.xBarra - 1, yb - 1, BARRA.largura + 2, BARRA.altura + 2, 0x000000).setOrigin(0).setStrokeStyle(1, 0x5a4a7a)
+    const fundo = cena.add.rectangle(this.xBarra - 1, yb - 1, BARRA.largura + 2, BARRA.altura + 2, 0x000000).setOrigin(0).setStrokeStyle(1, UI.linha)
     const vazio = cena.add.rectangle(this.xBarra, yb, BARRA.largura, BARRA.altura, CORES.hpFundo).setOrigin(0)
     this.rastro = cena.add.rectangle(this.xBarra, yb, BARRA.largura, BARRA.altura, 0xffffff).setOrigin(0)
     this.barra = cena.add.rectangle(this.xBarra, yb, BARRA.largura, BARRA.altura, this.corBarra).setOrigin(0)
@@ -81,7 +83,7 @@ export default class HudCoopN {
     // linha 3: energia
     this.yGemas = y0 + 40
     this.gemas = cena.add.graphics()
-    this.textoEnergia = texto(x0 + 6 + ENERGIA.maxima * GEMA.passo + 4, this.yGemas - 6, '', 10, '#7fd8ff').setOrigin(0, 0)
+    this.textoEnergia = texto(x0 + 6 + ENERGIA.maxima * GEMA.passo + 4, this.yGemas - 6, '', 10, UI.destaque).setOrigin(0, 0)
 
     // linha 4: combo / escudo à esquerda, mão à direita
     this.yLinha4 = y0 + 50
@@ -149,7 +151,7 @@ export default class HudCoopN {
         g.strokePoints(losango(r), true)
       }
     }
-    this.textoEnergia.setText(String(energia))
+    this.textoEnergia.setText(`EN ${energia}/${ENERGIA.maxima}`)
     if (animado && energia !== antes) this.cena.tweens.add({ targets: this.textoEnergia, scale: { from: 1.5, to: 1 }, duration: 260, ease: 'Back.easeOut' })
   }
 

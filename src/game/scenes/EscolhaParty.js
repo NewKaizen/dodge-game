@@ -1,4 +1,7 @@
+import { iconeDoPersonagem } from '../arte/icones.js'
+import { vagaNoPalco } from '../arte/elenco.js'
 import Phaser from 'phaser'
+import { UI, detalheCarta } from '../tema.js'
 import { irCarregando } from '../carregando.js'
 import Controles from '../controles.js'
 import { PERSONAGENS } from '../data/personagens.js'
@@ -14,7 +17,7 @@ import { montarAvisos } from '../conta/avisos.js'
 import { pedirP2, dicaDoP2 } from '../jogadoresLocais.js'
 
 // Área da grade de personagens e dos painéis de detalhes (px)
-const GRADE = { topo: 72, base: 282, esquerda: 40, direita: LARGURA - 40, espaco: 10, larguraMax: 188, alturaMax: 200 }
+const GRADE = { topo: 72, base: 282, esquerda: 304, direita: LARGURA - 40, espaco: 10, larguraMax: 188, alturaMax: 200 }
 const DETALHE = { y: 290, altura: 150, espaco: 8, linha: 17, linhasPorColuna: 5 }
 const TAMANHO_PARTY = 2 // com 1 jogador ele escolhe todos; com 2, cada um escolhe 1
 const CHAVE_SALVA = 'dodge-party' // última party (também fica no registry)
@@ -73,9 +76,12 @@ export default class EscolhaParty extends Phaser.Scene {
     this.fundo = criarFundo(this, 'king')
     this.fundo.escurecer()
 
-    this.texto(LARGURA / 2, 28, 'ESCOLHA A PARTY', 28, TEXTO.normal, { strokeThickness: 4 })
+    this.texto(LARGURA / 2, 28, 'FORME SUA EQUIPE', 28, TEXTO.normal, { strokeThickness: 4 })
     this.status = this.texto(LARGURA / 2, 56, '', 14, TEXTO.selecionado)
 
+    this.add.rectangle(154, 177, 280, 210, UI.painel, 0.9).setStrokeStyle(1, UI.linha)
+    this.texto(154, 86, 'CO-OP   /   SUA FORMAÇÃO', 13, UI.destaque)
+    this.palcos = [vagaNoPalco(this,84,248,145,'ALIADO 01'), vagaNoPalco(this,220,248,145,'ALIADO 02')]
     this.montarGrade()
 
     // 1 jogador: um cursor e a lista de escolhidos; 2 jogadores: um cursor e uma escolha por jogador
@@ -172,10 +178,11 @@ export default class EscolhaParty extends Phaser.Scene {
       const coluna = i % this.colunas
       // a última linha incompleta fica centralizada
       const naLinha = Math.min(this.colunas, n - linha * this.colunas)
-      const x = LARGURA / 2 + (coluna - (naLinha - 1) / 2) * (largura + g.espaco)
+      const x = (g.esquerda + g.direita) / 2 + (coluna - (naLinha - 1) / 2) * (largura + g.espaco)
       const y = topo + linha * (altura + g.espaco) + altura / 2
-      const moldura = this.add.rectangle(x, y, largura, altura, CORES.painel, 0.88).setStrokeStyle(2, def.cor, 0.55)
-      const textura = id
+      const moldura = this.add.rectangle(x, y, largura, altura, UI.painel, 0.98).setStrokeStyle(1, def.cor, 0.7)
+      detalheCarta(this, x, y, largura, altura, def.cor)
+      const textura = iconeDoPersonagem(id)
       const nomeGrande = def.nome.length <= 8
 
       let sprite
@@ -207,7 +214,7 @@ export default class EscolhaParty extends Phaser.Scene {
 
   // Escala inteira (pixel art) que cabe na caixa
   encaixar(sprite, largura, altura) {
-    const escala = Math.max(1, Math.floor(Math.min(largura / sprite.width, altura / sprite.height)))
+    const escala = Math.min(largura / sprite.width, altura / sprite.height)
     sprite.setScale(escala)
     sprite.escalaBase = escala
   }
@@ -216,10 +223,10 @@ export default class EscolhaParty extends Phaser.Scene {
   montarDetalhes() {
     const d = DETALHE
     const total = this.numJogadores
-    const largura = (GRADE.direita - GRADE.esquerda - d.espaco * (total - 1)) / total
+    const largura = (LARGURA - 80 - d.espaco * (total - 1)) / total
     this.paineis = this.cursores.map((_, j) => {
-      const x = GRADE.esquerda + j * (largura + d.espaco)
-      const moldura = this.add.rectangle(x, d.y, largura, d.altura, CORES.painel, 0.9).setOrigin(0).setStrokeStyle(2, 0x505050)
+      const x = 40 + j * (largura + d.espaco)
+      const moldura = this.add.rectangle(x, d.y, largura, d.altura, UI.painel, 0.98).setOrigin(0).setStrokeStyle(2, 0x505050)
       const estilo = (tamanho, cor = TEXTO.normal) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor })
       const cabeca = this.add.text(x + 10, d.y + 8, '', estilo(16))
       const numeros = this.add.text(x + largura - 10, d.y + 10, '', estilo(13)).setOrigin(1, 0)
@@ -405,6 +412,11 @@ export default class EscolhaParty extends Phaser.Scene {
       cur.coracao.setAlpha(!solo && this.confirmados[j] ? 0.5 : 1)
     })
 
+    this.palcos.forEach((p,j) => {
+      const travado = solo ? this.escolhidos[j] : this.confirmados[j]
+      const foco = solo ? (j === this.escolhidos.length ? this.ids[this.cursores[0].indice] : null) : this.ids[this.cursores[j].indice]
+      p.mostrar(travado || foco, Boolean(travado))
+    })
     // mensagem do topo
     if (solo) {
       const k = this.escolhidos.length
@@ -473,6 +485,7 @@ export default class EscolhaParty extends Phaser.Scene {
       }
     }
     this.fundo.atualizar(delta)
+    this.palcos.forEach(p => p.atualizar(time))
     // corações nos cantos de cima do card (P1 à esquerda, P2 à direita)
     this.cursores.forEach((cur, j) => {
       const c = this.cards[cur.indice]

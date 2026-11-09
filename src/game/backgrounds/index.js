@@ -1,3 +1,4 @@
+import { molduraArcade } from '../tema.js'
 import { LARGURA, ALTURA, FUNDO } from '../constants.js'
 import king from './king.js'
 import queen from './queen.js'
@@ -32,6 +33,7 @@ export function criarFundo(scene, id, agito = 1) {
   const sombra = scene.add.rectangle(0, 0, LARGURA, ALTURA, 0x000000).setOrigin(0).setDepth(-5).setAlpha(0)
   objetos.push(sombra)
 
+  let moldura = null
   return {
     estado,
     atualizar(dt) {
@@ -51,6 +53,7 @@ export function criarFundo(scene, id, agito = 1) {
       camada.atualizar(passo, estado)
     },
     escurecer() {
+      if (!moldura) { moldura = molduraArcade(scene); objetos.push(moldura) }
       scene.tweens.add({ targets: sombra, alpha: FUNDO.escurecer, duration: 300 })
     },
     setFase(fase, velocidade = 1) {

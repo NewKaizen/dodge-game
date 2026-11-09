@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { CORES, FONTE, LARGURA, TEXTO } from '../constants.js'
-import { SPRITES, CORACAO_MAPA } from '../arte/sprites.js'
+import { IDS_ICONES, iconeDoPersonagem } from '../arte/icones.js'
+import { CORACAO_MAPA } from '../arte/sprites.js'
 
 // Peças de desenho das telas de conta (Perfil, Amigos, Coleção) e dos avisos,
 // no jeito da tela de Configurações: caixas pretas de borda branca, fonte
@@ -108,17 +109,17 @@ const LADO = 16 // pixels da arte (quadrado), como o Avatar.svelte de antes
 
 // a textura 16x16 do personagem (ou do coração padrão), pintada uma vez por jogo
 export function texturaAvatar(cena, avatar) {
-  const sprite = avatar?.tipo === 'jogo' ? SPRITES[avatar.id] : null
-  const chave = `avatar-${sprite ? avatar.id : 'padrao'}`
+  if (avatar?.tipo === 'jogo' && IDS_ICONES.includes(avatar.id)) return iconeDoPersonagem(avatar.id)
+  const chave = 'avatar-padrao'
   if (cena.textures.exists(chave)) return chave
   const tex = cena.textures.createCanvas(chave, LADO, LADO)
   const ctx = tex.getContext()
   ctx.fillStyle = '#16182a'
   ctx.fillRect(0, 0, LADO, LADO)
-  const mapa = sprite ? sprite.mapa.slice(0, LADO) : CORACAO_MAPA
-  const paleta = sprite ? sprite.paleta : { '#': '#ff3355' }
+  const mapa = CORACAO_MAPA
+  const paleta = { '#': '#ff3355' }
   const dx = Math.floor((LADO - mapa[0].length) / 2)
-  const dy = sprite ? 1 : Math.floor((LADO - mapa.length) / 2)
+  const dy = Math.floor((LADO - mapa.length) / 2)
   mapa.forEach((linha, y) => {
     ;[...linha].forEach((letra, x) => {
       const cor = paleta[letra]

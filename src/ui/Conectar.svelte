@@ -52,12 +52,12 @@
 {/if}
 
 <div class="conectar">
-  <span class="dica">{ligados.length ? `controles: ${ligados.join(' · ')}${$jogo.numJogadores > 1 && !naSala ? ' · 2 jogadores' : ''}` : 'aperte uma tecla ou um botão do controle para jogar'}</span>
+  <span class="dica">{ligados.length ? `controles: ${ligados.join(' · ')}${$jogo.numJogadores > 1 && !naSala ? ' · 2 jogadores' : ''}` : 'Teclado ou controle · pressione para conectar'}</span>
   {#if podeSerial}
-    <button onclick={parearUsb} title="Pareia um joystick USB (porta serial)">🔌 Joystick USB</button>
+    <button onclick={parearUsb} title="Pareia um joystick USB (porta serial)">Joystick USB</button>
   {/if}
   {#if avisoUsb}<span class="dica" role="status">{avisoUsb}</span>{/if}
-  <button onclick={alternarTelaCheia}>⛶ Tela cheia (F)</button>
+  <button onclick={alternarTelaCheia}>Tela cheia ↗</button>
 </div>
 
 <style>
@@ -81,5 +81,13 @@
 
   .ping {
     font-weight: bold;
+  }
+
+  .conectar { flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+  .dica { color: var(--color-muted); font-size: 11px; }
+  button { font-size: 11px; }
+  @media (max-width: 700px) {
+    .conectar { justify-content: flex-start; }
+    .dica { width: 100%; font-size: 10px; }
   }
 </style>

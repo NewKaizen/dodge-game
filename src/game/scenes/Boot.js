@@ -1,4 +1,6 @@
 import Phaser from 'phaser'
+import { carregarIcones } from '../arte/icones.js'
+import { carregarElenco } from '../arte/elenco.js'
 import { ASSETS } from '../assets.js'
 import { gerarTexturas } from '../arte/texturas.js'
 import { IMAGENS_SUPER, SONS_SUPER } from '../pvp/super/sprites/index.js'
@@ -14,6 +16,8 @@ export default class Boot extends Phaser.Scene {
   }
 
   preload() {
+    carregarIcones(this)
+    carregarElenco(this)
     for (const [chave, arquivo] of Object.entries(ASSETS.imagens)) this.load.image(chave, arquivo)
     for (const [nome, arquivo] of Object.entries(ASSETS.sons)) this.load.audio(`som-${nome}`, arquivo)
     // cartas SUPER (pvp/super/sprites/), cartas normais (pvp/habilidades/sprites/) e menu (menu/sprites/)

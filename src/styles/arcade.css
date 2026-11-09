@@ -1,0 +1,27 @@
+@import '../../tokens.css';
+@font-face { font-family: 'Pixelify Sans'; src: url('/assets/fonts/PixelifySans-Regular.woff2') format('woff2'); font-display: swap; }
+html, body { overflow-x: clip; }
+body { background: var(--color-paper); color: var(--color-ink); font-family: var(--font-body); }
+* { box-sizing: border-box; }
+button { font: inherit; color: var(--color-ink); background: var(--color-panel); border: 1px solid var(--color-rule); border-radius: var(--radius-sm); padding: 8px 12px; cursor: pointer; white-space: nowrap; }
+button:hover { background: var(--color-raised); border-color: var(--color-accent); }
+button:active { transform: translateY(1px); }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 4px; }
+button:disabled { opacity: .45; cursor: default; }
+.arcade-shell { min-height: 100svh; padding: 0 16px 12px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.arcade-header { width: 100%; min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--color-rule); }
+.arcade-brand { font-family: var(--font-display); font-size: 25px; letter-spacing: 3px; color: var(--color-ink); display: flex; align-items: center; gap: 10px; }
+.arcade-brand span { color: var(--color-coral); font-size: 18px; }
+.arcade-caption { color: var(--color-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 2px; }
+.arcade-toolbar { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+.arcade-footer { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--color-muted); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+.arcade-footer strong { font-weight: 400; color: var(--color-accent); }
+.arcade-stage { flex: 1; display: flex; align-items: center; justify-content: center; width: 100%; min-width: 0; }
+@media(max-width: 700px) {
+  .arcade-header { flex-wrap: wrap; padding: 10px 0; gap: 8px; }
+  .arcade-toolbar { width: 100%; justify-content: space-between; }
+  .arcade-caption { font-size: 9px; }
+  .arcade-footer { font-size: 8px; letter-spacing: 0; }
+  .arcade-footer .secondary { display: none; }
+}
+@media(prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

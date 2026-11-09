@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { menosMovimento, pref } from '../preferencias.js'
 import { FONTE } from '../constants.js'
 import { tocar } from '../audio.js'
 import { GLIFOS, QUADRO, COLUNAS, MIOLO_O } from './sprites/logo.js'
@@ -203,7 +204,7 @@ export function criarLogo(cena, area, { titulo, subtitulo, escala = 1 }) {
   const esperar = (ms) => new Promise((ok) => cena.time.delayedCall(ms, ok))
 
   async function entrar({ rapido } = {}) {
-    if (rapido) {
+    if (rapido || menosMovimento() || !pref('flashes')) {
       Object.assign(vis, { disco: 1, alma: 1, sub: 1 })
       letras.forEach((l) => mostrar(l, 'on'))
       sub.setText(subtitulo)
@@ -240,7 +241,7 @@ export function criarLogo(cena, area, { titulo, subtitulo, escala = 1 }) {
   }
 
   function batida(n) {
-    if (saindo) return
+    if (saindo || menosMovimento()) return
     pulso = Math.max(pulso, 1)
     if (n % 4 === 1 && vis.disco > 0.9) {
       cena.tweens.killTweensOf(ping)
@@ -265,6 +266,7 @@ export function criarLogo(cena, area, { titulo, subtitulo, escala = 1 }) {
   }
 
   function atualizar(delta) {
+    if (menosMovimento()) delta = 0
     tempo += delta
     pulso *= Math.exp(-delta / 170)
 
@@ -280,7 +282,7 @@ export function criarLogo(cena, area, { titulo, subtitulo, escala = 1 }) {
     if (saindo) ping.setAlpha(Math.min(ping.alpha, vis.tudo))
 
     // falhas e glitch
-    if (ativo) {
+    if (ativo && !menosMovimento() && pref('flashes')) {
       proximaFalha -= delta
       if (proximaFalha <= 0) {
         falhar()

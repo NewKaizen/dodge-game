@@ -1,4 +1,6 @@
 import Phaser from 'phaser'
+import { UI } from '../tema.js'
+import { menosMovimento } from '../preferencias.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 import Controles from '../controles.js'
 import { tocar, pararMusica } from '../audio.js'
@@ -57,21 +59,28 @@ export default class Pausa extends Phaser.Scene {
     this.tweens.add({ targets: veu, alpha: 0.72, duration: 140 })
 
     const painel = this.add.container(cx, ALTURA / 2)
-    const caixa = this.add.rectangle(0, 0, 300, 250, CORES.painel, 0.96).setStrokeStyle(3, CORES.caixa)
+    const caixa = this.add.rectangle(0, 0, 360, 290, UI.painel, 0.98).setStrokeStyle(1, UI.linha)
     const texto = (x, y, conteudo, tamanho, cor = TEXTO.normal) =>
       this.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5)
-    const titulo = texto(0, -94, 'PAUSA', 34, TEXTO.selecionado)
+    const titulo = texto(0, -104, 'RESPIRA.', 38, UI.destaque)
     const sub = texto(0, -64, this.subtitulo, 13, TEXTO.desabilitado)
     this.linhas = OPCOES.map((o, i) => texto(10, -26 + i * 32, o.rotulo, 18))
     this.cursor = this.add.image(0, 0, 'coracao').setTint(CORES.almas[0]).setScale(1.3)
     this.aviso = texto(0, 104, 'C / B: continuar     A: escolher', 12, TEXTO.desabilitado)
-    painel.add([caixa, titulo, sub, ...this.linhas, this.cursor, this.aviso])
+    const detalhe = this.add.rectangle(-178, -104, 3, 48, UI.ciano)
+    this.realcePausa = this.add.rectangle(0, -26, 326, 29, UI.elevado)
+    painel.add([caixa, detalhe, this.realcePausa, titulo, sub, ...this.linhas, this.cursor, this.aviso])
+    this.linhas.forEach((l, i) => {
+      l.setInteractive({ useHandCursor: true })
+      l.on('pointerover', () => { if (!this.emConfig && !this.fechando) { this.indice = i; this.confirmando = false; this.marcar(false) } })
+      l.on('pointerdown', () => { if (!this.emConfig && !this.fechando) { this.indice = i; this.escolher() } })
+    })
     if (this.motivo) painel.add(texto(0, -45, `pausado: ${this.motivo}`, 11, TEXTO.selecionado))
 
     // entra com um "soco" rápido
-    painel.setScale(0.85).setAlpha(0)
-    this.tweens.add({ targets: painel, scale: 1, alpha: 1, duration: 160, ease: 'Back.easeOut' })
-    this.tweens.add({ targets: titulo, scale: 1.06, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+    painel.setScale(menosMovimento() ? 1 : 0.98).setAlpha(0)
+    this.tweens.add({ targets: painel, scale: 1, alpha: 1, duration: 160, ease: 'Cubic.easeOut' })
+
 
     this.controles = new Controles(this)
     // com as configurações abertas por cima, quem ouve os botões é a Config
@@ -101,10 +110,11 @@ export default class Pausa extends Phaser.Scene {
   marcar(comSom) {
     if (comSom) tocar(this, 'mover')
     this.linhas.forEach((l, i) => {
-      l.setColor(i === this.indice ? TEXTO.selecionado : TEXTO.normal)
+      l.setColor(i === this.indice ? UI.destaque : TEXTO.normal)
       if (OPCOES[i].id === 'sair') l.setText(this.confirmando && i === this.indice ? 'TEM CERTEZA? (A)' : OPCOES[i].rotulo)
     })
     const alvo = this.linhas[this.indice]
+    this.realcePausa.setY(alvo.y)
     this.cursor.setPosition(alvo.x - alvo.width / 2 - 18, alvo.y)
   }
 

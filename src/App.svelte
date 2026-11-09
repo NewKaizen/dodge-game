@@ -1,4 +1,5 @@
 <script>
+  import './styles/arcade.css'
   import Conectar from './ui/Conectar.svelte'
   import FotoModal from './ui/FotoModal.svelte'
   import Game from './ui/Game.svelte'
@@ -11,9 +12,16 @@
   iniciarAmigos()
 </script>
 
-<main>
-  <Conectar />
-  <Game />
+<main class="arcade-shell">
+  <header class="arcade-header">
+    <div class="arcade-brand"><span aria-hidden="true">♥</span> DODGE</div>
+    <div class="arcade-toolbar"><Conectar /></div>
+  </header>
+  <div class="arcade-stage"><Game /></div>
+  <footer class="arcade-footer">
+    <span><strong>DESVIE.</strong> JOGUE SUAS CARTAS. SOBREVIVA.</span>
+    <span class="secondary">TECLADO / CONTROLE / JOYSTICK</span>
+  </footer>
   <FotoModal />
 </main>
 
@@ -32,4 +40,7 @@
     gap: 12px;
     padding: 16px;
   }
+
+  :global(body) { background: var(--color-paper); color: var(--color-ink); font-family: var(--font-body); }
+  main.arcade-shell { gap: 10px; padding: 0 16px 12px; }
 </style>

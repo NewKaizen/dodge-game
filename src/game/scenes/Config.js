@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { UI } from '../tema.js'
 import { get } from 'svelte/store'
 import Controles from '../controles.js'
 import { criarFundo } from '../backgrounds/index.js'
@@ -43,23 +44,24 @@ import { rotulo as rotuloJoystick } from '../../lib/joysticks.js'
 const daltonismo = Object.values(import.meta.glob('../daltonismo.js', { eager: true }))[0] ?? null
 
 const REPETIR = { espera: 320, intervalo: 55 } // segurar ←/→ numa barra
-const TITULO = { x: 28, y: 6 }
+const TITULO = { x: 28, y: 10 }
 const ABAS_UI = { y: 54, altura: 26, esquerda: 44, direita: LARGURA - 44, folga: 6, recuo: 22 } // recuo: lugar do coração
 // lista (24..524) e painel (534..830) ocupam o 16:9 com 24 px de folga de cada lado
 const LISTA = { x: 24, y: 78, largura: 500, altura: 358 }
 const PAINEL = { x: 534, y: 78, largura: 296, altura: 358, margem: 14 }
+const ITENS_POR_PAGINA = 7
 const LINHA = { primeira: LISTA.y + 24, passo: 33, rotuloX: 36, direita: LISTA.x + LISTA.largura - 14 }
 const RODAPE = { linha: 446, y: 463 }
 const BARRA = { largura: 140, altura: 10, segmentos: 28 }
 const COR = {
-  borda: CORES.caixa,
-  bordaApagada: 0x4a4a5c,
+  borda: UI.linha,
+  bordaApagada: UI.linha,
   texto: TEXTO.normal,
   apagado: TEXTO.desabilitado,
-  descricao: '#d4d4e4',
+  descricao: UI.secundario,
   ligado: '#7fe08a',
   desligado: '#ff7a7a',
-  barra: 0x6dd0ff,
+  barra: UI.ciano,
   ok: '#7fe08a',
   erro: '#ff7a7a',
 }
@@ -463,6 +465,7 @@ function coresDaPaleta(paleta) {
 // deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do init().
 // Testado em src/game/__tests__/cenasReaproveitadas.test.js.
 const estadoInicial = () => ({
+  paginaLista: 0,
   fundo: null,
   gAbas: null,
   abas: null,
@@ -563,18 +566,22 @@ export default class Config extends Phaser.Scene {
   }
 
   caixa(g, x, y, largura, altura, borda = COR.borda, fundo = CORES.painel, alfa = 0.94) {
-    g.fillStyle(fundo, alfa).fillRect(x, y, largura, altura)
-    g.lineStyle(3, borda, 1).strokeRect(x + 1.5, y + 1.5, largura - 3, altura - 3)
+    g.fillStyle(fundo === CORES.painel ? UI.painel : fundo, alfa).fillRoundedRect(x, y, largura, altura, 4)
+    g.lineStyle(1, borda, 1).strokeRoundedRect(x + 0.5, y + 0.5, largura - 1, altura - 1, 4)
   }
 
   montarMoldura() {
-    const titulo = this.texto(TITULO.x, TITULO.y, 'CONFIGURAÇÕES', 24, TEXTO.selecionado)
-    const sub = this.texto(LARGURA - TITULO.x, TITULO.y + 10, this.sobre ? 'JOGO PAUSADO' : '', 11, COR.apagado).setOrigin(1, 0)
+    const titulo = this.texto(TITULO.x, TITULO.y, 'CONFIGURAÇÕES', 25, UI.texto)
+    const sub = this.texto(LARGURA - TITULO.x, TITULO.y - 2, this.sobre ? 'JOGO PAUSADO' : 'SEU JOGO. DO SEU JEITO.', 11, COR.apagado).setOrigin(1, 0)
     const g = this.add.graphics()
     this.caixa(g, LISTA.x, LISTA.y, LISTA.largura, LISTA.altura)
     this.caixa(g, PAINEL.x, PAINEL.y, PAINEL.largura, PAINEL.altura)
     g.lineStyle(1, 0xffffff, 0.15).lineBetween(LISTA.x, RODAPE.linha, PAINEL.x + PAINEL.largura, RODAPE.linha)
-    this.tela.add([g, titulo, sub])
+    g.fillStyle(UI.ciano).fillRect(LISTA.x, LISTA.y, 52, 3)
+    g.fillStyle(UI.coral).fillRect(PAINEL.x, PAINEL.y, 40, 3)
+    const voltar = this.texto(LARGURA - 28, 36, 'VOLTAR ↗', 10, UI.destaque).setOrigin(1, 1).setInteractive({ useHandCursor: true })
+    voltar.on('pointerdown', () => { if (!this.esperando && !this.saindo) this.sair() })
+    this.tela.add([g, titulo, sub, voltar])
   }
 
   // abas lado a lado ocupando a largura toda; a fonte encolhe se não couber
@@ -597,6 +604,13 @@ export default class Config extends Phaser.Scene {
     this.abas = ABAS.map((a, i) => {
       const largura = Math.round(textos[i].width + ABAS_UI.recuo + 10 + extra)
       const t = textos[i].setX(Math.round(x + ABAS_UI.recuo + (largura - ABAS_UI.recuo - 10 - textos[i].width) / 2))
+      const zona = this.add.zone(x, ABAS_UI.y - ABAS_UI.altura / 2, largura, ABAS_UI.altura).setOrigin(0).setInteractive({ useHandCursor: true })
+      zona.on('pointerdown', () => {
+        if (this.esperando || this.saindo) return
+        this.foco = 'abas'
+        this.trocarAba(i - this.aba)
+      })
+      this.tela.add(zona)
       const aba = { x, largura, texto: t }
       x += largura + ABAS_UI.folga
       return aba
@@ -611,28 +625,61 @@ export default class Config extends Phaser.Scene {
     this.tela.add(this.camadaLista)
     this.realce = this.add.graphics()
     this.camadaLista.add(this.realce)
+    const paginada = this.itens.length > 9
+    this.paginaLista = paginada ? Math.floor(this.indice / ITENS_POR_PAGINA) : 0
+    const inicio = this.paginaLista * ITENS_POR_PAGINA
     let y = LINHA.primeira
     this.linhas = this.itens.map((item, i) => {
-      if (item.tipo === 'acao' && i > 0) y += 8 // um respiro antes do "restaurar"
+      if (paginada && (i < inicio || i >= inicio + ITENS_POR_PAGINA)) return null
+      if (item.tipo === 'acao' && i > inicio) y += 8 // um respiro antes do "restaurar"
       const rotulo = this.texto(LISTA.x + LINHA.rotuloX, y, item.rotulo, 14).setOrigin(0, 0.5)
       const g = this.add.graphics()
       const valor = this.texto(LINHA.direita, y, '', 13).setOrigin(1, 0.5)
       this.camadaLista.add([rotulo, g, valor])
       const linha = { item, y, rotulo, g, valor, extras: [] }
-      if (item.tipo === 'acao' && i > 0) {
+      const zona = this.add.zone(LISTA.x + 8, y - 15, LISTA.largura - 16, 30).setOrigin(0).setInteractive({ useHandCursor: true })
+      zona.on('pointerover', () => {
+        if (this.esperando || this.saindo) return
+        this.foco = 'lista'
+        this.indice = i
+        this.desenhar()
+      })
+      zona.on('pointerdown', (pointer, localX) => {
+        if (this.esperando || this.saindo) return
+        this.foco = 'lista'
+        this.indice = i
+        if (item.tipo === 'barra' || item.tipo === 'opcoes') this.ajustar(localX < (LISTA.largura - 16) * 0.64 ? -1 : 1)
+        else this.apertar('A')
+        this.desenhar()
+      })
+      this.camadaLista.add(zona)
+      if (item.tipo === 'acao' && i > inicio) {
         const sep = this.add.graphics().lineStyle(1, 0xffffff, 0.18).lineBetween(LISTA.x + 14, y - 20, LISTA.x + LISTA.largura - 14, y - 20)
         this.camadaLista.add(sep)
       }
       y += LINHA.passo
       return linha
     })
+    if (paginada) {
+      const total = Math.ceil(this.itens.length / ITENS_POR_PAGINA)
+      const base = LISTA.y + LISTA.altura - 19
+      const meio = LISTA.x + LISTA.largura / 2
+      this.camadaLista.add(this.texto(meio, base, `PÁGINA ${this.paginaLista + 1} / ${total}`, 12, UI.secundario).setOrigin(0.5))
+      for (const passo of [-1, 1]) {
+        const destino = this.paginaLista + passo
+        if (destino < 0 || destino >= total) continue
+        const botao = this.texto(meio + passo * 110, base, passo > 0 ? 'PRÓXIMA ▶' : '◀ ANTERIOR', 12, UI.destaque).setOrigin(0.5).setInteractive({useHandCursor:true})
+        botao.on('pointerdown', () => { if (!this.esperando && !this.saindo) this.entrarNaLista(destino * ITENS_POR_PAGINA) })
+        this.camadaLista.add(botao)
+      }
+    }
   }
 
   montarPainel() {
     const x = PAINEL.x + PAINEL.margem
     const largura = PAINEL.largura - PAINEL.margem * 2
     this.painel = {
-      titulo: this.texto(x, PAINEL.y + 14, '', 15, TEXTO.selecionado, { wordWrap: { width: largura } }),
+      titulo: this.texto(x, PAINEL.y + 14, '', 15, UI.destaque, { wordWrap: { width: largura } }),
       linha: this.add.graphics(),
       corpo: this.texto(x, 0, '', 12, COR.descricao, { wordWrap: { width: largura }, lineSpacing: 4 }),
       extra: this.add.container(0, 0),
@@ -886,8 +933,9 @@ export default class Config extends Phaser.Scene {
 
   desenhar() {
     if (!this.linhas) return
+    if (this.itens.length > 9 && this.paginaLista !== Math.floor(this.indice / ITENS_POR_PAGINA)) this.montarLista()
     this.desenharAbas()
-    this.linhas.forEach((l, i) => this.desenharLinha(l, this.foco === 'lista' && i === this.indice))
+    this.linhas.forEach((l, i) => l && this.desenharLinha(l, this.foco === 'lista' && i === this.indice))
     this.desenharRealce()
     this.desenharPainel()
     this.desenharRodape()
@@ -899,9 +947,9 @@ export default class Config extends Phaser.Scene {
     this.abas.forEach((a, i) => {
       const ativa = i === this.aba
       const y = ABAS_UI.y - ABAS_UI.altura / 2
-      if (ativa) this.caixa(g, a.x, y, a.largura, ABAS_UI.altura, naBarra ? CORES.selecionado : COR.borda, CORES.painel, 0.96)
+      if (ativa) this.caixa(g, a.x, y, a.largura, ABAS_UI.altura, naBarra ? UI.ciano : COR.borda, UI.elevado, 0.96)
       else this.caixa(g, a.x, y, a.largura, ABAS_UI.altura, COR.bordaApagada, 0x000000, 0.6)
-      a.texto.setColor(ativa ? (naBarra ? TEXTO.selecionado : COR.texto) : COR.apagado)
+      a.texto.setColor(ativa ? UI.destaque : COR.apagado)
     })
     // ◀ ▶ nas pontas: ←/→ troca de aba
     const cor = naBarra ? CORES.selecionado : 0x707080
@@ -922,7 +970,8 @@ export default class Config extends Phaser.Scene {
     const g = this.realce.clear()
     if (this.foco !== 'lista') return
     const l = this.linhas[this.indice]
-    g.fillStyle(0xffffff, 0.07).fillRect(LISTA.x + 8, l.y - 14, LISTA.largura - 16, 28)
+    g.fillStyle(UI.elevado, 1).fillRoundedRect(LISTA.x + 8, l.y - 14, LISTA.largura - 16, 28, 3)
+    g.fillStyle(UI.ciano).fillRect(LISTA.x + 8, l.y - 14, 3, 28)
   }
 
   desenharLinha(l, ativo) {
@@ -930,7 +979,7 @@ export default class Config extends Phaser.Scene {
     l.extras.forEach((o) => o.destroy())
     l.extras = []
     const g = l.g.clear()
-    const corRotulo = ativo ? TEXTO.selecionado : COR.texto
+    const corRotulo = ativo ? UI.destaque : COR.texto
     l.rotulo.setColor(corRotulo).setFontSize(14)
     l.valor.setText('').setX(LINHA.direita).setColor(COR.texto)
     let esquerdaDoValor = LINHA.direita
@@ -947,7 +996,7 @@ export default class Config extends Phaser.Scene {
       const frac = (v - item.min) / (item.max - item.min)
       const cheios = Math.round(frac * BARRA.segmentos)
       const seg = largura / BARRA.segmentos
-      const cor = mudo ? 0x606070 : ativo ? CORES.selecionado : COR.barra
+      const cor = mudo ? 0x606070 : ativo ? UI.ciano : COR.barra
       for (let k = 0; k < BARRA.segmentos; k++) {
         g.fillStyle(k < cheios ? cor : 0xffffff, k < cheios ? 1 : 0.1)
         g.fillRect(Math.round(x + k * seg), l.y - BARRA.altura / 2, Math.max(1, Math.round(seg) - 1), BARRA.altura)
@@ -1061,7 +1110,7 @@ export default class Config extends Phaser.Scene {
         acessibilidade: 'Menos tremores, clarões e animações, e cores para daltonismo.',
         graficos: 'Qualidade dos gráficos: partículas, fundos animados e filtros.',
       }[aba.id]
-      corpo += '\n\nEsquerda/direita: troca de aba.\nBaixo ou A: entra na lista.'
+      corpo += '\n\nClique em uma opção ou use\nas setas e A para escolher.'
     } else {
       titulo = item.titulo ?? item.rotulo
       const v = item.ler?.(this)
@@ -1231,7 +1280,7 @@ export default class Config extends Phaser.Scene {
     if (this.saindo) return
     if (this.esperando) {
       // pisca o "aperte uma tecla…"
-      const l = this.linhas.find((x) => x.item.acao === this.esperando.acao)
+      const l = this.linhas.find((x) => x?.item.acao === this.esperando.acao)
       if (l) l.valor.setColor(Math.floor(time / 380) % 2 === 0 ? TEXTO.selecionado : COR.texto)
     } else {
       for (let j = 0; j < this.controles.numJogadores; j++) this.direcao(j, this.controles.toque(j), time)

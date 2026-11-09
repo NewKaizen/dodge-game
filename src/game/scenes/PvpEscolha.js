@@ -1,4 +1,7 @@
+import { iconeDoPersonagem } from '../arte/icones.js'
+import { arteElenco, vagaNoPalco } from '../arte/elenco.js'
 import Phaser from 'phaser'
+import { UI, detalheCarta } from '../tema.js'
 import Controles from '../controles.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { PERSONAGENS_PVP } from '../pvp/cartas.js'
@@ -16,7 +19,7 @@ import { montarAvisos } from '../conta/avisos.js'
 import { pedirP2, dicaDoP2 } from '../jogadoresLocais.js'
 
 // Área da grade de personagens e dos painéis de cada jogador (px)
-const GRADE = { topo: 62, base: 190, esquerda: 40, direita: LARGURA - 40, espaco: 8, larguraMax: 104, alturaMax: 128 }
+const GRADE = { topo: 72, base: 182, esquerda: 171, direita: LARGURA - 171, espaco: 8, larguraMax: 104, alturaMax: 128 }
 const PAINEL = { y: 198, altura: 250, espaco: 8 }
 const CHAVE_SALVA = 'dodge-pvp' // última escolha (também fica no registry 'pvp')
 const CHAVE_NIVEL = 'dodge-pvp-cpu' // nível da CPU (também fica no registry 'pvpNivelBot')
@@ -97,9 +100,10 @@ export default class PvpEscolha extends Phaser.Scene {
     this.fundo = criarFundo(this, 'queen')
     this.fundo.escurecer()
 
-    this.texto(LARGURA / 2, 22, 'PVP  ·  ESCOLHA O LUTADOR', 24, TEXTO.normal, { strokeThickness: 4 })
+    this.texto(LARGURA / 2, 22, 'VERSUS  /  ESCOLHA SEU LUTADOR', 24, TEXTO.normal, { strokeThickness: 4 })
     this.status = this.texto(LARGURA / 2, 46, '', 13, TEXTO.selecionado)
 
+    this.palcos = [vagaNoPalco(this,85,162,132,'LADO 01'), vagaNoPalco(this,LARGURA-85,162,132,'LADO 02',true)]
     this.montarGrade()
 
     const anterior = this.ultimaEscolha()
@@ -226,9 +230,10 @@ export default class PvpEscolha extends Phaser.Scene {
       const naLinha = Math.min(this.colunas, n - linha * this.colunas)
       const x = LARGURA / 2 + (coluna - (naLinha - 1) / 2) * (largura + g.espaco)
       const y = topo + linha * (altura + g.espaco) + altura / 2
-      const moldura = this.add.rectangle(x, y, largura, altura, CORES.painel, 0.88).setStrokeStyle(2, def.cor, 0.55)
-      const sprite = this.add.image(x, y - 8, id)
-      sprite.escalaBase = Math.max(1, Math.floor(Math.min((largura - 16) / sprite.width, (altura - 44) / sprite.height)))
+      const moldura = this.add.rectangle(x, y, largura, altura, UI.painel, 0.98).setStrokeStyle(1, def.cor, 0.7)
+      detalheCarta(this, x, y, largura, altura, def.cor)
+      const sprite = this.add.image(x, y - 9, iconeDoPersonagem(id))
+      sprite.escalaBase = Math.min((largura - 4) / sprite.width, (altura - 26) / sprite.height)
       sprite.setScale(sprite.escalaBase)
       this.texto(x, y + altura / 2 - 13, def.nome.toUpperCase(), def.nome.length <= 6 ? 14 : 12, corTexto(def.cor))
       // selos "P1"/"P2" de quem confirmou, no canto do jogador (no lugar do coração)
@@ -245,12 +250,12 @@ export default class PvpEscolha extends Phaser.Scene {
   // Um painel por jogador: o personagem em foco no cursor dele
   montarPaineis() {
     const p = PAINEL
-    const largura = (GRADE.direita - GRADE.esquerda - p.espaco) / 2
+    const largura = (LARGURA - 80 - p.espaco) / 2
     const estilo = (tamanho, cor = TEXTO.normal) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor })
     this.paineis = [0, 1].map((j) => {
-      const x = GRADE.esquerda + j * (largura + p.espaco)
+      const x = 40 + j * (largura + p.espaco)
       const y = p.y
-      const moldura = this.add.rectangle(x, y, largura, p.altura, CORES.painel, 0.92).setOrigin(0).setStrokeStyle(2, CORES.almas[j], 0.85)
+      const moldura = this.add.rectangle(x, y, largura, p.altura, UI.painel, 0.98).setOrigin(0).setStrokeStyle(2, CORES.almas[j], 0.85)
       this.add.rectangle(x + 8, y + 8, 30, 20, CORES.almas[j]).setOrigin(0)
       this.add.text(x + 23, y + 18, this.rotulo(j), estilo(14, '#000000')).setOrigin(0.5)
       const nome = this.add.text(x + 46, y + 7, '', estilo(19))
@@ -416,6 +421,7 @@ export default class PvpEscolha extends Phaser.Scene {
 
   atualizarTela() {
     const { largura, altura } = this.card
+    this.palcos.forEach((p,j) => p.mostrar(this.confirmados[j] || this.ids[this.cursores[j].indice], Boolean(this.confirmados[j])))
     this.cards.forEach((c) => {
       const donos = [0, 1].filter((j) => this.confirmados[j] === c.id)
       c.selos.forEach((s, j) => {
@@ -495,7 +501,7 @@ export default class PvpEscolha extends Phaser.Scene {
     p.estiloFrase.setX(p.estiloRotulo.x + p.estiloRotulo.width + 8)
     caber(p.estiloFrase, perfil.estilo.frase, p.x + p.largura - 10 - p.estiloFrase.x, 12)
 
-    p.sprite.setTexture(id).setScale(3).clearTint()
+    p.sprite.setTexture(arteElenco(id)).setDisplaySize(68,86).clearTint()
     this.tweens.killTweensOf(p.sprite)
     p.sprite.setY(p.y + 150).setAlpha(0).setX(p.x + 36)
     this.tweens.add({ targets: p.sprite, x: p.x + 48, alpha: 1, duration: 140, ease: 'Quad.easeOut' })
@@ -567,7 +573,7 @@ export default class PvpEscolha extends Phaser.Scene {
       const lado = j === 0 ? -1 : 1
       const x = CENTRO_X + lado * 200
       const sombra = this.add.ellipse(x, chao + 3, 80, 16, 0x000000, 0.6).setDepth(topo + 4)
-      const sprite = this.add.image(x, chao, id).setOrigin(0.5, 1).setScale(5).setDepth(topo + 5).setFlipX(j === 1)
+      const sprite = this.add.image(x, chao, arteElenco(id,'guarda')).setOrigin(0.5, 1).setDisplaySize(190,241).setDepth(topo + 5).setFlipX(j === 1)
       const etiqueta = this.add
         .text(x, chao + 26, this.rotulo(j), { fontFamily: FONTE, fontSize: '18px', color: TEXTO_JOGADOR[j], stroke: '#000000', strokeThickness: 4 })
         .setOrigin(0.5)
@@ -619,7 +625,7 @@ export default class PvpEscolha extends Phaser.Scene {
           this.tweens.add({ targets: vs, scale: 1.08, duration: 260, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
           // os dois dão um passo à frente, encarando
           lutadores.forEach(({ sprite, lado }) =>
-            this.tweens.add({ targets: sprite, x: sprite.x - lado * 18, scaleY: 5.4, duration: 110, yoyo: true, ease: 'Quad.easeOut' }),
+            this.tweens.add({ targets: sprite, x: sprite.x - lado * 18, scaleY: sprite.scaleY * 1.08, duration: 110, yoyo: true, ease: 'Quad.easeOut' }),
           )
         },
       })
@@ -676,9 +682,6 @@ export default class PvpEscolha extends Phaser.Scene {
       const y = c.y - this.card.altura / 2 + 13
       cur.coracao.setPosition(x, y + Math.sin(time / 200 + j) * 2)
     })
-    // o lutador em foco respira no painel
-    this.paineis.forEach((p) => {
-      if (!this.tweens.isTweening(p.sprite)) p.sprite.setScale(3, 3 + Math.sin(time / 260) * 0.06)
-    })
+    this.palcos.forEach(p => p.atualizar(time))
   }
 }

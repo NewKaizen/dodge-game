@@ -79,4 +79,8 @@
     pointer-events: none;
     z-index: 2;
   }
+
+  .jogo { border: 1px solid var(--color-rule); box-shadow: 0 16px 60px var(--color-shadow); line-height: 0; }
+  .jogo :global(canvas) { display: block; }
+  .jogo:fullscreen { border: 0; box-shadow: none; }
 </style>

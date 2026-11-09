@@ -1,0 +1,21 @@
+/* Hallmark · macrostructure: game cockpit · tone: vibrant arcade · anchor hue: cyan
+ * pre-emit critique: P4 H4 E4 S5 R4 V4 */
+:root {
+  --color-paper: oklch(14% .025 270);
+  --color-panel: oklch(19% .03 270);
+  --color-raised: oklch(25% .04 270);
+  --color-ink: oklch(96% .01 250);
+  --color-muted: oklch(73% .035 260);
+  --color-accent: oklch(85% .14 185);
+  --color-coral: oklch(70% .2 15);
+  --color-rule: oklch(34% .04 270);
+  --color-shadow: oklch(7% .02 270 / .65);
+  --font-display: 'Pixelify Sans', monospace;
+  --font-body: 'Trebuchet MS', sans-serif;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --radius-sm: 4px;
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+  --dur-fast: 140ms;
+}

@@ -1,16 +1,17 @@
 import Phaser from 'phaser'
+import { UI } from '../tema.js'
 import { get } from 'svelte/store'
 import { irCarregando } from '../carregando.js'
 import Controles from '../controles.js'
 import { tocar, musica } from '../audio.js'
 import { ASSETS } from '../assets.js'
-import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
-import { BATIDA, TELA, LOGO, OPCOES as POS_SALA, LOGO_MESA, OPCOES_MESA } from '../menu/layout.js'
+import { FONTE, LARGURA, ALTURA } from '../constants.js'
+import { BATIDA, TELA } from '../menu/layout.js'
 import { criarSala } from '../menu/sala.js'
 import { criarTelao } from '../menu/telao.js'
 import { criarLogo } from '../menu/logo.js'
 import { criarMesa } from '../menu/mesa.js'
-import { pref, definirPref } from '../preferencias.js'
+import { pref, definirPref, menosMovimento } from '../preferencias.js'
 import { souHost, salaDoLink, siteNaInternet } from '../../lib/lan/rede.js'
 import { conta } from '../../lib/conta.js'
 import { serialSuportado, listarJoysticks } from '../../lib/serial.js'
@@ -68,6 +69,9 @@ const montarLista = (comContas) => (comContas ? [RAPIDO, CAMPANHA, CO_OP, PVP, O
 // deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do create().
 // Testado em src/game/__tests__/cenasReaproveitadas.test.js.
 const estadoInicial = () => ({
+  realceMenu: null,
+  modoTitulo: null,
+  modoDescricao: null,
   sala: null,
   telao: null,
   painel: null,
@@ -106,9 +110,8 @@ export default class Menu extends Phaser.Scene {
 
     // o cenário: a MESA DE CARTAS (padrão) ou a SALA DE TV (Config > Gráficos > MENU INICIAL)
     const mesa = pref('menu') === 'mesa'
-    this.pos = mesa ? OPCOES_MESA : POS_SALA
-    // 8 linhas (com CAMPANHA): um pouco mais juntas e subindo, para a dica de baixo caber na tela
-    if (this.opcoes.length > 7) this.pos = { ...this.pos, y: this.pos.y - 24, passo: 25 }
+    this.pos = { x: 48, y: 216, passo: this.opcoes.length > 6 ? 25 : 34 }
+    this.ponteiro = false
     if (mesa) {
       this.sala = criarMesa(this)
       this.telao = this.sala.telao
@@ -116,7 +119,8 @@ export default class Menu extends Phaser.Scene {
       this.sala = criarSala(this, { tela: TELA })
       this.telao = criarTelao(this, TELA)
     }
-    const area = mesa ? LOGO_MESA : LOGO
+    this.montarPortal()
+    const area = { x: 32, y: 26, escala: 0.92 }
     this.logo = criarLogo(this, area, { titulo: TITULO, subtitulo: SUBTITULO, escala: area.escala ?? 1 })
     this.montarOpcoes()
     this.montarCantos()
@@ -159,7 +163,7 @@ export default class Menu extends Phaser.Scene {
   }
 
   batida() {
-    if (this.saindo) return
+    if (this.saindo || menosMovimento()) return
     const n = ++this.batidas
     this.telao.batida(n)
     this.sala.batida(n)
@@ -169,14 +173,50 @@ export default class Menu extends Phaser.Scene {
 
   // ---------- opções (alinhadas à esquerda, cada uma com a sua cor) ----------
 
+  montarPortal() {
+    const g = this.add.graphics().setDepth(19)
+    // Uma superfície própria mantém o menu legível sem apagar a ilustração.
+    g.fillStyle(UI.fundo, 0.97).fillRect(0, 0, 304, ALTURA)
+    for (let i = 0; i < 48; i++) g.fillStyle(UI.fundo, 0.65 * (1 - i / 48)).fillRect(304 + i, 0, 1, ALTURA)
+    g.lineStyle(1, UI.linha, 0.9).lineBetween(24, 174, 276, 174)
+    g.fillStyle(UI.ciano).fillRect(24, 174, 56, 2)
+    g.fillStyle(UI.coral).fillRect(24, 24, 4, 12)
+    const estilo = { fontFamily: FONTE, fontSize: '10px', color: UI.secundario }
+    this.add.text(38, 25, 'CARTAS. CAOS. CORAGEM.', estilo).setDepth(30).setLetterSpacing(1)
+    this.add.text(32, 188, 'ESCOLHA SEU PRÓXIMO DESAFIO', estilo).setDepth(30)
+    g.fillStyle(UI.fundo, 0.9).fillRoundedRect(364, 359, 458, 82, 6)
+    g.fillStyle(UI.ciano).fillRect(364, 371, 3, 58)
+    this.modoTitulo = this.add.text(382, 372, '', { fontFamily: FONTE, fontSize: '23px', color: UI.texto }).setDepth(30)
+    this.modoDescricao = this.add.text(382, 405, '', { ...estilo, fontSize: '13px', wordWrap: { width: 416 }, lineSpacing: 3 }).setDepth(30)
+  }
+
   montarOpcoes() {
-    this.painel = this.add.container(-40, 0).setDepth(30).setAlpha(0)
-    const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 5 })
-    const tamanho = this.opcoes.length > 7 ? 22 : this.opcoes.length > 5 ? 24 : 26 // com JOGAR RÁPIDO, CAMPANHA e PERFIL são 8 linhas na mesma tinta da mesa
-    this.linhas = this.opcoes.map((o, i) => this.add.text(this.pos.x, this.pos.y + i * this.pos.passo, o.rotulo, estilo(tamanho, o.cor)).setOrigin(0, 0.5))
-    this.seta = this.add.text(0, 0, '◀', estilo(22, '#ffffff')).setOrigin(0, 0.5)
-    this.aviso = this.add.text(this.pos.x, this.pos.y + this.opcoes.length * this.pos.passo - 6, '', { ...estilo(12, TEXTO.desabilitado), lineSpacing: 4 }).setOrigin(0, 0)
-    this.miniatura = null // o avatar de quem está logado, ao lado do PERFIL
+    this.painel = this.add.container(-16, 0).setDepth(30).setAlpha(0)
+    this.realceMenu = this.add.graphics()
+    this.painel.add(this.realceMenu)
+    const tamanho = this.opcoes.length > 6 ? 18 : 22
+    this.linhas = this.opcoes.map((o, i) => {
+      const y = this.pos.y + i * this.pos.passo
+      const zona = this.add.zone(24, y - this.pos.passo / 2, 258, this.pos.passo).setOrigin(0).setInteractive({ useHandCursor: true })
+      zona.on('pointerover', () => {
+        if (!this.pronto || this.saindo) return
+        this.ponteiro = true
+        if (this.indice !== i) this.selecionar(i)
+        else this.atualizarOpcoes()
+      })
+      zona.on('pointerdown', () => {
+        if (!this.pronto || this.saindo) return
+        this.ponteiro = true
+        this.indice = i
+        this.atualizarOpcoes()
+        this.confirmar()
+      })
+      this.painel.add(zona)
+      return this.add.text(this.pos.x, y, o.rotulo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: UI.texto }).setOrigin(0, 0.5)
+    })
+    this.seta = this.add.text(260, 0, '›', { fontFamily: FONTE, fontSize: '24px', color: UI.destaque }).setOrigin(0.5)
+    this.aviso = this.add.text(32, 425, '', { fontFamily: FONTE, fontSize: '11px', color: UI.secundario, wordWrap: { width: 248 }, lineSpacing: 3 })
+    this.miniatura = null
     this.painel.add([...this.linhas, this.seta, this.aviso])
   }
 
@@ -203,21 +243,22 @@ export default class Menu extends Phaser.Scene {
   }
 
   get conectado() {
-    return Boolean(this.registry.get('conectado'))
+    return this.ponteiro || Boolean(this.registry.get('conectado'))
   }
 
   atualizarOpcoes() {
-    const ativo = this.conectado
+    const opcao = this.opcoes[this.indice]
     this.linhas.forEach((l, i) => {
-      const sel = i === this.indice
-      l.setColor(ativo ? this.opcoes[i].cor : '#5a5a6a').setAlpha(ativo ? (sel ? 1 : 0.55) : 0.8)
-      l.setX(this.pos.x + (sel && ativo ? 8 : 0))
+      l.setColor(i === this.indice ? UI.destaque : UI.texto).setAlpha(i === this.indice ? 1 : 0.78)
+      l.setX(this.pos.x)
     })
     const l = this.linhas[this.indice]
-    this.seta.setVisible(ativo).setColor(this.opcoes[this.indice].cor).setPosition(this.pos.x + 8 + l.width + 12, l.y)
-    this.aviso
-      .setText(ativo ? this.dicaDe(this.opcoes[this.indice]) : 'aperte uma tecla ou um botão do\ncontrole para começar')
-      .setColor(ativo ? '#9a9ab0' : TEXTO.desabilitado)
+    this.realceMenu.clear().fillStyle(UI.elevado, 1).fillRoundedRect(24, l.y - this.pos.passo / 2 + 1, 258, this.pos.passo - 2, 3)
+    this.realceMenu.fillStyle(UI.ciano).fillRect(24, l.y - this.pos.passo / 2 + 1, 3, this.pos.passo - 2)
+    this.seta.setVisible(true).setPosition(266, l.y)
+    this.aviso.setText(this.conectado ? '↑↓ escolher · A confirmar  ou clique' : 'Clique para escolher ou conecte\num teclado / controle.').setColor(UI.secundario)
+    this.modoTitulo.setText(opcao.rotulo).setColor(opcao.cor)
+    this.modoDescricao.setText(this.dicaDe(opcao))
     this.atualizarMiniatura()
   }
 
@@ -252,7 +293,7 @@ export default class Menu extends Phaser.Scene {
   montarDicaUsb() {
     if (!dicaJoystickUsbVisivel()) return
     this.dicaUsb = this.add
-      .text(LARGURA - 14, ALTURA - 44, 'Joystick USB? CONFIGURAÇÕES → GAMEPAD', { fontFamily: FONTE, fontSize: '11px', color: '#c8c8d8', backgroundColor: 'rgba(0,0,0,0.45)', padding: { x: 6, y: 3 } })
+      .text(LARGURA - 14, ALTURA - 132, 'JOYSTICK USB · CONFIGURAÇÕES → GAMEPAD', { fontFamily: FONTE, fontSize: '11px', color: '#c8c8d8', backgroundColor: 'rgba(0,0,0,0.45)', padding: { x: 6, y: 3 } })
       .setOrigin(1, 0.5)
       .setDepth(30)
   }
@@ -299,6 +340,6 @@ export default class Menu extends Phaser.Scene {
     this.sala.atualizar(delta)
     this.telao.atualizar(delta)
     this.logo.atualizar(delta)
-    if (this.pronto && !this.saindo && this.seta.visible) this.seta.setX(this.pos.x + 8 + this.linhas[this.indice].width + 12 + Math.sin(time / 160) * 3)
+    if (this.pronto && !this.saindo && this.seta.visible) this.seta.setX(266 + (menosMovimento() ? 0 : Math.sin(time / 250) * 2))
   }
 }
