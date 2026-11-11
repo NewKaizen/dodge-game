@@ -114,6 +114,11 @@
 // rodado AQUI, no servidor (mão, energia, CPU, sementes e acertos refeitos pelas posições do coração).
 // Só com conta. `campanha {acao, ...}` vai para o campanha.js; quem cai, sai ou troca de conta
 // abandona a corrida (sem recompensa).
+//
+// DESAFIO DIÁRIO e CONQUISTAS (PROTOCOLO 17, docs/desafio-diario.md): o desafio do dia é uma corrida
+// do campanha.js (`campanha {acao: 'desafio' | 'comecarDesafio'}`; convidado também joga, sem
+// recompensa). `conquistas` pede as conquistas e a maestria da conta (resposta `conquistasEstado`); o
+// servidor avisa as novas com `conquistas {novas, itensNovos, maestria}` (server/conquistas.js).
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
@@ -123,6 +128,7 @@ import { CONVITE_MS, CONVITES_POR_MINUTO, MAX_CONVITES_RECEBIDOS } from './amigo
 import { criarFila, agendarPadrao, ACOES_FILA_POR_MINUTO, REVANCHE_MS, FOLGA_PING_MS, CASUAL_INICIO_MS, EVITAR_PAR_MS } from './fila.js'
 import { criarPartidas } from './partidas.js'
 import { criarCampanha } from './campanha.js'
+import { criarConquistas } from './conquistas.js'
 import { elegerHost, lerDiretos, ELEICAO_MS } from './eleicao.js'
 import { METRICAS_NULA } from './metricas.js'
 import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
@@ -130,7 +136,7 @@ import { nomeSeguro } from '../src/lib/contaRegras.js'
 import { arranjoValido } from '../src/lib/times2x2.js'
 import { infoSemanal } from '../src/lib/semanal.js'
 
-export const PROTOCOLO = 16
+export const PROTOCOLO = 17
 export const PORTA_DESCOBERTA = 47777
 // Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
 // aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")
@@ -267,9 +273,11 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
     const outro = x.conta ? presenca.get(x.conta) : null
     if (outro) enviar(outro, msg)
   }
-  const partidas = criarPartidas({ registro, agora, agendar, entregar, log, versao: PROTOCOLO, metricas })
-  // CAMPANHA: a partida single-player que o servidor roda (o envio é direto para a conexão)
-  const campanha = criarCampanha({ registro, agora, agendar, enviar: (c, msg) => c && enviar(c, msg), log })
+  // CONQUISTAS e MAESTRIA (4B): os eventos que o servidor já conhece (partidas, campanha, desafio)
+  const conquistas = criarConquistas({ registro, log })
+  const partidas = criarPartidas({ registro, agora, agendar, entregar, log, versao: PROTOCOLO, metricas, conquistas })
+  // CAMPANHA (e o DESAFIO DIÁRIO): a partida single-player que o servidor roda (o envio é direto para a conexão)
+  const campanha = criarCampanha({ registro, agora, agendar, enviar: (c, msg) => c && enviar(c, msg), log, conquistas })
   const saiuDaConta = new Map() // conta -> quando caiu (só para contar reconexões; nada por jogador sai daqui)
   const retomadas = new Map() // chave de retomada -> cliente
   const limiteRetomada = criarLimite({ max: RETOMADAS_POR_MINUTO, agora })
@@ -1226,6 +1234,21 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
     // CAMPANHA: a partida single-player rodada aqui (server/campanha.js)
     campanha(c, m) {
       campanha.receber(c, m)
+    },
+    // CONQUISTAS e MAESTRIA da conta (a Coleção); no máximo um pedido a cada 2 s por conexão
+    conquistas(c) {
+      const t = agora()
+      if (t - (c.pedidoConquistas ?? -Infinity) < 2000) return
+      c.pedidoConquistas = t
+      if (!c.usuario) return enviar(c, { t: 'conquistasEstado', convidado: true, conquistas: [], maestria: [] })
+      const usuario = c.usuario
+      conquistas
+        .estado(usuario)
+        .then((e) => c.usuario === usuario && enviar(c, { t: 'conquistasEstado', convidado: false, conquistas: e.conquistas, maestria: e.maestria }))
+        .catch((e) => {
+          log(`[conquistas] estado: ${e.message}`)
+          enviar(c, { t: 'conquistasEstado', convidado: false, erro: 'não deu para carregar as conquistas agora', conquistas: [], maestria: [] })
+        })
     },
     // fim da partida: o que este cliente viu (uma vez por partida; server/partidas.js decide)
     resultado(c, m) {

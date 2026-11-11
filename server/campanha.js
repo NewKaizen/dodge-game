@@ -25,6 +25,18 @@
 //                        campanhaFim {corrida, resultado, motivo, estrelas, xpGanho, ..., progresso}
 //                        campanhaErro {motivo, msg, corrida?}
 //
+// DESAFIO DIÁRIO (Fase 4A, docs/desafio-diario.md): a MESMA corrida, com a luta montada pela definição
+// do dia (src/lib/desafio.js, pelo relógio DESTE servidor; vira à meia-noite de São Paulo). Convidado
+// também joga (sem recompensa e sem recorde). No fim, conceder_desafio (0013) grava os pontos que o
+// SERVIDOR calculou (campanha/luta.js resumoDaLuta) e dá a recompensa principal UMA vez por dia.
+//   cliente -> servidor  campanha {acao: 'desafio'}                     o estado do dia
+//                        campanha {acao: 'comecarDesafio', dia}         (dia: o que a tela mostra)
+//                        (e as mesmas carta / posicoes / fimEsquiva / desistir)
+//   servidor -> cliente  desafioEstado {dia, desafio, convidado, recorde, concluido, diasSemana, meta,
+//                                       cosmetico, cosmeticoGanho, amigos, xp, restanteMs}
+//                        campanhaInicio {..., desafio: id} · campanhaFim {..., desafio: {...}}
+// CONQUISTAS (4B, server/conquistas.js): no fim de cada corrida com conta, um evento (`conquistas`).
+//
 // Queda de conexão: a corrida é ABANDONADA na hora (sem recompensa). É single-player: não há outro
 // lado esperando, e retomar uma esquiva no meio exigiria confiar no relógio do navegador.
 //
@@ -32,7 +44,9 @@
 //   campanha.receber(cliente, m) · campanha.saiu(cliente, motivo) · campanha.fechar()
 import crypto from 'node:crypto'
 import { agendarPadrao } from './fila.js'
-import { criarLuta, comecarRodada, jogar, concluirEsquiva, estrelasDaLuta } from '../src/game/campanha/luta.js'
+import { criarLuta, comecarRodada, jogar, concluirEsquiva, estrelasDaLuta, resumoDaLuta } from '../src/game/campanha/luta.js'
+import { diaDoDesafio, desafioDoDia, cosmeticoDaSemana, XP_DESAFIO, DIAS_COSMETICO_SEMANA, ID_DIA } from '../src/lib/desafio.js'
+import { msgConquistas } from './conquistas.js'
 import { ler, MAX_AMOSTRAS_QUADRO } from '../src/game/campanha/amostras.js'
 import { mundoDe, faseDe, faseLiberada, TEXTOS } from '../src/game/campanha/mundos/index.js'
 import { XP_CAMPANHA_DIA } from '../src/game/campanha/recompensas.js'
@@ -46,7 +60,13 @@ export const MAX_CORRIDAS = 2000
 const ID = /^[A-Za-z0-9_-]{8,40}$/
 const CHAVE = /^[a-z_]{1,24}$/
 
-export function criarCampanha({ registro = null, agora = Date.now, agendar = agendarPadrao, enviar = () => {}, log = () => {}, semente = () => crypto.randomBytes(9).toString('base64url'), novoId = () => crypto.randomUUID() } = {}) {
+// o que o convidado pode pedir (o desafio diário; nada da campanha)
+const ACOES_CONVIDADO = new Set(['desafio', 'comecarDesafio', 'carta', 'posicoes', 'fimEsquiva', 'desistir'])
+// a hora local (São Paulo) de um instante, para a conquista da madrugada
+const formatoHora = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hourCycle: 'h23' })
+const horaLocal = (ms) => Number(formatoHora.format(new Date(ms))) % 24
+
+export function criarCampanha({ registro = null, agora = Date.now, agendar = agendarPadrao, enviar = () => {}, log = () => {}, semente = () => crypto.randomBytes(9).toString('base64url'), novoId = () => crypto.randomUUID(), conquistas = null } = {}) {
   const corridas = new Map() // id -> corrida
   const porConta = new Map() // usuario -> id da corrida
 
@@ -83,7 +103,8 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
     k.encerrada = true
     cancelarTimer(k)
     corridas.delete(k.id)
-    if (porConta.get(k.usuario) === k.id) porConta.delete(k.usuario)
+    if (porConta.get(k.chave) === k.id) porConta.delete(k.chave)
+    if (k.desafio) return encerrarDesafio(k, resultado, motivo)
     const estrelas = resultado === 'vitoria' ? estrelasDaLuta(k.c) : 0
     const duracaoS = Math.round((agora() - k.inicio) / 1000)
     if (resultado === 'suspeita') log(`[campanha] corrida ${k.id} suspeita (${motivo}): conta ${k.usuario}, fase ${k.mundo}-${k.fase}, rodada ${k.c.estado.rodada}`)
@@ -110,11 +131,90 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
     const c = k.cliente
     enviar(c, fim)
     if (resultado !== 'abandono' && c?.usuario === k.usuario) mandarProgresso(c)
+    // CONQUISTAS e MAESTRIA: a corrida que o servidor viu (a Kris, o personagem do mundo)
+    if (concedido && (resultado === 'vitoria' || resultado === 'derrota')) {
+      const r = resumoDaLuta(k.c)
+      eventoDaConta(k, { tipo: 'campanha', resultado, personagem: k.c.estado.jogadores[0].personagem, acertos: r.acertos, hpFracao: r.hpFracao, mundo: k.mundo, fase: k.fase, ultimaFase: Boolean(k.c.fase.chefe), estrelas })
+    }
+  }
+
+  function eventoDaConta(k, ev) {
+    if (!conquistas || !k.usuario) return
+    conquistas.evento(k.usuario, `${k.desafio ? 'desafio' : 'campanha'}:${k.id}`, ev).then((r) => {
+      const msg = msgConquistas(r)
+      if (msg && k.cliente?.usuario === k.usuario) enviar(k.cliente, msg)
+    })
+  }
+
+  // ---------- DESAFIO DIÁRIO ----------
+
+  // o estado do dia para a tela: a definição (pelo relógio daqui), o recorde, a semana e os amigos
+  async function mandarDesafio(c) {
+    const dia = diaDoDesafio(agora())
+    const msg = { t: 'desafioEstado', dia: dia.id, semana: dia.semana, restanteMs: dia.restanteMs, desafio: desafioDoDia(dia.id), convidado: !c.usuario, disponivel: Boolean(registro?.concederDesafio), xp: XP_DESAFIO, meta: DIAS_COSMETICO_SEMANA, cosmetico: cosmeticoDaSemana(dia.semana), recorde: null, concluido: false, diasSemana: 0, cosmeticoGanho: false, concluidos: 0, amigos: [] }
+    if (c.usuario && registro?.estadoDesafio) {
+      try {
+        Object.assign(msg, await registro.estadoDesafio(c.usuario, dia.id))
+      } catch (e) {
+        log(`[desafio] estado: ${e.message}`)
+        msg.erro = 'não deu para carregar o seu recorde agora'
+      }
+    }
+    enviar(c, msg)
+  }
+
+  function comecarDesafio(c, m) {
+    const dia = diaDoDesafio(agora())
+    // a tela mostrava o desafio de ontem: o dia virou (a definição muda)
+    if (typeof m.dia === 'string' && ID_DIA.test(m.dia) && m.dia !== dia.id) {
+      erro(c, 'virou', 'o dia virou: já tem um desafio novo')
+      return mandarDesafio(c)
+    }
+    if (corridas.size >= MAX_CORRIDAS) return erro(c, 'lotado', 'o servidor está lotado: tente daqui a pouco')
+    const def = desafioDoDia(dia.id)
+    const chave = c.usuario ?? `convidado:${c.id}`
+    const velha = corridas.get(porConta.get(chave))
+    if (velha) encerrar(velha, 'abandono', 'outra_corrida')
+    // a semente é a do DIA (o mesmo desafio para todo mundo): o que muda entre as tentativas é você
+    const k = { id: novoId(), cliente: c, usuario: c.usuario ?? null, chave, desafio: def, dia: dia.id, semana: dia.semana, mundo: 0, fase: 0, inicio: agora(), c: criarLuta({ desafio: def, semente: def.semente }), esquiva: null, timer: null, encerrada: false }
+    corridas.set(k.id, k)
+    porConta.set(chave, k.id)
+    const rodada = comecarRodada(k.c)
+    prazo(k, ESCOLHA_MS, 'sem_carta')
+    enviar(c, { t: 'campanhaInicio', corrida: k.id, mundo: 0, fase: 0, desafio: def.id, rodada })
+  }
+
+  async function encerrarDesafio(k, resultado, motivo) {
+    const r = resumoDaLuta(k.c)
+    const conta = resultado === 'vitoria' || resultado === 'derrota'
+    const pontos = conta ? r.pontos : 0
+    const duracaoS = Math.round((agora() - k.inicio) / 1000)
+    if (resultado === 'suspeita') log(`[desafio] corrida ${k.id} suspeita (${motivo}): conta ${k.usuario ?? 'convidado'}, dia ${k.dia}, rodada ${k.c.estado.rodada}`)
+    const info = { dia: k.dia, pontos, rodadas: r.rodadas, acertos: r.acertos, grazes: r.grazes, recorde: null, novoRecorde: false, concluido: false, primeiraHoje: false, diasSemana: 0, meta: DIAS_COSMETICO_SEMANA, cosmeticoNovo: null }
+    const fim = { t: 'campanhaFim', corrida: k.id, mundo: 0, fase: 0, resultado, motivo, estrelas: 0, rodadas: k.c.estado.rodada, xpGanho: 0, desafio: info }
+    let concedido = null
+    if (!k.usuario) fim.motivo = conta ? 'convidado' : motivo
+    else if (registro?.concederDesafio) {
+      try {
+        concedido = await registro.concederDesafio({ corrida: k.id, usuario: k.usuario, dia: k.dia, versao: k.desafio.versao, resultado, motivo, pontos, rodadas: r.rodadas, acertos: r.acertos, duracaoS, item: cosmeticoDaSemana(k.semana) })
+      } catch (e) {
+        log(`[desafio] concessão da corrida ${k.id}: ${e.message}`)
+        if (conta) fim.motivo = 'erro'
+      }
+    } else if (conta) fim.motivo = 'indisponivel'
+    if (concedido) {
+      Object.assign(fim, { xpGanho: concedido.xpGanho, xpTotal: concedido.xpTotal, nivelAntes: concedido.nivelAntes, nivelDepois: concedido.nivelDepois, itensNovos: concedido.itensNovos })
+      Object.assign(info, { recorde: concedido.recorde, novoRecorde: concedido.novoRecorde, concluido: concedido.concluido, primeiraHoje: concedido.primeiraHoje, diasSemana: concedido.diasSemana, cosmeticoNovo: concedido.cosmeticoNovo })
+      if (conta) fim.motivo = concedido.motivo ?? fim.motivo
+    }
+    enviar(k.cliente, fim)
+    if (conta && concedido)
+      eventoDaConta(k, { tipo: 'desafio', resultado, personagem: k.desafio.personagem, acertos: r.acertos, hpFracao: r.hpFracao, hora: horaLocal(k.inicio), cosmeticoSemana: Boolean(concedido.cosmeticoNovo) })
   }
 
   const deDono = (c, m) => {
     const k = corridas.get(String(m.corrida ?? ''))
-    if (!k || k.cliente !== c || k.usuario !== c.usuario) return null
+    if (!k || k.cliente !== c || k.usuario !== (c.usuario ?? null)) return null
     return k
   }
 
@@ -142,7 +242,7 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
     // uma corrida por conta (a de outra aba é abandonada)
     const velha = corridas.get(porConta.get(c.usuario))
     if (velha) encerrar(velha, 'abandono', 'outra_corrida')
-    const k = { id: novoId(), cliente: c, usuario: c.usuario, mundo, fase: n, inicio: agora(), c: criarLuta({ mundo, fase: n, semente: semente() }), esquiva: null, timer: null, encerrada: false }
+    const k = { id: novoId(), cliente: c, usuario: c.usuario, chave: c.usuario, mundo, fase: n, inicio: agora(), c: criarLuta({ mundo, fase: n, semente: semente() }), esquiva: null, timer: null, encerrada: false }
     corridas.set(k.id, k)
     porConta.set(c.usuario, k.id)
     const rodada = comecarRodada(k.c)
@@ -223,6 +323,8 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
   const acoes = {
     progresso: (c) => mandarProgresso(c),
     comecar,
+    desafio: (c) => mandarDesafio(c),
+    comecarDesafio,
     carta,
     posicoes,
     fimEsquiva,
@@ -236,7 +338,7 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
   return {
     corridas,
     receber(c, m) {
-      if (!c.usuario) return erro(c, 'convidado', 'entre com sua conta para jogar a campanha')
+      if (!c.usuario && !ACOES_CONVIDADO.has(m.acao)) return erro(c, 'convidado', 'entre com sua conta para jogar a campanha')
       const f = acoes[m.acao]
       if (!f || !Object.hasOwn(acoes, m.acao)) return
       if (m.corrida !== undefined && m.corrida !== null && !ID.test(String(m.corrida))) return

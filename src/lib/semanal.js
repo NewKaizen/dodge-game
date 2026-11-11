@@ -35,7 +35,7 @@ function partesLocais(ms) {
   return { ano: Number(p.year), mes: Number(p.month), dia: Number(p.day), hora: Number(p.hour) % 24, minuto: Number(p.minute), segundo: Number(p.second) }
 }
 // dia número (dias desde 1970-01-01) da data local do instante
-const diaLocal = (ms) => {
+export const diaLocal = (ms) => {
   const p = partesLocais(ms)
   return Date.UTC(p.ano, p.mes - 1, p.dia) / DIA_MS
 }
