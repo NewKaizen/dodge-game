@@ -442,6 +442,7 @@ export default class CampanhaArena extends Phaser.Scene {
     g.lineStyle(900, 0x000000, 0.94).strokeCircle(c.x, c.y, r + 450)
     g.lineStyle(12, 0x000000, 0.55).strokeCircle(c.x, c.y, r - 6)
     g.lineStyle(8, 0x000000, 0.3).strokeCircle(c.x, c.y, r - 16)
+    g.fillStyle(0xfff2c8, 0.07).fillCircle(c.x, c.y, r - 10)
   }
 
   levouAcerto(j) {
