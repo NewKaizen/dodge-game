@@ -92,6 +92,7 @@ insert into public.catalogo_itens (id, tipo, nome, nivel_requerido, padrao, excl
   ('som.vidro', 'som', 'Vidro Quebrado', public.nivel_exclusivo(), false, false, 'raro', true),
   ('som.cabra', 'som', 'Cabra', public.nivel_exclusivo(), false, false, 'lendario', true),
   ('som.pum', 'som', 'Pum', public.nivel_exclusivo(), false, false, 'raro', true),
+  ('som.uuf', 'som', 'Uuf!', public.nivel_exclusivo(), false, false, 'comum', true),
   ('som.laser', 'som', 'Laser', public.nivel_exclusivo(), false, false, 'raro', true),
   ('efeito.bolhas', 'efeito', 'Bolhas', public.nivel_exclusivo(), false, false, 'comum', true),
   ('efeito.folhas', 'efeito', 'Folhas ao Vento', public.nivel_exclusivo(), false, false, 'comum', true),

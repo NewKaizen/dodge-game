@@ -30,6 +30,7 @@ j√° rodou) e esta tabela; `src/lib/__tests__/cosmeticos.test.js` confere esta p√
 | `dano-pato` | `som.pato` | Quack | comum |
 | `dano-moeda` | `som.moeda` | Moedinha | comum |
 | `dano-boing` | `som.boing` | Boing | comum |
+| `dano-uuf` | `som.uuf` | Uuf! | comum |
 | `dano-buzina` | `som.buzina` | Buzina | raro |
 | `dano-miau` | `som.miau` | Miau | raro |
 | `dano-vidro` | `som.vidro` | Vidro Quebrado | raro |

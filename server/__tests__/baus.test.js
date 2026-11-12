@@ -202,7 +202,7 @@ test('lobby: estado, abrir (com limite), equipar e os cosméticos na sala (proto
   assert.equal(ana.recebidas.filter((m) => m.t === 'bauAberto').length, 1)
   assert.equal(ana.ultima('bausErro').motivo, 'calma')
   const aberto = ana.ultima('bauAberto')
-  assert.equal(aberto.fechados, BAUS_TESTE - 1)
+  assert.equal(aberto.fechados, BAUS_TESTE - 1 + (aberto.nivelDepois - aberto.nivelAntes), 'o XP do baú pode subir de nível (+1 baú)')
   assert.ok(aberto.recompensas.length >= 1 && aberto.recompensas.length <= 3)
   // equipar pelo lobby um item que ganhou; um que não tem é recusado
   const item = aberto.recompensas.find((r) => r.tipo === 'item')

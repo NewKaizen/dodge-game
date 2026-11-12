@@ -86,7 +86,7 @@ const CARTA = { l: 168, a: 186 }
 export function criarRevelacao(cena) {
   const cx = LARGURA / 2
   const raiz = cena.add.container(0, 0).setDepth(1500)
-  const veu = cena.add.rectangle(LARGURA / 2, ALTURA / 2, LARGURA, ALTURA, 0x05040a, 0.86)
+  const veu = cena.add.rectangle(LARGURA / 2, ALTURA / 2, LARGURA, ALTURA, 0x05040a, 0.94)
   raiz.add(veu)
   const gBau = cena.add.graphics()
   const bau = cena.add.container(cx, 220, [gBau])
@@ -165,7 +165,7 @@ export function criarRevelacao(cena) {
       onStart: () => tocar(cena, nivelDaRaridade(rec.raridade) >= 2 ? 'confirmar' : 'mover'),
       onComplete: () => {
         if (!raiz.scene) return
-        const p = comPrevia ? previaDe(cena, d.tipo, registroDoId(rec.id), x, y - 26, 64) : null
+        const p = comPrevia ? previaDe(cena, d.tipo, registroDoId(rec.id), x, y - 26, 64, 1600) : null
         if (p) {
           previas.push(p)
           if (d.tipo === 'som') p.tocar?.()

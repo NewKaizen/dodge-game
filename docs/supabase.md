@@ -169,6 +169,16 @@ cosméticos de maestria no catálogo e as funções `registrar_evento_conta`, `d
 Sem elas o resto do jogo funciona, mas o desafio dá erro ao salvar e não há conquistas. Detalhes em
 [desafio-diario.md](desafio-diario.md). `desafioSql.test.js` roda a 0001–0014 duas vezes (com `DODGE_PG`).
 
+### 2.9 Migration 0015: baús e os slots novos de cosmético
+
+Rode `supabase/migrations/0015_baus_cosmeticos.sql` (depende da 0001, 0003, 0010, 0013 e 0014; roda de novo
+sem estragar). Ela abre os tipos `som`, `efeito` e `lancamento` no catálogo (com `raridade` e `bau`), põe os
+46 itens do baú, cria `perfis.som_equipado`/`efeito_equipado`/`lancamento_equipado`, as tabelas `baus` e
+`baus_contas` e as funções `conceder_bau`, `abrir_bau`, `baus_estado`, `equipar_conta` (só o servidor) e a
+`equipar` nova (o navegador; os mesmos parâmetros). Sem ela o jogo entra normal (o servidor lê os slots numa
+consulta à parte), mas não há baús. Detalhes em [baus.md](baus.md). `bausSql.test.js` roda a 0001–0015 duas
+vezes (com `DODGE_PG`).
+
 ## 3. Conferir o bucket
 
 Em **Storage** deve aparecer o bucket `avatares`, marcado como **Public**.

@@ -111,3 +111,22 @@ test('os cosméticos de cada lado: em rede os do lobby, fora dela o de quem est�
   assert.deepEqual(n[0], EQUIPADOS_PADRAO)
   assert.equal(n.length, 3)
 })
+
+// quando o conteúdo (src/game/cosmeticos/registro.js) existe: os ids e as raridades do catálogo do baú
+// (src/lib/cosmeticos.js, o banco) batem com os do conteúdo
+test('o catálogo do baú bate com o registro do conteúdo', async (t) => {
+  let reg
+  try {
+    reg = await import('../cosmeticos/registro.js')
+  } catch {
+    return t.skip('src/game/cosmeticos/registro.js ainda não existe')
+  }
+  const { ITENS_SLOTS, PADRAO_REGISTRO } = await import('../../lib/cosmeticos.js')
+  const listas = { som: reg.SONS_DANO, efeito: reg.EFEITOS_CARTA, lancamento: reg.LANCAMENTOS, moldura: reg.MOLDURAS_ANIMADAS }
+  for (const [slot, lista] of Object.entries(listas)) {
+    assert.equal(lista[0].id, PADRAO_REGISTRO[slot], `padrão de ${slot}`)
+    const doConteudo = lista.slice(1).map((i) => `${i.id}:${i.raridade}`).sort()
+    const doBau = ITENS_SLOTS.filter((i) => i.slot === slot).map((i) => `${i.registro}:${i.raridade}`).sort()
+    assert.deepEqual(doBau, doConteudo, slot)
+  }
+})

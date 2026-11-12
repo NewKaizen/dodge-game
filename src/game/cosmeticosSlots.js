@@ -121,9 +121,20 @@ export function molduraAnimada(cena, x, y, tamanho, id) {
   return chamar('desenharMoldura', cena, x, y, tamanho, id) ?? null
 }
 
-export function previaDe(cena, tipo, id, x, y, tamanho) {
+// profundidade: a prévia nasce na raiz da cena; o que ela criou vai para esta profundidade (por cima das
+// caixas da tela, que ficam num container mais alto)
+export function previaDe(cena, tipo, id, x, y, tamanho, profundidade = null) {
+  const lista = cena?.children?.list
+  const antes = profundidade != null && Array.isArray(lista) ? new Set(lista) : null
   const h = chamar('previa', cena, tipo, id, x, y, tamanho)
   if (!h || typeof h.destroy !== 'function') return null
+  if (antes) {
+    try {
+      for (const o of cena.children.list) if (!antes.has(o)) o.setDepth?.(profundidade)
+    } catch (e) {
+      falhou('previa.profundidade', e)
+    }
+  }
   return {
     destroy() {
       try {

@@ -168,7 +168,7 @@ export default class Colecao extends CenaConta {
     this.previaChave = chave
     if (!item?.registro) return null
     const tipo = item.tipo === 'moldura' ? 'moldura' : item.tipo
-    this.previa = previaDe(this, tipo, item.registro, x, y, tam)
+    this.previa = previaDe(this, tipo, item.registro, x, y, tam, 20)
     if (this.previa && tipo === 'som' && !item.semItem) this.previa.tocar?.()
     return this.previa
   }
@@ -329,6 +329,7 @@ export default class Colecao extends CenaConta {
   // ---------- desenho ----------
 
   desenhar() {
+    if (this.revelacao) return // a revelação do baú cobre a tela (o resto volta quando ela fechar)
     const p = this.perfil
     if (!p) {
       const c = get(conta)

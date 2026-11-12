@@ -95,6 +95,7 @@ export const ITENS_SLOTS = [
   item('som', 'vidro', 'Vidro Quebrado', 'raro'),
   item('som', 'cabra', 'Cabra', 'lendario'),
   item('som', 'pum', 'Pum', 'raro'),
+  item('som', 'uuf', 'Uuf!', 'comum'),
   item('som', 'laser', 'Laser', 'raro'),
   // efeitos de carta (efeito-*)
   item('efeito', 'bolhas', 'Bolhas', 'comum'),
