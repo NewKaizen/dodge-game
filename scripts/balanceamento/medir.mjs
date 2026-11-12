@@ -20,7 +20,7 @@ import { chromium } from 'playwright'
 import fs from 'node:fs'
 
 const [saida = 'medida.json', modo = 'tudo', nSementes = '6', filtro = ''] = process.argv.slice(2)
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined, args: ['--autoplay-policy=no-user-gesture-required'] })
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined, args: ['--autoplay-policy=no-user-gesture-required', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
 const page = await browser.newPage({ viewport: { width: 1280, height: 960 } })
 const avisos = []
 page.on('console', (m) => {

@@ -33,7 +33,7 @@ export default {
   },
   super: {
     nome: 'Prova Irrefutável',
-    texto: 'Um redemoinho de lâminas que passeia pela caixa num 8 e cresce a cada volta (o ego inflando), até o giro dourado e o corte final da resposta certa',
+    texto: 'Um redemoinho de lâminas que passeia pela caixa num 8 e cresce a cada volta (o ego inflando) enquanto páginas miradas cruzam a caixa, até o giro dourado e o corte final em X da resposta certa',
     criar: (A) => A.superBerdly()
   },
   cartas: [

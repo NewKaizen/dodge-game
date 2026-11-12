@@ -2,6 +2,7 @@ import { definirAtaque } from '../definir.js'
 import { ATAQUE } from '../../constants.js'
 import { tocar } from '../../audio.js'
 import { particulas } from '../../effects/particulas.js'
+import { criarPrevisao } from './previsao.js'
 
 // SUPER de Dess: ÚLTIMO BIS. A caixa vira um braço de guitarra com TRASTES
 // (faixas verticais, como um Guitar Hero de verdade) e o show tem um PULSO
@@ -12,8 +13,9 @@ import { particulas } from '../../effects/particulas.js'
 //   II.  Refrão  - duas notas por tempo (power chord), sempre sobrando um traste.
 //   III. Solo    - meio tempo cada nota: uma escala correndo pelo braço, com
 //        "bends" (duas notas) de vez em quando.
-//   IV.  Mergulho do whammy - a guitarra cai do alto e crava no palco; duas
-//        ondas de choque circulares varrem a caixa a partir do impacto.
+//   IV.  Mergulho do whammy - a guitarra cai do alto e crava no palco; três
+//        ondas de choque circulares varrem a caixa a partir do impacto (e ainda
+//        caem dois acordes por baixo delas).
 //
 // Cada nota é uma bala que entra pelo alto do traste e despenca acelerando;
 // quando bate no chão do palco, EXPLODE (sprite de explosão + som
@@ -27,12 +29,17 @@ import { particulas } from '../../effects/particulas.js'
 //   - um traste fica "aceso" da entrada da nota até a explosão acabar; um
 //     traste só recebe nota se, somado aos acesos, ainda sobrar pelo menos um
 //     traste inteiro apagado (a.parede com eixo x valida essa soma);
+//   - a nota que mira o coração cai no traste PARA ONDE ele está indo (previsão do
+//     movimento dele): quem corre para outro traste dá de cara com ela. Em compensação,
+//     só cai nota em cima de um traste com coração se o vizinho dele estiver apagado
+//     (a rota de fuga fica ao alcance, a uma corridinha, e não do outro lado do braço);
+//   - o palco treme e solta fagulhas só de leve: o que machuca é sempre o que está desenhado;
 //   - a onda de choque final nasce no centro, parada e piscando por
 //     `avisoClimax` ms (pode ficar em cima dela à vontade) antes de abrir um
 //     vão angular (sorteado perto do coração, nunca embaixo dele) e sair
 //     correndo para fora: o vão vale em QUALQUER raio, então dá tempo de se
-//     posicionar nele enquanto a onda ainda está parada. A segunda onda abre
-//     o vão perto do da primeira (no máximo `desvioVao` rad), e não do outro
+//     posicionar nele enquanto a onda ainda está parada. As seguintes abrem
+//     o vão perto do da anterior (no máximo `desvioVao` rad), e não do outro
 //     lado da caixa.
 //
 // Config:
@@ -46,7 +53,9 @@ import { particulas } from '../../effects/particulas.js'
 //   raioExplosao   fração da largura do traste que a explosão machuca (raio)
 //   estilhacos     estilhaços que cada explosão solta para cima
 //   avisoClimax    aviso das ondas de choque do Mergulho
-//   intervaloOndas ms entre as duas ondas de choque
+//   acordesFinais  ms (desde o Mergulho) dos acordes que caem por baixo das ondas de choque
+//   ondas          quantas ondas de choque o Mergulho solta
+//   intervaloOndas ms entre as ondas de choque
 //   desvioVao      quanto o vão da 2ª onda pode se afastar do da 1ª (rad)
 //   fases          { verso, refrao, solo, climax } ms de cada parte (soma = duracao)
 const CORES_SHOW = [0xff5070, 0xffb03a, 0xffe14a, 0xffffff]
@@ -56,23 +65,26 @@ export default definirAtaque({
   padrao: {
     duracao: 9000,
     bpm: 128,
-    queda: 660,
-    quedaAcorde: 720,
-    quedaSolo: 600,
-    notaSolo: 0.62,
-    bendSolo: 0.2,
+    queda: 580,
+    quedaAcorde: 620,
+    quedaSolo: 520,
+    notaSolo: 0.54,
+    bendSolo: 0.45,
     raioNota: 9,
     raioExplosao: 0.55,
     estilhacos: 3,
     avisoClimax: 700,
     intervaloOndas: 480,
     desvioVao: 0.55,
-    fases: { verso: 2500, refrao: 2500, solo: 2200, climax: 1800 },
+    ondas: 3,
+    acordesFinais: [350, 1100],
+    fases: { verso: 2400, refrao: 2400, solo: 2100, climax: 2100 },
   },
   iniciar(a, cfg) {
     const beat = Math.round(60000 / cfg.bpm)
     const palco = montarPalco(a)
     palco.acesos = new Array(palco.lanes).fill(0) // avisos/golpes em andamento em cada traste
+    palco.previsao = criarPrevisao(a)
     const luzes = montarLuzes(a)
     let k = 0
     const corDoGolpe = () => CORES_SHOW[k++ % CORES_SHOW.length]
@@ -84,9 +96,8 @@ export default definirAtaque({
     a.aCada(
       beat,
       () => {
-        const lanes = escolherTrastes(a, palco, 1, 0.5)
+        const lanes = escolherTrastes(a, palco, 1, 0.8, cfg.queda)
         acorde(a, cfg, palco, lanes, cfg.queda, corDoGolpe())
-        ondaAmp(a, a.escolher([-1, 1]))
       },
       Math.max(1, Math.round(cfg.fases.verso / beat)),
     )
@@ -96,9 +107,8 @@ export default definirAtaque({
       a.aCada(
         beat,
         () => {
-          const trastes = escolherTrastes(a, palco, 2, 0.7)
+          const trastes = escolherTrastes(a, palco, 2, 0.9, cfg.quedaAcorde)
           acorde(a, cfg, palco, trastes, cfg.quedaAcorde, corDoGolpe())
-          ondaAmp(a, a.escolher([-1, 1]))
         },
         Math.max(1, Math.round(cfg.fases.refrao / beat)),
       )
@@ -117,14 +127,19 @@ export default definirAtaque({
           if (atual <= 0 || atual >= palco.lanes - 1) dir *= -1
           const bend = palco.lanes > 3 && a.aleatorio(0, 1) < cfg.bendSolo
           const trastes = bend ? [...new Set([atual, limitar(atual + dir, 0, palco.lanes - 1)])] : [atual]
-          acorde(a, cfg, palco, livres(palco, trastes), cfg.quedaSolo, corDoGolpe())
+          acorde(a, cfg, palco, livres(a, palco, trastes), cfg.quedaSolo, corDoGolpe())
         },
         Math.max(1, Math.round(cfg.fases.solo / passoNota) - 1),
       )
     })
 
     // ---------- IV. Mergulho do whammy ----------
-    a.depois(cfg.fases.verso + cfg.fases.refrao + cfg.fases.solo, () => climax(a, cfg, palco))
+    const inicioMergulho = cfg.fases.verso + cfg.fases.refrao + cfg.fases.solo
+    a.depois(inicioMergulho, () => climax(a, cfg, palco))
+    // o palco ainda toca por baixo das ondas de choque: dois acordes (com a rota de fuga de sempre)
+    for (const ms of cfg.acordesFinais) {
+      a.depois(inicioMergulho + ms, () => acorde(a, cfg, palco, escolherTrastes(a, palco, 1, 0.8, cfg.queda), cfg.queda, corDoGolpe()))
+    }
   },
 })
 
@@ -161,29 +176,42 @@ function trasteDoAlvo(palco, alvo) {
 
 // Dos trastes pedidos, só os que podem acender sem apagar a última rota:
 // somados aos que já estão acesos (piscando ou batendo), sempre sobra pelo
-// menos um traste inteiro apagado
-function livres(palco, pedidos) {
+// menos um traste inteiro apagado. Em cima do coração só cai nota se ele tiver
+// um traste vizinho apagado para onde correr (um traste = ~0,3 s de corrida):
+// a rota de fuga fica ao alcance, não do outro lado do braço
+function livres(a, palco, pedidos) {
   const ok = []
+  const dosCoracoes = a.coracoes.filter((c) => c.ativo).map((c) => trasteDoAlvo(palco, c))
+  const quente = (k) => palco.acesos[k] > 0 || pedidos.includes(k)
   for (const i of pedidos) {
     const acesos = palco.acesos.filter((n, k) => n > 0 || ok.includes(k) || k === i).length
-    if (acesos <= palco.lanes - 1) ok.push(i)
+    if (acesos > palco.lanes - 1) continue
+    if (dosCoracoes.includes(i) && ![i - 1, i + 1].some((k) => k >= 0 && k < palco.lanes && !quente(k))) continue
+    ok.push(i)
   }
   return ok
+}
+
+// onde o coração estará quando a nota chegar ao chão (previsão do movimento dele):
+// quem corre para outro traste dá de cara com a nota que cai nele
+function mira(a, palco, queda) {
+  return palco.previsao.prever(a.alvo(), queda * 0.6)
 }
 
 // sorteia até `qtd` trastes para acender (contando os que já estão acesos,
 // sempre sobra pelo menos 1 traste inteiro apagado); prefere os que já estão
 // acesos ou colados neles, para o braço não acender inteiro
-function escolherTrastes(a, palco, qtd, mirar) {
+function escolherTrastes(a, palco, qtd, mirar, queda = 600) {
   const total = palco.lanes
   const n = Math.min(qtd, total - 1)
   const indices = []
-  if (a.aleatorio(0, 1) < mirar) indices.push(...livres(palco, [trasteDoAlvo(palco, a.alvo())]))
+  if (a.aleatorio(0, 1) < mirar) indices.push(...livres(a, palco, [trasteDoAlvo(palco, mira(a, palco, queda))]))
   for (let tentativa = 0; indices.length < n && tentativa < 12; tentativa++) {
     const i = a.inteiro(0, total - 1)
-    if (!indices.includes(i)) indices.push(...livres(palco, [...indices, i]).filter((k) => !indices.includes(k)))
+    if (!indices.includes(i)) indices.push(...livres(a, palco, [...indices, i]).filter((k) => !indices.includes(k)))
   }
-  return indices
+  // confere o conjunto final (um traste novo pode ser justamente o vizinho livre do coração)
+  return livres(a, palco, indices)
 }
 
 // ---------- o acorde: a nota despenca no traste e explode no chão ----------
@@ -254,9 +282,9 @@ function explodir(a, cfg, palco, x, y, cor, aoApagar) {
   if (a.tempo - ultimoEstrondo > 90 || a.tempo < ultimoEstrondo) {
     ultimoEstrondo = a.tempo
     tocar(a.cena, 'explosaoGrande')
-    a.tremer(90, 0.005)
+    a.tremer(70, 0.002)
   }
-  particulas(a.cena, x, y, { cor, quantidade: 7, velocidade: 150, vida: 300 })
+  particulas(a.cena, x, y, { cor, quantidade: 4, velocidade: 130, vida: 260 })
   const area = a.bala({ x, y, raio, jaAvisada: true, atravessa: true, vida: 220, pulso: 0, cor })
   area.sprite.setVisible(false) // quem aparece é a explosão
   a.depois(240, aoApagar)
@@ -267,7 +295,7 @@ function explodir(a, cfg, palco, x, y, cor, aoApagar) {
   }
 }
 
-// ---------- palco: luzes pulsando no tempo + ondas do amplificador ----------
+// ---------- palco: luzes pulsando no tempo ----------
 
 function montarLuzes(a) {
   const l = a.caixa
@@ -283,13 +311,6 @@ function montarLuzes(a) {
 
 function pulsar(a, luzes) {
   for (const g of luzes) a.cena.tweens.add({ targets: g, scaleY: 1.1, duration: 90, yoyo: true, ease: 'Sine.easeOut' })
-}
-
-function ondaAmp(a, lado) {
-  const l = a.caixa
-  const x = lado < 0 ? l.left : l.right
-  const g = a.decoracao(a.cena.add.ellipse(x, l.centerY, 8, l.height * 0.55, 0xffb03a, 0.16).setDepth(3))
-  a.cena.tweens.add({ targets: g, scaleX: 7, alpha: 0, duration: 260, ease: 'Quad.easeOut', onComplete: () => g.destroy() })
 }
 
 // ---------- IV. mergulho do whammy: a guitarra crava e explode em ondas ----------
@@ -321,7 +342,7 @@ function climax(a, cfg, palco) {
     a.bala({ x: cx, y: cy, raio: 15, textura: 'super-dess-impacto', tamanho: 50, cor: 0xffe14a, jaAvisada: true, atravessa: true, vida: 180, pulso: 0 })
     vao = anelChoque(a, cfg, cx, cy)
   })
-  a.depois(420 + cfg.intervaloOndas, () => anelChoque(a, cfg, cx, cy, vao))
+  for (let k = 1; k < cfg.ondas; k++) a.depois(420 + k * cfg.intervaloOndas, () => (vao = anelChoque(a, cfg, cx, cy, vao)))
 
   a.depois(cfg.fases.climax - 180, () => {
     a.cena.tweens.add({ targets: guitarra, alpha: 0, scale: 1.3, duration: 260 })

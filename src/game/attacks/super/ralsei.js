@@ -59,14 +59,14 @@ export default definirAtaque({
     duracao: 9000,
     sopros: [
       [150, 'supEsq'],
-      [1100, 'infDir'],
-      [2050, 'supDir'],
+      [1150, 'infDir'],
+      [2150, 'supDir'],
     ],
-    avisoSopro: 650,
-    meiaAberturaSopro: Math.PI / 4.6,
+    avisoSopro: 820,
+    meiaAberturaSopro: Math.PI / 5,
     rajadasPorSopro: 3,
-    intervaloRajada: 100,
-    chamasPorRajada: 7,
+    intervaloRajada: 170,
+    chamasPorRajada: 6,
     velocidadeChama: 150,
     raioChama: 7,
     moldura: {
@@ -81,15 +81,15 @@ export default definirAtaque({
         [1500, 480, 260],
       ],
       duracaoAtiva: 2500,
-      fechar: 0.72, // até onde a moldura fecha sozinha (fração do raio do pulso)
-      brasas: { intervalo: 300, velocidade: 78, balanco: 16, aviso: 420, raio: 6 },
+      fechar: 0.66, // até onde a moldura fecha sozinha (fração do raio do pulso)
+      brasas: { intervalo: 360, velocidade: 78, balanco: 16, aviso: 520, raio: 6 },
     },
     dragao: {
       inicio: 6200,
-      avisoInvocacao: 700,
+      avisoInvocacao: 900,
       contas: 14,
-      amplitude: null, // null = calculado da caixa (0.3 da largura)
-      omega: 3.2,
+      amplitude: null, // null = calculado da caixa (0.26 da largura)
+      omega: 2.9,
       defasagem: 0.4,
       raio: 9,
       duracaoSway: 1900,
@@ -343,7 +343,7 @@ function atualizarMoldura(m, ativo) {
 function montarDragao(a, cfg, D) {
   const l = a.caixa
   const avisoD = Math.max(ATAQUE.telegrafoMs, D.avisoInvocacao)
-  const amplitude = D.amplitude ?? l.width * 0.3
+  const amplitude = D.amplitude ?? l.width * 0.26
 
   tocar(a.cena, 'super-ralsei-dragao')
   a.tremer(260, 0.01)

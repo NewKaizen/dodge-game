@@ -2,6 +2,7 @@ import { limitar, MISTURA_ADD } from '../../phaserPuro.js'
 import { definirAtaque } from '../definir.js'
 import { tocar } from '../../audio.js'
 import { particulas } from '../../effects/particulas.js'
+import { criarPrevisao } from './previsao.js'
 
 // SUPER de Asriel: SINGULARIDADE RADIANTE. A única carta do jogo que mexe no
 // coração sem ser bala: a gravidade dele é de verdade.
@@ -17,7 +18,10 @@ import { particulas } from '../../effects/particulas.js'
 //      empurrão (o coração é jogado contra as paredes) enquanto anéis de
 //      estrelas arco-íris se expandem do centro, cada um com uma brecha. A
 //      brecha muda de lugar a cada anel: é preciso correr pela borda (contra
-//      o empurrão) até ela. O último anel é duplo.
+//      o empurrão) até ela. O último anel é duplo. Entre um anel e outro,
+//      uma ESTRELA CADENTE nasce (piscando) na parede de lá e cruza a caixa
+//      em direção a onde o coração vai estar: não dá para só ficar encostado
+//      na parede esperando a brecha.
 //
 // Justiça:
 //   - o puxão/empurrão nunca passa de `forcaMax` px/s (o coração anda
@@ -31,6 +35,8 @@ import { particulas } from '../../effects/particulas.js'
 //   - as estrelas da espiral nascem paradas e piscando (aviso de a.bala); no
 //     mesmo braço, duas estrelas seguidas ficam a mais de `lacunaMinima` uma
 //     da outra ao longo do caminho;
+//   - a estrela cadente pisca `cadentes.aviso` ms antes de andar, nasce a mais de 90 px do coração
+//     e é uma só por vez (entre dois anéis);
 //   - cada anel da supernova nasce parado e piscando como um círculo de nós
 //     com a brecha já visível, e a brecha anda no máximo `passoBrecha` rad
 //     de um anel para o outro.
@@ -44,7 +50,7 @@ const PUXAO_MAX = 0.45 // fração da velocidade do coração (a de agora) que o
 const PADRAO = {
   vazio: { fracoes: [0.32, 0.55, 0.78, 1], tempos: [0, 1150, 2300, 3400], aviso: 650, margem: 6, forcas: [28, 46, 62, 74] },
   espiral: { bracos: 3, inicio: 500, intervalo: 620, giroBracos: 0.72, velRadial: 34, velTangencial: 70, omegaMax: 4.2, aviso: 520 },
-  nova: { aneis: 5, intervalo: 720, estrelas: 18, abertura: 1.25, passoBrecha: 0.85, velocidade: 105, aviso: 520, raioNo: 40, empurrao: 58, duracaoEmpurrao: 3600 },
+  nova: { aneis: 6, intervalo: 640, estrelas: 18, cadentes: { velocidade: 135, aviso: 520, atraso: 320 }, abertura: 1.25, passoBrecha: 0.85, velocidade: 105, aviso: 520, raioNo: 40, empurrao: 58, duracaoEmpurrao: 3600 },
   forcaMax: 80,
 }
 
@@ -95,6 +101,7 @@ export default definirAtaque({
     a.lacuna(Math.hypot(r0 * (S.giroBracos - (S.velTangencial / r0) * T), S.velRadial * T), 'estrelas seguidas no braço da espiral')
 
     // ---------- II. colapso -> supernova ----------
+    const previsao = criarPrevisao(a)
     a.depois(metade, () => {
       colapsar(a, vazio, buraco, disco, cx, cy, g)
       g.forca = -N.empurrao
@@ -106,6 +113,8 @@ export default definirAtaque({
       a.depois(metade + 380 + k * N.intervalo, () => {
         brecha += a.escolher([-1, 1]) * a.aleatorio(N.passoBrecha * 0.45, N.passoBrecha)
         anelNova(a, N, cx, cy, brecha, k, 0)
+        // entre este anel e o próximo, uma estrela cadente mirada
+        if (!ultimo) a.depois(N.cadentes.atraso, () => estrelaCadente(a, N, previsao))
         // o último anel é duplo: um segundo anel colado, com a mesma brecha
         if (ultimo) a.depois(170, () => anelNova(a, N, cx, cy, brecha, k + 1, 0.5))
       })
@@ -267,4 +276,34 @@ function anelNova(a, cfg, cx, cy, brecha, k, defasagem) {
       vida: 2600,
     })
   }
+}
+
+// Estrela cadente: nasce na parede oposta à do coração (pisca `aviso` ms) e cruza
+// a caixa em direção a onde ele vai estar. Nunca nasce a menos de 90 px dele
+function estrelaCadente(a, cfg, previsao) {
+  const l = a.caixa
+  const C = cfg.cadentes
+  const alvo = a.alvo()
+  const futuro = previsao.prever(alvo, C.aviso + 300)
+  // a parede mais longe do coração
+  const horizontal = Math.abs(alvo.x - l.centerX) / l.width >= Math.abs(alvo.y - l.centerY) / l.height
+  const dir = horizontal ? Math.sign(l.centerX - alvo.x) || 1 : Math.sign(l.centerY - alvo.y) || 1
+  const p = horizontal ? { x: dir > 0 ? l.right - 6 : l.left + 6, y: limitar(futuro.y + a.aleatorio(-40, 40), l.top + 10, l.bottom - 10) } : { x: limitar(futuro.x + a.aleatorio(-40, 40), l.left + 10, l.right - 10), y: dir > 0 ? l.bottom - 6 : l.top + 6 }
+  if (Math.hypot(p.x - alvo.x, p.y - alvo.y) < 90) return
+  // a parede de onde nasce é a de lá: o tiro vai da parede mais longe até o coração
+  const ang = Math.atan2(futuro.y - p.y, futuro.x - p.x)
+  tocar(a.cena, 'super-asriel-pulso')
+  a.bala({
+    x: p.x,
+    y: p.y,
+    vx: Math.cos(ang) * C.velocidade,
+    vy: Math.sin(ang) * C.velocidade,
+    raio: 7,
+    textura: 'super-asriel-estrelas',
+    quadro: a.inteiro(0, 5),
+    tamanho: 20,
+    aviso: C.aviso,
+    girar: 8,
+    vida: 3200,
+  })
 }
