@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { CENTRO_X, CORES, FONTE, corTexto } from '../constants.js'
 import { tocar } from '../audio.js'
 import Carta from './Carta.js'
+import { efeitoNaCarta } from '../cosmeticosSlots.js'
 
 // Mão de cartas em leque, com cursor do jogador.
 //
@@ -30,6 +31,7 @@ import Carta from './Carta.js'
 //   profundidade depth base das cartas (a carta com cursor fica por cima)
 //   rotulo       texto do cursor (padrão 'P1' / 'P2'); '' esconde
 //   corVerso     cor do verso de carta equipado deste jogador (null = o padrão; pvp/versos.js)
+//   efeito       efeito de carta equipado deste jogador (id do registro; null = nenhum; cosmeticosSlots.js)
 export default class Mao {
   constructor(scene, opcoes = {}) {
     this.scene = scene
@@ -45,6 +47,7 @@ export default class Mao {
     this.larguraMax = opcoes.larguraMax ?? 260
     this.larguraCarta = opcoes.largura ?? 70
     this.corVerso = opcoes.corVerso ?? null
+    this.efeito = opcoes.efeito ?? null
     this.monte = opcoes.monte ?? null
     this.profundidade = opcoes.profundidade ?? 20
     this.cartas = []
@@ -127,6 +130,8 @@ export default class Mao {
     const monte = this.posicaoMonte()
     const carta = new Carta(this.scene, monte.x, monte.y, dados, { largura: this.larguraCarta, corFoco: this.cor, corVerso: this.corVerso })
     carta.mao = this
+    // cosmético: o efeito equipado em volta da carta (some com ela; nunca quebra a mão)
+    if (this.efeito) efeitoNaCarta(this.scene, carta, this.efeito)
     this.cartas.push(carta)
     const n = Math.max(total, this.cartas.length)
     const p = this.posicao(this.cartas.length - 1, n)

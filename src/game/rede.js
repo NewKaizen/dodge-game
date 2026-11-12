@@ -7,6 +7,7 @@ import { corDaVaga } from './vagas.js'
 import { interceptarBotao } from './controles.js'
 import { conta } from '../lib/conta.js'
 import { coresDosVersosDaPartida } from './pvp/versos.js'
+import { cosmeticosDosLados, cosmeticosDosParticipantes } from './cosmeticosSlots.js'
 
 // Partida EM REDE (docs/rede-pvp.md): numa sala (LAN ou ONLINE) o PVP e o
 // CO-OP rodam no PC de cada um; só as decisões viajam, pelo canal
@@ -23,6 +24,9 @@ import { coresDosVersosDaPartida } from './pvp/versos.js'
 //   participantesDaPartida()    (5A) [{ indice, id, nome, conta, cor, host, dono, caiu }] em ordem de vaga
 //   souHostDaRede()             o host DA PARTIDA é quem decide (sorteios, resultado da rodada)
 //   coresDosVersos()            [cor do verso de carta do lado 0, do lado 1] (null = verso padrão)
+//   cosmeticosDaPartida(n?)     [{ som, efeito, lancamento, moldura }] de cada lado (ids do registro dos
+//                               cosméticos; em rede os de cada jogador, que o lobby repassa; fora dela o
+//                               lado 0 é quem está logado). Com n > 2: por vaga (salas de N)
 //   irParaCena(cena, chave, dados)  (host) troca de cena aqui e no convidado;
 //                               'Lan' encerra a partida em rede (os dois voltam ao lobby)
 //   podeEntrarEmSala()          true se o jogador está num menu (não no meio de uma
@@ -109,6 +113,12 @@ export const participantesDaPartida = () => participantes().map((p) => ({ ...p, 
 export const souHostDaRede = () => get(lan).papel === 'host'
 // verso equipado de cada lado (0 = host/P1): em rede o de cada jogador, fora dela o de quem está logado (pvp/versos.js)
 export const coresDosVersos = () => coresDosVersosDaPartida({ sala: emRede() ? get(lan).sala : null, perfil: get(conta).perfil })
+// os cosméticos dos slots novos de cada lado (docs/baus.md); um cosmético nunca muda a partida
+export function cosmeticosDaPartida(n = 2) {
+  if (n > 2 && emRede()) return cosmeticosDosParticipantes(participantesDaPartida(), n)
+  const perfil = get(conta).estado === 'logado' ? get(conta).perfil : null
+  return cosmeticosDosLados({ sala: emRede() ? get(lan).sala : null, perfil, n, emRede: emRede() })
+}
 
 function ativar(sim) {
   ativa = sim

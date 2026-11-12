@@ -22,7 +22,8 @@ import FimDePartida from '../pvp/fimDePartida/index.js'
 import ArenaRedeN from '../pvp/rede/ArenaRedeN.js'
 import HudCoopN, { CARTAO as CARTAO_HUD } from '../coop/HudCoopN.js'
 import { marcadorDaVaga, nomeNoCoracao, desenharForma, formaDaVaga } from '../coop/marcadores.js'
-import { canal, emRede, meuLado, meuIndice, souHostDaRede, irParaCena, participantesDaPartida } from '../rede.js'
+import { canal, emRede, meuLado, meuIndice, souHostDaRede, irParaCena, participantesDaPartida, cosmeticosDaPartida } from '../rede.js'
+import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 import { corDaVaga, textoDaVaga } from '../vagas.js'
 import { shake } from '../effects/shake.js'
 import { flashTela, claraoCamera } from '../effects/flash.js'
@@ -104,6 +105,7 @@ const estadoInicial = () => ({
   fundoArena: null,
   pistas: null,
   huds: null,
+  cosmeticos: null, // os cosméticos dos slots novos de cada vaga (som de dano, efeito, lançamento; docs/baus.md)
   mao: null,
   monte: null,
   botaoPassar: null,
@@ -178,6 +180,7 @@ export default class PvpArenaN extends Phaser.Scene {
     this.lugares = this.dupla ? lugaresDoTime(this.estado.times) : null
     this.nomes = Array.from({ length: this.n }, (_, j) => participantesDaPartida().find((p) => p.indice === j)?.nome ?? `P${j + 1}`)
     this.nomesJog = this.nomes.map((nome) => nomeNoCoracao(nome, 10))
+    this.cosmeticos = cosmeticosDaPartida(this.n) // só enfeite: nunca muda a partida
     this.controles = new Controles(this)
     this.rede = new ArenaRedeN(this, { canal, meuIndice: this.meu, souHost: souHostDaRede(), participantes: participantesDaPartida, dev: Boolean(import.meta.env?.DEV) })
     this.rede.esconderBaralhos(this.estado) // o host embaralha com um sorteio só dele (pvp/sigilo.js)
@@ -334,6 +337,7 @@ export default class PvpArenaN extends Phaser.Scene {
       })
       pista.aoAcertar = (dano) => this.acertou(k, dano)
       pista.aoGraze = () => this.grazeou(k)
+      pista.somDano = () => somDoLado(this, k, () => tocar(this, 'dano')) // o som de dano equipado (cosmético)
       const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 4, align: 'center' })
       this.avisoPista.push(this.add.text(c.x, c.y - 18, '', estilo(14, TEXTO.caido)).setOrigin(0.5).setDepth(41))
       this.infoPista.push(this.add.text(c.x, c.y + 18, '', estilo(10, TEXTO.desabilitado)).setOrigin(0.5).setDepth(40))
@@ -366,7 +370,7 @@ export default class PvpArenaN extends Phaser.Scene {
       cartas: [0, 1, 2].map((k) => new Carta(this, x - k * 1.2, y - k * 1.8, { personagem: this.ids[this.meu], naipe: 'espadas', valor: 2 }, { virada: true, largura: 46 }).setDepth(5 + k).setRotation(-0.08)),
       texto: this.add.text(x, y + 40, '', { fontFamily: FONTE, fontSize: '10px', color: TEXTO.desabilitado, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(8),
     }
-    this.mao = new Mao(this, { jogador: this.meu, cor, rotulo: `P${this.meu + 1}`, x: MAO.x, y: MAO.y, monte: MAO.monte, larguraMax: 150, espacamento: 40, profundidade: 20 })
+    this.mao = new Mao(this, { jogador: this.meu, cor, rotulo: `P${this.meu + 1}`, x: MAO.x, y: MAO.y, monte: MAO.monte, larguraMax: 150, espacamento: 40, profundidade: 20, efeito: this.cosmeticos?.[this.meu]?.efeito })
     this.botaoPassar = this.criarBotaoPassar(cor)
   }
 
@@ -1046,6 +1050,8 @@ export default class PvpArenaN extends Phaser.Scene {
       }
       return new Carta(this, origem.x, origem.y, { ...jog.carta }, { virada: true, largura: 70, corFoco: corDaVaga(j) }).setDepth(80 + j).setScale(0.3)
     })
+    // o LANÇAMENTO equipado de cada um (da carta até a mesa): só enfeite, a partida não espera
+    this.reveladas.forEach((c, j) => c instanceof Carta && lancarDoLado(this, j, { x: c.x, y: c.y }, this.mesa(j), corDaVaga(j)))
     this.mao.setTravada(false)
     tocar(this, 'cartaDeslizar')
     await Promise.all(this.reveladas.map((c, j) => c && this.tween({ targets: c, ...this.mesa(j), rotation: 0, scaleX: ESCALA_MESA, scaleY: ESCALA_MESA, duration: 320, ease: 'Cubic.easeOut' })))
@@ -1282,6 +1288,7 @@ export default class PvpArenaN extends Phaser.Scene {
     if (doOutro && coracao?.ativo) {
       coracao.tomarDano(TEMPOS.invencivelMs)
       particulas(this, coracao.x, coracao.y, { cor: coracao.cor, quantidade: 10, velocidade: 110 })
+      somDoLado(this, j, () => {}) // o som de dano equipado de quem levou (sem cosmético, silêncio como antes)
     }
     const borda = pista.caixa.retangulo
     borda.setStrokeStyle(4, CORES.acerto)

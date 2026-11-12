@@ -4,6 +4,7 @@ import { tocar } from '../../audio.js'
 import { particulas } from '../../effects/particulas.js'
 import { diferencasDeEstado, criarEspelhoCoracao } from './sincronia.js'
 import { criarFichas, embaralharEscondido, mascararEstado, mascararResultado, mascararJogada, mascararDadosDeCena, cartaOculta } from '../sigilo.js'
+import { somDoLado } from '../../cosmeticosSlots.js'
 
 // A PvpArena EM REDE (docs/rede-pvp.md, seção da arena): cada PC roda a arena
 // inteira, desvia na própria caixa sem atraso, e só as decisões viajam pelo
@@ -360,7 +361,7 @@ export default class ArenaRede {
       if (coracao?.ativo) {
         coracao.tomarDano(TEMPOS.invencivelMs)
         particulas(a, coracao.x, coracao.y, { cor: coracao.cor, quantidade: 10, velocidade: 110 })
-        tocar(a, 'dano')
+        somDoLado(a, lado, () => tocar(a, 'dano')) // o som de dano equipado dele (cosmético)
       }
     } else {
       for (let k = 0; k < n; k++) a.aplicarGraze(lado)

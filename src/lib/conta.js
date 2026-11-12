@@ -26,6 +26,8 @@ import { validarNome, AVATARES_JOGO } from './contaRegras.js'
 export const conta = writable({ estado: 'carregando', perfil: null, estatisticas: null, inventario: null, erro: '' })
 
 const COLUNAS = 'id, tag, nome_exibicao, avatar_tipo, avatar_id, avatar_url, titulo_equipado, moldura_equipada, verso_equipado, nivel, xp'
+// os slots novos (0015, docs/baus.md): lidos à parte (banco sem a 0015 continua carregando o perfil)
+const COLUNAS_SLOTS = 'som_equipado, efeito_equipado, lancamento_equipado'
 const ESTATISTICAS_ZERO = { partidas: 0, vitorias: 0, personagem_favorito: null }
 
 let supabase = null
@@ -112,7 +114,8 @@ async function carregarPerfil() {
     mudar({ estado: 'logado', perfil: null, estatisticas: null, erro: 'não deu para carregar o perfil: o serviço de contas não respondeu. Recarregue a página daqui a pouco' })
     return
   }
-  mudar({ estado: 'logado', perfil: p.data, estatisticas: e.data ?? ESTATISTICAS_ZERO, erro: '' })
+  const slots = await supabase.from('perfis').select(COLUNAS_SLOTS).eq('id', id).maybeSingle()
+  mudar({ estado: 'logado', perfil: { ...p.data, ...(!slots.error && slots.data) }, estatisticas: e.data ?? ESTATISTICAS_ZERO, erro: '' })
   avisar()
   carregarInventario()
 }
@@ -140,14 +143,21 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') {
   window.debugConta = {
     fingir({ id, nome }) {
       tokenDev = `falsa:${id}:${nome}`
-      mudar({ estado: 'logado', perfil: { id, tag: `${nome}#0001`, nome_exibicao: nome, avatar_tipo: 'padrao', avatar_id: null, avatar_url: null, titulo_equipado: null, moldura_equipada: null, verso_equipado: null, nivel: 1, xp: 0 }, estatisticas: ESTATISTICAS_ZERO, inventario: new Set(), erro: '' })
+      mudar({ estado: 'logado', perfil: { id, tag: `${nome}#0001`, nome_exibicao: nome, avatar_tipo: 'padrao', avatar_id: null, avatar_url: null, titulo_equipado: null, moldura_equipada: null, verso_equipado: null, som_equipado: null, efeito_equipado: null, lancamento_equipado: null, nivel: 1, xp: 0 }, estatisticas: ESTATISTICAS_ZERO, inventario: new Set(), erro: '' })
       avisar()
     },
   }
 }
 
-// tipo: 'titulo' | 'moldura' | 'verso' | 'avatar'; itemId null tira (menos o avatar)
+// tipo: 'titulo' | 'moldura' | 'verso' | 'avatar' | 'som' | 'efeito' | 'lancamento' (0015); itemId null
+// tira (menos o avatar). Sem Supabase, com a conta de teste do dev: pelo lobby (lib/bausConta.js)
 export async function equipar(tipo, itemId) {
+  if ((!supabase || !sessao) && tokenDev) {
+    const { equiparPeloLobby } = await import('./bausConta.js')
+    const r = await equiparPeloLobby(tipo, itemId)
+    if (r.ok && r.perfil) mudar({ perfil: { ...get(conta).perfil, ...r.perfil } })
+    return r.ok ? { ok: true } : r
+  }
   if (!supabase || !sessao) return { ok: false, erro: 'entre na conta primeiro' }
   const { data, error } = await supabase.rpc('equipar', { p_tipo: tipo, p_item: itemId ?? null })
   if (error) return { ok: false, erro: /item|tipo|avatar/i.test(String(error.message)) ? error.message : 'não deu para equipar: tente de novo' }

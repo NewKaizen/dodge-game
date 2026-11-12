@@ -35,7 +35,8 @@ import ArenaRedeCoopN from '../coop/ArenaRedeCoopN.js'
 import HudCoopN from '../coop/HudCoopN.js'
 import { marcadorDaVaga, nomeNoCoracao } from '../coop/marcadores.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
-import { canal, emRede, meuLado, meuIndice, souHostDaRede, irParaCena, participantesDaPartida } from '../rede.js'
+import { canal, emRede, meuLado, meuIndice, souHostDaRede, irParaCena, participantesDaPartida, cosmeticosDaPartida } from '../rede.js'
+import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 import { ligarEscuridao } from '../coop/semanal/escuridao.js'
 import { salaSemanal } from '../../lib/lan/rede.js'
 import { ligarLadra } from '../coop/semanal/ladraCena.js'
@@ -108,6 +109,7 @@ const NOMES_GOLPE = { espadas: 'GOLPE', ouros: 'GOLPE + ATRASA', paus: 'ARMADILH
 const estadoInicial = () => ({
   fundo: null,
   inimigo: null,
+  cosmeticos: null, // os cosméticos dos slots novos de cada vaga (som de dano, efeito, lançamento; docs/baus.md)
   textoChefe: null,
   balao: null,
   personagens: null,
@@ -169,6 +171,7 @@ export default class CoopArenaN extends Phaser.Scene {
     this.grupo = this.estado.grupo
     this.quadroCfg = quadroDoGrupo(this.grupo)
     this.nomes = Array.from({ length: this.n }, (_, j) => participantesDaPartida().find((p) => p.indice === j)?.nome ?? `P${j + 1}`)
+    this.cosmeticos = cosmeticosDaPartida(this.n) // só enfeite: nunca muda a partida
 
     this.controles = new Controles(this)
     this.rede = new ArenaRedeCoopN(this, { canal, meuIndice: this.meu, souHost: souHostDaRede(), participantes: participantesDaPartida, dev: Boolean(import.meta.env?.DEV) })
@@ -309,6 +312,7 @@ export default class CoopArenaN extends Phaser.Scene {
     })
     // cada coração leva o próprio dano, com o próprio escudo
     quadro.aoAcertar = (dano, bala, coracao) => this.acertou(coracao.jogador, this.danoNoCoracao(coracao.jogador, dano))
+    quadro.somDano = (coracao) => somDoLado(this, coracao.jogador, () => tocar(this, 'dano')) // o som de dano equipado (cosmético)
     quadro.aoGraze = (coracao) => this.grazeou(coracao.jogador)
     this.quadro = quadro
     this.pistas = [quadro]
@@ -329,7 +333,7 @@ export default class CoopArenaN extends Phaser.Scene {
       cartas: [0, 1, 2].map((k) => new Carta(this, x - k * 1.2, y - k * 1.8, { personagem: this.ids[this.meu], naipe: 'espadas', valor: 2 }, { virada: true, largura: 46 }).setDepth(5 + k).setRotation(-0.08)),
       texto: this.add.text(x, y + 40, '', { fontFamily: FONTE, fontSize: '10px', color: TEXTO.desabilitado, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(8),
     }
-    this.mao = new Mao(this, { jogador: this.meu, cor, rotulo: `P${this.meu + 1}`, x: MAO.x, y: MAO.y, monte: MAO.monte, larguraMax: 150, espacamento: 40, profundidade: 20 })
+    this.mao = new Mao(this, { jogador: this.meu, cor, rotulo: `P${this.meu + 1}`, x: MAO.x, y: MAO.y, monte: MAO.monte, larguraMax: 150, espacamento: 40, profundidade: 20, efeito: this.cosmeticos?.[this.meu]?.efeito })
     this.botaoPassar = this.criarBotaoPassar(cor)
   }
 
@@ -1010,6 +1014,8 @@ export default class CoopArenaN extends Phaser.Scene {
       }
       return new Carta(this, origem.x, origem.y, { ...jog.carta }, { virada: true, largura: 70, corFoco: corDaVaga(j) }).setDepth(80 + j).setScale(0.3)
     })
+    // o LANÇAMENTO equipado de cada um (da carta até a mesa): só enfeite, a partida não espera
+    this.reveladas.forEach((c, j) => c instanceof Carta && MESA[j] && lancarDoLado(this, j, { x: c.x, y: c.y }, MESA[j], corDaVaga(j)))
     this.mao.setTravada(false)
     tocar(this, 'cartaDeslizar')
     await Promise.all(
@@ -1363,7 +1369,7 @@ export default class CoopArenaN extends Phaser.Scene {
     if (doOutro && coracao?.ativo) {
       coracao.tomarDano(TEMPOS.invencivelMs)
       particulas(this, coracao.x, coracao.y, { cor: coracao.cor, quantidade: 10, velocidade: 110 })
-      tocar(this, 'dano')
+      somDoLado(this, j, () => tocar(this, 'dano')) // o som de dano equipado de quem levou (cosmético)
     }
     const borda = this.quadro.caixa.retangulo
     borda.setStrokeStyle(4, corDaVaga(j))

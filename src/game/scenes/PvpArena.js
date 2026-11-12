@@ -30,7 +30,8 @@ import { anunciarSuper } from '../pvp/super/anuncio.js'
 import FimDePartida from '../pvp/fimDePartida/index.js'
 import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe, venceu } from '../../lib/saida.js'
 import { nomesDaPartida } from '../pvp/nomesDaPartida.js'
-import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos } from '../rede.js'
+import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, cosmeticosDaPartida } from '../rede.js'
+import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 import ArenaRede from '../pvp/rede/ArenaRede.js'
 import { fatores } from '../acessibilidade.js'
 
@@ -206,6 +207,7 @@ const estadoInicial = () => ({
   etiquetasMesa: [],
   grazesRodada: [0, 0],
   paradaAgendada: false,
+  cosmeticos: null, // os cosméticos dos slots novos de cada lado (som de dano, efeito, lançamento; docs/baus.md)
 })
 
 export default class PvpArena extends Phaser.Scene {
@@ -279,9 +281,10 @@ export default class PvpArena extends Phaser.Scene {
     this.huds = [0, 1].map((j) => new HudPvp(this, { jogador: j, personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, rotulo: this.rotulo(j), nomeJogador: this.nomesJog[j] }))
     this.criarTopo()
     this.versos = coresDosVersos() // verso de carta equipado de cada lado (Fase 2F; em rede o de cada jogador)
+    this.cosmeticos = cosmeticosDaPartida(2) // som de dano, efeito e lançamento de cada lado (só enfeite)
     this.montes = [0, 1].map((j) => this.criarMonte(j))
     this.maos = [0, 1].map(
-      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: LARGURA_MAO, espacamento: 40, profundidade: 20, corVerso: this.versos[j] }),
+      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: LARGURA_MAO, espacamento: 40, profundidade: 20, corVerso: this.versos[j], efeito: this.cosmeticos[j].efeito }),
     )
     this.botoesPassar = [0, 1].map((j) => this.criarBotaoPassar(j))
     this.criarTextos()
@@ -392,6 +395,8 @@ export default class PvpArena extends Phaser.Scene {
       // quem leva o dano/graze é o dono do coração que está nesta pista
       pista.aoAcertar = (dano) => this.acertou(this.donoDaPista(j), dano)
       pista.aoGraze = () => this.grazeou(this.donoDaPista(j))
+      // o som de dano equipado de quem levou (cosmético; sem ele, o de sempre)
+      pista.somDano = () => somDoLado(this, this.donoDaPista(j), () => tocar(this, 'dano'))
       return pista
     })
   }
@@ -821,6 +826,7 @@ export default class PvpArena extends Phaser.Scene {
       mao.retirar(carta)
       return this.cartaDeVerdade(carta, jog.carta).setDepth(80 + j)
     })
+    this.lancarCosmeticos(cartas)
     this.maos.forEach((m) => m.setTravada(false))
     tocar(this, 'cartaDeslizar')
     await Promise.all(cartas.map((c, j) => this.tween({ targets: c, x: MESA[j].x, y: MESA[j].y, rotation: 0, scaleX: ESCALA_MESA, scaleY: ESCALA_MESA, duration: 320, ease: 'Cubic.easeOut' })))
@@ -1303,6 +1309,7 @@ export default class PvpArena extends Phaser.Scene {
       mao.retirar(carta)
       return this.cartaDeVerdade(carta, r.trocas?.[j]?.de ?? jog.carta).setDepth(80 + j)
     })
+    this.lancarCosmeticos(this.reveladas)
     this.maos.forEach((m) => m.setTravada(false))
     tocar(this, 'cartaDeslizar')
     await Promise.all(
@@ -1688,6 +1695,13 @@ export default class PvpArena extends Phaser.Scene {
   // Acerto no coração do jogador j (pistas, efeitos de bônus, duelo). Em rede
   // só vale para o coração daqui: aplica e manda o dano para o outro PC (o do
   // outro chega pela rede e entra direto em aplicarAcerto, sem voltar para lá)
+  // o LANÇAMENTO equipado de cada carta jogada (da mão até a mesa): só enfeite, a partida não espera
+  lancarCosmeticos(cartas) {
+    ;(cartas ?? []).forEach((c, j) => {
+      if (c instanceof Carta && MESA[j]) lancarDoLado(this, j, { x: c.x, y: c.y }, MESA[j], CORES.almas[j])
+    })
+  }
+
   acertou(j, dano) {
     if (this.rede && !this.rede.ehMeu(j)) return false
     const ok = this.aplicarAcerto(j, dano)

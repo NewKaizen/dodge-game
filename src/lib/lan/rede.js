@@ -69,7 +69,10 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 // CAMPANHA (PROTOCOLO 16, docs/campanha.md): `campanha {acao}` e as respostas campanha* (lib/campanha.js)
 // DESAFIO DIÁRIO e CONQUISTAS (PROTOCOLO 17, docs/desafio-diario.md): `campanha {acao: desafio...}`,
 // `conquistas` -> conquistasEstado e o aviso `conquistas` (lib/campanha.js e lib/conquistasConta.js)
-export const PROTOCOLO = 17
+// BAÚS e SLOTS NOVOS (PROTOCOLO 18, docs/baus.md): o membro da sala leva conta.cosmeticos {som, efeito,
+// lancamento, moldura}; `baus {acao}` -> bausEstado / bauAberto / bausErro / equipado e o aviso bauGanho
+// (lib/bausConta.js)
+export const PROTOCOLO = 18
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas

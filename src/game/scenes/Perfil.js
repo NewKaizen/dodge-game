@@ -205,7 +205,7 @@ export default class Perfil extends CenaConta {
     this.caixa(e.x, e.y, e.largura, e.altura)
     const cx = e.x + e.largura / 2
     const prog = progressoDoXp(p.xp)
-    this.view.add(criarAvatar(this, cx, e.y + 70, avatarDoPerfil(p), 96, corDaMoldura(p.moldura_equipada)))
+    this.view.add(criarAvatar(this, cx, e.y + 70, avatarDoPerfil(p), 96, corDaMoldura(p.moldura_equipada), p.moldura_equipada))
     caber(this.t(cx, e.y + 140, p.nome_exibicao, 20, COR.texto, { strokeThickness: 4 }).setOrigin(0.5), p.nome_exibicao, e.largura - 24)
     this.t(cx, e.y + 162, p.tag, 12, COR.dica).setOrigin(0.5)
     this.t(cx, e.y + 182, nomeDoItem(p.titulo_equipado) ?? 'sem título', 13, COR.titulo).setOrigin(0.5)

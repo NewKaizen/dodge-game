@@ -101,10 +101,11 @@ export const textoMotivo = (codigo) => MOTIVOS[codigo] ?? ''
 import { trofeuDoId } from './semanal.js'
 import { cosmeticoDoId } from './desafio.js'
 import { itemDaMaestria } from './conquistas.js'
+import { itemDoBau } from './cosmeticos.js'
 import { ITENS_CAMPANHA } from '../game/campanha/mundos/index.js'
 
-export const TIPOS_ITEM = ['avatar', 'titulo', 'moldura', 'verso']
-export const NOME_TIPO = { avatar: 'avatar', titulo: 'título', moldura: 'moldura', verso: 'verso de carta' }
+export const TIPOS_ITEM = ['avatar', 'titulo', 'moldura', 'verso', 'som', 'efeito', 'lancamento']
+export const NOME_TIPO = { avatar: 'avatar', titulo: 'título', moldura: 'moldura', verso: 'verso de carta', som: 'som de dano', efeito: 'efeito de carta', lancamento: 'lançamento de carta' }
 
 export const CATALOGO = [
   { id: 'titulo.novato', tipo: 'titulo', nome: 'Novato', nivel: 1, padrao: true },
@@ -135,7 +136,8 @@ const PORID = new Map(CATALOGO.map((i) => [i.id, i]))
 const DA_CAMPANHA = new Map(ITENS_CAMPANHA.map((i) => [i.id, i]))
 export const itemDaCampanha = (id) => DA_CAMPANHA.get(id) ?? null
 // (os do DESAFIO DIÁRIO, um por semana, e os da MAESTRIA, por personagem: src/lib/desafio.js e conquistas.js)
-export const itemDoCatalogo = (id) => PORID.get(id) ?? trofeuDoId(id) ?? itemDaCampanha(id) ?? cosmeticoDoId(id) ?? itemDaMaestria(id)
+// (os do BAÚ, com raridade, e os slots novos: src/lib/cosmeticos.js)
+export const itemDoCatalogo = (id) => PORID.get(id) ?? trofeuDoId(id) ?? itemDaCampanha(id) ?? cosmeticoDoId(id) ?? itemDaMaestria(id) ?? itemDoBau(id)
 export const nomeDoItem = (id) => itemDoCatalogo(id)?.nome ?? null
 // os da trilha até o nível (os padrão não entram: todo mundo já tem)
 export const itensAte = (nivel) => CATALOGO.filter((i) => !i.padrao && i.nivel <= nivel)

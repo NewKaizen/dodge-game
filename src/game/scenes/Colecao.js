@@ -16,6 +16,10 @@ import { PERSONAGENS } from '../data/personagens.js'
 import { ESCALA } from '../arte/texturas.js'
 import { semLigaduras } from '../campanha/texto.js'
 import { lan } from '../../lib/lan/rede.js'
+import { bausConta, pedirBaus, abrirBau, desistirDeAbrir } from '../../lib/bausConta.js'
+import { TITULOS_BAU, itensDoSlot, PADRAO_REGISTRO, COLUNA_DO_SLOT, COR_RARIDADE, NOME_RARIDADE, CHANCES, PITY, FONTES_BAU, XP_DUPLICADO, BAU_XP_TETO_DIA } from '../../lib/cosmeticos.js'
+import { previaDe } from '../cosmeticosSlots.js'
+import { desenharBau, iconeDoTipo, criarRevelacao } from '../conta/bau.js'
 
 const corDoMundo = (id) => `#${(mundoDe(id)?.cor ?? 0x7fc46b).toString(16).padStart(6, '0')}`
 
@@ -36,27 +40,48 @@ const corDoMundo = (id) => `#${(mundoDe(id)?.cor ?? 0x7fc46b).toString(16).padSt
 // cosméticos do nível 5 e 10 (que também aparecem nas abas de títulos e molduras). Os dados vêm do
 // servidor pelo lobby (lib/conquistasConta.js). Todo texto passa por semLigaduras (a fonte junta fi/fl).
 //
+// BAÚS e SLOTS NOVOS (docs/baus.md): a aba BAÚS (quantos tem, ABRIR com a revelação, as chances
+// publicadas) e as abas SONS, EFEITOS e LANÇAMENTOS (as molduras animadas entram na aba MOLDURAS). A
+// prévia de cada um vem do conteúdo (cosmeticosSlots.js previaDe); sem ela, o ícone e a cor da raridade.
+// Só se ganha baú jogando: nada aqui compra coisa nenhuma.
+//
 //   ↑↓←→ escolhe na grade (↑ no topo vai para as abas, ←→ troca de aba) · A equipa · B volta
-//   scene.start('Colecao', { pilha: [{ cena: 'Perfil' }] })
+//   scene.start('Colecao', { pilha: [{ cena: 'Perfil' }], aba: 'baus' })
 const ABAS = [
+  { tipo: 'baus', rotulo: 'BAÚS' },
   { tipo: 'avatar', rotulo: 'AVATARES' },
   { tipo: 'titulo', rotulo: 'TÍTULOS' },
   { tipo: 'moldura', rotulo: 'MOLDURAS' },
   { tipo: 'verso', rotulo: 'VERSOS' },
+  { tipo: 'som', rotulo: 'SONS' },
+  { tipo: 'efeito', rotulo: 'EFEITOS' },
+  { tipo: 'lancamento', rotulo: 'LANÇAMENTOS' },
   { tipo: 'semanal', rotulo: 'SEMANAIS' },
   { tipo: 'conquistas', rotulo: 'CONQUISTAS' },
   { tipo: 'maestria', rotulo: 'MAESTRIA' },
 ]
+const ABAS_VISIVEIS = 7 // a barra mostra 7 e anda com a aba escolhida
 // as abas que não equipam nada (só mostram)
-const SO_VER = new Set(['conquistas', 'maestria'])
+const SO_VER = new Set(['conquistas', 'maestria', 'baus'])
+const SLOTS_NOVOS = ['som', 'efeito', 'lancamento']
+const NOME_SLOT = { som: 'SOM DE DANO', efeito: 'EFEITO DE CARTA', lancamento: 'LANÇAMENTO DE CARTA', moldura: 'MOLDURA ANIMADA' }
+// o "padrão" de cada slot novo (equipar = tirar o cosmético)
+const padraoDoSlot = (tipo) => ({ id: `${tipo}.padrao`, tipo, nome: 'Padrão', padrao: true, registro: PADRAO_REGISTRO[tipo], semItem: true })
+const ehSlotNovo = (item) => SLOTS_NOVOS.includes(item?.tipo)
+const ESPERA_ABRIR_MS = 8000
 const COR_MEDALHA = 0xe0b84a
 
 const estadoInicial = () => ({
-  aba: 0,
+  aba: 1,
   foco: 'grade', // 'abas' | 'grade'
   indice: 0,
   mensagem: null,
   ocupado: false,
+  revelacao: null, // a abertura de um baú na tela (conta/bau.js)
+  abriuEm: 0,
+  previa: null, // a prévia do item em foco (registro dos cosméticos) e de quem ela é
+  previaChave: null,
+  pedidoBausEm: -Infinity,
 })
 const GRADE = { x: 24, y: 78, largura: 510, altura: 358, colunas: 4, linhas: 3, cel: { l: 120, a: 100 } }
 const DETALHE = { x: 544, y: 78, largura: 286, altura: 358 }
@@ -67,13 +92,85 @@ export default class Colecao extends CenaConta {
     super('Colecao')
   }
 
-  create() {
+  create(dados = {}) {
     Object.assign(this, estadoInicial())
+    const pedida = ABAS.findIndex((a) => a.tipo === dados?.aba)
+    if (pedida >= 0) this.aba = pedida
     this.iniciarBase({ titulo: 'COLEÇÃO' })
     this.ouvir(conta)
     this.ouvir(conquistasConta)
+    this.ouvir(bausConta)
     carregarInventario()
-    if (get(conta).estado === 'logado') pedirConquistas()
+    if (get(conta).estado === 'logado') {
+      pedirConquistas()
+      this.pedirBaus(0)
+    }
+    this.events.once('shutdown', () => {
+      this.revelacao?.destruir()
+      this.trocarPrevia(null)
+    })
+  }
+
+  // o estado dos baús (de novo a cada 3 s enquanto não chegou: a conexão pode estar subindo)
+  pedirBaus(agora = this.time.now) {
+    this.pedidoBausEm = agora
+    pedirBaus()
+  }
+
+  tique(time) {
+    if (this.perfil && !get(bausConta).carregado && time - this.pedidoBausEm > 3000) this.pedirBaus(time)
+    const r = this.revelacao
+    if (r?.estado !== 'esperando') return
+    const b = get(bausConta)
+    if (b.ultimo) r.mostrar(b.ultimo)
+    else if (b.erroAbrir) r.falhar(b.erroAbrir)
+    else if (time - this.abriuEm > ESPERA_ABRIR_MS) desistirDeAbrir()
+    if (r.estado !== 'esperando') this.time.delayedCall(1500, () => this.revelacao === r && r.rodape(this.textoRodapeRevelacao()))
+  }
+
+  textoRodapeRevelacao() {
+    const n = get(bausConta).fechados
+    return n > 0 ? `A: ABRIR OUTRO (${n})   ·   B: FECHAR` : 'A / B: FECHAR'
+  }
+
+  // A na aba BAÚS: pede ao servidor e o baú treme até o resultado chegar
+  abrir() {
+    const b = get(bausConta)
+    if (this.revelacao) return
+    if (!b.carregado || b.fechados <= 0) {
+      tocar(this, 'cancelar')
+      this.mensagem = { texto: b.convidado ? 'entre na sua conta para ganhar baús' : 'nenhum baú fechado: jogue para ganhar', cor: COR.aviso }
+      this.sujo = true
+      return
+    }
+    if (!abrirBau()) return
+    this.abriuEm = this.time.now
+    this.trocarPrevia(null)
+    this.revelacao = criarRevelacao(this)
+    this.revelacao.comecar()
+  }
+
+  fecharRevelacao(outro) {
+    const r = this.revelacao
+    if (!r?.pronto) return
+    r.destruir()
+    this.revelacao = null
+    this.sujo = true
+    if (outro && get(bausConta).fechados > 0) this.abrir()
+  }
+
+  // a prévia do conteúdo do item em foco (fica viva enquanto o foco não muda; o som toca ao chegar)
+  trocarPrevia(item, x, y, tam) {
+    const chave = item ? `${item.id}:${x}:${y}:${tam}` : null
+    if (chave === this.previaChave) return this.previa
+    this.previa?.destroy()
+    this.previa = null
+    this.previaChave = chave
+    if (!item?.registro) return null
+    const tipo = item.tipo === 'moldura' ? 'moldura' : item.tipo
+    this.previa = previaDe(this, tipo, item.registro, x, y, tam, 20)
+    if (this.previa && tipo === 'som' && !item.semItem) this.previa.tocar?.()
+    return this.previa
   }
 
   // todo texto da Coleção sem a ligadura fi/fl (nomes de cosméticos e conquistas)
@@ -82,7 +179,7 @@ export default class Colecao extends CenaConta {
   }
 
   travado() {
-    return this.ocupado
+    return this.ocupado && !this.revelacao
   }
 
   get perfil() {
@@ -97,6 +194,11 @@ export default class Colecao extends CenaConta {
   }
 
   itensDe(tipo) {
+    if (tipo === 'baus') return []
+    // os slots novos: o padrão (tira o cosmético) e os do baú, em ordem de raridade
+    if (SLOTS_NOVOS.includes(tipo)) return [padraoDoSlot(tipo), ...itensDoSlot(tipo)]
+    if (tipo === 'moldura') return [...CATALOGO.filter((i) => i.tipo === tipo), ...ITENS_CAMPANHA.filter((i) => i.tipo === tipo), ...ITENS_MAESTRIA.filter((i) => i.tipo === tipo), ...itensDoSlot('moldura')]
+    if (tipo === 'titulo') return [...CATALOGO.filter((i) => i.tipo === tipo), ...ITENS_CAMPANHA.filter((i) => i.tipo === tipo), ...ITENS_MAESTRIA.filter((i) => i.tipo === tipo), ...TITULOS_BAU]
     if (tipo === 'conquistas') return CONQUISTAS.map((c) => ({ ...c, tipo: 'conquista' }))
     if (tipo === 'maestria') return PERSONAGENS_MAESTRIA.map((p) => ({ id: `maestria.${p}`, tipo: 'maestria', personagem: p, nome: PERSONAGENS[p].nome }))
     // os da CAMPANHA (docs/campanha.md) e os da MAESTRIA entram no fim da aba do tipo deles
@@ -122,6 +224,7 @@ export default class Colecao extends CenaConta {
     if (item.tipo === 'titulo') return p.titulo_equipado === item.id
     if (item.tipo === 'moldura') return (p.moldura_equipada ?? 'moldura.simples') === item.id
     if (item.tipo === 'verso') return (p.verso_equipado ?? 'verso.classico') === item.id
+    if (ehSlotNovo(item)) return (p[COLUNA_DO_SLOT[item.tipo]] ?? null) === (item.semItem ? null : item.id)
     return p.avatar_tipo === 'jogo' && p.avatar_id === item.id.split('.')[1]
   }
 
@@ -132,7 +235,7 @@ export default class Colecao extends CenaConta {
     this.sujo = true
     // A no título já equipado tira o título
     const tirar = item.tipo === 'titulo' && this.equipado(item)
-    const r = await equipar(item.tipo, tirar ? null : item.id)
+    const r = await equipar(item.tipo, tirar || item.semItem ? null : item.id)
     this.ocupado = false
     this.mensagem = r.ok ? { texto: tirar ? 'título removido' : `${item.nome} equipado`, cor: COR.ok } : { texto: r.erro, cor: COR.erro }
     this.sujo = true
@@ -141,6 +244,7 @@ export default class Colecao extends CenaConta {
   // ---------- entrada ----------
 
   aoDirecao(d) {
+    if (this.revelacao) return
     if (!this.perfil) {
       if (d === 'cima' || d === 'baixo') this.sujo = true
       return
@@ -153,6 +257,15 @@ export default class Colecao extends CenaConta {
         tocar(this, 'mover')
         this.sujo = true
       }
+      return
+    }
+    // a aba BAÚS não tem grade: ↑ volta para as abas, ←→ troca de aba
+    if (ABAS[this.aba].tipo === 'baus') {
+      if (d === 'cima') {
+        this.foco = 'abas'
+        tocar(this, 'mover')
+        this.sujo = true
+      } else if (d === 'esquerda' || d === 'direita') this.trocarAba(d === 'direita' ? 1 : -1)
       return
     }
     const r = moverNaGrade(this.indice, this.itens().length, GRADE.colunas, d)
@@ -171,11 +284,18 @@ export default class Colecao extends CenaConta {
     this.aba = abaVizinha(ABAS.length, this.aba, passo)
     this.indice = 0
     this.mensagem = null
+    if (ABAS[this.aba].tipo === 'baus') this.pedirBaus()
     tocar(this, 'mover')
     this.sujo = true
   }
 
   aoBotao(botao) {
+    // a revelação de um baú por cima: A abre outro, B fecha (só depois que tudo apareceu)
+    if (this.revelacao) {
+      if (!this.revelacao.pronto) return
+      tocar(this, botao === 'A' ? 'confirmar' : 'cancelar')
+      return this.fecharRevelacao(botao === 'A')
+    }
     if (botao === 'B') {
       tocar(this, 'cancelar')
       if (this.perfil && this.foco === 'abas') {
@@ -197,6 +317,7 @@ export default class Colecao extends CenaConta {
       this.sujo = true
       return
     }
+    if (ABAS[this.aba].tipo === 'baus') return this.abrir()
     const item = this.itens()[this.indice]
     if (!item) return
     if (item.tipo === 'conquista' || item.tipo === 'maestria') return tocar(this, 'mover')
@@ -208,6 +329,7 @@ export default class Colecao extends CenaConta {
   // ---------- desenho ----------
 
   desenhar() {
+    if (this.revelacao) return // a revelação do baú cobre a tela (o resto volta quando ela fechar)
     const p = this.perfil
     if (!p) {
       const c = get(conta)
@@ -224,6 +346,10 @@ export default class Colecao extends CenaConta {
     const tem = CATALOGO.filter((i) => this.possui(i)).length
     this.subTexto.setText(`nível ${nivel}  ·  ${tem}/${CATALOGO.length} itens`)
     this.desenharAbas()
+    if (ABAS[this.aba].tipo === 'baus') {
+      this.trocarPrevia(null)
+      return this.desenharBaus()
+    }
     this.caixa(GRADE.x, GRADE.y, GRADE.largura, GRADE.altura)
     this.caixa(DETALHE.x, DETALHE.y, DETALHE.largura, DETALHE.altura)
     this.desenharGrade(p)
@@ -234,24 +360,87 @@ export default class Colecao extends CenaConta {
 
   desenharAbas() {
     const g = this.grafico()
-    const largura = (ABAS_UI.direita - ABAS_UI.esquerda - ABAS_UI.folga * (ABAS.length - 1)) / ABAS.length
+    // 11 abas não cabem: a barra mostra ABAS_VISIVEIS e anda com a escolhida
+    const visiveis = Math.min(ABAS_VISIVEIS, ABAS.length)
+    const inicio = janela(ABAS.length, this.aba, visiveis)
+    const largura = (ABAS_UI.direita - ABAS_UI.esquerda - ABAS_UI.folga * (visiveis - 1)) / visiveis
     ABAS.forEach((aba, i) => {
-      const x = ABAS_UI.esquerda + i * (largura + ABAS_UI.folga)
+      if (i < inicio || i >= inicio + visiveis) return
+      const x = ABAS_UI.esquerda + (i - inicio) * (largura + ABAS_UI.folga)
       const ativa = i === this.aba
       const doTipo = this.itensDe(aba.tipo)
       g.fillStyle(0x0b0914, 0.94).fillRect(x, ABAS_UI.y - ABAS_UI.altura / 2, largura, ABAS_UI.altura)
       g.lineStyle(3, ativa ? 0xffe040 : 0x4a4a5c, 1).strokeRect(x + 1.5, ABAS_UI.y - ABAS_UI.altura / 2 + 1.5, largura - 3, ABAS_UI.altura - 3)
-      const rotulo = `${aba.rotulo} ${doTipo.filter((c) => this.possui(c)).length}/${doTipo.length}`
-      this.t(x + largura / 2, ABAS_UI.y, rotulo, rotulo.length > 13 ? 10 : rotulo.length > 10 ? 12 : 14, ativa ? (aba.tipo === 'semanal' ? '#ffb060' : '#ffe040') : COR.apagado).setOrigin(0.5)
+      const fechados = get(bausConta).fechados
+      const rotulo = aba.tipo === 'baus' ? `${aba.rotulo}${fechados ? ` (${fechados})` : ''}` : `${aba.rotulo} ${doTipo.filter((c) => this.possui(c)).length}/${doTipo.length}`
+      this.t(x + largura / 2, ABAS_UI.y, rotulo, rotulo.length > 13 ? 10 : rotulo.length > 10 ? 12 : 14, ativa ? (aba.tipo === 'semanal' || aba.tipo === 'baus' ? '#ffb060' : '#ffe040') : aba.tipo === 'baus' && fechados ? '#ffb060' : COR.apagado).setOrigin(0.5)
       if (ativa && this.foco === 'abas') this.cursorEm(x + 16, ABAS_UI.y, 0.85)
     })
-    seta(g, 24, ABAS_UI.y, 'esquerda', 6, 0xffe040)
-    seta(g, LARGURA - 24, ABAS_UI.y, 'direita', 6, 0xffe040)
+    seta(g, 24, ABAS_UI.y, 'esquerda', 6, 0xffe040, inicio > 0 ? 1 : 0.35)
+    seta(g, LARGURA - 24, ABAS_UI.y, 'direita', 6, 0xffe040, inicio + visiveis < ABAS.length ? 1 : 0.35)
+  }
+
+  // ---------- a aba BAÚS ----------
+
+  desenharBaus() {
+    const b = get(bausConta)
+    const e = GRADE
+    const cx = e.x + e.largura / 2
+    this.caixa(e.x, e.y, e.largura, e.altura)
+    this.caixa(DETALHE.x, DETALHE.y, DETALHE.largura, DETALHE.altura)
+    const g = this.grafico()
+    desenharBau(g, cx, e.y + 108, 1.5)
+    if (!b.carregado) this.t(cx, e.y + 196, b.erro || 'carregando os baús do servidor…', 13, b.erro ? COR.erro : COR.dica).setOrigin(0.5)
+    else if (b.convidado) this.t(cx, e.y + 196, 'entre na sua conta para ganhar baús', 14, COR.aviso).setOrigin(0.5)
+    else if (!b.disponivel) this.t(cx, e.y + 196, 'baús indisponíveis neste servidor', 14, COR.aviso).setOrigin(0.5)
+    else {
+      this.t(cx, e.y + 192, b.fechados ? `VOCÊ TEM ${b.fechados} BAÚ${b.fechados > 1 ? 'S' : ''}` : 'NENHUM BAÚ FECHADO', 20, b.fechados ? COR.gold : COR.apagado, { strokeThickness: 4 }).setOrigin(0.5)
+      if (b.fechados) {
+        const sel = this.foco === 'grade'
+        g.fillStyle(0xffe040, sel ? 0.16 : 0.06).fillRect(cx - 110, e.y + 214, 220, 34)
+        g.lineStyle(3, sel ? 0xffe040 : 0x6a6a7c, 1).strokeRect(cx - 108.5, e.y + 215.5, 217, 31)
+        this.t(cx, e.y + 231, 'A: ABRIR BAÚ', 16, sel ? '#ffe040' : COR.texto).setOrigin(0.5)
+        if (sel) this.cursorEm(cx - 128, e.y + 231, 0.9)
+      } else this.t(cx, e.y + 231, 'jogue para ganhar: veja de onde vêm ao lado', 12, COR.dica).setOrigin(0.5)
+      const faltam = Math.max(1, b.pity - b.desdeEpico)
+      this.t(cx, e.y + 266, faltam <= 1 ? 'o próximo baú garante um ÉPICO ou melhor!' : `épico garantido em no máximo ${faltam} baús`, 12, faltam <= 1 ? COR_RARIDADE.epico : COR.descricao).setOrigin(0.5)
+      this.t(cx, e.y + 286, `${b.abertos} aberto${b.abertos === 1 ? '' : 's'} até agora`, 11, COR.dica).setOrigin(0.5)
+    }
+    const m = this.mensagem
+    if (m) this.t(cx, e.y + e.altura - 50, m.texto, 12, m.cor, { wordWrap: { width: e.largura - 40 }, align: 'center' }).setOrigin(0.5)
+    this.t(cx, e.y + e.altura - 22, 'baú só se ganha jogando: nada aqui é vendido', 11, COR.apagado).setOrigin(0.5)
+
+    // as chances (publicadas) e as fontes
+    const d = DETALHE
+    const dx = d.x + 18
+    this.t(d.x + d.largura / 2, d.y + 18, 'CHANCES DE CADA RECOMPENSA', 13, COR.gold).setOrigin(0.5, 0)
+    CHANCES.forEach((c, i) => {
+      const y = d.y + 44 + i * 20
+      g.fillStyle(parseInt(COR_RARIDADE[c.raridade].slice(1), 16), 1).fillRect(dx, y + 3, 10, 10)
+      this.t(dx + 18, y, NOME_RARIDADE[c.raridade], 12, COR_RARIDADE[c.raridade])
+      this.t(d.x + d.largura - 18, y, `${c.pct}%`, 12, COR.texto).setOrigin(1, 0)
+    })
+    const regras = [
+      `1 a 3 recompensas por baú (50% · 35% · 15%)`,
+      `ÉPICO garantido a cada ${PITY} baús sem um`,
+      `já tinha o item: vira XP (+${XP_DUPLICADO.comum} a +${XP_DUPLICADO.lendario})`,
+      `XP de baús: até ${BAU_XP_TETO_DIA} por dia`,
+    ]
+    regras.forEach((r, i) => this.t(dx, d.y + 134 + i * 17, `· ${r}`, 10, COR.descricao, { wordWrap: { width: d.largura - 36 } }))
+    this.t(d.x + d.largura / 2, d.y + 210, 'DE ONDE VÊM', 13, COR.gold).setOrigin(0.5, 0)
+    const fontes = ['cada nível novo: 1 baú', 'baú do dia: a 1ª partida do dia', 'a 1ª vitória no desafio diário', 'vencer o boss semanal', 'algumas conquistas']
+    fontes.forEach((f, i) => this.t(dx, d.y + 234 + i * 17, `· ${f}`, 10, COR.descricao))
+    this.t(d.x + d.largura / 2, d.y + d.altura - 22, `${Object.keys(FONTES_BAU).length} fontes · sorteio feito no servidor`, 9, COR.apagado).setOrigin(0.5)
+    this.rodape(this.foco === 'abas' ? [['esqDir', 'Aba'], ['cimaBaixo', 'Entrar'], ['B', 'Voltar']] : [['esqDir', 'Aba'], ['A', 'Abrir'], ['B', 'Voltar']])
   }
 
   // um item pequeno (na grade) ou grande (no detalhe)
   amostra(item, p, x, y, escala) {
     if (item.tipo === 'conquista') return this.medalha(item, x, y, escala)
+    if (ehSlotNovo(item)) {
+      const cor = item.raridade ? parseInt(COR_RARIDADE[item.raridade].slice(1), 16) : 0x9a9ab0
+      return iconeDoTipo(this.grafico(), item.tipo, x, y, 26 * escala, cor)
+    }
     if (item.tipo === 'maestria') return this.retratoMaestria(item, x, y, escala)
     const moldura = corDaMoldura(p.moldura_equipada)
     if (item.tipo === 'avatar') this.view.add(criarAvatar(this, x, y, { tipo: 'jogo', id: item.id.split('.')[1] }, 36 * escala, moldura))
@@ -324,7 +513,7 @@ export default class Colecao extends CenaConta {
         g.lineStyle(3, 0x9a9ab0, 1).strokeRect(lx - 5, ly - 10, 10, 10)
       }
       if (item.tipo !== 'titulo') caber(this.t(x, y + 22, item.nome, 12, tem ? COR.texto : COR.apagado).setOrigin(0.5), item.nome, cel.l - 14)
-      const estado = tem ? (this.equipado(item) ? 'EQUIPADO' : item.padrao ? 'padrão' : 'seu') : item.exclusivo || item.diario ? 'esta semana' : item.maestria ? `maestria ${item.maestria}` : item.campanha ? 'campanha' : `nível ${item.nivel}`
+      const estado = tem ? (this.equipado(item) ? 'EQUIPADO' : item.padrao ? 'padrão' : 'seu') : item.bau ? `baú · ${NOME_RARIDADE[item.raridade].toLowerCase()}` : item.exclusivo || item.diario ? 'esta semana' : item.maestria ? `maestria ${item.maestria}` : item.campanha ? 'campanha' : `nível ${item.nivel}`
       this.t(x, y + (item.tipo === 'titulo' ? 22 : 36), estado, 10, tem ? (this.equipado(item) ? COR.ok : COR.dica) : COR.aviso).setOrigin(0.5)
       if (sel) this.cursorEm(x - cel.l / 2 + 16, y - cel.a / 2 + 16, 0.7)
     })
@@ -374,6 +563,7 @@ export default class Colecao extends CenaConta {
 
   desenharDetalhe(p, nivel) {
     const item = this.foco === 'grade' ? this.itens()[this.indice] : null
+    if (!item || !(ehSlotNovo(item) || (item.tipo === 'moldura' && item.registro))) this.trocarPrevia(null)
     const d = DETALHE
     const cx = d.x + d.largura / 2
     if (!item) {
@@ -383,11 +573,16 @@ export default class Colecao extends CenaConta {
     if (item.tipo === 'conquista') return this.detalheConquista(item, cx, d)
     if (item.tipo === 'maestria') return this.detalheMaestria(item, cx, d)
     const tem = this.possui(item)
-    this.amostra(item, p, cx, d.y + (item.tipo === 'titulo' ? 140 : 96), 2.2)
+    // a prévia do conteúdo (som, efeito, lançamento, moldura animada); sem ela, o desenho de sempre
+    const comPrevia = (ehSlotNovo(item) || (item.tipo === 'moldura' && item.registro)) && this.trocarPrevia(item, cx, d.y + 96, 96)
+    if (!comPrevia) {
+      if (!ehSlotNovo(item) && !(item.tipo === 'moldura' && item.registro)) this.trocarPrevia(null)
+      this.amostra(item, p, cx, d.y + (item.tipo === 'titulo' ? 140 : 96), 2.2)
+    }
     if (item.tipo !== 'titulo') caber(this.t(cx, d.y + 176, item.nome, 20, COR.texto, { strokeThickness: 4 }).setOrigin(0.5), item.nome, d.largura - 24)
-    const tipo = { avatar: 'AVATAR', titulo: 'TÍTULO', moldura: 'MOLDURA', verso: 'VERSO DE CARTA' }[item.tipo]
-    const origem = item.campanha ? `${tipo} · CAMPANHA, MUNDO ${item.mundo}` : item.diario ? `${tipo} · DESAFIO DIÁRIO ${item.semana}` : item.exclusivo ? `${tipo} · TROFÉU SEMANAL ${item.semana}` : item.maestria ? `${tipo} · MAESTRIA ${PERSONAGENS[item.personagem].nome.toUpperCase()}` : tipo
-    this.t(cx, d.y + 200, origem, 11, item.campanha ? corDoMundo(item.mundo) : item.exclusivo || item.diario ? '#ffb060' : COR.dica).setOrigin(0.5)
+    const tipo = item.registro && item.tipo === 'moldura' ? NOME_SLOT.moldura : { avatar: 'AVATAR', titulo: 'TÍTULO', moldura: 'MOLDURA', verso: 'VERSO DE CARTA', ...NOME_SLOT }[item.tipo]
+    const origem = item.bau ? `${tipo} · BAÚ · ${NOME_RARIDADE[item.raridade]}` : item.campanha ? `${tipo} · CAMPANHA, MUNDO ${item.mundo}` : item.diario ? `${tipo} · DESAFIO DIÁRIO ${item.semana}` : item.exclusivo ? `${tipo} · TROFÉU SEMANAL ${item.semana}` : item.maestria ? `${tipo} · MAESTRIA ${PERSONAGENS[item.personagem].nome.toUpperCase()}` : tipo
+    this.t(cx, d.y + 200, origem, 11, item.bau ? COR_RARIDADE[item.raridade] : item.campanha ? corDoMundo(item.mundo) : item.exclusivo || item.diario ? '#ffb060' : COR.dica).setOrigin(0.5)
     let estado
     if (this.equipado(item)) estado = { texto: item.tipo === 'titulo' ? 'EQUIPADO  ·  A tira o título' : 'EQUIPADO', cor: COR.ok }
     else if (tem) estado = { texto: 'A: EQUIPAR', cor: COR.gold }
@@ -395,14 +590,17 @@ export default class Colecao extends CenaConta {
     else if (item.diario) estado = { texto: `vença o desafio diário em ${DIAS_COSMETICO_SEMANA} dias da semana`, cor: COR.aviso }
     else if (item.maestria) estado = { texto: `maestria ${item.maestria} com ${PERSONAGENS[item.personagem].nome}`, cor: COR.aviso }
     else if (item.exclusivo) estado = { texto: `vença: ${SEMANAIS[item.chefe]?.nome ?? 'o boss semanal'}`, cor: COR.aviso }
+    else if (item.bau) estado = { texto: 'sai do BAÚ (aba BAÚS)', cor: COR.aviso }
     else estado = { texto: `libera no nível ${item.nivel}`, cor: COR.aviso }
     this.t(cx, d.y + 232, estado.texto, 14, estado.cor).setOrigin(0.5)
     if (!tem && item.campanha) this.t(cx, d.y + 254, 'menu → CAMPANHA (com conta)', 11, COR.dica).setOrigin(0.5)
     else if (!tem && item.diario) this.t(cx, d.y + 254, 'menu → DESAFIO DIÁRIO · só até domingo, nunca volta', 11, COR.dica).setOrigin(0.5)
     else if (!tem && item.maestria) this.t(cx, d.y + 254, 'jogue com o personagem (aba MAESTRIA)', 11, COR.dica).setOrigin(0.5)
     else if (!tem && item.exclusivo) this.t(cx, d.y + 254, 'ONLINE · BOSS SEMANAL · só até domingo, nunca volta', 11, COR.dica).setOrigin(0.5)
+    else if (!tem && item.bau) this.t(cx, d.y + 254, 'baús se ganham jogando (nunca se compram)', 11, COR.dica).setOrigin(0.5)
     else if (!tem) this.t(cx, d.y + 254, nivel >= item.nivel ? 'jogue uma partida para receber' : `faltam ${item.nivel - nivel} nível${item.nivel - nivel > 1 ? 'is' : ''}`, 11, COR.dica).setOrigin(0.5)
-    if (item.tipo === 'verso') this.t(cx, d.y + 282, 'equipado, este verso aparece nas suas\ncartas nas partidas (online, o\noutro jogador também vê)', 10, COR.apagado, { align: 'center' }).setOrigin(0.5, 0)
+    if (ehSlotNovo(item) || (item.tipo === 'moldura' && item.registro)) this.t(cx, d.y + 282, { som: 'toca quando VOCÊ leva um acerto\n(online, os outros também ouvem)', efeito: 'em volta das suas cartas na partida\n(online, os outros também veem)', lancamento: 'quando você joga uma carta\n(online, os outros também veem)', moldura: 'em volta do seu avatar\n(no lobby, os outros também veem)' }[item.tipo], 10, COR.apagado, { align: 'center' }).setOrigin(0.5, 0)
+    else if (item.tipo === 'verso') this.t(cx, d.y + 282, 'equipado, este verso aparece nas suas\ncartas nas partidas (online, o\noutro jogador também vê)', 10, COR.apagado, { align: 'center' }).setOrigin(0.5, 0)
     else this.t(cx, d.y + 290, 'cosméticos não mudam nada no jogo', 10, COR.apagado).setOrigin(0.5)
     // os da campanha têm um texto (o catálogo do banco não tem descrição: fica em mundos/mundoN.js)
     if (item.descricao) this.t(cx, d.y + 306, item.descricao, 10, COR.dica, { align: 'center', wordWrap: { width: d.largura - 40 } }).setOrigin(0.5, 0)

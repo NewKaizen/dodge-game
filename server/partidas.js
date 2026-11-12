@@ -76,6 +76,8 @@ import { agendarPadrao } from './fila.js'
 import { METRICAS_NULA } from './metricas.js'
 import { infoSemanal, ID_SEMANA } from '../src/lib/semanal.js'
 import { msgConquistas } from './conquistas.js'
+import { msgBauGanho } from './baus.js'
+import { RESULTADOS_JOGADOS } from '../src/lib/progresso.js'
 
 export const RELATO_JANELA_MS = 20_000
 export const ABANDONO_GRACA_MS = 3_000
@@ -198,6 +200,40 @@ export function criarRegistro(supabase) {
     desbloquearConquistas: async (usuario, ids) => {
       const d = await chamar('desbloquear_conquistas', { p_user: usuario, p_ids: ids })
       return Array.isArray(d) ? d.filter((x) => typeof x === 'string') : []
+    },
+    // BAÚS e SLOTS NOVOS (0015, server/baus.js)
+    concederBau: async (usuario, fonte, ref) => {
+      const d = (await chamar('conceder_bau', { p_user: usuario, p_fonte: fonte, p_ref: ref })) ?? {}
+      return { novo: Boolean(d.novo), fonte: d.fonte ?? fonte, chave: d.chave ?? null, fechados: Number(d.fechados) || 0 }
+    },
+    abrirBau: async (usuario, bauId, sorteio) => {
+      const d = (await chamar('abrir_bau', { p_user: usuario, p_bau: bauId ?? null, p_sorteio: sorteio })) ?? {}
+      if (!d.aberto) return { aberto: false, motivo: d.motivo ?? 'sem_bau', fechados: Number(d.fechados) || 0 }
+      return {
+        aberto: true,
+        bauId: d.bau_id ?? null,
+        fonte: d.fonte ?? null,
+        recompensas: (Array.isArray(d.recompensas) ? d.recompensas : []).map((r) => ({ tipo: r.tipo, ...(r.id && { id: r.id }), raridade: r.raridade, ...(r.xp != null && { xp: Number(r.xp) || 0 }) })),
+        xpGanho: Number(d.xp_ganho) || 0,
+        xpSorteado: Number(d.xp_sorteado) || 0,
+        teto: Boolean(d.teto),
+        xpTotal: d.xp_total ?? null,
+        nivelAntes: d.nivel_antes ?? null,
+        nivelDepois: d.nivel_depois ?? null,
+        itensNovos: Array.isArray(d.itens_novos) ? d.itens_novos : [],
+        pity: Boolean(d.pity),
+        desdeEpico: Number(d.desde_epico) || 0,
+        repetido: Boolean(d.repetido),
+        fechados: Number(d.fechados) || 0,
+      }
+    },
+    estadoBaus: async (usuario) => {
+      const d = (await chamar('baus_estado', { p_user: usuario })) ?? {}
+      return { fechados: Number(d.fechados) || 0, abertos: Number(d.abertos) || 0, desdeEpico: Number(d.desde_epico) || 0, lista: Array.isArray(d.lista) ? d.lista.map((b) => ({ id: b.id, fonte: b.fonte, em: b.em ?? null })) : [] }
+    },
+    equiparConta: async (usuario, tipo, item) => {
+      const d = await chamar('equipar_conta', { p_uid: usuario, p_tipo: tipo, p_item: item ?? null })
+      return Array.isArray(d) ? d[0] : d
     },
     conquistasDaConta: async (usuario) => {
       const d = (await chamar('conquistas_da_conta', { p_user: usuario })) ?? {}
@@ -419,7 +455,7 @@ export function lerRelato(m, modo = 'pvp', n = 2) {
 
 // ---------- o registro no lobby ----------
 
-export function criarPartidas({ registro = null, agora = Date.now, agendar = agendarPadrao, entregar = () => {}, log = () => {}, versao = 1, metricas = METRICAS_NULA, conquistas = null } = {}) {
+export function criarPartidas({ registro = null, agora = Date.now, agendar = agendarPadrao, entregar = () => {}, log = () => {}, versao = 1, metricas = METRICAS_NULA, conquistas = null, baus = null } = {}) {
   const partidas = new Map() // id -> partida (em andamento e as guardadas)
   const doCliente = new Map() // id do cliente -> Set de partidas em andamento
   // os timers daqui (prazo dos relatos, esquecer a decisão): fechar() cancela todos
@@ -661,17 +697,34 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
         ...(trofeus.has(x.usuario) && { trofeu: trofeus.get(x.usuario) }),
       })
     }
+    // BAÚS (0015): nível novo, o baú do dia (partida jogada até o fim) e o boss semanal; nunca derruba o XP
+    if (baus) for (const x of comConta) bausDaConta(p, d, x, linhas.find((y) => y.usuario === x.usuario), trofeus)
     // CONQUISTAS e MAESTRIA (4B): depois do XP, um evento por conta (o personagem do relato; só cosmético)
     if (conquistas) for (const x of comConta) eventoDaConta(p, d, x, trofeus)
+  }
+
+  function bausDaConta(p, d, x, l, trofeus) {
+    if (!l) return
+    baus
+      .depoisDoXp(x.usuario, { nivelAntes: l.nivel_antes, nivelDepois: l.nivel_depois, jogou: RESULTADOS_JOGADOS.includes(d.resultados[x.lado]) && l.motivo !== 'curta', semana: trofeus.has(x.usuario) ? p.semanal?.semana ?? null : null })
+      .then((novos) => {
+        const msg = msgBauGanho(novos)
+        if (msg) entregar(x, msg)
+      })
+      .catch((e) => log(`[baus] partida ${p.id}: ${e.message}`))
   }
 
   function eventoDaConta(p, d, x, trofeus) {
     const resultado = d.resultados[x.lado]
     conquistas
       .evento(x.usuario, `partida:${p.id}`, { tipo: 'partida', modo: p.modo, resultado, personagem: x.relato?.personagem ?? null, trofeuSemanal: Boolean(trofeus.get(x.usuario)?.novo) })
-      .then((r) => {
+      .then(async (r) => {
         const msg = msgConquistas(r)
         if (msg) entregar(x, msg)
+        // BAÚS: as conquistas novas que dão baú
+        const novos = baus && r?.novas?.length ? await baus.depoisDoXp(x.usuario, { conquistas: r.novas }) : []
+        const aviso = msgBauGanho(novos)
+        if (aviso) entregar(x, aviso)
       })
   }
 
