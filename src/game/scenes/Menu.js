@@ -83,6 +83,7 @@ const estadoInicial = () => ({
   seta: null,
   aviso: null,
   miniatura: null,
+  chaveMiniatura: null,
   barras: null,
   dicaUsb: null,
   ultimaDicaUsb: 0,
@@ -221,6 +222,7 @@ export default class Menu extends Phaser.Scene {
     this.seta = this.add.text(260, 0, '›', { fontFamily: FONTE, fontSize: '24px', color: UI.destaque }).setOrigin(0.5)
     this.aviso = this.add.text(32, 425, '', { fontFamily: FONTE, fontSize: '11px', color: UI.secundario, wordWrap: { width: 248 }, lineSpacing: 3 })
     this.miniatura = null
+    this.chaveMiniatura = null
     this.painel.add([...this.linhas, this.seta, this.aviso])
   }
 
@@ -237,12 +239,26 @@ export default class Menu extends Phaser.Scene {
   // o avatar com a moldura fica na margem esquerda da linha do PERFIL
   atualizarMiniatura() {
     const i = this.opcoes.findIndex((o) => o.id === 'perfil')
-    this.miniatura?.destroy()
-    this.miniatura = null
     const c = get(conta)
-    if (i < 0 || c.estado !== 'logado' || !c.perfil) return
+    if (i < 0 || c.estado !== 'logado' || !c.perfil) {
+      this.miniatura?.destroy()
+      this.miniatura = null
+      this.chaveMiniatura = null
+      return
+    }
     const sel = i === this.indice && this.conectado
-    this.miniatura = criarAvatar(this, this.pos.x - 16 + (sel ? 8 : 0), this.linhas[i].y, avatarDoPerfil(c.perfil), 20, corDaMoldura(c.perfil.moldura_equipada))
+    const x = this.pos.x - 16 + (sel ? 8 : 0)
+    const y = this.linhas[i].y
+    const avatar = avatarDoPerfil(c.perfil)
+    // só recria quando o avatar ou a moldura mudam; a cada tecla, só move (recriar fazia a foto piscar)
+    const chave = JSON.stringify([avatar, c.perfil.moldura_equipada])
+    if (this.miniatura?.scene && this.chaveMiniatura === chave) {
+      this.miniatura.setPosition(x, y)
+      return
+    }
+    this.miniatura?.destroy()
+    this.miniatura = criarAvatar(this, x, y, avatar, 20, corDaMoldura(c.perfil.moldura_equipada))
+    this.chaveMiniatura = chave
     this.painel.add(this.miniatura)
   }
 
