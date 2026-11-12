@@ -183,7 +183,9 @@ const ARCOIRIS = [0xff3355, 0xffd34d, 0x6dffb0, 0x4da6ff]
 export function criarAvatar(cena, x, y, avatar, tamanho, moldura = null, idMoldura = null) {
   const c = cena.add.container(x, y)
   const fundo = cena.add.rectangle(0, 0, tamanho, tamanho, 0x16182a)
-  const img = cena.add.image(0, 0, texturaAvatar(cena, avatar?.tipo === 'enviado' ? { tipo: 'padrao' } : avatar))
+  // foto já carregada antes: usa direto (sem piscar o coração padrão por um quadro)
+  const fotoPronta = avatar?.tipo === 'enviado' && avatar.url && cena.textures.exists(`foto:${avatar.url}`) ? `foto:${avatar.url}` : null
+  const img = cena.add.image(0, 0, fotoPronta ?? texturaAvatar(cena, avatar?.tipo === 'enviado' ? { tipo: 'padrao' } : avatar))
   img.setDisplaySize(tamanho, tamanho)
   const borda = tamanho >= 48 ? 4 : 2
   const g = cena.add.graphics()
@@ -206,7 +208,7 @@ export function criarAvatar(cena, x, y, avatar, tamanho, moldura = null, idMoldu
     const anim = molduraAnimada(cena, 0, 0, tamanho + borda * 2, registroDoId(idMoldura))
     if (anim) c.add(anim)
   }
-  if (avatar?.tipo === 'enviado' && avatar.url) {
+  if (!fotoPronta && avatar?.tipo === 'enviado' && avatar.url) {
     carregarFoto(cena, avatar.url).then((chave) => {
       if (!chave || !img.scene || !cena.textures.exists(chave)) return // falhou (ou a tela já mudou): fica o coração
       img.setTexture(chave).setDisplaySize(tamanho, tamanho)

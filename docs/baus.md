@@ -9,10 +9,10 @@ nada na partida (regra fixa da Fase 4): só som e desenho, e a partida nunca esp
 | Catálogo dos slots, chances, pena, sorteio (puro) | `src/lib/cosmeticos.js` (ids em [cosmeticos-ids.md](cosmeticos-ids.md)) |
 | Banco | `supabase/migrations/0015_baus_cosmeticos.sql` (espelho em `server/supabase/fake.js`) |
 | Servidor: conceder e abrir | `server/baus.js` (chamado de `server/partidas.js`, `server/campanha.js`; mensagens em `server/lan.js`) |
-| Navegador: estado, abrir, aviso | `src/lib/bausConta.js`, `src/game/conta/avisos.js` |
+| Navegador: estado, abrir, aviso | `src/lib/bausConta.js` (o aviso `bauGanho` vai para `src/game/conta/popupBau.js`) |
 | Ponte para o conteúdo | `src/game/cosmeticosSlots.js` (+ `cosmeticosRegistro.js`, que carrega `src/game/cosmeticos/registro.js`) |
-| Telas | Coleção: abas **BAÚS**, SONS, EFEITOS, LANÇAMENTOS (as molduras animadas na aba MOLDURAS); revelação em `src/game/conta/bau.js` |
-| Testes | `src/lib/__tests__/cosmeticos.test.js`, `src/game/__tests__/cosmeticosSlots.test.js`, `server/__tests__/baus.test.js`, `bausSql.test.js` (Postgres, com `DODGE_PG`) |
+| Telas | Coleção: abas **BAÚS**, SONS, EFEITOS, LANÇAMENTOS (as molduras animadas na aba MOLDURAS); a **roleta** em `src/game/conta/roletaBau.js` (o desenho do baú em `bau.js`); o pop-up em `src/game/scenes/BauPopup.js` |
+| Testes | `src/lib/__tests__/cosmeticos.test.js`, `src/game/__tests__/cosmeticosSlots.test.js`, `server/__tests__/baus.test.js`, `bausSql.test.js` (Postgres, com `DODGE_PG`), `src/lib/__tests__/roleta.test.js` (a fita), `src/game/__tests__/filaBau.test.js` (a fila do pop-up) |
 
 ## De onde vêm os baús (só o servidor concede)
 
@@ -57,6 +57,39 @@ números.
 
 As mesmas chances aparecem na aba BAÚS da Coleção.
 
+## O pop-up e a roleta (só interface: chances, pena e concessão não mudaram)
+
+**Pop-up "VOCÊ GANHOU UM BAÚ!"**: quando o servidor manda `bauGanho` (nível novo, baú do dia, desafio diário, boss
+semanal, conquista) o aviso entra numa fila (`src/game/conta/filaBau.js`, pura e testada) e aparece **na hora** por
+cima de qualquer menu ou tela de resultado (`Menu`, `Lan`, `PvpResultado`, `PvpResultadoN`, `Vitoria`, `GameOver`,
+`CampanhaFim`, `PartyFim`, `DesafioDiario`...; a lista é `CENAS_DO_POPUP`). **Nunca interrompe uma partida**: com uma
+arena (ou votação, pausa, escolha de partida) na tela o aviso espera e sai ~0,7 s depois de a tela de resultado
+aparecer. Dois avisos seguidos viram um pop-up só. Quem liga tudo é `popupBau.js` (`Game.svelte`); a cena
+`BauPopup` pausa a cena de baixo e fica com os botões (A/B/C) até fechar. Se uma partida começar com o pop-up aberto
+(convite aceito, o host iniciou a sala), ele fecha sozinho e o aviso volta para a fila.
+
+| Botão | O que faz |
+| --- | --- |
+| **ABRIR AGORA** (A) | roda a roleta ali mesmo, sem trocar de tela |
+| **DEPOIS** (B / C / Esc) | fecha; o baú continua na aba BAÚS (`BAÚS (n)`) e o PERFIL do menu mostra "n BAÚS PARA ABRIR" |
+
+**Roleta** (`roletaBau.js`, usada pelo pop-up e pela aba BAÚS da Coleção): uma fita horizontal de cartas na cor da
+raridade passa por baixo de um marcador, com um tique a cada carta. Ao abrir ela já gira (rápida e constante) **enquanto
+o servidor sorteia** (`abrir_bau`); quando a resposta chega, desacelera (~3,4 s) e para em cima do item de verdade. As
+outras cartas são iscas do catálogo sorteadas pelas **mesmas chances publicadas** (`src/lib/roleta.js`,
+`construirFita`: a carta real fica em `fita[parada]`, o gerador é injetável nos testes). Baú com 2 ou 3 recompensas: um
+giro por cosmético (os seguintes de ~2,4 s) e o bônus de XP vira uma ficha; "já tinha: +N XP" aparece na legenda e na
+ficha. Ao parar: brilho e partículas pela raridade (comum discreto, raro e épico com anel e clarão, **lendário** com
+arco-íris, raios de luz e tremor de tela). No fim: **EQUIPAR AGORA** (cosmético novo; usa o `equipar` de sempre),
+**ABRIR OUTRO (n)** e **FECHAR**.
+
+Controles: A (ou clique) pula o giro e passa para a próxima recompensa, ←→ escolhem o botão, A confirma, B fecha; mouse
+e toque clicam nos botões. Com **movimento reduzido** (Config) não há rolagem: só a revelação. O texto passa por
+`semLigaduras`. Há uma proteção de 350 ms para o A que o jogador ainda tinha na mão.
+
+Dev: `window.debugBau.simular(['nivel'], 3)` finge o aviso do servidor; `window.debugBau.forcar = { recompensas: [...], xpGanho, ... }`
+faz a roleta usar esse resultado no lugar do servidor (para ver o lendário e o baú de 3 recompensas).
+
 ## Os slots e quem vê
 
 | Slot | Coluna | O que faz | Quem vê/ouve |
@@ -79,7 +112,7 @@ limite de 2,5 s e ninguém espera por ele; sem conteúdo (ou com erro) fica o pa
 `baus {acao: 'abrir'}` → `bauAberto {bauId, fonte, recompensas: [{tipo: 'item'|'duplicado'|'xp', id?, raridade, xp?}],
 xpGanho, teto, xpTotal, nivelAntes, nivelDepois, itensNovos, pity, desdeEpico, fechados, repetido}` ou `bausErro
 {motivo, msg}` (um "abrir" por conexão a cada 1,5 s) · `baus {acao: 'equipar', tipo, item}` → `equipado {ok, ...}`
-(o caminho do dev com contas falsas) · aviso do servidor: `bauGanho {fontes, fechados}` ("VOCÊ GANHOU UM BAÚ!" no menu).
+(o caminho do dev com contas falsas) · aviso do servidor: `bauGanho {fontes, fechados}` (o pop-up "VOCÊ GANHOU UM BAÚ!", abaixo).
 
 ## Migration
 

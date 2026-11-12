@@ -8,6 +8,7 @@
   import { vigiarContextoWebgl } from '../game/contextoPerdido.js'
   import { instalarRede } from '../game/rede.js'
   import { instalarAvisos } from '../game/conta/avisos.js'
+  import { instalarPopupBau } from '../game/conta/popupBau.js'
   import { instalarEntrada } from '../game/entrada.js'
   import { instalarTelaCheia } from '../lib/telaCheia.js'
   import { lan } from '../lib/lan/rede.js'
@@ -33,6 +34,7 @@
     else game.events.once('ready', vigiar)
     const desligarRede = instalarRede(game)
     const desligarAvisos = instalarAvisos()
+    const desligarPopupBau = instalarPopupBau(game)
     const desligarEntrada = instalarEntrada(game)
     ligarJogo(game)
 
@@ -40,6 +42,7 @@
       desligarContexto()
       desligarRede()
       desligarAvisos()
+      desligarPopupBau()
       desligarEntrada()
       desligarTelaCheia()
       desligarResolucao()

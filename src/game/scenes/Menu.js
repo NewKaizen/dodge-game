@@ -14,6 +14,7 @@ import { criarMesa } from '../menu/mesa.js'
 import { pref, definirPref, menosMovimento } from '../preferencias.js'
 import { souHost, salaDoLink, siteNaInternet } from '../../lib/lan/rede.js'
 import { conta } from '../../lib/conta.js'
+import { bausConta, pedirBaus } from '../../lib/bausConta.js'
 import { serialSuportado, listarJoysticks } from '../../lib/serial.js'
 import { avatarDoPerfil } from '../../lib/contaRegras.js'
 import { corDaMoldura, progressoDoXp } from '../../lib/progresso.js'
@@ -83,6 +84,7 @@ const estadoInicial = () => ({
   seta: null,
   aviso: null,
   miniatura: null,
+  chaveMiniatura: null,
   barras: null,
   dicaUsb: null,
   ultimaDicaUsb: 0,
@@ -141,6 +143,9 @@ export default class Menu extends Phaser.Scene {
       if (comConta() !== this.comContas && !this.saindo) return this.scene.restart()
       this.atualizarOpcoes()
     })
+    // o selo de BAÚS fechados na linha do PERFIL (docs/baus.md): some e volta com a contagem
+    const pararBaus = bausConta.subscribe(() => this.pronto && this.atualizarOpcoes())
+    if (get(conta).estado === 'logado') pedirBaus()
     const aoConectar = () => this.atualizarOpcoes()
     this.registry.events.on('changedata-conectado', aoConectar)
     // o painel de cima pode mudar o número de jogadores: os controles mudam junto
@@ -148,6 +153,7 @@ export default class Menu extends Phaser.Scene {
     this.registry.events.on('changedata-numJogadores', aoMudar)
     this.events.once('shutdown', () => {
       pararConta()
+      pararBaus()
       this.registry.events.off('changedata-conectado', aoConectar)
       this.registry.events.off('changedata-numJogadores', aoMudar)
     })
@@ -221,6 +227,7 @@ export default class Menu extends Phaser.Scene {
     this.seta = this.add.text(260, 0, '›', { fontFamily: FONTE, fontSize: '24px', color: UI.destaque }).setOrigin(0.5)
     this.aviso = this.add.text(32, 425, '', { fontFamily: FONTE, fontSize: '11px', color: UI.secundario, wordWrap: { width: 248 }, lineSpacing: 3 })
     this.miniatura = null
+    this.chaveMiniatura = null
     this.painel.add([...this.linhas, this.seta, this.aviso])
   }
 
@@ -228,7 +235,10 @@ export default class Menu extends Phaser.Scene {
   dicaDe(opcao) {
     if (opcao.id !== 'perfil') return opcao.dica
     const c = get(conta)
-    if (c.estado === 'logado' && c.perfil) return `${c.perfil.nome_exibicao} · nível ${progressoDoXp(c.perfil.xp).nivel}`
+    if (c.estado === 'logado' && c.perfil) {
+      const baus = get(bausConta).fechados
+      return `${c.perfil.nome_exibicao} · nível ${progressoDoXp(c.perfil.xp).nivel}${baus > 0 ? `\n${baus} BAÚ${baus > 1 ? 'S' : ''} PARA ABRIR (COLEÇÃO)` : ''}`
+    }
     if (c.estado === 'deslogado') return 'entre com o Google: XP, amigos e coleção'
     if (c.estado === 'indisponivel') return 'contas fora do ar: você joga como convidado'
     return 'carregando a conta…'
@@ -237,12 +247,26 @@ export default class Menu extends Phaser.Scene {
   // o avatar com a moldura fica na margem esquerda da linha do PERFIL
   atualizarMiniatura() {
     const i = this.opcoes.findIndex((o) => o.id === 'perfil')
-    this.miniatura?.destroy()
-    this.miniatura = null
     const c = get(conta)
-    if (i < 0 || c.estado !== 'logado' || !c.perfil) return
+    if (i < 0 || c.estado !== 'logado' || !c.perfil) {
+      this.miniatura?.destroy()
+      this.miniatura = null
+      this.chaveMiniatura = null
+      return
+    }
     const sel = i === this.indice && this.conectado
-    this.miniatura = criarAvatar(this, this.pos.x - 16 + (sel ? 8 : 0), this.linhas[i].y, avatarDoPerfil(c.perfil), 20, corDaMoldura(c.perfil.moldura_equipada))
+    const x = this.pos.x - 16 + (sel ? 8 : 0)
+    const y = this.linhas[i].y
+    const avatar = avatarDoPerfil(c.perfil)
+    // só recria quando o avatar ou a moldura mudam; a cada tecla, só move (recriar fazia a foto piscar)
+    const chave = JSON.stringify([avatar, c.perfil.moldura_equipada])
+    if (this.miniatura?.scene && this.chaveMiniatura === chave) {
+      this.miniatura.setPosition(x, y)
+      return
+    }
+    this.miniatura?.destroy()
+    this.miniatura = criarAvatar(this, x, y, avatar, 20, corDaMoldura(c.perfil.moldura_equipada))
+    this.chaveMiniatura = chave
     this.painel.add(this.miniatura)
   }
 
