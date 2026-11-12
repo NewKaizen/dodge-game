@@ -16,10 +16,11 @@ import { PERSONAGENS } from '../data/personagens.js'
 import { ESCALA } from '../arte/texturas.js'
 import { semLigaduras } from '../campanha/texto.js'
 import { lan } from '../../lib/lan/rede.js'
-import { bausConta, pedirBaus, abrirBau, desistirDeAbrir } from '../../lib/bausConta.js'
+import { bausConta, pedirBaus } from '../../lib/bausConta.js'
 import { TITULOS_BAU, itensDoSlot, PADRAO_REGISTRO, COLUNA_DO_SLOT, COR_RARIDADE, NOME_RARIDADE, CHANCES, PITY, FONTES_BAU, XP_DUPLICADO, BAU_XP_TETO_DIA } from '../../lib/cosmeticos.js'
 import { previaDe } from '../cosmeticosSlots.js'
-import { desenharBau, iconeDoTipo, criarRevelacao } from '../conta/bau.js'
+import { desenharBau, iconeDoTipo } from '../conta/bau.js'
+import { criarRoletaBau } from '../conta/roletaBau.js'
 
 const corDoMundo = (id) => `#${(mundoDe(id)?.cor ?? 0x7fc46b).toString(16).padStart(6, '0')}`
 
@@ -68,7 +69,6 @@ const NOME_SLOT = { som: 'SOM DE DANO', efeito: 'EFEITO DE CARTA', lancamento: '
 // o "padrão" de cada slot novo (equipar = tirar o cosmético)
 const padraoDoSlot = (tipo) => ({ id: `${tipo}.padrao`, tipo, nome: 'Padrão', padrao: true, registro: PADRAO_REGISTRO[tipo], semItem: true })
 const ehSlotNovo = (item) => SLOTS_NOVOS.includes(item?.tipo)
-const ESPERA_ABRIR_MS = 8000
 const COR_MEDALHA = 0xe0b84a
 
 const estadoInicial = () => ({
@@ -77,8 +77,7 @@ const estadoInicial = () => ({
   indice: 0,
   mensagem: null,
   ocupado: false,
-  revelacao: null, // a abertura de um baú na tela (conta/bau.js)
-  abriuEm: 0,
+  revelacao: null, // a roleta do baú na tela (conta/roletaBau.js)
   previa: null, // a prévia do item em foco (registro dos cosméticos) e de quem ela é
   previaChave: null,
   pedidoBausEm: -Infinity,
@@ -107,6 +106,7 @@ export default class Colecao extends CenaConta {
     }
     this.events.once('shutdown', () => {
       this.revelacao?.destruir()
+      this.revelacao = null
       this.trocarPrevia(null)
     })
   }
@@ -119,21 +119,9 @@ export default class Colecao extends CenaConta {
 
   tique(time) {
     if (this.perfil && !get(bausConta).carregado && time - this.pedidoBausEm > 3000) this.pedirBaus(time)
-    const r = this.revelacao
-    if (r?.estado !== 'esperando') return
-    const b = get(bausConta)
-    if (b.ultimo) r.mostrar(b.ultimo)
-    else if (b.erroAbrir) r.falhar(b.erroAbrir)
-    else if (time - this.abriuEm > ESPERA_ABRIR_MS) desistirDeAbrir()
-    if (r.estado !== 'esperando') this.time.delayedCall(1500, () => this.revelacao === r && r.rodape(this.textoRodapeRevelacao()))
   }
 
-  textoRodapeRevelacao() {
-    const n = get(bausConta).fechados
-    return n > 0 ? `A: ABRIR OUTRO (${n})   ·   B: FECHAR` : 'A / B: FECHAR'
-  }
-
-  // A na aba BAÚS: pede ao servidor e o baú treme até o resultado chegar
+  // A na aba BAÚS: a roleta (conta/roletaBau.js) pede ao servidor e gira até o resultado chegar
   abrir() {
     const b = get(bausConta)
     if (this.revelacao) return
@@ -143,20 +131,16 @@ export default class Colecao extends CenaConta {
       this.sujo = true
       return
     }
-    if (!abrirBau()) return
-    this.abriuEm = this.time.now
+    if (b.abrindo) return
     this.trocarPrevia(null)
-    this.revelacao = criarRevelacao(this)
-    this.revelacao.comecar()
-  }
-
-  fecharRevelacao(outro) {
-    const r = this.revelacao
-    if (!r?.pronto) return
-    r.destruir()
-    this.revelacao = null
-    this.sujo = true
-    if (outro && get(bausConta).fechados > 0) this.abrir()
+    this.revelacao = criarRoletaBau(this, {
+      popup: false,
+      profundidade: 1500,
+      aoFechar: () => {
+        this.revelacao = null
+        this.sujo = true
+      },
+    })
   }
 
   // a prévia do conteúdo do item em foco (fica viva enquanto o foco não muda; o som toca ao chegar)
@@ -244,7 +228,7 @@ export default class Colecao extends CenaConta {
   // ---------- entrada ----------
 
   aoDirecao(d) {
-    if (this.revelacao) return
+    if (this.revelacao) return this.revelacao.direcao(d)
     if (!this.perfil) {
       if (d === 'cima' || d === 'baixo') this.sujo = true
       return
@@ -290,12 +274,8 @@ export default class Colecao extends CenaConta {
   }
 
   aoBotao(botao) {
-    // a revelação de um baú por cima: A abre outro, B fecha (só depois que tudo apareceu)
-    if (this.revelacao) {
-      if (!this.revelacao.pronto) return
-      tocar(this, botao === 'A' ? 'confirmar' : 'cancelar')
-      return this.fecharRevelacao(botao === 'A')
-    }
+    // a roleta de um baú por cima: ela cuida dos botões dela (A, B, pular, equipar, abrir outro)
+    if (this.revelacao) return this.revelacao.botao(botao)
     if (botao === 'B') {
       tocar(this, 'cancelar')
       if (this.perfil && this.foco === 'abas') {

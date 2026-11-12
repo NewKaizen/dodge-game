@@ -8,8 +8,6 @@ import { amigos, responderConvite } from '../../lib/amigos.js'
 import { lan } from '../../lib/lan/rede.js'
 import { nomeDoItem, textoMotivo } from '../../lib/progresso.js'
 import { aoConquistaNova } from '../../lib/conquistasConta.js'
-import { aoBauGanho } from '../../lib/bausConta.js'
-import { nomeDaFonte } from '../../lib/cosmeticos.js'
 import { semLigaduras } from '../campanha/texto.js'
 import { criarFilaAvisos } from './fila.js'
 import { novosIds } from './lista.js'
@@ -141,13 +139,7 @@ export function instalarAvisos() {
   )
   // CONQUISTAS (4B): cada conquista nova vira um aviso (espera o menu, como os outros)
   parar.push(aoConquistaNova((c) => avisar({ id: `conquista:${c.id}`, tipo: 'xp', titulo: semLigaduras(`CONQUISTA: ${c.nome}`), texto: semLigaduras(`${c.descricao}\nveja em PERFIL > COLEÇÃO > CONQUISTAS`), ms: 7000 })))
-  // BAÚS (docs/baus.md): "você ganhou um baú" (espera o menu, como os outros)
-  parar.push(
-    aoBauGanho((b) => {
-      const n = b.fontes.length || 1
-      avisar({ id: `bau:${Date.now()}`, tipo: 'bau', titulo: semLigaduras(n > 1 ? `VOCÊ GANHOU ${n} BAÚS!` : 'VOCÊ GANHOU UM BAÚ!'), texto: semLigaduras(`${b.fontes.map(nomeDaFonte).join(', ')}\nabra em PERFIL > COLEÇÃO > BAÚS${b.fechados > 1 ? ` (${b.fechados} fechados)` : ''}`), ms: 8000 })
-    }),
-  )
+  // BAÚS: o "VOCÊ GANHOU UM BAÚ!" não é mais um aviso de canto: é o pop-up com a roleta (conta/popupBau.js)
   return () => parar.forEach((f) => f())
 }
 
@@ -175,8 +167,8 @@ function aoBotaoDoAviso(botao) {
 
 const LARGURA_AVISO = 336
 const POS = { x: LARGURA - LARGURA_AVISO - 12, y: 40 }
-const BORDA = { convite: 0xffe040, amizade: 0x3fd6c8, xp: 0x6dffb0, erro: 0xff7a7a, info: 0xffffff, bau: 0xffb020 }
-const COR_TITULO = { convite: '#ffe040', amizade: '#7fe8de', xp: '#7fe08a', erro: '#ff7a7a', info: '#ffffff', bau: '#ffb020' }
+const BORDA = { convite: 0xffe040, amizade: 0x3fd6c8, xp: 0x6dffb0, erro: 0xff7a7a, info: 0xffffff }
+const COR_TITULO = { convite: '#ffe040', amizade: '#7fe8de', xp: '#7fe08a', erro: '#ff7a7a', info: '#ffffff' }
 
 // `selecao: true` nas telas de escolha (PVP, party): ali só aparecem os avisos 'info'
 // (controle conectado, jogador 2 entrou); convite e pedido de amizade esperam o menu

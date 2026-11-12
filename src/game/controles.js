@@ -6,7 +6,8 @@ const LIMIAR = 50 // quanto o joystick precisa inclinar para contar como direç�
 
 // Quem quer os botões A/B antes das cenas (o aviso de convite de amigo, que se
 // aceita com A e se recusa com B por cima de qualquer menu): interceptarBotao(fn)
-// com fn(botao, jogador) -> true se tratou (a cena nem fica sabendo). Várias
+// com fn(botao, jogador) -> true se tratou (a cena nem fica sabendo; vale também para o C, o pause/Esc:
+// o pop-up do baú, cena BauPopup, usa isso). Várias
 // cenas ouvem o mesmo evento: o que já foi tratado não é tratado de novo.
 const interceptadores = new Set()
 const tratados = new WeakSet()
@@ -42,7 +43,7 @@ export default class Controles {
 
     const aoBotao = (evento) => {
       const { jogador, botao } = evento
-      if (botao !== 'C' && typeof evento === 'object' && interceptado(evento)) return
+      if (typeof evento === 'object' && interceptado(evento)) return
       // o botão de pause vale para qualquer jogador (na partida online não tem pausa)
       if (botao === 'C') return partidaOnline() || emRede() ? undefined : this.ouvintesPausa.forEach((fn) => fn(jogador))
       const j = emRede() ? meuLado() : this.numJogadores === 1 ? 0 : jogador

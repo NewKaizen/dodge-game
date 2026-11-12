@@ -14,6 +14,7 @@ import { criarMesa } from '../menu/mesa.js'
 import { pref, definirPref, menosMovimento } from '../preferencias.js'
 import { souHost, salaDoLink, siteNaInternet } from '../../lib/lan/rede.js'
 import { conta } from '../../lib/conta.js'
+import { bausConta, pedirBaus } from '../../lib/bausConta.js'
 import { serialSuportado, listarJoysticks } from '../../lib/serial.js'
 import { avatarDoPerfil } from '../../lib/contaRegras.js'
 import { corDaMoldura, progressoDoXp } from '../../lib/progresso.js'
@@ -142,6 +143,9 @@ export default class Menu extends Phaser.Scene {
       if (comConta() !== this.comContas && !this.saindo) return this.scene.restart()
       this.atualizarOpcoes()
     })
+    // o selo de BAÚS fechados na linha do PERFIL (docs/baus.md): some e volta com a contagem
+    const pararBaus = bausConta.subscribe(() => this.pronto && this.atualizarOpcoes())
+    if (get(conta).estado === 'logado') pedirBaus()
     const aoConectar = () => this.atualizarOpcoes()
     this.registry.events.on('changedata-conectado', aoConectar)
     // o painel de cima pode mudar o número de jogadores: os controles mudam junto
@@ -149,6 +153,7 @@ export default class Menu extends Phaser.Scene {
     this.registry.events.on('changedata-numJogadores', aoMudar)
     this.events.once('shutdown', () => {
       pararConta()
+      pararBaus()
       this.registry.events.off('changedata-conectado', aoConectar)
       this.registry.events.off('changedata-numJogadores', aoMudar)
     })
@@ -230,7 +235,10 @@ export default class Menu extends Phaser.Scene {
   dicaDe(opcao) {
     if (opcao.id !== 'perfil') return opcao.dica
     const c = get(conta)
-    if (c.estado === 'logado' && c.perfil) return `${c.perfil.nome_exibicao} · nível ${progressoDoXp(c.perfil.xp).nivel}`
+    if (c.estado === 'logado' && c.perfil) {
+      const baus = get(bausConta).fechados
+      return `${c.perfil.nome_exibicao} · nível ${progressoDoXp(c.perfil.xp).nivel}${baus > 0 ? `\n${baus} BAÚ${baus > 1 ? 'S' : ''} PARA ABRIR (COLEÇÃO)` : ''}`
+    }
     if (c.estado === 'deslogado') return 'entre com o Google: XP, amigos e coleção'
     if (c.estado === 'indisponivel') return 'contas fora do ar: você joga como convidado'
     return 'carregando a conta…'

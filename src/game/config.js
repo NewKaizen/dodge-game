@@ -44,6 +44,7 @@ import Colecao from './scenes/Colecao.js'
 import Campanha from './scenes/Campanha.js'
 import CampanhaArena from './scenes/CampanhaArena.js'
 import CampanhaFim from './scenes/CampanhaFim.js'
+import BauPopup from './scenes/BauPopup.js'
 import DesafioDiario from './scenes/DesafioDiario.js'
 import GaleriaCosmeticos from './scenes/GaleriaCosmeticos.js'
 import Carregando from './carregando.js'
@@ -64,6 +65,6 @@ export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCs
     scale: { mode: Phaser.Scale.NONE, zoom: zoomCss },
     // um contexto de áudio só para o jogo inteiro (a transmissão LAN copia o som dele)
     audio: { context: contextoAudio() ?? undefined },
-    scene: [Boot, Menu, EscolhaParty, EscolhaPartyN, PvpEscolha, PvpVoto, PvpArena, PvpResultado, PvpEscolhaN, PvpArenaN, PvpResultadoN, PartyVoto, PartyFim, PartyIntro, Selecao, Dificuldade, CoopArena, CoopArenaN, Vitoria, GameOver, Entrada, Pausa, Config, Grimorio, GuiaBonus, GuiaEntrada, ManualRalsei, ManualRalsei2, ManualRalsei3, ManualRalsei4, ManualRalsei5, ManualRalsei5Partida, ManualRalsei6, ManualRalsei7, ManualRalsei8, ManualRalsei9, Lan, Perfil, Amigos, Colecao, Campanha, CampanhaArena, CampanhaFim, DesafioDiario, GaleriaCosmeticos, Carregando, Religando],
+    scene: [Boot, Menu, EscolhaParty, EscolhaPartyN, PvpEscolha, PvpVoto, PvpArena, PvpResultado, PvpEscolhaN, PvpArenaN, PvpResultadoN, PartyVoto, PartyFim, PartyIntro, Selecao, Dificuldade, CoopArena, CoopArenaN, Vitoria, GameOver, Entrada, Pausa, Config, Grimorio, GuiaBonus, GuiaEntrada, ManualRalsei, ManualRalsei2, ManualRalsei3, ManualRalsei4, ManualRalsei5, ManualRalsei5Partida, ManualRalsei6, ManualRalsei7, ManualRalsei8, ManualRalsei9, Lan, Perfil, Amigos, Colecao, Campanha, CampanhaArena, CampanhaFim, DesafioDiario, GaleriaCosmeticos, Carregando, Religando, BauPopup],
   }
 }
