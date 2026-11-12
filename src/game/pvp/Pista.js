@@ -49,6 +49,7 @@ import { tocar } from '../audio.js'
 //                                        ou função (jogador) => {x, y} se a pista tem vários corações
 //   pista.aoAcertar = (dano, bala, coracao) => {}   devolva false para o acerto não contar
 //   pista.aoGraze = (coracao, bala) => {}
+//   pista.somDano = (coracao) => {}      o som do acerto (o cosmético de quem levou); sem ele, o 'dano' de sempre
 //   pista.destruir()
 //
 //   pista.fatorCoracao                   multiplica a velocidade do coração (morte súbita; padrão 1)
@@ -112,6 +113,7 @@ export default class Pista {
     this.terminarFechamento = null
     this.aoAcertar = null
     this.aoGraze = null
+    this.somDano = null
     this.ultimoGraze = 0
   }
 
@@ -292,7 +294,9 @@ export default class Pista {
     if (this.aoAcertar?.(bala.dano, bala, coracao) === false) return false
     coracao.tomarDano(TEMPOS.invencivelMs)
     particulas(this.cena, coracao.x, coracao.y, { cor: coracao.cor, quantidade: 10, velocidade: 110 })
-    tocar(this.cena, 'dano')
+    // somDano(coracao): a arena toca o som de dano equipado de quem levou (cosmeticosSlots.js)
+    if (this.somDano) this.somDano(coracao)
+    else tocar(this.cena, 'dano')
     return true
   }
 

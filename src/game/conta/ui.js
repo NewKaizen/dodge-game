@@ -2,6 +2,8 @@ import Phaser from 'phaser'
 import { CORES, FONTE, LARGURA, TEXTO } from '../constants.js'
 import { IDS_ICONES, iconeDoPersonagem } from '../arte/icones.js'
 import { CORACAO_MAPA } from '../arte/sprites.js'
+import { molduraAnimada } from '../cosmeticosSlots.js'
+import { registroDoId, slotDoId } from '../../lib/cosmeticos.js'
 
 // Peças de desenho das telas de conta (Perfil, Amigos, Coleção) e dos avisos,
 // no jeito da tela de Configurações: caixas pretas de borda branca, fonte
@@ -13,7 +15,9 @@ import { CORACAO_MAPA } from '../arte/sprites.js'
 //   caber(texto, conteudo, largura)         reticências até caber
 //   seta(g, x, y, direcao, t, cor)          triângulo
 //   desenharDicas(cena, container, dicas)   rodapé: [['cimaBaixo', 'Escolher'], ['A', 'Confirmar'], ...]
-//   criarAvatar(cena, x, y, avatar, tam, moldura?)
+//   criarAvatar(cena, x, y, avatar, tam, moldura?, idMoldura?)
+//                                      idMoldura: o id da moldura equipada; se for uma moldura ANIMADA
+//                                      (do baú, docs/baus.md) a animação do registro vai por cima da borda
 //                                      avatar de personagem (pixel art), coração padrão ou a
 //                                      foto enviada (carregada na hora; se falhar, o padrão)
 //   barraXp(cena, g, x, y, w, h, prog)      a barra do nível
@@ -176,7 +180,7 @@ const paraNumero = (css) => Phaser.Display.Color.HexStringToColor(css).color
 const ARCOIRIS = [0xff3355, 0xffd34d, 0x6dffb0, 0x4da6ff]
 
 // Avatar com moldura: container centrado em (x, y). `moldura` é a cor da borda (CSS) ou null (a verde de sempre).
-export function criarAvatar(cena, x, y, avatar, tamanho, moldura = null) {
+export function criarAvatar(cena, x, y, avatar, tamanho, moldura = null, idMoldura = null) {
   const c = cena.add.container(x, y)
   const fundo = cena.add.rectangle(0, 0, tamanho, tamanho, 0x16182a)
   const img = cena.add.image(0, 0, texturaAvatar(cena, avatar?.tipo === 'enviado' ? { tipo: 'padrao' } : avatar))
@@ -197,6 +201,11 @@ export function criarAvatar(cena, x, y, avatar, tamanho, moldura = null) {
     g.lineStyle(borda, paraNumero(moldura ?? '#6dffb0'), 1).strokeRect(-meio - borda / 2, -meio - borda / 2, tamanho + borda, tamanho + borda)
   }
   c.add([fundo, img, g])
+  // moldura animada (cosmético do baú): por cima da borda parada; se o conteúdo falhar, fica a borda
+  if (idMoldura && slotDoId(idMoldura) === 'moldura') {
+    const anim = molduraAnimada(cena, 0, 0, tamanho + borda * 2, registroDoId(idMoldura))
+    if (anim) c.add(anim)
+  }
   if (avatar?.tipo === 'enviado' && avatar.url) {
     carregarFoto(cena, avatar.url).then((chave) => {
       if (!chave || !img.scene || !cena.textures.exists(chave)) return // falhou (ou a tela já mudou): fica o coração

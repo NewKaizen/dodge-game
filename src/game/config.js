@@ -48,6 +48,8 @@ import DesafioDiario from './scenes/DesafioDiario.js'
 import GaleriaCosmeticos from './scenes/GaleriaCosmeticos.js'
 import Carregando from './carregando.js'
 import Religando from './religando.js'
+// o conteúdo dos cosméticos dos slots novos (som de dano, efeito, lançamento, moldura animada)
+import './cosmeticosRegistro.js'
 
 // tamanho: { largura, altura, zoomCss } de prepararResolucao() (resolucao.js)
 export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCss = 1 } = {}) {

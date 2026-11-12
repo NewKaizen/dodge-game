@@ -30,6 +30,8 @@ import { criarTita } from '../campanha/tita.js'
 import { aoCampanha, comecarFase, comecarDesafio, jogarCarta, enviarPosicoes, terminarEsquiva, desistirDaCorrida, trapacaDev } from '../../lib/campanha.js'
 import { lerDesafio, faseDoDesafio, descreverDesafio } from '../../lib/desafio.js'
 import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe, venceu } from '../../lib/saida.js'
+import { cosmeticosDaPartida } from '../rede.js'
+import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 
 // CAMPANHA: a LUTA de uma fase (docs/campanha.md), no jeito do CO-OP: o CHEFE no alto, a carta dele
 // (a intenção, com o naipe à vista) embaixo, o QUADRO grande onde você (e a CPU aliada) desviam do
@@ -78,6 +80,7 @@ const misturar = (a, b, k) => {
 }
 
 const estadoInicial = () => ({
+  cosmeticos: null, // os cosméticos dos slots novos de quem joga (som de dano, efeito, lançamento; docs/baus.md)
   mundo: null,
   fase: null,
   desafio: null,
@@ -131,6 +134,7 @@ export default class CampanhaArena extends Phaser.Scene {
   create(dados = {}) {
     Object.assign(this, estadoInicial())
     this.desafio = dados.desafio ? lerDesafio(dados.desafio) : null
+    this.cosmeticos = cosmeticosDaPartida(1) // só enfeite: o servidor nem sabe deles
     this.mundo = this.desafio ? { id: 0, personagem: this.desafio.personagem, nome: 'DESAFIO DIÁRIO' } : mundoDe(dados.mundo ?? 1)
     this.fase = this.desafio ? faseDoDesafio(this.desafio) : faseDe(this.mundo.id, dados.fase ?? 1)
     this.def = CHEFES[this.fase.inimigo]
@@ -218,7 +222,7 @@ export default class CampanhaArena extends Phaser.Scene {
     this.aviso = this.add.text(CENTRO_X, ALTURA / 2, 'conectando ao servidor da campanha…', estilo(16)).setOrigin(0.5).setDepth(90)
     this.add.text(LARGURA - 8, ALTURA - 4, 'ESC 2×: DESISTIR', estilo(9, COR_TEXTO.dica)).setOrigin(1, 1).setDepth(71)
 
-    this.mao = new Mao(this, { jogador: 0, x: MAO_POS.x, y: MAO_POS.y, rotulo: '', largura: LARGURA_CARTA, espacamento: 70, larguraMax: 380, profundidade: 30 })
+    this.mao = new Mao(this, { jogador: 0, x: MAO_POS.x, y: MAO_POS.y, rotulo: '', largura: LARGURA_CARTA, espacamento: 70, larguraMax: 380, profundidade: 30, efeito: this.cosmeticos?.[0]?.efeito })
     this.mao.setAtiva(false)
     this.medo = criarMedo(this, { profundidade: 3 })
     this.baloes = { oponente: null, amigos: null }
@@ -452,7 +456,7 @@ export default class CampanhaArena extends Phaser.Scene {
     if (j === 0) {
       this.acertosLocais++
       levouGolpe(0, { super: Boolean(this.rodadaAtual?.intencao?.super) }) // vibração; BUZZER só no SUPER do chefe
-      tocar(this, 'dano')
+      somDoLado(this, 0, () => tocar(this, 'dano')) // o som de dano equipado (cosmético)
       if (!menosMovimento() && fatores().tremor > 0) this.cameras.main.shake(120, 0.004 * fatores().tremor)
     }
     if (h) {
@@ -822,6 +826,9 @@ export default class CampanhaArena extends Phaser.Scene {
   }
 
   enviarCarta(id) {
+    // o LANÇAMENTO equipado (da carta até o chefe): só enfeite, nada espera por ele
+    const sel = id ? this.mao.selecionada : null
+    if (sel) lancarDoLado(this, 0, { x: sel.x, y: sel.y }, CHEFE, 0xffffff)
     this.etapa = 'enviando'
     this.mao.setAtiva(false)
     tocar(this, id ? 'cartaSelecionar' : 'passar')

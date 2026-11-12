@@ -48,6 +48,7 @@ import { encerrarRede, irParaCena } from '../rede.js'
 import { opcoesDeModo } from '../party/regras.js'
 import { novoPlacar } from '../party/placar.js'
 import { criarAvatar } from '../conta/ui.js'
+import { corDaMoldura } from '../../lib/progresso.js'
 import { corDaVaga, textoDaVaga } from '../vagas.js'
 
 // Lobby do modo LAN e do ONLINE (Menu -> ONLINE; docs/lan.md, docs/online.md).
@@ -687,7 +688,9 @@ export default class Lan extends Phaser.Scene {
       }
       // avatar + nome (e a tag da conta)
       const lado = 30
-      this.add2(criarAvatar(this, x + 14 + lado / 2, y + 50, m.conta?.avatar ?? null, lado))
+      // a moldura equipada (0015: o lobby repassa; a animada do baú anima aqui para todos da sala)
+      const moldura = m.conta?.cosmeticos?.moldura ?? null
+      this.add2(criarAvatar(this, x + 14 + lado / 2, y + 50, m.conta?.avatar ?? null, lado, corDaMoldura(moldura), moldura))
       const xNome = x + 14 + lado + 8
       const larguraNome = largura - (xNome - x) - 8
       const voce = m.id === s.eu.id ? (estreito ? ' (você)' : '  (você)') : ''

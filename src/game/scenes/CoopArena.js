@@ -39,7 +39,8 @@ import { escolherJogadaCoop } from '../coop/bot.js'
 import { superNoChefe } from '../coop/superNoChefe.js'
 import ArenaRedeCoop from '../coop/ArenaRedeCoop.js'
 import { nomesDaPartida } from '../pvp/nomesDaPartida.js'
-import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos } from '../rede.js'
+import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, cosmeticosDaPartida } from '../rede.js'
+import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
@@ -152,6 +153,7 @@ const estadoInicial = () => ({
   pistas: null,
   etiquetasMesa: [],
   perfeitoCoop: [false, false],
+  cosmeticos: null, // os cosméticos dos slots novos de cada lado (som de dano, efeito, lançamento; docs/baus.md)
 })
 
 export default class CoopArena extends PvpArena {
@@ -237,9 +239,10 @@ export default class CoopArena extends PvpArena {
     else if (!this.rede) this.textoTreino.setText('')
     // o monte (criarMonte, da PvpArena) também usa o verso de cada lado: sem isto o CO-OP quebrava ao abrir
     this.versos = coresDosVersos()
+    this.cosmeticos = cosmeticosDaPartida(2) // só enfeite: nunca muda a partida
     this.montes = [0, 1].map((j) => this.criarMonte(j))
     this.maos = [0, 1].map(
-      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: 150, espacamento: 40, profundidade: 20, corVerso: this.versos[j] }),
+      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: 150, espacamento: 40, profundidade: 20, corVerso: this.versos[j], efeito: this.cosmeticos[j].efeito }),
     )
     this.botoesPassar = [0, 1].map((j) => this.criarBotaoPassar(j))
     this.criarTextos()
@@ -342,6 +345,7 @@ export default class CoopArena extends PvpArena {
     // cada coração leva o próprio dano, com o próprio escudo (o dano da bala é o da carta)
     quadro.aoAcertar = (dano, bala, coracao) => this.acertou(coracao.jogador, this.danoNoCoracao(coracao.jogador, dano))
     quadro.aoGraze = (coracao) => this.grazeou(coracao.jogador)
+    quadro.somDano = (coracao) => somDoLado(this, coracao.jogador, () => tocar(this, 'dano')) // o som de dano equipado (cosmético)
     this.quadro = quadro
     this.pistas = [quadro]
   }
@@ -709,6 +713,8 @@ export default class CoopArena extends PvpArena {
       mao.retirar(carta)
       return carta.setDepth(80 + j)
     })
+    // o LANÇAMENTO equipado de cada um (da carta até a mesa): só enfeite, a partida não espera
+    this.reveladas.forEach((c, j) => c instanceof Carta && lancarDoLado(this, j, { x: c.x, y: c.y }, MESA[j], CORES.almas[j]))
     this.maos.forEach((m) => m.setTravada(false))
     tocar(this, 'cartaDeslizar')
     await Promise.all(
