@@ -21,12 +21,12 @@ export const RARIDADES = ['comum', 'raro', 'epico', 'lendario']
 
 export const SONS_DANO = [
   { id: 'dano-padrao', nome: 'Padrão', raridade: 'comum' },
-  { id: 'dano-latido', nome: 'Latido de cachorro', raridade: 'comum' },
+  { id: 'dano-latido', nome: 'Latido de cachorro', raridade: 'comum', arquivo: 'sons/dano/latido.mp3' },
   { id: 'dano-pato', nome: 'Quack do pato', raridade: 'comum' },
   { id: 'dano-moeda', nome: 'Moeda de videogame', raridade: 'comum' },
   { id: 'dano-boing', nome: 'Boing de mola', raridade: 'comum' },
   { id: 'dano-buzina', nome: 'Buzina de palhaço', raridade: 'raro' },
-  { id: 'dano-miau', nome: 'Miado de gato', raridade: 'raro' },
+  { id: 'dano-miau', nome: 'Miado de gato', raridade: 'raro', arquivo: 'sons/dano/miau.mp3' },
   { id: 'dano-vidro', nome: 'Vidro quebrando', raridade: 'raro' },
   { id: 'dano-laser', nome: 'Laser 8-bit', raridade: 'raro' },
   { id: 'dano-pum', nome: 'Pum cômico', raridade: 'raro' },
