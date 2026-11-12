@@ -533,6 +533,41 @@ Lacunas conhecidas: o bot perfeito continua desviando quase tudo do Kris (6,2) e
 acesos). O Berdly (38,7) ficou um pouco acima de 38 e o Asriel/Noelle/Ralsei na parte de baixo da faixa; com 48
 sementes o ruído é de ±2 de dano.
 
+**2026-11-13: SUPER do Asriel mais forte** (`attacks/super/asriel.js`, geometria nova em `attacks/super/asrielGeometria.js`,
+testes em `src/game/__tests__/asrielSuper.test.js`). Os jogadores ainda achavam a Singularidade Radiante "mole" (sem
+ameaça e sem espetáculo). Medido com 48 sementes (bot perfeito = `dificil` no JSON, médio = `normal`, lento = FÁCIL de
+320 ms), antes → depois, com o Susie (referência) ao lado:
+
+| SUPER | Bot perfeito | Bot médio | Bot lento (FÁCIL) |
+|---|---|---|---|
+| Asriel · Singularidade Radiante | 13,8 → 20,3 | 33,9 → 43,3 | 56,6 → 62,6 |
+| Susie · Machado Colossal (referência) | 16,8 | 36,6 | 65,5 |
+
+O bot perfeito e o médio ficaram acima do alvo (16–19 e 38–40) e o lento um pouco abaixo (65–70): neste ataque os três
+níveis sobem e descem juntos (a razão lento/médio ficou em ~1,45, a do Susie é 1,8), então não deu para acertar os
+três ao mesmo tempo sem tirar legibilidade. Com 48 sementes o ruído é de ±2 de dano. Validador: **zero** avisos
+`[telegrafo]` e `[rota de fuga]` (48 sementes × 4 níveis de bot: imbativel, dificil, normal, facil). Dano por bala (13),
+custo, protocolo e ajuste de HP do PvP **não mudaram**; o CO-OP (`coop/superNoChefe.js`) só usa as texturas e continua igual.
+
+- **Ato I (O Vazio), mais pressão.** O vazio cresce mais cedo (pulsos em 0/700/1400/2000 ms, aviso 500; eram
+  0/1150/2300/3400 e 650) e fica cheio por mais tempo, com um **aro arco-íris** no raio que machuca (o sprite do buraco
+  é menor que a hitbox e o jogador não via onde acabava). Espiral com 4 braços (eram 3), uma estrela por braço a cada
+  600 ms (620), mais rápida (queda 44 px/s, giro até 5 rad/s). Novo: **4 jatos do vazio**, uma linha fina riscada através do
+  ponto para onde o coração vai (`previsao.js`) e, 520 ms depois, uma fileira de 3 estrelas lado a lado corre por ela de
+  uma borda à outra (nascem fora da caixa).
+- **Ato II (Supernova), sem pausa.** A pausa do meio da onda foi desligada (`respiro.meio = 0`): o colapso (4200 ms)
+  vem direto, com clarão, anel de choque e tremor maiores; o 1º anel sai 400 ms depois.
+  5 anéis a cada 540 ms (eram 6 a cada 640; o 6º saiu porque os raios finais precisam do campo livre), o último
+  duplo, estrelas cadentes miradas entre eles (duas nos últimos), e cada anel dá um clarão e um tremor crescentes, em
+  cores diferentes. As estrelas trocam de quadro/cor sem parar (arco-íris).
+- **Ato III (Caos Final), novo.** O núcleo da supernova incha e 6 raios coloridos são riscados (aviso 540 ms); cada
+  raio dispara uma coluna de 4 estrelas rápidas (290 px/s). Logo que a 1ª onda sai, uma **2ª onda** é riscada nos
+  ângulos do meio das fatias da 1ª (aviso 460 ms; a fatia segura vira raio e o raio já passou), e fecha com clarão
+  arco-íris. Rota de fuga: raios com folga angular mínima (`asrielGeometria.js`) deixam fatias de ≥ 48 px a 60 px do
+  centro; o miolo (raio < 36) nunca é atingido; os anéis já saíram da caixa quando os raios disparam (testado). Os
+  clarões respeitam a preferência de clarões/tremor (`fatores()`).
+- **Duração:** 9000 → 9800 ms ativos (o Caos Final precisa dos ~800 ms extras para a 2ª onda atravessar a caixa).
+
 ## Nome de cada lado (2E)
 
 Na partida o lado é identificado pelo **nome do jogador**, não pelo do personagem (o personagem fica como linha pequena): HUD, abertura, replay do K.O., "… VENCE!" e tela de resultado. Online/LAN: o nome do membro da sala (conta ou convidado, já filtrado pelo servidor). Mesmo PC: P1 = nome da conta logada ou `JOGADOR 1`; P2 = `JOGADOR 2`; contra a CPU, `CPU`. Nomes passam pelo filtro de palavras (`nomeSeguro`) e são cortados em 12 letras com "…". Lógica pura em `src/game/pvp/nomes.js` (`nomeDoJogador(lado, contexto)`).
