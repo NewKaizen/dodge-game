@@ -40,6 +40,7 @@ export const OPCOES_E_AGORA = [
   { id: 'cpu', rotulo: 'JOGAR CONTRA A CPU', dica: 'uma partida normal, com o nível que você quiser' },
   { id: 'online', rotulo: 'ONLINE', dica: 'jogar com amigos (internet ou rede local)' },
   { id: 'cartas', rotulo: 'CARTAS E ARENAS', dica: 'o guia de todas as cartas e das rodadas bônus' },
+  { id: 'extras', rotulo: 'EXTRAS DO MANUAL', dica: 'páginas 6 a 9, se quiser: naipes, graze, jogar em dupla, ases e SUPER' },
   { id: 'indice', rotulo: 'VOLTAR AO ÍNDICE', dica: 'as páginas do manual, para jogar de novo' },
 ]
 

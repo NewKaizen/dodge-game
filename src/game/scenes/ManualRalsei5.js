@@ -48,7 +48,7 @@ import {
 //           estava. Daí esta cena sai e a partida começa.
 //   depois  a arena relança esta cena com { resultado }: a folha volta por cima da arena, o Ralsei
 //           comemora (ganhando ou perdendo), o adesivo dourado "MANUAL ESSENCIAL ✓" (salvo na hora) e a
-//           folha vira para a página "e agora?": JOGAR CONTRA A CPU · ONLINE · CARTAS E ARENAS · VOLTAR AO ÍNDICE.
+//           folha vira para a página "e agora?": JOGAR CONTRA A CPU · ONLINE · CARTAS E ARENAS · EXTRAS DO MANUAL (6 a 9) · VOLTAR AO ÍNDICE.
 //   A: continuar / ir · ↑/↓: escolher (no "e agora?") · B: volta ao índice do manual
 // "Reduzir animações": sem crescer, colorir, descolar e voltar (corte), balão inteiro, sem confete.
 // No dev: window.manualRalsei5.
@@ -429,7 +429,8 @@ export default class ManualRalsei5 extends Phaser.Scene {
       else if (destino === 'cartas') {
         musica('menu', 'jevil') // o guia de cartas toca a música do menu
         irCarregando(this, 'Grimorio')
-      } else this.scene.start('GuiaEntrada', { modo: 'indice' })
+      } else if (destino === 'extras') this.scene.start('ManualRalsei6')
+      else this.scene.start('GuiaEntrada', { modo: 'indice' })
     })
   }
 

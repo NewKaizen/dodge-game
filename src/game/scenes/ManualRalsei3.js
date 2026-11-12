@@ -3,7 +3,6 @@ import { get } from 'svelte/store'
 import Controles from '../controles.js'
 import { jogo } from '../../lib/estado.js'
 import { criarRng } from '../pvp/baralho.js'
-import { SIMBOLOS, nomeDoValor } from '../pvp/cartas.js'
 import { ataques } from '../attacks/index.js'
 import { tocar, musica } from '../audio.js'
 import { LARGURA, ALTURA } from '../constants.js'
@@ -15,13 +14,16 @@ import { PALETA, corCss } from '../manual/cera.js'
 import { dicasDeBotoes, teclasDoEixo } from '../manual/botoes.js'
 import { criarPagina3, PASSOS3 } from '../manual/pagina3.js'
 import { criarPagina4, PASSOS4 } from '../manual/pagina4.js'
+import { criarPagina6, PASSOS6 } from '../manual/pagina6.js'
 import { PASSAR, OPCOES_AJUDA, VIVA_MS, PULAR_VITRINE_MS, ENCHE_RODADA_MS, expressaoDasCartas } from '../manual/licaoDeCartas.js'
-import { planoDaVitrine, DESENHO_DA_CARTA, ENERGIA } from '../manual/cartasDoManual.js'
+import { planoDaVitrine, ENERGIA } from '../manual/cartasDoManual.js'
+import { CARTA, assarCartaDeGiz, assarCartaPassar, assarBrilhoDaCarta, caminho } from '../manual/cartaDeGiz.js'
 import { normalizarProgresso, comPasso, comPagina } from '../manual/progresso.js'
 import { VitrineDeAtaque } from '../manual/vitrineNaTela.js'
 import { montarCapaDaPagina5 } from './ManualRalsei5.js'
+import { montarCapaDaPaginaExtra } from './ManualRalsei7.js'
 import { CAIXA_VITRINE } from '../manual/vitrine.js'
-import { sublinhado, rabiscosDaMargem, retanguloRedondo, desenhoDaCarta, rabiscoDaGema, rabiscoDoBoneco, iconeDoPasso, rabiscoDoCoracao } from '../manual/ilustracoes.js'
+import { sublinhado, rabiscosDaMargem, rabiscoDaGema, rabiscoDoBoneco, iconeDoPasso, rabiscoDoCoracao } from '../manual/ilustracoes.js'
 import { elipse } from '../manual/ralsei.js'
 import {
   FONTE_TEXTO,
@@ -69,7 +71,6 @@ const LX = LOUSA.x + LOUSA.largura / 2
 const MOLDURA = 9
 const BALAO = { x: 64, y: 92, largura: 334, altura: 128, cauda: { de: 112, x: 126, y: 262 }, tamanho: 16 }
 const RALSEI = { x: 176, y: 438, escala: 1.12 }
-const CARTA = { largura: 74, altura: 98 }
 const MAO_Y = 378
 const LEVANTA = 13
 const GEMAS = { y: LOUSA.y + LOUSA.altura + 22, passo: 19, raio: 7.2 }
@@ -118,9 +119,31 @@ const PAGINAS_CARTAS = {
     ],
   },
 }
-const CORES_ADESIVO = { conhecer: '#fff2c8', chuva: '#d8ecff', caro: '#ffe1ea', passar: '#dff4e6', jogar: '#ece4fb' }
+PAGINAS_CARTAS[6] = {
+  chave: 'ManualRalsei6',
+  titulo: 'Os quatro naipes',
+  criar: (passos) => criarPagina6({ passos }),
+  passos: PASSOS6,
+  espaco: 84,
+  gemas: false,
+  proxima: 7,
+  margem: [
+    { tipo: 'estrela', x: 420, y: 52, r: 6, cor: PALETA.rosa },
+    { tipo: 'coracao', x: 818, y: 120, r: 5, cor: PALETA.rosa },
+    { tipo: 'estrela', x: 822, y: 214, r: 5, cor: PALETA.amarelo },
+    { tipo: 'pata', x: 812, y: 452, r: 7, giro: -0.4, cor: PALETA.verde },
+    { tipo: 'estrela', x: 336, y: 304, r: 6, cor: PALETA.azul },
+    { tipo: 'coracao', x: 316, y: 372, r: 5, cor: PALETA.lavanda },
+    { tipo: 'estrela', x: 404, y: 446, r: 5, cor: PALETA.amarelo },
+    { tipo: 'coracao', x: 70, y: 262, r: 5, cor: PALETA.rosa },
+  ],
+}
+const CORES_ADESIVO = { conhecer: '#fff2c8', chuva: '#d8ecff', caro: '#ffe1ea', passar: '#dff4e6', jogar: '#ece4fb', espadas: '#fff2c8', ouros: '#d8ecff', paus: '#dff4e6', copas: '#ffe1ea', coop: '#ece4fb' }
 
 // ---------- o fundo de cada página (a capa aparece atrás da folha que vira na página anterior) ----------
+
+const COR_SUBLINHADO = { 3: PALETA.amarelo, 4: PALETA.azul, 6: PALETA.rosa }
+const FITAS = { 3: [PALETA.rosa, PALETA.azul], 4: [PALETA.lavanda, PALETA.amarelo], 6: [PALETA.verde, PALETA.rosa] }
 
 function assarFundoDasCartas(scene, n) {
   const cfg = PAGINAS_CARTAS[n]
@@ -128,7 +151,7 @@ function assarFundoDasCartas(scene, n) {
   const l = LOUSA
   const largura = assarLetreiro(scene, `manual-p${n}-titulo`, cfg.titulo, { tamanho: cfg.tamanhoTitulo ?? 26 }).largura
   assar(scene, `manual-p${n}-fundo`, LARGURA, ALTURA, {
-    camadas: [...rabiscosDaMargem(r('margem'), cfg.margem), { tipo: 'traco', tracos: sublinhado(r('sub'), 66, 76, 66 + Math.min(largura, 420)), cor: n === 3 ? PALETA.amarelo : PALETA.azul, largura: 3.4, passadas: 3 }],
+    camadas: [...rabiscosDaMargem(r('margem'), cfg.margem), { tipo: 'traco', tracos: sublinhado(r('sub'), 66, 76, 66 + Math.min(largura, 420)), cor: COR_SUBLINHADO[n], largura: 3.4, passadas: 3 }],
     grao: 0.4,
     fundo: (ctx) => {
       // a lousa: um quadro-negro com moldura de madeira, pendurado no caderno com fita
@@ -149,8 +172,8 @@ function assarFundoDasCartas(scene, n) {
       for (let k = 0; k < 7; k++) ctx.fillRect(l.x + 14 + k * 36, l.y + 18 + ((k * 37) % 120), 26, 5)
     },
     frente: (ctx) => {
-      desenharFita(ctx, l.x - 10, l.y - 12, 58, 17, -0.62, n === 3 ? PALETA.rosa : PALETA.lavanda)
-      desenharFita(ctx, l.x + l.largura + 10, l.y - 12, 58, 17, 0.62, n === 3 ? PALETA.azul : PALETA.amarelo)
+      desenharFita(ctx, l.x - 10, l.y - 12, 58, 17, -0.62, FITAS[n][0])
+      desenharFita(ctx, l.x + l.largura + 10, l.y - 12, 58, 17, 0.62, FITAS[n][1])
     },
   })
   return { rotulo: assarRotulo(scene, `manual-rotulo-p${n}`, `PÁGINA ${n}`), titulo: `manual-p${n}-titulo` }
@@ -226,7 +249,7 @@ export default class ManualRalsei3 extends Phaser.Scene {
   init(dados) {
     Object.assign(this, estadoInicial())
     this.dados = dados ?? {}
-    this.numero = this.sys.settings.key === PAGINAS_CARTAS[4].chave ? 4 : 3
+    this.numero = Number(this.sys.settings.key.replace('ManualRalsei', '')) || 3
     this.cfg = PAGINAS_CARTAS[this.numero]
   }
 
@@ -353,6 +376,7 @@ export default class ManualRalsei3 extends Phaser.Scene {
   montarProxima() {
     const c = (this.proxima = this.add.container(0, 0).setDepth(10).setVisible(false))
     if (this.cfg.proxima === 4) montarCapaDasCartas(this, c, 4)
+    else if (this.cfg.proxima === 7) montarCapaDaPaginaExtra(this, c, 7)
     else montarCapaDaPagina5(this, c)
   }
 
@@ -607,7 +631,7 @@ export default class ManualRalsei3 extends Phaser.Scene {
         this.pagina.terminouDeVirar()
         // a página seguinte começa do mesmo papel (a capa dela já está na tela): troca de cena sem fade
         this.saindo = true
-        this.scene.start(this.cfg.proxima === 4 ? 'ManualRalsei4' : 'ManualRalsei5', { deVirada: true })
+        this.scene.start(`ManualRalsei${this.cfg.proxima}`, { deVirada: true })
       },
     })
   }
@@ -615,148 +639,6 @@ export default class ManualRalsei3 extends Phaser.Scene {
 
 // os adesivos dos passos ficam em cima da lousa, entre as duas fitas
 const slotX = (n, k) => LX + (k - (n - 1) / 2) * 42
-
-// ---------- texturas das cartas de giz ----------
-
-// A carta de giz: o papel da carta, o valor e o naipe no canto (como a carta do jogo), o desenho do
-// ataque no meio, o nome embaixo e a gema do custo no canto de baixo (vermelha com × quando bloqueada).
-function assarCartaDeGiz(scene, carta, bloqueada) {
-  const chave = `manual-carta:${carta.id}:${bloqueada ? 'b' : 'n'}`
-  if (scene.textures.exists(chave)) return chave
-  const { largura: w, altura: h } = CARTA
-  const rng = criarRng(`manual:carta:${carta.id}`)
-  const corpo = retanguloRedondo(-w / 2, -h / 2, w, h, 8)
-  const vermelho = carta.naipe === 'copas' || carta.naipe === 'ouros'
-  const tinta = vermelho ? 0xc81e3c : PALETA.tinta
-  const gema = { x: -w / 2 + 12, y: h / 2 - 11 }
-  const camadas = [
-    { tipo: 'traco', tracos: [[...corpo, corpo[0], corpo[1]]], cor: carta.valor === 14 ? PALETA.ouro : PALETA.tinta, largura: 2.4, passadas: 2 },
-    ...desenhoDaCarta(rng, DESENHO_DA_CARTA[carta.id], 19).map((c) => deslocar(c, 4, -10)),
-    ...rabiscoDaGema(rng, 9, { ...gema, estado: bloqueada ? 'bloqueada' : 'cheia' }).camadas,
-  ]
-  const pad = 6
-  assar(scene, chave, w + pad * 2, h + pad * 2, {
-    camadas,
-    ox: w / 2 + pad,
-    oy: h / 2 + pad,
-    grao: 0.3,
-    fundo: (ctx) => {
-      ctx.save()
-      ctx.translate(w / 2 + pad, h / 2 + pad)
-      ctx.shadowColor = 'rgba(60,36,20,0.28)'
-      ctx.shadowBlur = 4
-      ctx.shadowOffsetY = 2
-      ctx.fillStyle = carta.valor === 14 ? '#fff6d8' : '#fffcf4'
-      caminho(ctx, corpo)
-      ctx.fill()
-      ctx.restore()
-    },
-    frente: (ctx) => {
-      ctx.save()
-      ctx.translate(w / 2 + pad, h / 2 + pad)
-      ctx.fillStyle = corCss(tinta)
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.font = `bold 13px ${FONTE_TEXTO}`
-      ctx.fillText(nomeDoValor(carta.valor), -w / 2 + 11, -h / 2 + 12)
-      ctx.font = `bold 12px ${FONTE_TEXTO}`
-      ctx.fillText(SIMBOLOS[carta.naipe], -w / 2 + 11, -h / 2 + 26)
-      // o nome, em até 2 linhas
-      ctx.fillStyle = TINTA
-      ctx.font = `bold 9.5px ${FONTE_TEXTO}`
-      const linhas = quebrar(ctx, carta.nome, w - 12)
-      linhas.forEach((l, k) => ctx.fillText(l, 3, h / 2 - 37 + k * 11 + (linhas.length === 1 ? 5 : 0)))
-      // o custo na gema
-      ctx.fillStyle = '#ffffff'
-      ctx.strokeStyle = bloqueada ? '#3a0a14' : '#06283e'
-      ctx.lineWidth = 2.5
-      ctx.font = `bold 11px ${FONTE_TEXTO}`
-      ctx.strokeText(String(carta.custo), gema.x, gema.y + 0.5)
-      ctx.fillText(String(carta.custo), gema.x, gema.y + 0.5)
-      if (bloqueada) {
-        // o véu de carta indisponível e o selo "×" na gema (como Carta.desenharMarcaCusto)
-        ctx.fillStyle = 'rgba(70,60,80,0.38)'
-        caminho(ctx, corpo)
-        ctx.fill()
-        ctx.fillStyle = '#ffffff'
-        ctx.beginPath()
-        ctx.arc(gema.x + 7, gema.y - 7, 5, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.fillStyle = '#c81e3c'
-        ctx.beginPath()
-        ctx.arc(gema.x + 7, gema.y - 7, 4, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.strokeStyle = '#ffffff'
-        ctx.lineWidth = 1.4
-        ctx.beginPath()
-        ctx.moveTo(gema.x + 5.2, gema.y - 8.8)
-        ctx.lineTo(gema.x + 8.8, gema.y - 5.2)
-        ctx.moveTo(gema.x + 5.2, gema.y - 5.2)
-        ctx.lineTo(gema.x + 8.8, gema.y - 8.8)
-        ctx.stroke()
-      }
-      ctx.restore()
-    },
-  })
-  return chave
-}
-
-// o "slot" PASSAR no fim da mão (o botão da arena: PASSAR e +1 com a gema)
-function assarCartaPassar(scene) {
-  const chave = 'manual-carta:passar'
-  if (scene.textures.exists(chave)) return chave
-  const { largura: w, altura: h } = CARTA
-  const rng = criarRng('manual:carta:passar')
-  const corpo = retanguloRedondo(-w / 2, -h / 2, w, h, 8)
-  const pad = 6
-  assar(scene, chave, w + pad * 2, h + pad * 2, {
-    camadas: [{ tipo: 'traco', tracos: [[...corpo, corpo[0], corpo[1]]], cor: PALETA.verdeEscuro, largura: 2.4, passadas: 2 }, ...desenhoDaCarta(rng, 'passar', 20).map((c) => deslocar(c, 0, 2))],
-    ox: w / 2 + pad,
-    oy: h / 2 + pad,
-    grao: 0.3,
-    fundo: (ctx) => {
-      ctx.save()
-      ctx.translate(w / 2 + pad, h / 2 + pad)
-      ctx.shadowColor = 'rgba(60,36,20,0.28)'
-      ctx.shadowBlur = 4
-      ctx.shadowOffsetY = 2
-      ctx.fillStyle = '#eef8ef'
-      caminho(ctx, corpo)
-      ctx.fill()
-      ctx.restore()
-    },
-    frente: (ctx) => {
-      ctx.save()
-      ctx.translate(w / 2 + pad, h / 2 + pad)
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillStyle = corCss(PALETA.verdeEscuro)
-      ctx.font = `bold 13px ${FONTE_TEXTO}`
-      ctx.fillText('PASSAR', 0, -h / 2 + 16)
-      ctx.fillStyle = '#0b6a9e'
-      ctx.font = `bold 13px ${FONTE_TEXTO}`
-      ctx.fillText(`+${ENERGIA.passar}`, 14, h / 2 - 14)
-      ctx.restore()
-    },
-  })
-  return chave
-}
-
-// o brilho amarelo de giz em volta da carta selecionada
-function assarBrilhoDaCarta(scene) {
-  const chave = 'manual-carta-brilho'
-  if (scene.textures.exists(chave)) return chave
-  const { largura: w, altura: h } = CARTA
-  const pad = 12
-  const contorno = retanguloRedondo(-w / 2 - 4, -h / 2 - 4, w + 8, h + 8, 11)
-  assar(scene, chave, w + pad * 2, h + pad * 2, {
-    camadas: [{ tipo: 'traco', tracos: [[...contorno, contorno[0], contorno[1]]], cor: PALETA.amarelo, largura: 5, passadas: 3 }],
-    ox: w / 2 + pad,
-    oy: h / 2 + pad,
-    grao: 0.35,
-  })
-  return chave
-}
 
 // adesivo redondo de cada passo: papel colorido recortado com o desenho de giz dele
 function assarAdesivoDoPasso(scene, id) {
@@ -774,31 +656,3 @@ function assarAdesivoDoPasso(scene, id) {
     grao: 0.25,
   })
 }
-
-function caminho(ctx, poli) {
-  ctx.beginPath()
-  poli.forEach((q, k) => (k ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)))
-  ctx.closePath()
-}
-
-// uma camada de cera movida de (dx, dy)
-function deslocar(camada, dx, dy) {
-  const m = (q) => ({ x: q.x + dx, y: q.y + dy })
-  const c = { ...camada }
-  if (c.tracos) c.tracos = c.tracos.map((t) => t.map(m))
-  if (c.poligono) c.poligono = c.poligono.map(m)
-  return c
-}
-
-// quebra o texto em linhas que cabem em `largura` (no máximo 2)
-function quebrar(ctx, texto, largura) {
-  const palavras = texto.split(' ')
-  const linhas = ['']
-  for (const p of palavras) {
-    const tentativa = linhas[linhas.length - 1] ? `${linhas[linhas.length - 1]} ${p}` : p
-    if (ctx.measureText(tentativa).width <= largura || !linhas[linhas.length - 1]) linhas[linhas.length - 1] = tentativa
-    else linhas.push(p)
-  }
-  return linhas.slice(0, 2)
-}
-

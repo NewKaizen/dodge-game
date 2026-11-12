@@ -10,6 +10,8 @@ import { CORACAO } from '../../constants.js'
 import { criarOnda, moverCoracao } from '../onda.js'
 import { criarRoteiro, pilotoDeDesvio, LICOES } from '../padroes.js'
 import { criarPagina1 } from '../pagina1.js'
+import { roteiroDeTiros, posicaoDeGraze } from '../tiros.js'
+import { coracaoNovo } from '../exercicio.js'
 import { cenaDeMentira, caixaDeMentira } from './apoio/cenaDeMentira.mjs'
 
 register('./apoio/ganchos.mjs', import.meta.url) // `phaser` -> Phaser de mentira (só lógica)
@@ -133,4 +135,75 @@ test('o coração do manual anda como o Heart real (diagonal limitada, preso à 
     perto(real.heart.x, c.x, `passo ${i} x`)
     perto(real.heart.y, c.y, `passo ${i} y`)
   }
+})
+
+// extras (3D, páginas 7 a 9): o graze e o acerto com VÁRIOS corações (onda.passoMulti) = Balas.tocar de verdade
+test('extras: graze e acerto de 1 e 2 corações batem com as Balas e o Heart reais (mesmo quadro, mesma bala, mesmo coração)', () => {
+  const cenarios = [
+    { nome: 'zigue-zague', joy: (t, i) => ({ x: Math.round(100 * Math.sin(t / (650 + i * 170))), y: Math.round(100 * Math.cos(t / (1050 + i * 90))) }) },
+    { nome: 'parados', joy: () => ({ x: 0, y: 0 }) },
+    { nome: 'vai e volta', joy: (t, i) => ({ x: (t + i * 700) % 2400 < 1200 ? 100 : -100, y: i ? 25 : -25 }) },
+  ]
+  let grazesTotais = 0
+  let acertosTotais = 0
+  for (const n of [1, 2]) {
+    for (const { nome, joy } of cenarios) {
+      const cena = cenaDeMentira()
+      const cx = caixaDeMentira(CAIXA)
+      const balas = new Balas(cena, cx)
+      const inicio = [{ x: 560, y: 248 }, { x: 660, y: 248 }]
+      const reais = Array.from({ length: n }, (_, i) => {
+        const h = new Heart(cena, cx, 0xff0000, i)
+        h.mostrar(inicio[i].x, inicio[i].y)
+        return h
+      })
+      const manuais = Array.from({ length: n }, (_, i) => coracaoNovo(i, inicio[i].x, inicio[i].y))
+      const onda = criarOnda(CAIXA)
+      const rA = roteiroDeTiros(CAIXA, { semente: `par:${nome}:${n}`, passo: 700 })
+      const rB = roteiroDeTiros(CAIXA, { semente: `par:${nome}:${n}`, passo: 700 })
+      const criadasReais = []
+      const criadasManuais = []
+      const evR = []
+      const evM = []
+      let t = 0
+      for (let q = 0; q < 700; q++) {
+        const dt = DTS[q % DTS.length]
+        reais.forEach((h, i) => h.update(joy(t, i), CORACAO.velocidadePadrao, dt))
+        manuais.forEach((m, i) => moverCoracao(m, joy(t, i), CORACAO.velocidadePadrao, dt, CAIXA))
+        t += dt
+        for (const o of rA.gerar(t, reais[q % n])) criadasReais.push(balas.criar({ ...o, extra: undefined }))
+        for (const o of rB.gerar(t, manuais[q % n])) criadasManuais.push(onda.bala(o))
+        balas.atualizar(dt, reais, (h, b) => (evR.push(['acerto', q, reais.indexOf(h), criadasReais.indexOf(b)]), true), (h, b) => evR.push(['graze', q, reais.indexOf(h), criadasReais.indexOf(b)]))
+        const r = onda.passoMulti(dt, manuais)
+        for (const a of r.acertos) evM.push(['acerto', q, manuais.indexOf(a.alvo), criadasManuais.indexOf(a.bala)])
+        for (const g of r.grazes) evM.push(['graze', q, manuais.indexOf(g.alvo), criadasManuais.indexOf(g.bala)])
+        evM.sort()
+        evR.sort()
+      }
+      assert.deepEqual(evM, evR, `${nome} com ${n} coração(ões)`)
+      grazesTotais += evR.filter((e) => e[0] === 'graze').length
+      acertosTotais += evR.filter((e) => e[0] === 'acerto').length
+    }
+  }
+  assert.ok(grazesTotais > 5, `o teste tem de ter grazes de verdade (teve ${grazesTotais})`)
+  assert.ok(acertosTotais > 5, `e acertos de verdade (teve ${acertosTotais})`)
+})
+
+test('extras: raspar em 17 px da linha do tiro é graze (nunca acerto) nas Balas reais', () => {
+  const rA = roteiroDeTiros(CAIXA, { semente: 'raspa', passo: 5000, inicio: 100 })
+  const cena = cenaDeMentira()
+  const cx = caixaDeMentira(CAIXA)
+  const balas = new Balas(cena, cx)
+  const h = new Heart(cena, cx, 0xff0000, 0)
+  h.mostrar(610, 248)
+  const [o] = rA.gerar(200, { x: 610, y: 248 })
+  balas.criar({ ...o, extra: undefined })
+  const q = posicaoDeGraze({ extra: { linha: o.extra.linha } }, { x: 610, y: 248 }, CAIXA)
+  assert.ok(q)
+  h.mostrar(q.x, q.y)
+  let acertos = 0
+  let grazes = 0
+  for (let k = 0; k < 400; k++) balas.atualizar(16, [h], () => (acertos++, true), () => grazes++)
+  assert.equal(acertos, 0)
+  assert.equal(grazes, 1, 'uma bala dá no máximo 1 graze')
 })

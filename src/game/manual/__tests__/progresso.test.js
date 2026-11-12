@@ -16,6 +16,10 @@ import {
   paginaParaRetomar,
   resumoDoIndice,
   PAGINAS,
+  ESSENCIAIS,
+  EXTRAS,
+  extraParaRetomar,
+  extrasCompletos,
 } from '../progresso.js'
 
 test('valida o formato: só objetos certinhos (ou null) podem ser salvos', () => {
@@ -74,8 +78,9 @@ test('retomar e índice', () => {
   const tudo = comPagina5(ate4)
   assert.equal(paginaParaRetomar(tudo), null)
   const r = resumoDoIndice(tudo)
-  assert.deepEqual(r.map((x) => [x.pagina, x.completa, x.adesivos, x.total]), [[1, true, 1, 1], [2, true, 3, 4], [3, true, 1, 2], [4, true, 3, 3], [5, true, 1, 1]])
+  assert.deepEqual(r.slice(0, 5).map((x) => [x.pagina, x.completa, x.adesivos, x.total]), [[1, true, 1, 1], [2, true, 3, 4], [3, true, 1, 2], [4, true, 3, 3], [5, true, 1, 1]])
   assert.deepEqual(r.map((x) => x.cena), PAGINAS.map((x) => x.cena))
+  assert.deepEqual(r.slice(5).map((x) => [x.pagina, x.extra, x.completa]), [[6, true, false], [7, true, false], [8, true, false], [9, true, false]], 'os extras vêm depois, marcados, e não entram no essencial')
   const meio = resumoDoIndice(comLicao(null, 0, 'feita'))
   assert.equal(meio[1].comecada, true)
   assert.equal(meio[1].completa, false)
@@ -85,7 +90,7 @@ test('páginas 3 e 4: passos salvos, validados e o progresso antigo (sem p3/p4) 
   const antigo = { p1: { completa: true }, p2: { completa: true, licoes: ['feita', 'feita', 'feita', 'feita'] } }
   assert.equal(progressoValido(antigo), true, 'o salvo de antes das páginas 3 e 4 não vira lixo')
   assert.deepEqual(normalizarProgresso(antigo).p3, { completa: false, passos: [null, null] })
-  assert.deepEqual(TOTAL_PASSOS, { 3: 2, 4: 3 })
+  assert.deepEqual(TOTAL_PASSOS, { 3: 2, 4: 3, 6: 5, 7: 2, 8: 2, 9: 3 })
   for (const ruim of [
     { ...antigo, p3: { completa: false, passos: [null] } },
     { ...antigo, p3: { completa: 'sim', passos: [null, null] } },
@@ -107,8 +112,9 @@ test('páginas 3 e 4: passos salvos, validados e o progresso antigo (sem p3/p4) 
   assert.deepEqual([meio[2].comecada, meio[2].adesivos, meio[3].comecada], [true, 1, false])
 })
 
-test('página 5 e o manual essencial: 5 páginas, a flag vem só com a página 5, e o salvo antigo continua valendo', () => {
-  assert.equal(PAGINAS.length, 5)
+test('página 5 e o manual essencial: 5 páginas essenciais (mais 4 extras), a flag vem só com a página 5, e o salvo antigo continua valendo', () => {
+  assert.equal(ESSENCIAIS.length, 5)
+  assert.equal(PAGINAS.length, 9)
   assert.deepEqual(PAGINAS[4], { pagina: 5, titulo: 'Uma partida de verdade', cena: 'ManualRalsei5' })
   const antigo = { p1: { completa: true }, p2: { completa: true, licoes: ['feita', 'feita', 'feita', 'feita'] }, p3: { completa: true, passos: ['feita', 'feita'] }, p4: { completa: true, passos: ['feita', 'feita', 'feita'] } }
   assert.equal(progressoValido(antigo), true, 'o salvo de antes da página 5 não vira lixo')
@@ -141,4 +147,36 @@ test('preferencias.js guarda o progresso validado (chave "manual") e ignora lixo
   assert.deepEqual(JSON.parse(guardado.get('dodge-preferencias')).manual, bom)
   const b = await import('../../preferencias.js?manual=2')
   assert.deepEqual(b.pref('manual'), bom, 'relido do navegador')
+})
+
+test('extras (6 a 9): marcados, passos salvos e validados, e nunca puxam o CONTINUAR do essencial', () => {
+  assert.deepEqual(EXTRAS.map((e) => e.pagina), [6, 7, 8, 9])
+  assert.ok(EXTRAS.every((e) => e.extra && /^ManualRalsei[6-9]$/.test(e.cena)))
+  assert.ok(ESSENCIAIS.every((e) => !e.extra))
+  // o salvo de antes dos extras continua valendo e ganha os extras vazios
+  const antigo = { p1: { completa: true }, p2: { completa: true, licoes: ['feita', 'feita', 'feita', 'feita'] } }
+  assert.equal(progressoValido(antigo), true)
+  assert.deepEqual(normalizarProgresso(antigo).p6, { completa: false, passos: [null, null, null, null, null] })
+  assert.deepEqual(normalizarProgresso(antigo).p9, { completa: false, passos: [null, null, null] })
+  for (const ruim of [{ ...antigo, p6: { completa: false, passos: [null, null] } }, { ...antigo, p7: { completa: 'sim', passos: [null, null] } }, { ...antigo, p9: [] }, { ...antigo, p8: { completa: false, passos: ['ok', null] } }])
+    assert.equal(progressoValido(ruim), false, JSON.stringify(ruim))
+  // marcar: pular não apaga adesivo; passo fora do intervalo é ignorado; completa só com tudo resolvido
+  let p = comPasso(null, 7, 0, 'feita')
+  p = comPasso(p, 7, 0, 'pulada')
+  p = comPasso(p, 7, 5, 'feita')
+  assert.deepEqual(p.p7.passos, ['feita', null])
+  assert.equal(comPagina(p, 7).p7.completa, false)
+  p = comPagina(comPasso(p, 7, 1, 'pulada'), 7)
+  assert.equal(p.p7.completa, true)
+  assert.ok(progressoValido(p))
+  // o CONTINUAR é do essencial: ninguém é puxado para um extra sem querer
+  assert.equal(paginaParaRetomar(p), 1, 'um extra feito não conta como essencial')
+  assert.equal(extraParaRetomar(null), null)
+  assert.equal(extraParaRetomar(comPasso(null, 8, 0, 'feita')), 8, 'só retoma um extra já começado')
+  assert.equal(extraParaRetomar(p), null, 'completo não retoma')
+  assert.equal(extrasCompletos(p), 1)
+  assert.equal(paginaParaRetomar(comPagina5(comPasso(null, 6, 0, 'feita'))), 1)
+  // o selo do essencial não depende dos extras
+  assert.equal(essencialCompleto(comPagina5(null)), true)
+  assert.equal(resumoDoIndice(comPasso(null, 6, 1, 'feita'))[5].comecada, true)
 })

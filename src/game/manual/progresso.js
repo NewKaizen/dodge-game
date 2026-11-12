@@ -6,9 +6,12 @@
 //     p3: { completa: bool, passos: [null | 'feita' | 'pulada' x2] },
 //     p4: { completa: bool, passos: [null | 'feita' | 'pulada' x3] },
 //     p5: { completa: bool },          a partida de verdade (página 5) chegou ao fim
-//     essencial: bool }                o MANUAL ESSENCIAL: o adesivo de quem terminou a página 5
+//     essencial: bool,                 o MANUAL ESSENCIAL: o adesivo de quem terminou a página 5
+//     p6..p9: { completa: bool, passos: [null | 'feita' | 'pulada' x TOTAL_PASSOS[n]] } }   as páginas EXTRAS (3D)
 //
-//   p3, p4, p5 e essencial podem faltar (progresso salvo antes delas existirem): valem como "nada ainda".
+//   p3, p4, p5, essencial e p6..p9 podem faltar (progresso salvo antes delas existirem): valem como "nada ainda".
+//   As páginas 1 a 5 são o manual ESSENCIAL; as 6 a 9 são extras: oferecidas no índice, nunca forçadas
+//   (não entram no CONTINUAR do essencial nem no selo; `extraParaRetomar` só retoma um extra já começado).
 //
 //   progressoValido(v)             o valor pode ser salvo? (null também: "nada ainda")
 //   normalizarProgresso(v)         sempre um progresso completo e limpo
@@ -16,20 +19,29 @@
 //   comPasso(prog, pagina, i, resultado) / comPagina(prog, pagina)        idem, para as páginas 3 e 4
 //   comPagina5(prog)               a página 5 completa e o manual essencial ganho
 //   paginaParaRetomar(prog)        1 a 5: a primeira página que falta (ou null: tudo pronto)
+//   extraParaRetomar(prog)         6 a 9: o primeiro extra já começado e não completo (ou null)
+//   extrasCompletos(prog)          quantos extras (de 4) estão completos
 //   essencialCompleto(prog)        o manual essencial já foi ganho?
 //   resumoDoIndice(prog)           as linhas do índice: [{ pagina, titulo, completa, adesivos, total }]
 
 export const TOTAL_LICOES_P2 = 4
-export const TOTAL_PASSOS = { 3: 2, 4: 3 } // passos (adesivos) das páginas de cartas
+export const TOTAL_PASSOS = { 3: 2, 4: 3, 6: 5, 7: 2, 8: 2, 9: 3 } // passos (adesivos) das páginas de cartas e dos extras
 export const PAGINAS = [
   { pagina: 1, titulo: 'Este é o seu coração', cena: 'ManualRalsei' },
   { pagina: 2, titulo: 'Vamos desviar?', cena: 'ManualRalsei2' },
   { pagina: 3, titulo: 'Sua primeira carta', cena: 'ManualRalsei3' },
   { pagina: 4, titulo: 'Nem toda rodada pede ataque', cena: 'ManualRalsei4' },
   { pagina: 5, titulo: 'Uma partida de verdade', cena: 'ManualRalsei5' },
+  // extras (3D): oferecidos, nunca forçados
+  { pagina: 6, titulo: 'Os quatro naipes', cena: 'ManualRalsei6', extra: true },
+  { pagina: 7, titulo: 'Graze: raspando', cena: 'ManualRalsei7', extra: true },
+  { pagina: 8, titulo: 'Jogando em dupla', cena: 'ManualRalsei8', extra: true },
+  { pagina: 9, titulo: 'Ases, SUPER e perfeitos', cena: 'ManualRalsei9', extra: true },
 ]
+export const ESSENCIAIS = PAGINAS.filter((x) => !x.extra) // páginas 1 a 5
+export const EXTRAS = PAGINAS.filter((x) => x.extra) // páginas 6 a 9
 const RESULTADOS = [null, 'feita', 'pulada']
-const PAGINAS_DE_PASSOS = [3, 4]
+const PAGINAS_DE_PASSOS = [3, 4, 6, 7, 8, 9]
 
 const vazioDePassos = (n) => ({ completa: false, passos: Array(TOTAL_PASSOS[n]).fill(null) })
 export const progressoVazio = () => ({
@@ -38,6 +50,10 @@ export const progressoVazio = () => ({
   p3: vazioDePassos(3),
   p4: vazioDePassos(4),
   p5: { completa: false },
+  p6: vazioDePassos(6),
+  p7: vazioDePassos(7),
+  p8: vazioDePassos(8),
+  p9: vazioDePassos(9),
   essencial: false,
 })
 
@@ -103,7 +119,7 @@ export function comPagina2(prog) {
   return p
 }
 
-// páginas 3 e 4: um passo resolvido (pular não apaga um adesivo já ganho)
+// páginas de passos (3, 4 e os extras 6 a 9): um passo resolvido (pular não apaga um adesivo já ganho)
 export function comPasso(prog, pagina, i, resultado) {
   const p = normalizarProgresso(prog)
   const q = p[`p${pagina}`]
@@ -112,7 +128,7 @@ export function comPasso(prog, pagina, i, resultado) {
   return p
 }
 
-// páginas 3 e 4: completa só com todos os passos resolvidos
+// páginas de passos: completa só com todos os passos resolvidos
 export function comPagina(prog, pagina) {
   if (pagina === 1) return comPagina1(prog)
   if (pagina === 2) return comPagina2(prog)
@@ -135,21 +151,38 @@ export const essencialCompleto = (prog) => normalizarProgresso(prog).essencial
 
 const completaDe = (p, n) => p[`p${n}`].completa
 
+// só o manual ESSENCIAL (1 a 5): os extras nunca entram aqui
 export function paginaParaRetomar(prog) {
   const p = normalizarProgresso(prog)
-  const falta = PAGINAS.find(({ pagina }) => !completaDe(p, pagina))
+  const falta = ESSENCIAIS.find(({ pagina }) => !completaDe(p, pagina))
   return falta ? falta.pagina : null
 }
 
+// um extra que a pessoa já começou e não terminou (nunca puxa para um extra que ela nem abriu)
+export function extraParaRetomar(prog) {
+  const p = normalizarProgresso(prog)
+  const e = EXTRAS.find(({ pagina }) => !p[`p${pagina}`].completa && p[`p${pagina}`].passos.some(Boolean))
+  return e ? e.pagina : null
+}
+
+export const extrasCompletos = (prog) => {
+  const p = normalizarProgresso(prog)
+  return EXTRAS.filter(({ pagina }) => p[`p${pagina}`].completa).length
+}
+
+// as linhas do índice: as 5 essenciais e depois os 4 extras (`extra: true`)
 export function resumoDoIndice(prog) {
   const p = normalizarProgresso(prog)
+  const deCartas = (n) => {
+    const q = p[`p${n}`]
+    return { ...PAGINAS[n - 1], completa: q.completa, adesivos: q.passos.filter((x) => x === 'feita').length, total: TOTAL_PASSOS[n], comecada: q.passos.some(Boolean) }
+  }
   return [
     { ...PAGINAS[0], completa: p.p1.completa, adesivos: p.p1.completa ? 1 : 0, total: 1 },
     { ...PAGINAS[1], completa: p.p2.completa, adesivos: p.p2.licoes.filter((x) => x === 'feita').length, total: TOTAL_LICOES_P2, comecada: p.p2.licoes.some(Boolean) },
-    ...PAGINAS_DE_PASSOS.map((n) => {
-      const q = p[`p${n}`]
-      return { ...PAGINAS[n - 1], completa: q.completa, adesivos: q.passos.filter((x) => x === 'feita').length, total: TOTAL_PASSOS[n], comecada: q.passos.some(Boolean) }
-    }),
+    deCartas(3),
+    deCartas(4),
     { ...PAGINAS[4], completa: p.p5.completa, adesivos: p.p5.completa ? 1 : 0, total: 1 },
+    ...EXTRAS.map((e) => deCartas(e.pagina)),
   ]
 }
