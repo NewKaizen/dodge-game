@@ -349,6 +349,12 @@ imagens; o "desenhando" repinta uma textura pequena (a área da caixa) por ~2,7 
    `ManualRalsei7.js` (mais a subclasse da cena, o registro em `config.js` e em `rede.js`).
 5. Cena nova segue o padrão `estadoInicial()` (`__tests__/cenasReaproveitadas.test.js` cobre).
 
+Extras 6 a 9 (sub-fase 3D), no navegador (build de produção servido por `vite preview` + Playwright/Chromium com GL de
+software, teclado): índice com os 4 EXTRA em azul → página 6 (cartas de giz, ataque real na lousa, adesivos) → página 7
+(anel de graze, linha pontilhada, "graze: 1 de 3") → página 8 (coração vermelho e o Ralsei verde indo à marca dele) →
+página 9 (mesa com as 10 gemas, Ás e ★, a ajuda dos 3 erros); normal e com "reduzir animações". Nenhum erro de página.
+Em software GL o quadro é lento: toques de direção precisam de ~350 ms de tecla segurada para o jogo enxergar.
+
 ## Antes de produzir mais páginas
 
 - O tremidinho do giz e a linha de dicas ainda são repetidos nas duas cenas (pequenos); dá para subir para a base.
