@@ -7,6 +7,8 @@ import { conta } from '../../lib/conta.js'
 import { amigos, responderConvite } from '../../lib/amigos.js'
 import { lan } from '../../lib/lan/rede.js'
 import { nomeDoItem, textoMotivo } from '../../lib/progresso.js'
+import { aoConquistaNova } from '../../lib/conquistasConta.js'
+import { semLigaduras } from '../campanha/texto.js'
 import { criarFilaAvisos } from './fila.js'
 import { novosIds } from './lista.js'
 import { caixa, criarAvatar, COR, texto } from './ui.js'
@@ -135,6 +137,8 @@ export function instalarAvisos() {
       avisar({ id: `xp:${r.partidaId}:${Date.now()}`, tipo: 'xp', titulo: `+${r.xpGanho} XP`, texto: linhas.join('\n'), ms: 7000 })
     }),
   )
+  // CONQUISTAS (4B): cada conquista nova vira um aviso (espera o menu, como os outros)
+  parar.push(aoConquistaNova((c) => avisar({ id: `conquista:${c.id}`, tipo: 'xp', titulo: semLigaduras(`CONQUISTA: ${c.nome}`), texto: semLigaduras(`${c.descricao}\nveja em PERFIL > COLEÇÃO > CONQUISTAS`), ms: 7000 })))
   return () => parar.forEach((f) => f())
 }
 

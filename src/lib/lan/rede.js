@@ -67,7 +67,9 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 // (dono): a sala do boss (CO-OP de 2 a 4); sala.semanal = a semana da sala. partyModo(modo, semanal).
 // O resultado do CO-OP leva `semana`; a recompensa pode trazer `trofeu` { id, semana, novo }.
 // CAMPANHA (PROTOCOLO 16, docs/campanha.md): `campanha {acao}` e as respostas campanha* (lib/campanha.js)
-export const PROTOCOLO = 16
+// DESAFIO DIÁRIO e CONQUISTAS (PROTOCOLO 17, docs/desafio-diario.md): `campanha {acao: desafio...}`,
+// `conquistas` -> conquistasEstado e o aviso `conquistas` (lib/campanha.js e lib/conquistasConta.js)
+export const PROTOCOLO = 17
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas

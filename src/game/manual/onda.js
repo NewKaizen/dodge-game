@@ -1,5 +1,5 @@
 import { CORACAO } from '../constants.js'
-import { avisoDaBala, andarBala, quicarNaCaixa, longeDaCaixa, foraDaCaixa, folgaDaBala, acerta, passoDoCoracao } from '../entities/fisica.js'
+import { avisoDaBala, andarBala, quicarNaCaixa, longeDaCaixa, foraDaCaixa, folgaDaBala, acerta, grazeia, passoDoCoracao } from '../entities/fisica.js'
 
 // Uma "Pista" de bolso para o Manual do Ralsei, SEM Phaser: as balas nascem com as MESMAS opções
 // de a.bala({...}) (entities/Bullets.js) e andam/acertam pelas MESMAS regras (entities/fisica.js,
@@ -9,6 +9,8 @@ import { avisoDaBala, andarBala, quicarNaCaixa, longeDaCaixa, foraDaCaixa, folga
 //   const o = criarOnda(caixa)          caixa no formato do manual { esquerda, direita, topo, base }
 //   o.bala(opcoes)                      cria uma bala (x, y, vx, vy, ax, ay, raio, aviso, entrando, jaAvisada, ...)
 //   o.passo(dt, coracao)                anda as balas dt ms; devolve a bala que acertou o coração (ou null)
+//   o.passoMulti(dt, alvos)             idem para VÁRIOS corações ({ x, y, hitbox, graze, ativo }): devolve
+//                                       { acertos: [{ alvo, bala }], grazes: [{ alvo, bala }] } (a bala que acerta some)
 //   o.lista                             as balas vivas (cada uma: x, y, raio, idade, aviso, extra...)
 //   moverCoracao(c, joy, vel, dt, caixa)   o passo do coração (Heart.update)
 //
@@ -46,6 +48,7 @@ export function novaBala(o, l) {
     aviso: avisoDaBala(o, l),
     idade: 0,
     morta: false,
+    grazeados: new Set(), // os corações que já grazearam esta bala (passoMulti)
     extra: o.extra ?? {},
   }
 }
@@ -78,6 +81,34 @@ export function criarOnda(caixa, { fatorVelocidade = 1, velocidadeMax = Infinity
       }
       onda.lista = onda.lista.filter((b) => !b.morta)
       return acertou
+    },
+    // O mesmo laço de Balas.atualizar + Balas.tocar com vários corações: acertou (miolo) a bala some;
+    // raspou (anel de graze, fora do miolo) conta UM graze por bala e por coração.
+    passoMulti(dt, alvos) {
+      const saida = { acertos: [], grazes: [] }
+      for (const b of onda.lista) {
+        b.idade += dt
+        if (b.idade < b.aviso) continue
+        andarBala(b, dt, fatorVelocidade, velocidadeMax)
+        if (b.quicar > 0) quicarNaCaixa(b, l)
+        b.vida -= dt
+        if (b.morta || longeDaCaixa(b, l) || b.vida <= 0) {
+          b.morta = true
+          continue
+        }
+        for (const c of alvos) {
+          if (c.ativo === false) continue
+          if (acerta(b, c, l)) {
+            saida.acertos.push({ alvo: c, bala: b })
+            b.morta = true
+          } else if (!b.grazeados.has(c) && grazeia(b, c, l)) {
+            b.grazeados.add(c)
+            saida.grazes.push({ alvo: c, bala: b })
+          }
+        }
+      }
+      onda.lista = onda.lista.filter((b) => !b.morta)
+      return saida
     },
     perigosa: (b) => !b.morta && b.idade >= b.aviso,
     limpar() {

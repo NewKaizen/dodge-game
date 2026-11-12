@@ -339,6 +339,48 @@ export function desenhoDaCarta(rng, id, r = 20) {
       ...rabiscoDaGema(rng, r * 0.4, { x: 0, y: r * 0.55 }).camadas,
     ]
   }
+  // página 6 (o chá) e página 9 (os quatro Ases)
+  if (id === 'cha') {
+    const copo = [{ x: -r * 0.6, y: -r * 0.1 }, { x: r * 0.5, y: -r * 0.1 }, { x: r * 0.4, y: r * 0.7 }, { x: -r * 0.5, y: r * 0.7 }]
+    const alca = []
+    for (let i = 0; i <= 10; i++) {
+      const a = -Math.PI / 2 + (i / 10) * Math.PI
+      alca.push({ x: r * 0.5 + Math.cos(a) * r * 0.3, y: r * 0.3 + Math.sin(a) * r * 0.28 })
+    }
+    const c = [preencher(copo, PALETA.verde, { espaco: 1.6, mancha: 0.7 }), traco(fechar(copo), PALETA.verdeEscuro, 1.8, { passadas: 2 }), traco([alca], PALETA.verdeEscuro, 1.8, { passadas: 2 })]
+    for (const x of [-r * 0.3, 0.05 * r, r * 0.35]) c.push(traco([[{ x, y: -r * 0.2 }, { x: x - r * 0.12, y: -r * 0.45 }, { x: x + r * 0.1, y: -r * 0.7 }]], PALETA.rosa, 1.5, { passadas: 1, alpha: 0.85 }))
+    return c
+  }
+  if (id === 'espelho') {
+    // um espelho redondo com o brilho e a seta que volta
+    const c = [traco(circuloGiz(rng, 0, -r * 0.1, r * 0.72, { tremor: 0.3, tracos: 1 }), PALETA.lavanda, 2.4, { passadas: 2 }), { tipo: 'mancha', poligono: elipse(0, -r * 0.1, r * 0.66, r * 0.66, 18), cor: PALETA.azul, alpha: 0.25 }]
+    c.push(traco(linhaGiz(rng, -r * 0.35, -r * 0.5, -r * 0.05, -r * 0.8, { tracos: 1, tremor: 0.2, excesso: 0 }), 0xffffff, 2.2, { passadas: 1 }))
+    c.push(traco([[{ x: -r * 0.4, y: r * 0.05 }, { x: r * 0.3, y: r * 0.05 }, { x: r * 0.3, y: -r * 0.3 }]], PALETA.coracao, 2, { passadas: 2 }))
+    c.push(traco([[{ x: r * 0.12, y: -r * 0.12 }, { x: r * 0.3, y: -r * 0.36 }, { x: r * 0.48, y: -r * 0.12 }]], PALETA.coracao, 2, { passadas: 2 }))
+    c.push(traco(linhaGiz(rng, 0, r * 0.62, 0, r * 0.9, { tracos: 1, tremor: 0.2, excesso: 0 }), PALETA.lavanda, 2.4, { passadas: 2 }))
+    return c
+  }
+  if (id === 'anular') {
+    // o sinal de proibido sobre uma cartinha
+    const carta = retanguloRedondo(-r * 0.45, -r * 0.7, r * 0.9, r * 1.2, r * 0.15)
+    return [preencher(carta, 0xfffbf1, { espaco: 1.2, mancha: 1 }), traco(fechar(carta), PALETA.tinta, 1.6, { passadas: 2 }), traco(circuloGiz(rng, 0, -r * 0.1, r * 0.8, { tremor: 0.3, tracos: 1 }), PALETA.coracao, 3, { passadas: 2 }), traco(linhaGiz(rng, -r * 0.55, -r * 0.65, r * 0.55, r * 0.45, { tracos: 1, tremor: 0.2, excesso: 0 }), PALETA.coracao, 3, { passadas: 2 })]
+  }
+  if (id === 'roubo') {
+    // uma cartinha sendo puxada por uma setinha
+    const carta = retanguloRedondo(-r * 0.7, -r * 0.6, r * 0.8, r * 1.1, r * 0.14)
+    const c = [preencher(carta, 0xfffbf1, { espaco: 1.2, mancha: 1 }), traco(fechar(carta), PALETA.tinta, 1.6, { passadas: 2 })]
+    c.push(traco(linhaGiz(rng, r * 0.15, r * 0.1, r * 0.85, r * 0.1, { tracos: 1, tremor: 0.2, excesso: 0 }), PALETA.ouro, 2.6, { passadas: 2 }))
+    c.push(traco([[{ x: r * 0.55, y: -r * 0.2 }, { x: r * 0.88, y: r * 0.1 }, { x: r * 0.55, y: r * 0.4 }]], PALETA.ouro, 2.6, { passadas: 2 }))
+    return c
+  }
+  if (id === 'segunda') {
+    // um coração com um "+" de cura
+    const miolo = contornoDoCoracao(0, -r * 0.05, r * 1.7, 28)
+    const c = [preencher(miolo, PALETA.rosa, { espaco: 1.8, mancha: 0.8 }), traco(coracaoGiz(rng, 0, -r * 0.05, r * 1.7, { tremor: 0.3, passo: 3 }), PALETA.rosaEscuro, 2.2, { passadas: 2 })]
+    c.push(traco(linhaGiz(rng, -r * 0.25, -r * 0.1, r * 0.25, -r * 0.1, { tracos: 1, tremor: 0.1, excesso: 0 }), 0xffffff, 2.6, { passadas: 1 }))
+    c.push(traco(linhaGiz(rng, 0, -r * 0.35, 0, r * 0.15, { tracos: 1, tremor: 0.1, excesso: 0 }), 0xffffff, 2.6, { passadas: 1 }))
+    return c
+  }
   return []
 }
 
@@ -417,6 +459,65 @@ export function iconeDoPasso(rng, id, r = 11) {
     const c = carta(PALETA.verdeEscuro)
     c.push(...estrelinha(rng, 0, 0, r * 0.36, PALETA.verde, PALETA.verdeEscuro))
     for (const [x, y] of [[r * 0.85, -r * 0.75], [-r * 0.9, -r * 0.2], [r * 0.85, r * 0.55]]) c.push(traco(xGiz(rng, x, y, r * 0.18, { tremor: 0.2 }), PALETA.amarelo, 1.6, { passadas: 1 }))
+    return c
+  }
+  // extras (6 a 9): os adesivos de cada passo
+  if (id === 'espadas') return [...carta(PALETA.tinta), ...estrelinha(rng, 0, 0, r * 0.42, PALETA.amarelo, PALETA.ouro)]
+  if (id === 'ouros') return [...carta(PALETA.azulEscuro), ...desenhoDaCarta(rng, 'ninar', r * 0.5)]
+  if (id === 'paus') return [...carta(PALETA.verdeEscuro), ...desenhoDaCarta(rng, 'bolinho', r * 0.5)]
+  if (id === 'copas') return [...carta(PALETA.coracao), ...desenhoDaCarta(rng, 'cha', r * 0.5)]
+  if (id === 'coop') {
+    const c = []
+    for (const [x, cor, escura] of [[-r * 0.42, PALETA.coracao, 0xa50e26], [r * 0.42, PALETA.azul, PALETA.azulEscuro]]) {
+      const m = contornoDoCoracao(x, 0, r * 0.95, 20)
+      c.push(preencher(m, cor, { espaco: 1.6, mancha: 0.8 }), traco(coracaoGiz(rng, x, 0, r * 0.95, { tremor: 0.2, passo: 3 }), escura, 1.6, { passadas: 2 }))
+    }
+    return c
+  }
+  if (id === 'raspar') {
+    // o coração com o anel de graze e uma bolinha raspando
+    const m = contornoDoCoracao(0, 0, r * 0.8, 20)
+    const c = [preencher(m, PALETA.coracao, { espaco: 1.6, mancha: 0.8 }), traco(coracaoGiz(rng, 0, 0, r * 0.8, { tremor: 0.2, passo: 3 }), 0xa50e26, 1.6, { passadas: 2 })]
+    c.push(traco(circuloGiz(rng, 0, 0, r * 0.95, { tremor: 0.3, tracos: 1 }), PALETA.ouro, 1.4, { passadas: 1, alpha: 0.9 }))
+    const bola = elipse(r * 0.78, -r * 0.62, r * 0.24, r * 0.24, 12)
+    c.push(preencher(bola, PALETA.lavanda, { espaco: 1.3, mancha: 0.8 }), traco([[...bola, bola[0]]], PALETA.bala, 1.4, { passadas: 1 }))
+    return c
+  }
+  if (id === 'energia') {
+    const c = [...rabiscoDaGema(rng, r * 0.7, { x: -r * 0.1, y: 0 }).camadas]
+    c.push(traco(linhaGiz(rng, r * 0.5, -r * 0.6, r * 0.9, -r * 0.6, { tracos: 1, tremor: 0.1, excesso: 0 }), PALETA.verdeEscuro, 2.2, { passadas: 2 }))
+    c.push(traco(linhaGiz(rng, r * 0.7, -r * 0.8, r * 0.7, -r * 0.4, { tracos: 1, tremor: 0.1, excesso: 0 }), PALETA.verdeEscuro, 2.2, { passadas: 2 }))
+    return c
+  }
+  if (id === 'marcas') {
+    const c = []
+    for (const [x, cor, escura] of [[-r * 0.5, PALETA.coracao, 0xa50e26], [r * 0.5, PALETA.verde, PALETA.verdeEscuro]]) {
+      c.push(...estrelinha(rng, x, r * 0.5, r * 0.28, PALETA.amarelo, PALETA.ouro))
+      const m = contornoDoCoracao(x, -r * 0.2, r * 0.85, 20)
+      c.push(preencher(m, cor, { espaco: 1.6, mancha: 0.8 }), traco(coracaoGiz(rng, x, -r * 0.2, r * 0.85, { tremor: 0.2, passo: 3 }), escura, 1.5, { passadas: 2 }))
+    }
+    return c
+  }
+  if (id === 'dupla') {
+    const c = []
+    for (const [x, y, cor, escura] of [[-r * 0.35, r * 0.15, PALETA.coracao, 0xa50e26], [r * 0.35, -r * 0.15, PALETA.verde, PALETA.verdeEscuro]]) {
+      const m = contornoDoCoracao(x, y, r * 0.95, 20)
+      c.push(preencher(m, cor, { espaco: 1.6, mancha: 0.8 }), traco(coracaoGiz(rng, x, y, r * 0.95, { tremor: 0.2, passo: 3 }), escura, 1.5, { passadas: 2 }))
+    }
+    c.push(traco(circuloGiz(rng, 0, 0, r * 1.05, { tremor: 0.3, tracos: 1 }), PALETA.azulEscuro, 1.4, { passadas: 1, alpha: 0.8 }))
+    return c
+  }
+  if (id === 'carregar') {
+    const c = [...rabiscoDaGema(rng, r * 0.85).camadas]
+    for (const [x, y] of [[r * 0.85, -r * 0.7], [-r * 0.9, -r * 0.5], [r * 0.8, r * 0.6]]) c.push(traco(xGiz(rng, x, y, r * 0.18, { tremor: 0.2 }), PALETA.amarelo, 1.6, { passadas: 1 }))
+    return c
+  }
+  if (id === 'super') return desenhoDaCarta(rng, 'super', r * 0.9)
+  if (id === 'ases') {
+    // um "A" de giz sobre uma cartinha
+    const c = [...carta(PALETA.ouro)]
+    c.push(traco([[{ x: -r * 0.32, y: r * 0.5 }, { x: 0, y: -r * 0.55 }, { x: r * 0.32, y: r * 0.5 }]], PALETA.tinta, 2.2, { passadas: 2 }))
+    c.push(traco(linhaGiz(rng, -r * 0.18, r * 0.12, r * 0.18, r * 0.12, { tracos: 1, tremor: 0.1, excesso: 0 }), PALETA.tinta, 2, { passadas: 1 }))
     return c
   }
   return []

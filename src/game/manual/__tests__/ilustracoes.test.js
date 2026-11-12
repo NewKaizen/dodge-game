@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { criarRng } from '../../pvp/baralho.js'
-import { contornoDoBalao, bordaDoBalao, letrasTortas, rabiscosDaMargem, rabiscoDoCoracao, rabiscoDaBala, rabiscoDaMarca, estrelaGorda } from '../ilustracoes.js'
+import { contornoDoBalao, bordaDoBalao, letrasTortas, rabiscosDaMargem, rabiscoDoCoracao, rabiscoDaBala, rabiscoDaMarca, estrelaGorda, desenhoDaCarta, iconeDoPasso } from '../ilustracoes.js'
 import { caixaDasCamadas } from '../cera.js'
 
 test('balão: determinístico, com o rabinho chegando na ponta pedida', () => {
@@ -51,4 +51,23 @@ test('coração, bala e marca: camadas assadas + traços para o desenho progress
   const e = estrelaGorda(0, 0, 10, 5)
   assert.equal(e.length, 10)
   assert.ok(Math.abs(Math.hypot(e[0].x, e[0].y) - 10) < 1e-9 && Math.abs(Math.hypot(e[1].x, e[1].y) - 5) < 1e-9)
+})
+
+// extras (3D): os desenhos das cartas novas (o chá e os 4 Ases) e os adesivos dos passos das páginas 6 a 9
+test('extras: desenhos das cartas e adesivos dos passos existem, são determinísticos e cabem no seu raio', () => {
+  for (const id of ['cha', 'espelho', 'anular', 'roubo', 'segunda']) {
+    const a = desenhoDaCarta(criarRng(`c:${id}`), id, 19)
+    assert.ok(a.length > 0, `carta ${id}`)
+    assert.deepEqual(a, desenhoDaCarta(criarRng(`c:${id}`), id, 19), `determinístico ${id}`)
+    const b = caixaDasCamadas(a)
+    assert.ok(Number.isFinite(b.minX + b.maxX + b.minY + b.maxY) && b.maxX - b.minX < 19 * 3 && b.maxY - b.minY < 19 * 3, `cabe na carta: ${id}`)
+  }
+  const ids = ['espadas', 'ouros', 'paus', 'copas', 'coop', 'raspar', 'energia', 'marcas', 'dupla', 'carregar', 'super', 'ases']
+  for (const id of ids) {
+    const a = iconeDoPasso(criarRng(`i:${id}`), id, 11)
+    assert.ok(a.length > 0, `adesivo ${id}`)
+    assert.deepEqual(a, iconeDoPasso(criarRng(`i:${id}`), id, 11), `determinístico ${id}`)
+    const b = caixaDasCamadas(a)
+    assert.ok(b.maxX - b.minX <= 11 * 3 && b.maxY - b.minY <= 11 * 3, `cabe no adesivo: ${id}`)
+  }
 })

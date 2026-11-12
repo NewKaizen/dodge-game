@@ -158,6 +158,17 @@ id da corrida, com o teto de 300 XP de campanha por dia). Detalhes e o modelo an
 Silenciosa": a 0012 só troca os **nomes** dos três cosméticos (Quem Deixou a Luz Acesa, Vitral
 Silencioso, Porta Entreaberta). Os ids e o `campanha_quando` continuam os da 0011.
 
+### 2.8 Migrations 0013 e 0014: desafio diário, conquistas e maestria
+
+Rode, nesta ordem, `supabase/migrations/0013_desafio_diario.sql` (depende da 0001, 0002, 0003 e 0010) e
+`supabase/migrations/0014_conquistas_maestria.sql` (depende da 0013). As duas rodam de novo sem estragar.
+A 0013 cria `desafio_corridas`, `desafio_recordes`, `desafio_concluidos` e `desafio_semanas` e as funções
+`desafio_estado` e `conceder_desafio`; a 0014 cria `conta_eventos`, `maestria` e `conquistas`, os 14
+cosméticos de maestria no catálogo e as funções `registrar_evento_conta`, `desbloquear_conquistas` e
+`conquistas_da_conta`. RLS: cada conta lê só o seu; só o servidor (`service_role`) chama as funções.
+Sem elas o resto do jogo funciona, mas o desafio dá erro ao salvar e não há conquistas. Detalhes em
+[desafio-diario.md](desafio-diario.md). `desafioSql.test.js` roda a 0001–0014 duas vezes (com `DODGE_PG`).
+
 ## 3. Conferir o bucket
 
 Em **Storage** deve aparecer o bucket `avatares`, marcado como **Public**.

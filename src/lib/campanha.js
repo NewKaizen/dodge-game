@@ -1,6 +1,7 @@
 import { writable, get } from 'svelte/store'
 import { lan, aoServidor, enviarLobby, manterLobby } from './lan/rede.js'
 import { conta, recarregarPerfil, ganhouItem } from './conta.js'
+import { lerDesafio, cosmeticoDoId } from './desafio.js'
 
 // A CAMPANHA do lado do navegador (docs/campanha.md): o servidor roda a partida
 // (server/campanha.js); daqui só saem a carta de cada rodada, as posições do coração e as
@@ -32,9 +33,62 @@ function ligar() {
       for (const id of Array.isArray(m.itensNovos) ? m.itensNovos : []) if (typeof id === 'string') ganhouItem(id)
       if (m.xpGanho > 0 || m.itensNovos?.length) recarregarPerfil()
     }
-    if (m.t.startsWith('campanha') || m.t === '_fechou') ouvintes.forEach((fn) => fn(m))
+    if (m.t === 'desafioEstado') desafioDiario.set(lerEstadoDesafio(m))
+    if (m.t.startsWith('campanha') || m.t === 'desafioEstado' || m.t === '_fechou') ouvintes.forEach((fn) => fn(m))
   })
 }
+
+// ---------- DESAFIO DIÁRIO (docs/desafio-diario.md) ----------
+// A mesma corrida da campanha (o servidor roda a luta), com a definição do dia pelo relógio do
+// SERVIDOR (src/lib/desafio.js). Convidado também joga, sem recompensa nem recorde.
+//   desafioDiario (store)   { carregado, dia, semana, desafio, convidado, disponivel, recorde, concluido,
+//                             diasSemana, meta, cosmetico, cosmeticoGanho, concluidos, amigos, xp, ate, erro }
+//   entrarNoDesafio() · sairDoDesafio() · conectadoAoLobby() · pedirDesafio() · comecarDesafio(dia)
+export const desafioDiario = writable({ carregado: false })
+
+function lerEstadoDesafio(m) {
+  const desafio = lerDesafio(m.desafio)
+  const inteiro = (x) => Math.max(0, Math.floor(Number(x) || 0))
+  return {
+    carregado: Boolean(desafio),
+    dia: desafio?.id ?? null,
+    semana: typeof m.semana === 'string' ? m.semana : null,
+    desafio,
+    convidado: Boolean(m.convidado),
+    disponivel: Boolean(m.disponivel),
+    recorde: m.recorde && typeof m.recorde === 'object' ? { pontos: inteiro(m.recorde.pontos), rodadas: m.recorde.rodadas ?? null, acertos: m.recorde.acertos ?? null } : null,
+    concluido: Boolean(m.concluido),
+    diasSemana: inteiro(m.diasSemana),
+    meta: inteiro(m.meta) || 4,
+    cosmetico: cosmeticoDoId(m.cosmetico?.id),
+    cosmeticoGanho: Boolean(m.cosmeticoGanho),
+    concluidos: inteiro(m.concluidos),
+    amigos: (Array.isArray(m.amigos) ? m.amigos : []).slice(0, 20).map((a) => ({ nome: String(a?.nome ?? '').slice(0, 24), tag: String(a?.tag ?? '').slice(0, 32), pontos: inteiro(a?.pontos) })),
+    xp: inteiro(m.xp),
+    // o relógio daqui só para a contagem (quem decide o dia é o servidor)
+    ate: Date.now() + Math.min(86_400_000 + 3_600_000, inteiro(m.restanteMs)),
+    erro: String(m.erro ?? ''),
+  }
+}
+
+export function conectadoAoLobby() {
+  const l = get(lan)
+  if (l.fase === 'fora' || l.fase === 'conectando') return false
+  return get(conta).estado !== 'logado' || Boolean(l.eu.conta)
+}
+
+// a tela do desafio abre a conexão do lobby (também para o convidado: a luta roda no servidor)
+export function entrarNoDesafio() {
+  ligar()
+  manterLobby(true)
+  if (conectadoAoLobby()) pedirDesafio()
+}
+// voltando ao menu: o convidado não precisa da conexão aberta (quem está logado continua: amigos)
+export function sairDoDesafio() {
+  if (get(conta).estado !== 'logado') manterLobby(false)
+}
+export const pedirDesafio = () => mandar({ acao: 'desafio' })
+export const comecarDesafio = (dia) => mandar({ acao: 'comecarDesafio', dia })
 
 export function aoCampanha(fn) {
   ligar()

@@ -27,7 +27,8 @@ import { criarQuadro, limitesDoQuadro } from '../campanha/quadro.js'
 import { PASSO_MS } from '../campanha/amostras.js'
 import { criarMedo } from '../campanha/medo.js'
 import { criarTita } from '../campanha/tita.js'
-import { aoCampanha, comecarFase, jogarCarta, enviarPosicoes, terminarEsquiva, desistirDaCorrida, trapacaDev } from '../../lib/campanha.js'
+import { aoCampanha, comecarFase, comecarDesafio, jogarCarta, enviarPosicoes, terminarEsquiva, desistirDaCorrida, trapacaDev } from '../../lib/campanha.js'
+import { lerDesafio, faseDoDesafio, descreverDesafio } from '../../lib/desafio.js'
 import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe, venceu } from '../../lib/saida.js'
 
 // CAMPANHA: a LUTA de uma fase (docs/campanha.md), no jeito do CO-OP: o CHEFE no alto, a carta dele
@@ -40,6 +41,9 @@ import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe, venceu } from '..
 //
 //   escolha: ←→ carta · A jogar · B passar a vez · esquiva: mover o coração · Esc: desistir (2×)
 //   scene.start('CampanhaArena', { mundo: 1, fase: 1, escolhas })
+//   scene.start('CampanhaArena', { desafio: def })   o DESAFIO DIÁRIO (docs/desafio-diario.md): a mesma
+//     luta, com a "fase" do dia (src/lib/desafio.js faseDoDesafio); o fim e a desistência voltam à cena
+//     DesafioDiario. O modificador ESCURIDÃO só existe aqui: um véu no quadro com luz em volta do coração.
 const CHEFE = { x: CENTRO_X, y: 196 }
 // a carta do chefe (a intenção) fica ao lado dele: embaixo do chefe ficam a frase e a descrição da carta
 const INTENCAO = { x: CENTRO_X + 92, y: 204 }
@@ -76,6 +80,8 @@ const misturar = (a, b, k) => {
 const estadoInicial = () => ({
   mundo: null,
   fase: null,
+  desafio: null,
+  escuro: null,
   def: null,
   corrida: null,
   etapa: 'conectando', // conectando | escolha | enviando | revelacao | abrindo | esquiva | conferindo | golpes | fim | erro
@@ -124,8 +130,9 @@ export default class CampanhaArena extends Phaser.Scene {
 
   create(dados = {}) {
     Object.assign(this, estadoInicial())
-    this.mundo = mundoDe(dados.mundo ?? 1)
-    this.fase = faseDe(this.mundo.id, dados.fase ?? 1)
+    this.desafio = dados.desafio ? lerDesafio(dados.desafio) : null
+    this.mundo = this.desafio ? { id: 0, personagem: this.desafio.personagem, nome: 'DESAFIO DIÁRIO' } : mundoDe(dados.mundo ?? 1)
+    this.fase = this.desafio ? faseDoDesafio(this.desafio) : faseDe(this.mundo.id, dados.fase ?? 1)
     this.def = CHEFES[this.fase.inimigo]
     this.escolhas = dados.escolhas ?? {}
     this.controles = new Controles(this)
@@ -146,13 +153,16 @@ export default class CampanhaArena extends Phaser.Scene {
       this.limparArmadas()
       this.quadro?.parar()
       this.quadro = null
+      this.escuro?.destroy()
+      this.escuro = null
       this.caixa?.destruir()
       this.medo?.destruir()
       if (this.musicaEspecial) voltarMusicaNormal()
     })
     musica(this.def.musica ?? 'campanha_luta', 'campanha2')
     this.cameras.main.fadeIn(260)
-    comecarFase(this.mundo.id, this.fase.n)
+    if (this.desafio) comecarDesafio(this.desafio.id)
+    else comecarFase(this.mundo.id, this.fase.n)
   }
 
   get textosDaFase() {
@@ -164,8 +174,10 @@ export default class CampanhaArena extends Phaser.Scene {
   montar() {
     const estilo = (t, cor = TINTA, extra = {}) => ({ fontFamily: FONTE, fontSize: `${t}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra })
     // o título da fase e a regra, no meio do alto (os placares ficam nos cantos)
-    this.add.text(CENTRO_X, 4, `${this.fase.chefe ? 'ÚLTIMA PORTA' : `PORTA ${this.fase.n}`} · ${this.fase.nome}`, estilo(12)).setOrigin(0.5, 0).setDepth(71)
-    this.add.text(CENTRO_X, 22, semLigaduras(this.textosDaFase?.tema ?? descreverRegra(this.fase.regra)), { ...estilo(10, COR_TEXTO.tema), align: 'center', wordWrap: { width: 300 } }).setOrigin(0.5, 0).setDepth(71)
+    const titulo = this.desafio ? `DESAFIO DIÁRIO · ${this.desafio.nome}` : `${this.fase.chefe ? 'ÚLTIMA PORTA' : `PORTA ${this.fase.n}`} · ${this.fase.nome}`
+    const tema = this.desafio ? descreverDesafio(this.desafio).join('\n') : (this.textosDaFase?.tema ?? descreverRegra(this.fase.regra))
+    this.add.text(CENTRO_X, 4, semLigaduras(titulo), estilo(12)).setOrigin(0.5, 0).setDepth(71)
+    this.add.text(CENTRO_X, 22, semLigaduras(tema), { ...estilo(10, COR_TEXTO.tema), align: 'center', wordWrap: { width: 300 } }).setOrigin(0.5, 0).setDepth(71)
 
     // o chefe: um eco (o amigo possuído) ou o TITÃ gigante atrás de tudo
     if (this.def.titan) {
@@ -249,7 +261,7 @@ export default class CampanhaArena extends Phaser.Scene {
     if (m.t === 'campanhaErro') {
       if (m.corrida && m.corrida === this.corrida && m.motivo === 'carta') {
         tocar(this, 'erro')
-        this.frase.setText(m.msg)
+        this.frase.setText(semLigaduras(m.msg))
         this.etapa = 'escolha'
         this.mao.setAtiva(true)
         return
@@ -259,6 +271,8 @@ export default class CampanhaArena extends Phaser.Scene {
     }
     if (m.t === 'campanhaInicio') {
       if (this.corrida) return
+      // (o desafio de outro dia: a tela estava velha; o servidor recusa antes, isto é só a segunda trava)
+      if (Boolean(this.desafio) !== Boolean(m.desafio) || (this.desafio && m.desafio !== this.desafio.id)) return
       this.corrida = m.corrida
       this.aviso.setVisible(false)
       return this.novaRodada(m.rodada)
@@ -341,11 +355,11 @@ export default class CampanhaArena extends Phaser.Scene {
     if (m.intencao) {
       this.intencao?.destroy()
       this.intencao = new Carta(this, INTENCAO.x, INTENCAO.y, { ...m.intencao, personagem: this.def.sprite, custo: 0 }, { largura: LARGURA_INTENCAO, cor: CORES.hpChefe }).setDepth(12)
-      this.rotuloIntencao.setText(`${m.intencao.nome}`)
+      this.rotuloIntencao.setText(semLigaduras(m.intencao.nome))
     }
     if (DESTINOS[m.destino]) this.banner(DESTINOS[m.destino], '#ffe9a0', { y: 240 })
     const quem = (j, nome) => (j.passou ? `${nome} passou` : `${nome}: ${j.carta.nome}`)
-    this.frase.setText(`${quem(m.jogadas[0], 'você')}${this.huds[1] ? `  ·  ${quem(m.jogadas[1], PERSONAGENS[this.fase.aliado].nome)}` : ''}`)
+    this.frase.setText(semLigaduras(`${quem(m.jogadas[0], 'você')}${this.huds[1] ? `  ·  ${quem(m.jogadas[1], PERSONAGENS[this.fase.aliado].nome)}` : ''}`))
     this.atualizarPlacares(m.eu, m.aliado)
     this.atualizarChefe(m.chefe)
     if (m.chefeEfeito?.cura) this.numeroNoChefe(`+${m.chefeEfeito.cura}`, '#9affb0')
@@ -383,6 +397,11 @@ export default class CampanhaArena extends Phaser.Scene {
     this.caixa.mostrar(() => {
       if (this.saindo || this.etapa !== 'abrindo') return
       this.quadro = criarQuadro(this, esq, { caixa: this.caixa })
+      // ESCURIDÃO (desafio diário): só o desenho; o servidor refaz o quadro igual
+      if (this.fase.modificador?.escuro) {
+        this.escuro = this.add.graphics().setDepth(8.8)
+        this.caixa.recortar(this.escuro)
+      }
       this.coracoes.forEach((img, j) => img.setVisible(Boolean(esq.jogadores[j])))
       this.etapa = 'esquiva'
       this.infoQuadro.setText(semLigaduras(`${this.rodadaAtual.intencao?.nome ?? 'ataque'} · ${esq.danos[0] ?? esq.danos[1] ?? 0} de dano por acerto${esq.inverter ? ' · CONTROLES INVERTIDOS!' : ''}`))
@@ -408,11 +427,22 @@ export default class CampanhaArena extends Phaser.Scene {
       if (!img.visible) return
       img.setPosition(c.x, c.y).setAlpha(!c.ativo ? 0.25 : c.invencivel > 0 && Math.floor(this.time.now / 80) % 2 ? 0.35 : 1)
     })
+    if (this.escuro) this.desenharEscuro(q.coracoes[0])
     this.moverArremesso(q.balas.lista)
     const hp = this.huds[0].hp / Math.max(1, this.huds[0].hpMax)
     this.medo.atualizar(delta, { ativo: !q.acabou, hp, caixa: { esquerda: q.limites.left, direita: q.limites.right, topo: q.limites.top, base: q.limites.bottom } })
     if (!q.acabou) this.caixa.retangulo.setStrokeStyle(4, misturar(CORES.caixa, BORDA_MEDO, 0.55 + 0.45 * Math.sin(this.time.now / (110 + 200 * hp))))
     if (q.acabou) this.terminarEsquiva()
+  }
+
+  // o véu da ESCURIDÃO: tudo preto, menos um círculo de luz em volta do seu coração (um anel enorme)
+  desenharEscuro(c) {
+    const r = 46
+    const g = this.escuro.clear()
+    g.lineStyle(900, 0x000000, 0.94).strokeCircle(c.x, c.y, r + 450)
+    g.lineStyle(12, 0x000000, 0.55).strokeCircle(c.x, c.y, r - 6)
+    g.lineStyle(8, 0x000000, 0.3).strokeCircle(c.x, c.y, r - 16)
+    g.fillStyle(0xfff2c8, 0.07).fillCircle(c.x, c.y, r - 10)
   }
 
   levouAcerto(j) {
@@ -457,6 +487,8 @@ export default class CampanhaArena extends Phaser.Scene {
       this.quadro.parar()
     }
     this.quadro = null
+    this.escuro?.destroy()
+    this.escuro = null
     if (this.arremesso) for (const a of this.arremesso.values()) if (!a.foi) ((a.foi = true), this.desfazerCarta(a.carta))
     this.arremesso = null
     this.coracoes.forEach((img) => img.setVisible(false))
@@ -579,7 +611,7 @@ export default class CampanhaArena extends Phaser.Scene {
     }
     this.time.delayedCall(m.resultado === 'vitoria' ? 1300 : 700, () => {
       this.cameras.main.fadeOut(240, 0, 0, 0)
-      this.time.delayedCall(260, () => this.scene.start('CampanhaFim', { mundo: this.mundo.id, fase: this.fase.n, fim: m, escolhas: this.escolhas }))
+      this.time.delayedCall(260, () => (this.desafio ? this.scene.start('DesafioDiario', { fim: m }) : this.scene.start('CampanhaFim', { mundo: this.mundo.id, fase: this.fase.n, fim: m, escolhas: this.escolhas })))
     })
   }
 
@@ -589,7 +621,7 @@ export default class CampanhaArena extends Phaser.Scene {
     this.mao.setAtiva(false)
     this.quadro?.parar()
     this.quadro = null
-    this.aviso.setText(`${msg}\n\nA ou B: voltar ao mapa`).setVisible(true).setAlign('center').setWordWrapWidth(600)
+    this.aviso.setText(semLigaduras(`${msg}\n\nA ou B: voltar${this.desafio ? '' : ' ao mapa'}`)).setVisible(true).setAlign('center').setWordWrapWidth(600)
     this.etapa = 'erro'
   }
 
@@ -813,7 +845,7 @@ export default class CampanhaArena extends Phaser.Scene {
     this.quadro?.parar()
     this.quadro = null
     this.cameras.main.fadeOut(220, 0, 0, 0)
-    this.time.delayedCall(240, () => this.scene.start('Campanha', { mundo: this.mundo.id, fase: this.fase.n }))
+    this.time.delayedCall(240, () => (this.desafio ? this.scene.start('DesafioDiario') : this.scene.start('Campanha', { mundo: this.mundo.id, fase: this.fase.n })))
   }
 
   update(tempo, delta) {

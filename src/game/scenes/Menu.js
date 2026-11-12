@@ -19,6 +19,7 @@ import { avatarDoPerfil } from '../../lib/contaRegras.js'
 import { corDaMoldura, progressoDoXp } from '../../lib/progresso.js'
 import { criarAvatar } from '../conta/ui.js'
 import { montarAvisos } from '../conta/avisos.js'
+import { semLigaduras } from '../campanha/texto.js'
 
 // Tela inicial: a turma jogando cartas na mesa, com o caos preso no telão ao
 // fundo (uma luta de balas rolando) (menu/mesa.js). Ou, com MENU INICIAL = SALA
@@ -52,8 +53,10 @@ const RAPIDO = { id: 'rapido', rotulo: 'JOGAR RÁPIDO', cor: '#ffd23a', cena: 'L
 const PERFIL = { id: 'perfil', rotulo: 'PERFIL', cor: '#6dffb0', cena: 'Perfil', dica: '' }
 // CAMPANHA (docs/campanha.md): o modo história, com conta e online (a cena avisa quem não está logado)
 const CAMPANHA = { id: 'campanha', rotulo: 'CAMPANHA', cor: '#5fb8b0', cena: 'Campanha', dica: 'história com a Kris: A Casa Silenciosa' }
+// DESAFIO DIÁRIO (docs/desafio-diario.md): um por dia, igual para todos; convidado joga sem recompensa
+const DESAFIO = { id: 'desafio', rotulo: 'DESAFIO DIÁRIO', cor: '#ffb060', cena: 'DesafioDiario', dica: semLigaduras('um desafio por dia, o mesmo para todos: recorde e recompensa') }
 // cenas que não explodem a sala: só escurecem a tela e abrem
-const SO_ESCURECEM = ['config', 'cartas', 'lan', 'rapido', 'perfil', 'campanha']
+const SO_ESCURECEM = ['config', 'cartas', 'lan', 'rapido', 'perfil', 'campanha', 'desafio']
 
 // Joystick USB: o caminho do pareamento (CONFIGURAÇÕES → GAMEPAD) não aparece em lugar nenhum, então uma
 // linha discreta no canto avisa. Só com Web Serial, sem joystick pareado nunca, e até o jogador abrir
@@ -63,7 +66,8 @@ const dicaJoystickUsbVisivel = () =>
 
 // JOGAR RÁPIDO e PERFIL: onde há conta (ou o site está na internet, mesmo que as contas estejam fora do ar)
 const comConta = () => siteNaInternet() || get(conta).estado !== 'indisponivel'
-const montarLista = (comContas) => (comContas ? [RAPIDO, CAMPANHA, CO_OP, PVP, ONLINE, GUIA, PERFIL, CONFIG] : [CO_OP, PVP, ONLINE, GUIA, CONFIG])
+// (o DESAFIO DIÁRIO aparece também sem contas: o convidado joga, sem recompensa, em qualquer servidor)
+const montarLista = (comContas) => (comContas ? [RAPIDO, CAMPANHA, DESAFIO, CO_OP, PVP, ONLINE, GUIA, PERFIL, CONFIG] : [CO_OP, PVP, ONLINE, DESAFIO, GUIA, CONFIG])
 
 // A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
 // deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do create().
@@ -110,7 +114,7 @@ export default class Menu extends Phaser.Scene {
 
     // o cenário: a MESA DE CARTAS (padrão) ou a SALA DE TV (Config > Gráficos > MENU INICIAL)
     const mesa = pref('menu') === 'mesa'
-    this.pos = { x: 48, y: 216, passo: this.opcoes.length > 6 ? 25 : 34 }
+    this.pos = { x: 48, y: 216, passo: this.opcoes.length > 8 ? 23 : this.opcoes.length > 6 ? 25 : 34 }
     this.ponteiro = false
     if (mesa) {
       this.sala = criarMesa(this)
@@ -256,7 +260,7 @@ export default class Menu extends Phaser.Scene {
     this.realceMenu.clear().fillStyle(UI.elevado, 1).fillRoundedRect(24, l.y - this.pos.passo / 2 + 1, 258, this.pos.passo - 2, 3)
     this.realceMenu.fillStyle(UI.ciano).fillRect(24, l.y - this.pos.passo / 2 + 1, 3, this.pos.passo - 2)
     this.seta.setVisible(true).setPosition(266, l.y)
-    this.aviso.setText(this.conectado ? '↑↓ escolher · A confirmar  ou clique' : 'Clique para escolher ou conecte\num teclado / controle.').setColor(UI.secundario)
+    this.aviso.setText(semLigaduras(this.conectado ? '↑↓ escolher · A confirmar  ou clique' : 'Clique para escolher ou conecte\num teclado / controle.')).setColor(UI.secundario)
     this.modoTitulo.setText(opcao.rotulo).setColor(opcao.cor)
     this.modoDescricao.setText(this.dicaDe(opcao))
     this.atualizarMiniatura()

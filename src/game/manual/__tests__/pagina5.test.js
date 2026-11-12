@@ -63,8 +63,8 @@ test('depois da partida (ganhando, perdendo ou empatando): volta, parabéns, ade
   assert.equal(expressaoDaPagina5({ etapa: 'parabens', resultado: 'perdeu', falaIdx: 0 }), 'incentivo')
 })
 
-test('"e agora?": as 4 saídas, ↑/↓ dá a volta, A vai', () => {
-  assert.deepEqual(OPCOES_E_AGORA.map((o) => o.rotulo), ['JOGAR CONTRA A CPU', 'ONLINE', 'CARTAS E ARENAS', 'VOLTAR AO ÍNDICE'])
+test('"e agora?": as 5 saídas (os extras 6 a 9 são uma delas, oferecida), ↑/↓ dá a volta, A vai', () => {
+  assert.deepEqual(OPCOES_E_AGORA.map((o) => o.rotulo), ['JOGAR CONTRA A CPU', 'ONLINE', 'CARTAS E ARENAS', 'EXTRAS DO MANUAL', 'VOLTAR AO ÍNDICE'])
   for (let k = 0; k < OPCOES_E_AGORA.length; k++) {
     const p = criarPagina5({ resultado: { vencedor: 1 }, calmo: true })
     while (p.etapa === 'parabens') p.avancar()

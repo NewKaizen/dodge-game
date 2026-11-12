@@ -2,7 +2,7 @@ import { ATAQUE } from '../constants.js'
 import { CARTAS, ataqueDaCarta } from '../pvp/cartas.js'
 import { criarPartida, iniciarRodada, resolverRodada, fimDaRodada, motivoBloqueio, ENERGIA } from '../pvp/regras.js'
 
-// As cartas das páginas 3 e 4 do Manual do Ralsei, com as REGRAS REAIS (lógica pura, sem Phaser).
+// As cartas das páginas 3, 4, 6 e 9 do Manual do Ralsei, com as REGRAS REAIS (lógica pura, sem Phaser).
 // Nada de carta inventada: as cartas são as do baralho do Ralsei (pvp/cartas.js), e jogar, pagar,
 // bloquear e passar passam pelas funções do PvP de verdade (pvp/regras.js) numa partida de verdade.
 //
@@ -35,6 +35,13 @@ export const MAO_P4 = ['ralsei-paus-3', 'ralsei-espadas-9', 'ralsei-espadas-14']
 export const CARA_P4 = 'ralsei-espadas-9' // Coro de Estrelas (custa 3)
 export const ENERGIA_P4 = 2
 
+// página 6 (extra): uma carta de cada naipe, baratas (o que muda é o naipe), na ordem ♠ ♥ ♦ ♣
+export const ESPADAS_P6 = 'ralsei-espadas-5' // Estrela Gentil
+export const COPAS_P6 = 'ralsei-copas-2' // Chá Quentinho (cura 7)
+export const OUROS_P6 = 'ralsei-ouros-4' // Canção de Ninar
+export const PAUS_P6 = 'ralsei-paus-3' // Bolinho Explosivo
+export const MAO_P6 = [ESPADAS_P6, COPAS_P6, OUROS_P6, PAUS_P6]
+
 // o desenho de giz no miolo de cada carta (manual/ilustracoes.js desenhoDaCarta), pelo ataque dela
 export const DESENHO_DA_CARTA = {
   'ralsei-espadas-5': 'estrela',
@@ -42,6 +49,12 @@ export const DESENHO_DA_CARTA = {
   'ralsei-paus-3': 'bolinho',
   'ralsei-espadas-9': 'coro',
   'ralsei-espadas-14': 'super',
+  // página 6 (o chá) e página 9 (os quatro Ases)
+  'ralsei-copas-2': 'cha',
+  'ralsei-espadas-1': 'espelho',
+  'ralsei-ouros-1': 'anular',
+  'ralsei-paus-1': 'roubo',
+  'ralsei-copas-1': 'segunda',
 }
 
 const TODAS = Object.values(CARTAS).flat()

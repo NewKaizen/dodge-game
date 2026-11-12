@@ -75,6 +75,7 @@ import crypto from 'node:crypto'
 import { agendarPadrao } from './fila.js'
 import { METRICAS_NULA } from './metricas.js'
 import { infoSemanal, ID_SEMANA } from '../src/lib/semanal.js'
+import { msgConquistas } from './conquistas.js'
 
 export const RELATO_JANELA_MS = 20_000
 export const ABANDONO_GRACA_MS = 3_000
@@ -149,6 +150,62 @@ export function criarRegistro(supabase) {
       return { xpGanho: d.xp_ganho ?? 0, xpTotal: d.xp_total ?? null, nivelAntes: d.nivel_antes ?? null, nivelDepois: d.nivel_depois ?? null, itensNovos: Array.isArray(d.itens_novos) ? d.itens_novos : [], motivo: d.motivo ?? null, estrelas: d.estrelas ?? 0, melhorEstrelas: d.melhor_estrelas ?? null, primeira: Boolean(d.primeira), resultado: d.resultado ?? x.resultado }
     },
     escolherCampanha: (x) => chamar('campanha_escolher', { p_user: x.usuario, p_mundo: x.mundo, p_chave: x.chave, p_valor: x.valor }),
+    // DESAFIO DIÁRIO (0013, server/campanha.js): o estado do dia (recorde, semana, amigos) e a concessão de uma corrida
+    estadoDesafio: async (usuario, dia) => {
+      const d = (await chamar('desafio_estado', { p_user: usuario, p_dia: dia })) ?? {}
+      const r = d.recorde
+      return {
+        recorde: r && typeof r === 'object' ? { pontos: Number(r.pontos) || 0, rodadas: r.rodadas ?? null, acertos: r.acertos ?? null } : null,
+        concluido: Boolean(d.concluido),
+        diasSemana: Number(d.dias_semana) || 0,
+        cosmeticoGanho: Boolean(d.cosmetico_ganho),
+        concluidos: Number(d.concluidos) || 0,
+        amigos: Array.isArray(d.amigos) ? d.amigos.map((a) => ({ id: a.id, nome: String(a.nome ?? ''), tag: String(a.tag ?? ''), pontos: Number(a.pontos) || 0 })) : [],
+      }
+    },
+    concederDesafio: async (x) => {
+      const d =
+        (await chamar('conceder_desafio', { p_corrida: x.corrida, p_user: x.usuario, p_dia: x.dia, p_versao: x.versao, p_resultado: x.resultado, p_motivo: x.motivo ?? null, p_pontos: x.pontos ?? 0, p_rodadas: x.rodadas ?? null, p_acertos: x.acertos ?? null, p_duracao_s: x.duracaoS ?? null, p_item: x.item?.id ?? null, p_tipo: x.item?.tipo ?? null, p_nome: x.item?.nome ?? null })) ?? {}
+      return {
+        xpGanho: d.xp_ganho ?? 0,
+        xpTotal: d.xp_total ?? null,
+        nivelAntes: d.nivel_antes ?? null,
+        nivelDepois: d.nivel_depois ?? null,
+        itensNovos: Array.isArray(d.itens_novos) ? d.itens_novos : [],
+        motivo: d.motivo ?? null,
+        resultado: d.resultado ?? x.resultado,
+        pontos: d.pontos ?? 0,
+        recorde: d.recorde ?? null,
+        novoRecorde: Boolean(d.novo_recorde),
+        concluido: Boolean(d.concluido),
+        primeiraHoje: Boolean(d.primeira_hoje),
+        diasSemana: Number(d.dias_semana) || 0,
+        cosmeticoNovo: d.cosmetico_novo ?? null,
+        concluidos: Number(d.concluidos) || 0,
+      }
+    },
+    // CONQUISTAS e MAESTRIA (0014, server/conquistas.js)
+    registrarEventoConta: async (x) => {
+      const d = (await chamar('registrar_evento_conta', { p_user: x.usuario, p_ref: x.ref, p_tipo: x.tipo, p_modo: x.modo ?? null, p_personagem: x.personagem ?? null, p_resultado: x.resultado ?? null })) ?? {}
+      const r = d.resumo ?? {}
+      return {
+        novo: Boolean(d.novo),
+        resumo: { partidas: Number(r.partidas) || 0, vitorias: Number(r.vitorias) || 0, desafios: Number(r.desafios) || 0, maestria: r.maestria && typeof r.maestria === 'object' ? r.maestria : {} },
+        itensNovos: Array.isArray(d.itens_novos) ? d.itens_novos : [],
+        maestria: d.maestria ?? null,
+      }
+    },
+    desbloquearConquistas: async (usuario, ids) => {
+      const d = await chamar('desbloquear_conquistas', { p_user: usuario, p_ids: ids })
+      return Array.isArray(d) ? d.filter((x) => typeof x === 'string') : []
+    },
+    conquistasDaConta: async (usuario) => {
+      const d = (await chamar('conquistas_da_conta', { p_user: usuario })) ?? {}
+      return {
+        conquistas: Array.isArray(d.conquistas) ? d.conquistas.map((c) => ({ id: c.id, em: c.em ?? null })) : [],
+        maestria: Array.isArray(d.maestria) ? d.maestria.map((m) => ({ personagem: m.personagem, pontos: Number(m.pontos) || 0, partidas: Number(m.partidas) || 0, vitorias: Number(m.vitorias) || 0 })) : [],
+      }
+    },
   }
 }
 
@@ -362,7 +419,7 @@ export function lerRelato(m, modo = 'pvp', n = 2) {
 
 // ---------- o registro no lobby ----------
 
-export function criarPartidas({ registro = null, agora = Date.now, agendar = agendarPadrao, entregar = () => {}, log = () => {}, versao = 1, metricas = METRICAS_NULA } = {}) {
+export function criarPartidas({ registro = null, agora = Date.now, agendar = agendarPadrao, entregar = () => {}, log = () => {}, versao = 1, metricas = METRICAS_NULA, conquistas = null } = {}) {
   const partidas = new Map() // id -> partida (em andamento e as guardadas)
   const doCliente = new Map() // id do cliente -> Set de partidas em andamento
   // os timers daqui (prazo dos relatos, esquecer a decisão): fechar() cancela todos
@@ -604,6 +661,18 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
         ...(trofeus.has(x.usuario) && { trofeu: trofeus.get(x.usuario) }),
       })
     }
+    // CONQUISTAS e MAESTRIA (4B): depois do XP, um evento por conta (o personagem do relato; só cosmético)
+    if (conquistas) for (const x of comConta) eventoDaConta(p, d, x, trofeus)
+  }
+
+  function eventoDaConta(p, d, x, trofeus) {
+    const resultado = d.resultados[x.lado]
+    conquistas
+      .evento(x.usuario, `partida:${p.id}`, { tipo: 'partida', modo: p.modo, resultado, personagem: x.relato?.personagem ?? null, trofeuSemanal: Boolean(trofeus.get(x.usuario)?.novo) })
+      .then((r) => {
+        const msg = msgConquistas(r)
+        if (msg) entregar(x, msg)
+      })
   }
 
   // BOSS SEMANAL: usuario -> { id, semana, novo } de quem levou o troféu (uma falha aqui não tira o XP)

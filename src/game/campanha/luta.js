@@ -10,6 +10,11 @@
 //   titan            as cartas que você NÃO jogou são arremessadas em você antes do ataque do chefe
 //
 //   const l = criarLuta({ mundo, fase, semente })
+//   const l = criarLuta({ desafio: def, semente })   o DESAFIO DIÁRIO (src/lib/desafio.js): a "fase" sai
+//                                    de faseDoDesafio(def), com o modificador do dia por cima das regras:
+//     modificador.velocidade / densidade   o ritmo dos ataques do chefe (o quadro refeito usa o mesmo)
+//     modificador.vida                     o seu HP (e o máximo) no começo
+//     modificador.escuro                   só desenho no navegador (o servidor não precisa)
 //   comecarRodada(l)                 -> a visão da rodada (mão, energias, a intenção do chefe)
 //   jogar(l, cartaId | null)         -> { ok, motivo } | { ok: true, rodada } (null = passar)
 //   concluirEsquiva(l, { amostras, acertosCliente, decorridoMs })
@@ -26,6 +31,7 @@ import { ehSuper } from '../pvp/cartas.js'
 import { TEMPOS } from '../constants.js'
 import { mundoDe, faseDe } from './mundos/index.js'
 import { validarAmostras } from './amostras.js'
+import { faseDoDesafio, pontosDoDesafio } from '../../lib/desafio.js'
 import { simularQuadro, duracaoDoQuadro, limitesDoQuadro, inicioNoQuadro, ritmoDoQuadro, velocidadeMaxDoQuadro } from './quadro.js'
 
 export const MAX_RODADAS = 30 // passou disso: o Silêncio vence
@@ -34,9 +40,9 @@ export const QUADRO_MINIMO = { largura: 190, altura: 120 }
 
 // ---------- a luta ----------
 
-export function criarLuta({ mundo, fase: n, semente }) {
-  const m = mundoDe(mundo)
-  const fase = faseDe(mundo, n)
+export function criarLuta({ mundo, fase: n, semente, desafio = null }) {
+  const m = desafio ? { id: 0, personagem: desafio.personagem } : mundoDe(mundo)
+  const fase = desafio ? faseDoDesafio(desafio) : faseDe(mundo, n)
   if (!m || !fase) throw new Error(`fase da campanha não existe: ${mundo}-${n}`)
   if (!CHEFES[fase.inimigo]) throw new Error(`chefe da campanha não existe: ${fase.inimigo}`)
   const aliado = fase.aliado ?? null
@@ -46,6 +52,12 @@ export function criarLuta({ mundo, fase: n, semente }) {
   // só um naipe: o seu baralho (o monte) fica só com ele
   const naipe = fase.regra?.soNaipe
   if (naipe) estado.jogadores[0].baralho.monte = estado.jogadores[0].baralho.monte.filter((c) => c.naipe === naipe)
+  // o desafio POR UM FIO: você começa com uma parte do HP (e esse é o máximo)
+  const vida = fase.modificador?.vida ?? 1
+  if (vida !== 1) {
+    const eu = estado.jogadores[0]
+    eu.hp = eu.hpMax = Math.max(1, Math.round(eu.hpMax * vida))
+  }
   return {
     mundo: m.id,
     fase,
@@ -58,6 +70,7 @@ export function criarLuta({ mundo, fase: n, semente }) {
     vencedor: null,
     perfeitos: 0,
     acertosLevados: 0,
+    grazesFeitos: 0,
   }
 }
 
@@ -125,7 +138,7 @@ function montarEsquiva(l, r, arremessadas) {
     protegido: e.jogadores.map((j) => Boolean(j.protegido)),
     jogadores: q.jogadores.map((d, j) => Boolean(d) && !e.jogadores[j].saiu),
     caixa: caixaDaRodada(fase, e.rodada),
-    ritmo: ritmoDoQuadro(fase.inimigo, e.nivel, q.ritmo),
+    ritmo: ritmoDoQuadro(fase.inimigo, e.nivel, { velocidade: (q.ritmo?.velocidade ?? 1) * (fase.modificador?.velocidade ?? 1), densidade: (q.ritmo?.densidade ?? 1) * (fase.modificador?.densidade ?? 1) }),
     velocidadeMax: velocidadeMaxDoQuadro(fase.inimigo, e.nivel),
     inverter: Boolean(q.inverter),
     semente: `${l.semente}:r${e.rodada}:quadro`,
@@ -202,6 +215,7 @@ export function concluirEsquiva(l, { amostras, acertosCliente = 0, decorridoMs =
   for (const j of [0, 1]) for (let k = 0; k < acertos[j]; k++) dano[j] += aplicarDanoCoop(e, j, esq.danos[j] ?? 0)
   for (const j of [0, 1]) if (grazes[j]) registrarGrazes(e, j, grazes[j])
   l.acertosLevados += acertos[0]
+  l.grazesFeitos += grazes[0] ?? 0
   // desvio perfeito (cada um): CRÍTICO no golpe e a energia (x combo) se o ataque dá energia
   const perfeito = [0, 1].map((j) => Boolean(esq?.jogadores[j]) && !acertos[j] && !e.jogadores[j].caido)
   const perfeitos = [null, null]
@@ -257,4 +271,20 @@ export function descreverRegra(regra = {}) {
   if (regra.soDeCima) return 'Todo ataque do chefe vem de cima.'
   if (regra.titan) return 'O TITÃ: as cartas que você não jogar são arremessadas em você antes do ataque dele.'
   return ''
+}
+
+// o resumo do fim da luta que o servidor guarda (o desafio diário e as conquistas): tudo do que ELE viu
+export function resumoDaLuta(l) {
+  const eu = l.estado.jogadores[0]
+  const c = l.estado.chefe
+  const r = {
+    vitoria: l.vencedor === 'vitoria',
+    rodadas: l.estado.rodada,
+    acertos: l.acertosLevados,
+    grazes: l.grazesFeitos,
+    perfeitos: l.perfeitos,
+    hpFracao: eu.hpMax > 0 ? Math.max(0, eu.hp) / eu.hpMax : 0,
+    chefeFracao: c.hpMax > 0 ? 1 - Math.max(0, c.hp) / c.hpMax : 0,
+  }
+  return { ...r, pontos: pontosDoDesafio(r) }
 }

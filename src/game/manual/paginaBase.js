@@ -31,6 +31,7 @@ import { contornoDoCoracao, desenharTracos } from './giz.js'
 //   riscosDeGolpe(g, x, y, cor)           os risquinhos parados de "levou um acerto" (sem clarão)
 //   barraDeGiz(g, caixa, progresso)       a barra de tempo embaixo da caixa
 //   joyDeTodos(controles)                 o joystick somado de todos os jogadores locais (um coração só)
+//   joysDosJogadores(controles)           um joystick por jogador local (a página 8: um coração para cada pessoa)
 //
 // "Reduzir animações" (op.calmo): sem respiração/piscada, balão inteiro, virada em corte, sem confete.
 
@@ -866,6 +867,17 @@ export function assarPilula(scene, texto) {
     },
     grao: 0.25,
   })
+}
+
+// UM joystick por jogador local (2 jogadores = 2 corações): cada controle do jogador 1 e do jogador 2.
+// Com 1 jogador, joy(0) já soma todos os controles (qualquer fonte move o coração dele).
+export function joysDosJogadores(controles) {
+  const lista = []
+  for (let j = 0; j < Math.max(1, controles.numJogadores); j++) {
+    const d = controles.joy(j)
+    lista.push({ x: Math.max(-100, Math.min(100, d.x)), y: Math.max(-100, Math.min(100, d.y)) })
+  }
+  return lista
 }
 
 // um coração só no tutorial: qualquer fonte local move (com 2 jogadores detectados, soma as duas)

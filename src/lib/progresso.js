@@ -99,6 +99,8 @@ export const textoMotivo = (codigo) => MOTIVOS[codigo] ?? ''
 // id = '<tipo>.<nome>'; padrao: todo mundo tem (não precisa ganhar).
 // cor: só para desenhar (moldura em volta do avatar, verso da carta).
 import { trofeuDoId } from './semanal.js'
+import { cosmeticoDoId } from './desafio.js'
+import { itemDaMaestria } from './conquistas.js'
 import { ITENS_CAMPANHA } from '../game/campanha/mundos/index.js'
 
 export const TIPOS_ITEM = ['avatar', 'titulo', 'moldura', 'verso']
@@ -132,7 +134,8 @@ const PORID = new Map(CATALOGO.map((i) => [i.id, i]))
 // (os cosméticos da CAMPANHA também: um por conquista de mundo, docs/campanha.md; nível 1000 no banco)
 const DA_CAMPANHA = new Map(ITENS_CAMPANHA.map((i) => [i.id, i]))
 export const itemDaCampanha = (id) => DA_CAMPANHA.get(id) ?? null
-export const itemDoCatalogo = (id) => PORID.get(id) ?? trofeuDoId(id) ?? itemDaCampanha(id)
+// (os do DESAFIO DIÁRIO, um por semana, e os da MAESTRIA, por personagem: src/lib/desafio.js e conquistas.js)
+export const itemDoCatalogo = (id) => PORID.get(id) ?? trofeuDoId(id) ?? itemDaCampanha(id) ?? cosmeticoDoId(id) ?? itemDaMaestria(id)
 export const nomeDoItem = (id) => itemDoCatalogo(id)?.nome ?? null
 // os da trilha até o nível (os padrão não entram: todo mundo já tem)
 export const itensAte = (nivel) => CATALOGO.filter((i) => !i.padrao && i.nivel <= nivel)

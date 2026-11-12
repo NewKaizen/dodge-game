@@ -1,20 +1,25 @@
-# O Manual Interativo do Ralsei (páginas 1 a 5)
+# O Manual Interativo do Ralsei (páginas 1 a 9)
 
 Tutorial em forma de caderno desenhado a giz de cera, jogável. O Ralsei entrega um manual feito à mão; ao virar
 a página os desenhos ganham vida e o jogador mexe no coração **dentro da ilustração**, com as regras reais do
 jogo. Começou como UMA página para validar a sensação (plano em
 [plano-fases-2-6.md](plano-fases-2-6.md#fase-3-manual-interativo-do-ralsei)); agora são cinco (coração, desvio, cartas, energia e uma partida de verdade contra a CPU), com índice,
-progresso salvo e o adesivo de quem termina: MANUAL ESSENCIAL ✓.
+progresso salvo e o adesivo de quem termina: MANUAL ESSENCIAL ✓. Depois delas há **quatro páginas EXTRAS (6 a 9)**:
+os quatro naipes, graze, jogar em dupla e ases/SUPER/perfeitos. As páginas 1 a 5 são o "essencial"; os extras são
+**oferecidos, nunca forçados** (ver [As páginas extras](#as-páginas-extras-6-a-9)).
 
 Entrada: **Menu → GUIA → MANUAL DO RALSEI** abre o **índice** (cena `GuiaEntrada`, modo `indice`): CONTINUAR
-(a primeira página que falta, só quando já há progresso), PÁGINA 1 a PÁGINA 5, com ✓ nas completas e os adesivos
-das páginas 2 a 4 na dica; quem terminou a página 5 ganha o selo "★ MANUAL ESSENCIAL ✓" embaixo do título. Uma página completa abre do zero ("jogar de novo"); uma página pela metade retoma na
+(a primeira página que falta, só quando já há progresso), PÁGINA 1 a PÁGINA 5, depois os **EXTRA · PÁGINA 6 a 9**
+(letra azul, com o prefixo "EXTRA"), com ✓ nas completas e os adesivos na dica; quem terminou a página 5 ganha o selo
+"★ MANUAL ESSENCIAL ✓" embaixo do título. Uma página completa abre do zero ("jogar de novo"); uma página pela metade retoma na
 primeira mini-lição (ou passo) que falta. `B` sai do manual a qualquer momento (volta ao índice; `B` de novo, ao GUIA e ao Menu). O guia
 de antes, "CARTAS E ARENAS", continua intacto na outra opção do GUIA.
 
 Navegação: página 1 → (a folha vira e a página seguinte continua do mesmo papel, sem fade) → página 2
 (`ManualRalsei2`) → página 3 (`ManualRalsei3`) → página 4 (`ManualRalsei4`) → (vira) → página 5 (`ManualRalsei5`) →
 (a folha descola) → a partida de verdade (`ManualRalsei5Partida`) → (a folha volta) → parabéns → (vira) → "e agora?".
+Dali, **EXTRAS DO MANUAL** abre a página 6 (`ManualRalsei6`) → (vira) → 7 (`ManualRalsei7`) → 8 (`ManualRalsei8`) → 9
+(`ManualRalsei9`); a 9 volta ao índice. Os extras também abrem direto do índice, em qualquer ordem.
 
 ## A página 1, "Este é o seu coração"
 
@@ -173,16 +178,70 @@ O **treinador** (`manual/treinador.js`) é um Ralsei de giz pequenininho no cant
 a sua mão e a sua caixa ficam livres), com o balão do caderno (fonte clara) e uma seta amarela de giz cutucando o
 alvo. Calmo: sem deslizar, balão inteiro, seta parada.
 
+## As páginas extras (6 a 9)
+
+Extras (sub-fase 3D): mesmo caderno de giz, mesma voz do Ralsei, mesmos adesivos e o mesmo "tentar de novo / ver /
+pular esta parte". Nenhum é obrigatório: não entram no CONTINUAR do essencial (só um extra **já começado e não
+terminado** aparece como "CONTINUAR · EXTRA n", depois que o essencial está completo), nem no selo MANUAL ESSENCIAL.
+Cada um vale por si e salva o progresso (`p6` a `p9` em `progresso.js`; salvo antigo continua valendo).
+
+| Pág. | Título | Cena | Passos (adesivos) |
+| --- | --- | --- | --- |
+| 6 | Os quatro naipes | `ManualRalsei6` (a cena das páginas de cartas) | ♠ espadas, ♦ ouros, ♣ paus, ♥ copas (PVP) e "No CO-OP" (5) |
+| 7 | Graze: raspando | `ManualRalsei7` | raspar em 3 tiros; 5 grazes = +1 de energia (2) |
+| 8 | Jogando em dupla | `ManualRalsei8` | cada um na sua marca; desviar juntos no mesmo quadro (2) |
+| 9 | Ases, SUPER e perfeitos | `ManualRalsei9` | carregar energia com perfeitos em combo; jogar o ★; os quatro Ases (3) |
+
+**Página 6** (`manual/pagina6.js`, a mesma máquina das páginas 3 e 4): uma carta de cada naipe do baralho do Ralsei
+(Estrela Gentil ♠, Chá Quentinho ♥, Canção de Ninar ♦, Bolinho Explosivo ♣), cada uma solta o ataque **real** dela na
+lousa; ♥ cura 7 de vida e manda só um ataque fraquinho. O último passo é a pergunta do CO-OP: qual naipe atrasa o
+ataque do chefe para os dois (♦, balas 15% mais lentas); cada naipe errado explica o que faz no CO-OP (♠ golpe forte,
+♣ +6% por graze, ♥ cura os dois). Os números vêm de `docs/pvp-regras.md` e `docs/coop-cartas.md`.
+
+**Página 7** (`manual/pagina7.js`): tiros mirados com a linha pontilhada da página 2 (`manual/tiros.js`) e o anelzinho
+de giz de graze em volta do coração (raio `CORACAO.graze`, 22 px; o miolo é `CORACAO.hitbox`). Passou pelo anel sem
+tocar o miolo = **graze** (`entities/fisica.js` `grazeia`, igual a `Balas.tocar`; cada bala dá 1 graze por coração).
+Passo 2: a conta de energia é a do jogo (`registrarGrazes`: +1 a cada 5), numa mesa de verdade. Levou um acerto: o passo
+recomeça.
+
+**Página 8** (`manual/pagina8.js`): dois corações no mesmo quadro, como no CO-OP. **Quem move o quê** usa os controles
+do jogo: com **2 pessoas locais** (2 controles, controle + teclado, ou o teclado nos dois conjuntos depois que o
+jogador 2 entra nas telas de escolha: ver `docs/controles.md`) cada uma move um coração (`joysDosJogadores`); com 1,
+todos os controles movem o coração vermelho (`joyDeTodos`, como no resto do manual) e o parceiro é o **Ralsei, a CPU
+aliada** (coração verde, o piloto de desvio da página 2). Em "desviar juntos" os tiros alternam entre os corações de pé;
+quem leva um acerto cai (fica apagado), o outro segura; só os dois caídos recomeçam o passo.
+
+**Página 9** (`manual/pagina9.js`): numa mesa de verdade (`criarMesa`). Passo 1: dois ataques sem acerto = dois desvios
+**perfeitos** (`registrarPerfeitoCombo`: +2 pela carta J, x1 e depois x2; `quebrarSequencia` ao levar um acerto),
+grazes também contam; as gemas vão de 6 a 10. Passo 2: com 10 de energia, jogar o ★ SUPER (custa `SUPER.custo` = 10,
+imparável); o Ás errado não gasta nada. Passo 3: os quatro Ases custam 3, e a pergunta "qual cancela a carta do
+adversário?" (♦ Anular) explica os outros ao errar e ao acertar.
+
+### A máquina dos extras (`manual/exercicio.js`)
+
+Pura (testada com passos de brinquedo e com as 3 páginas): `intro -> [ passo ] x N -> concluida -> virando -> fim`.
+Um passo é um **desafio** (corações numa caixa, uma onda e uma meta: `explicar -> preparar -> tentar -> errou/acertou`;
+o desafio já mostra os corações parados enquanto o Ralsei explica) ou uma **escolha** de cartas (`explicar ->
+escolher -> errou -> disparando? -> acertou`). 3 erros no mesmo passo abrem a ajuda ("tentar de novo" / "pular esta
+parte"); passou do tempo sem a meta conta como erro. As balas e os acertos/grazes vêm de `onda.passoMulti` (o mesmo
+laço de `Balas.atualizar`/`tocar`, com vários corações); `__tests__/paridade.test.js` roda a classe `Balas` e o `Heart`
+reais lado a lado (1 e 2 corações, três jeitos de andar) e confere cada acerto e cada graze (quadro, bala e coração).
+A cena `ManualRalsei7` serve as páginas 7 a 9 (a 8 e a 9 só mudam a página, como a 4 em relação à 3).
+
+Navegação e retomada: igual às outras (A confirma, B sai para o índice, ←/→ a mão, ↑/↓ a ajuda; uma página completa
+abre do zero, uma pela metade retoma no primeiro passo que falta). Reduzir animações: giz parado, avisos ("GRAZE!",
+"PERFEITO x2!") sem subir, o estouro do SUPER sem girar, virada em corte; a linha pontilhada dos tiros fica.
+
 ## Progresso salvo
 
 Preferência `manual` em `preferencias.js`, validada por `manual/progresso.js` (lixo salvo vira "nada ainda", nunca
 erro): `{ p1: { completa }, p2: { completa, licoes: [null | 'feita' | 'pulada' x4] }, p3: { completa, passos: [x2] },
-p4: { completa, passos: [x3] }, p5: { completa }, essencial }`. `p3`/`p4`/`p5`/`essencial` podem faltar (o progresso
-salvo antes delas continua valendo); `essencial` só vale junto com `p5` (`comPagina5` marca os dois: a página 5
+p4: { completa, passos: [x3] }, p5: { completa }, essencial, p6..p9: { completa, passos: [x5 | x2 | x2 | x3] } }`.
+`p3`/`p4`/`p5`/`essencial`/`p6` a `p9` podem faltar (o progresso salvo antes delas continua valendo); `essencial` só vale junto com `p5` (`comPagina5` marca os dois: a página 5
 conta ganhando ou perdendo, mesmo sem as outras completas; `essencialCompleto` alimenta o selo do índice). A página 1
 salva ao concluir; as outras salvam cada mini-lição/passo (pular nunca apaga um adesivo ganho, `comLicao`/`comPasso`)
-e a página ao concluir (`comPagina2`/`comPagina`). `paginaParaRetomar` e
-`resumoDoIndice` alimentam o índice.
+e a página ao concluir (`comPagina2`/`comPagina`). `paginaParaRetomar` (só 1 a 5), `extraParaRetomar` (6 a 9, só um já
+começado) e `resumoDoIndice` alimentam o índice (`manual/indice.js`, `opcoesDoIndice`).
 
 ## Música
 
@@ -231,7 +290,7 @@ Tudo puro (sem Phaser, determinístico por semente, testado em `__tests__/`), me
 | `ilustracoes.js` | coração, bala, marcas (traços + camadas assadas), seta, sublinhado, `contornoDoBalao`/`bordaDoBalao`, `letrasTortas`, `rabiscosDaMargem` (sol, nuvem, coração, estrela, pata); páginas de cartas: `desenhoDaCarta` (o miolo de cada carta), `rabiscoDaGema`, `rabiscoDoBoneco` (o espantalho), `iconeDoPasso` |
 | `papel.js` | `gerarPapel` (pixels: grão, fibras, manchas, vinheta), `vinheta`, `fibrasDoPapel`, `furosDaEspiral` |
 | `confete.js` | `gerarConfete`, `passoConfete` (gravidade, ar, vai-e-vem), `viradaDaPeca` |
-| `paginaBase.js` | **a base de toda página** (Phaser + canvas): `garantirPapel` (mesa/folha/espiral), `assar`/`assarCamadas`/`imagemDeCera`, `assarAdesivo`, `assarEstrelaDourada`, `assarLetreiro`, `assarRotulo`, `desenharFita`, `Balao` (digitação pulável), `RalseiDesenhado`, `Confete`, `brilhar`, `virarFolha`, `somDePapel`, e os pedaços jogáveis: `BalasDeGiz` (bolinhas com rastro), `coracaoDeGiz` (miolo exato da hitbox), `riscosDeGolpe`, `barraDeGiz`, `joyDeTodos` |
+| `paginaBase.js` | **a base de toda página** (Phaser + canvas): `garantirPapel` (mesa/folha/espiral), `assar`/`assarCamadas`/`imagemDeCera`, `assarAdesivo`, `assarEstrelaDourada`, `assarLetreiro`, `assarRotulo`, `desenharFita`, `Balao` (digitação pulável), `RalseiDesenhado`, `Confete`, `brilhar`, `virarFolha`, `somDePapel`, e os pedaços jogáveis: `BalasDeGiz` (bolinhas com rastro), `coracaoDeGiz` (miolo exato da hitbox), `riscosDeGolpe`, `barraDeGiz`, `joyDeTodos`, `joysDosJogadores` (um joystick por pessoa) |
 | `pagina1.js` | a máquina de estados da página 1 (as balas numa `onda`) |
 | `onda.js` | a "Pista" de bolso: balas com as opções de `a.bala` e as regras de `entities/fisica.js`; `moverCoracao` |
 | `padroes.js` | os roteiros da página 2 (`criarRoteiro`: chuva, linha, mira, mistura; com semente) e o `pilotoDeDesvio` |
@@ -242,6 +301,12 @@ Tudo puro (sem Phaser, determinístico por semente, testado em `__tests__/`), me
 | `vitrineNaTela.js` | a câmera da vitrine (Phaser): a região do mundo da vitrine desenhada em cima da lousa |
 | `licaoDeCartas.js` | a máquina de estados das páginas de cartas (escolher, atacando, enchendo, errou, ajuda, demo, adesivos) |
 | `pagina3.js` / `pagina4.js` | as cartas, os passos e as falas das páginas 3 e 4 |
+| `pagina6.js` | extra: os quatro naipes (cartas, passos e falas; a máquina é a de `licaoDeCartas.js`) |
+| `exercicio.js` | extras: a máquina dos desafios com corações e das escolhas de cartas (páginas 7 a 9) |
+| `tiros.js` | os tiros mirados em cadência fixa e o ponto de graze (`posicaoDeGraze`, dos testes) |
+| `pagina7.js` / `pagina8.js` / `pagina9.js` | extras: graze, jogar em dupla, ases/SUPER/perfeitos (passos e falas) |
+| `cartaDeGiz.js` | as cartas de giz (textura da carta, PASSAR, brilho) das páginas de cartas e da mão da página 9 |
+| `indice.js` | as linhas do índice (essencial e extras) |
 | `pagina5.js` | a máquina do caderno da página 5 (intro, encher, descolar, voltar, parabéns, "e agora?") |
 | `partidaDoManual.js` | a partida mansa da página 5 (CPU, vidas, semente, sem bônus) |
 | `dicasDaPartida.js` | o motor de dicas da partida e o leitor de "ataque de cima" |
@@ -277,10 +342,18 @@ imagens; o "desenhando" repinta uma textura pequena (a área da caixa) por ~2,7 
    folha que vira (exporte um `montarCapaDaPaginaN`) e troca de cena sem fade.
 4. Registrar a cena em `config.js` e, se for cena de menu, em `rede.js` (`CENAS_DE_MENU`; a `ManualRalsei5Partida`
    não é: no meio da partida, convite não entra); somar a página em
-   `progresso.js` (`PAGINAS`, formato e validação) e no índice (`DICAS_PAGINA` em `GuiaEntrada`).
+   `progresso.js` (`PAGINAS`, formato e validação) e no índice (`DICAS_PAGINA` em `manual/indice.js`).
    Uma página de CARTAS nova: passos em `licaoDeCartas.js` (avaliar com `acao` 'atacar' | 'passar' | 'negar'), uma
    mesa de `criarMesa`, e uma entrada em `PAGINAS_CARTAS` de `ManualRalsei3.js`; ataque sempre por `planoDaVitrine`.
+   Uma página de EXERCÍCIO nova (corações e metas): passos de `exercicio.js` e uma entrada em `PAGINAS_EXTRA` de
+   `ManualRalsei7.js` (mais a subclasse da cena, o registro em `config.js` e em `rede.js`).
 5. Cena nova segue o padrão `estadoInicial()` (`__tests__/cenasReaproveitadas.test.js` cobre).
+
+Extras 6 a 9 (sub-fase 3D), no navegador (build de produção servido por `vite preview` + Playwright/Chromium com GL de
+software, teclado): índice com os 4 EXTRA em azul → página 6 (cartas de giz, ataque real na lousa, adesivos) → página 7
+(anel de graze, linha pontilhada, "graze: 1 de 3") → página 8 (coração vermelho e o Ralsei verde indo à marca dele) →
+página 9 (mesa com as 10 gemas, Ás e ★, a ajuda dos 3 erros); normal e com "reduzir animações". Nenhum erro de página.
+Em software GL o quadro é lento: toques de direção precisam de ~350 ms de tecla segurada para o jogo enxergar.
 
 ## Antes de produzir mais páginas
 

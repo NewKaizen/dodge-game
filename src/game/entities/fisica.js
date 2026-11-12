@@ -15,6 +15,7 @@ import { ATAQUE } from '../constants.js'
 //   foraDaCaixa(b, l)             a bala INTEIRA ainda está fora da caixa (não acerta nem grazeia)
 //   folgaDaBala(b, px, py)        distância do ponto à borda da bala (negativa = dentro)
 //   acerta(b, c, l)               a bala acerta o coração c ({ x, y, hitbox })?
+//   grazeia(b, c, l)              a bala passa raspando em c ({ x, y, hitbox, graze }): perto, mas sem acertar o miolo
 //   entrada(l, x, y, vx, vy)      onde a reta entra na caixa · distanciaFora(l, x, y)
 
 export const MARGEM_FORA = 160 // distância fora da caixa em que a bala é removida
@@ -160,3 +161,11 @@ export function folgaDaBala(b, px, py) {
 
 // O acerto de Balas.tocar: só com a bala (em parte) dentro da caixa, pelo miolo do coração
 export const acerta = (b, c, l) => !foraDaCaixa(b, l) && folgaDaBala(b, c.x, c.y) <= c.hitbox
+
+// O graze de Balas.tocar: dentro do anel (folga <= graze) e fora do miolo (folga > hitbox). Quem chama guarda
+// quais corações já grazearam esta bala (cada bala dá no máximo 1 graze por coração).
+export const grazeia = (b, c, l) => {
+  if (foraDaCaixa(b, l)) return false
+  const folga = folgaDaBala(b, c.x, c.y)
+  return folga > c.hitbox && folga <= c.graze
+}

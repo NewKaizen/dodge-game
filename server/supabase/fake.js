@@ -19,6 +19,8 @@
 import { xpDaPartida, nivelDoXp, itensAte, RESULTADOS_JOGADOS, CONVIDADOS_LIMITE_DIA, REPETICAO_LIMITE, DURACAO_MINIMA_S, RODADAS_MINIMAS } from '../../src/lib/progresso.js'
 import { xpDaCorrida } from '../../src/game/campanha/recompensas.js'
 import { mundoDe, ITENS_CAMPANHA } from '../../src/game/campanha/mundos/index.js'
+import { XP_DESAFIO, DIAS_COSMETICO_SEMANA, MAX_AMIGOS_RECORDE, numeroDoDia, semanaDoDia, VERSAO_DESAFIO } from '../../src/lib/desafio.js'
+import { pontosDeMaestria, nivelDaMaestria, MAESTRIA_TETO_DIA, PERSONAGENS_MAESTRIA, IDS_CONQUISTAS, ITENS_MAESTRIA } from '../../src/lib/conquistas.js'
 
 const erro = (message) => ({ message })
 
@@ -202,6 +204,145 @@ function rpcs(sb) {
       t.campanha_corridas.push({ ...base, estrelas, xp, xp_motivo: xpMotivo, itens, xp_total: total, nivel_antes: nivelAntes, nivel_depois: nivel, primeira, melhor_estrelas: Math.max(antes, estrelas) })
       return { xp_ganho: xp, xp_total: total, nivel_antes: nivelAntes, nivel_depois: nivel, itens_novos: itens, motivo: xpMotivo, estrelas, melhor_estrelas: Math.max(antes, estrelas), primeira, resultado: 'vitoria' }
     },
+    // DESAFIO DIÁRIO (0013): os espelhos de desafio_estado e conceder_desafio
+    desafio_estado({ p_user, p_dia }) {
+      const semana = semanaDoDia(p_dia)
+      if (!semana) throw new Error('dia inválido')
+      const rec = t.desafio_recordes.find((r) => r.user_id === p_user && r.dia === p_dia)
+      const amigos = t.amizades
+        .filter((a) => a.a === p_user || a.b === p_user)
+        .map((a) => (a.a === p_user ? a.b : a.a))
+        .filter((o) => !t.bloqueios.some((b) => (b.quem === p_user && b.bloqueado === o) || (b.quem === o && b.bloqueado === p_user)))
+        .map((o) => ({ o, r: t.desafio_recordes.find((r) => r.user_id === o && r.dia === p_dia), perfil: t.perfis.find((x) => x.id === o) }))
+        .filter((x) => x.r && x.perfil)
+        .sort((x, y) => y.r.pontos - x.r.pontos || (x.o < y.o ? -1 : 1))
+        .slice(0, MAX_AMIGOS_RECORDE)
+        .map((x) => ({ id: x.o, nome: x.perfil.nome_exibicao, tag: x.perfil.tag, pontos: x.r.pontos }))
+      return {
+        recorde: rec ? { pontos: rec.pontos, rodadas: rec.rodadas, acertos: rec.acertos } : null,
+        concluido: t.desafio_concluidos.some((c) => c.user_id === p_user && c.dia === p_dia),
+        dias_semana: t.desafio_concluidos.filter((c) => c.user_id === p_user && c.semana === semana).length,
+        cosmetico_ganho: t.desafio_semanas.some((c) => c.user_id === p_user && c.semana === semana),
+        concluidos: t.desafio_concluidos.filter((c) => c.user_id === p_user).length,
+        amigos,
+      }
+    },
+    conceder_desafio({ p_corrida, p_user, p_dia, p_versao, p_resultado, p_motivo, p_pontos, p_rodadas, p_acertos, p_duracao_s, p_item, p_tipo, p_nome }) {
+      if (!['vitoria', 'derrota', 'suspeita', 'abandono'].includes(p_resultado)) throw new Error('resultado inválido')
+      const numero = numeroDoDia(p_dia)
+      const hoje = sb.diaDe(sb.agora())
+      if (numero == null || numero > hoje || numero < hoje - 1) throw new Error('dia inválido')
+      if (p_versao !== VERSAO_DESAFIO) throw new Error('versão inválida')
+      const semana = semanaDoDia(p_dia)
+      const ja = t.desafio_corridas.find((c) => c.id === p_corrida)
+      const estado = () => ({
+        concluido: t.desafio_concluidos.some((c) => c.user_id === p_user && c.dia === p_dia),
+        dias_semana: t.desafio_concluidos.filter((c) => c.user_id === p_user && c.semana === semana).length,
+        concluidos: t.desafio_concluidos.filter((c) => c.user_id === p_user).length,
+        recorde: t.desafio_recordes.find((r) => r.user_id === p_user && r.dia === p_dia)?.pontos ?? null,
+      })
+      if (ja) return { xp_ganho: ja.xp, xp_total: ja.xp_total, nivel_antes: ja.nivel_antes, nivel_depois: ja.nivel_depois, itens_novos: ja.itens, motivo: ja.xp_motivo, resultado: ja.resultado, pontos: ja.pontos, novo_recorde: ja.novo_recorde, primeira_hoje: ja.primeira_hoje, cosmetico_novo: ja.cosmetico_novo, repetida: true, ...estado() }
+      const perfil = t.perfis.find((x) => x.id === p_user)
+      if (!perfil) throw new Error('perfil não encontrado')
+      perfil.xp ??= 0
+      perfil.nivel ??= 1
+      const conta = p_resultado === 'vitoria' || p_resultado === 'derrota'
+      const pontos = conta ? Math.max(0, Math.min(100000, Number(p_pontos) || 0)) : 0
+      const base = { id: p_corrida, user_id: p_user, dia: p_dia, resultado: p_resultado, motivo: p_motivo ? String(p_motivo).slice(0, 32) : null, pontos, rodadas: p_rodadas, acertos: p_acertos, duracao_s: p_duracao_s, criada_em: sb.agora() }
+      let novoRecorde = false
+      if (conta) {
+        const r = t.desafio_recordes.find((x) => x.user_id === p_user && x.dia === p_dia)
+        novoRecorde = !r || pontos > r.pontos
+        if (!r) t.desafio_recordes.push({ user_id: p_user, dia: p_dia, pontos, rodadas: p_rodadas, acertos: p_acertos, corrida_id: p_corrida })
+        else if (novoRecorde) Object.assign(r, { pontos, rodadas: p_rodadas, acertos: p_acertos, corrida_id: p_corrida })
+      }
+      let xp = 0
+      let motivo = p_resultado
+      let itens = []
+      let primeiraHoje = false
+      let cosmetico = null
+      const nivelAntes = perfil.nivel
+      if (p_resultado === 'vitoria') {
+        motivo = 'repeticao'
+        if (!t.desafio_concluidos.some((c) => c.user_id === p_user && c.dia === p_dia)) {
+          primeiraHoje = true
+          xp = XP_DESAFIO
+          motivo = 'desafio'
+          t.desafio_concluidos.push({ user_id: p_user, dia: p_dia, semana, xp, corrida_id: p_corrida })
+          const total = perfil.xp + xp
+          const nivel = nivelDoXp(total)
+          const tem = new Set(t.inventario.filter((i) => i.user_id === p_user).map((i) => i.item_id))
+          itens = itensAte(nivel).filter((i) => !tem.has(i.id)).map((i) => i.id).sort()
+          Object.assign(perfil, { xp: total, nivel })
+          // o cosmético da semana: DIAS_COSMETICO_SEMANA dias vencidos na semana, uma vez por semana
+          const dias = t.desafio_concluidos.filter((c) => c.user_id === p_user && c.semana === semana).length
+          const idEsperado = p_tipo && `${p_tipo}.diario_${semana.replace('-S', '_')}`
+          if (dias >= DIAS_COSMETICO_SEMANA && !t.desafio_semanas.some((c) => c.user_id === p_user && c.semana === semana) && ['titulo', 'moldura', 'verso'].includes(p_tipo) && p_item === idEsperado) {
+            if (!t.catalogo_itens.some((c) => c.id === p_item)) t.catalogo_itens.push({ id: p_item, tipo: p_tipo, nome: String(p_nome || p_item).slice(0, 32), nivel_requerido: 1000, padrao: false, exclusivo: true, semana })
+            t.desafio_semanas.push({ user_id: p_user, semana, item_id: p_item })
+            if (!tem.has(p_item)) itens.push(p_item)
+            cosmetico = p_item
+          }
+          for (const item_id of itens) t.inventario.push({ user_id: p_user, item_id, obtido_em: new Date(sb.agora()).toISOString() })
+        }
+      }
+      t.desafio_corridas.push({ ...base, xp, xp_motivo: motivo, itens, xp_total: perfil.xp, nivel_antes: nivelAntes, nivel_depois: perfil.nivel, novo_recorde: novoRecorde, primeira_hoje: primeiraHoje, cosmetico_novo: cosmetico })
+      return { xp_ganho: xp, xp_total: perfil.xp, nivel_antes: nivelAntes, nivel_depois: perfil.nivel, itens_novos: itens, motivo, resultado: p_resultado, pontos, novo_recorde: novoRecorde, primeira_hoje: primeiraHoje, cosmetico_novo: cosmetico, ...estado() }
+    },
+    // CONQUISTAS e MAESTRIA (0014): os espelhos de registrar_evento_conta, desbloquear_conquistas e conquistas_da_conta
+    registrar_evento_conta({ p_user, p_ref, p_tipo, p_modo, p_personagem, p_resultado }) {
+      if (!/^[A-Za-z0-9:_-]{8,80}$/.test(p_ref ?? '') || !['partida', 'campanha', 'desafio'].includes(p_tipo)) throw new Error('evento inválido')
+      if (!t.perfis.some((x) => x.id === p_user)) throw new Error('perfil não encontrado')
+      const personagem = PERSONAGENS_MAESTRIA.includes(p_personagem) ? p_personagem : null
+      const resumo = () => {
+        const ev = t.conta_eventos.filter((e) => e.user_id === p_user)
+        const maestria = {}
+        for (const m of t.maestria.filter((x) => x.user_id === p_user)) maestria[m.personagem] = m.pontos
+        return { partidas: ev.filter((e) => pontosDeMaestria(e.resultado) > 0).length, vitorias: ev.filter((e) => e.resultado === 'vitoria').length, desafios: t.desafio_concluidos.filter((c) => c.user_id === p_user).length, maestria }
+      }
+      if (t.conta_eventos.some((e) => e.user_id === p_user && e.ref === p_ref)) return { novo: false, resumo: resumo(), itens_novos: [], maestria: null }
+      const dia = sb.diaDe(sb.agora())
+      let pontos = personagem ? pontosDeMaestria(p_resultado) : 0
+      if (pontos) {
+        const hoje = t.conta_eventos.filter((e) => e.user_id === p_user && e.personagem === personagem && sb.diaDe(e.criado_em) === dia).reduce((s, e) => s + e.pontos, 0)
+        pontos = Math.max(0, Math.min(pontos, MAESTRIA_TETO_DIA - hoje))
+      }
+      t.conta_eventos.push({ user_id: p_user, ref: p_ref, tipo: p_tipo, modo: p_modo ?? null, personagem, resultado: p_resultado ?? null, pontos, criado_em: sb.agora() })
+      let maestria = null
+      const itens = []
+      if (personagem && pontosDeMaestria(p_resultado) > 0) {
+        let m = t.maestria.find((x) => x.user_id === p_user && x.personagem === personagem)
+        if (!m) t.maestria.push((m = { user_id: p_user, personagem, pontos: 0, partidas: 0, vitorias: 0 }))
+        const antes = nivelDaMaestria(m.pontos)
+        m.pontos += pontos
+        m.partidas++
+        if (p_resultado === 'vitoria') m.vitorias++
+        const depois = nivelDaMaestria(m.pontos)
+        maestria = { personagem, pontos: m.pontos, nivel_antes: antes, nivel_depois: depois }
+        for (const i of ITENS_MAESTRIA.filter((x) => x.personagem === personagem && x.maestria <= depois).sort((a, b) => (a.id < b.id ? -1 : 1)))
+          if (!t.inventario.some((x) => x.user_id === p_user && x.item_id === i.id)) {
+            t.inventario.push({ user_id: p_user, item_id: i.id, obtido_em: new Date(sb.agora()).toISOString() })
+            itens.push(i.id)
+          }
+      }
+      return { novo: true, resumo: resumo(), itens_novos: itens, maestria }
+    },
+    desbloquear_conquistas({ p_user, p_ids }) {
+      if (!t.perfis.some((x) => x.id === p_user)) return []
+      const novas = []
+      for (const id of [...new Set(p_ids ?? [])].sort()) {
+        if (!IDS_CONQUISTAS.includes(id) || t.conquistas.some((c) => c.user_id === p_user && c.conquista === id)) continue
+        t.conquistas.push({ user_id: p_user, conquista: id, obtida_em: new Date(sb.agora()).toISOString() })
+        novas.push(id)
+      }
+      return novas
+    },
+    conquistas_da_conta({ p_user }) {
+      return {
+        conquistas: t.conquistas.filter((c) => c.user_id === p_user).sort((a, b) => (a.conquista < b.conquista ? -1 : 1)).map((c) => ({ id: c.conquista, em: c.obtida_em })),
+        maestria: t.maestria.filter((m) => m.user_id === p_user).sort((a, b) => (a.personagem < b.personagem ? -1 : 1)).map((m) => ({ personagem: m.personagem, pontos: m.pontos, partidas: m.partidas, vitorias: m.vitorias })),
+      }
+    },
     conceder_recompensa({ p_partida }) {
       sb.concederChamadas++
       const p = t.partidas.find((x) => x.id === p_partida)
@@ -268,7 +409,7 @@ function rpcs(sb) {
 
 export function criarSupabaseFalso({ usuarios = {}, perfis = [], url = 'https://falso.supabase.co', agora = Date.now } = {}) {
   const sb = {
-    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [], denuncias: [], catalogo_itens: [], trofeus_semanais: [], campanha_progresso: [], campanha_escolhas: [], campanha_corridas: [] },
+    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [], denuncias: [], catalogo_itens: [], trofeus_semanais: [], campanha_progresso: [], campanha_escolhas: [], campanha_corridas: [], desafio_corridas: [], desafio_recordes: [], desafio_concluidos: [], desafio_semanas: [], conta_eventos: [], maestria: [], conquistas: [] },
     agora,
     diaDe: (ms) => Math.floor((ms - 3 * 3600_000) / 86_400_000), // dia em São Paulo (UTC−3)
     concederChamadas: 0,

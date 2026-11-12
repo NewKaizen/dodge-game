@@ -99,8 +99,8 @@ async function jogarAteOFim(m, p, op = {}) {
   return p.ultima('campanhaFim')
 }
 
-test('protocolo 16 nos dois lados', () => {
-  assert.equal(PROTOCOLO, 16)
+test('protocolo 17 nos dois lados', () => {
+  assert.equal(PROTOCOLO, 17)
   assert.equal(PROTOCOLO_CLIENTE, PROTOCOLO)
 })
 
