@@ -33,6 +33,7 @@ const MAX_TOKEN = 4096
 const TIPOS_ACEITOS = { 'image/png': 'png', 'image/jpeg': 'jpeg', 'image/webp': 'webp' }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const COLUNAS_PERFIL = 'id, tag, nome_exibicao, avatar_tipo, avatar_id, avatar_url, titulo_equipado, verso_equipado, nivel, xp'
+export const COLUNAS_SLOTS = 'moldura_equipada, som_equipado, efeito_equipado, lancamento_equipado'
 
 // ---------- config ----------
 
@@ -67,7 +68,13 @@ export function criarAutenticador(supabase, { tempoMs = 2500 } = {}) {
       const id = data?.user?.id
       if (error || !id || !UUID.test(id)) return null
       const r = await supabase.from('perfis').select(COLUNAS_PERFIL).eq('id', id).maybeSingle()
-      return { id, perfil: r.error ? null : r.data ?? null }
+      const perfil = r.error ? null : r.data ?? null
+      // os slots novos (0015) numa leitura à parte: banco sem a 0015 continua entrando (só sem os cosméticos)
+      if (perfil) {
+        const x = await supabase.from('perfis').select(COLUNAS_SLOTS).eq('id', id).maybeSingle()
+        if (!x.error && x.data) Object.assign(perfil, x.data)
+      }
+      return { id, perfil }
     })().catch(() => null)
     try {
       return await Promise.race([validar, limite])

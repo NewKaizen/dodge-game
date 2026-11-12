@@ -119,6 +119,17 @@
 // do campanha.js (`campanha {acao: 'desafio' | 'comecarDesafio'}`; convidado também joga, sem
 // recompensa). `conquistas` pede as conquistas e a maestria da conta (resposta `conquistasEstado`); o
 // servidor avisa as novas com `conquistas {novas, itensNovos, maestria}` (server/conquistas.js).
+//
+// BAÚS e SLOTS NOVOS de cosmético (PROTOCOLO 18, docs/baus.md, server/baus.js): o membro da sala leva
+// `conta.cosmeticos {som, efeito, lancamento, moldura}` (ids do catálogo; null = o padrão), para os outros
+// verem o efeito das suas cartas, o lançamento e a moldura, e ouvirem o seu som de dano. Os baús (só com
+// conta; só se ganham jogando):
+//   cliente -> servidor  baus {acao: 'estado'} · baus {acao: 'abrir', bauId?} · baus {acao: 'equipar', tipo, item}
+//   servidor -> cliente  bausEstado {convidado, disponivel, fechados, abertos, desdeEpico, pity, lista, erro?}
+//                        bauAberto {bauId, fonte, recompensas, xpGanho, teto, xpTotal, nivelAntes, nivelDepois,
+//                                   itensNovos, pity, desdeEpico, fechados, repetido} · bausErro {motivo, msg}
+//                        equipado {ok, tipo, item, erro?, perfil?} · bauGanho {fontes, fechados} (o aviso)
+// ('equipar' pelo lobby é o caminho do dev com contas falsas; o navegador com Supabase usa a equipar() do banco)
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
@@ -129,6 +140,8 @@ import { criarFila, agendarPadrao, ACOES_FILA_POR_MINUTO, REVANCHE_MS, FOLGA_PIN
 import { criarPartidas } from './partidas.js'
 import { criarCampanha } from './campanha.js'
 import { criarConquistas } from './conquistas.js'
+import { criarBaus, ABRIR_INTERVALO_MS, ESTADO_INTERVALO_MS } from './baus.js'
+import { cosmeticosPublicos, PITY } from '../src/lib/cosmeticos.js'
 import { elegerHost, lerDiretos, ELEICAO_MS } from './eleicao.js'
 import { METRICAS_NULA } from './metricas.js'
 import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
@@ -136,7 +149,7 @@ import { nomeSeguro } from '../src/lib/contaRegras.js'
 import { arranjoValido } from '../src/lib/times2x2.js'
 import { infoSemanal } from '../src/lib/semanal.js'
 
-export const PROTOCOLO = 17
+export const PROTOCOLO = 18
 export const PORTA_DESCOBERTA = 47777
 // Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
 // aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")
@@ -183,10 +196,12 @@ const resumoPerfil = (p) =>
     titulo: p.titulo_equipado ?? null,
     // verso de carta equipado (Fase 2F): só o id; o cliente desenha (id desconhecido = o padrão)
     verso: VERSO.test(p.verso_equipado ?? '') ? p.verso_equipado : null,
+    // os slots novos (0015): só ids conhecidos do catálogo do baú (o resto vira null = o padrão)
+    cosmeticos: cosmeticosPublicos(p),
     nivel: Number(p.nivel) || 1,
     xp: Number(p.xp) || 0,
   }
-const contaPublica = (c) => (c.perfil ? { tag: c.perfil.tag, avatar: c.perfil.avatar, nivel: c.perfil.nivel, titulo: c.perfil.titulo, verso: c.perfil.verso } : null)
+const contaPublica = (c) => (c.perfil ? { tag: c.perfil.tag, avatar: c.perfil.avatar, nivel: c.perfil.nivel, titulo: c.perfil.titulo, verso: c.perfil.verso, cosmeticos: c.perfil.cosmeticos } : null)
 export const normalizarCodigo = (texto) =>
   String(texto ?? '')
     .toUpperCase()
@@ -275,9 +290,11 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
   }
   // CONQUISTAS e MAESTRIA (4B): os eventos que o servidor já conhece (partidas, campanha, desafio)
   const conquistas = criarConquistas({ registro, log })
-  const partidas = criarPartidas({ registro, agora, agendar, entregar, log, versao: PROTOCOLO, metricas, conquistas })
+  // BAÚS (0015): concedidos depois do XP (partidas, campanha, desafio, conquistas), abertos aqui
+  const baus = criarBaus({ registro, log })
+  const partidas = criarPartidas({ registro, agora, agendar, entregar, log, versao: PROTOCOLO, metricas, conquistas, baus })
   // CAMPANHA (e o DESAFIO DIÁRIO): a partida single-player que o servidor roda (o envio é direto para a conexão)
-  const campanha = criarCampanha({ registro, agora, agendar, enviar: (c, msg) => c && enviar(c, msg), log, conquistas })
+  const campanha = criarCampanha({ registro, agora, agendar, enviar: (c, msg) => c && enviar(c, msg), log, conquistas, baus })
   const saiuDaConta = new Map() // conta -> quando caiu (só para contar reconexões; nada por jogador sai daqui)
   const retomadas = new Map() // chave de retomada -> cliente
   const limiteRetomada = criarLimite({ max: RETOMADAS_POR_MINUTO, agora })
@@ -1249,6 +1266,60 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
           log(`[conquistas] estado: ${e.message}`)
           enviar(c, { t: 'conquistasEstado', convidado: false, erro: 'não deu para carregar as conquistas agora', conquistas: [], maestria: [] })
         })
+    },
+    // BAÚS (0015): o estado, abrir um (o sorteio é daqui, crypto) e equipar pelo lobby (o dev com contas falsas)
+    baus(c, m) {
+      const t = agora()
+      const usuario = c.usuario
+      if (m.acao === 'estado') {
+        if (t - (c.pedidoBaus ?? -Infinity) < ESTADO_INTERVALO_MS) return
+        c.pedidoBaus = t
+        const base = { t: 'bausEstado', convidado: !usuario, disponivel: baus.disponivel(), pity: PITY, fechados: 0, abertos: 0, desdeEpico: 0, lista: [] }
+        if (!usuario || !baus.disponivel()) return enviar(c, base)
+        return baus
+          .estado(usuario)
+          .then((e) => c.usuario === usuario && enviar(c, { ...base, ...e }))
+          .catch((e) => {
+            log(`[baus] estado: ${e.message}`)
+            enviar(c, { ...base, erro: 'não deu para carregar os baús agora' })
+          })
+      }
+      if (m.acao === 'abrir') {
+        if (!usuario) return enviar(c, { t: 'bausErro', motivo: 'convidado', msg: 'entre na sua conta para ganhar e abrir baús' })
+        if (c.abrindoBau || t - (c.abriuBau ?? -Infinity) < ABRIR_INTERVALO_MS) return enviar(c, { t: 'bausErro', motivo: 'calma', msg: 'calma: um baú de cada vez' })
+        c.abrindoBau = true
+        c.abriuBau = t
+        const bauId = typeof m.bauId === 'string' && /^[0-9a-f-]{36}$/i.test(m.bauId) ? m.bauId : null
+        return baus
+          .abrir(usuario, bauId)
+          .then((r) => {
+            if (c.usuario !== usuario) return
+            if (!r.aberto) return enviar(c, { t: 'bausErro', motivo: r.motivo ?? 'sem_bau', msg: r.motivo === 'indisponivel' ? 'baús indisponíveis neste servidor' : 'você não tem baú fechado agora: jogue para ganhar' })
+            enviar(c, { t: 'bauAberto', ...r })
+          })
+          .catch((e) => {
+            log(`[baus] abrir: ${e.message}`)
+            enviar(c, { t: 'bausErro', motivo: 'erro', msg: 'não deu para abrir o baú agora: tente de novo' })
+          })
+          .finally(() => (c.abrindoBau = false))
+      }
+      if (m.acao === 'equipar') {
+        const tipo = String(m.tipo ?? '')
+        const item = m.item == null ? null : String(m.item).slice(0, 40)
+        if (!usuario || !registro?.equiparConta) return enviar(c, { t: 'equipado', ok: false, tipo, item, erro: 'entre na conta primeiro' })
+        if (t - (c.equipouLobby ?? -Infinity) < 300) return enviar(c, { t: 'equipado', ok: false, tipo, item, erro: 'calma: espere um pouco' })
+        c.equipouLobby = t
+        return Promise.resolve()
+          .then(() => registro.equiparConta(usuario, tipo, item))
+          .then((perfil) => {
+            if (c.usuario !== usuario || !perfil) return
+            c.perfil = resumoPerfil(perfil)
+            enviar(c, { t: 'equipado', ok: true, tipo, item, perfil: { titulo_equipado: perfil.titulo_equipado ?? null, moldura_equipada: perfil.moldura_equipada ?? null, verso_equipado: perfil.verso_equipado ?? null, som_equipado: perfil.som_equipado ?? null, efeito_equipado: perfil.efeito_equipado ?? null, lancamento_equipado: perfil.lancamento_equipado ?? null } })
+            const sala = salas.get(c.sala)
+            if (sala) avisarSala(sala)
+          })
+          .catch((e) => enviar(c, { t: 'equipado', ok: false, tipo, item, erro: /item|tipo|avatar/i.test(String(e.message)) ? String(e.message).replace(/^equipar_conta: /, '') : 'não deu para equipar: tente de novo' }))
+      }
     },
     // fim da partida: o que este cliente viu (uma vez por partida; server/partidas.js decide)
     resultado(c, m) {

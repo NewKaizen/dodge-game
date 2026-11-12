@@ -9,6 +9,7 @@
 //   sb.storage.from('avatares').upload(caminho, buf, opcoes) · remove([caminho]) · getPublicUrl(caminho)
 //
 //   sb.rpc('registrar_partida' | 'encerrar_partida' | 'conceder_recompensa', args)
+//     (0015) também conceder_bau, abrir_bau, baus_estado e equipar_conta (o espelho em src/lib/cosmeticos.js)
 //     (Fase 1D) a mesma regra das funções de 0003_progresso.sql, em JS (com o
 //     espelho src/lib/progresso.js); sb.diaDe(t) diz o "dia" do limite de repetição
 //
@@ -16,10 +17,12 @@
 // sb.chamadas ficam expostos para o teste conferir. sb.falhar = { getUser: true,
 // upload: true, conceder_recompensa: true, ... } faz a operação devolver erro.
 
-import { xpDaPartida, nivelDoXp, itensAte, RESULTADOS_JOGADOS, CONVIDADOS_LIMITE_DIA, REPETICAO_LIMITE, DURACAO_MINIMA_S, RODADAS_MINIMAS } from '../../src/lib/progresso.js'
+import crypto from 'node:crypto'
+import { xpDaPartida, nivelDoXp, itensAte, CATALOGO, RESULTADOS_JOGADOS, CONVIDADOS_LIMITE_DIA, REPETICAO_LIMITE, DURACAO_MINIMA_S, RODADAS_MINIMAS } from '../../src/lib/progresso.js'
 import { xpDaCorrida } from '../../src/game/campanha/recompensas.js'
 import { mundoDe, ITENS_CAMPANHA } from '../../src/game/campanha/mundos/index.js'
-import { XP_DESAFIO, DIAS_COSMETICO_SEMANA, MAX_AMIGOS_RECORDE, numeroDoDia, semanaDoDia, VERSAO_DESAFIO } from '../../src/lib/desafio.js'
+import { XP_DESAFIO, DIAS_COSMETICO_SEMANA, MAX_AMIGOS_RECORDE, numeroDoDia, semanaDoDia, VERSAO_DESAFIO, diaDoDesafio } from '../../src/lib/desafio.js'
+import { ITENS_BAU, FONTES_BAU, CONQUISTAS_COM_BAU, BAU_XP_TETO_DIA, rolarBau, sorteioValido } from '../../src/lib/cosmeticos.js'
 import { pontosDeMaestria, nivelDaMaestria, MAESTRIA_TETO_DIA, PERSONAGENS_MAESTRIA, IDS_CONQUISTAS, ITENS_MAESTRIA } from '../../src/lib/conquistas.js'
 
 const erro = (message) => ({ message })
@@ -343,6 +346,92 @@ function rpcs(sb) {
         maestria: t.maestria.filter((m) => m.user_id === p_user).sort((a, b) => (a.personagem < b.personagem ? -1 : 1)).map((m) => ({ personagem: m.personagem, pontos: m.pontos, partidas: m.partidas, vitorias: m.vitorias })),
       }
     },
+    // BAÚS e SLOTS NOVOS (0015): os espelhos de equipar_conta, conceder_bau, abrir_bau e baus_estado
+    equipar_conta({ p_uid, p_tipo, p_item = null }) {
+      if (!p_uid) throw new Error('precisa estar logado')
+      if (!['avatar', 'titulo', 'moldura', 'verso', 'som', 'efeito', 'lancamento'].includes(p_tipo)) throw new Error('tipo de item inválido')
+      const perfil = t.perfis.find((x) => x.id === p_uid)
+      if (!perfil) throw new Error('perfil não encontrado')
+      if (p_item == null) {
+        if (p_tipo === 'avatar') throw new Error('escolha outro avatar no perfil')
+      } else {
+        const item = [...CATALOGO, ...ITENS_BAU, ...t.catalogo_itens].find((i) => i.id === p_item && i.tipo === p_tipo)
+        if (!item) throw new Error('item inválido')
+        if (!item.padrao && !t.inventario.some((i) => i.user_id === p_uid && i.item_id === p_item)) throw new Error('você ainda não tem esse item')
+      }
+      const coluna = { titulo: 'titulo_equipado', moldura: 'moldura_equipada', verso: 'verso_equipado', som: 'som_equipado', efeito: 'efeito_equipado', lancamento: 'lancamento_equipado' }[p_tipo]
+      if (coluna) perfil[coluna] = p_item
+      else Object.assign(perfil, { avatar_tipo: 'jogo', avatar_id: p_item.split('.')[1] })
+      return { ...perfil }
+    },
+    conceder_bau({ p_user, p_fonte, p_ref }) {
+      if (!FONTES_BAU[p_fonte]) throw new Error('fonte inválida')
+      const perfil = t.perfis.find((x) => x.id === p_user)
+      if (!perfil) throw new Error('perfil não encontrado')
+      let ref = String(p_ref ?? '')
+      if (p_fonte === 'nivel') {
+        if (!/^[0-9]{1,3}$/.test(ref)) throw new Error('nível inválido')
+        ref = String(Number(ref))
+        if (Number(ref) < 2 || Number(ref) > (perfil.nivel ?? 1)) throw new Error('a conta ainda não chegou nesse nível')
+      } else if (p_fonte === 'dia') ref = diaDoDesafio(sb.agora()).id
+      else if (p_fonte === 'desafio') {
+        if (!t.desafio_concluidos.some((d) => d.user_id === p_user && d.dia === ref)) throw new Error('desafio não vencido')
+      } else if (p_fonte === 'semanal') {
+        if (!t.trofeus_semanais.some((x) => x.user_id === p_user && x.semana === ref)) throw new Error('boss semanal não vencido')
+      } else if (!CONQUISTAS_COM_BAU.includes(ref) || !t.conquistas.some((c) => c.user_id === p_user && c.conquista === ref)) throw new Error('conquista sem baú')
+      const chave = FONTES_BAU[p_fonte].chave(ref)
+      const novo = !t.baus.some((b) => b.user_id === p_user && b.chave === chave)
+      if (novo) t.baus.push({ id: crypto.randomUUID(), user_id: p_user, fonte: p_fonte, chave, criado_em: sb.agora(), ordem: t.baus.length, aberto_em: null, xp: 0, resultado: null })
+      return { novo, fonte: p_fonte, chave, fechados: t.baus.filter((b) => b.user_id === p_user && b.aberto_em == null).length }
+    },
+    abrir_bau({ p_user, p_bau = null, p_sorteio }) {
+      if (!sorteioValido(p_sorteio)) throw new Error('sorteio inválido')
+      const perfil = t.perfis.find((x) => x.id === p_user)
+      if (!perfil) throw new Error('perfil não encontrado')
+      perfil.xp ??= 0
+      perfil.nivel ??= 1
+      const fechados = () => t.baus.filter((b) => b.user_id === p_user && b.aberto_em == null).length
+      let b
+      if (p_bau == null) {
+        b = t.baus.filter((x) => x.user_id === p_user && x.aberto_em == null).sort((x, y) => x.criado_em - y.criado_em || x.ordem - y.ordem)[0]
+        if (!b) return { aberto: false, motivo: 'sem_bau', fechados: 0 }
+      } else {
+        b = t.baus.find((x) => x.id === p_bau && x.user_id === p_user)
+        if (!b) throw new Error('baú não existe')
+        if (b.aberto_em != null) return { ...b.resultado, repetido: true, fechados: fechados() }
+      }
+      let c = t.baus_contas.find((x) => x.user_id === p_user)
+      if (!c) t.baus_contas.push((c = { user_id: p_user, desde_epico: 0, abertos: 0 }))
+      const tem = new Set(t.inventario.filter((i) => i.user_id === p_user).map((i) => i.item_id))
+      const rolado = rolarBau(p_sorteio, { desdeEpico: c.desde_epico, possui: (id) => tem.has(id) })
+      for (const r of rolado.recompensas) if (r.tipo === 'item') t.inventario.push({ user_id: p_user, item_id: r.id, obtido_em: new Date(sb.agora()).toISOString() })
+      const dia = sb.diaDe(sb.agora())
+      const hoje = t.baus.filter((x) => x.user_id === p_user && x.aberto_em != null && sb.diaDe(x.aberto_em) === dia).reduce((s, x) => s + x.xp, 0)
+      const xp = Math.min(rolado.xp, Math.max(0, BAU_XP_TETO_DIA - hoje))
+      const nivelAntes = perfil.nivel
+      const total = perfil.xp + xp
+      const nivel = nivelDoXp(total)
+      let itens = []
+      if (xp > 0) {
+        Object.assign(perfil, { xp: total, nivel })
+        const agoraTem = new Set(t.inventario.filter((i) => i.user_id === p_user).map((i) => i.item_id))
+        itens = itensAte(nivel).filter((i) => !agoraTem.has(i.id)).map((i) => i.id).sort()
+        for (const item_id of itens) t.inventario.push({ user_id: p_user, item_id, obtido_em: new Date(sb.agora()).toISOString() })
+        for (let n = nivelAntes + 1; n <= nivel; n++) {
+          const chave = `nivel:${n}`
+          if (!t.baus.some((x) => x.user_id === p_user && x.chave === chave)) t.baus.push({ id: crypto.randomUUID(), user_id: p_user, fonte: 'nivel', chave, criado_em: sb.agora(), ordem: t.baus.length, aberto_em: null, xp: 0, resultado: null })
+        }
+      }
+      Object.assign(c, { desde_epico: rolado.desdeEpico, abertos: c.abertos + 1 })
+      const res = { aberto: true, bau_id: b.id, fonte: b.fonte, recompensas: rolado.recompensas, xp_sorteado: rolado.xp, xp_ganho: xp, teto: xp < rolado.xp, xp_total: perfil.xp, nivel_antes: nivelAntes, nivel_depois: perfil.nivel, itens_novos: itens, pity: rolado.pity, desde_epico: c.desde_epico }
+      Object.assign(b, { aberto_em: sb.agora(), xp, resultado: res })
+      return { ...res, repetido: false, fechados: fechados() }
+    },
+    baus_estado({ p_user }) {
+      const c = t.baus_contas.find((x) => x.user_id === p_user)
+      const lista = t.baus.filter((b) => b.user_id === p_user && b.aberto_em == null).sort((x, y) => x.criado_em - y.criado_em || x.ordem - y.ordem)
+      return { fechados: lista.length, abertos: c?.abertos ?? 0, desde_epico: c?.desde_epico ?? 0, lista: lista.slice(0, 20).map((b) => ({ id: b.id, fonte: b.fonte, chave: b.chave, em: new Date(b.criado_em).toISOString() })) }
+    },
     conceder_recompensa({ p_partida }) {
       sb.concederChamadas++
       const p = t.partidas.find((x) => x.id === p_partida)
@@ -409,7 +498,7 @@ function rpcs(sb) {
 
 export function criarSupabaseFalso({ usuarios = {}, perfis = [], url = 'https://falso.supabase.co', agora = Date.now } = {}) {
   const sb = {
-    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [], denuncias: [], catalogo_itens: [], trofeus_semanais: [], campanha_progresso: [], campanha_escolhas: [], campanha_corridas: [], desafio_corridas: [], desafio_recordes: [], desafio_concluidos: [], desafio_semanas: [], conta_eventos: [], maestria: [], conquistas: [] },
+    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [], denuncias: [], catalogo_itens: [], trofeus_semanais: [], campanha_progresso: [], campanha_escolhas: [], campanha_corridas: [], desafio_corridas: [], desafio_recordes: [], desafio_concluidos: [], desafio_semanas: [], conta_eventos: [], maestria: [], conquistas: [], baus: [], baus_contas: [] },
     agora,
     diaDe: (ms) => Math.floor((ms - 3 * 3600_000) / 86_400_000), // dia em São Paulo (UTC−3)
     concederChamadas: 0,

@@ -47,6 +47,7 @@ import { agendarPadrao } from './fila.js'
 import { criarLuta, comecarRodada, jogar, concluirEsquiva, estrelasDaLuta, resumoDaLuta } from '../src/game/campanha/luta.js'
 import { diaDoDesafio, desafioDoDia, cosmeticoDaSemana, XP_DESAFIO, DIAS_COSMETICO_SEMANA, ID_DIA } from '../src/lib/desafio.js'
 import { msgConquistas } from './conquistas.js'
+import { msgBauGanho } from './baus.js'
 import { ler, MAX_AMOSTRAS_QUADRO } from '../src/game/campanha/amostras.js'
 import { mundoDe, faseDe, faseLiberada, TEXTOS } from '../src/game/campanha/mundos/index.js'
 import { XP_CAMPANHA_DIA } from '../src/game/campanha/recompensas.js'
@@ -66,7 +67,7 @@ const ACOES_CONVIDADO = new Set(['desafio', 'comecarDesafio', 'carta', 'posicoes
 const formatoHora = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Sao_Paulo', hour: '2-digit', hourCycle: 'h23' })
 const horaLocal = (ms) => Number(formatoHora.format(new Date(ms))) % 24
 
-export function criarCampanha({ registro = null, agora = Date.now, agendar = agendarPadrao, enviar = () => {}, log = () => {}, semente = () => crypto.randomBytes(9).toString('base64url'), novoId = () => crypto.randomUUID(), conquistas = null } = {}) {
+export function criarCampanha({ registro = null, agora = Date.now, agendar = agendarPadrao, enviar = () => {}, log = () => {}, semente = () => crypto.randomBytes(9).toString('base64url'), novoId = () => crypto.randomUUID(), conquistas = null, baus = null } = {}) {
   const corridas = new Map() // id -> corrida
   const porConta = new Map() // usuario -> id da corrida
 
@@ -133,6 +134,7 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
     if (resultado !== 'abandono' && c?.usuario === k.usuario) mandarProgresso(c)
     // CONQUISTAS e MAESTRIA: a corrida que o servidor viu (a Kris, o personagem do mundo)
     if (concedido && (resultado === 'vitoria' || resultado === 'derrota')) {
+      bausDaCorrida(k, { nivelAntes: concedido.nivelAntes, nivelDepois: concedido.nivelDepois, jogou: true })
       const r = resumoDaLuta(k.c)
       eventoDaConta(k, { tipo: 'campanha', resultado, personagem: k.c.estado.jogadores[0].personagem, acertos: r.acertos, hpFracao: r.hpFracao, mundo: k.mundo, fase: k.fase, ultimaFase: Boolean(k.c.fase.chefe), estrelas })
     }
@@ -143,7 +145,20 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
     conquistas.evento(k.usuario, `${k.desafio ? 'desafio' : 'campanha'}:${k.id}`, ev).then((r) => {
       const msg = msgConquistas(r)
       if (msg && k.cliente?.usuario === k.usuario) enviar(k.cliente, msg)
+      if (r?.novas?.length) bausDaCorrida(k, { conquistas: r.novas })
     })
+  }
+
+  // BAÚS (0015, server/baus.js): nível novo, o baú do dia, a 1ª vitória do desafio e as conquistas novas
+  function bausDaCorrida(k, x) {
+    if (!baus || !k.usuario) return
+    baus
+      .depoisDoXp(k.usuario, x)
+      .then((novos) => {
+        const msg = msgBauGanho(novos)
+        if (msg && k.cliente?.usuario === k.usuario) enviar(k.cliente, msg)
+      })
+      .catch((e) => log(`[baus] corrida ${k.id}: ${e.message}`))
   }
 
   // ---------- DESAFIO DIÁRIO ----------
@@ -208,6 +223,7 @@ export function criarCampanha({ registro = null, agora = Date.now, agendar = age
       if (conta) fim.motivo = concedido.motivo ?? fim.motivo
     }
     enviar(k.cliente, fim)
+    if (conta && concedido) bausDaCorrida(k, { nivelAntes: concedido.nivelAntes, nivelDepois: concedido.nivelDepois, jogou: true, desafioDia: concedido.primeiraHoje ? k.dia : null })
     if (conta && concedido)
       eventoDaConta(k, { tipo: 'desafio', resultado, personagem: k.desafio.personagem, acertos: r.acertos, hpFracao: r.hpFracao, hora: horaLocal(k.inicio), cosmeticoSemana: Boolean(concedido.cosmeticoNovo) })
   }
