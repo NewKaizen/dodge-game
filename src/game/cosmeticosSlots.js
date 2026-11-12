@@ -158,8 +158,9 @@ export function cosmeticosDosLados({ sala = null, perfil = null, n = 2, emRede =
   const lados = Array.from({ length: n }, () => ({ ...EQUIPADOS_PADRAO }))
   const membros = sala?.membros ?? []
   if (emRede && membros.length > 1) {
-    if (porVaga) for (const m of membros) if (Number.isInteger(m.vaga) && m.vaga >= 0 && m.vaga < n) lados[m.vaga] = equipadosDoMembro(m)
-    else {
+    if (porVaga) {
+      for (const m of membros) if (Number.isInteger(m.vaga) && m.vaga >= 0 && m.vaga < n) lados[m.vaga] = equipadosDoMembro(m)
+    } else {
       const host = membros.find((m) => m.papel === 'host')
       const convidado = membros.find((m) => m.papel === 'convidado')
       lados[0] = equipadosDoMembro(host)
