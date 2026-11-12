@@ -62,9 +62,9 @@ export default definirAtaque({
   nome: 'superNoelle',
   padrao: {
     duracao: 9000,
-    neve: [380, 220],
-    velocidadeNeve: [70, 105],
-    mirarNeve: 0.45,
+    neve: [480, 320],
+    velocidadeNeve: [68, 98],
+    mirarNeve: 0.35,
     flocoes: [
       [450, 900],
       [1500, 2000],
@@ -72,28 +72,28 @@ export default definirAtaque({
     ],
     velocidadeFlocao: 64,
     estouroFlocao: 66,
-    avisoEstouro: 300,
+    avisoEstouro: 400,
     estilhacosFlocao: 5,
     velocidadeEstilhaco: 150,
     nevasca: 2600,
-    rajada: [650, 520],
+    rajada: [800, 680],
     estilhacosRajada: [3, 5],
     velocidadeRajada: [165, 215],
-    folgaRajada: 58,
+    folgaRajada: 66,
     redemoinho: 4500,
-    anel: [950, 760],
+    anel: [1060, 870],
     flocosAnel: 5,
     queda: 62,
     giro: 5400,
-    raioLivre: 56,
+    raioLivre: 62,
     perseguir: 24,
-    mirados: 760,
-    pilares: [5500, 6150, 6700],
-    avisoPilar: 460,
+    mirados: 800,
+    pilares: [4900, 5400, 5900, 6350, 6750],
+    avisoPilar: 580,
     larguraPilar: 30,
     manterPilar: 360,
     snowgrave: 7150,
-    convergir: 1150,
+    convergir: 1300,
     lascasTumulo: [7, 8],
     explosao: 6,
     velocidadeExplosao: 175,
@@ -230,13 +230,14 @@ function montarCenario(a, cfg, estado) {
   for (let i = 0; i < 46; i++) {
     const f = a.decoracao(
       cena.add
-        .image(a.aleatorio(l.left, l.right), a.aleatorio(l.top, l.bottom), i % 5 ? 'faisca' : 'super-noelle-floco')
+        .image(a.aleatorio(l.left, l.right), a.aleatorio(l.top, l.bottom), 'faisca')
         .setDepth(2)
-        .setTint(0xdff6ff)
+        .setTint(0xb8d4ea)
         .setAlpha(0)
-        .setScale(i % 5 ? a.aleatorio(0.25, 0.6) : a.aleatorio(0.35, 0.6)),
+        .setScale(a.aleatorio(0.2, 0.45)),
     )
-    flocos.push({ f, rapidez: a.aleatorio(0.55, 1.35), fase: a.aleatorio(0, TAU), alfa: a.aleatorio(0.25, 0.6) })
+    // a neve de fundo é só cenário: pequena e apagada, nunca parecida com um floco que machuca
+    flocos.push({ f, rapidez: a.aleatorio(0.55, 1.35), fase: a.aleatorio(0, TAU), alfa: a.aleatorio(0.15, 0.32) })
   }
   // o olho do redemoinho: o selo de gelo (aparece no ato III)
   const selo = a.decoracao(cena.add.image(l.centerX, l.centerY, 'super-noelle-selo').setDepth(2).setTint(0xbfe8ff).setAlpha(0).setScale(0.1))
@@ -249,7 +250,7 @@ function andarCenario(a, cfg, estado, dt) {
   const s = dt / 1000
   // o frio cresce o ataque todo: veu mais escuro e geada mais alta
   const frio = Math.min(1, estado.ativo / cfg.duracao)
-  c.frio.setAlpha(0.18 + 0.55 * frio)
+  c.frio.setAlpha(0.14 + 0.36 * frio)
   for (const r of [c.frio, c.branco]) r.setPosition(l.centerX, l.centerY).setSize(l.width, l.height) // a caixa pode mexer
   c.redesenho -= dt
   if (c.redesenho <= 0) {
@@ -454,7 +455,7 @@ function nevasca(a, cfg, estado) {
   ventoDoLado(a, estado)
   tocar(a.cena, 'super-noelle-nevasca')
   a.tremer(220, 0.006)
-  a.cena.tweens.add({ targets: estado.cenario.branco, alpha: 0.2, duration: 500 })
+  a.cena.tweens.add({ targets: estado.cenario.branco, alpha: 0.08, duration: 500 })
   a.lacuna(cfg.folgaRajada, 'brecha da rajada de estilhaços')
 
   const fim = cfg.redemoinho - 250
@@ -462,7 +463,7 @@ function nevasca(a, cfg, estado) {
   let invertido = false
   const proxima = () => {
     if (estado.ativo >= fim) {
-      a.cena.tweens.add({ targets: estado.cenario.branco, alpha: 0.06, duration: 400 })
+      a.cena.tweens.add({ targets: estado.cenario.branco, alpha: 0.03, duration: 400 })
       return
     }
     // o vento inverte uma vez (com um respiro curto antes da 1ª rajada do outro lado)
@@ -696,7 +697,7 @@ function snowgrave(a, cfg, estado) {
   estado.fase = 'snowgrave'
   tocar(a.cena, 'snowgrave')
   a.tremer(380, 0.01)
-  a.cena.tweens.add({ targets: estado.cenario.frio, alpha: 0.85, duration: 600 })
+  a.cena.tweens.add({ targets: estado.cenario.frio, alpha: 0.55, duration: 600 })
   // o olho se apaga e o núcleo deixa de machucar
   if (estado.nucleo) {
     estado.nucleo.inofensiva = true

@@ -2,6 +2,7 @@ import { definirAtaque } from '../definir.js'
 import { ATAQUE, FONTE } from '../../constants.js'
 import { tocar } from '../../audio.js'
 import { particulas } from '../../effects/particulas.js'
+import { criarPrevisao } from './previsao.js'
 
 // SUPER de Berdly: PROVA IRREFUTÁVEL. A passiva dele ("Ego Inflado": cada
 // vento usado deixa o próximo +10% mais forte, até +30%) vira o golpe
@@ -24,7 +25,12 @@ import { particulas } from '../../effects/particulas.js'
 //   III. Giro final. Uma lâmina única, maior e dourada, dá duas voltas bem
 //      mais rápidas que qualquer uma do redemoinho.
 //   IV. Corte final. Ela para, mira quem está jogando e solta um feixe reto
-//      que atravessa a caixa inteira.
+//      que atravessa a caixa inteira; um segundo feixe, cruzado com o
+//      primeiro (um X), cai logo depois.
+//
+// Durante o redemoinho, Berdly ainda MIRA: de tempos em tempos uma "réplica"
+// (página) pisca numa borda e sai em direção a onde o coração vai estar, de
+// vez em quando duas em leque. Quem só desvia das lâminas leva a réplica.
 //
 // Justiça:
 //   - toda lâmina (as três do redemoinho e a final) fica parada e piscando
@@ -56,14 +62,15 @@ import { particulas } from '../../effects/particulas.js'
 //   escalaFinal      tamanho da lâmina final (x a lâmina da última volta)
 //   omegaFinal       rad/s do giro final
 //   voltasFinais     quantas voltas o giro final dá antes do corte
-//   avisoCorteFinal  ms de aviso do corte final
+//   avisoCorteFinal  ms de aviso do corte final; cruzarCorte (rad entre os dois feixes) e atrasoCorte (ms entre eles)
+//   replicas         { inicio, intervalo, aviso, velocidade, dupla }: tiros mirados durante o redemoinho
 export default definirAtaque({
   nome: 'superBerdly',
   padrao: {
     duracao: 9000,
     pas: 3,
     avisoPas: 650,
-    omegaInicial: 3.5,
+    omegaInicial: 3.7,
     bonusPorVolta: 0.1,
     voltas: 3,
     rajadaBase: 8,
@@ -77,7 +84,10 @@ export default definirAtaque({
     omegaFinal: 10,
     voltasFinais: 2,
     avisoCorteFinal: 600,
-    raio: 0.32, // fração do menor lado da caixa (comprimento da lâmina na 1ª volta)
+    cruzarCorte: 1.05,
+    atrasoCorte: 280,
+    replicas: { inicio: 900, intervalo: 760, aviso: 460, velocidade: 185, dupla: 3 },
+    raio: 0.34, // fração do menor lado da caixa (comprimento da lâmina na 1ª volta)
     oito: { ax: 0.27, ay: 0.2, periodo: 4500 }, // o 8 do pivô (frações da caixa, ms por volta do 8)
   },
   iniciar(a, cfg) {
@@ -99,6 +109,7 @@ export default definirAtaque({
 
     tocar(a.cena, 'super-berdly-vento')
     desenharCaminho(a, pontoDoOito, avisoPas)
+    const previsao = criarPrevisao(a)
 
     const lams = []
     for (let i = 0; i < cfg.pas; i++) {
@@ -118,6 +129,15 @@ export default definirAtaque({
       lams.push({ bala, anguloBase, raio0, espessura0: espessura, escala0: { x: bala.escalaX, y: bala.escalaY } })
     }
     const orbita = criarOrbita(a, cx, cy, raio0 * 1.15)
+
+    // réplicas mirantes: só enquanto o redemoinho gira
+    let nReplica = 0
+    const atirar = () => {
+      if (fase !== 'girando') return
+      replica(a, cfg, previsao, ++nReplica % cfg.replicas.dupla === 0 ? 2 : 1)
+      a.depois(cfg.replicas.intervalo * a.aleatorio(0.85, 1.15), atirar)
+    }
+    a.depois(cfg.replicas.inicio, atirar)
 
     let relogio = 0
     let omega = cfg.omegaInicial
@@ -162,7 +182,7 @@ export default definirAtaque({
             a.cena.tweens.add({ targets: lam.bala.sprite, alpha: 0, scale: 0.2, duration: 320 })
           }
           desmontarOrbita(a, orbita)
-          a.depois(cfg.pausaFinal, () => girarFinal(a, cfg, cx, cy, raio))
+          a.depois(cfg.pausaFinal, () => girarFinal(a, cfg, cx, cy, raio, previsao))
         } else {
           // Ego Inflado, de verdade: cada volta deixa tudo 10% maior e mais rápido
           const ego = 1 + cfg.bonusPorVolta * volta
@@ -242,6 +262,46 @@ function rajada(a, cfg, cx, cy, n, anguloBase) {
   }
 }
 
+// ---------- réplicas mirantes (durante o redemoinho) ----------
+
+// Uma página pisca numa borda da caixa (aviso) e depois sai em direção a onde o
+// coração vai estar (previsão do movimento dele). `n` = 2: duas, em leque
+function replica(a, cfg, previsao, n) {
+  const l = a.caixa
+  const R = cfg.replicas
+  const aviso = Math.max(ATAQUE.telegrafoMs, R.aviso)
+  const alvo = a.alvo()
+  const futuro = previsao.prever(alvo, aviso + 250)
+  // nasce numa borda sorteada, longe do coração (>= 70 px), para o aviso ser visível e justo
+  let lado = a.inteiro(0, 3)
+  let p = null
+  for (let t = 0; t < 4 && !p; t++, lado = (lado + 1) % 4) {
+    const f = a.aleatorio(0.12, 0.88)
+    const q = lado === 0 ? { x: l.left + 6, y: l.top + f * l.height } : lado === 1 ? { x: l.right - 6, y: l.top + f * l.height } : lado === 2 ? { x: l.left + f * l.width, y: l.top + 6 } : { x: l.left + f * l.width, y: l.bottom - 6 }
+    if (Math.hypot(q.x - alvo.x, q.y - alvo.y) >= 70) p = q
+  }
+  if (!p) return
+  const base = Math.atan2(futuro.y - p.y, futuro.x - p.x)
+  const alcance = Math.hypot(l.width, l.height)
+  tocar(a.cena, 'super-berdly-tique')
+  for (let i = 0; i < n; i++) {
+    const ang = base + (n === 1 ? 0 : (i === 0 ? -1 : 1) * 0.2)
+    a.bala({
+      x: p.x,
+      y: p.y,
+      raio: 6,
+      textura: 'super-berdly-pagina',
+      quadro: a.inteiro(0, 2),
+      tamanho: 15,
+      vx: Math.cos(ang) * R.velocidade,
+      vy: Math.sin(ang) * R.velocidade,
+      girar: a.escolher([-1, 1]) * cfg.girarPagina,
+      aviso,
+      vida: (alcance / R.velocidade) * 1000 + 300,
+    })
+  }
+}
+
 // flash decorativo no centro a cada volta completa (sem colisão: é só o "ding" visual)
 function pulsoCentro(a, cx, cy) {
   const img = a.decoracao(a.cena.add.image(cx, cy, 'super-berdly-impacto').setDepth(6).setScale(0.4).setAlpha(0.9))
@@ -278,7 +338,7 @@ function desmontarOrbita(a, orbita) {
 
 // ---------- III. giro final: uma lâmina só, maior, dourada e bem mais rápida ----------
 
-function girarFinal(a, cfg, cx, cy, raioBase) {
+function girarFinal(a, cfg, cx, cy, raioBase, previsao) {
   const raio = raioBase * cfg.escalaFinal
   const espessura = Math.max(24, raio * 0.3)
   const aviso = Math.max(ATAQUE.telegrafoMs, cfg.avisoGiroFinal)
@@ -325,7 +385,7 @@ function girarFinal(a, cfg, cx, cy, raioBase) {
         rodando = false
         bala.inofensiva = true
         a.cena.tweens.add({ targets: bala.sprite, alpha: 0, duration: 180 })
-        corteFinal(a, cfg, cx, cy)
+        corteFinal(a, cfg, cx, cy, previsao)
       }
     }
   })
@@ -333,16 +393,26 @@ function girarFinal(a, cfg, cx, cy, raioBase) {
 
 // ---------- IV. corte final: um feixe reto mirado em quem está jogando ----------
 
-function corteFinal(a, cfg, cx, cy) {
+function corteFinal(a, cfg, cx, cy, previsao) {
   const l = a.caixa
   const aviso = Math.max(ATAQUE.telegrafoMs, cfg.avisoCorteFinal)
   const alvo = a.alvo()
   const angulo = Math.atan2(alvo.y - cy, alvo.x - cx)
+  tocar(a.cena, 'super-berdly-vento')
+  feixe(a, l, cx, cy, angulo, aviso, 0)
+  // o segundo feixe cruza o primeiro (um X) e mira onde o coração vai estar quando o primeiro cair
+  const futuro = previsao.prever(alvo, aviso + cfg.atrasoCorte)
+  const lado = Math.sin(Math.atan2(futuro.y - cy, futuro.x - cx) - angulo) >= 0 ? 1 : -1
+  a.lacuna(Math.min(l.width, l.height) / 2, 'cunhas do X do corte final')
+  feixe(a, l, cx, cy, angulo + lado * cfg.cruzarCorte, aviso, cfg.atrasoCorte)
+}
+
+// um feixe reto que atravessa a caixa; o aviso começa junto, o golpe cai `atraso` ms depois do aviso
+function feixe(a, l, cx, cy, angulo, avisoBase, atraso) {
+  const aviso = avisoBase + atraso
   const comp = Math.hypot(l.width, l.height) + 40
   const dx = Math.cos(angulo) * comp
   const dy = Math.sin(angulo) * comp
-
-  tocar(a.cena, 'super-berdly-vento')
   a.aviso({ tipo: 'linha', x1: cx - dx, y1: cy - dy, x2: cx + dx, y2: cy + dy, espessura: 18, ms: aviso }, () => {
     tocar(a.cena, 'super-berdly-estalo')
     a.tremer(200, 0.012)

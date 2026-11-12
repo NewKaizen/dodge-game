@@ -48,7 +48,7 @@ export default {
   // a 3ª fase é o Caos Final encurtado (o colapso ainda explode: fica com 50% do tempo)
   super: {
     nome: 'Singularidade Radiante',
-    texto: 'Um buraco negro que puxa o seu coração enquanto estrelas descem em espiral, depois implode numa supernova que empurra para fora com anéis arco-íris',
+    texto: 'Um buraco negro que puxa o seu coração enquanto estrelas descem em espiral, depois implode numa supernova que empurra para fora com anéis arco-íris e estrelas cadentes miradas',
     criar: (A) => A.superAsriel()
   },
   cartas: [

@@ -87,13 +87,13 @@ Todo baralho tem **uma** carta SUPER (`valor: 14`, `naipe: 'espadas'`, id `'<per
 
 | Personagem | SUPER | Fases |
 |---|---|---|
-| Kris | Alma Determinada | estocadas + colunas de espada → lasers alternados numa caixa apertada → forcado + rajadas miradas |
+| Kris | Alma Determinada | tabuleiro (espadas onde a peça ataca, depois também onde o coração vai estar) + rastro de lâminas → eco do caminho + sentenças em X por onde o coração vai estar → cortes finais em X |
 | Susie | Machado Colossal | pisões → machado gigante com faíscas → dinamite (bombas + chão rachado) |
-| Ralsei | Valsa Real | carrossel de anéis → anel + divisores → espiral de copas |
+| Ralsei | Último Capítulo | sopros de fogo em leque → moldura de espinhos que fecha → sombra do dragão |
 | Noelle | SNOWGRAVE | neve + flocos gigantes que estouram → nevasca (rajadas de estilhaços) → redemoinho que persegue + pilares de gelo → túmulo de estilhaços que se fecha e explode |
-| Berdly | Furacão Genial | vento da esquerda → estocadas numa caixa apertada → lasers em cruz + mira |
-| Dess | Turnê Final | ondas sonoras → bolas quicando → palco explosivo |
-| Asriel | Supernova Arco-Íris | chuva de estrelas → espiral + chuva → Caos Final (com tempo para o colapso explodir) |
+| Berdly | Prova Irrefutável | redemoinho de lâminas num 8 com páginas miradas (réplicas) → giro dourado → corte final em X |
+| Dess | Último Bis | braço de guitarra: levada → refrão → solo (as notas caem no traste para onde o coração vai) → mergulho com 3 ondas de choque |
+| Asriel | Singularidade Radiante | vazio que puxa + estrelas em espiral → supernova com 6 anéis e estrelas cadentes miradas entre eles |
 
 ## Desvio perfeito
 
@@ -467,6 +467,71 @@ espaçada, 5 estilhaços por floco gigante, rajadas de 3–5, anéis de 5 flocos
 de 6) e cada golpe fere 75% do dano do SUPER (`fatorDano`). Medido (12 sementes, dano real por SUPER):
 imbatível 6,5 → 2,5, CPU difícil 20,6 → 11,7, bot normal 41,2 → 27,5 (era o SUPER mais forte; agora fica
 junto com o Último Bis, o mais fraco).
+
+**2026-11-12: rebalanceamento dos SUPERs** (`attacks/super/*.js`, helper novo `attacks/super/previsao.js`).
+Feedback de quem joga: SNOWGRAVE (Noelle), Último Bis (Dess) e Último Capítulo (Ralsei) "esmagam"; Alma
+Determinada (Kris), Prova Irrefutável (Berdly) e Singularidade Radiante (Asriel) "não pesam". O Susie ficou como
+referência (não mudou). Medido com 48 sementes, antes → depois (dano real por SUPER; bot perfeito = `dificil` no
+JSON, médio = `normal`; o "lento" é o bot FÁCIL, reação de 320 ms, usado como termômetro de quem joga com
+reflexo de gente: `NIVEIS_BOT=imbativel,normal,facil`):
+
+| SUPER | Bot perfeito | Bot médio | Bot lento (FÁCIL) |
+|---|---|---|---|
+| Kris · Alma Determinada | 7,3 → 6,2 | 33,3 → 36,0 | 50,4 → 60,9 |
+| Susie · Machado Colossal (referência) | 16,8 → 16,8 | 36,6 → 36,6 | 65,5 → 65,5 |
+| Ralsei · Último Capítulo | 13,8 → 13,3 | 37,6 → 34,4 | 58,8 → 54,4 |
+| Noelle · SNOWGRAVE | 5,7 → 9,2 | 32,2 → 33,3 | 57,4 → 55,0 |
+| Berdly · Prova Irrefutável | 15,4 → 14,4 | 37,4 → 38,7 | 47,4 → 52,8 |
+| Dess · Último Bis | 3,5 → 4,9 | 29,3 → 32,8 | 51,5 → 52,8 |
+| Asriel · Singularidade Radiante | 13,5 → 13,8 | 33,3 → 33,9 | 52,8 → 56,6 |
+
+Os números do bot sozinhos não dizem o que o jogador sente (o bot enxerga todos os avisos, e o Kris/Dess/Noelle
+eram os que ele mais desviava), então a regra foi: tirar do Noelle/Dess/Ralsei o que é ilegível ou injusto para
+gente (aviso curto, rota de fuga longe, véu escuro, cenário parecido com bala) e pôr a pressão onde o jogador vê
+o que vem; no Kris/Berdly/Asriel acrescentar tiros que miram **para onde o coração vai** (previsão do movimento,
+`previsao.js`: velocidade suavizada do coração, deslocamento no máximo 56 px, sempre dentro da caixa), sempre com
+aviso e com rota de fuga. Tudo é sorteado com a semente do ataque (sem `Math.random`); os corações do CO-OP/2x2 usam a mesma
+previsão (o coração mais perto do alvo). Validador: **zero** avisos `[telegrafo]` e `[rota de fuga]` nos 7 SUPERs
+(48 sementes × 4 níveis de bot). Dano por bala (13), custo das cartas e protocolo de rede não mudaram; o CO-OP
+(`coop/superNoChefe.js`) usa só as texturas e continua igual.
+
+- **Noelle (SNOWGRAVE), mais legível.** Neve mais espaçada (430/270 → 480/320 ms, 35% mirada, era 45%), rajadas
+  800/680 ms (eram 650/520) com brecha de 66 px (era 58), anéis do redemoinho 1060/870 ms (eram 950/760) com
+  62 px livres em volta do olho (eram 56), flocos mirados a cada 800 ms (760), floco gigante racha 400 ms antes de
+  estourar (300), pilar mostra a ponta 580 ms (460), túmulo fecha em 1300 ms (1150). O cenário ficou calmo: véu
+  de frio de 0,14–0,50 (era 0,18–0,73 e 0,85 no SNOWGRAVE), branco da nevasca 0,08 (0,2) e a neve de fundo agora
+  é só faísca pequena e apagada (antes 1 de cada 5 usava o desenho do floco que machuca). Para o bot perfeito
+  não virar passeio, são 5 pilares (eram 3), cada um com a ponta visível por 580 ms.
+- **Dess (Último Bis), rota de fuga ao alcance.** Só cai nota em cima do traste do coração se o traste vizinho
+  estiver apagado (antes a única rota podia estar a 2–3 trastes, mais longe do que dá para correr em 0,6 s; o
+  conjunto final de trastes é conferido de novo, porque um traste novo pode ser justamente o vizinho livre).
+  A nota que mira cai no traste para onde o coração anda (previsão) e mira mais (80%/90%, eram 50%/70%) com queda
+  mais curta (580/620/520 ms; eram 660/720/600, ainda acima de 400); em compensação saíram o tremor e as fagulhas
+  fortes de cada explosão (0,005 → 0,002; 7 → 4), a onda do amplificador (decoração que se confundia com dano),
+  e o Mergulho agora tem 3 ondas de choque (480 ms entre elas, o vão fica perto do anterior) com dois acordes
+  caindo por baixo. Solo mais denso (nota a cada 0,54 tempo, bend em 45%, era 62% e 20%).
+- **Ralsei (Último Capítulo), avisos maiores.** Aviso do sopro 650 → 820 ms, leque mais estreito (π/5 em vez de
+  π/4,6) e 6 chamas por rajada (eram 7), 3 rajadas espaçadas em 170 ms (era 100: deixa de ser parede), moldura
+  fecha até 66% (72%), brasas a cada 360 ms com 520 ms de aviso (300/420), dragão com aviso de 900 ms (700),
+  balanço de 26% da largura (30%) e mais lento (2,9 rad/s, era 3,2): as bordas ficam mais largas para esperar.
+- **Kris (Alma Determinada), pressão sem depender do rastro.** Golpes do tabuleiro a cada 620 ms (aviso 540,
+  era 700/580) e, do 4º em diante, a peça cai também a partir da casa para onde o coração anda (só se sobrar uma
+  casa vizinha livre da casa dele). Fase do eco: 4 **sentenças** (um X de duas linhas finas, aviso 520 ms,
+  atravessadas no caminho do coração), que punem quem só roda em círculo ou foge reto; eco nasce 1,25 s atrás
+  (era 1,4), chega até 430 ms (era 450) e acelera mais (0,26/s, era 0,24); 4 cortes finais (eram 3), e o 2º em
+  diante passam por onde o coração vai estar.
+- **Berdly (Prova Irrefutável), cruzamentos mais apertados.** Lâminas maiores (0,34 do lado, era 0,32) e mais
+  rápidas (3,7 rad/s, era 3,5). Durante o redemoinho, **réplicas**: uma página pisca 460 ms numa borda (a mais de
+  70 px do coração) e sai para onde ele vai estar, a cada ~760 ms (de 3 em 3, duas em leque). O corte final vira
+  um X: o 2º feixe cruza o 1º (1,05 rad) e cai 280 ms depois.
+- **Asriel (Singularidade Radiante), supernova mais densa.** 6 anéis (eram 5) a cada 640 ms (720) e, entre dois
+  anéis, uma **estrela cadente** que pisca 520 ms na parede de lá e cruza a caixa até onde o coração vai estar
+  (quem fica encostado na parede esperando a brecha é pego).
+
+Lacunas conhecidas: o bot perfeito continua desviando quase tudo do Kris (6,2) e do Dess (4,9), abaixo da faixa
+8–16; o Dess não sobe mais sem tirar justamente a legibilidade que os jogadores pediram (o bot lê todos os trastes
+acesos). O Berdly (38,7) ficou um pouco acima de 38 e o Asriel/Noelle/Ralsei na parte de baixo da faixa; com 48
+sementes o ruído é de ±2 de dano.
 
 ## Nome de cada lado (2E)
 

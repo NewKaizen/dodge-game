@@ -2,6 +2,7 @@ import { definirAtaque } from '../definir.js'
 import { ATAQUE } from '../../constants.js'
 import { tocar } from '../../audio.js'
 import { particulas } from '../../effects/particulas.js'
+import { criarPrevisao } from './previsao.js'
 
 // SUPER de Kris: ALMA SEM RETORNO. Três regras novas, uma depois da outra,
 // todas sobre o CAMINHO do próprio coração:
@@ -19,6 +20,10 @@ import { particulas } from '../../effects/particulas.js'
 //      ~1,4 s atrás e REFAZ o caminho dele, cada vez mais perto (mas
 //      nunca menos de `atrasoMin` atrás). Ele também crava lâminas por onde
 //      passa. Ficar parado = o passado alcança você.
+//      Além do eco, SENTENÇAS: linhas finas que cortam a caixa por onde o
+//      coração VAI estar (a previsão do movimento dele), atravessadas no
+//      caminho. Não depende do rastro: quem só roda em círculo ou foge em
+//      linha reta cai na linha; mudar de direção na hora salva.
 //   III. Corte final. O eco para, mira e dá `cortes` cortes que atravessam a
 //      caixa inteira (em X), cada um com a linha piscando antes.
 //
@@ -33,7 +38,11 @@ import { particulas } from '../../effects/particulas.js'
 //     adapta à caixa) e piscam `avisoCasa` antes da espada cair;
 //   - o eco pisca `avisoEco` antes de começar a andar, anda sempre pelo
 //     caminho que o coração já fez e fica pelo menos `atrasoMin` ms atrás;
-//   - os cortes finais são linhas finas com aviso de `avisoCorte`.
+//   - os cortes finais são linhas finas com aviso de `avisoCorte`;
+//   - os golpes do tabuleiro também miram a casa PARA ONDE o coração anda
+//     (`previsto`), mas só se sobrar uma casa vizinha livre da casa dele;
+//   - as sentenças são linhas finas (`larguraSentenca`) com aviso de
+//     `avisoSentenca`, uma de cada vez e com respiro entre elas.
 //
 // Config:
 //   passoRastro    distância percorrida entre duas lâminas do rastro (px)
@@ -46,6 +55,8 @@ import { particulas } from '../../effects/particulas.js'
 //   atrasoMin      o eco nunca chega a menos disso do coração (ms de caminho)
 //   aceleracao     quanto o eco acelera por segundo (1 = mesma velocidade do coração)
 //   giroEco        rad/s da espada do eco
+//   previsto       a partir de qual golpe (índice) o tabuleiro mira também a casa prevista
+//   sentencas      ms (tempo ativo) de cada sentença (um X de duas linhas); avisoSentenca, larguraSentenca, abreSentenca
 //   avisoEco, avisoCorte
 //   cortes, intervaloCorte  quantos cortes finais e o ms entre eles
 export default definirAtaque({
@@ -58,21 +69,26 @@ export default definirAtaque({
     parado: 950,
     golpes: [
       [150, 'cavalo'],
-      [850, 'bispo'],
-      [1550, 'torre'],
-      [2250, 'cavalo'],
-      [2950, 'bispo'],
-      [3650, 'torre'],
+      [770, 'bispo'],
+      [1390, 'torre'],
+      [2010, 'cavalo'],
+      [2630, 'bispo'],
+      [3250, 'torre'],
     ],
-    avisoCasa: 580,
-    atraso: 1400,
-    atrasoMin: 450,
-    aceleracao: 0.24,
+    previsto: 3,
+    sentencas: [4700, 5400, 6100, 6800],
+    avisoSentenca: 520,
+    larguraSentenca: 11,
+    abreSentenca: 1.2, // rad entre as duas linhas do X
+    avisoCasa: 540,
+    atraso: 1250,
+    atrasoMin: 430,
+    aceleracao: 0.26,
     giroEco: 4.2,
     avisoEco: 600,
     avisoCorte: 620,
-    cortes: 3,
-    intervaloCorte: 340,
+    cortes: 4,
+    intervaloCorte: 300,
   },
   iniciar(a, cfg) {
     const metade = cfg.duracao / 2
@@ -86,10 +102,11 @@ export default definirAtaque({
       return almas.get(c)
     }
     const ecos = []
+    const previsao = criarPrevisao(a)
 
     // ---------- I. tabuleiro + rastro ----------
     const tabuleiro = montarTabuleiro(a)
-    for (const [ms, peca] of cfg.golpes) a.depois(ms, () => golpe(a, cfg, tabuleiro, peca))
+    cfg.golpes.forEach(([ms, peca], i) => a.depois(ms, () => golpe(a, cfg, tabuleiro, peca, i >= cfg.previsto ? previsao : null)))
     a.depois(metade - 250, () => desmontarTabuleiro(a, tabuleiro))
 
     // ---------- II. eco ----------
@@ -102,12 +119,15 @@ export default definirAtaque({
       }
     })
 
+    // sentenças: linhas por onde o coração VAI estar (não dependem do rastro)
+    for (const ms of cfg.sentencas) a.depois(ms, () => sentenca(a, cfg, previsao))
+
     // ---------- III. corte final ----------
     a.depois(inicioCorte, () => {
       for (const e of ecos) pararEco(a, e)
-      cortar(a, cfg, ecos, 0)
+      cortar(a, cfg, ecos, 0, previsao)
     })
-    for (let i = 1; i < cfg.cortes; i++) a.depois(inicioCorte + i * cfg.intervaloCorte, () => cortar(a, cfg, ecos, i))
+    for (let i = 1; i < cfg.cortes; i++) a.depois(inicioCorte + i * cfg.intervaloCorte, () => cortar(a, cfg, ecos, i, previsao))
 
     a.aoAtualizar((dt) => {
       ativo += dt
@@ -217,12 +237,32 @@ function casasDaPeca(peca, c, r, colunas, linhas) {
   return lista.filter(dentro).filter(([x, y]) => !vistas.has(`${x},${y}`) && vistas.add(`${x},${y}`))
 }
 
-function golpe(a, cfg, t, peca) {
+function golpe(a, cfg, t, peca, previsao = null) {
   const alvo = a.alvo()
-  const c = Math.min(t.colunas - 1, Math.max(0, Math.floor((alvo.x - t.x) / t.w)))
-  const r = Math.min(t.linhas - 1, Math.max(0, Math.floor((alvo.y - t.y) / t.h)))
+  const casaDe = (p) => [Math.min(t.colunas - 1, Math.max(0, Math.floor((p.x - t.x) / t.w))), Math.min(t.linhas - 1, Math.max(0, Math.floor((p.y - t.y) / t.h)))]
+  const [c, r] = casaDe(alvo)
   const atacadas = casasDaPeca(peca, c, r, t.colunas, t.linhas)
   const marcadas = new Set(atacadas.map(([x, y]) => `${x},${y}`))
+  // a mesma peça também cai a partir da casa PARA ONDE o coração anda (quem só
+  // foge em linha reta ou roda em círculo cai nela). Só vale se, juntando as
+  // duas, ainda sobra uma casa vizinha livre da casa dele
+  if (previsao) {
+    const [pc, pr] = casaDe(previsao.prever(alvo, cfg.avisoCasa))
+    if (pc !== c || pr !== r) {
+      const extra = casasDaPeca(peca, pc, pr, t.colunas, t.linhas)
+      const uniao = new Set([...marcadas, ...extra.map(([x, y]) => `${x},${y}`)])
+      let sobra = false
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const x = c + dx
+        const y = r + dy
+        if ((dx || dy) && x >= 0 && y >= 0 && x < t.colunas && y < t.linhas && !uniao.has(`${x},${y}`)) sobra = true
+      }
+      if (sobra) {
+        for (const e of extra) if (!marcadas.has(`${e[0]},${e[1]}`)) atacadas.push(e)
+        for (const k of uniao) marcadas.add(k)
+      }
+    }
+  }
   // rota de fuga: uma casa vizinha (inclusive diagonal) que não cai espada
   let livre = false
   for (let dy = -1; dy <= 1; dy++) {
@@ -360,12 +400,64 @@ function pararEco(a, e) {
   }
 }
 
+// ---------- sentença: uma linha fina por onde o coração vai estar ----------
+
+function sentenca(a, cfg, previsao) {
+  const alvo = a.alvo()
+  const v = previsao.velocidade(alvo)
+  const futuro = previsao.prever(alvo, Math.max(ATAQUE.telegrafoMs, cfg.avisoSentenca))
+  // atravessada no caminho dele; parado, em ângulo sorteado
+  const andando = Math.hypot(v.vx, v.vy) > 30
+  const ang = andando ? Math.atan2(v.vy, v.vx) + Math.PI / 2 + a.aleatorio(-0.4, 0.4) : a.aleatorio(0, Math.PI)
+  // duas linhas em X (as quatro cunhas entre elas têm >= lacuna mínima a partir de ~50 px do cruzamento)
+  a.lacuna(Math.min(a.caixa.width, a.caixa.height) / 2, 'cunhas da sentença')
+  linhaDaSentenca(a, cfg, futuro, ang)
+  linhaDaSentenca(a, cfg, futuro, ang + a.escolher([-1, 1]) * cfg.abreSentenca)
+}
+
+function linhaDaSentenca(a, cfg, p, ang) {
+  const l = a.caixa
+  const aviso = Math.max(ATAQUE.telegrafoMs, cfg.avisoSentenca)
+  const comp = Math.hypot(l.width, l.height) + 40
+  const dx = Math.cos(ang) * comp
+  const dy = Math.sin(ang) * comp
+  tocar(a.cena, 'super-kris-tique')
+  a.aviso({ tipo: 'linha', x1: p.x - dx, y1: p.y - dy, x2: p.x + dx, y2: p.y + dy, espessura: cfg.larguraSentenca, ms: aviso, cor: 0x8fdcff }, () => {
+    tocar(a.cena, 'super-kris-corte')
+    a.tremer(110, 0.005)
+    const b = a.bala({
+      x: p.x,
+      y: p.y,
+      comprimento: comp * 2,
+      espessura: cfg.larguraSentenca - 2,
+      angulo: ang,
+      textura: 'super-kris-corte',
+      jaAvisada: true,
+      vida: 260,
+      atravessa: true,
+      pulso: 0,
+      atualizar: (bala) => {
+        if (bala.vida < 110) {
+          bala.inofensiva = true
+          bala.sprite.setAlpha(Math.max(0, bala.vida / 110))
+        }
+      },
+    })
+    b.sprite.setDisplaySize(comp * 2, 22)
+    b.escalaX = b.sprite.scaleX
+    b.escalaY = b.sprite.scaleY
+    particulas(a.cena, p.x, p.y, { cor: 0x8fdcff, quantidade: 8, velocidade: 150, vida: 320 })
+  })
+}
+
 // ---------- corte final ----------
 
-function cortar(a, cfg, ecos, i) {
+function cortar(a, cfg, ecos, i, previsao) {
   const l = a.caixa
   const aviso = Math.max(ATAQUE.telegrafoMs, cfg.avisoCorte)
-  const alvo = a.alvo()
+  const atual = a.alvo()
+  // do 2º corte em diante a linha passa por onde o coração vai estar quando ela cair
+  const alvo = i > 0 ? previsao.prever(atual, aviso) : atual
   const eco = ecos[i % Math.max(1, ecos.length)]
   // o corte sai do eco e passa pelo coração; sem eco (ou colado nele), em diagonal
   let ox = eco?.x ?? l.centerX
