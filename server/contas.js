@@ -34,6 +34,8 @@ const TIPOS_ACEITOS = { 'image/png': 'png', 'image/jpeg': 'jpeg', 'image/webp': 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const COLUNAS_PERFIL = 'id, tag, nome_exibicao, avatar_tipo, avatar_id, avatar_url, titulo_equipado, verso_equipado, nivel, xp'
 export const COLUNAS_SLOTS = 'moldura_equipada, som_equipado, efeito_equipado, lancamento_equipado'
+// o estilo da frente da carta (0016) numa leitura à parte: banco sem a 0016 continua entrando com os da 0015
+export const COLUNAS_0016 = 'frente_equipada'
 
 // ---------- config ----------
 
@@ -73,6 +75,8 @@ export function criarAutenticador(supabase, { tempoMs = 2500 } = {}) {
       if (perfil) {
         const x = await supabase.from('perfis').select(COLUNAS_SLOTS).eq('id', id).maybeSingle()
         if (!x.error && x.data) Object.assign(perfil, x.data)
+        const f = await supabase.from('perfis').select(COLUNAS_0016).eq('id', id).maybeSingle()
+        if (!f.error && f.data) Object.assign(perfil, f.data)
       }
       return { id, perfil }
     })().catch(() => null)

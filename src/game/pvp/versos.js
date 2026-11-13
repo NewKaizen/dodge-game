@@ -8,7 +8,13 @@
 //   coresDosVersosDaPartida({ sala, perfil })
 //       em rede: [verso do host, verso do convidado] (cada um vê o do outro também);
 //       fora da rede: o P1 usa o verso equipado de quem está logado, o P2 o padrão
+//   arteDoVerso(id) / artesDosVersosDaPartida({ sala, perfil })
+//       os versos ILUSTRADOS do baú (0016): id do registro ('verso-<x>') para a Carta (opção arteVerso), ou null
+//       (os versos lisos). A cor continua indo junto: é o verso liso se o desenho não carregar
 import { itemDoCatalogo } from '../../lib/progresso.js'
+import { arteDoVerso } from '../../lib/cosmeticos.js'
+
+export { arteDoVerso }
 
 // As cores do catálogo (progresso.js) são escuras demais para a mesa: o verso quase sumia ao lado do
 // padrão. Na hora de desenhar a cor sobe de luminosidade e de saturação (o mesmo matiz, então o
@@ -49,4 +55,9 @@ export const coresDosVersos = (ids) => ids.map(corDoVerso)
 export function coresDosVersosDaPartida({ sala = null, perfil = null } = {}) {
   if (sala && sala.membros?.length > 1) return coresDosVersos(versosDaSala(sala))
   return [corDoVerso(perfil?.verso_equipado), null]
+}
+
+export function artesDosVersosDaPartida({ sala = null, perfil = null } = {}) {
+  if (sala && sala.membros?.length > 1) return versosDaSala(sala).map(arteDoVerso)
+  return [arteDoVerso(perfil?.verso_equipado), null]
 }

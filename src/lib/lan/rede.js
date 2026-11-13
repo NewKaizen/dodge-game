@@ -72,7 +72,8 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 // BAÚS e SLOTS NOVOS (PROTOCOLO 18, docs/baus.md): o membro da sala leva conta.cosmeticos {som, efeito,
 // lancamento, moldura}; `baus {acao}` -> bausEstado / bauAberto / bausErro / equipado e o aviso bauGanho
 // (lib/bausConta.js)
-export const PROTOCOLO = 18
+// ESTILOS DE CARTA (PROTOCOLO 19, docs/cosmeticos.md): conta.cosmeticos ganhou `frente` (o estilo da face)
+export const PROTOCOLO = 19
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas

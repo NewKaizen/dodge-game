@@ -122,6 +122,7 @@
 //
 // BAÚS e SLOTS NOVOS de cosmético (PROTOCOLO 18, docs/baus.md, server/baus.js): o membro da sala leva
 // `conta.cosmeticos {som, efeito, lancamento, moldura}` (ids do catálogo; null = o padrão), para os outros
+// (PROTOCOLO 19, 0016: e `frente`, o estilo da face das cartas; os versos ilustrados viajam em `conta.verso`)
 // verem o efeito das suas cartas, o lançamento e a moldura, e ouvirem o seu som de dano. Os baús (só com
 // conta; só se ganham jogando):
 //   cliente -> servidor  baus {acao: 'estado'} · baus {acao: 'abrir', bauId?} · baus {acao: 'equipar', tipo, item}
@@ -149,7 +150,7 @@ import { nomeSeguro } from '../src/lib/contaRegras.js'
 import { arranjoValido } from '../src/lib/times2x2.js'
 import { infoSemanal } from '../src/lib/semanal.js'
 
-export const PROTOCOLO = 18
+export const PROTOCOLO = 19
 export const PORTA_DESCOBERTA = 47777
 // Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
 // aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")
@@ -1314,7 +1315,7 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
           .then((perfil) => {
             if (c.usuario !== usuario || !perfil) return
             c.perfil = resumoPerfil(perfil)
-            enviar(c, { t: 'equipado', ok: true, tipo, item, perfil: { titulo_equipado: perfil.titulo_equipado ?? null, moldura_equipada: perfil.moldura_equipada ?? null, verso_equipado: perfil.verso_equipado ?? null, som_equipado: perfil.som_equipado ?? null, efeito_equipado: perfil.efeito_equipado ?? null, lancamento_equipado: perfil.lancamento_equipado ?? null } })
+            enviar(c, { t: 'equipado', ok: true, tipo, item, perfil: { titulo_equipado: perfil.titulo_equipado ?? null, moldura_equipada: perfil.moldura_equipada ?? null, verso_equipado: perfil.verso_equipado ?? null, som_equipado: perfil.som_equipado ?? null, efeito_equipado: perfil.efeito_equipado ?? null, lancamento_equipado: perfil.lancamento_equipado ?? null, frente_equipada: perfil.frente_equipada ?? null } })
             const sala = salas.get(c.sala)
             if (sala) avisarSala(sala)
           })

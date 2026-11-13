@@ -12,7 +12,11 @@
 //   efeitoNaCarta(cena, carta, id)              -> { destroy() } (some sozinho quando a carta é destruída)
 //   lancar(cena, { x, y, alvoX, alvoY, cor }, id)  -> Promise que SEMPRE resolve (no máximo LANCAR_MAX_MS)
 //   molduraAnimada(cena, x, y, tamanho, id)     -> Container | null
-//   previaDe(cena, tipo, id, x, y, tamanho)     -> { destroy(), tocar?() } | null ('som'|'efeito'|'lancamento'|'moldura')
+//   previaDe(cena, tipo, id, x, y, tamanho)     -> { destroy(), tocar?() } | null ('som'|'efeito'|'lancamento'|'moldura'|'frente'|'verso')
+//   frenteNaCarta(cena, carta, id)              true = o estilo da frente desenhou a face (entities/Carta.js); false = a
+//                                               Carta desenha a clássica (padrão, id desconhecido, sem registro ou ERRO)
+//   versoNaCarta(cena, carta, id)               o mesmo para o verso ilustrado (id do registro, 'verso-<x>')
+//   miniaturaDe(cena, tipo, id)                 chave de uma textura parada da carta de amostra ('frente'|'verso') | null
 //   cosmeticosDosLados({ sala, perfil, n, emRede })  -> [{ som, efeito, lancamento, moldura }] por lado/vaga
 //                                               (ids do REGISTRO; em rede os de cada jogador, pelo lobby;
 //                                               fora da rede o lado 0 é quem está logado, o resto o padrão)
@@ -21,6 +25,12 @@
 import { PADRAO_REGISTRO, EQUIPADOS_PADRAO, equipadosDoPerfil, registroDoId } from '../lib/cosmeticos.js'
 
 export const LANCAR_MAX_MS = 2500
+
+// a classe Carta (entities/Carta.js se registra aqui ao carregar): as prévias dos estilos de carta montam
+// cartas de verdade sem o conteúdo precisar importar o Phaser
+let ClasseCarta = null
+export const definirCarta = (C) => (ClasseCarta = typeof C === 'function' ? C : null)
+export const classeCarta = () => ClasseCarta
 
 let registro = null
 const falhas = new Map() // função -> quantas vezes falhou (só para o console do dev)
@@ -155,12 +165,41 @@ export function previaDe(cena, tipo, id, x, y, tamanho, profundidade = null) {
   }
 }
 
+// ESTILO DA FRENTE (0016): o conteúdo desenha a face inteira chamando carta.montarFrente(tema). Qualquer erro
+// (no estilo, num desenho, numa textura) devolve false e a Carta limpa o que sobrou e desenha a clássica.
+export function frenteNaCarta(cena, carta, id) {
+  if (ehPadrao('frente', id) || !carta || typeof registro?.desenharFrente !== 'function') return false
+  try {
+    return registro.desenharFrente(cena, carta, id) === true
+  } catch (e) {
+    falhou('desenharFrente', e)
+    return false
+  }
+}
+
+// VERSO ILUSTRADO (0016): o mesmo contrato (false = o verso de sempre, liso na cor do item)
+export function versoNaCarta(cena, carta, id) {
+  if (!id || !carta || typeof registro?.desenharVerso !== 'function') return false
+  try {
+    return registro.desenharVerso(cena, carta, id) === true
+  } catch (e) {
+    falhou('desenharVerso', e)
+    return false
+  }
+}
+
+// a textura parada de uma carta de amostra (Coleção, roleta do baú): chave ou null
+export function miniaturaDe(cena, tipo, id) {
+  const chave = chamar('miniatura', cena, tipo, id)
+  return typeof chave === 'string' && cena?.textures?.exists?.(chave) ? chave : null
+}
+
 // o que o lobby mandou de um membro (conta.cosmeticos, ids do banco) -> ids do registro
 export const equipadosDoMembro = (m) => {
   const c = m?.conta?.cosmeticos
   if (!c || typeof c !== 'object') return { ...EQUIPADOS_PADRAO }
   const ler = (slot) => registroDoId(c[slot]) ?? PADRAO_REGISTRO[slot]
-  return { som: ler('som'), efeito: ler('efeito'), lancamento: ler('lancamento'), moldura: ler('moldura') }
+  return { som: ler('som'), efeito: ler('efeito'), lancamento: ler('lancamento'), moldura: ler('moldura'), frente: ler('frente') }
 }
 
 // os cosméticos de cada lado da partida. Modos de 2 (n = 2, porVaga false): [host, convidado], como os

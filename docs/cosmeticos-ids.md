@@ -8,7 +8,9 @@ e o conteúdo (`src/game/cosmeticos/registro.js`) usam. Cada item tem **dois nom
 - **banco**: o id do catálogo (`catalogo_itens`, `inventario`, `perfis.*_equipado`), no formato de sempre `<tipo>.<slug>`.
 
 A conversão é fixa (`registroDoId` / `idDoRegistro`): `som.<x>` ↔ `dano-<x>`, `efeito.<x>` ↔ `efeito-<x>`,
-`lancamento.<x>` ↔ `lancamento-<x>`, `moldura.anim_<x>` ↔ `moldura-anim-<x>` (o `_` do banco vira `-` no registro).
+`lancamento.<x>` ↔ `lancamento-<x>`, `moldura.anim_<x>` ↔ `moldura-anim-<x>`, `frente.<x>` ↔ `frente-<x>` e (só os versos
+do baú) `verso.<x>` ↔ `verso-<x>` (o `_` do banco vira `-` no registro). Os estilos de carta e os versos ilustrados
+vieram na `0016_cartas_estilos.sql`.
 O primeiro de cada lista do registro é o **padrão de graça** (nada equipado no banco). As raridades seguem as do
 conteúdo. Mudou um id ou uma raridade: mude `ITENS_SLOTS` (JS), o `insert` da migration (nova migration, se a 0015
 já rodou) e esta tabela; `src/lib/__tests__/cosmeticos.test.js` confere esta página.
@@ -21,6 +23,8 @@ já rodou) e esta tabela; `src/lib/__tests__/cosmeticos.test.js` confere esta p�
 | efeito de carta | `efeito-nenhum` |
 | lançamento de carta | `lancamento-padrao` |
 | moldura animada | `moldura-nenhuma` |
+| estilo de carta (frente) | `frente-classica` |
+| verso de carta | o `verso.classico` de sempre (os versos lisos da trilha não têm registro) |
 
 ## Sons de dano (`perfis.som_equipado`)
 
@@ -81,6 +85,38 @@ já rodou) e esta tabela; `src/lib/__tests__/cosmeticos.test.js` confere esta p�
 | `moldura-anim-fogo` | `moldura.anim_fogo` | Fogo | épico |
 | `moldura-anim-gerson` | `moldura.anim_gerson` | Gerson | lendário |
 | `moldura-anim-galaxia` | `moldura.anim_galaxia` | Galáxia | lendário |
+
+## Estilos de carta (`perfis.frente_equipada`, 0016)
+
+| registro | banco | nome | raridade |
+| --- | --- | --- | --- |
+| `frente-mal-desenhada` | `frente.mal_desenhada` | Mal Desenhada | comum |
+| `frente-jornal` | `frente.jornal` | Jornal | comum |
+| `frente-pixel` | `frente.pixel` | Pixel 8-bit | raro |
+| `frente-sakura` | `frente.sakura` | Sakura | raro |
+| `frente-cervos-nara` | `frente.cervos_nara` | Cervos de Nara | raro |
+| `frente-dark` | `frente.dark` | Dark Mode | raro |
+| `frente-aquarela` | `frente.aquarela` | Aquarela | épico |
+| `frente-origami` | `frente.origami` | Origami | épico |
+| `frente-holografica` | `frente.holografica` | Holográfica | épico |
+| `frente-tarot` | `frente.tarot` | Tarot | lendário |
+
+## Versos ilustrados (`perfis.verso_equipado`, o slot de verso de sempre; 0016)
+
+| registro | banco | nome | raridade |
+| --- | --- | --- | --- |
+| `verso-noite-estrelada` | `verso.noite_estrelada` | Lua e Estrelas | comum |
+| `verso-circuito` | `verso.circuito` | Placa de Circuito | comum |
+| `verso-patinhas` | `verso.patinhas` | Patinhas de Gato | comum |
+| `verso-aboboras` | `verso.aboboras` | Abóboras | comum |
+| `verso-lago-koi` | `verso.lago_koi` | Lago das Carpas | raro |
+| `verso-vitral` | `verso.vitral` | Vitral | raro |
+| `verso-cervo-nara` | `verso.cervo_nara` | Cervo de Nara | raro |
+| `verso-fliperama` | `verso.fliperama` | Fliperama | raro |
+| `verso-filigrana` | `verso.filigrana` | Filigrana Vitoriana | épico |
+| `verso-onda` | `verso.onda` | Onda do Mar | épico |
+| `verso-dragao-pixel` | `verso.dragao_pixel` | Dragão de Pixel | épico |
+| `verso-galaxia` | `verso.galaxia` | Galáxia | lendário |
 
 ## Títulos do baú (sem conteúdo no registro: são texto)
 

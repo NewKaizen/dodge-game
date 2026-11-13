@@ -6,6 +6,8 @@ import { tocar } from '../audio.js'
 import { particulas } from '../effects/particulas.js'
 import { shake } from '../effects/shake.js'
 import { fatores } from '../acessibilidade.js'
+import { frenteNaCarta, versoNaCarta, definirCarta } from '../cosmeticosSlots.js'
+import { semLigaduras } from '../campanha/texto.js'
 
 // Carta de baralho desenhada por código (frente, verso e animações).
 // Só o VISUAL: as regras (baralho, naipes, valores, efeitos) ficam em outro módulo.
@@ -43,6 +45,8 @@ import { fatores } from '../acessibilidade.js'
 //   corFoco      cor do brilho do cursor (Mao usa CORES.almas[jogador])
 //   cor          cor da faixa/verso (padrão: cor do personagem)
 //   corVerso     verso de carta equipado (Fase 2F, pvp/versos.js): cor de fundo do verso, no lugar da do personagem
+//   arteVerso    verso ILUSTRADO do baú (id do registro, 'verso-<x>'; cosmeticos/versos.js); sem conteúdo = o liso
+//   frente       ESTILO DA FRENTE equipado (id do registro, 'frente-<x>'; cosmeticos/frentes.js); null = clássica
 //   ampliada     número: já nasce ampliada nesse fator, com a legenda visível
 //
 // Carta ESCONDIDA (dados.oculta, a da mão do outro no PVP online: pvp/sigilo.js): fica sempre com o
@@ -184,6 +188,12 @@ export default class Carta extends Phaser.GameObjects.Container {
     this.u = this.largura / BASE
     this.corPersonagem = opcoes.cor ?? PERSONAGENS[dados.personagem]?.cor ?? 0x8a7aff
     this.corVerso = opcoes.corVerso ?? null
+    this.arteVerso = opcoes.arteVerso ?? null
+    this.estiloFrente = opcoes.frente ?? null
+    this.C = CORES_CARTA // as cores da frente (o estilo pode trocar; montarFrente)
+    this.tema = null
+    this.ctxFrente = null
+    this.animFrente = null
     this.corFoco = opcoes.corFoco ?? 0xffffff
     this.focoCfg = { subida: 14, escala: 1.1, ...opcoes.foco }
     this.virada = false
@@ -251,61 +261,123 @@ export default class Carta extends Phaser.GameObjects.Container {
     this.sombra.fillRoundedRect(-w / 2 + 2.5 * u, -h / 2 + 3.5 * u, w, h, 6 * u)
   }
 
+  // A FRENTE. Com um ESTILO equipado (cosmético, cosmeticos/frentes.js) quem desenha é o estilo: ele chama
+  // montarFrente(tema) com as cores e os desenhos dele; a DISPOSIÇÃO (valor e naipe nos cantos, miolo, faixa do
+  // nome, gema de custo, moldura arco-íris do SUPER) é sempre a mesma, para tudo continuar legível. Qualquer
+  // erro no estilo: limpa o que sobrou e desenha a clássica (um cosmético nunca quebra a partida).
   desenharFrente() {
+    if (this.estiloFrente) {
+      if (frenteNaCarta(this.scene, this, this.estiloFrente)) return
+      this.limparFrente()
+    }
+    this.montarFrente(null)
+  }
+
+  limparFrente() {
+    try {
+      this.animFrente?.destroy()
+    } catch {
+      // a animação do estilo já estava quebrada: só some
+    }
+    this.animFrente = null
+    this.frente.removeAll(true)
+    this.gema = null
+    this.gemaTexto = null
+    this.camadaBrilhos = null
+    this.tema = null
+    this.C = CORES_CARTA
+  }
+
+  // cor do naipe desta carta no estilo atual (vermelho: copas e ouros; escuro: espadas e paus)
+  corNaipe(naipe = this.dados.naipe) {
+    return naipe === 'copas' || naipe === 'ouros' ? this.C.vermelho : this.C.escuro
+  }
+
+  // desenha um naipe com o traço do estilo (o rabisco, o pixel...) ou o vetorial de sempre
+  naipe(g, naipe, x, y, r, cor, alpha = 1, invertido = false) {
+    if (this.tema?.naipe) return this.tema.naipe(g, naipe, x, y, r, cor, alpha, invertido, this.ctxFrente)
+    desenharNaipe(g, naipe, x, y, r, cor, alpha, invertido)
+  }
+
+  // tema (opcional): { cores, fundo(ctx), naipe(g, ...), miolo(ctx, cy) -> true, faixa(ctx, fy, fh),
+  //   nome: { cor, stroke, espessura }, rotulo: { cor(naipe) -> '#hex', stroke }, decorar(ctx), sobre(ctx),
+  //   animar(ctx) -> { destroy() } }
+  // ctx: { scene, carta, g, w, h, u, hw, hh, C, cor, dados, super, formas, adicionar(obj), camadaAnim, camadaSobre }
+  montarFrente(tema = null) {
     const { largura: w, altura: h, u, dados } = this
     const hw = w / 2
     const hh = h / 2
-    const cor = corDoNaipe(dados.naipe)
-    const corHex = '#' + cor.toString(16).padStart(6, '0')
-    const g = this.scene.add.graphics()
-    this.frente.add(g)
+    this.tema = tema
+    const C = (this.C = tema?.cores ? { ...CORES_CARTA, ...tema.cores } : CORES_CARTA)
+    const cor = this.corNaipe()
+    const ctx = (this.ctxFrente = { scene: this.scene, carta: this, w, h, u, hw, hh, C, cor, dados, super: this.super, formas: formas(), adicionar: (o) => (this.frente.add(o), o) })
 
-    // papel com borda
-    g.fillStyle(CORES_CARTA.borda, 1)
-    g.fillRoundedRect(-hw, -hh, w, h, 6 * u)
-    g.fillStyle(CORES_CARTA.papel, 1)
-    g.fillRoundedRect(-hw + 1.2 * u, -hh + 1.2 * u, w - 2.4 * u, h - 2.4 * u, 5 * u)
-    // fio interno (SUPER: moldura arco-íris)
+    // fundo: o do estilo (texturas feitas uma vez) ou o papel com borda de sempre
+    if (tema?.fundo) tema.fundo(ctx)
+    ctx.camadaAnim = this.scene.add.container(0, 0) // o que o estilo anima POR TRÁS dos naipes (pétalas...)
+    this.frente.add(ctx.camadaAnim)
+    const g = this.scene.add.graphics()
+    ctx.g = g
+    this.frente.add(g)
+    if (!tema?.fundo) {
+      g.fillStyle(C.borda, 1)
+      g.fillRoundedRect(-hw, -hh, w, h, 6 * u)
+      g.fillStyle(C.papel, 1)
+      g.fillRoundedRect(-hw + 1.2 * u, -hh + 1.2 * u, w - 2.4 * u, h - 2.4 * u, 5 * u)
+    }
+    // fio interno (SUPER: moldura arco-íris, em todos os estilos: é o selo da carta)
     if (this.super) {
       ARCO_IRIS.forEach((c, i) => {
         g.lineStyle(0.75 * u, c, 1)
         const d = (1.6 + i * 0.7) * u
         g.strokeRoundedRect(-hw + d, -hh + d, w - d * 2, h - d * 2, Math.max(1, 5 * u - i * 0.4 * u))
       })
-    } else {
-      g.lineStyle(0.8 * u, CORES_CARTA.papelSombra, 1)
+    } else if (!tema?.fundo) {
+      g.lineStyle(0.8 * u, C.papelSombra, 1)
       g.strokeRoundedRect(-hw + 3.2 * u, -hh + 3.2 * u, w - 6.4 * u, h - 6.4 * u, 3.5 * u)
     }
+    tema?.decorar?.(ctx)
 
-    // miolo: SUPER, figura, Ás ou naipes
+    // miolo: SUPER (igual em todos), o do estilo, figura, Ás ou naipes
     const cy = -7 * u
     if (this.super) this.desenharSuper(g, cy)
-    else if (dados.valor === 1) this.desenharAs(g, cy)
+    else if (tema?.miolo?.(ctx, cy)) {
+      // o estilo desenhou o miolo
+    } else if (dados.valor === 1) this.desenharAs(g, cy)
     else if (dados.valor >= 11) this.desenharFigura(g, cy)
     else this.desenharPips(g, cy)
 
     // faixa do nome (cor do personagem, bem suave)
     const fy = 21 * u
     const fh = 16 * u
-    g.fillStyle(this.corPersonagem, 0.2)
-    g.fillRoundedRect(-21 * u, fy, 42 * u, fh, 3 * u)
-    g.lineStyle(0.8 * u, this.corPersonagem, 0.75)
-    g.strokeRoundedRect(-21 * u, fy, 42 * u, fh, 3 * u)
-    g.fillStyle(this.corPersonagem, 0.9)
-    g.fillRect(-15 * u, fy + fh - 1.6 * u, 30 * u, 1.2 * u)
-    const nome = this.texto(0, fy + fh / 2 - 0.4 * u, dados.nome ?? '', 7 * u, '#2a2238', {
+    if (tema?.faixa) tema.faixa(ctx, fy, fh)
+    else {
+      g.fillStyle(this.corPersonagem, 0.2)
+      g.fillRoundedRect(-21 * u, fy, 42 * u, fh, 3 * u)
+      g.lineStyle(0.8 * u, this.corPersonagem, 0.75)
+      g.strokeRoundedRect(-21 * u, fy, 42 * u, fh, 3 * u)
+      g.fillStyle(this.corPersonagem, 0.9)
+      g.fillRect(-15 * u, fy + fh - 1.6 * u, 30 * u, 1.2 * u)
+    }
+    const estiloNome = tema?.nome ?? {}
+    const nome = this.texto(0, fy + fh / 2 - 0.4 * u, tema ? semLigaduras(dados.nome ?? '') : dados.nome ?? '', 7 * u, estiloNome.cor ?? '#2a2238', {
       align: 'center',
       wordWrap: { width: 40 * u, useAdvancedWrap: true },
       lineSpacing: -1.5 * u,
+      ...(estiloNome.stroke && { stroke: estiloNome.stroke, strokeThickness: (estiloNome.espessura ?? 1.4) * u }),
     }).setOrigin(0.5)
     // encolhe até caber na faixa
     for (let tam = 7; tam > 4.5 && (nome.height > fh + 1 * u || nome.width > 41 * u); tam -= 0.5) nome.setFontSize(tam * u)
+    const torto = tema?.torto ?? 0 // "mal desenhada": tudo um tiquinho torto
+    if (torto) nome.setRotation(-torto * 0.5)
     this.frente.add(nome)
 
     // cantos: valor + naipe (o de baixo, de cabeça para baixo)
     const rotulo = rotuloValor(dados.valor)
     const tamRotulo = (rotulo.length > 1 ? 10.5 : 12.5) * u
     const cx = hw - 8 * u
+    const corHex = tema?.rotulo?.cor?.(dados.naipe) ?? '#' + cor.toString(16).padStart(6, '0')
+    const strokeRotulo = tema?.rotulo?.stroke ?? corHex
     for (const lado of [-1, 1]) {
       if (this.super) {
         // SUPER: estrela dourada no lugar do valor e do naipe
@@ -317,13 +389,13 @@ export default class Carta extends Phaser.GameObjects.Container {
         g.fillPoints(pontosEstrela5(5.2 * u).map((p) => ({ x: sx + p.x, y: sy + p.y * lado })), true)
         continue
       }
-      const t = this.texto(cx * lado, (hh - 3 * u) * lado, rotulo, tamRotulo, corHex, { stroke: corHex, strokeThickness: 0.6 * u })
-      t.setOrigin(0.5, 0).setRotation(lado === 1 ? Math.PI : 0)
+      const t = this.texto(cx * lado, (hh - 3 * u) * lado, rotulo, tamRotulo, corHex, { stroke: strokeRotulo, strokeThickness: (tema?.rotulo?.espessura ?? 0.6) * u })
+      t.setOrigin(0.5, 0).setRotation((lado === 1 ? Math.PI : 0) - torto * lado)
       this.frente.add(t)
-      desenharNaipe(g, dados.naipe, cx * lado, (hh - 20 * u) * lado, 4 * u, cor, 1, lado === 1)
+      this.naipe(g, dados.naipe, cx * lado, (hh - 20 * u) * lado, 4 * u, cor, 1, lado === 1)
     }
 
-    // gema de energia (canto superior direito)
+    // gema de energia (canto superior direito): igual em todos os estilos
     this.gema = this.scene.add.graphics()
     this.gemaTexto = this.texto(hw - 9.5 * u, -hh + 9.5 * u, String(dados.custo ?? 0), 8.5 * u, '#ffffff', {
       stroke: '#06283e',
@@ -332,9 +404,14 @@ export default class Carta extends Phaser.GameObjects.Container {
     this.frente.add([this.gema, this.gemaTexto])
     this.desenharGema(false)
 
-    // brilhos (figuras e Ás) ficam por cima da arte
+    // por cima de tudo (brilho holográfico...), e os brilhos das figuras e do Ás
+    ctx.camadaSobre = this.scene.add.container(0, 0)
+    this.frente.add(ctx.camadaSobre)
+    tema?.sobre?.(ctx)
     this.camadaBrilhos = this.scene.add.container(0, 0)
     this.frente.add(this.camadaBrilhos)
+    // a animação do estilo (respeita "reduzir animações"; some com a carta)
+    if (tema?.animar) this.animFrente = tema.animar(ctx) ?? null
   }
 
   desenharGema(semEnergia) {
@@ -364,24 +441,24 @@ export default class Carta extends Phaser.GameObjects.Container {
 
   desenharPips(g, cy) {
     const { u, dados } = this
-    const cor = corDoNaipe(dados.naipe)
+    const cor = this.corNaipe()
     const posicoes = PIPS[dados.valor] ?? [[0, 0]]
     const r = (dados.valor >= 9 ? 5 : 5.6) * u
-    for (const [px, py] of posicoes) desenharNaipe(g, dados.naipe, px * 12.5 * u, cy + py * 19 * u, r, cor, 1, py > 0.01)
+    for (const [px, py] of posicoes) this.naipe(g, dados.naipe, px * 12.5 * u, cy + py * 19 * u, r, cor, 1, py > 0.01)
   }
 
   desenharAs(g, cy) {
     const { u, dados } = this
-    const cor = corDoNaipe(dados.naipe)
+    const cor = this.corNaipe()
     // rosácea dourada atrás do naipe
-    g.fillStyle(CORES_CARTA.ouroClaro, 0.55)
+    g.fillStyle(this.C.ouroClaro, 0.55)
     g.fillCircle(0, cy, 20 * u)
     for (let i = 0; i < 16; i++) {
       const a = (i * TAU) / 16
       const r1 = 15 * u
       const r2 = (i % 2 ? 19 : 22.5) * u
       const largura = 0.11
-      g.fillStyle(CORES_CARTA.ouro, i % 2 ? 0.45 : 0.8)
+      g.fillStyle(this.C.ouro, i % 2 ? 0.45 : 0.8)
       g.fillTriangle(
         Math.cos(a - largura) * r1,
         cy + Math.sin(a - largura) * r1,
@@ -391,13 +468,13 @@ export default class Carta extends Phaser.GameObjects.Container {
         cy + Math.sin(a) * r2,
       )
     }
-    g.lineStyle(1 * u, CORES_CARTA.ouroEscuro, 0.9)
+    g.lineStyle(1 * u, this.C.ouroEscuro, 0.9)
     g.strokeCircle(0, cy, 16 * u)
-    g.lineStyle(0.6 * u, CORES_CARTA.ouro, 1)
+    g.lineStyle(0.6 * u, this.C.ouro, 1)
     g.strokeCircle(0, cy, 14.2 * u)
     // naipe grande com contorno dourado
-    desenharNaipe(g, dados.naipe, 0, cy, 13.6 * u, CORES_CARTA.ouroEscuro)
-    desenharNaipe(g, dados.naipe, 0, cy, 12.4 * u, cor)
+    this.naipe(g, dados.naipe, 0, cy, 13.6 * u, this.C.ouroEscuro)
+    this.naipe(g, dados.naipe, 0, cy, 12.4 * u, cor)
     // reflexo
     g.fillStyle(0xffffff, 0.35)
     g.fillEllipse(-4 * u, cy - 5 * u, 4 * u, 7 * u)
@@ -405,13 +482,13 @@ export default class Carta extends Phaser.GameObjects.Container {
 
   desenharFigura(g, cy) {
     const { u, dados } = this
-    const cor = corDoNaipe(dados.naipe)
+    const cor = this.corNaipe()
     const x0 = -22 * u
     const y0 = cy - 25 * u
     const fw = 44 * u
     const fh = 47 * u
     // fundo da moldura levemente na cor do naipe
-    g.fillStyle(misturar(CORES_CARTA.papel, cor, 0.1), 1)
+    g.fillStyle(misturar(this.C.papel, cor, 0.1), 1)
     g.fillRect(x0, y0, fw, fh)
     // diagonais finas (textura de "gravura")
     g.lineStyle(0.5 * u, cor, 0.12)
@@ -422,23 +499,23 @@ export default class Carta extends Phaser.GameObjects.Container {
       g.lineBetween(x0 + ax, y0 + ay, x0 + ax + len, y0 + ay + len)
     }
     // moldura dupla dourada
-    g.lineStyle(1.4 * u, CORES_CARTA.ouro, 1)
+    g.lineStyle(1.4 * u, this.C.ouro, 1)
     g.strokeRect(x0, y0, fw, fh)
-    g.lineStyle(0.6 * u, CORES_CARTA.ouroEscuro, 1)
+    g.lineStyle(0.6 * u, this.C.ouroEscuro, 1)
     g.strokeRect(x0 + 2 * u, y0 + 2 * u, fw - 4 * u, fh - 4 * u)
     // ornamentos nos cantos da moldura
     for (const [ox, oy] of [[x0, y0], [x0 + fw, y0], [x0, y0 + fh], [x0 + fw, y0 + fh]]) {
       const r = 2.6 * u
-      g.fillStyle(CORES_CARTA.ouroEscuro, 1)
+      g.fillStyle(this.C.ouroEscuro, 1)
       g.fillPoints([{ x: ox, y: oy - r - 0.6 * u }, { x: ox + r + 0.6 * u, y: oy }, { x: ox, y: oy + r + 0.6 * u }, { x: ox - r - 0.6 * u, y: oy }], true)
-      g.fillStyle(CORES_CARTA.ouro, 1)
+      g.fillStyle(this.C.ouro, 1)
       g.fillPoints([{ x: ox, y: oy - r }, { x: ox + r, y: oy }, { x: ox, y: oy + r }, { x: ox - r, y: oy }], true)
     }
     // emblema (coroa do K, tiara da Q, chapéu de pena do J)
     this.desenharEmblema(g, 0, cy - 12 * u, cor)
     // naipe médio embaixo do emblema
-    desenharNaipe(g, dados.naipe, 0, cy + 8 * u, 10.6 * u, CORES_CARTA.ouroEscuro)
-    desenharNaipe(g, dados.naipe, 0, cy + 8 * u, 9.6 * u, cor)
+    this.naipe(g, dados.naipe, 0, cy + 8 * u, 10.6 * u, this.C.ouroEscuro)
+    this.naipe(g, dados.naipe, 0, cy + 8 * u, 9.6 * u, cor)
     g.fillStyle(0xffffff, 0.3)
     g.fillEllipse(-3 * u, cy + 4 * u, 3 * u, 5 * u)
   }
@@ -517,24 +594,24 @@ export default class Carta extends Phaser.GameObjects.Container {
     const { u, dados } = this
     const P = (px, py) => ({ x: x + px * u, y: y + py * u })
     const contorno = (pontos) => {
-      g.fillStyle(CORES_CARTA.ouro, 1)
+      g.fillStyle(this.C.ouro, 1)
       g.fillPoints(pontos, true)
-      g.lineStyle(0.8 * u, CORES_CARTA.ouroEscuro, 1)
+      g.lineStyle(0.8 * u, this.C.ouroEscuro, 1)
       g.strokePoints(pontos, true)
     }
     if (dados.valor === 13) {
       // coroa de 3 pontas com bolinhas
       contorno([P(-11, 6), P(-11, -4), P(-5.5, 1), P(0, -8), P(5.5, 1), P(11, -4), P(11, 6)])
-      g.fillStyle(CORES_CARTA.ouroEscuro, 1)
+      g.fillStyle(this.C.ouroEscuro, 1)
       g.fillRect(x - 11 * u, y + 3 * u, 22 * u, 1 * u)
       for (const [px, py] of [[-11, -4], [0, -8], [11, -4]]) {
-        g.fillStyle(CORES_CARTA.ouroEscuro, 1)
+        g.fillStyle(this.C.ouroEscuro, 1)
         g.fillCircle(x + px * u, y + py * u, 2 * u)
-        g.fillStyle(CORES_CARTA.ouroClaro, 1)
+        g.fillStyle(this.C.ouroClaro, 1)
         g.fillCircle(x + px * u, y + py * u, 1.3 * u)
       }
       for (const px of [-6, 0, 6]) {
-        g.fillStyle(px === 0 ? cor : CORES_CARTA.ouroEscuro, 1)
+        g.fillStyle(px === 0 ? cor : this.C.ouroEscuro, 1)
         g.fillCircle(x + px * u, y + 1.2 * u, 1.3 * u)
       }
     } else if (dados.valor === 12) {
@@ -547,14 +624,14 @@ export default class Carta extends Phaser.GameObjects.Container {
         arco.push(P(px, -2 - 5 * ondas - 3 * Math.sin(t * Math.PI)))
       }
       contorno([P(-10, 5), ...arco, P(10, 5)])
-      g.fillStyle(CORES_CARTA.ouroEscuro, 1)
+      g.fillStyle(this.C.ouroEscuro, 1)
       g.fillCircle(x, y - 1 * u, 3 * u)
       g.fillStyle(cor, 1)
       g.fillCircle(x, y - 1 * u, 2.2 * u)
       g.fillStyle(0xffffff, 0.6)
       g.fillCircle(x - 0.7 * u, y - 1.7 * u, 0.7 * u)
       for (const px of [-6, 6]) {
-        g.fillStyle(CORES_CARTA.ouroClaro, 1)
+        g.fillStyle(this.C.ouroClaro, 1)
         g.fillCircle(x + px * u, y + 2 * u, 1.1 * u)
       }
     } else {
@@ -562,18 +639,23 @@ export default class Carta extends Phaser.GameObjects.Container {
       const pena = [P(3, -2), P(8, -9), P(14, -12), P(11, -6), P(7, -1)]
       g.fillStyle(cor, 1)
       g.fillPoints(pena, true)
-      g.lineStyle(0.6 * u, CORES_CARTA.ouroEscuro, 1)
+      g.lineStyle(0.6 * u, this.C.ouroEscuro, 1)
       g.strokePoints(pena, true)
       g.lineBetween(x + 4 * u, y - 2 * u, x + 12 * u, y - 10 * u)
       contorno([P(-11, 6), P(-9, -1), P(-4, -5), P(4, -5), P(9, -1), P(11, 6)])
       g.fillStyle(cor, 0.85)
       g.fillRect(x - 10 * u, y + 2 * u, 20 * u, 2 * u)
-      g.fillStyle(CORES_CARTA.ouroClaro, 1)
+      g.fillStyle(this.C.ouroClaro, 1)
       g.fillCircle(x - 4 * u, y - 1 * u, 1.1 * u)
     }
   }
 
   desenharVerso() {
+    // verso ilustrado do baú (o desenho vem do conteúdo; erro ou sem conteúdo: o liso de sempre)
+    if (this.arteVerso) {
+      if (versoNaCarta(this.scene, this, this.arteVerso)) return
+      this.verso.removeAll(true)
+    }
     const { largura: w, altura: h, u } = this
     const hw = w / 2
     const hh = h / 2
@@ -1071,6 +1153,12 @@ export default class Carta extends Phaser.GameObjects.Container {
   }
 
   preDestroy() {
+    try {
+      this.animFrente?.destroy()
+    } catch {
+      // a animação do estilo some junto
+    }
+    this.animFrente = null
     this.timerBrilhos?.remove()
     this.pulso?.stop()
     if (this.scene) {
@@ -1081,6 +1169,9 @@ export default class Carta extends Phaser.GameObjects.Container {
     super.preDestroy?.()
   }
 }
+
+// as prévias dos estilos de carta (cosmeticos/frentes.js) montam cartas de verdade por aqui
+definirCarta(Carta)
 
 // Estilhaço da carta no alvo: clarão, anel, naipe fantasma, cacos e faíscas
 function impactoCarta(scene, x, y, { naipe = 'espadas', largura = 70, especial = false } = {}) {

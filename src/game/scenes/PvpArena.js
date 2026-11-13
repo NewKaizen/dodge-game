@@ -30,7 +30,7 @@ import { anunciarSuper } from '../pvp/super/anuncio.js'
 import FimDePartida from '../pvp/fimDePartida/index.js'
 import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe, venceu } from '../../lib/saida.js'
 import { nomesDaPartida } from '../pvp/nomesDaPartida.js'
-import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, cosmeticosDaPartida } from '../rede.js'
+import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, artesDosVersos, cosmeticosDaPartida } from '../rede.js'
 import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 import ArenaRede from '../pvp/rede/ArenaRede.js'
 import { fatores } from '../acessibilidade.js'
@@ -281,10 +281,11 @@ export default class PvpArena extends Phaser.Scene {
     this.huds = [0, 1].map((j) => new HudPvp(this, { jogador: j, personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, rotulo: this.rotulo(j), nomeJogador: this.nomesJog[j] }))
     this.criarTopo()
     this.versos = coresDosVersos() // verso de carta equipado de cada lado (Fase 2F; em rede o de cada jogador)
+    this.artesVerso = artesDosVersos() // o verso ILUSTRADO do baú de cada lado (0016; null = o liso)
     this.cosmeticos = cosmeticosDaPartida(2) // som de dano, efeito e lançamento de cada lado (só enfeite)
     this.montes = [0, 1].map((j) => this.criarMonte(j))
     this.maos = [0, 1].map(
-      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: LARGURA_MAO, espacamento: 40, profundidade: 20, corVerso: this.versos[j], efeito: this.cosmeticos[j].efeito }),
+      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: LARGURA_MAO, espacamento: 40, profundidade: 20, corVerso: this.versos[j], arteVerso: this.artesVerso[j], efeito: this.cosmeticos[j].efeito, frente: this.cosmeticos[j].frente }),
     )
     this.botoesPassar = [0, 1].map((j) => this.criarBotaoPassar(j))
     this.criarTextos()
@@ -422,7 +423,7 @@ export default class PvpArena extends Phaser.Scene {
   criarMonte(j) {
     const { x, y } = MAOS[j].monte
     const cartas = [0, 1, 2].map((k) =>
-      new Carta(this, x - k * 1.2, y - k * 1.8, { personagem: this.ids[j], naipe: 'espadas', valor: 2 }, { virada: true, largura: 46, corVerso: this.versos[j] }).setDepth(5 + k).setRotation(j ? 0.08 : -0.08),
+      new Carta(this, x - k * 1.2, y - k * 1.8, { personagem: this.ids[j], naipe: 'espadas', valor: 2 }, { virada: true, largura: 46, corVerso: this.versos[j], arteVerso: this.artesVerso[j] }).setDepth(5 + k).setRotation(j ? 0.08 : -0.08),
     )
     const texto = this.add
       .text(x, y + 40, '', { fontFamily: FONTE, fontSize: '10px', color: TEXTO.desabilitado, stroke: '#000000', strokeThickness: 3 })
@@ -927,7 +928,7 @@ export default class PvpArena extends Phaser.Scene {
   // a carta virada da mão do outro (rede) vira a carta de verdade, no mesmo lugar e do mesmo jeito
   cartaDeVerdade(carta, dados) {
     if (!carta.oculta) return carta
-    const nova = new Carta(this, carta.x, carta.y, { ...dados }, { largura: carta.largura, corFoco: carta.corFoco, corVerso: carta.corVerso, virada: true })
+    const nova = new Carta(this, carta.x, carta.y, { ...dados }, { largura: carta.largura, corFoco: carta.corFoco, corVerso: carta.corVerso, arteVerso: carta.arteVerso, frente: carta.estiloFrente, virada: true })
     nova.setDepth(carta.depth).setRotation(carta.rotation).setScale(carta.scaleX, carta.scaleY)
     carta.destroy()
     return nova
@@ -1076,7 +1077,7 @@ export default class PvpArena extends Phaser.Scene {
         .setOrigin(0.5)
       previa.add([g, t1, t2])
     } else {
-      previa = new Carta(this, p.x, p.y, carta.dados, { ampliada: p.escala, corFoco: CORES.almas[j] }).setDepth(60)
+      previa = new Carta(this, p.x, p.y, carta.dados, { ampliada: p.escala, corFoco: CORES.almas[j], frente: carta.estiloFrente }).setDepth(60)
       if (carta.indisponivel) previa.setIndisponivel(true)
       previa.indisponivel = carta.indisponivel
     }
@@ -1381,7 +1382,7 @@ export default class PvpArena extends Phaser.Scene {
         // gira rápido (achata e volta algumas vezes) e troca no meio
         for (let k = 0; k < 3; k++) await this.tween({ targets: velha, scaleX: 0.05, duration: 70 + k * 30, yoyo: true, ease: 'Sine.easeInOut' })
         await this.tween({ targets: velha, scaleX: 0.05, duration: 110, ease: 'Sine.easeIn' })
-        const nova = new Carta(this, velha.x, velha.y, { ...troca.para }, { largura: velha.largura }).setDepth(velha.depth)
+        const nova = new Carta(this, velha.x, velha.y, { ...troca.para }, { largura: velha.largura, frente: velha.estiloFrente, arteVerso: velha.arteVerso, corVerso: velha.corVerso }).setDepth(velha.depth)
         nova.setScale(0.05, velha.scaleY)
         velha.destroy()
         this.reveladas[j] = nova

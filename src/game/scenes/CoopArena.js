@@ -39,7 +39,7 @@ import { escolherJogadaCoop } from '../coop/bot.js'
 import { superNoChefe } from '../coop/superNoChefe.js'
 import ArenaRedeCoop from '../coop/ArenaRedeCoop.js'
 import { nomesDaPartida } from '../pvp/nomesDaPartida.js'
-import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, cosmeticosDaPartida } from '../rede.js'
+import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, artesDosVersos, cosmeticosDaPartida } from '../rede.js'
 import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
@@ -239,10 +239,11 @@ export default class CoopArena extends PvpArena {
     else if (!this.rede) this.textoTreino.setText('')
     // o monte (criarMonte, da PvpArena) também usa o verso de cada lado: sem isto o CO-OP quebrava ao abrir
     this.versos = coresDosVersos()
+    this.artesVerso = artesDosVersos() // os versos ilustrados do baú (0016): o monte e a mão usam
     this.cosmeticos = cosmeticosDaPartida(2) // só enfeite: nunca muda a partida
     this.montes = [0, 1].map((j) => this.criarMonte(j))
     this.maos = [0, 1].map(
-      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: 150, espacamento: 40, profundidade: 20, corVerso: this.versos[j], efeito: this.cosmeticos[j].efeito }),
+      (j) => new Mao(this, { jogador: j, x: MAOS[j].x, y: MAOS[j].y, monte: MAOS[j].monte, larguraMax: 150, espacamento: 40, profundidade: 20, corVerso: this.versos[j], arteVerso: this.artesVerso[j], efeito: this.cosmeticos[j].efeito, frente: this.cosmeticos[j].frente }),
     )
     this.botoesPassar = [0, 1].map((j) => this.criarBotaoPassar(j))
     this.criarTextos()

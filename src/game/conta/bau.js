@@ -50,6 +50,15 @@ export function iconeDoTipo(g, tipo, x, y, tam = 24, cor = 0xffffff) {
   } else if (tipo === 'moldura') {
     g.strokeRect(x - 10 * s, y - 10 * s, 20 * s, 20 * s)
     g.strokeRect(x - 6 * s, y - 6 * s, 12 * s, 12 * s)
+  } else if (tipo === 'frente') {
+    // carta de frente: o contorno, um "A" em traço e um losango no meio
+    g.strokeRect(x - 8 * s, y - 11 * s, 16 * s, 22 * s)
+    g.fillTriangle(x, y - 5 * s, x + 4 * s, y + 1 * s, x - 4 * s, y + 1 * s).fillTriangle(x, y + 7 * s, x + 4 * s, y + 1 * s, x - 4 * s, y + 1 * s)
+    g.fillRect(x - 6 * s, y - 9 * s, 3 * s, 3 * s)
+  } else if (tipo === 'verso') {
+    // carta virada: treliça
+    g.strokeRect(x - 8 * s, y - 11 * s, 16 * s, 22 * s)
+    for (const [dx, dy] of [[-3, -5], [3, -5], [0, 0], [-3, 5], [3, 5]]) g.fillRect(x + dx * s - 1.5 * s, y + dy * s - 1.5 * s, 3 * s, 3 * s)
   } else if (tipo === 'xp') {
     g.fillTriangle(x, y - 11 * s, x - 10 * s, y + 7 * s, x + 10 * s, y + 7 * s)
   } else {

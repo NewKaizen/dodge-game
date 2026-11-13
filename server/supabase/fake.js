@@ -347,9 +347,10 @@ function rpcs(sb) {
       }
     },
     // BAÚS e SLOTS NOVOS (0015): os espelhos de equipar_conta, conceder_bau, abrir_bau e baus_estado
+    // (0016: o tipo 'frente', o estilo da face das cartas, em perfis.frente_equipada)
     equipar_conta({ p_uid, p_tipo, p_item = null }) {
       if (!p_uid) throw new Error('precisa estar logado')
-      if (!['avatar', 'titulo', 'moldura', 'verso', 'som', 'efeito', 'lancamento'].includes(p_tipo)) throw new Error('tipo de item inválido')
+      if (!['avatar', 'titulo', 'moldura', 'verso', 'som', 'efeito', 'lancamento', 'frente'].includes(p_tipo)) throw new Error('tipo de item inválido')
       const perfil = t.perfis.find((x) => x.id === p_uid)
       if (!perfil) throw new Error('perfil não encontrado')
       if (p_item == null) {
@@ -359,7 +360,7 @@ function rpcs(sb) {
         if (!item) throw new Error('item inválido')
         if (!item.padrao && !t.inventario.some((i) => i.user_id === p_uid && i.item_id === p_item)) throw new Error('você ainda não tem esse item')
       }
-      const coluna = { titulo: 'titulo_equipado', moldura: 'moldura_equipada', verso: 'verso_equipado', som: 'som_equipado', efeito: 'efeito_equipado', lancamento: 'lancamento_equipado' }[p_tipo]
+      const coluna = { titulo: 'titulo_equipado', moldura: 'moldura_equipada', verso: 'verso_equipado', som: 'som_equipado', efeito: 'efeito_equipado', lancamento: 'lancamento_equipado', frente: 'frente_equipada' }[p_tipo]
       if (coluna) perfil[coluna] = p_item
       else Object.assign(perfil, { avatar_tipo: 'jogo', avatar_id: p_item.split('.')[1] })
       return { ...perfil }

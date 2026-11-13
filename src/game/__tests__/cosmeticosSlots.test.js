@@ -96,7 +96,7 @@ test('os cosméticos de cada lado: em rede os do lobby, fora dela o de quem est�
   const sala = { membros: [membro('convidado', 1, { som: 'som.latido', efeito: null, lancamento: 'lancamento.raio', moldura: 'moldura.anim_fogo' }), membro('host', 0, { som: 'som.inventado', efeito: 'efeito.chamas' })] }
   const dois = S.cosmeticosDosLados({ sala, n: 2, emRede: true })
   assert.deepEqual(dois[0], { ...EQUIPADOS_PADRAO, efeito: 'efeito-chamas' }, 'id desconhecido vira o padrão')
-  assert.deepEqual(dois[1], { som: 'dano-latido', efeito: 'efeito-nenhum', lancamento: 'lancamento-raio', moldura: 'moldura-anim-fogo' })
+  assert.deepEqual(dois[1], { som: 'dano-latido', efeito: 'efeito-nenhum', lancamento: 'lancamento-raio', moldura: 'moldura-anim-fogo', frente: 'frente-classica' })
   // convidado (sem conta) do outro lado: padrão
   const comConvidado = S.cosmeticosDosLados({ sala: { membros: [membro('host', 0, { som: 'som.pato' }), membro('convidado', 1)] }, n: 2, emRede: true })
   assert.deepEqual(comConvidado[1], EQUIPADOS_PADRAO)
@@ -122,11 +122,54 @@ test('o catálogo do baú bate com o registro do conteúdo', async (t) => {
     return t.skip('src/game/cosmeticos/registro.js ainda não existe')
   }
   const { ITENS_SLOTS, PADRAO_REGISTRO } = await import('../../lib/cosmeticos.js')
-  const listas = { som: reg.SONS_DANO, efeito: reg.EFEITOS_CARTA, lancamento: reg.LANCAMENTOS, moldura: reg.MOLDURAS_ANIMADAS }
+  const listas = { som: reg.SONS_DANO, efeito: reg.EFEITOS_CARTA, lancamento: reg.LANCAMENTOS, moldura: reg.MOLDURAS_ANIMADAS, frente: reg.ESTILOS_FRENTE }
+  // os versos ilustrados não têm "padrão" na lista (o padrão é o verso liso de sempre)
+  const versos = reg.VERSOS_ILUSTRADOS.map((i) => `${i.id}:${i.raridade}`).sort()
+  assert.deepEqual(ITENS_SLOTS.filter((i) => i.slot === 'verso').map((i) => `${i.registro}:${i.raridade}`).sort(), versos, 'verso')
   for (const [slot, lista] of Object.entries(listas)) {
     assert.equal(lista[0].id, PADRAO_REGISTRO[slot], `padrão de ${slot}`)
     const doConteudo = lista.slice(1).map((i) => `${i.id}:${i.raridade}`).sort()
     const doBau = ITENS_SLOTS.filter((i) => i.slot === slot).map((i) => `${i.registro}:${i.raridade}`).sort()
     assert.deepEqual(doBau, doConteudo, slot)
   }
+})
+
+// ESTILOS DE CARTA e VERSOS ILUSTRADOS (0016): o estilo que falha NUNCA quebra a carta (a Carta cai na clássica)
+test('frenteNaCarta / versoNaCarta: padrão e sem registro = false; erro = false (sem lançar)', () => {
+  calar()
+  const carta = { montarFrente() {}, verso: { add() {} } }
+  S.definirRegistro(null)
+  assert.equal(S.frenteNaCarta(cena, carta, 'frente-tarot'), false)
+  assert.equal(S.versoNaCarta(cena, carta, 'verso-galaxia'), false)
+  const chamadas = []
+  S.definirRegistro({ desenharFrente: (...a) => (chamadas.push(a[2]), true), desenharVerso: () => true, miniatura: () => 'mini' })
+  assert.equal(S.frenteNaCarta(cena, carta, 'frente-classica'), false, 'a clássica nem chama o conteúdo')
+  assert.equal(S.frenteNaCarta(cena, carta, null), false)
+  assert.equal(S.frenteNaCarta(cena, carta, 'frente-tarot'), true)
+  assert.deepEqual(chamadas, ['frente-tarot'])
+  assert.equal(S.versoNaCarta(cena, carta, 'verso-galaxia'), true)
+  assert.equal(S.miniaturaDe({ textures: { exists: () => true } }, 'frente', 'frente-tarot'), 'mini')
+  assert.equal(S.miniaturaDe({ textures: { exists: () => false } }, 'frente', 'frente-tarot'), null, 'textura que não existe')
+  const explode = () => {
+    throw new Error('bum')
+  }
+  S.definirRegistro({ desenharFrente: explode, desenharVerso: explode, miniatura: explode })
+  assert.doesNotThrow(() => assert.equal(S.frenteNaCarta(cena, carta, 'frente-tarot'), false))
+  assert.doesNotThrow(() => assert.equal(S.versoNaCarta(cena, carta, 'verso-galaxia'), false))
+  assert.equal(S.miniaturaDe(cena, 'frente', 'frente-tarot'), null)
+  S.definirRegistro({ desenharFrente: () => 'lixo' })
+  assert.equal(S.frenteNaCarta(cena, carta, 'frente-tarot'), false, 'só true conta como desenhado')
+})
+
+test('o estilo da frente viaja pelo lobby (conta.cosmeticos.frente) e vira o id do registro', () => {
+  const sala = {
+    membros: [
+      { papel: 'host', conta: { cosmeticos: { frente: 'frente.tarot' } } },
+      { papel: 'convidado', conta: { cosmeticos: { frente: 'frente.inventada' } } },
+    ],
+  }
+  const lados = S.cosmeticosDosLados({ sala, n: 2, emRede: true })
+  assert.equal(lados[0].frente, 'frente-tarot')
+  assert.equal(lados[1].frente, 'frente-classica', 'id desconhecido = a clássica')
+  assert.equal(S.cosmeticosDosLados({ perfil: { frente_equipada: 'frente.dark' }, n: 2 })[0].frente, 'frente-dark')
 })
