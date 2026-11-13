@@ -45,8 +45,8 @@ números.
 
 - **Quantas recompensas**: 1 (50%), 2 (35%) ou 3 (15%).
 - A **1ª** é sempre um cosmético; a 2ª e a 3ª têm 35% de ser **bônus de XP** (comum 25, raro 50, épico 100, lendário 200).
-- O cosmético é um dos itens do baú da raridade sorteada, por igual (46 itens: 12 sons, 10 efeitos, 8 lançamentos,
-  10 molduras animadas e 6 títulos).
+- O cosmético é um dos itens do baú da raridade sorteada, por igual (68 itens: 12 sons, 10 efeitos, 8 lançamentos,
+  10 molduras animadas, 6 títulos e, desde a 0016, 10 estilos de carta e 12 versos ilustrados).
 - **Pena (pity)**: depois de 9 baús seguidos sem nada épico ou melhor, o 10º garante a 1ª recompensa **épica** (ou
   melhor, se sair lendário). A tela mostra quantos faltam.
 - **Repetido** (já tinha, ou saiu duas vezes no mesmo baú): vira XP, "já tinha: +N XP" (comum 15, raro 30, épico 60,
@@ -98,6 +98,8 @@ faz a roleta usar esse resultado no lugar do servidor (para ver o lendário e o 
 | efeito de carta | `perfis.efeito_equipado` | em volta das suas cartas na mão | todos que veem a sua mão (PVP de 2 mostra as duas) |
 | lançamento | `perfis.lancamento_equipado` | quando a sua carta vai para a mesa (a revelação) | todos (cada um roda o seu e o dos outros) |
 | moldura animada | `perfis.moldura_equipada` (o slot de sempre) | em volta do avatar | perfil, menu, Coleção e o lobby da sala (os outros membros) |
+| estilo de carta (0016) | `perfis.frente_equipada` | a face das suas cartas (mão, prévia ampliada, carta revelada) | todos que veem as suas cartas |
+| verso ilustrado (0016) | `perfis.verso_equipado` (o slot de verso de sempre) | o verso das suas cartas e do seu monte | todos (PVP e CO-OP de 2) |
 
 Equipar é a `equipar()` de sempre (o banco confere que a conta tem o item; `null` volta ao padrão). O lobby repassa
 `conta.cosmeticos {som, efeito, lancamento, moldura}` (só ids conhecidos do catálogo) de cada membro: PROTOCOLO 18.
@@ -106,7 +108,11 @@ As arenas (`PvpArena`, `PvpArenaN`, `CoopArena`, `CoopArenaN`, `CampanhaArena`) 
 2º jogador no mesmo PC, convidado). Toda chamada ao conteúdo passa pela ponte com try/catch; o lançamento tem um
 limite de 2,5 s e ninguém espera por ele; sem conteúdo (ou com erro) fica o padrão de sempre.
 
-## Protocolo (versão 18)
+## Protocolo (versão 19)
+
+Versão 19 (0016): `conta.cosmeticos` ganhou `frente` (o estilo da face das cartas; só ids do catálogo, o resto vira
+`null` = a clássica) e `equipado.perfil` traz `frente_equipada`. Os versos ilustrados viajam no `conta.verso` de sempre.
+Na roleta, estilos e versos aparecem como a miniatura de uma carta (`cosmeticosSlots.js` `miniaturaDe`).
 
 `baus {acao: 'estado'}` → `bausEstado {convidado, disponivel, fechados, abertos, desdeEpico, pity, lista}` (1 por s) ·
 `baus {acao: 'abrir'}` → `bauAberto {bauId, fonte, recompensas: [{tipo: 'item'|'duplicado'|'xp', id?, raridade, xp?}],
@@ -115,6 +121,10 @@ xpGanho, teto, xpTotal, nivelAntes, nivelDepois, itensNovos, pity, desdeEpico, f
 (o caminho do dev com contas falsas) · aviso do servidor: `bauGanho {fontes, fechados}` (o pop-up "VOCÊ GANHOU UM BAÚ!", abaixo).
 
 ## Migration
+
+A **`0016_cartas_estilos.sql`** (depois da 0015) põe o tipo `frente`, `perfis.frente_equipada`, os 22 itens novos
+do baú e a `equipar_conta`/`equipar` com o tipo `frente` (só o que a conta tem). Sem ela o jogo entra normal (o
+servidor e o navegador leem `frente_equipada` numa consulta à parte) e o baú só sorteia os itens da 0015.
 
 Rode a **`0015_baus_cosmeticos.sql`** depois da 0014 (idempotente; `docs/supabase.md` 2.9). RLS ligado em `baus` e
 `baus_contas` (cada conta lê só o seu); `conceder_bau`, `abrir_bau`, `baus_estado` e `equipar_conta` só com a chave do

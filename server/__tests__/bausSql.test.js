@@ -1,6 +1,6 @@
 // A 0015 (BAÚS e SLOTS NOVOS) num Postgres de verdade (opcional): roda só com
 //   DODGE_PG="-h /caminho/do/socket -p 5432 -U postgres" npm test
-// (cria e apaga o banco dodge_teste_baus). Sem a variável, pula. Roda 0001–0015 DUAS vezes e confere: os
+// (cria e apaga o banco dodge_teste_baus). Sem a variável, pula. Roda 0001–0016 DUAS vezes e confere: os
 // números e o catálogo iguais aos do navegador (src/lib/cosmeticos.js), cada fonte UMA vez (repetida e em
 // paralelo) e conferida, abrir_bau igual ao rolarBau do JS com os mesmos números (pena, duplicado, XP extra),
 // o mesmo baú nunca abre duas vezes (nem em paralelo), o teto de XP, o nível novo dá baú, equipar só o que
@@ -13,7 +13,7 @@ import * as C from '../../src/lib/cosmeticos.js'
 
 const ARGS = process.env.DODGE_PG ? process.env.DODGE_PG.split(/\s+/).filter(Boolean) : null
 const BANCO = 'dodge_teste_baus'
-const MIGRATIONS = ['0001_contas', '0002_amigos', '0003_progresso', '0004_moderacao', '0005_pendencias', '0006_n_jogadores', '0007_ffa', '0008_filtro_palavras', '0009_2x2', '0010_boss_semanal', '0011_campanha', '0012_campanha_mundo1', '0013_desafio_diario', '0014_conquistas_maestria', '0015_baus_cosmeticos']
+const MIGRATIONS = ['0001_contas', '0002_amigos', '0003_progresso', '0004_moderacao', '0005_pendencias', '0006_n_jogadores', '0007_ffa', '0008_filtro_palavras', '0009_2x2', '0010_boss_semanal', '0011_campanha', '0012_campanha_mundo1', '0013_desafio_diario', '0014_conquistas_maestria', '0015_baus_cosmeticos', '0016_cartas_estilos']
 const migration = (n) => fileURLToPath(new URL(`../../supabase/migrations/${n}.sql`, import.meta.url))
 const psql = (sql, banco = BANCO) => execFileSync('psql', [...ARGS, '-d', banco, '-v', 'ON_ERROR_STOP=1', '-qAt', '-c', sql], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const psqlAsync = (sql) => new Promise((ok, erro) => execFile('psql', [...ARGS, '-d', BANCO, '-v', 'ON_ERROR_STOP=1', '-qAt', '-c', sql], { encoding: 'utf8' }, (e, out) => (e ? erro(e) : ok(out.trim()))))
@@ -52,7 +52,10 @@ test('0015 no Postgres (duas vezes): baús, slots novos e equipar', { skip: !ARG
   psql(`create database ${BANCO}`, 'postgres')
   try {
     psql(STUB)
-    for (let vez = 0; vez < 2; vez++) for (const n of MIGRATIONS) arquivo(migration(n))
+    // 0001–0015 duas vezes (como antes) e a 0016 duas vezes no fim: a 0015 de novo DEPOIS da 0016 recria a checagem de id
+    // sem o tipo 'frente' e falha (as migrations antigas não mudam; docs/supabase.md 2.10)
+    for (let vez = 0; vez < 2; vez++) for (const n of MIGRATIONS.slice(0, -1)) arquivo(migration(n))
+    for (let vez = 0; vez < 2; vez++) arquivo(migration('0016_cartas_estilos'))
     psql(`insert into auth.users (id, raw_user_meta_data) values ('${A}', '{"full_name":"Ana"}'), ('${B}', '{"full_name":"Beto"}')`)
 
     // ---------- os números e o catálogo são os do navegador ----------
@@ -163,6 +166,20 @@ test('0015 no Postgres (duas vezes): baús, slots novos e equipar', { skip: !ARG
     // os tipos de sempre continuam iguais
     assert.match(falha(comoNavegador(`select public.equipar('moldura', 'moldura.ouro')`)), /ainda não tem/)
     psql(comoNavegador(`select public.equipar('titulo', 'titulo.novato')`))
+
+    // ---------- 0016: o estilo da frente e os versos ilustrados (só o que tem) ----------
+    assert.match(falha(comoNavegador(`select public.equipar('frente', 'frente.tarot')`)), /ainda não tem/)
+    assert.match(falha(comoNavegador(`select public.equipar('frente', 'verso.galaxia')`)), /item inválido/, 'tipo errado')
+    assert.match(falha(comoNavegador(`select public.equipar('verso', 'verso.galaxia')`)), /ainda não tem/)
+    psql(`insert into public.inventario (user_id, item_id) values ('${A}', 'frente.tarot'), ('${A}', 'verso.galaxia') on conflict do nothing`)
+    psql(comoNavegador(`select public.equipar('frente', 'frente.tarot')`))
+    psql(comoNavegador(`select public.equipar('verso', 'verso.galaxia')`))
+    assert.equal(psql(`select frente_equipada || '|' || verso_equipado from public.perfis where id = '${A}'`), 'frente.tarot|verso.galaxia')
+    psql(comoNavegador(`select public.equipar('frente', null)`))
+    assert.equal(psql(`select coalesce(frente_equipada, 'classica') from public.perfis where id = '${A}'`), 'classica')
+    assert.match(falha(`insert into public.catalogo_itens (id, tipo, nome, nivel_requerido) values ('frente.x', 'pao', 'x', 1)`), /catalogo_tipo_valido|check/)
+    assert.equal(psql(`select count(*) from public.catalogo_itens where bau and tipo = 'frente'`), String(C.itensDoSlot('frente').length))
+    assert.equal(psql(`select count(*) from public.catalogo_itens where bau and tipo = 'verso'`), String(C.itensDoSlot('verso').length))
 
     // ---------- o navegador não chama nada do servidor e só lê o que é seu ----------
     for (const f of [`public.conceder_bau('${A}', 'dia', null)`, `public.abrir_bau('${A}', null, ${arr(Array(10).fill(0))})`, `public.baus_estado('${A}')`, `public.equipar_conta('${A}', 'som', null)`])

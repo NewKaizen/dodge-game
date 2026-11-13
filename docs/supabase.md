@@ -179,6 +179,19 @@ sem estragar). Ela abre os tipos `som`, `efeito` e `lancamento` no catálogo (co
 consulta à parte), mas não há baús. Detalhes em [baus.md](baus.md). `bausSql.test.js` roda a 0001–0015 duas
 vezes (com `DODGE_PG`).
 
+### 2.10 Migration 0016: estilos de carta e versos ilustrados
+
+Rode `supabase/migrations/0016_cartas_estilos.sql` depois da 0015 (roda de novo sem estragar). Ela abre o tipo
+`frente` no catálogo, cria `perfis.frente_equipada` (null = a frente clássica), põe os 22 itens novos do baú (10
+estilos de carta e 12 versos ilustrados, todos com `bau = true` e raridade) e troca a `equipar_conta`/`equipar` para
+aceitar o tipo `frente` (só o que a conta tem; as mesmas permissões da 0015). Sem ela o jogo entra normal (o servidor
+e o navegador leem `frente_equipada` numa consulta à parte) e o baú só sorteia os itens da 0015. Detalhes em
+[cosmeticos.md](cosmeticos.md).
+
+**Atenção**: depois da 0016, **não rode a 0015 de novo** (ela recria a checagem dos ids sem o tipo `frente` e para
+com erro, porque já existem itens `frente.*`). Para reaplicar, rode só a 0016. `bausSql.test.js` roda a 0001–0015
+duas vezes e depois a 0016 duas vezes (com `DODGE_PG`).
+
 ## 3. Conferir o bucket
 
 Em **Storage** deve aparecer o bucket `avatares`, marcado como **Public**.

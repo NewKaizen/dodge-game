@@ -9,6 +9,7 @@ import { construirFita, itemDaRecompensa, sortearIsca } from '../../lib/roleta.j
 import { bausConta, abrirBau, desistirDeAbrir } from '../../lib/bausConta.js'
 import { equipar } from '../../lib/conta.js'
 import { desenharBau, iconeDoTipo } from './bau.js'
+import { miniaturaDe } from '../cosmeticosSlots.js'
 import { texto } from './ui.js'
 
 // A ROLETA DO BAÚ (docs/baus.md): o módulo que abre um baú na tela, usado pelo pop-up "VOCÊ GANHOU UM BAÚ!"
@@ -106,10 +107,12 @@ export function criarRoletaBau(cena, { popup = false, fontes = [], fechados = 0,
     const c = cena.add.container(0, YF)
     const g = cena.add.graphics()
     const ic = cena.add.graphics()
+    // estilos de carta e versos ilustrados (0016): a miniatura de uma carta no lugar do ícone
+    const mini = cena.add.image(0, -22, '__WHITE').setVisible(false)
     const nome = texto(cena, 0, 32, '', 11, '#ffffff', { align: 'center', wordWrap: { width: L - 8 } }).setOrigin(0.5, 0.5)
-    c.add([g, ic, nome])
+    c.add([g, ic, mini, nome])
     gFita.add(c)
-    cartas.push({ c, g, ic, nome, idx: NaN })
+    cartas.push({ c, g, ic, mini, nome, idx: NaN })
   }
   // as bordas escurecem (a roleta "some" nas pontas) e o marcador fica no meio
   const sombra = cena.add.graphics()
@@ -156,7 +159,15 @@ export function criarRoletaBau(cena, { popup = false, fontes = [], fechados = 0,
     slot.g.lineStyle(3, cor, 1).strokeRect(-L / 2 + 1.5, -A / 2 + 1.5, L - 3, A - 3)
     slot.g.fillStyle(cor, 1).fillRect(-L / 2, A / 2 - 9, L, 9)
     slot.ic.clear()
-    iconeDoTipo(slot.ic, tipoDoIcone(c), 0, -22, 44, cor)
+    const item = c.tipo === 'xp' ? null : itemDoBau(c.id)
+    const chave = item && (item.slot === 'frente' || item.slot === 'verso') ? miniaturaDe(cena, item.slot, item.registro) : null
+    if (chave) {
+      slot.mini.setTexture(chave).setDisplaySize(44, 63).setPosition(0, -18).setVisible(true)
+      slot.ic.lineStyle(2, cor, 1).strokeRect(-23, -50.5, 46, 65)
+    } else {
+      slot.mini.setVisible(false)
+      iconeDoTipo(slot.ic, tipoDoIcone(c), 0, -22, 44, cor)
+    }
     slot.nome.setText(semLigaduras(nomeDaCarta(c))).setColor(COR_RARIDADE[c.raridade] ?? '#ffffff')
   }
 

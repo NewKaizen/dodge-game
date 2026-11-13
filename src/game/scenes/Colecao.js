@@ -18,7 +18,7 @@ import { semLigaduras } from '../campanha/texto.js'
 import { lan } from '../../lib/lan/rede.js'
 import { bausConta, pedirBaus } from '../../lib/bausConta.js'
 import { TITULOS_BAU, itensDoSlot, PADRAO_REGISTRO, COLUNA_DO_SLOT, COR_RARIDADE, NOME_RARIDADE, CHANCES, PITY, FONTES_BAU, XP_DUPLICADO, BAU_XP_TETO_DIA } from '../../lib/cosmeticos.js'
-import { previaDe } from '../cosmeticosSlots.js'
+import { previaDe, miniaturaDe } from '../cosmeticosSlots.js'
 import { desenharBau, iconeDoTipo } from '../conta/bau.js'
 import { criarRoletaBau } from '../conta/roletaBau.js'
 
@@ -46,6 +46,10 @@ const corDoMundo = (id) => `#${(mundoDe(id)?.cor ?? 0x7fc46b).toString(16).padSt
 // prévia de cada um vem do conteúdo (cosmeticosSlots.js previaDe); sem ela, o ícone e a cor da raridade.
 // Só se ganha baú jogando: nada aqui compra coisa nenhuma.
 //
+// ESTILOS DE CARTA e VERSOS ILUSTRADOS (0016, docs/cosmeticos.md): a aba ESTILOS DE CARTA (a Clássica e os do
+// baú; a prévia são duas cartas de verdade no estilo) e os versos do baú no fim da aba VERSOS (a prévia é o
+// verso desenhado). Na grade, a miniatura parada da carta (cosmeticosSlots.js miniaturaDe).
+//
 //   ↑↓←→ escolhe na grade (↑ no topo vai para as abas, ←→ troca de aba) · A equipa · B volta
 //   scene.start('Colecao', { pilha: [{ cena: 'Perfil' }], aba: 'baus' })
 const ABAS = [
@@ -54,6 +58,7 @@ const ABAS = [
   { tipo: 'titulo', rotulo: 'TÍTULOS' },
   { tipo: 'moldura', rotulo: 'MOLDURAS' },
   { tipo: 'verso', rotulo: 'VERSOS' },
+  { tipo: 'frente', rotulo: 'ESTILOS DE CARTA' },
   { tipo: 'som', rotulo: 'SONS' },
   { tipo: 'efeito', rotulo: 'EFEITOS' },
   { tipo: 'lancamento', rotulo: 'LANÇAMENTOS' },
@@ -64,11 +69,13 @@ const ABAS = [
 const ABAS_VISIVEIS = 7 // a barra mostra 7 e anda com a aba escolhida
 // as abas que não equipam nada (só mostram)
 const SO_VER = new Set(['conquistas', 'maestria', 'baus'])
-const SLOTS_NOVOS = ['som', 'efeito', 'lancamento']
-const NOME_SLOT = { som: 'SOM DE DANO', efeito: 'EFEITO DE CARTA', lancamento: 'LANÇAMENTO DE CARTA', moldura: 'MOLDURA ANIMADA' }
+const SLOTS_NOVOS = ['som', 'efeito', 'lancamento', 'frente']
+const NOME_SLOT = { som: 'SOM DE DANO', efeito: 'EFEITO DE CARTA', lancamento: 'LANÇAMENTO DE CARTA', moldura: 'MOLDURA ANIMADA', frente: 'ESTILO DE CARTA' }
 // o "padrão" de cada slot novo (equipar = tirar o cosmético)
-const padraoDoSlot = (tipo) => ({ id: `${tipo}.padrao`, tipo, nome: 'Padrão', padrao: true, registro: PADRAO_REGISTRO[tipo], semItem: true })
+const padraoDoSlot = (tipo) => ({ id: `${tipo}.padrao`, tipo, nome: tipo === 'frente' ? 'Clássica' : 'Padrão', padrao: true, registro: PADRAO_REGISTRO[tipo], semItem: true })
 const ehSlotNovo = (item) => SLOTS_NOVOS.includes(item?.tipo)
+// o que tem prévia do conteúdo no detalhe (os slots novos, as molduras animadas e os versos ilustrados)
+const temPrevia = (item) => Boolean(item?.registro) && (ehSlotNovo(item) || item.tipo === 'moldura' || item.tipo === 'verso')
 const COR_MEDALHA = 0xe0b84a
 
 const estadoInicial = () => ({
@@ -151,7 +158,7 @@ export default class Colecao extends CenaConta {
     this.previa = null
     this.previaChave = chave
     if (!item?.registro) return null
-    const tipo = item.tipo === 'moldura' ? 'moldura' : item.tipo
+    const tipo = item.tipo
     this.previa = previaDe(this, tipo, item.registro, x, y, tam, 20)
     if (this.previa && tipo === 'som' && !item.semItem) this.previa.tocar?.()
     return this.previa
@@ -185,8 +192,8 @@ export default class Colecao extends CenaConta {
     if (tipo === 'titulo') return [...CATALOGO.filter((i) => i.tipo === tipo), ...ITENS_CAMPANHA.filter((i) => i.tipo === tipo), ...ITENS_MAESTRIA.filter((i) => i.tipo === tipo), ...TITULOS_BAU]
     if (tipo === 'conquistas') return CONQUISTAS.map((c) => ({ ...c, tipo: 'conquista' }))
     if (tipo === 'maestria') return PERSONAGENS_MAESTRIA.map((p) => ({ id: `maestria.${p}`, tipo: 'maestria', personagem: p, nome: PERSONAGENS[p].nome }))
-    // os da CAMPANHA (docs/campanha.md) e os da MAESTRIA entram no fim da aba do tipo deles
-    if (tipo !== 'semanal') return [...CATALOGO.filter((i) => i.tipo === tipo), ...ITENS_CAMPANHA.filter((i) => i.tipo === tipo), ...ITENS_MAESTRIA.filter((i) => i.tipo === tipo)]
+    // os da CAMPANHA (docs/campanha.md) e os da MAESTRIA entram no fim da aba do tipo deles (os versos do baú também)
+    if (tipo !== 'semanal') return [...CATALOGO.filter((i) => i.tipo === tipo), ...ITENS_CAMPANHA.filter((i) => i.tipo === tipo), ...ITENS_MAESTRIA.filter((i) => i.tipo === tipo), ...(tipo === 'verso' ? itensDoSlot('verso') : [])]
     // os ganhos (a semana mais nova primeiro) e os desta semana (boss semanal e desafio diário), se ainda não tem
     const inv = [...(get(conta).inventario ?? [])]
     const ganhos = [...inv.filter(ehTrofeuSemanal).map(trofeuDoId), ...inv.filter(ehCosmeticoDiario).map(cosmeticoDoId)].filter(Boolean)
@@ -353,7 +360,7 @@ export default class Colecao extends CenaConta {
       g.lineStyle(3, ativa ? 0xffe040 : 0x4a4a5c, 1).strokeRect(x + 1.5, ABAS_UI.y - ABAS_UI.altura / 2 + 1.5, largura - 3, ABAS_UI.altura - 3)
       const fechados = get(bausConta).fechados
       const rotulo = aba.tipo === 'baus' ? `${aba.rotulo}${fechados ? ` (${fechados})` : ''}` : `${aba.rotulo} ${doTipo.filter((c) => this.possui(c)).length}/${doTipo.length}`
-      this.t(x + largura / 2, ABAS_UI.y, rotulo, rotulo.length > 13 ? 10 : rotulo.length > 10 ? 12 : 14, ativa ? (aba.tipo === 'semanal' || aba.tipo === 'baus' ? '#ffb060' : '#ffe040') : aba.tipo === 'baus' && fechados ? '#ffb060' : COR.apagado).setOrigin(0.5)
+      this.t(x + largura / 2, ABAS_UI.y, rotulo, rotulo.length > 17 ? 9 : rotulo.length > 13 ? 10 : rotulo.length > 10 ? 12 : 14, ativa ? (aba.tipo === 'semanal' || aba.tipo === 'baus' ? '#ffb060' : '#ffe040') : aba.tipo === 'baus' && fechados ? '#ffb060' : COR.apagado).setOrigin(0.5)
       if (ativa && this.foco === 'abas') this.cursorEm(x + 16, ABAS_UI.y, 0.85)
     })
     seta(g, 24, ABAS_UI.y, 'esquerda', 6, 0xffe040, inicio > 0 ? 1 : 0.35)
@@ -417,6 +424,9 @@ export default class Colecao extends CenaConta {
   // um item pequeno (na grade) ou grande (no detalhe)
   amostra(item, p, x, y, escala) {
     if (item.tipo === 'conquista') return this.medalha(item, x, y, escala)
+    // estilos de carta e versos ilustrados: a miniatura parada da carta
+    const mini = (item.tipo === 'frente' || item.tipo === 'verso') && item.registro ? miniaturaDe(this, item.tipo, item.registro) : null
+    if (mini) return this.view.add(this.add.image(x, y, mini).setDisplaySize(28 * escala, 40 * escala).setAlpha(this.possui(item) ? 1 : 0.4))
     if (ehSlotNovo(item)) {
       const cor = item.raridade ? parseInt(COR_RARIDADE[item.raridade].slice(1), 16) : 0x9a9ab0
       return iconeDoTipo(this.grafico(), item.tipo, x, y, 26 * escala, cor)
@@ -543,7 +553,7 @@ export default class Colecao extends CenaConta {
 
   desenharDetalhe(p, nivel) {
     const item = this.foco === 'grade' ? this.itens()[this.indice] : null
-    if (!item || !(ehSlotNovo(item) || (item.tipo === 'moldura' && item.registro))) this.trocarPrevia(null)
+    if (!item || !temPrevia(item)) this.trocarPrevia(null)
     const d = DETALHE
     const cx = d.x + d.largura / 2
     if (!item) {
@@ -554,9 +564,9 @@ export default class Colecao extends CenaConta {
     if (item.tipo === 'maestria') return this.detalheMaestria(item, cx, d)
     const tem = this.possui(item)
     // a prévia do conteúdo (som, efeito, lançamento, moldura animada); sem ela, o desenho de sempre
-    const comPrevia = (ehSlotNovo(item) || (item.tipo === 'moldura' && item.registro)) && this.trocarPrevia(item, cx, d.y + 96, 96)
+    const comPrevia = temPrevia(item) && this.trocarPrevia(item, cx, d.y + 96, item.tipo === 'frente' ? 128 : 96)
     if (!comPrevia) {
-      if (!ehSlotNovo(item) && !(item.tipo === 'moldura' && item.registro)) this.trocarPrevia(null)
+      if (!temPrevia(item)) this.trocarPrevia(null)
       this.amostra(item, p, cx, d.y + (item.tipo === 'titulo' ? 140 : 96), 2.2)
     }
     if (item.tipo !== 'titulo') caber(this.t(cx, d.y + 176, item.nome, 20, COR.texto, { strokeThickness: 4 }).setOrigin(0.5), item.nome, d.largura - 24)
@@ -579,7 +589,7 @@ export default class Colecao extends CenaConta {
     else if (!tem && item.exclusivo) this.t(cx, d.y + 254, 'ONLINE · BOSS SEMANAL · só até domingo, nunca volta', 11, COR.dica).setOrigin(0.5)
     else if (!tem && item.bau) this.t(cx, d.y + 254, 'baús se ganham jogando (nunca se compram)', 11, COR.dica).setOrigin(0.5)
     else if (!tem) this.t(cx, d.y + 254, nivel >= item.nivel ? 'jogue uma partida para receber' : `faltam ${item.nivel - nivel} nível${item.nivel - nivel > 1 ? 'is' : ''}`, 11, COR.dica).setOrigin(0.5)
-    if (ehSlotNovo(item) || (item.tipo === 'moldura' && item.registro)) this.t(cx, d.y + 282, { som: 'toca quando VOCÊ leva um acerto\n(online, os outros também ouvem)', efeito: 'em volta das suas cartas na partida\n(online, os outros também veem)', lancamento: 'quando você joga uma carta\n(online, os outros também veem)', moldura: 'em volta do seu avatar\n(no lobby, os outros também veem)' }[item.tipo], 10, COR.apagado, { align: 'center' }).setOrigin(0.5, 0)
+    if (ehSlotNovo(item) || (item.tipo === 'moldura' && item.registro)) this.t(cx, d.y + 282, { som: 'toca quando VOCÊ leva um acerto\n(online, os outros também ouvem)', efeito: 'em volta das suas cartas na partida\n(online, os outros também veem)', lancamento: 'quando você joga uma carta\n(online, os outros também veem)', moldura: 'em volta do seu avatar\n(no lobby, os outros também veem)', frente: 'a face das suas cartas na partida\n(online, os outros também veem)' }[item.tipo], 10, COR.apagado, { align: 'center' }).setOrigin(0.5, 0)
     else if (item.tipo === 'verso') this.t(cx, d.y + 282, 'equipado, este verso aparece nas suas\ncartas nas partidas (online, o\noutro jogador também vê)', 10, COR.apagado, { align: 'center' }).setOrigin(0.5, 0)
     else this.t(cx, d.y + 290, 'cosméticos não mudam nada no jogo', 10, COR.apagado).setOrigin(0.5)
     // os da campanha têm um texto (o catálogo do banco não tem descrição: fica em mundos/mundoN.js)

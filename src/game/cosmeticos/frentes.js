@@ -1174,16 +1174,26 @@ export function desenharFrente(scene, carta, id) {
 
 // a carta de amostra parada (Coleção, roleta): o fundo do estilo, um naipe grande e um "A"
 const AMOSTRA = { 'frente-mal-desenhada': 'copas', 'frente-jornal': 'espadas', 'frente-pixel': 'copas', 'frente-sakura': 'copas', 'frente-cervos-nara': 'ouros', 'frente-dark': 'espadas', 'frente-aquarela': 'copas', 'frente-origami': 'paus', 'frente-holografica': 'ouros', 'frente-tarot': 'espadas' }
+const CLASSICA = { cores: { vermelho: 0xd42340, escuro: 0x1f1b2e } }
 export function miniaturaFrente(scene, id) {
-  const tema = TEMAS[id]
-  const fundo = texturaFundo(scene, id)
-  if (!tema || !fundo) return null
-  const fonte = scene.textures.get?.(fundo)?.getSourceImage?.()
+  const classica = id === 'frente-classica'
+  const tema = classica ? CLASSICA : TEMAS[id]
+  const fundo = classica ? null : texturaFundo(scene, id)
+  if (!tema || (!fundo && !classica)) return null
+  const fonte = fundo ? scene.textures.get?.(fundo)?.getSourceImage?.() : null
   const naipe = AMOSTRA[id] ?? 'copas'
   const cor = hex(naipe === 'copas' || naipe === 'ouros' ? tema.cores.vermelho : tema.cores.escuro)
   return textura(scene, `frente-mini-${id}`, TW, TH, (c, w, h) => {
     if (fonte) c.drawImage(fonte, 0, 0, w, h)
     emUnidades((k) => {
+      if (classica) {
+        k.fillStyle = '#2a2238'
+        cartao(k, -35, -50, 70, 100, 6)
+        k.fill()
+        k.fillStyle = '#fbf6ea'
+        cartao(k, -33.8, -48.8, 67.6, 97.6, 5)
+        k.fill()
+      }
       k.fillStyle = cor
       if (id === 'frente-tarot') {
         naipeCanvas(k, naipe, 0, -6, 13)

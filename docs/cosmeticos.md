@@ -72,3 +72,56 @@ lançamentos; `X` troca o fundo (escuro, claro, verde); clique num som para ouvi
 `src/game/__tests__/cosmeticos.test.js`: integridade do registro (ids únicos, padrão no índice 0,
 raridades, renderizador de cada id), duração dos sons, limpeza de ouvintes e objetos de cada efeito
 (cena de mentira que registra o que é criado), limites de partículas e modo "reduzir animações".
+
+## Estilos de carta (frente) e versos ilustrados (0016)
+
+Dois cosméticos novos, os dois do **baú** (ids em [cosmeticos-ids.md](cosmeticos-ids.md)):
+
+- **Estilo da frente** (`perfis.frente_equipada`, aba **ESTILOS DE CARTA** da Coleção): como a face das SUAS cartas é
+  desenhada. A disposição nunca muda (valor e naipe nos dois cantos, miolo, faixa do nome, gema de custo, o "×" de
+  bloqueada, a moldura arco-íris e a janela do ★ SUPER): só o papel, as cores, o traço dos naipes e os enfeites. O
+  vermelho (copas/ouros) e o escuro (espadas/paus) continuam distintos em todos (no Dark Mode o "escuro" vira um branco
+  gelo e o vermelho um rosa neon) e o formato de cada naipe é sempre o mesmo (a pista para quem não distingue cores).
+  `frente-classica` (padrão), `frente-mal-desenhada`, `frente-jornal` (comuns), `frente-pixel`, `frente-sakura`,
+  `frente-cervos-nara`, `frente-dark` (raros), `frente-aquarela`, `frente-origami`, `frente-holografica` (épicos),
+  `frente-tarot` (lendário: numeral romano do valor, moldura dourada, sol, lua e estrelas, faixa de título).
+- **Versos ilustrados** (o slot de verso de sempre, `perfis.verso_equipado`; aba VERSOS): `verso-noite-estrelada`,
+  `verso-circuito`, `verso-patinhas`, `verso-aboboras` (comuns), `verso-lago-koi`, `verso-vitral`, `verso-cervo-nara`,
+  `verso-fliperama` (raros), `verso-filigrana`, `verso-onda`, `verso-dragao-pixel` (épicos), `verso-galaxia`
+  (lendário). Os versos antigos (Clássico, Estrelado, Carmesim, Dourado, semanais, campanha) continuam lisos, na cor.
+
+| Peça | Onde |
+| --- | --- |
+| Pintura em canvas (texturas de uma vez por jogo) | `src/game/cosmeticos/pintura.js` |
+| Estilos: fundos, temas, naipes, animação, miniatura, prévia | `src/game/cosmeticos/frentes.js` (`desenharFrente(scene, carta, id)`) |
+| Versos ilustrados | `src/game/cosmeticos/versos.js` (`desenharVerso(scene, carta, id)`) |
+| A Carta | `entities/Carta.js`: opções `frente` e `arteVerso`; `montarFrente(tema)` é a disposição única |
+| Ponte (try/catch) | `cosmeticosSlots.js`: `frenteNaCarta`, `versoNaCarta`, `miniaturaDe`, `classeCarta` |
+
+**Contrato do tema** (`montarFrente(tema)`): `cores` (as de `CORES_CARTA` que mudam: `vermelho`, `escuro`, `papel`,
+`ouro`...), `fundo(ctx)` (põe a imagem da textura), `naipe(g, naipe, x, y, r, cor, alpha, invertido, ctx)`,
+`miolo(ctx, cy)` (true = desenhou), `faixa(ctx, fy, fh)`, `nome { cor, stroke }`, `rotulo { cor(naipe), stroke }`,
+`torto` (rad), `decorar(ctx)`, `sobre(ctx)` e `animar(ctx) -> { destroy() }`. Qualquer erro (no estilo, numa textura)
+faz a Carta limpar a frente e desenhar a clássica; um verso que falha vira o liso na cor do item. **Um cosmético nunca
+quebra a partida.**
+
+**Desempenho**: o fundo de cada estilo e cada verso são pintados UMA vez por jogo numa textura de canvas (210 x 300,
+3 px por unidade: as cartas ampliadas continuam nítidas) e cada carta só põe uma imagem. Os naipes e a faixa são
+`Graphics` parados. Só a **Sakura** (4 pétalas caindo atrás dos naipes) e a **Holográfica** (o brilho que passa)
+animam, por um ouvinte de `update` que some com a carta (`preDestroy`) e com a cena; com "reduzir animações" ficam
+paradas. Nada fica pendurado entre aberturas de cena (as texturas são do jogo, não da cena).
+
+**Online**: o estilo viaja em `conta.cosmeticos.frente` (PROTOCOLO 19) e as arenas passam `frente` à `Mao` e às cartas
+reveladas/da prévia (o seu estilo aparece nas suas cartas para todos); o verso ilustrado viaja no `conta.verso` de
+sempre (`pvp/versos.js` `artesDosVersosDaPartida`, `rede.js` `artesDosVersos`).
+
+**Galeria (dev)**: `window.debugGaleria('frente', n)` mostra 2 estilos por página com 7 cartas de amostra (Ás, 7, 10
+com nome comprido, 4 de paus, Q, K bloqueado e ★ SUPER); `window.debugGaleria('verso')`, 6 versos por página. Para ver
+na arena com a conta de teste (`DODGE_CONTAS_FALSAS=1`): `window.debugConta.fingir({...})`, depois
+`window.debugConta.vestir({ frente_equipada: 'frente.sakura', verso_equipado: 'verso.galaxia' })` (só a tela) e
+`window.debugConta.ganhar(['frente.tarot'])` (o inventário mostrado na Coleção).
+
+Testes: `src/game/__tests__/cartasEstilos.test.js` (todo estilo e verso pinta num canvas de mentira, uma textura por
+jogo, todos os naipes e valores, vermelho x escuro, animação que some com a carta e com a cena, "reduzir animações"),
+`cosmeticosSlots.test.js` (o erro cai na clássica), `src/lib/__tests__/cosmeticos.test.js` (JS = inserts da 0015 +
+0016), `server/__tests__/baus.test.js` (o estilo viaja pelo lobby; só equipa o que tem) e `bausSql.test.js` (Postgres).

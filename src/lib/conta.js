@@ -148,6 +148,13 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') {
       mudar({ estado: 'logado', perfil: { id, tag: `${nome}#0001`, nome_exibicao: nome, avatar_tipo: 'padrao', avatar_id: null, avatar_url: null, titulo_equipado: null, moldura_equipada: null, verso_equipado: null, som_equipado: null, efeito_equipado: null, lancamento_equipado: null, frente_equipada: null, nivel: 1, xp: 0 }, estatisticas: ESTATISTICAS_ZERO, inventario: new Set(), erro: '' })
       avisar()
     },
+    // só a tela: veste a conta de teste com cosméticos (sem passar pelo banco), para ver as arenas.
+    // window.debugConta.vestir({ frente_equipada: 'frente.tarot', verso_equipado: 'verso.galaxia' })
+    vestir(campos) {
+      if (get(conta).estado === 'logado') mudar({ perfil: { ...get(conta).perfil, ...campos } })
+    },
+    // só a tela: põe itens no inventário mostrado (a Coleção); equipar de verdade continua pelo servidor
+    ganhar: (ids) => [].concat(ids).forEach(ganhouItem),
   }
 }
 
