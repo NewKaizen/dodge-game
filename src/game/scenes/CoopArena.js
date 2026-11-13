@@ -1,6 +1,7 @@
 import PvpArena, { LAYOUT_PVP } from './PvpArena.js'
 import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, DESAFIO, NIVEIS, DIFICULDADES } from '../constants.js'
 import Controles from '../controles.js'
+import { outroAusente } from '../ausencia.js'
 import { tocar, musica, velocidadeMusica, pausarMusica } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
@@ -39,7 +40,7 @@ import { escolherJogadaCoop } from '../coop/bot.js'
 import { superNoChefe } from '../coop/superNoChefe.js'
 import ArenaRedeCoop from '../coop/ArenaRedeCoop.js'
 import { nomesDaPartida } from '../pvp/nomesDaPartida.js'
-import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, artesDosVersos, cosmeticosDaPartida } from '../rede.js'
+import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, artesDosVersos, cosmeticosDaPartida, participantesDaPartida } from '../rede.js'
 import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
@@ -183,7 +184,7 @@ export default class CoopArena extends PvpArena {
     this.ids = [party[0], party[1] ?? party[0]]
 
     // partida EM REDE: cada PC roda esta cena; coop/ArenaRedeCoop.js faz a ponte
-    this.rede = emRede() ? new ArenaRedeCoop(this, { canal, meuLado: meuLado(), souHost: souHostDaRede() }) : null
+    this.rede = emRede() ? new ArenaRedeCoop(this, { canal, meuLado: meuLado(), souHost: souHostDaRede(), ausente: () => outroAusente(participantesDaPartida(), meuLado()) }) : null
     this.controles = new Controles(this)
     this.numJogadores = this.controles.numJogadores
     this.cpu = this.numJogadores < 2 ? 1 : null // sozinho: o P2 é a CPU aliada (em rede, nunca)
@@ -234,6 +235,7 @@ export default class CoopArena extends PvpArena {
     this.criarQuadro()
     this.nomesJog = nomesDaPartida({ rede: Boolean(this.rede), cpu: this.cpu }) // o jogador identifica o lado, não o personagem
     this.huds = [0, 1].map((j) => new HudPvp(this, { jogador: j, personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, rotulo: this.rotulo(j), nomeJogador: this.nomesJog[j] }))
+    this.criarSelosDeAusencia()
     this.criarTopo()
     if (this.cpu !== null) this.textoTreino.setText('COM CPU ALIADA')
     else if (!this.rede) this.textoTreino.setText('')
@@ -255,6 +257,7 @@ export default class CoopArena extends PvpArena {
       else this.apertarB(j)
     })
     this.controles.onPausa(() => this.pausar())
+    this.controles.onPausaOnline(() => this.pausarOnline())
     this.controles.onPerdaDeFoco((motivo) => this.pausar(motivo))
     this.events.on('postupdate', this.filtrarCaixas, this)
 

@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
 import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, DESAFIO, NIVEIS, DIFICULDADES, TEMPOS } from '../constants.js'
 import Controles from '../controles.js'
+import { marcaDeAusencia, assinaturaDeAusencia, COR_AUSENCIA } from '../ausencia.js'
+import { abrirPausaOnline } from '../pausaOnline.js'
 import { tocar, musica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
@@ -134,6 +136,8 @@ const estadoInicial = () => ({
   infoQuadro: null,
   textoRodada: null,
   textoRelogio: null,
+  proximaAusencia: 0, // AUSENTE / PAUSADO nos cartões (game/ausencia.js)
+  ausenciaVista: null,
   textoTreino: null,
   avisos: null,
   etiquetasMesa: [],
@@ -183,6 +187,8 @@ export default class CoopArenaN extends Phaser.Scene {
     this.versos = versosDasVagasDaPartida(this.n) // o verso de cada vaga (conta.verso de cada membro; sem conta, o padrão)
 
     this.controles = new Controles(this)
+    // C (Esc / Start): o menu de pausa por cima, sem parar a partida (game/pausaOnline.js)
+    this.controles.onPausaOnline(() => abrirPausaOnline(this, { subtitulo: `${this.n} JOGADORES` }))
     this.rede = new ArenaRedeCoopN(this, { canal, meuIndice: this.meu, souHost: souHostDaRede(), participantes: participantesDaPartida, dev: Boolean(import.meta.env?.DEV) })
     this.tempoEscolha = this.tempoBase
     this.hpAvisado = Array(this.n).fill(false)
@@ -467,6 +473,9 @@ export default class CoopArenaN extends Phaser.Scene {
     const p = lista.find((x) => x.indice === j)
     if (jog.saiu || !p) return ['SAIU', TEXTO.caido]
     if (p.caiu != null) return [`SEM CONEXÃO (volta caído) ${Math.max(0, Math.ceil(p.caiu / 1000))}s`, '#ff9a3a']
+    // aba escondida / menu de pausa aberto: só aviso (o jogo dele continua, com o coração parado)
+    const ausencia = marcaDeAusencia(p)
+    if (ausencia && !jog.eliminado) return [ausencia, COR_AUSENCIA[ausencia]]
     if (jog.caido) return [`CAÍDO · volta em ${Math.max(1, (jog.voltaEm ?? 0) - this.estado.rodada)}`, TEXTO.caido]
     if (this.fase === 'escolha') return this.prontos[j] ? ['PRONTO', TEXTO.cura] : ['ESCOLHENDO', TEXTO.desabilitado]
     return ['', TEXTO.desabilitado]
@@ -1702,6 +1711,16 @@ export default class CoopArenaN extends Phaser.Scene {
   // ---------- frame ----------
 
   update(_, deltaReal) {
+    // AUSENTE / PAUSADO nos cartões (game/ausencia.js), conferido a cada ~250 ms
+    const agora = Date.now()
+    if (this.huds && agora >= this.proximaAusencia) {
+      this.proximaAusencia = agora + 250
+      const assinatura = assinaturaDeAusencia(participantesDaPartida())
+      if (assinatura !== this.ausenciaVista) {
+        this.ausenciaVista = assinatura
+        this.atualizarEstados()
+      }
+    }
     const delta = deltaReal * debug.acelerar
     this.tweens.timeScale = debug.acelerar
     this.time.timeScale = debug.acelerar

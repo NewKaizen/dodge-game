@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { partidaOnline } from './online.js'
 import { emRede, meuLado } from './rede.js'
+import { podeLer } from './travaEntrada.js'
 
 const LIMIAR = 50 // quanto o joystick precisa inclinar para contar como direção nos menus
 
@@ -25,6 +26,9 @@ function interceptado(evento) {
   return false
 }
 
+// PAUSA ONLINE: com o menu aberto por cima da partida só as cenas dele leem o controle (game/travaEntrada.js)
+export { travarEntrada, entradaTravada } from './travaEntrada.js'
+
 // Entrada dos jogadores dentro do Phaser (os dados chegam pela bridge).
 // Em modo 1 jogador, todos os controles comandam o jogador 1.
 // Partida EM REDE (game/rede.js): são sempre 2 jogadores e todos os controles
@@ -37,6 +41,7 @@ export default class Controles {
     this.numJogadores = emRede() ? 2 : scene.registry.get('numJogadores') ?? 1
     this.ouvintes = []
     this.ouvintesPausa = []
+    this.ouvintesPausaOnline = []
     this.ouvintesPerda = []
     this.anterior = []
     this.toques = []
@@ -44,8 +49,10 @@ export default class Controles {
     const aoBotao = (evento) => {
       const { jogador, botao } = evento
       if (typeof evento === 'object' && interceptado(evento)) return
-      // o botão de pause vale para qualquer jogador (na partida online não tem pausa)
-      if (botao === 'C') return partidaOnline() || emRede() ? undefined : this.ouvintesPausa.forEach((fn) => fn(jogador))
+      if (!podeLer(scene.scene?.key)) return // menu de pausa online aberto por cima
+      // o botão de pause vale para qualquer jogador. Na partida online/em rede a pausa de verdade não
+      // existe (travaria os outros): só quem pediu onPausaOnline (as arenas: o menu por cima, que não para nada)
+      if (botao === 'C') return (partidaOnline() || emRede() ? this.ouvintesPausaOnline : this.ouvintesPausa).forEach((fn) => fn(jogador))
       const j = emRede() ? meuLado() : this.numJogadores === 1 ? 0 : jogador
       if (j >= this.numJogadores) return
       this.ouvintes.forEach((fn) => fn(j, botao, jogador))
@@ -75,6 +82,11 @@ export default class Controles {
     this.ouvintesPausa.push(fn)
   }
 
+  // fn(jogador): o C numa partida online/em rede (a pausa que não para nada: abrirPausaOnline)
+  onPausaOnline(fn) {
+    this.ouvintesPausaOnline.push(fn)
+  }
+
   // fn(motivo): a janela perdeu o foco ou o controle foi desconectado no meio da partida
   // (só partida local: online não tem pausa)
   onPerdaDeFoco(fn) {
@@ -83,6 +95,7 @@ export default class Controles {
 
   // Direção analógica do jogador, -100..100 em cada eixo
   joy(jogador) {
+    if (!podeLer(this.scene.scene?.key)) return { x: 0, y: 0 } // menu de pausa online aberto: o coração fica parado
     const controles = this.scene.registry.get('jogadores') ?? []
     const rede = emRede()
     if (rede && jogador !== meuLado()) return { x: 0, y: 0 }

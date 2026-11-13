@@ -182,7 +182,7 @@ const esperar = async (n = 6) => {
 }
 
 test('lobby: estado, abrir (com limite), equipar e os cosméticos na sala (protocolo 19)', async () => {
-  assert.equal(PROTOCOLO, 19)
+  assert.ok(PROTOCOLO >= 19) // (20: a pausa online, docs/rede-pvp.md)
   const { conectar, avancar } = lobbyFalso()
   const ana = conectar(`falsa:${A}:ANA`)
   const beto = conectar(`falsa:${B}:BETO`)

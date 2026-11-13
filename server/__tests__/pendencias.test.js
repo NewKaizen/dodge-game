@@ -414,6 +414,24 @@ test('aba do host em segundo plano: só depois de uns segundos, e voltar limpa n
   m.relogio.andar(SEGUNDO_PLANO_MS * 2)
 })
 
+test('pausa online (protocolo 20): PAUSADO só com a sala em partida; fechar o menu limpa; partida nova zera', async () => {
+  const m = montar()
+  const { host, conv } = await lobbyDe(m)
+  const doConv = () => host.ultima('sala').sala.membros.find((x) => x.papel === 'convidado').pausado
+  conv.mandar({ t: 'pausado', valor: true })
+  assert.equal(doConv(), false, 'no lobby não tem pausa para mostrar')
+  conv.mandar({ t: 'pronto', valor: true })
+  host.mandar({ t: 'partida', valor: true })
+  assert.equal(doConv(), false, 'a partida começa sem ninguém pausado')
+  conv.mandar({ t: 'pausado', valor: true })
+  assert.equal(doConv(), true)
+  conv.mandar({ t: 'pausado', valor: 'sim' }) // só true vale
+  assert.equal(doConv(), false)
+  conv.mandar({ t: 'pausado', valor: true })
+  host.mandar({ t: 'partida', valor: false })
+  assert.equal(doConv(), false, 'fora da partida o PAUSADO some')
+})
+
 // ---------- nome inicial do Google ----------
 
 test('nome do Google: ofensivo ou inválido vira JOGADOR; o normal fica (espelho do criar_perfil)', () => {

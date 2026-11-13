@@ -3,6 +3,7 @@ import { lan, iniciarPartida, sairSala, participantes, minhaVaga } from '../lib/
 import { enviarRapido as enviarTransporte, enviarPeloServidor, aoRapido, contagem, zerarContagem } from '../lib/lan/transmissao.js'
 import { criarCanal } from '../lib/lan/canal.js'
 import { criarSincCena } from '../lib/lan/sincCena.js'
+import { agendarFundo } from '../lib/relogioFundo.js'
 import { corDaVaga } from './vagas.js'
 import { interceptarBotao } from './controles.js'
 import { conta } from '../lib/conta.js'
@@ -81,6 +82,8 @@ export const canal = criarCanal({
   enviarTodos: (msg) => enviarTransporte(msg),
   destinos,
   meuId: () => get(lan).eu.id ?? '?',
+  // o reenvio e as esperas andam também com a aba escondida (lib/relogioFundo.js)
+  agendar: agendarFundo,
 })
 // quem mandou é quem diz que mandou (pelo direto, a ligação; pelo servidor, o id que ele carimbou)
 aoRapido((dados, de) => (!de || dados?.de === de) && canal.entregar(dados))

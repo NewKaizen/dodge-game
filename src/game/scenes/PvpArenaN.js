@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
 import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, TEMPOS, ACELERACAO, fatorAceleracao, nivelAceleracao, parteDoFator } from '../constants.js'
 import Controles from '../controles.js'
+import { marcaDeAusencia, assinaturaDeAusencia, COR_AUSENCIA } from '../ausencia.js'
+import { abrirPausaOnline } from '../pausaOnline.js'
 import { tocar, musica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
@@ -123,6 +125,8 @@ const estadoInicial = () => ({
   dica: null,
   textoRodada: null,
   textoRelogio: null,
+  proximaAusencia: 0, // AUSENTE / PAUSADO nos cartões (game/ausencia.js)
+  ausenciaVista: null,
   textoModo: null,
   celulas: null,
   avisoPista: null,
@@ -191,6 +195,8 @@ export default class PvpArenaN extends Phaser.Scene {
     this.cosmeticos = cosmeticosDaPartida(this.n) // só enfeite: nunca muda a partida
     this.versos = versosDasVagasDaPartida(this.n) // o verso de cada vaga (conta.verso de cada membro; sem conta, o padrão)
     this.controles = new Controles(this)
+    // C (Esc / Start): o menu de pausa por cima, sem parar a partida (game/pausaOnline.js)
+    this.controles.onPausaOnline(() => abrirPausaOnline(this, { subtitulo: `${this.n} JOGADORES` }))
     this.rede = new ArenaRedeN(this, { canal, meuIndice: this.meu, souHost: souHostDaRede(), participantes: participantesDaPartida, dev: Boolean(import.meta.env?.DEV) })
     this.rede.esconderBaralhos(this.estado) // o host embaralha com um sorteio só dele (pvp/sigilo.js)
     this.tempoEscolha = this.tempoBase
@@ -550,6 +556,9 @@ export default class PvpArenaN extends Phaser.Scene {
     if (jog.eliminado) return [`ELIMINADO ${this.posicaoDe(j)}º${jog.eliminado.motivo === 'saiu' ? ' (saiu)' : ''}`, TEXTO.caido]
     if (!p) return ['SAIU', TEXTO.caido]
     if (p.caiu != null) return [`SEM CONEXÃO ${Math.max(0, Math.ceil(p.caiu / 1000))}s`, '#ff9a3a']
+    // aba escondida / menu de pausa aberto: só aviso (o jogo dele continua, com o coração parado)
+    const ausencia = marcaDeAusencia(p)
+    if (ausencia && !jog.eliminado) return [ausencia, COR_AUSENCIA[ausencia]]
     if (this.dupla && jog.caido) return ['CAÍDO · resgate!', TEXTO.caido]
     if (this.fase === 'escolha') return this.prontos[j] ? ['já escolheu ✓', TEXTO.cura] : ['ESCOLHENDO', TEXTO.desabilitado]
     if (this.semAlvo(j)) return ['SEM ALVO: apoio', '#7fd8ff']
@@ -1802,6 +1811,16 @@ export default class PvpArenaN extends Phaser.Scene {
   // ---------- frame ----------
 
   update(_, deltaReal) {
+    // AUSENTE / PAUSADO nos cartões (game/ausencia.js), conferido a cada ~250 ms
+    const agora = Date.now()
+    if (this.huds && agora >= this.proximaAusencia) {
+      this.proximaAusencia = agora + 250
+      const assinatura = assinaturaDeAusencia(participantesDaPartida())
+      if (assinatura !== this.ausenciaVista) {
+        this.ausenciaVista = assinatura
+        this.atualizarEstados()
+      }
+    }
     const lento = this.fimDePartida?.fator ?? 1
     const delta = deltaReal * debug.acelerar * lento
     const animacao = debug.acelerar * parteDoFator(this.aceleracao, ACELERACAO.animacao) * lento

@@ -159,12 +159,16 @@ export function iniciarGamepads({ aviso = () => {}, aoPerder = () => {} } = {}) 
   }
   window.addEventListener('gamepadconnected', aoConectar)
   window.addEventListener('blur', aoPerderFoco)
+  // aba escondida: a leitura (requestAnimationFrame) para, mas o jogo continua (game/segundoPlano.js)
+  const aoEsconder = () => document.visibilityState === 'hidden' && aoPerderFoco()
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', aoEsconder)
   quadro = requestAnimationFrame(aoQuadro)
 
   return () => {
     cancelAnimationFrame(quadro)
     window.removeEventListener('gamepadconnected', aoConectar)
     window.removeEventListener('blur', aoPerderFoco)
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', aoEsconder)
     ativos.clear()
     direcoes.clear()
     definirPads(0)
