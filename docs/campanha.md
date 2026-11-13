@@ -224,6 +224,11 @@ intencao, destino, efeitos, chefeEfeito, esquiva, arremessadas, eu, aliado, chef
 melhorEstrelas, primeira}` · `escolha {mundo, chave, valor}` · `desistir {corrida}`. Sem a carta em
 3 minutos, ou sem o fim da esquiva até 20 s depois da duração: `abandono`.
 
+Pausa e aba escondida: o Esc abre o menu de pausa **por cima** (a luta continua: os prazos acima são do
+servidor), com o coração parado; SAIR DA PARTIDA manda o `desistir`. Com a aba escondida a esquiva
+continua em passo fixo pelo relógio de fundo e não cai no anti-trapaça
+([rede-pvp.md](rede-pvp.md#aba-em-segundo-plano-e-pausa-online)).
+
 ## Banco (0011, 0012)
 
 `campanha_progresso` (conta, mundo, fase: melhor estrela, vencida, vitórias, melhor nº de rodadas),

@@ -2,7 +2,8 @@ import { partidaOnline } from '../lib/lan/rede.js'
 
 // Regras da partida ONLINE (docs/online.md). O outro jogador está do outro
 // lado da internet, então:
-//   - não tem pausa (Controles ignora o C: pausar travaria o amigo);
+//   - não tem pausa de verdade (pausar travaria o amigo): o C abre o menu POR CIMA e a partida
+//     continua (game/pausaOnline.js; docs/rede-pvp.md "Aba em segundo plano e pausa online");
 //   - não tem revanche: no fim (PvpResultado, Vitoria, GameOver) a única
 //     opção é voltar ao lobby da sala (cena Lan), onde dá para conversar e
 //     começar outra partida; a sala continua aberta. A exceção é a sala

@@ -5,6 +5,7 @@ import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 import Controles, { travarEntrada } from '../controles.js'
 import { tocar, pararMusica } from '../audio.js'
 import { avisarPausa } from '../../lib/lan/rede.js'
+import { semLigaduras } from '../campanha/texto.js'
 
 // Menu de pause por cima da luta (botão C: tecla C/Esc, ou BTN C no joystick).
 // A arena fica congelada (scene.pause) e a música parada no ponto em que
@@ -91,7 +92,7 @@ export default class Pausa extends Phaser.Scene {
     this.cursor = this.add.image(0, 0, 'coracao').setTint(CORES.almas[0]).setScale(1.3)
     this.aviso = texto(0, 104, 'C / B: continuar     A: escolher', 12, TEXTO.desabilitado)
     // online: a partida não para (o coração fica parado e o relógio corre)
-    const continua = this.online ? texto(0, 128, 'a partida continua: seu coração fica parado', 11, TEXTO.selecionado) : null
+    const continua = this.online ? texto(0, 128, semLigaduras('a partida continua: seu coração fica parado'), 11, TEXTO.selecionado) : null
     const detalhe = this.add.rectangle(-178, -104, 3, 48, UI.ciano)
     this.realcePausa = this.add.rectangle(0, -26, 326, 29, UI.elevado)
     painel.add([caixa, detalhe, this.realcePausa, titulo, sub, ...this.linhas, this.cursor, this.aviso, ...(continua ? [continua] : [])])
@@ -114,13 +115,24 @@ export default class Pausa extends Phaser.Scene {
     this.controles.onPausaOnline(() => !this.emConfig && this.continuar())
     const aoVoltar = () => (this.emConfig = false)
     this.events.on('resume', aoVoltar)
+    // online: a partida acabou (ou a cena trocou) com o menu aberto: ele fecha junto (senão a tela
+    // seguinte ficaria sem controle, travada por ele)
+    const debaixo = this.online ? this.scene.get(this.cenaPausada) : null
+    const fecharJunto = () => {
+      if (this.scene.isActive() || this.scene.isPaused()) {
+        if (this.scene.isActive('Config')) this.scene.stop('Config')
+        this.scene.stop()
+      }
+    }
     if (this.online) {
       // só esta cena (e a Config por cima) lê o controle: o coração da arena fica parado
       this.destravar = travarEntrada(['Pausa', 'Config'])
       avisarPausa(true)
+      debaixo?.events.once('shutdown', fecharJunto)
     }
     this.events.once('shutdown', () => {
       this.events.off('resume', aoVoltar) // a cena é reaproveitada: sem ouvinte acumulado
+      debaixo?.events.off('shutdown', fecharJunto)
       if (this.online) {
         // (depois dos outros ouvintes deste mesmo botão: o C que fechou não reabre a pausa na arena)
         const destravar = this.destravar
