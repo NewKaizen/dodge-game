@@ -222,7 +222,7 @@ export default class CampanhaArena extends Phaser.Scene {
     this.aviso = this.add.text(CENTRO_X, ALTURA / 2, 'conectando ao servidor da campanha…', estilo(16)).setOrigin(0.5).setDepth(90)
     this.add.text(LARGURA - 8, ALTURA - 4, 'ESC 2×: DESISTIR', estilo(9, COR_TEXTO.dica)).setOrigin(1, 1).setDepth(71)
 
-    this.mao = new Mao(this, { jogador: 0, x: MAO_POS.x, y: MAO_POS.y, rotulo: '', largura: LARGURA_CARTA, espacamento: 70, larguraMax: 380, profundidade: 30, efeito: this.cosmeticos?.[0]?.efeito })
+    this.mao = new Mao(this, { jogador: 0, x: MAO_POS.x, y: MAO_POS.y, rotulo: '', largura: LARGURA_CARTA, espacamento: 70, larguraMax: 380, profundidade: 30, efeito: this.cosmeticos?.[0]?.efeito, frente: this.cosmeticos?.[0]?.frente })
     this.mao.setAtiva(false)
     this.medo = criarMedo(this, { profundidade: 3 })
     this.baloes = { oponente: null, amigos: null }
@@ -349,7 +349,7 @@ export default class CampanhaArena extends Phaser.Scene {
     m.jogadas.forEach((j, k) => {
       if (!j.carta || (k === 1 && !this.huds[1])) return
       const de = k === 0 ? { x: MAO_POS.x, y: MAO_POS.y - 30 } : { x: PERSONAGEM[1].x, y: PERSONAGEM[1].y - 60 }
-      const carta = new Carta(this, de.x, de.y, { ...j.carta }, { largura: LARGURA_CARTA }).setDepth(40)
+      const carta = new Carta(this, de.x, de.y, { ...j.carta }, { largura: LARGURA_CARTA, frente: k === 0 ? this.cosmeticos?.[0]?.frente : null }).setDepth(40)
       this.armadas[k] = carta
       if (menosMovimento()) carta.setPosition(ARMADA[k].x, ARMADA[k].y).setScale(ESCALA_ARMADA)
       else this.tweens.add({ targets: carta, x: ARMADA[k].x, y: ARMADA[k].y, scale: ESCALA_ARMADA, duration: 380, ease: 'Cubic.easeOut' })

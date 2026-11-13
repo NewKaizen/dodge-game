@@ -181,8 +181,8 @@ const esperar = async (n = 6) => {
   for (let i = 0; i < n; i++) await new Promise((r) => setImmediate(r))
 }
 
-test('lobby: estado, abrir (com limite), equipar e os cosméticos na sala (protocolo 18)', async () => {
-  assert.equal(PROTOCOLO, 18)
+test('lobby: estado, abrir (com limite), equipar e os cosméticos na sala (protocolo 19)', async () => {
+  assert.equal(PROTOCOLO, 19)
   const { conectar, avancar } = lobbyFalso()
   const ana = conectar(`falsa:${A}:ANA`)
   const beto = conectar(`falsa:${B}:BETO`)
@@ -221,8 +221,40 @@ test('lobby: estado, abrir (com limite), equipar e os cosméticos na sala (proto
     assert.equal(ana.ultima('equipado').ok, true, JSON.stringify(ana.ultima('equipado')))
     // o OUTRO membro da sala vê o cosmético da Ana (se for de um slot que viaja)
     const membroAna = beto.ultima('sala')?.sala.membros.find((m) => m.nome === 'ANA')
-    if (['som', 'efeito', 'lancamento'].includes(tipo) || item.id.startsWith('moldura.anim_')) assert.equal(membroAna.conta.cosmeticos[tipo], item.id)
+    if (['som', 'efeito', 'lancamento', 'frente'].includes(tipo) || item.id.startsWith('moldura.anim_')) assert.equal(membroAna.conta.cosmeticos[tipo], item.id)
+    if (tipo === 'verso') assert.equal(membroAna.conta.verso, item.id, 'o verso ilustrado viaja no verso de sempre')
   }
+})
+
+test('lobby: o ESTILO DA FRENTE equipado viaja para os outros da sala (protocolo 19; só o que tem)', async () => {
+  const { conectar, avancar, contas } = lobbyFalso()
+  const ana = conectar(`falsa:${A}:ANA`)
+  const beto = conectar(`falsa:${B}:BETO`)
+  await esperar()
+  ana.mandar({ t: 'criar' })
+  const sala = ana.ultima('sala').sala
+  beto.mandar({ t: 'entrar', id: sala.id, codigo: sala.codigo })
+  avancar(1000)
+  ana.mandar({ t: 'baus', acao: 'equipar', tipo: 'frente', item: 'frente.tarot' })
+  await esperar()
+  assert.equal(ana.ultima('equipado').ok, false, 'não tem: recusado')
+  contas.sb.tabelas.inventario.push({ user_id: A, item_id: 'frente.tarot' }, { user_id: A, item_id: 'verso.galaxia' })
+  avancar(1000)
+  ana.mandar({ t: 'baus', acao: 'equipar', tipo: 'frente', item: 'frente.tarot' })
+  await esperar()
+  assert.equal(ana.ultima('equipado').ok, true, JSON.stringify(ana.ultima('equipado')))
+  assert.equal(ana.ultima('equipado').perfil.frente_equipada, 'frente.tarot')
+  avancar(1000)
+  ana.mandar({ t: 'baus', acao: 'equipar', tipo: 'verso', item: 'verso.galaxia' })
+  await esperar()
+  assert.equal(ana.ultima('equipado').ok, true)
+  const membroAna = beto.ultima('sala')?.sala.membros.find((m) => m.nome === 'ANA')
+  assert.equal(membroAna.conta.cosmeticos.frente, 'frente.tarot')
+  assert.equal(membroAna.conta.verso, 'verso.galaxia')
+  avancar(1000)
+  ana.mandar({ t: 'baus', acao: 'equipar', tipo: 'frente', item: 'efeito.chamas' })
+  await esperar()
+  assert.equal(ana.ultima('equipado').ok, false, 'tipo errado')
 })
 
 test('partida de verdade: o baú do dia chega depois do XP (e o aviso bauGanho)', async () => {

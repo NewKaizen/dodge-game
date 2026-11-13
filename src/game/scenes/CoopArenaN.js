@@ -333,7 +333,7 @@ export default class CoopArenaN extends Phaser.Scene {
       cartas: [0, 1, 2].map((k) => new Carta(this, x - k * 1.2, y - k * 1.8, { personagem: this.ids[this.meu], naipe: 'espadas', valor: 2 }, { virada: true, largura: 46 }).setDepth(5 + k).setRotation(-0.08)),
       texto: this.add.text(x, y + 40, '', { fontFamily: FONTE, fontSize: '10px', color: TEXTO.desabilitado, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(8),
     }
-    this.mao = new Mao(this, { jogador: this.meu, cor, rotulo: `P${this.meu + 1}`, x: MAO.x, y: MAO.y, monte: MAO.monte, larguraMax: 150, espacamento: 40, profundidade: 20, efeito: this.cosmeticos?.[this.meu]?.efeito })
+    this.mao = new Mao(this, { jogador: this.meu, cor, rotulo: `P${this.meu + 1}`, x: MAO.x, y: MAO.y, monte: MAO.monte, larguraMax: 150, espacamento: 40, profundidade: 20, efeito: this.cosmeticos?.[this.meu]?.efeito, frente: this.cosmeticos?.[this.meu]?.frente })
     this.botaoPassar = this.criarBotaoPassar(cor)
   }
 
@@ -828,7 +828,7 @@ export default class CoopArenaN extends Phaser.Scene {
       const t2 = this.add.text(0, 10, `Não joga carta nesta\nrodada e ganha +${ENERGIA.passar}\nde energia.`, { fontFamily: FONTE, fontSize: '10px', color: TEXTO.normal, align: 'center', lineSpacing: 3 }).setOrigin(0.5)
       previa.add([g, t1, t2])
     } else {
-      previa = new Carta(this, p.x, p.y, carta.dados, { ampliada: p.escala, corFoco: corDaVaga(this.meu) }).setDepth(60)
+      previa = new Carta(this, p.x, p.y, carta.dados, { ampliada: p.escala, corFoco: corDaVaga(this.meu), frente: carta.estiloFrente }).setDepth(60)
       if (carta.indisponivel) previa.setIndisponivel(true)
       previa.indisponivel = carta.indisponivel
     }
@@ -1012,7 +1012,7 @@ export default class CoopArenaN extends Phaser.Scene {
           return carta.setDepth(80 + j)
         }
       }
-      return new Carta(this, origem.x, origem.y, { ...jog.carta }, { virada: true, largura: 70, corFoco: corDaVaga(j) }).setDepth(80 + j).setScale(0.3)
+      return new Carta(this, origem.x, origem.y, { ...jog.carta }, { virada: true, largura: 70, corFoco: corDaVaga(j), frente: this.cosmeticos?.[j]?.frente }).setDepth(80 + j).setScale(0.3)
     })
     // o LANÇAMENTO equipado de cada um (da carta até a mesa): só enfeite, a partida não espera
     this.reveladas.forEach((c, j) => c instanceof Carta && MESA[j] && lancarDoLado(this, j, { x: c.x, y: c.y }, MESA[j], corDaVaga(j)))

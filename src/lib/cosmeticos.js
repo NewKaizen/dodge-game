@@ -8,12 +8,15 @@
 //   efeito      um efeito em volta das SUAS cartas              perfis.efeito_equipado
 //   lancamento  a animação quando você JOGA uma carta           perfis.lancamento_equipado
 //   moldura     moldura animada em volta do avatar              perfis.moldura_equipada (o slot de sempre)
+//   frente      o ESTILO da frente das suas cartas (0016)        perfis.frente_equipada
+// e os VERSOS ilustrados do baú (0016), que usam o slot de verso de sempre (perfis.verso_equipado).
 //
 // Dois nomes por item:
 //   id        o do banco, '<tipo>.<slug>' (catalogo_itens; o formato de sempre): 'som.latido'
 //   registro  o do conteúdo (src/game/cosmeticos/registro.js): 'dano-latido'
 // A conversão é fixa (registroDoId / idDoRegistro): som.<x> <-> dano-<x>, efeito.<x> <-> efeito-<x>,
-// lancamento.<x> <-> lancamento-<x>, moldura.anim_<x> <-> moldura-anim-<x> ('_' no banco = '-' no registro).
+// lancamento.<x> <-> lancamento-<x>, moldura.anim_<x> <-> moldura-anim-<x>, frente.<x> <-> frente-<x>,
+// verso.<x> <-> verso-<x> (só os versos do baú) ('_' no banco = '-' no registro).
 //
 // O BAÚ: só se ganha jogando (nunca se compra; não existe compra nenhuma). O servidor sorteia com
 // crypto.randomInt (server/baus.js) os SORTEIO_TAMANHO números de 0 a ESCALA-1 e o BANCO aplica as regras
@@ -64,13 +67,13 @@ export const nomeDaFonte = (fonte) => FONTES_BAU[fonte]?.nome ?? 'baú'
 
 // ---------- o catálogo dos slots novos ----------
 
-export const SLOTS = ['som', 'efeito', 'lancamento', 'moldura']
-export const TIPOS_SLOT = ['som', 'efeito', 'lancamento'] // os tipos NOVOS do catálogo (a moldura já existia)
-export const COLUNA_DO_SLOT = { som: 'som_equipado', efeito: 'efeito_equipado', lancamento: 'lancamento_equipado', moldura: 'moldura_equipada' }
+export const SLOTS = ['som', 'efeito', 'lancamento', 'moldura', 'frente']
+export const TIPOS_SLOT = ['som', 'efeito', 'lancamento', 'frente'] // os tipos NOVOS do catálogo (a moldura e o verso já existiam)
+export const COLUNA_DO_SLOT = { som: 'som_equipado', efeito: 'efeito_equipado', lancamento: 'lancamento_equipado', moldura: 'moldura_equipada', frente: 'frente_equipada' }
 // o primeiro de cada lista do registro: o padrão de graça (equipado = nada no banco)
-export const PADRAO_REGISTRO = { som: 'dano-padrao', efeito: 'efeito-nenhum', lancamento: 'lancamento-padrao', moldura: 'moldura-nenhuma' }
-const PREFIXO = { som: 'dano-', efeito: 'efeito-', lancamento: 'lancamento-', moldura: 'moldura-anim-' }
-const SLUG_BANCO = { som: '', efeito: '', lancamento: '', moldura: 'anim_' }
+export const PADRAO_REGISTRO = { som: 'dano-padrao', efeito: 'efeito-nenhum', lancamento: 'lancamento-padrao', moldura: 'moldura-nenhuma', frente: 'frente-classica' }
+const PREFIXO = { som: 'dano-', efeito: 'efeito-', lancamento: 'lancamento-', moldura: 'moldura-anim-', frente: 'frente-', verso: 'verso-' }
+const SLUG_BANCO = { som: '', efeito: '', lancamento: '', moldura: 'anim_', frente: '', verso: '' }
 
 const item = (tipo, slug, nome, raridade, cor) => ({
   id: `${tipo}.${SLUG_BANCO[tipo]}${slug}`,
@@ -128,6 +131,31 @@ export const ITENS_SLOTS = [
   item('moldura', 'glitch', 'Glitch', 'raro', '#40ffd0'),
   item('moldura', 'gerson', 'Gerson', 'lendario', '#7aa05a'),
   item('moldura', 'galaxia', 'Galáxia', 'lendario', '#7a5aff'),
+  // ESTILOS DA FRENTE da carta (frente-*, 0016): como a face das SUAS cartas é desenhada (valor, naipe, cor,
+  // nome e custo sempre legíveis). A cor é a da miniatura quando o conteúdo não carregou.
+  item('frente', 'mal_desenhada', 'Mal Desenhada', 'comum', '#f4efe2'),
+  item('frente', 'jornal', 'Jornal', 'comum', '#e8e2d0'),
+  item('frente', 'pixel', 'Pixel 8-bit', 'raro', '#3a8a4a'),
+  item('frente', 'sakura', 'Sakura', 'raro', '#ffc8dc'),
+  item('frente', 'cervos_nara', 'Cervos de Nara', 'raro', '#f2e6c8'),
+  item('frente', 'dark', 'Dark Mode', 'raro', '#1c1e26'),
+  item('frente', 'aquarela', 'Aquarela', 'epico', '#cfe6f2'),
+  item('frente', 'origami', 'Origami', 'epico', '#f6d2a0'),
+  item('frente', 'holografica', 'Holográfica', 'epico', '#c8d8ff'),
+  item('frente', 'tarot', 'Tarot', 'lendario', '#2a1a4a'),
+  // VERSOS ILUSTRADOS (verso-*, 0016): o slot de verso de sempre. A cor é a do verso liso se o desenho falhar.
+  item('verso', 'noite_estrelada', 'Lua e Estrelas', 'comum', '#1a2050'),
+  item('verso', 'circuito', 'Placa de Circuito', 'comum', '#0e4a32'),
+  item('verso', 'patinhas', 'Patinhas de Gato', 'comum', '#c85a80'),
+  item('verso', 'aboboras', 'Abóboras', 'comum', '#3a1a4a'),
+  item('verso', 'lago_koi', 'Lago das Carpas', 'raro', '#1a5a6a'),
+  item('verso', 'vitral', 'Vitral', 'raro', '#2a3a8a'),
+  item('verso', 'cervo_nara', 'Cervo de Nara', 'raro', '#8a4a2a'),
+  item('verso', 'fliperama', 'Fliperama', 'raro', '#2a1060'),
+  item('verso', 'filigrana', 'Filigrana Vitoriana', 'epico', '#4a1424'),
+  item('verso', 'onda', 'Onda do Mar', 'epico', '#16346a'),
+  item('verso', 'dragao_pixel', 'Dragão de Pixel', 'epico', '#5a1a1a'),
+  item('verso', 'galaxia', 'Galáxia', 'lendario', '#2a1060'),
 ]
 
 // títulos que só saem do baú (o tipo de sempre)
@@ -188,8 +216,11 @@ export function cosmeticosPublicos(perfil) {
     const id = perfil?.[COLUNA_DO_SLOT[slot]] ?? null
     return POR_ID.get(id)?.slot === slot ? id : null
   }
-  return { som: ler('som'), efeito: ler('efeito'), lancamento: ler('lancamento'), moldura: ler('moldura') }
+  return { som: ler('som'), efeito: ler('efeito'), lancamento: ler('lancamento'), moldura: ler('moldura'), frente: ler('frente') }
 }
+
+// verso ILUSTRADO do baú? id do banco -> o do registro ('verso-<x>'); os versos lisos (trilha, semanais...): null
+export const arteDoVerso = (id) => (POR_ID.get(id)?.slot === 'verso' ? POR_ID.get(id).registro : null)
 
 // ---------- o sorteio (espelho de abrir_bau da 0015) ----------
 

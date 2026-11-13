@@ -7,7 +7,12 @@
 //   aplicarEfeitoCarta(scene, alvo, id) -> { destroy() }
 //   animarLancamento(scene, { x, y, alvoX, alvoY, cor }, id) -> Promise<void>
 //   desenharMoldura(scene, x, y, tamanho, id) -> Container
-//   previa(scene, tipo, id, x, y, tamanho) -> { destroy(), tocar?() }   tipo: 'som'|'efeito'|'lancamento'|'moldura'
+//   previa(scene, tipo, id, x, y, tamanho) -> { destroy(), tocar?() }   tipo: 'som'|'efeito'|'lancamento'|'moldura'|'frente'|'verso'
+//   ESTILOS_FRENTE, VERSOS_ILUSTRADOS   (0016) o estilo da face das cartas ('frente-classica' é o padrão) e os versos
+//        ilustrados do baú ('verso-<x>'; os versos lisos de sempre não estão aqui)
+//   desenharFrente(scene, carta, id) -> true   chama carta.montarFrente(tema) (entities/Carta.js); erro sobe
+//   desenharVerso(scene, carta, id) -> true    põe o desenho em carta.verso; erro sobe
+//   miniatura(scene, tipo, id) -> chave       textura parada de uma carta de amostra ('frente' | 'verso')
 //
 // Para trocar um som sintetizado por um arquivo seu, ponha `arquivo: 'sons/dano/xxx.ogg'` na entrada
 // (arquivo em public/sons/dano/). Ver docs/cosmeticos.md.
@@ -15,7 +20,9 @@ import { IDS_SOM, definirRegistroSons, tocarSomDano } from './sons.js'
 import { EFEITOS_DEF, aplicarEfeitoCarta } from './efeitos.js'
 import { IDS_LANCAMENTO, animarLancamento } from './lancamentos.js'
 import { IDS_MOLDURA, desenharMoldura } from './molduras.js'
-import { previa } from './previa.js'
+import { previa as previaSlots } from './previa.js'
+import { ESTILOS_FRENTE, desenharFrente, miniaturaFrente, previaFrente, temRenderizadorFrente } from './frentes.js'
+import { VERSOS_ILUSTRADOS, desenharVerso, previaVerso, temRenderizadorVerso, texturaVerso } from './versos.js'
 
 export const RARIDADES = ['comum', 'raro', 'epico', 'lendario']
 
@@ -77,7 +84,7 @@ export const MOLDURAS_ANIMADAS = [
 
 definirRegistroSons(SONS_DANO)
 
-export const CATALOGO_COSMETICOS = { som: SONS_DANO, efeito: EFEITOS_CARTA, lancamento: LANCAMENTOS, moldura: MOLDURAS_ANIMADAS }
+export const CATALOGO_COSMETICOS = { som: SONS_DANO, efeito: EFEITOS_CARTA, lancamento: LANCAMENTOS, moldura: MOLDURAS_ANIMADAS, frente: ESTILOS_FRENTE, verso: VERSOS_ILUSTRADOS }
 
 // o id tem quem o desenhe/toque? (os padrões "nenhum" não precisam)
 export function temRenderizador(tipo, id) {
@@ -85,7 +92,26 @@ export function temRenderizador(tipo, id) {
   if (tipo === 'efeito') return id === 'efeito-nenhum' || id in EFEITOS_DEF
   if (tipo === 'lancamento') return IDS_LANCAMENTO.includes(id)
   if (tipo === 'moldura') return id === 'moldura-nenhuma' || IDS_MOLDURA.includes(id)
+  if (tipo === 'frente') return temRenderizadorFrente(id)
+  if (tipo === 'verso') return temRenderizadorVerso(id)
   return false
 }
 
-export { tocarSomDano, aplicarEfeitoCarta, animarLancamento, desenharMoldura, previa }
+// a prévia de qualquer cosmético (as dos estilos de carta e dos versos moram nos módulos deles)
+export function previa(scene, tipo, id, x, y, tamanho = 64) {
+  try {
+    if (tipo === 'frente') return previaFrente(scene, id, x, y, tamanho)
+    if (tipo === 'verso') return previaVerso(scene, id, x, y, tamanho)
+  } catch {
+    return { destroy() {} }
+  }
+  return previaSlots(scene, tipo, id, x, y, tamanho)
+}
+
+export function miniatura(scene, tipo, id) {
+  if (tipo === 'frente') return miniaturaFrente(scene, id)
+  if (tipo === 'verso') return texturaVerso(scene, id)
+  return null
+}
+
+export { tocarSomDano, aplicarEfeitoCarta, animarLancamento, desenharMoldura, desenharFrente, desenharVerso, ESTILOS_FRENTE, VERSOS_ILUSTRADOS }

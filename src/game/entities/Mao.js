@@ -32,6 +32,8 @@ import { efeitoNaCarta } from '../cosmeticosSlots.js'
 //   rotulo       texto do cursor (padrão 'P1' / 'P2'); '' esconde
 //   corVerso     cor do verso de carta equipado deste jogador (null = o padrão; pvp/versos.js)
 //   efeito       efeito de carta equipado deste jogador (id do registro; null = nenhum; cosmeticosSlots.js)
+//   arteVerso    verso ILUSTRADO equipado deste jogador (id do registro 'verso-<x>'; null = o liso)
+//   frente       ESTILO DA FRENTE equipado deste jogador (id do registro 'frente-<x>'; null = a clássica)
 export default class Mao {
   constructor(scene, opcoes = {}) {
     this.scene = scene
@@ -48,6 +50,8 @@ export default class Mao {
     this.larguraCarta = opcoes.largura ?? 70
     this.corVerso = opcoes.corVerso ?? null
     this.efeito = opcoes.efeito ?? null
+    this.arteVerso = opcoes.arteVerso ?? null
+    this.frente = opcoes.frente ?? null
     this.monte = opcoes.monte ?? null
     this.profundidade = opcoes.profundidade ?? 20
     this.cartas = []
@@ -128,7 +132,7 @@ export default class Mao {
   //   para cada carta já voar para o lugar definitivo
   adicionar(dados, { atraso = 0, revelar = true, total = 0 } = {}) {
     const monte = this.posicaoMonte()
-    const carta = new Carta(this.scene, monte.x, monte.y, dados, { largura: this.larguraCarta, corFoco: this.cor, corVerso: this.corVerso })
+    const carta = new Carta(this.scene, monte.x, monte.y, dados, { largura: this.larguraCarta, corFoco: this.cor, corVerso: this.corVerso, arteVerso: this.arteVerso, frente: this.frente })
     carta.mao = this
     // cosmético: o efeito equipado em volta da carta (some com ela; nunca quebra a mão)
     if (this.efeito) efeitoNaCarta(this.scene, carta, this.efeito)

@@ -28,6 +28,7 @@ export const conta = writable({ estado: 'carregando', perfil: null, estatisticas
 const COLUNAS = 'id, tag, nome_exibicao, avatar_tipo, avatar_id, avatar_url, titulo_equipado, moldura_equipada, verso_equipado, nivel, xp'
 // os slots novos (0015, docs/baus.md): lidos à parte (banco sem a 0015 continua carregando o perfil)
 const COLUNAS_SLOTS = 'som_equipado, efeito_equipado, lancamento_equipado'
+const COLUNAS_0016 = 'frente_equipada' // o estilo da frente das cartas (sem a 0016: só não vem)
 const ESTATISTICAS_ZERO = { partidas: 0, vitorias: 0, personagem_favorito: null }
 
 let supabase = null
@@ -115,7 +116,8 @@ async function carregarPerfil() {
     return
   }
   const slots = await supabase.from('perfis').select(COLUNAS_SLOTS).eq('id', id).maybeSingle()
-  mudar({ estado: 'logado', perfil: { ...p.data, ...(!slots.error && slots.data) }, estatisticas: e.data ?? ESTATISTICAS_ZERO, erro: '' })
+  const frente = await supabase.from('perfis').select(COLUNAS_0016).eq('id', id).maybeSingle()
+  mudar({ estado: 'logado', perfil: { ...p.data, ...(!slots.error && slots.data), ...(!frente.error && frente.data) }, estatisticas: e.data ?? ESTATISTICAS_ZERO, erro: '' })
   avisar()
   carregarInventario()
 }
@@ -143,13 +145,13 @@ if (import.meta.env?.DEV && typeof window !== 'undefined') {
   window.debugConta = {
     fingir({ id, nome }) {
       tokenDev = `falsa:${id}:${nome}`
-      mudar({ estado: 'logado', perfil: { id, tag: `${nome}#0001`, nome_exibicao: nome, avatar_tipo: 'padrao', avatar_id: null, avatar_url: null, titulo_equipado: null, moldura_equipada: null, verso_equipado: null, som_equipado: null, efeito_equipado: null, lancamento_equipado: null, nivel: 1, xp: 0 }, estatisticas: ESTATISTICAS_ZERO, inventario: new Set(), erro: '' })
+      mudar({ estado: 'logado', perfil: { id, tag: `${nome}#0001`, nome_exibicao: nome, avatar_tipo: 'padrao', avatar_id: null, avatar_url: null, titulo_equipado: null, moldura_equipada: null, verso_equipado: null, som_equipado: null, efeito_equipado: null, lancamento_equipado: null, frente_equipada: null, nivel: 1, xp: 0 }, estatisticas: ESTATISTICAS_ZERO, inventario: new Set(), erro: '' })
       avisar()
     },
   }
 }
 
-// tipo: 'titulo' | 'moldura' | 'verso' | 'avatar' | 'som' | 'efeito' | 'lancamento' (0015); itemId null
+// tipo: 'titulo' | 'moldura' | 'verso' | 'avatar' | 'som' | 'efeito' | 'lancamento' (0015) | 'frente' (0016); itemId null
 // tira (menos o avatar). Sem Supabase, com a conta de teste do dev: pelo lobby (lib/bausConta.js)
 export async function equipar(tipo, itemId) {
   if ((!supabase || !sessao) && tokenDev) {
