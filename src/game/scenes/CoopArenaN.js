@@ -35,7 +35,8 @@ import ArenaRedeCoopN from '../coop/ArenaRedeCoopN.js'
 import HudCoopN from '../coop/HudCoopN.js'
 import { marcadorDaVaga, nomeNoCoracao } from '../coop/marcadores.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
-import { canal, emRede, meuLado, meuIndice, souHostDaRede, irParaCena, participantesDaPartida, cosmeticosDaPartida } from '../rede.js'
+import { canal, emRede, meuLado, meuIndice, souHostDaRede, irParaCena, participantesDaPartida, cosmeticosDaPartida, versosDasVagasDaPartida } from '../rede.js'
+import { criarMonte, criarViradaEscolhida, LARGURA_MONTE, LARGURA_VIRADA } from '../entities/MonteVerso.js'
 import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 import { ligarEscuridao } from '../coop/semanal/escuridao.js'
 import { salaSemanal } from '../../lib/lan/rede.js'
@@ -94,7 +95,11 @@ const PERSONAGEM = [
   { x: LARGURA - 40, y: 262 },
   { x: LARGURA - 40, y: 334 },
 ]
-const MAO = { x: CENTRO_X - 20, y: 426, monte: { x: 62, y: 404 } }
+const MAO = { x: CENTRO_X - 20, y: 426 }
+// o monte de cada jogador fica ao lado do personagem dele, para dentro da tela (longe das balas e do cartão); a
+// carta virada que ele escolheu às cegas, logo depois do monte (some na revelação)
+const MONTE_AO_LADO = 44
+const VIRADA_AO_LADO = 98
 const PASSAR = { x: CENTRO_X + 150, y: 428 }
 const PREVIA = { x: 218, y: 176, escala: 1.5 }
 const MAO_FORA = ALTURA + 80
@@ -110,6 +115,9 @@ const estadoInicial = () => ({
   fundo: null,
   inimigo: null,
   cosmeticos: null, // os cosméticos dos slots novos de cada vaga (som de dano, efeito, lançamento; docs/baus.md)
+  versos: null, // o verso equipado de cada vaga { cor, arte } (o monte, a carta virada e a mão usam)
+  montes: null, // o monte de cada vaga (entities/MonteVerso.js), ao lado do personagem dela
+  viradas: null, // a carta virada que cada vaga escolheu às cegas (aparece ao confirmar)
   textoChefe: null,
   balao: null,
   personagens: null,
@@ -117,7 +125,7 @@ const estadoInicial = () => ({
   pistas: null,
   huds: null,
   mao: null,
-  monte: null,
+  monte: null, // o MEU monte (um dos de `montes`): o que a mão compra
   botaoPassar: null,
   previa: null,
   banner: null,
@@ -172,6 +180,7 @@ export default class CoopArenaN extends Phaser.Scene {
     this.quadroCfg = quadroDoGrupo(this.grupo)
     this.nomes = Array.from({ length: this.n }, (_, j) => participantesDaPartida().find((p) => p.indice === j)?.nome ?? `P${j + 1}`)
     this.cosmeticos = cosmeticosDaPartida(this.n) // só enfeite: nunca muda a partida
+    this.versos = versosDasVagasDaPartida(this.n) // o verso de cada vaga (conta.verso de cada membro; sem conta, o padrão)
 
     this.controles = new Controles(this)
     this.rede = new ArenaRedeCoopN(this, { canal, meuIndice: this.meu, souHost: souHostDaRede(), participantes: participantesDaPartida, dev: Boolean(import.meta.env?.DEV) })
@@ -273,6 +282,8 @@ export default class CoopArenaN extends Phaser.Scene {
   // os personagens da party nos cantos (vagas 0 e 1 à esquerda, 2 e 3 à direita), virados para o meio, com a forma e o nome
   criarPersonagens() {
     this.avisos = []
+    this.montes = Array(this.n).fill(null)
+    this.viradas = Array(this.n).fill(null)
     this.personagens = Array.from({ length: this.n }, (_, j) => {
       const { x, y } = PERSONAGEM[j]
       const direita = j >= 2
@@ -287,6 +298,10 @@ export default class CoopArenaN extends Phaser.Scene {
         .setOrigin(0.5)
         .setDepth(2)
       this.avisos.push(aviso)
+      // o monte desta vaga (o verso DELA + quantas cartas restam) e a carta virada que ela escolhe às cegas
+      const dentro = direita ? -1 : 1
+      this.montes[j] = criarMonte(this, { x: x + dentro * MONTE_AO_LADO, y, personagem: this.ids[j], verso: this.versos[j], largura: LARGURA_MONTE, inclinacao: direita ? 0.08 : -0.08 })
+      this.viradas[j] = criarViradaEscolhida(this, { x: x + dentro * VIRADA_AO_LADO, y, personagem: this.ids[j], verso: this.versos[j], largura: LARGURA_VIRADA, inclinacao: direita ? 0.05 : -0.05 })
       return { sprite, idle, aviso, tag, x, y, direita }
     })
   }
@@ -328,12 +343,9 @@ export default class CoopArenaN extends Phaser.Scene {
   // a MINHA mão, o monte, o PASSAR ao lado dela
   criarMao() {
     const cor = corDaVaga(this.meu)
-    const { x, y } = MAO.monte
-    this.monte = {
-      cartas: [0, 1, 2].map((k) => new Carta(this, x - k * 1.2, y - k * 1.8, { personagem: this.ids[this.meu], naipe: 'espadas', valor: 2 }, { virada: true, largura: 46 }).setDepth(5 + k).setRotation(-0.08)),
-      texto: this.add.text(x, y + 40, '', { fontFamily: FONTE, fontSize: '10px', color: TEXTO.desabilitado, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(8),
-    }
-    this.mao = new Mao(this, { jogador: this.meu, cor, rotulo: `P${this.meu + 1}`, x: MAO.x, y: MAO.y, monte: MAO.monte, larguraMax: 150, espacamento: 40, profundidade: 20, efeito: this.cosmeticos?.[this.meu]?.efeito, frente: this.cosmeticos?.[this.meu]?.frente })
+    this.monte = this.montes[this.meu]
+    const { x, y } = this.monte
+    this.mao = new Mao(this, { jogador: this.meu, cor, rotulo: `P${this.meu + 1}`, x: MAO.x, y: MAO.y, monte: { x, y }, larguraMax: 150, espacamento: 40, profundidade: 20, corVerso: this.versos[this.meu].cor, arteVerso: this.versos[this.meu].arte, efeito: this.cosmeticos?.[this.meu]?.efeito, frente: this.cosmeticos?.[this.meu]?.frente })
     this.botaoPassar = this.criarBotaoPassar(cor)
   }
 
@@ -466,6 +478,7 @@ export default class CoopArenaN extends Phaser.Scene {
       this.huds[j].setEstado(texto, cor)
       this.huds[j].setApagado(jog.caido || jog.saiu || this.rede.fora(j))
     })
+    this.atualizarViradas()
   }
 
   marcarPronto(j) {
@@ -741,10 +754,21 @@ export default class CoopArenaN extends Phaser.Scene {
     this.mao.setEnergia(jog.energia)
   }
 
+  // o monte de cada um (o verso dele + quantas cartas restam); quem saiu fica sem monte
   atualizarMonte() {
-    const n = this.estado.jogadores[this.meu].baralho.monte.length
-    this.monte.texto.setText(`${n}`)
-    this.monte.cartas.forEach((c, k) => c.setVisible(n > k))
+    this.montes.forEach((monte, j) => {
+      const jog = this.estado.jogadores[j]
+      monte.setVisivel(!jog.saiu)
+      monte.setQuantidade(jog.saiu ? 0 : jog.baralho.monte.length)
+    })
+  }
+
+  // a carta virada de quem já confirmou a escolha (às cegas: só o verso dele)
+  atualizarViradas() {
+    this.viradas?.forEach((v, j) => {
+      const jog = this.estado.jogadores[j]
+      return this.fase === 'escolha' && this.prontos[j] && !jog.caido && !jog.saiu && !this.rede.fora(j) ? v.mostrar() : v.esconder()
+    })
   }
 
   // ---------- escolha ----------
@@ -994,8 +1018,8 @@ export default class CoopArenaN extends Phaser.Scene {
     this.atualizarEstados()
     // as cartas de todos viram na mesa (a minha sai da mão; as dos outros chegam viradas do cartão deles)
     this.reveladas = r.jogadas.map((jog, j) => {
-      const hud = this.huds[j]
-      const origem = { x: hud.x0 + 95, y: hud.y0 + 30 }
+      // a carta sai de onde a virada dele estava (ao lado do personagem); a virada some e a de verdade vem no lugar
+      const origem = { x: this.viradas[j].x, y: this.viradas[j].y }
       const caidoOuFora = (this.estado.jogadores[j].caido && !r.efeitos[j].levantou) || this.estado.jogadores[j].saiu || this.rede.fora(j)
       if (jog.passou) {
         if (j === this.meu) {
@@ -1012,7 +1036,7 @@ export default class CoopArenaN extends Phaser.Scene {
           return carta.setDepth(80 + j)
         }
       }
-      return new Carta(this, origem.x, origem.y, { ...jog.carta }, { virada: true, largura: 70, corFoco: corDaVaga(j), frente: this.cosmeticos?.[j]?.frente }).setDepth(80 + j).setScale(0.3)
+      return new Carta(this, origem.x, origem.y, { ...jog.carta }, { virada: true, largura: 70, corFoco: corDaVaga(j), corVerso: this.versos[j].cor, arteVerso: this.versos[j].arte, frente: this.cosmeticos?.[j]?.frente }).setDepth(80 + j).setScale(LARGURA_VIRADA / 70)
     })
     // o LANÇAMENTO equipado de cada um (da carta até a mesa): só enfeite, a partida não espera
     this.reveladas.forEach((c, j) => c instanceof Carta && MESA[j] && lancarDoLado(this, j, { x: c.x, y: c.y }, MESA[j], corDaVaga(j)))
@@ -1158,8 +1182,7 @@ export default class CoopArenaN extends Phaser.Scene {
     this.mao.setPosicao({ y: MAO_FORA })
     this.botaoPassar.descer(true)
     this.status.setText('')
-    this.monte.cartas.forEach((c) => this.tweens.add({ targets: c, alpha: 0.25, duration: 200 }))
-    this.tweens.add({ targets: this.monte.texto, alpha: 0.25, duration: 200 })
+    this.montes.forEach((m) => this.tweens.add({ targets: m.objetos, alpha: 0.25, duration: 200 }))
     tocar(this, 'caixaAbrir')
     await this.quadro.mostrar()
     if (this.saindo) return
@@ -1596,8 +1619,7 @@ export default class CoopArenaN extends Phaser.Scene {
     tocar(this, 'cartaDeslizar')
     this.mao.setPosicao({ y: MAO.y })
     this.botaoPassar.descer(false)
-    this.monte.cartas.forEach((c) => this.tweens.add({ targets: c, alpha: 1, duration: 200 }))
-    this.tweens.add({ targets: this.monte.texto, alpha: 1, duration: 200 })
+    this.montes.forEach((m) => this.tweens.add({ targets: m.objetos, alpha: 1, duration: 200 }))
     await this.esperar(resgatados.length ? 900 : 300)
     return null
   }

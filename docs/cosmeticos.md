@@ -125,3 +125,25 @@ Testes: `src/game/__tests__/cartasEstilos.test.js` (todo estilo e verso pinta nu
 jogo, todos os naipes e valores, vermelho x escuro, animação que some com a carta e com a cena, "reduzir animações"),
 `cosmeticosSlots.test.js` (o erro cai na clássica), `src/lib/__tests__/cosmeticos.test.js` (JS = inserts da 0015 +
 0016), `server/__tests__/baus.test.js` (o estilo viaja pelo lobby; só equipa o que tem) e `bausSql.test.js` (Postgres).
+
+## Versos nas arenas de 3 e 4 jogadores (PvpArenaN e CoopArenaN)
+
+Nas salas de N cada jogador vê o verso equipado de TODOS (cor + arte ilustrada), como nos modos de 2:
+
+- **De onde vem**: o `conta.verso` de cada membro da sala (o mesmo caminho dos modos de 2, sem mudar o protocolo).
+  `pvp/versos.js` `versosDasVagas({ participantes, n, perfil, emRede })` devolve `[{ cor, arte }]` por vaga;
+  `rede.js` `versosDasVagasDaPartida(n)` lê a sala. Convidado sem login, sem verso ou com id desconhecido: o verso
+  padrão (`{ cor: null, arte: null }`). Fora da rede só a vaga 0 usa o verso de quem está logado.
+- **Monte de cada jogador** (`entities/MonteVerso.js` `criarMonte`): 3 versos empilhados e quantas cartas restam.
+  Na PvpArenaN fica na coluna de fora da célula do jogador (esquerda nas células da esquerda, direita nas da direita),
+  embaixo do nome; na CoopArenaN, ao lado do personagem, para dentro da tela. O monte da vaga `meu` é o da mão
+  (`Mao` compra dele e usa o MEU verso na compra e nas cartas viradas); os outros esmaecem junto com a grade no foco
+  do par (PvP) ou ficam a 25% durante a esquiva (CO-OP). Quem está eliminado/saiu fica sem monte.
+- **Carta virada da escolha às cegas** (`criarViradaEscolhida`): quem já confirmou mostra uma carta virada com o
+  verso DELE (meio da célula no PvP, ao lado do monte no CO-OP). Na revelação a virada some e a carta de verdade
+  (também com o verso dele) sai do mesmo lugar e vira para a frente no estilo de frente do dono.
+- **Ver**: abra a sala de mentira no navegador (`npm run dev`): `lan.update(...)` com 4 membros `{ vaga, conta: { verso } }`
+  (`import('/src/lib/lan/rede.js')`), `debugJogo.jogo.scene.stop('Menu')` e `debugRede.iniciar('PvpArenaN', { personagens: [...] })`
+  (ou `'CoopArenaN'` com `{ chefe, nivel, party }`); `window.pvpArenaN.marcarPronto(j)` mostra a virada do jogador `j`.
+- Testes: `pvp/__tests__/versos.test.js` (mapa vaga -> verso, fallbacks e a ligação nas duas arenas).
+
