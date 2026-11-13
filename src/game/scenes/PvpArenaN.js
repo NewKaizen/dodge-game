@@ -571,7 +571,9 @@ export default class PvpArenaN extends Phaser.Scene {
       const [texto, cor] = this.textoDoEstado(j)
       this.huds[j].setEstado(texto, cor)
       const alvoJ = this.estado.alvos[j]
-      this.huds[j].setAlvo(this.fase !== 'escolha' && !jog.eliminado && !(this.dupla && jog.caido) && !this.rede.fora(j) && !this.semAlvo(j) && alvoJ != null ? alvoJ : null)
+      // (AUSENTE/PAUSADO fica no lugar do ícone do alvo: o texto não fica por baixo da seta)
+      const ausente = Boolean(marcaDeAusencia(participantesDaPartida().find((x) => x.indice === j))) && !jog.eliminado
+      this.huds[j].setAlvo(!ausente && this.fase !== 'escolha' && !jog.eliminado && !(this.dupla && jog.caido) && !this.rede.fora(j) && !this.semAlvo(j) && alvoJ != null ? alvoJ : null)
       this.huds[j].setApagado(Boolean(jog.eliminado) || this.rede.fora(j))
       const cel = this.celulas[j]
       if (!cel) return
