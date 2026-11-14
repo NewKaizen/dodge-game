@@ -57,8 +57,6 @@ export const EVENTOS = [
   { id: 'oxigenio', nome: 'OXIGÊNIO', descricao: 'o ar acabou: pegue as bolhas de O2 enquanto desvia!', cartas: 'normal', cor: 0x7fe8ff },
   { id: 'trator', nome: 'RAIO TRATOR', descricao: 'A agarra uma bala e A de novo lança na caixa do oponente!', cartas: 'normal', cor: 0x5affd0 },
   { id: 'manutencao', nome: 'MANUTENÇÃO', descricao: 'painéis piscam: pare em cima de cada um para consertar e ganhar escudo!', cartas: 'normal', cor: 0xffb020 },
-  { id: 'dragao', nome: 'DRAGÃO', descricao: 'o dragão da festa serpenteia pela caixa: siga o risco dourado!', cartas: 'normal', cor: 0xff3a30 },
-  { id: 'lanternas', nome: 'LANTERNAS', descricao: 'lanternas acesas sobem balançando e fecham o caminho!', cartas: 'normal', cor: 0xffb040 },
   { id: 'transito', nome: 'TRÂNSITO', descricao: 'o semáforo abriu: carros, ônibus e motos cruzam as faixas!', cartas: 'normal', cor: 0xffd030 },
   { id: 'obra', nome: 'OBRA', descricao: 'vigas despencam do guindaste: fuja da coluna listrada!', cartas: 'normal', cor: 0xf4c61a },
   { id: 'chuva', nome: 'CHUVA DE VERÃO', descricao: 'a chuva empurra o coração pra baixo e as poças escorregam!', cartas: 'normal', cor: 0x6ab8ff },
@@ -102,6 +100,15 @@ export const EVENTOS = [
   { id: 'pegadas', nome: 'PEGADAS', descricao: 'um fantasma refaz seus passos 2 segundos depois!', cartas: 'normal', cor: 0xcfd8ff },
   { id: 'concha', nome: 'CONCHA', descricao: 'dentro da concha ninguém te machuca... até ela fechar!', cartas: 'normal', cor: 0xff9ac8 },
   { id: 'gaivotaLadra', nome: 'GAIVOTA LADRA', descricao: 'ela mergulha na sombra e rouba sua energia!', cartas: 'normal', cor: 0xdfe8f0 },
+  // CHINATOWN
+  { id: 'biscoito', nome: 'BISCOITO DA SORTE', descricao: 'o biscoito racha e o papelzinho traz uma regra maluca pra rodada!', cartas: 'normal', cor: 0xffd23a },
+  { id: 'hashi', nome: 'HASHI', descricao: 'pauzinhos gigantes miram o coração para beliscar como um bolinho!', cartas: 'normal', cor: 0xd8a45c },
+  { id: 'sombrasChinesas', nome: 'SOMBRAS CHINESAS', descricao: 'as balas só aparecem como sombras no papel: maiores e atrasadas!', cartas: 'normal', cor: 0xe9cf9c },
+  { id: 'abaco', nome: 'ÁBACO', descricao: 'o coração só anda nas hastes: troque de haste nos portões!', cartas: 'normal', cor: 0xc8782c },
+  { id: 'mahjong', nome: 'MAHJONG', descricao: 'o chão vira peças: pise em duas iguais seguidas e limpe a fileira!', cartas: 'normal', cor: 0x3fbf8a },
+  { id: 'dancaDoLeao', nome: 'DANÇA DO LEÃO', descricao: 'repita a sequência de setas do leão e ganhe um escudo!', cartas: 'normal', cor: 0xd8262a },
+  { id: 'gatoDaSorte', nome: 'GATO DA SORTE', descricao: 'pata erguida: tudo para! Pata baixa: tudo vai!', cartas: 'normal', cor: 0xf0c040 },
+  { id: 'cestinhaDeVapor', nome: 'CESTINHA DE VAPOR', descricao: 'esconda-se nos cestos de bambu... até a tampa estourar!', cartas: 'normal', cor: 0xe8c277 },
 ]
 
 export const EVENTO = Object.fromEntries(EVENTOS.map((ev) => [ev.id, ev]))

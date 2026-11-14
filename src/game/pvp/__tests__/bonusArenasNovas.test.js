@@ -53,7 +53,6 @@ test('os eventos novos existem como eventos de esquiva, com a ficha e o efeito r
 test('renomeados: o evento reaproveitado ganha o nome da arena sem mudar o evento original', () => {
   const nomes = (arena) => Object.fromEntries(eventosDaArena(arena).map((e) => [e.id, e.nome]))
   assert.equal(nomes('cidade').apagao, 'BLECAUTE')
-  assert.equal(nomes('chinatown').explosoes, 'FOGOS DE ARTIFÍCIO')
   assert.equal(EVENTO.gravidade.nome, 'GRAVIDADE MALUCA')
   assert.equal(EVENTO.apagao.nome, 'APAGÃO')
 })

@@ -4,8 +4,6 @@
 // 'malucas', 'duelo' e 'copia' não estão aqui (a arena, o Duelo.js e o Copia.js cuidam deles).
 
 import explosoes from './explosoes.js'
-import dragao from './dragao.js'
-import lanternas from './lanternas.js'
 import transito from './transito.js'
 import obra from './obra.js'
 import festa from './festa.js'
@@ -51,6 +49,7 @@ import areia from './areia.js'
 import relogio from './relogio.js'
 
 export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira, encolhendo, leoes, lancas, bigas, brasas, polegar, rede, plateia, geloSeco, ritmo, karaoke, mosh, pedra, armadilhas, areia, relogio, dragao, lanternas, transito, obra }
+export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira, encolhendo, leoes, lancas, bigas, brasas, polegar, rede, plateia, geloSeco, ritmo, karaoke, mosh, pedra, armadilhas, areia, relogio, meteoros, airlock, transito, obra }
 
 
 
@@ -84,3 +83,15 @@ import concha from './praia/concha.js'
 import gaivotaLadra from './praia/gaivota.js'
 
 Object.assign(EFEITOS, { castelodeAreia, surf, solDoMeioDia, cacaTesouro, pipa, pegadas, concha, gaivotaLadra })
+
+// CHINATOWN (planos puros em chinatown/planos.js)
+import biscoito from './chinatown/biscoito.js'
+import hashi from './chinatown/hashi.js'
+import sombras from './chinatown/sombras.js'
+import abaco from './chinatown/abaco.js'
+import mahjong from './chinatown/mahjong.js'
+import leao from './chinatown/leao.js'
+import gato from './chinatown/gato.js'
+import cestinha from './chinatown/cestinha.js'
+
+Object.assign(EFEITOS, { biscoito, hashi, sombrasChinesas: sombras, abaco, mahjong, dancaDoLeao: leao, gatoDaSorte: gato, cestinhaDeVapor: cestinha })
