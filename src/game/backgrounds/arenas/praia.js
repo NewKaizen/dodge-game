@@ -1,3 +1,4 @@
+import { pintarCeu } from './arteFundos.js'
 import Phaser from 'phaser'
 import { LARGURA, ALTURA, CENTRO_X } from '../../constants.js'
 import { texturasPraiaCafe } from '../../arte/praiaCafe.js'
@@ -81,8 +82,7 @@ export default function praia(scene, objetos) {
 
   // ---------- céu ----------
   const ceu = add(scene.add.graphics())
-  const faixa = HORIZONTE / CEU.length
-  CEU.forEach((cor, i) => ceu.fillStyle(cor, 1).fillRect(0, Math.floor(i * faixa), LARGURA, Math.ceil(faixa) + 1))
+  pintarCeu(ceu, CEU, LARGURA, HORIZONTE)
 
   // ---------- sol ----------
   const halo = add(scene.add.image(SOL.x, SOL.y, 'arte-brilho').setTint(0xffd070).setBlendMode(Phaser.BlendModes.ADD).setScale(5.2).setAlpha(0.55))
@@ -133,7 +133,7 @@ export default function praia(scene, objetos) {
   ilha.fillStyle(0x38604e, 1).fillRect(788, HORIZONTE - 16, 1, 4)
 
   // brilhos do sol na água (um caminho de pontinhos que piscam)
-  const brilhos = Array.from({ length: 46 }, () => {
+  const brilhos = Array.from({ length: 30 }, () => {
     const p = sorte()
     const y = HORIZONTE + 3 + p ** 1.5 * 190
     const largura = 4 + p * 26
@@ -177,7 +177,7 @@ export default function praia(scene, objetos) {
   areia.fillStyle(0xf2d9a0, 1)
   areia.fillPoints([...topo.map((p) => ({ x: p.x, y: p.y + 44 })), { x: LARGURA, y: ALTURA }, { x: 0, y: ALTURA }], true)
   // grãos, conchas e estrelas-do-mar
-  for (let i = 0; i < 260; i++) {
+  for (let i = 0; i < 160; i++) {
     const x = sorte() * LARGURA
     const y = praiaY(x) + 20 + sorte() * (ALTURA - praiaY(x) - 20)
     areia.fillStyle(sorte() < 0.5 ? 0xc8aa72 : 0xfff0c8, 0.8).fillRect(x, y, 2, 1.2)
@@ -215,19 +215,25 @@ export default function praia(scene, objetos) {
     // sombra no chão, haste e a copa de gomos
     cena.fillStyle(0x000000, 0.2).fillEllipse(x + 8, y + 22, r * 1.8, 8)
     cena.lineStyle(3, 0xf0f0f0, 1).lineBetween(x - inclina * 8, y + 22, x + inclina * 3, y - r * 0.55)
-    const gomos = 6
-    for (let k = 0; k < gomos; k++) {
-      const a0 = Math.PI + (k / gomos) * Math.PI
-      const a1 = Math.PI + ((k + 1) / gomos) * Math.PI
-      cena.fillStyle(k % 2 ? c1 : c2, 1)
-      cena.beginPath()
-      cena.moveTo(x + inclina * 3, y - r * 0.55 - 5)
-      cena.arc(x + inclina * 3, y - r * 0.55 + 2, r, a0, a1)
-      cena.closePath()
-      cena.fillPath()
+    // Copa vista de lado: gomos unidos e bainha, sem o círculo fantasma abaixo.
+    const cx = x + inclina * 3
+    const topo = y - r * 1.15
+    const borda = y - r * 0.4
+    const n = 6
+    for (let k = 0; k < n; k++) {
+      const x0 = cx - r + k * r * 2 / n
+      const x1 = cx - r + (k + 1) * r * 2 / n
+      const y0 = borda - Math.sin(k / n * Math.PI) * r * 0.13
+      const y1 = borda - Math.sin((k + 1) / n * Math.PI) * r * 0.13
+      const cor = k % 2 ? c1 : c2
+      cena.fillStyle(cor, 1).fillTriangle(cx, topo, x0, y0, x1, y1)
+      cena.fillStyle(misturar(cor, 0x3a2850, 0.24), 1)
+      cena.fillPoints([{ x: x0, y: y0 }, { x: x1, y: y1 }, { x: x1, y: y1 + 4 }, { x: x0, y: y0 + 4 }], true)
+      cena.lineStyle(1, 0x70445a, 0.4).lineBetween(cx, topo, x0, y0)
     }
-    cena.fillStyle(0xfff4e0, 1).fillCircle(x + inclina * 3, y - r * 0.55 - 5, 2)
-    cena.lineStyle(1, 0x000000, 0.2).strokeCircle(x + inclina * 3, y - r * 0.55 + 2, r)
+    cena.lineStyle(1.5, 0x70445a, 0.6).lineBetween(cx - r, borda, cx, topo).lineBetween(cx, topo, cx + r, borda)
+    cena.fillStyle(0xfff4e0, 1).fillCircle(cx, topo, 2)
+
   }
   toalha(14, 376, 38, 14, 0xff6a8a, 0xfff0f0)
   toalha(796, 360, 40, 14, 0x4ab8ff, 0xfff0f0)

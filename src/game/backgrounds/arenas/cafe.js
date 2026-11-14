@@ -1,3 +1,4 @@
+import { pintarCeu } from './arteFundos.js'
 import Phaser from 'phaser'
 import { LARGURA, ALTURA, CENTRO_X, FONTE } from '../../constants.js'
 import { texturasPraiaCafe } from '../../arte/praiaCafe.js'
@@ -43,8 +44,7 @@ export default function cafe(scene, objetos) {
 
   // ---------- céu ----------
   const ceu = add(scene.add.graphics())
-  const faixa = HORIZONTE / CEU.length
-  CEU.forEach((cor, i) => ceu.fillStyle(cor, 1).fillRect(0, Math.floor(i * faixa), LARGURA, Math.ceil(faixa) + 1))
+  pintarCeu(ceu, CEU, LARGURA, HORIZONTE)
   ceu.fillStyle(CEU[CEU.length - 1], 1).fillRect(0, HORIZONTE, LARGURA, ALTURA - HORIZONTE)
   const estrelas = Array.from({ length: 34 }, () => {
     const e = add(scene.add.rectangle(sorte() * LARGURA, 4 + sorte() * 110, 1.5, 1.5, 0xfff4e0))
@@ -164,6 +164,16 @@ export default function cafe(scene, objetos) {
         g.lineStyle(1, 0x24202e, 1)
         for (let bx = cx - 11; bx <= cx + 11; bx += 3) g.lineBetween(bx, y + 25, bx, y + 33)
         g.lineBetween(cx - 12, y + 25, cx + 12, y + 25)
+        // Jardineiras alternadas quebram a repetição das fachadas.
+        if ((y === 120 && cx < 60) || (y === 176 && cx > LARGURA - 60)) {
+          g.fillStyle(0x734531, 1).fillRect(cx - 13, y + 32, 26, 6)
+          g.fillStyle(0xb77b4b, 1).fillRect(cx - 14, y + 31, 28, 2)
+          for (let f = -10; f <= 10; f += 5) {
+            g.fillStyle(0x326b48, 1).fillEllipse(cx + f, y + 29, 8, 7)
+            g.fillStyle(f % 2 ? 0xffb4c4 : 0xe95b89, 1).fillCircle(cx + f, y + 26, 2)
+            g.fillStyle(0xffdf85, 1).fillRect(cx + f, y + 25, 1, 1)
+          }
+        }
       }
     }
   }
@@ -465,10 +475,10 @@ export default function cafe(scene, objetos) {
       for (const m of marquises) desenharMarquise(m, t)
       for (const l of luzes) {
         const a = 0.75 + 0.25 * Math.sin(t * l.v + l.fase)
-        l.halo.setAlpha(0.35 + 0.3 * a)
+        l.halo.setAlpha(0.26 + 0.14 * a)
         l.bulbo.setAlpha(0.65 + 0.35 * a)
       }
-      for (const p of postes) p.halo.setAlpha(0.42 + 0.1 * Math.sin(t * 6 + p.fase) * Math.sin(t * 1.3))
+      for (const p of postes) p.halo.setAlpha(0.4 + 0.045 * Math.sin(t * 1.4 + p.fase))
       luzChao.setAlpha(0.28 + Math.sin(t * 0.8) * 0.03)
       luzChao2.setAlpha(0.24 + Math.sin(t * 0.7 + 1) * 0.03)
 

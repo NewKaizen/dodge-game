@@ -104,6 +104,9 @@ export default function criar(arena, { rng } = {}) {
     s.barra.fillStyle(0x000000, 0.75).fillRect(x - 2, y - 2, BARRA.largura + 4, BARRA.altura + 4)
     s.barra.fillStyle(0x0a2a38, 1).fillRect(x, y, BARRA.largura, BARRA.altura)
     s.barra.fillStyle(cor, 1).fillRect(x, y, BARRA.largura * s.o2, BARRA.altura)
+    // Segmentos e parafusos dão à barra a mesma linguagem dos consoles.
+    for (let k = 1; k < 12; k++) s.barra.fillStyle(0x0a2a38, 1).fillRect(x + k * 10 - 1, y, 1, BARRA.altura)
+    s.barra.fillStyle(0x8eafb6, 1).fillRect(x - 4, y + 2, 2, 2).fillRect(x + BARRA.largura + 2, y + 2, 2, 2)
     s.rotulo.setPosition(x - 6, y + BARRA.altura / 2).setText(s.o2 <= 0 ? 'SEM AR!' : 'O2').setColor(s.o2 <= 0 ? (pisca ? '#ffffff' : '#ff5a5a') : '#9eeaff')
   }
 

@@ -8,7 +8,7 @@ import { criarSorte, criarTextura, css, retArredondado } from './arteFundos.js'
 //     fachadas das bordas com sacadas e beirais, o PAIFANG (o portal de três vãos com
 //     telhados de telha azul-esverdeada, placa dourada e pilares vermelhos) no meio, o
 //     chão molhado de pedras refletindo o neon e as barraquinhas de comida nos cantos;
-//   - os LETREIROS de néon (originais, os ideogramas são rabiscos inventados) que piscam, um
+//   - os LETREIROS de néon (originais, os emblemas de lanternas, moedas e nós decorativos) que piscam, um
 //     deles com defeito (falha de vez em quando), e o brilho que cai no chão;
 //   - os fios de LANTERNAS vermelhas balançando por cima da rua e de uma borda à outra;
 //   - VAPOR saindo das panelas das barraquinhas e do bueiro da rua;
@@ -63,31 +63,28 @@ function telhado(g, cx, y, w, h, { telha = '#1f6f72', claro = '#46b0a8', escuro 
   g.fillRect(L + 6, y + h + 5, w - 12, 2)
 }
 
-// rabisco que parece um ideograma (inventado): traços horizontais, verticais e quadradinhos
-function ideograma(g, x, y, s, sorte) {
-  const t = Math.max(2, s * 0.14)
-  g.lineWidth = t
-  g.lineCap = 'round'
-  const n = 3 + Math.floor(sorte() * 3)
-  for (let k = 0; k < n; k++) {
-    const a = sorte()
-    g.beginPath()
-    if (a < 0.35) {
-      const yy = y + s * (0.12 + sorte() * 0.76)
-      g.moveTo(x + s * 0.08, yy)
-      g.lineTo(x + s * (0.55 + sorte() * 0.37), yy)
-    } else if (a < 0.65) {
-      const xx = x + s * (0.2 + sorte() * 0.6)
-      g.moveTo(xx, y + s * 0.06)
-      g.lineTo(xx, y + s * (0.55 + sorte() * 0.4))
-    } else if (a < 0.82) {
-      g.rect(x + s * 0.18, y + s * (0.15 + sorte() * 0.3), s * 0.5, s * 0.3)
-    } else {
-      g.moveTo(x + s * 0.8, y + s * 0.1)
-      g.lineTo(x + s * 0.2, y + s * 0.9)
-    }
-    g.stroke()
+// Emblemas desenhados de lanterna, moeda e nó decorativo. Nenhuma pseudoescrita.
+function emblema(g, x, y, s, tipo) {
+  const cx = x + s / 2
+  g.lineWidth = Math.max(1.5, s * 0.09)
+  g.lineCap = 'square'
+  g.lineJoin = 'round'
+  g.beginPath()
+  if (tipo % 3 === 0) {
+    g.ellipse(cx, y + s * 0.45, s * 0.31, s * 0.32, 0, 0, Math.PI * 2)
+    g.moveTo(cx, y + s * 0.13); g.lineTo(cx, y + s * 0.77)
+    g.moveTo(x + s * 0.29, y + s * 0.08); g.lineTo(x + s * 0.71, y + s * 0.08)
+    g.moveTo(cx, y + s * 0.8); g.lineTo(cx, y + s)
+  } else if (tipo % 3 === 1) {
+    g.arc(cx, y + s * 0.5, s * 0.38, 0, Math.PI * 2)
+    g.rect(x + s * 0.37, y + s * 0.37, s * 0.26, s * 0.26)
+  } else {
+    g.moveTo(cx, y + s * 0.05); g.lineTo(x + s * 0.84, y + s * 0.42)
+    g.lineTo(cx, y + s * 0.8); g.lineTo(x + s * 0.16, y + s * 0.42); g.closePath()
+    g.moveTo(x + s * 0.36, y + s * 0.72); g.lineTo(x + s * 0.36, y + s)
+    g.moveTo(x + s * 0.64, y + s * 0.72); g.lineTo(x + s * 0.64, y + s)
   }
+  g.stroke()
 }
 
 function texturaCeu(scene) {
@@ -247,7 +244,7 @@ function texturaCenario(scene) {
     g.fillStyle = '#e8b428'
     g.fillRect(bx - 100, 150, 200, 3)
     g.fillRect(bx - 100, 163, 200, 3)
-    // placa central dourada com ideogramas inventados
+    // placa central dourada com emblemas decorativos
     g.fillStyle = '#220608'
     retArredondado(g, bx - 38, 168, 76, 34, 4)
     g.fill()
@@ -256,8 +253,7 @@ function texturaCenario(scene) {
     retArredondado(g, bx - 38, 168, 76, 34, 4)
     g.stroke()
     g.strokeStyle = '#ffd860'
-    const sp = criarSorte(99)
-    for (let k = 0; k < 3; k++) ideograma(g, bx - 33 + k * 24, 173, 22, sp)
+    for (let k = 0; k < 3; k++) emblema(g, bx - 33 + k * 24, 173, 22, k)
     // telhados (3 níveis): o central maior e os laterais
     telhado(g, bx, 112, 128, 38)
     telhado(g, bx - 79, 128, 70, 22)
@@ -322,10 +318,9 @@ function texturaCenario(scene) {
   })
 }
 
-// letreiro vertical de néon: moldura, ideogramas inventados e brilho (shadowBlur)
+// letreiro vertical de néon: moldura, emblemas decorativos e brilho (shadowBlur)
 function texturaLetreiro(scene, chave, largura, altura, cor, n, semente) {
   return criarTextura(scene, chave, largura, altura, (g) => {
-    const sorte = criarSorte(semente)
     g.shadowColor = css(cor, 1)
     g.shadowBlur = 8
     g.fillStyle = 'rgba(10,4,12,0.88)'
@@ -338,7 +333,7 @@ function texturaLetreiro(scene, chave, largura, altura, cor, n, semente) {
     const s = largura - 16
     for (let k = 0; k < n; k++) {
       g.strokeStyle = css(cor, 0.95)
-      ideograma(g, 8, 10 + k * ((altura - 20) / n), s, sorte)
+      emblema(g, 8, 10 + k * ((altura - 20) / n), s, k + semente)
     }
   })
 }
@@ -430,7 +425,7 @@ function texturaVinheta(scene) {
   return criarTextura(scene, 'arena-chinatown-vinheta', LARGURA, ALTURA, (g) => {
     const rg = g.createRadialGradient(CENTRO_X, ALTURA / 2, 200, CENTRO_X, ALTURA / 2, 560)
     rg.addColorStop(0, 'rgba(10,0,10,0)')
-    rg.addColorStop(1, 'rgba(10,0,10,0.6)')
+    rg.addColorStop(1, 'rgba(10,0,10,0.30)')
     g.fillStyle = rg
     g.fillRect(0, 0, LARGURA, ALTURA)
   })
@@ -452,7 +447,7 @@ export default function chinatown(scene, objetos) {
 
   add(scene.add.image(0, 0, texturaCenario(scene)).setOrigin(0))
 
-  // letreiros de néon: [textura, x, y, cor, quantos ideogramas, semente, brilho extra]
+  // letreiros de néon: [textura, x, y, cor, quantos emblemas, semente, brilho extra]
   const defs = [
     { x: 16, y: 118, l: 36, a: 128, cor: 0xff4a7a, n: 4, s: 11 },
     { x: 62, y: 176, l: 30, a: 96, cor: 0x40e0ff, n: 3, s: 22 },

@@ -104,7 +104,7 @@ export const ARENAS = [
     musica: 'arena_praia',
     tituloMusica: 'Maré Mansa',
     cor: 0x35d0e8,
-    moldura: { cor: 0x1d6a8a, alpha: 0.3 },
+    moldura: { cor: 0x1d6a8a, alpha: 0.22 },
     bonus: [...GERAIS, 'castelodeAreia', 'surf', 'solDoMeioDia', 'cacaTesouro', 'pipa', 'pegadas', 'concha', 'gaivotaLadra'],
   },
   {
@@ -115,7 +115,7 @@ export const ARENAS = [
     musica: 'arena_cafe',
     tituloMusica: 'Valsa do Croissant',
     cor: 0xf0a868,
-    moldura: { cor: 0x6a3a2a, alpha: 0.35 },
+    moldura: { cor: 0x6a3a2a, alpha: 0.25 },
     bonus: [...GERAIS, 'latteArt', 'bandeja', 'mimico', 'acordeao', 'pintor', 'menuDoDia', 'expresso', 'xadrez'],
   },
   {
@@ -126,7 +126,7 @@ export const ARENAS = [
     musica: 'arena_estacao',
     tituloMusica: 'Órbita Baixa',
     cor: 0x5ad0ff,
-    moldura: { cor: 0x14204a, alpha: 0.35 },
+    moldura: { cor: 0x14204a, alpha: 0.24 },
     // oito rodadas só da estação, todas mexem numa REGRA (pvp/bonus/eventos/estacao/)
     bonus: [...GERAIS, 'semAtrito', 'minhoca', 'radar', 'orbita', 'polaridade', 'oxigenio', 'trator', 'manutencao'],
   },
@@ -138,7 +138,7 @@ export const ARENAS = [
     musica: 'arena_chinatown',
     tituloMusica: 'Rua das Mil Lanternas',
     cor: 0xff3a4a,
-    moldura: { cor: 0x5a1418, alpha: 0.35 },
+    moldura: { cor: 0x5a1418, alpha: 0.24 },
     bonus: [...GERAIS, 'biscoito', 'hashi', 'sombrasChinesas', 'abaco', 'mahjong', 'dancaDoLeao', 'gatoDaSorte', 'cestinhaDeVapor'],
   },
   {
@@ -149,7 +149,7 @@ export const ARENAS = [
     musica: 'arena_cidade',
     tituloMusica: 'Hora do Rush',
     cor: 0xffc83a,
-    moldura: { cor: 0x3a2a14, alpha: 0.35 },
+    moldura: { cor: 0x3a2a14, alpha: 0.24 },
     bonus: [
       ...GERAIS,
       'cidGps',

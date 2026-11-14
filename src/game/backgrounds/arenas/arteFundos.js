@@ -78,3 +78,14 @@ export function retArredondado(g, x, y, w, h, r) {
   g.arcTo(x, y, x + w, y, r)
   g.closePath()
 }
+
+// Céus ilustrados: transições finas entre os tons escolhidos pelo mapa.
+// Desenhado uma vez, sem filtro de tela ou alteração das cores dos sprites.
+export function pintarCeu(g, cores, largura, altura) {
+  for (let y = 0; y < altura; y += 2) {
+    const pos = y / Math.max(1, altura - 2) * (cores.length - 1)
+    const i = Math.min(cores.length - 2, Math.floor(pos))
+    g.fillStyle(misturar(cores[i], cores[i + 1], pos - i), 1)
+    g.fillRect(0, y, largura, Math.min(2, altura - y))
+  }
+}

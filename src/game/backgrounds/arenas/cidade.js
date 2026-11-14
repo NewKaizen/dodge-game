@@ -89,6 +89,18 @@ function desenharPredios(g, predios, { base, topoCor, detalhe }) {
       g.fillStyle = detalhe
       g.fillRect(b.x + b.w / 2 - 1, b.topo - (b.degrau ? 34 : 24), 2, b.degrau ? 22 : 24)
     }
+    // Cornija e caixas d'água dão silhuetas próprias aos blocos mais largos.
+    g.fillStyle = topoCor
+    g.fillRect(b.x - 1, b.topo, b.w + 2, 2)
+    if (b.w > 62 && !b.antena) {
+      const tx = Math.round(b.x + b.w * 0.58)
+      g.fillStyle = base
+      g.fillRect(tx, b.topo - 16, 15, 12)
+      g.fillStyle = detalhe
+      g.fillRect(tx - 1, b.topo - 17, 17, 3)
+      g.fillRect(tx + 2, b.topo - 4, 2, 4)
+      g.fillRect(tx + 11, b.topo - 4, 2, 4)
+    }
     // linhas dos andares, bem fracas
     g.fillStyle = 'rgba(255,255,255,0.05)'
     for (let y = b.topo + 4; y < CHAO; y += 22) g.fillRect(b.x, y, b.w, 1)
@@ -194,7 +206,7 @@ function texturaVinheta(scene) {
   return criarTextura(scene, 'arena-cidade-vinheta', LARGURA, ALTURA, (g) => {
     const rg = g.createRadialGradient(CENTRO_X, ALTURA / 2, 200, CENTRO_X, ALTURA / 2, 560)
     rg.addColorStop(0, 'rgba(0,0,10,0)')
-    rg.addColorStop(1, 'rgba(0,0,10,0.55)')
+    rg.addColorStop(1, 'rgba(0,0,10,0.26)')
     g.fillStyle = rg
     g.fillRect(0, 0, LARGURA, ALTURA)
   })
@@ -502,7 +514,7 @@ export default function cidade(scene, objetos) {
       gCeu.clear()
       const topo = paleta(noite, 0)
       const horiz = paleta(noite, 1)
-      const faixas = 28
+      const faixas = 100
       for (let i = 0; i < faixas; i++) {
         const k = i / (faixas - 1)
         gCeu.fillStyle(misturar(topo, horiz, k ** 1.6), 1)

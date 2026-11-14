@@ -85,11 +85,16 @@ export default function criar(arena, { rng } = {}) {
     const virada = v.flip
     const larg = Math.max(1.5, tw * Math.abs(Math.cos(Math.PI * virada)))
     const frente = virada > 0.5
-    // sombra grossa (a espessura da peça)
-    g.fillStyle(0x000000, 0.35).fillRoundedRect(cx - larg, cy - th + 3, larg * 2, th * 2, 4)
-    g.fillStyle(frente ? 0xcfc09a : 0x13553a, 1).fillRoundedRect(cx - larg, cy - th + 2, larg * 2, th * 2, 4)
-    g.fillStyle(frente ? 0xf4ead0 : 0x2a8a62, frente ? 1 : 0.92).fillRoundedRect(cx - larg, cy - th, larg * 2, th * 2, 4)
-    g.lineStyle(1.5, frente ? 0xffffff : 0xf0e6c8, 0.8).strokeRoundedRect(cx - larg, cy - th, larg * 2, th * 2, 4)
+    // Marfim sobre jade, canto em degrau e espessura escura de 3 px.
+    const px = Math.round(cx - larg), py = Math.round(cy - th)
+    const pw = Math.max(2, Math.round(larg * 2)), ph = Math.max(2, Math.round(th * 2))
+    g.fillStyle(0x142e32, 1).fillRect(px, py + 2, pw, ph + 2)
+    g.fillStyle(frente ? 0xb89c78 : 0x315c53, 1).fillRect(px + 1, py + 1, Math.max(1, pw - 2), ph + 1)
+    g.fillStyle(frente ? 0xf2dfb9 : 0x467b69, 1).fillRect(px + 1, py, Math.max(1, pw - 2), Math.max(1, ph - 2))
+    g.fillStyle(frente ? 0xfff0d0 : 0x86ad8a, 1).fillRect(px + 2, py + 1, Math.max(1, pw - 4), 1)
+    if (pw > 10 && ph > 10) {
+      g.lineStyle(1, frente ? 0xd3b58a : 0x315c53, 1).strokeRect(px + 3, py + 3, pw - 6, ph - 8)
+    }
     if (larg > 6) {
       if (frente) simbolo(g, e.pecas[i], cx, cy, Math.min(larg, th) * 0.62)
       else {

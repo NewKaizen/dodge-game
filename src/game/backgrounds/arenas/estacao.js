@@ -92,22 +92,22 @@ function gerarTerra(scene) {
           const h = (e - 0.545) / 0.2
           if (lat > 1.28 || h > 0.85) [r, gg, b] = [232, 238, 244]
           else if (h > 0.5) [r, gg, b] = [128, 108, 70]
-          else if (h > 0.18) [r, gg, b] = [64, 126, 58]
-          else [r, gg, b] = [100, 140, 70]
+          else if (h > 0.18) [r, gg, b] = [49, 147, 101]
+          else [r, gg, b] = [100, 181, 117]
         } else {
-          const p = limitar((e - 0.3) / 0.25, 0, 1)
-          ;[r, gg, b] = [10 + 28 * p, 36 + 66 * p, 84 + 88 * p]
+          const p = Math.round(limitar((e - 0.3) / 0.25, 0, 1) * 3) / 3
+          ;[r, gg, b] = [18 + 24 * p, 54 + 74 * p, 122 + 82 * p]
         }
         if (lat > 1.36 && !terraFirme) [r, gg, b] = [214, 226, 238] // gelo do polo
         // nuvens
-        const nv = limitar((c - 0.5) * 3.2, 0, 0.88)
+        const nv = c > 0.62 ? 0.84 : c > 0.56 ? 0.45 : 0
         r += (246 - r) * nv
         gg += (248 - gg) * nv
         b += (252 - b) * nv
         // luz: dia, terminador alaranjado e noite com luzes de cidade
         const dl = luz[k]
         const dia = limitar(dl * 1.25 + 0.12, 0, 1)
-        const sombra = 0.1 + 0.95 * dia ** 0.85
+        const sombra = 0.17 + 0.83 * (Math.round(dia * 5) / 5)
         r *= sombra
         gg *= sombra
         b *= sombra
@@ -400,7 +400,7 @@ function texturaVinheta(scene) {
   return criarTextura(scene, 'arena-estacao-vinheta', LARGURA, ALTURA, (g) => {
     const rg = g.createRadialGradient(CENTRO_X, ALTURA / 2, 180, CENTRO_X, ALTURA / 2, 560)
     rg.addColorStop(0, 'rgba(0,0,8,0)')
-    rg.addColorStop(1, 'rgba(0,0,8,0.62)')
+    rg.addColorStop(1, 'rgba(0,0,8,0.30)')
     g.fillStyle = rg
     g.fillRect(0, 0, LARGURA, ALTURA)
   })

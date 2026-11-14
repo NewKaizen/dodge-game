@@ -25,19 +25,23 @@ export default function criar(arena) {
     if (!duro(b, agora)) {
       // molhado: escuro e translúcido, endurecendo (a borda clareia)
       const k = Math.min(1, idade / CASTELO.endureceMs)
-      g.fillStyle(AREIA.molhada, 0.5 + 0.2 * k).fillRoundedRect(x - 7, y - 6, 14, 12, 3)
-      g.lineStyle(1, AREIA.molhadaBorda, 0.8).strokeRoundedRect(x - 7, y - 6, 14, 12, 3)
+      g.fillStyle(AREIA.molhada, 0.5 + 0.2 * k).fillRect(x - 7, y - 6, 14, 12)
+      g.lineStyle(1, AREIA.molhadaBorda, 0.8).strokeRect(x - 7, y - 6, 14, 12)
       return
     }
     // duro: pedra de areia com ameia em cima; some piscando nos últimos 700 ms
     const resta = CASTELO.vidaMs - idade
     if (resta < 700 && !calmo() && Math.floor(resta / 90) % 2) return
     const rachou = b.vida < CASTELO.aguenta
-    g.fillStyle(AREIA.sombra, 1).fillRoundedRect(x - 8, y - 5, 16, 12, 3)
-    g.fillStyle(AREIA.dura, 1).fillRoundedRect(x - 8, y - 7, 16, 12, 3)
+    g.fillStyle(AREIA.sombra, 1).fillRect(x - 8, y - 5, 16, 12)
+    g.fillStyle(AREIA.dura, 1).fillRect(x - 8, y - 7, 16, 12)
     g.fillStyle(AREIA.dura, 1).fillRect(x - 8, y - 11, 4, 5).fillRect(x - 2, y - 11, 4, 5).fillRect(x + 4, y - 11, 4, 5)
     g.fillStyle(AREIA.clara, 0.9).fillRect(x - 6, y - 6, 12, 2)
-    g.lineStyle(1, 0x7a5a28, 0.9).strokeRoundedRect(x - 8, y - 7, 16, 12, 3)
+    g.lineStyle(1, 0x7a5a28, 0.9).strokeRect(x - 8, y - 7, 16, 12)
+    // Juntas desenhadas à mão; leitura de muralha, não de bloco arredondado.
+    g.fillStyle(AREIA.sombra, 1).fillRect(x - 7, y - 1, 14, 1)
+    g.fillRect(x - 2, y - 5, 1, 4).fillRect(x + 3, y, 1, 4)
+    g.fillStyle(AREIA.clara, 1).fillRect(x - 7, y - 11, 2, 1).fillRect(x - 1, y - 11, 2, 1).fillRect(x + 5, y - 11, 2, 1)
     if (rachou) g.lineStyle(1, 0x5a3e18, 1).lineBetween(x - 2, y - 7, x + 1, y - 2).lineBetween(x + 1, y - 2, x - 1, y + 4)
   }
 

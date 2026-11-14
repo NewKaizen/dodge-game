@@ -17,9 +17,9 @@ const MEIO_CORACAO = 6.5 // meia largura usada para bater nos blocos (o coraçã
 const PALETA = [0x8d97ab, 0xb9645a, 0x4f9aa8, 0xc9a45a, 0x6d7fa8, 0xa8a08c, 0x8a68a8] // concreto, tijolo, vidro, ocre, ardósia, areia, roxo
 const COR_PECA = Object.fromEntries(NOMES_PECAS.map((n, i) => [n, PALETA[i % PALETA.length]]))
 const claro = (cor, k) => {
-  const r = Math.min(255, ((cor >> 16) & 255) + k)
-  const g = Math.min(255, ((cor >> 8) & 255) + k)
-  const b = Math.min(255, (cor & 255) + k)
+  const r = Math.max(0, Math.min(255, ((cor >> 16) & 255) + k))
+  const g = Math.max(0, Math.min(255, ((cor >> 8) & 255) + k))
+  const b = Math.max(0, Math.min(255, (cor & 255) + k))
   return (r << 16) | (g << 8) | b
 }
 const escuro = (cor, k) => claro(cor, -k)
@@ -149,6 +149,8 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
     g.fillStyle(escuro(cor, 60), 1).fillRect(x, y, w, h)
     g.fillStyle(cor, 1).fillRect(x + 1, y + 1, w - 2, h - 2)
     g.fillStyle(claro(cor, 38), 1).fillRect(x + 1, y + 1, w - 2, 3) // telhado
+    g.fillStyle(0x22283c, 1).fillRect(x + w - 3, y + 4, 2, h - 4)
+    g.fillStyle(escuro(cor, 30), 1).fillRect(x + 2, y + h - 3, w - 4, 2)
     // janelas: 2 x 2, umas acesas
     const jw = Math.max(2, (w - 6) / 2 - 1)
     const jh = Math.max(2, (h - 9) / 2 - 1)
