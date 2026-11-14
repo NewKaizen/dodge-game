@@ -43,7 +43,7 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
       pulso: 0,
       textura: 'praia-caranguejo',
       quadro: 'c0',
-      tamanho: 28,
+      tamanho: 34,
       origem: 'bonus-caranguejos',
     })
     const c = { plano, bala, pista, idade: 0, fase: 'anda', zonaDada: -1, somDado: -1 }

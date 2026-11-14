@@ -185,6 +185,20 @@ Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria 
 | Palco | `arena_palco.mid` | festa, dança da estátua, pirotecnia (explosões), plateia arremessa, gelo seco, no ritmo, karaokê, mosh |
 | Templo | `arena_templo.mid` | terremoto, gravidade, ponta-cabeça, tochas (apagão), pedra rolante, armadilhas, areia movediça, relógio do tempo |
 | Coliseu | `arena_coliseu.mid` | coração trocado, arena encolhendo, leões, chuva de lanças, corrida de bigas, chão em brasas, polegar do imperador, rede do reciário |
+| Praia | Maré Mansa (`arena_praia.mid`) | onda gigante, caranguejos, bola de praia, maré alta (aquário), brisa do mar (ventania), areia movediça, areia quente (chão em brasas), festa na praia, chuva de verão |
+| Café Francês | Valsa do Croissant (`arena_cafe.mid`) | croissants voadores, bule quente, pombos, queda de luz (apagão), luzinhas (vaga-lumes), no compasso (no ritmo), chanson (karaokê), chuva de verão, coração trocado |
+
+**Praia** (fundo `backgrounds/arenas/praia.js`: enseada ao pôr do sol com ondas rolando, coqueiros, guarda-sóis, caranguejo, gaivotas e veleiros; música bossa-reggae em Dó maior, `scripts/musica/arenasPraiaCafe.mjs`) e **Café Francês** (fundo `cafe.js`: terraço de Paris com marquises, luzinhas, torre de ferro genérica, gato, pombos e acordeonista; valsa musette em Lá menor). Eventos novos (planos puros e testados em `pvp/bonus/eventos/planosPraiaCafe.js`, desenho em `onda.js`, `caranguejos.js`, `bola.js`, `croissants.js`, `bule.js`, `pombos.js`; todos sorteiam só com o rng da semente da rodada, sempre com aviso >= 400 ms e saída garantida):
+
+| Evento | Arena | O que faz |
+|---|---|---|
+| Onda gigante | Praia | uma parede de água varre a caixa com um VÃO de 66 px (marcado em verde no aviso de 1,3 s); o vão da onda seguinte fica a até 74 px do anterior |
+| Caranguejos | Praia | até 2 por caixa andam de lado; param, abrem as pinças (anel vermelho por 520 ms) e beliscam o anel todo (dano 4) |
+| Bola de praia | Praia | uma bola cai (sombra crescendo) e quica em linha reta; encostar EMPURRA o coração (sem dano; a trajetória não depende do coração, igual em rede). Cai uma segunda bola aos ~6,5 s |
+| Croissants voadores | Café | croissants cruzam a caixa ondulando (seno); o aviso (850 ms) tracejado mostra a curva toda |
+| Bule quente | Café | o bule apita e 2 a 3 nuvens de vapor (círculos afastados, no máximo 36% da caixa) pulsam por 1,1 s e estouram por 0,62 s |
+| Pombos | Café | um bando cruza em cunha com um VÃO de 62 px (aviso de 1 s: linhas de voo e vão verde); o vão do próximo bando fica perto do anterior |
+
 
 Testes: `scene.start('PvpVoto', { p1, p2 })` ou direto `scene.start('PvpArena', { p1, p2, arena: 'templo' })`.
 

@@ -93,10 +93,12 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
         // vapor juntando: o círculo pulsa e vai enchendo; fumacinhas sobem de dentro
         const k = b.idade / b.aviso
         const pisca = Math.sin(b.idade / 65) > 0 ? 1 : 0.6
-        g.fillStyle(0xffe8e0, (0.1 + 0.25 * k) * pisca)
+        g.fillStyle(0xffd8c8, (0.2 + 0.3 * k) * pisca)
         g.fillCircle(n.x, n.y, n.raio * (0.55 + 0.45 * k))
-        g.lineStyle(2, COR, (0.5 + 0.4 * k) * pisca)
+        g.lineStyle(3, COR, (0.7 + 0.3 * k) * pisca)
         g.strokeCircle(n.x, n.y, n.raio)
+        g.lineStyle(1, 0xffffff, 0.8 * pisca)
+        g.strokeCircle(n.x, n.y, n.raio - 4)
         g.lineStyle(2, 0xffffff, 0.55)
         for (let w = 0; w < 3; w++) {
           const ph = (t / 600 + w / 3 + n.fase) % 1

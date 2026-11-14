@@ -21,6 +21,7 @@ import { ARENAS, ARENA, eventosDaArena } from '../pvp/arenas.js'
 import { EVENTO, BONUS, ARMAS } from '../pvp/bonus.js'
 import { CARTAS, PERSONAGENS_PVP, SIMBOLOS, ehSuper, especialDaCarta, resumoDoAtaque } from '../pvp/cartas.js'
 import { PAGINAS } from './fichas.js'
+import { semLigaduras } from '../campanha/texto.js'
 
 export const PAGINAS_ARENA = ARENAS.map((a) => ({ id: a.id, tipo: 'arena' }))
 // todas as páginas do Guia, na ordem do ↑/↓: cartas (personagens, chefes) e depois as arenas
@@ -77,7 +78,7 @@ const DICAS = {
   ondaGigante: { nome: 'ONDA GIGANTE', dica: 'A faixa azul piscando mostra por onde a água passa; o vão verde é a saída. Vá para o vão antes de a onda entrar: o próximo vão fica sempre perto do anterior.' },
   caranguejos: { nome: 'CARANGUEJOS', dica: 'Eles andam de lado. Quando um para e ergue as pinças, o anel vermelho mostra o alcance do beliscão: saia do anel antes de ele fechar.' },
   bolaDePraia: { nome: 'BOLA DE PRAIA', dica: 'A sombra mostra onde a bola cai e ela quica em linha reta. Encostou, ela empurra o coração (sem dano): fique longe dela e das quinas.' },
-  croissants: { nome: 'CROISSANTS VOADORES', dica: 'O "!" marca por onde o croissant entra e o tracejado mostra a curva inteira que ele vai fazer. Espere ele passar e vá pelo lado oposto da onda.' },
+  croissants: { nome: 'CROISSANTS VOADORES', dica: 'O "!" marca por onde o croissant entra e o tracejado mostra a curva inteira que ele vai fazer. Espere ele passar ou contorne pelo lado oposto da curva.' },
   buleQuente: { nome: 'BULE QUENTE', dica: 'O bule apita e círculos de vapor pulsam: quando o aviso acaba, eles estouram e queimam por um instante. Saia dos círculos; sempre sobra espaço livre.' },
   pombos: { nome: 'POMBOS', dica: 'Linhas pálidas mostram as fileiras do bando e o vão verde é a passagem. Os pombos de fora chegam um pouco depois dos do meio.' },
 }
@@ -132,11 +133,11 @@ export function fichaDoEvento(evento, arenaId, { efeitos = {} } = {}) {
     id: evento.id,
     nome: evento.nome,
     nomeOriginal: base.nome,
-    descricao: maiuscula(evento.descricao ?? base.descricao ?? ''),
+    descricao: semLigaduras(maiuscula(evento.descricao ?? base.descricao ?? '')), // a fonte junta "fi"/"fl" num "A"
     cor: evento.cor ?? base.cor ?? 0xffffff,
     cartas,
     numeros,
-    dica,
+    dica: dica && semLigaduras(dica),
     emTodas,
     tambemEm,
     previa: Boolean(efeitos[evento.id]),
@@ -162,10 +163,10 @@ export function fichaDaArena(id, { efeitos = {} } = {}) {
     id: arena.id,
     nome: arena.nome,
     curto: arena.curto ?? arena.nome,
-    descricao: arena.descricao ?? '',
+    descricao: semLigaduras(arena.descricao ?? ''),
     musica: arena.tituloMusica ?? null,
     cor: arena.cor ?? 0xffffff,
-    frequencia: `A cada ${BONUS.aCadaRodadas} rodadas a roleta sorteia uma destas (nunca a mesma duas vezes seguidas).`,
+    frequencia: semLigaduras(`A cada ${BONUS.aCadaRodadas} rodadas a roleta sorteia uma destas (nunca a mesma duas vezes seguidas).`),
     eventos,
     grupos,
   }

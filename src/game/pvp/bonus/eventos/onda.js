@@ -15,6 +15,7 @@ import { contextoDoEvento, pistaEncerrada } from './utilPraiaCafe.js'
 
 const COR = 0x2a9fff
 const ESPUMA = 0xf2fbff
+const VAO = 0x6aff9a
 const DANO = 5
 
 export default function criar(arena, { rng, aceleracao = 1 } = {}) {
@@ -80,12 +81,12 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
       for (const b of o.blocos) {
         g.fillStyle(COR, (0.12 + 0.2 * k) * pisca)
         g.fillRect(l.left, b.y0, l.width, b.y1 - b.y0)
-        g.lineStyle(1, ESPUMA, 0.35 + 0.3 * k)
+        g.lineStyle(2, VAO, 0.55 + 0.35 * k)
         const y = b.y0 < o.plano.vaoY ? b.y1 : b.y0
         for (let x = l.left + 3; x < l.right - 3; x += 12) g.lineBetween(x, y, x + 6, y)
       }
-      // o vão: verde
-      g.fillStyle(0x6aff9a, 0.07 + 0.06 * Math.sin(idade / 140))
+      // o vão: verde (a saída)
+      g.fillStyle(VAO, 0.14 + 0.08 * Math.sin(idade / 120))
       g.fillRect(l.left, o.plano.vaoY - ONDA.vao / 2, l.width, ONDA.vao)
       // setas no sentido da onda
       g.lineStyle(3, ESPUMA, 0.9 * pisca)

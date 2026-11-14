@@ -19,7 +19,7 @@ export const VEL_CORACAO = CORACAO.velocidadePadrao
 // Uma parede de água varre a caixa de um lado ao outro. Sempre sobra um VÃO (a água
 // "abre" ali); o vão do onda seguinte fica a no máximo ALCANCE do anterior, para dar
 // tempo de chegar até ele durante o aviso.
-export const ONDA = { avisoMs: 1300, velocidade: 205, vao: 66, largura: 36, alcance: 74, pausaMs: { min: 1300, max: 1900 }, primeira: { min: 500, max: 1000 } }
+export const ONDA = { avisoMs: 1300, velocidade: 205, vao: 66, largura: 44, alcance: 74, pausaMs: { min: 1300, max: 1900 }, primeira: { min: 500, max: 1000 } }
 
 // { lado: 1 (entra pela esquerda) | -1, vaoY: centro do vão }
 export function planejarOnda(sorte, l, anterior = null, cfg = ONDA) {

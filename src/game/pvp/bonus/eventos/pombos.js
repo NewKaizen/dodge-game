@@ -84,7 +84,7 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
         for (let x = l.left + 2; x < l.right - 2; x += 10) g.lineBetween(x, p.y, x + 5, p.y)
       }
       // o vão
-      g.fillStyle(0x6aff9a, 0.07 + 0.06 * Math.sin(idade / 140))
+      g.fillStyle(0x6aff9a, 0.14 + 0.08 * Math.sin(idade / 120))
       g.fillRect(l.left, bando.plano.vaoY - POMBOS.vao / 2, l.width, POMBOS.vao)
       // setas na entrada
       g.lineStyle(3, 0xeef2ff, 0.9 * pisca)

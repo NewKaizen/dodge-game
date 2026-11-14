@@ -113,7 +113,7 @@ export const ARENAS = [
       { id: 'aquario', nome: 'MARÉ ALTA', descricao: 'a maré encheu as caixas: o coração boia (segure ↓ para afundar)' },
       { id: 'ventania', nome: 'BRISA DO MAR', descricao: 'rajadas da brisa empurram o coração (olhe as folhas!)' },
       'areia',
-      { id: 'brasas', nome: 'AREIA QUENTE', descricao: 'a areia está fervendo: ficar parado queima!' },
+      { id: 'brasas', nome: 'AREIA QUENTE', descricao: 'a areia está fervendo: parado, você queima!' },
       { id: 'festa', nome: 'FESTA NA PRAIA', descricao: 'luzes, confete e balões: é festa na areia!' },
       'chuva',
     ],
