@@ -226,27 +226,19 @@ de 0 nem acima de `ENERGIA.maxima`) e voa gema a gema de um HUD para o outro.
 A CPU usa `BotCopia` (`NIVEIS_COPIA`: ~4, 5,5 e 7 apertos/s com variação, cansaço e tropeços).
 `pvpArena.duelo.estadoDebug()` mostra apertos, cabo e o resultado.
 
-## Eventos das arenas CHINATOWN e CIDADE
+## Eventos das arenas ESTAÇÃO e CIDADE
 
-`dragao`, `lanternas`, `transito`, `obra`. O plano de cada um (tempos, posições, faixas) sai de
+`meteoros`, `airlock`, `transito`, `obra` (a CHINATOWN tem a seção abaixo). O plano de cada um (tempos, posições, faixas) sai de
 `eventos/planosArenas.js` (sem Phaser, testado em `__tests__/bonusArenasNovas.test.js`: repetível pela semente, avisado,
 com corredor de fuga); a arte (texturas de canvas) fica em `eventos/arteArenasNovas.js`. Todos usam `pista.balas.criar` com
 `aviso`/`jaAvisada` e `registrarZona` para a CPU enxergar; o AIRLOCK só mexe no `joy`.
 
-## Eventos da arena ESTAÇÃO ESPACIAL (`eventos/estacao/`)
+## Eventos da arena CHINATOWN (`eventos/chinatown/`)
 
-`semAtrito`, `minhoca`, `radar`, `orbita`, `polaridade`, `oxigenio`, `trator`, `manutencao`: cada um muda uma regra (inércia,
-bordas ligadas, visão, gravidade, polos, ar, raio trator, escudos). Contas puras em `estacao/planos.js` (testes em
-`__tests__/eventosEstacao.test.js`), ajudantes em `estacao/util.js` (`criarCofre`, `avisoDoEvento`, `ouvirBotao`, `criarCanal`).
-Os que mexem em balas só alteram `vx/vy/x/y/morta/sprite.setVisible` (`b.segurada`, `b.marcaPlaneta`, `b.pol` são marcas
-próprias). Eventos com ação do jogador (`polaridade`, `trator`) ouvem o A por `ouvirBotao` (só o aperto, não há "segurar") e,
-em rede, mandam uma mensagem pelo canal (`estPolaridade`, `estTrator`) com a rodada junto.
-
-## Arena PRAIA (eventos de regra nova)
-
-`eventos/praia/` (regras puras e testadas em `praia/planos.js`; `util.js` tem o contexto de limpeza, `criarAjustes`
-para cura/roubo de energia que vai ao outro PC pela mensagem `praiaAjuste`): `castelodeAreia` (trilha de areia que
-bloqueia balas), `surf` (ficar na crista da onda), `solDoMeioDia` (só a sombra protege), `cacaTesouro` (detector que
-apita e cava para curar), `pipa` (o coração é pêndulo: `joy` vira força), `pegadas` (fantasma refaz o caminho 2 s
-depois, bala atravessável posta todo frame), `concha` (invulnerável dentro, estala), `gaivotaLadra` (mergulho avisado
-que rouba energia).
+Regras e planos puros em `chinatown/planos.js` (testes: `__tests__/eventosChinatown.test.js`, que também roda cada efeito numa cena de
+mentira conferindo a limpeza). Cada evento muda uma REGRA da esquiva: `biscoito` (regra sorteada: diagonal, bala dourada, parado sem
+dano, setas espelhadas/giradas, velocidade dobrada, portais; `joy` + `fatorCoracao`), `hashi` (pauzinhos miram, travam e beliscam:
+balas-segmento invisíveis + `registrarZona`), `sombrasChinesas` (esconde os sprites das balas e desenha silhuetas atrasadas),
+`abaco` (`joy` zera o vertical e `passo` põe o coração na haste), `mahjong` (peças no chão, par limpa a fileira e dá i-frames),
+`dancaDoLeao` (setas lidas do joystick em `passo`), `gatoDaSorte` (`pista.congelada` + `passo` acelerado) e `cestinhaDeVapor`
+(cestos abrigo com i-frames e empurrão no `joy`). Recompensas são i-frames locais (`coracao.invencivelMs`): nada vai à rede.

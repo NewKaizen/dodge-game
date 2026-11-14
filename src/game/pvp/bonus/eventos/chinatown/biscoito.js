@@ -77,7 +77,7 @@ export default function criar(arena, { rng } = {}) {
     const b = 19
 
     // bandeja escura (o fundo da arena é cheio de detalhes): cresce quando o papel sai
-    const larguraBandeja = 96 + 120 * sai
+    const larguraBandeja = 96 + 150 * sai
     g.fillStyle(0x12060c, 0.72 * alpha).fillRoundedRect(x - larguraBandeja / 2, cy - 42, larguraBandeja, 84, 16)
     g.lineStyle(2, CORES.ouro, 0.8 * alpha).strokeRoundedRect(x - larguraBandeja / 2, cy - 42, larguraBandeja, 84, 16)
     // sombra no chão
@@ -85,14 +85,14 @@ export default function criar(arena, { rng } = {}) {
 
     // o papelzinho (por trás das metades)
     if (sai > 0) {
-      const larg = 176 * sai
+      const larg = 150 * sai
       g.fillStyle(0x000000, 0.28 * alpha).fillRoundedRect(cx - larg / 2 + 2, cy - 17 + 3, larg, 36, 3)
       g.fillStyle(CORES.creme, alpha).fillRoundedRect(cx - larg / 2, cy - 17, larg, 36, 3)
       g.lineStyle(2, CORES.vermelho, alpha).strokeRoundedRect(cx - larg / 2, cy - 17, larg, 36, 3)
       g.fillStyle(CORES.vermelho, alpha).fillRect(cx - larg / 2 + 4, cy - 14, Math.max(0, larg - 8), 2).fillRect(cx - larg / 2 + 4, cy + 16, Math.max(0, larg - 8), 2)
     }
 
-    const separa = abre * 40
+    const separa = abre * 82
     const gira = abre * 0.35
     const metade = (lado) => {
       const pts = meia(lado, a, b).map((p) => {
