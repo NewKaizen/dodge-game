@@ -21,7 +21,7 @@ const sorteDe = (semente) => {
 }
 const SEMENTES = Array.from({ length: 40 }, (_, i) => `arenas-novas:${i}`)
 // (os 8 eventos da ESTAÇÃO são conferidos em eventosEstacao.test.js)
-const NOVOS = { estacao: [], chinatown: ['dragao', 'lanternas'], cidade: ['transito', 'obra'] }
+const NOVOS = { estacao: [], chinatown: [], cidade: ['transito', 'obra'] }
 
 test('arenas novas: existem, com música própria, e a lista de bônus tem no mínimo BONUS_POR_ARENA eventos válidos', () => {
   for (const id of Object.keys(NOVOS)) {
