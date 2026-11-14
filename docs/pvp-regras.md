@@ -185,25 +185,40 @@ Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria 
 | Palco | `arena_palco.mid` | festa, dança da estátua, pirotecnia (explosões), plateia arremessa, gelo seco, no ritmo, karaokê, mosh |
 | Templo | `arena_templo.mid` | terremoto, gravidade, ponta-cabeça, tochas (apagão), pedra rolante, armadilhas, areia movediça, relógio do tempo |
 | Coliseu | `arena_coliseu.mid` | coração trocado, arena encolhendo, leões, chuva de lanças, corrida de bigas, chão em brasas, polegar do imperador, rede do reciário |
-| Praia | Maré Mansa (`arena_praia.mid`) | onda gigante, caranguejos, bola de praia, maré alta (aquário), brisa do mar (ventania), areia movediça, areia quente (chão em brasas), festa na praia, chuva de verão |
-| Café Francês | Valsa do Croissant (`arena_cafe.mid`) | croissants voadores, bule quente, pombos, queda de luz (apagão), luzinhas (vaga-lumes), no compasso (no ritmo), chanson (karaokê), chuva de verão, coração trocado |
-| Estação Espacial | Órbita Baixa (`arena_estacao.mid`, ambiente em Lá menor) | gravidade zero (gravidade maluca), **meteoros**, **airlock**, estação girando (ponta-cabeça), falha de energia (apagão), sinal atrasado (lag), sistema travado (tela azul), teletransporte (coração trocado), alarmes (pop-ups) |
-| Chinatown | Rua das Mil Lanternas (`arena_chinatown.mid`, Ré maior pentatônico) | fogos de artifício (explosões), **dragão**, **lanternas**, festival (festa), multidão (mosh), tambores (no ritmo), vapor das panelas (gelo seco), chuva de noite, karaokê |
-| Cidade Grande | Hora do Rush (`arena_cidade.mid`, funk/jazz-hop em Dó) | **trânsito**, **obra**, blecaute (apagão), metrô (terremoto), temporal (chuva), vento entre prédios (ventania), outdoors (pop-ups), hora do rush (mosh), fumaça de escapamento (gelo seco) |
+| Praia | Maré Mansa (`arena_praia.mid`) | **castelo de areia**, **surf**, **sol do meio-dia**, **caça ao tesouro**, **pipa**, **pegadas**, **concha**, **gaivota ladra** (os 8 mudam uma REGRA da esquiva; só existem na Praia) |
+| Café Francês | Valsa do Croissant (`arena_cafe.mid`) | **latte art**, **bandeja**, **mímico**, **acordeão**, **pintor**, **menu do dia**, **expresso**, **xadrez** (8 eventos que mudam uma REGRA da esquiva, ver abaixo) |
+| Estação Espacial | Órbita Baixa (`arena_estacao.mid`, ambiente em Lá menor) | **sem atrito**, **buraco de minhoca**, **radar**, **órbita**, **polaridade**, **oxigênio**, **raio trator**, **manutenção** (8 bônus próprios, cada um muda uma regra; ver abaixo) |
+| Chinatown | Rua das Mil Lanternas (`arena_chinatown.mid`, Ré maior pentatônico) | **biscoito da sorte** (regra maluca sorteada: diagonal, bala dourada dá escudo, parado sem dano, setas espelhadas/giradas, velocidade dobrada, paredes-portais), **hashi** (pauzinhos miram e beliscam), **sombras chinesas** (balas viram sombras maiores e atrasadas), **ábaco** (só anda em hastes; troca nos portões), **mahjong** (par de peças iguais limpa a fileira e dá escudo), **dança do leão** (repita as setas: escudo), **gato da sorte** (pata erguida congela as balas), **cestinha de vapor** (cestos-abrigo cuja tampa estoura) |
+| Cidade Grande | Hora do Rush (`arena_cidade.mid`, funk/jazz-hop em Dó) | 8 eventos que **mudam a regra** da esquiva (tabela abaixo): **GPS**, **câmera de segurança**, **elevador**, **tetris de prédios**, **faixa de pedestre**, **selfie**, **entrega**, **escada rolante** |
 
-**Praia** (fundo `backgrounds/arenas/praia.js`: enseada ao pôr do sol com ondas rolando, coqueiros, guarda-sóis, caranguejo, gaivotas e veleiros; música bossa-reggae em Dó maior, `scripts/musica/arenasPraiaCafe.mjs`) e **Café Francês** (fundo `cafe.js`: terraço de Paris com marquises, luzinhas, torre de ferro genérica, gato, pombos e acordeonista; valsa musette em Lá menor). Eventos novos (planos puros e testados em `pvp/bonus/eventos/planosPraiaCafe.js`, desenho em `onda.js`, `caranguejos.js`, `bola.js`, `croissants.js`, `bule.js`, `pombos.js`; todos sorteiam só com o rng da semente da rodada, sempre com aviso >= 400 ms e saída garantida):
+**Praia** (fundo `backgrounds/arenas/praia.js`: enseada ao pôr do sol com ondas rolando, coqueiros, guarda-sóis, caranguejo, gaivotas e veleiros; música bossa-reggae em Dó maior, `scripts/musica/arenasPraiaCafe.mjs`) e **Café Francês** (fundo `cafe.js`: terraço de Paris com marquises, luzinhas, torre de ferro genérica, gato, pombos e acordeonista; valsa musette em Lá menor). Os 8 eventos de regra nova de cada uma estão nas tabelas abaixo (pastas `pvp/bonus/eventos/praia/` e `pvp/bonus/eventos/cafe/`):
 
 | Evento | Arena | O que faz |
 |---|---|---|
-| Onda gigante | Praia | uma parede de água varre a caixa com um VÃO de 66 px (marcado em verde no aviso de 1,3 s); o vão da onda seguinte fica a até 74 px do anterior |
-| Caranguejos | Praia | até 2 por caixa andam de lado; param, abrem as pinças (anel vermelho por 520 ms) e beliscam o anel todo (dano 4) |
-| Bola de praia | Praia | uma bola cai (sombra crescendo) e quica em linha reta; encostar EMPURRA o coração (sem dano; a trajetória não depende do coração, igual em rede). Cai uma segunda bola aos ~6,5 s |
-| Croissants voadores | Café | croissants cruzam a caixa ondulando (seno); o aviso (850 ms) tracejado mostra a curva toda |
-| Bule quente | Café | o bule apita e 2 a 3 nuvens de vapor (círculos afastados, no máximo 36% da caixa) pulsam por 1,1 s e estouram por 0,62 s |
-| Pombos | Café | um bando cruza em cunha com um VÃO de 62 px (aviso de 1 s: linhas de voo e vão verde); o vão do próximo bando fica perto do anterior |
+| Castelo de areia | Praia | o coração deixa uma trilha de blocos de areia (a cada 12 px; no máximo 12, o mais velho cai primeiro). Molhados por 0,45 s, depois duros: BLOQUEIAM balas (cada bala some e o bloco aguenta 2 batidas) por ~5,5 s. O coração atravessa a areia |
+| Surf | Praia | a caixa vira mar e uma faixa de crista (58 px) sobe e desce (soma de senóides, no máximo ~0,5x a velocidade do coração; tracejado mostra 0,6 s à frente). Fora dela a barra de queda enche: alerta aos 0,45 s e CAIDÃO (5% do HP) aos 1,7 s; depois 1,3 s de folga. Dentro, a barra desce em dobro |
+| Sol do meio-dia | Praia | 2 guarda-sóis passeiam em órbitas lentas (<= 40 px/s); só a sombra (raio 42) protege. Fora dela o calor sobe de 0 a 1 em 2,6 s (alerta na metade) e QUEIMA (4% do HP), voltando a 45%; na sombra desce em 1 s |
+| Caça ao tesouro | Praia | um tesouro escondido por caixa (nunca visível); o detector de metais apita de 950 ms (longe) até 130 ms (perto) com ondas saindo do coração e um termômetro frio/quente. Ficar a menos de 15 px por 0,6 s CAVA: cura 6% do HP (cheio: +1 energia). Até 3 por caixa, a 70 px do coração |
+| Pipa | Praia | o coração pendurado numa pipa (corda de 94 px) balança como pêndulo: a mola puxa para a pipa, o direcional soma FORÇA (inércia, vai e volta em ~3 s) e a pipa passeia devagar (<= 22 px/s). Qualquer ponto da corda dá para segurar com <= 80% do direcional |
+| Pegadas | Praia | as pegadas ficam na areia (2,3 s) e, 2 s depois, um fantasma refaz EXATAMENTE o caminho (posição = a do coração 2 s atrás). Nasce translúcido e inofensivo por 0,7 s; depois machuca (dano 4) |
+| Concha | Praia | uma concha gigante abre (0,55 s) e dentro dela o coração fica INVULNERÁVEL (balas passam, sem dano nem graze). Nos últimos 1,1 s ela pisca e fecha; no estalo quem ainda está dentro leva 5% do HP. Fica 1,3 s fechada e reabre >= 80 px dali |
+| Gaivota ladra | Praia | a gaivota roda (1,7 a 2,5 s), trava a mira e mostra o anel/sombra no chão por 0,8 s; mergulha e pega quem ainda está no anel (raio 19): rouba 1 de energia (sem energia, arranhão de 3% do HP). Cura e roubo vão ao outro PC pela mensagem `praiaAjuste` |
 
 
-Os eventos em **negrito** são novos (planos puros em `pvp/bonus/eventos/planosArenas.js`, testes em `__tests__/bonusArenasNovas.test.js`): sorteados pela semente da rodada (igual nos dois PCs), o mesmo plano nas duas caixas, sempre avisados (≥ 400 ms) e com corredor de fuga ≥ 48 px. METEOROS: pedras cruzam as caixas pelo risco vermelho tracejado. AIRLOCK: a comporta de um lado avisa (sirene, parede piscando) e puxa o coração (sem dano). DRAGÃO: serpenteia pelo risco dourado ondulado. LANTERNAS: anel dourado avisa, depois a lanterna acesa sobe balançando. TRÂNSITO: o semáforo amarelo avisa a faixa (faróis acesos), verde = carro, ônibus e moto disparam. OBRA: coluna listrada de amarelo e preto avisa a viga que despenca do guindaste.
+**Café Francês** (fundo `backgrounds/arenas/cafe.js`; música `arena_cafe.mid`). Os 8 bônus da arena (Duelo e Cartas malucas + estes) **mudam uma regra de como se joga a esquiva**, em vez de só passar balas. Regras puras em `pvp/bonus/eventos/cafe/planos.js` (testes em `__tests__/eventosCafe.test.js`), um arquivo por evento em `pvp/bonus/eventos/cafe/`. Todos os planos saem do rng da rodada (igual nos dois PCs; cada caixa usa um rng filho quando o que ela sorteia depende do tempo dela), têm instrução curta na tela (até 6 palavras), dica no Guia e prévia ao vivo.
+
+| Evento | Regra que muda | Justiça / saída |
+|---|---|---|
+| Latte art | o coração deixa uma linha de leite (2,8 s). **Fechar um laço** (área ≥ 420 px², caminho ≥ 80 px) apaga as balas lá dentro. Tinta limitada: o tanque dá ~520 px de linha, recarrega 9%/s andando e 42%/s parado, e cada bala apagada devolve 7% | a linha nunca machuca; sem tinta só para de desenhar |
+| Bandeja | carrega uma xícara: giro brusco (> 3,6 rad/s), arrancada e freada fazem o **medidor de balanço** subir; cheio, **derrama** (dano 3% do HP máx., mín. 2, e 1,5 s de respiro). As balas andam 8% mais devagar | curva aberta e andar reto nunca derramam; o balanço baixa sozinho; a CPU suaviza o joystick |
+| Mímico | **paredes invisíveis** (um dos 5 moldes, espelhado ao acaso). Aparecem fracas por 2,2 s no começo e por 0,9 s quando alguém **encosta** (luva do mímico). O coração desliza pela parede e **as balas quicam nela** | o labirinto nunca parte a caixa (corredores ≥ 26 px) |
+| Acordeão | a caixa é o fole: a cada compasso (1,875 s, valsa a 96 bpm) o fole recebe um alvo, **avisa** (faixa vermelha com setas + nota, 0,56 s) e anda (0,56 s), **empurrando** o coração (limite interno, como a Arena encolhendo) | sempre sobra ≥ 96 px livres; o fole anda mais devagar que o coração |
+| Pintor | o pintor pinta faixas e manchas (contorno tracejado por 0,8 s; no máx. 34% da caixa e 2 pinceladas). **Tinta molhada (4,3 s) congela a bala** que entra nela: vira obstáculo parado e some quando a tinta seca | a tinta em si não machuca nem prende o coração |
+| Menu do dia | as balas viram pratos (croissant, baguete, queijo, sopa, macaron); o quadro mostra o **prato do dia**: encostar nele **cura** (3% do HP máx., mín. 2, 0,9 s de respiro; em rede a cura vai para o outro PC, mensagem `cura`); os outros machucam (4). Troca a cada ~6,8 s com aviso de 0,8 s e 0,5 s em que nada machuca | ~36% dos pratos são o do dia |
+| Expresso | xícaras aparecem; **cada café** dá +17% de velocidade por 5,4 s e **soma** (até 4). Com 4 ao mesmo tempo: **tremedeira** de 3,4 s (o direcional balança e o coração chacoalha; "reduzir animações" tira só o chacoalho do desenho) | nunca machuca; a CPU para em 3 |
+| Xadrez | o coração é um **cavalo**: não anda, **pula em L** (6 x 4 casas, 8 destinos marcados na hora, o direcional escolhe o mais alinhado, recarga 0,42 s mostrada num anel). No ar (0,15 s) não leva dano | de qualquer casa há ≥ 2 pulos e o tabuleiro todo é alcançável; a CPU pula quando a casa dela vai ficar perigosa |
+
+Os eventos em **negrito** são novos: cada arena nova tem 8 eventos de regra nova (pastas `pvp/bonus/eventos/<arena>/`, planos puros em `<arena>/planos.js`, testes em `__tests__/eventos<Arena>.test.js`), sorteados pela semente da rodada (iguais nos dois PCs), sempre avisados e com saída.
 
 **Layout da votação** (`pvp/layoutVoto.js`): até 8 cartões numa fileira; mais que isso vira grade de 2 (até 16) ou 3 fileiras, qualquer número de arenas. ← → andam em fila, ↑ ↓ trocam de fileira, o mouse aponta (passar) e vota (clicar). Músicas geradas por `scripts/musica/arenasNovas.mjs`.
 
@@ -728,3 +743,20 @@ Cada Ás de cada personagem ganha um floreio curto (até ~1,2 s), só enfeite: n
 | Asriel | Hiper Espelho: prisma arco-íris | Apagar: borracha arco-íris | Pegar Alma: alma vermelha vem até a carta | Salvar: estrela de SAVE |
 
 Conferir no dev: `window.debugGaleria('ases')` (uma página por personagem, Z repete) ou `window.debugPalcoAses('dess', 'espadas')`.
+
+### Estação Espacial: 8 bônus que mudam uma regra
+
+Código em `pvp/bonus/eventos/estacao/` (contas puras em `planos.js`, testes em `__tests__/eventosEstacao.test.js`). Todos avisam com uma frase curta em cima das caixas; a CPU joga todos.
+
+| Bônus | Regra que muda |
+|---|---|
+| SEM ATRITO | o direcional vira empuxo: o coração desliza e só para se você frear ao contrário (vmax 90, quica de leve) |
+| BURACO DE MINHOCA | as bordas se ligam (cima-baixo, esquerda-direita) para o coração e para as balas (cada bala atravessa 1 vez) |
+| RADAR | caixa escura; o feixe (1,8 s por volta) revela as balas com um blip que apaga; balas piscando, chegando de fora ou coladas no coração sempre aparecem |
+| ÓRBITA | planeta no meio: puxa balas (curvam, são engolidas) e o coração (puxão < direcional); encostar machuca |
+| POLARIDADE | coração e balas são + ou −; iguais repelem, opostos atraem; A inverte o seu (recarga 220 ms); polo da bala = função do índice (igual nos 2 PCs); a inversão vai pelo canal `estPolaridade` |
+| OXIGÊNIO | barra de O2 esvazia (~5,6 s); bolhas avisadas recarregam; vazia = dano de 2% do HP máx a cada 1,5 s |
+| RAIO TRATOR | A perto de uma bala a agarra (inofensiva, orbita o coração); A de novo lança na caixa do oponente (aviso de 650 ms); canal `estTrator` cria a mesma bala no PC do outro |
+| MANUTENÇÃO | 4 painéis piscam (1 por quadrante); 1 s em cima conserta e vira escudo que apaga balas até o fim da rodada |
+
+O jogo só recebe o aperto do botão (sem segurar/soltar), por isso o trator é "A pega, A lança".

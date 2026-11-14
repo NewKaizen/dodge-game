@@ -58,6 +58,7 @@ Como cada tela usa essas mensagens:
 | `coracao` (rápida) | | os dois | `{ x, y, k, r }` posição do MEU coração na caixa `k` onde ele está (`r` = rodada) |
 | `dano` | | dono → outro | `{ lado, dano, r }` (o outro aplica com as regras: escudo, 2ª chance...) |
 | `graze` | | dono → outro | `{ lado, n, r }` |
+| `cura` | | dono → outro | `{ lado, cura, r }`: curei o meu coração (MENU DO DIA, arena Café: `arena.curarCoracao`); o outro aplica `aplicarCura` e o HP dele fica igual |
 | `fimEsquiva` | rodada | os dois | `{ acertos, ko }` do meu coração: terminei a minha caixa (também depois do duelo e do CTRL+C CTRL+V) |
 | `fimRodada` | rodada | host → conv. | `{ estado, vencedor }` |
 | `resultadoPronto` | rodada | conv. → host | `{}`: o replay do K.O. acabou aqui (o host espera, no máximo 20 s, e abre a `PvpResultado` nos dois com `irParaCena`) |
