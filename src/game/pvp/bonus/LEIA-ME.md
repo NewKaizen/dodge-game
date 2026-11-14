@@ -216,9 +216,18 @@ de 0 nem acima de `ENERGIA.maxima`) e voa gema a gema de um HUD para o outro.
 A CPU usa `BotCopia` (`NIVEIS_COPIA`: ~4, 5,5 e 7 apertos/s com variação, cansaço e tropeços).
 `pvpArena.duelo.estadoDebug()` mostra apertos, cabo e o resultado.
 
-## Eventos das arenas ESTAÇÃO, CHINATOWN e CIDADE
+## Eventos das arenas CHINATOWN e CIDADE
 
-`meteoros`, `airlock`, `dragao`, `lanternas`, `transito`, `obra`. O plano de cada um (tempos, posições, faixas) sai de
+`dragao`, `lanternas`, `transito`, `obra`. O plano de cada um (tempos, posições, faixas) sai de
 `eventos/planosArenas.js` (sem Phaser, testado em `__tests__/bonusArenasNovas.test.js`: repetível pela semente, avisado,
 com corredor de fuga); a arte (texturas de canvas) fica em `eventos/arteArenasNovas.js`. Todos usam `pista.balas.criar` com
 `aviso`/`jaAvisada` e `registrarZona` para a CPU enxergar; o AIRLOCK só mexe no `joy`.
+
+## Eventos da arena ESTAÇÃO ESPACIAL (`eventos/estacao/`)
+
+`semAtrito`, `minhoca`, `radar`, `orbita`, `polaridade`, `oxigenio`, `trator`, `manutencao`: cada um muda uma regra (inércia,
+bordas ligadas, visão, gravidade, polos, ar, raio trator, escudos). Contas puras em `estacao/planos.js` (testes em
+`__tests__/eventosEstacao.test.js`), ajudantes em `estacao/util.js` (`criarCofre`, `avisoDoEvento`, `ouvirBotao`, `criarCanal`).
+Os que mexem em balas só alteram `vx/vy/x/y/morta/sprite.setVisible` (`b.segurada`, `b.marcaPlaneta`, `b.pol` são marcas
+próprias). Eventos com ação do jogador (`polaridade`, `trator`) ouvem o A por `ouvirBotao` (só o aperto, não há "segurar") e,
+em rede, mandam uma mensagem pelo canal (`estPolaridade`, `estTrator`) com a rodada junto.

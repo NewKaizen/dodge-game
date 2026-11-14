@@ -1,6 +1,6 @@
 // Arte (texturas de canvas, geradas em código) e utilidades dos bônus das arenas ESTAÇÃO
 // ESPACIAL, CHINATOWN e CIDADE GRANDE (planosArenas.js tem a parte sem Phaser).
-//   texturaMeteoro · texturaLanterna · texturaVeiculo · texturaViga
+//   texturaLanterna · texturaVeiculo · texturaViga
 //   rotulo(arena, x, y, texto, opcoes)     texto com contorno e sem ligadura ("fi" vira "A" na fonte)
 //   faixaListrada(g, x, y, w, h, ...)      faixa de perigo amarela e preta (OBRA)
 // Sempre teste `arena.textures.exists(chave)` (as funções já fazem isso).
@@ -27,40 +27,6 @@ const arredondado = (g, x, y, w, h, r) => {
   g.arcTo(x, y + h, x, y, r)
   g.arcTo(x, y, x + w, y, r)
   g.closePath()
-}
-
-// pedra do espaço: cinza-marrom, cheia de crateras, luz de cima à esquerda
-export function texturaMeteoro(arena) {
-  return desenhar(arena, 'estacao-meteoro', 64, 64, (g, w, h) => {
-    const pontos = []
-    for (let k = 0; k < 14; k++) {
-      const a = (k / 14) * Math.PI * 2
-      const r = 27 + Math.sin(k * 2.3) * 3 + (k % 3) * 1.2
-      pontos.push([w / 2 + Math.cos(a) * r, h / 2 + Math.sin(a) * r])
-    }
-    g.beginPath()
-    pontos.forEach(([x, y], k) => (k ? g.lineTo(x, y) : g.moveTo(x, y)))
-    g.closePath()
-    const grad = g.createRadialGradient(24, 22, 4, 32, 32, 34)
-    grad.addColorStop(0, '#b8a898')
-    grad.addColorStop(0.55, '#7c6c60')
-    grad.addColorStop(1, '#3a302c')
-    g.fillStyle = grad
-    g.fill()
-    g.lineWidth = 2
-    g.strokeStyle = '#1e1816'
-    g.stroke()
-    for (const [x, y, r] of [[22, 24, 7], [40, 20, 5], [36, 40, 8], [18, 42, 4], [46, 34, 3.5]]) {
-      g.fillStyle = '#4a3e38'
-      g.beginPath()
-      g.ellipse(x, y, r, r * 0.8, 0, 0, Math.PI * 2)
-      g.fill()
-      g.fillStyle = '#a89888'
-      g.beginPath()
-      g.ellipse(x - r * 0.25, y - r * 0.3, r * 0.6, r * 0.4, 0, 0, Math.PI * 2)
-      g.fill()
-    }
-  })
 }
 
 // lanterna de festival: corpo vermelho com gomos, tampas douradas e franja

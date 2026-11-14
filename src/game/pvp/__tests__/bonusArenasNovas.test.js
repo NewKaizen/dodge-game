@@ -1,6 +1,6 @@
 // node --test src/game/pvp/__tests__/
 // Os bônus das arenas ESTAÇÃO ESPACIAL, CHINATOWN e CIDADE GRANDE: as arenas, as listas, e os PLANOS dos eventos
-// novos (METEOROS, AIRLOCK, DRAGÃO, LANTERNAS, TRÂNSITO, OBRA; pvp/bonus/eventos/planosArenas.js): repetíveis pela
+// novos (DRAGÃO, LANTERNAS, TRÂNSITO, OBRA; pvp/bonus/eventos/planosArenas.js): repetíveis pela
 // semente, sempre telegrafados e sempre com um corredor de fuga (o mesmo critério de attacks/validacao.js).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -11,8 +11,8 @@ import { criarRng, aleatorio } from '../baralho.js'
 import { ATAQUE } from '../../constants.js'
 import { LACUNA_MINIMA } from '../../attacks/validacao.js'
 import {
-  REF_CAIXA, METEOROS, AIRLOCK, LADOS, DRAGAO, LANTERNAS, TRANSITO, OBRA, FAIXAS_TRANSITO, VEICULOS,
-  planoMeteoros, planoAirlock, planoDragao, caminhoDoDragao, planoLanternas, planoTransito, travessiaDoVeiculo, planoObra, maiorLacuna,
+  REF_CAIXA, DRAGAO, LANTERNAS, TRANSITO, OBRA, FAIXAS_TRANSITO, VEICULOS,
+  planoDragao, caminhoDoDragao, planoLanternas, planoTransito, travessiaDoVeiculo, planoObra, maiorLacuna,
 } from '../bonus/eventos/planosArenas.js'
 
 const sorteDe = (semente) => {
@@ -20,7 +20,8 @@ const sorteDe = (semente) => {
   return () => aleatorio(rng) // como a arena faz: criarRng(`${semente}:efeito:${rodada}`) -> () => aleatorio(rng)
 }
 const SEMENTES = Array.from({ length: 40 }, (_, i) => `arenas-novas:${i}`)
-const NOVOS = { estacao: ['meteoros', 'airlock'], chinatown: ['dragao', 'lanternas'], cidade: ['transito', 'obra'] }
+// (os 8 eventos da ESTAÇÃO são conferidos em eventosEstacao.test.js)
+const NOVOS = { estacao: [], chinatown: ['dragao', 'lanternas'], cidade: ['transito', 'obra'] }
 
 test('arenas novas: existem, com música própria, e a lista de bônus tem no mínimo BONUS_POR_ARENA eventos válidos', () => {
   for (const id of Object.keys(NOVOS)) {
@@ -51,7 +52,6 @@ test('os eventos novos existem como eventos de esquiva, com a ficha e o efeito r
 
 test('renomeados: o evento reaproveitado ganha o nome da arena sem mudar o evento original', () => {
   const nomes = (arena) => Object.fromEntries(eventosDaArena(arena).map((e) => [e.id, e.nome]))
-  assert.equal(nomes('estacao').gravidade, 'GRAVIDADE ZERO')
   assert.equal(nomes('cidade').apagao, 'BLECAUTE')
   assert.equal(nomes('chinatown').explosoes, 'FOGOS DE ARTIFÍCIO')
   assert.equal(EVENTO.gravidade.nome, 'GRAVIDADE MALUCA')
@@ -62,41 +62,6 @@ test('renomeados: o evento reaproveitado ganha o nome da arena sem mudar o event
 
 // em ordem crescente e com `aviso` de pelo menos ATAQUE.telegrafoMs
 const emOrdem = (lista) => lista.every((x, i) => i === 0 || x.em > lista[i - 1].em)
-
-test('METEOROS: repetível, telegrafado, e a faixa varrida deixa um corredor livre', () => {
-  assert.ok(METEOROS.avisoMs >= ATAQUE.telegrafoMs)
-  for (const semente of SEMENTES) {
-    const plano = planoMeteoros(sorteDe(semente))
-    assert.deepEqual(plano, planoMeteoros(sorteDe(semente)), 'mesma semente, mesmo plano')
-    assert.ok(plano.length >= 8 && emOrdem(plano))
-    for (const onda of plano) {
-      assert.ok(onda.rochas.length >= 1 && onda.rochas.length <= 3)
-      assert.ok(maiorLacuna(REF_CAIXA.altura, onda.rochas.map((r) => r.faixa)) >= LACUNA_MINIMA, 'sem rota de fuga')
-      for (const r of onda.rochas) {
-        assert.ok(Math.abs(r.inclinacao) <= METEOROS.inclinacaoMax && [-1, 1].includes(r.dir) && r.raio >= 10)
-        assert.ok(r.fy >= 0 && r.fy <= 1)
-      }
-    }
-  }
-  assert.notDeepEqual(planoMeteoros(sorteDe('a')), planoMeteoros(sorteDe('b')))
-})
-
-test('AIRLOCK: repetível, avisa antes de puxar e nunca repete o lado', () => {
-  assert.ok(AIRLOCK.avisoMs >= ATAQUE.telegrafoMs && AIRLOCK.forca > 0 && AIRLOCK.forca < 100)
-  for (const semente of SEMENTES) {
-    const plano = planoAirlock(sorteDe(semente))
-    assert.deepEqual(plano, planoAirlock(sorteDe(semente)))
-    assert.equal(plano.length, AIRLOCK.aberturas)
-    let fim = 0
-    plano.forEach((a, i) => {
-      assert.ok(LADOS.includes(a.lado))
-      if (i) assert.notEqual(a.lado, plano[i - 1].lado)
-      assert.ok(a.avisoMs >= ATAQUE.telegrafoMs)
-      assert.ok(a.em >= fim, 'uma abertura por vez')
-      fim = a.em + a.avisoMs + a.sugaMs
-    })
-  }
-})
 
 test('DRAGÃO: repetível, telegrafado, e a onda do corpo deixa um corredor livre em toda a travessia', () => {
   assert.ok(DRAGAO.avisoMs >= ATAQUE.telegrafoMs)

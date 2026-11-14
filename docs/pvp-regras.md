@@ -187,7 +187,7 @@ Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria 
 | Coliseu | `arena_coliseu.mid` | coração trocado, arena encolhendo, leões, chuva de lanças, corrida de bigas, chão em brasas, polegar do imperador, rede do reciário |
 | Praia | Maré Mansa (`arena_praia.mid`) | onda gigante, caranguejos, bola de praia, maré alta (aquário), brisa do mar (ventania), areia movediça, areia quente (chão em brasas), festa na praia, chuva de verão |
 | Café Francês | Valsa do Croissant (`arena_cafe.mid`) | croissants voadores, bule quente, pombos, queda de luz (apagão), luzinhas (vaga-lumes), no compasso (no ritmo), chanson (karaokê), chuva de verão, coração trocado |
-| Estação Espacial | Órbita Baixa (`arena_estacao.mid`, ambiente em Lá menor) | gravidade zero (gravidade maluca), **meteoros**, **airlock**, estação girando (ponta-cabeça), falha de energia (apagão), sinal atrasado (lag), sistema travado (tela azul), teletransporte (coração trocado), alarmes (pop-ups) |
+| Estação Espacial | Órbita Baixa (`arena_estacao.mid`, ambiente em Lá menor) | **sem atrito**, **buraco de minhoca**, **radar**, **órbita**, **polaridade**, **oxigênio**, **raio trator**, **manutenção** (8 bônus próprios, cada um muda uma regra; ver abaixo) |
 | Chinatown | Rua das Mil Lanternas (`arena_chinatown.mid`, Ré maior pentatônico) | fogos de artifício (explosões), **dragão**, **lanternas**, festival (festa), multidão (mosh), tambores (no ritmo), vapor das panelas (gelo seco), chuva de noite, karaokê |
 | Cidade Grande | Hora do Rush (`arena_cidade.mid`, funk/jazz-hop em Dó) | **trânsito**, **obra**, blecaute (apagão), metrô (terremoto), temporal (chuva), vento entre prédios (ventania), outdoors (pop-ups), hora do rush (mosh), fumaça de escapamento (gelo seco) |
 
@@ -203,7 +203,7 @@ Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria 
 | Pombos | Café | um bando cruza em cunha com um VÃO de 62 px (aviso de 1 s: linhas de voo e vão verde); o vão do próximo bando fica perto do anterior |
 
 
-Os eventos em **negrito** são novos (planos puros em `pvp/bonus/eventos/planosArenas.js`, testes em `__tests__/bonusArenasNovas.test.js`): sorteados pela semente da rodada (igual nos dois PCs), o mesmo plano nas duas caixas, sempre avisados (≥ 400 ms) e com corredor de fuga ≥ 48 px. METEOROS: pedras cruzam as caixas pelo risco vermelho tracejado. AIRLOCK: a comporta de um lado avisa (sirene, parede piscando) e puxa o coração (sem dano). DRAGÃO: serpenteia pelo risco dourado ondulado. LANTERNAS: anel dourado avisa, depois a lanterna acesa sobe balançando. TRÂNSITO: o semáforo amarelo avisa a faixa (faróis acesos), verde = carro, ônibus e moto disparam. OBRA: coluna listrada de amarelo e preto avisa a viga que despenca do guindaste.
+Os eventos em **negrito** são novos (planos puros em `pvp/bonus/eventos/planosArenas.js`, testes em `__tests__/bonusArenasNovas.test.js`): sorteados pela semente da rodada (igual nos dois PCs), o mesmo plano nas duas caixas, sempre avisados (≥ 400 ms) e com corredor de fuga ≥ 48 px. DRAGÃO: serpenteia pelo risco dourado ondulado. LANTERNAS: anel dourado avisa, depois a lanterna acesa sobe balançando. TRÂNSITO: o semáforo amarelo avisa a faixa (faróis acesos), verde = carro, ônibus e moto disparam. OBRA: coluna listrada de amarelo e preto avisa a viga que despenca do guindaste.
 
 **Layout da votação** (`pvp/layoutVoto.js`): até 8 cartões numa fileira; mais que isso vira grade de 2 (até 16) ou 3 fileiras, qualquer número de arenas. ← → andam em fila, ↑ ↓ trocam de fileira, o mouse aponta (passar) e vota (clicar). Músicas geradas por `scripts/musica/arenasNovas.mjs`.
 
@@ -728,3 +728,20 @@ Cada Ás de cada personagem ganha um floreio curto (até ~1,2 s), só enfeite: n
 | Asriel | Hiper Espelho: prisma arco-íris | Apagar: borracha arco-íris | Pegar Alma: alma vermelha vem até a carta | Salvar: estrela de SAVE |
 
 Conferir no dev: `window.debugGaleria('ases')` (uma página por personagem, Z repete) ou `window.debugPalcoAses('dess', 'espadas')`.
+
+### Estação Espacial: 8 bônus que mudam uma regra
+
+Código em `pvp/bonus/eventos/estacao/` (contas puras em `planos.js`, testes em `__tests__/eventosEstacao.test.js`). Todos avisam com uma frase curta em cima das caixas; a CPU joga todos.
+
+| Bônus | Regra que muda |
+|---|---|
+| SEM ATRITO | o direcional vira empuxo: o coração desliza e só para se você frear ao contrário (vmax 90, quica de leve) |
+| BURACO DE MINHOCA | as bordas se ligam (cima-baixo, esquerda-direita) para o coração e para as balas (cada bala atravessa 1 vez) |
+| RADAR | caixa escura; o feixe (1,8 s por volta) revela as balas com um blip que apaga; balas piscando, chegando de fora ou coladas no coração sempre aparecem |
+| ÓRBITA | planeta no meio: puxa balas (curvam, são engolidas) e o coração (puxão < direcional); encostar machuca |
+| POLARIDADE | coração e balas são + ou −; iguais repelem, opostos atraem; A inverte o seu (recarga 220 ms); polo da bala = função do índice (igual nos 2 PCs); a inversão vai pelo canal `estPolaridade` |
+| OXIGÊNIO | barra de O2 esvazia (~5,6 s); bolhas avisadas recarregam; vazia = dano de 2% do HP máx a cada 1,5 s |
+| RAIO TRATOR | A perto de uma bala a agarra (inofensiva, orbita o coração); A de novo lança na caixa do oponente (aviso de 650 ms); canal `estTrator` cria a mesma bala no PC do outro |
+| MANUTENÇÃO | 4 painéis piscam (1 por quadrante); 1 s em cima conserta e vira escudo que apaga balas até o fim da rodada |
+
+O jogo só recebe o aperto do botão (sem segurar/soltar), por isso o trator é "A pega, A lança".

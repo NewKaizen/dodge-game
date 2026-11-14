@@ -1,5 +1,5 @@
-// Planos (lógica pura, sem Phaser) dos bônus das arenas ESTAÇÃO ESPACIAL, CHINATOWN e
-// CIDADE GRANDE: METEOROS, AIRLOCK, DRAGÃO, LANTERNAS, TRÂNSITO e OBRA.
+// Planos (lógica pura, sem Phaser) dos bônus das arenas CHINATOWN e CIDADE GRANDE:
+// DRAGÃO, LANTERNAS, TRÂNSITO e OBRA. (Os da ESTAÇÃO ESPACIAL ficam em estacao/planos.js.)
 //
 // Cada evento sorteia o plano inteiro da rodada a partir do `rng` da rodada (a semente
 // vem de `${semente}:efeito:${rodada}`, igual nos dois PCs em rede) e usa o MESMO plano
@@ -20,60 +20,8 @@ import { LACUNA_MINIMA, lacunasLivres } from '../../../attacks/validacao.js'
 export const REF_CAIXA = { largura: 220, altura: 170 }
 
 const entre = (sorte, a, b) => a + (b - a) * sorte()
-const sortearDe = (sorte, lista) => lista[Math.min(lista.length - 1, Math.floor(sorte() * lista.length))]
 // a maior lacuna livre em [0, total] depois de tirar as faixas ocupadas
 export const maiorLacuna = (total, ocupados) => Math.max(0, ...lacunasLivres(0, total, ocupados).map(([a, b]) => b - a))
-
-// ---------- METEOROS (Estação Espacial) ----------
-// Pedras do espaço cruzam a caixa na diagonal suave, de um lado a outro. A rota de cada
-// uma aparece antes como um risco vermelho (AVISO_METEORO_MS). Uma onda tem 1 a 3 pedras
-// e a soma das faixas de altura que elas varrem sempre deixa um corredor livre.
-export const METEOROS = { primeiraMs: 900, periodoMs: { min: 1700, max: 2300 }, avisoMs: 950, velocidade: 270, inclinacaoMax: 0.3, ondas: 14 }
-
-export function planoMeteoros(sorte, ref = REF_CAIXA, { ondas = METEOROS.ondas } = {}) {
-  const lista = []
-  let em = METEOROS.primeiraMs
-  for (let k = 0; k < ondas; k++) {
-    const quantas = sorte() < 0.4 ? 2 : sorte() < 0.2 ? 3 : 1
-    const rochas = []
-    for (let tentativa = 0; tentativa < 60 && rochas.length < quantas; tentativa++) {
-      const raio = Math.round(entre(sorte, 11, 17))
-      const dir = sorte() < 0.5 ? 1 : -1
-      const inclinacao = entre(sorte, -METEOROS.inclinacaoMax, METEOROS.inclinacaoMax) // dy/dx
-      const y0 = entre(sorte, 0.08, 0.92) * ref.altura // altura na borda por onde entra
-      const y1 = y0 + inclinacao * (ref.largura + 2 * raio) // altura na borda por onde sai
-      const faixa = [Math.min(y0, y1) - raio - 6, Math.max(y0, y1) + raio + 6]
-      const ocupados = [...rochas.map((r) => r.faixa), faixa]
-      if (maiorLacuna(ref.altura, ocupados) < LACUNA_MINIMA + 16) continue
-      rochas.push({ dir, raio, inclinacao, fy: y0 / ref.altura, faixa })
-    }
-    if (!rochas.length) continue
-    lista.push({ em, rochas: rochas.map(({ faixa, ...r }) => ({ ...r, faixa })) })
-    em += entre(sorte, METEOROS.periodoMs.min, METEOROS.periodoMs.max)
-  }
-  return lista
-}
-
-// ---------- AIRLOCK (Estação Espacial) ----------
-// A comporta de um lado de cada caixa abre: luz vermelha girando e sirene (aviso), depois
-// a descompressão puxa tudo (inclusive o coração) para aquele lado, e fecha. Nunca duas
-// vezes seguidas o mesmo lado. Não dá dano: é só o puxão contra os ataques.
-export const AIRLOCK = { primeiraMs: 800, avisoMs: 1000, sugaMs: { min: 1300, max: 1800 }, pausaMs: { min: 900, max: 1400 }, forca: 52, aberturas: 10 }
-export const LADOS = ['esquerda', 'direita', 'cima', 'baixo']
-
-export function planoAirlock(sorte, { aberturas = AIRLOCK.aberturas } = {}) {
-  const lista = []
-  let em = AIRLOCK.primeiraMs
-  let ultimo = null
-  for (let k = 0; k < aberturas; k++) {
-    const lado = sortearDe(sorte, LADOS.filter((l) => l !== ultimo))
-    const suga = entre(sorte, AIRLOCK.sugaMs.min, AIRLOCK.sugaMs.max)
-    lista.push({ em, lado, avisoMs: AIRLOCK.avisoMs, sugaMs: suga })
-    ultimo = lado
-    em += AIRLOCK.avisoMs + suga + entre(sorte, AIRLOCK.pausaMs.min, AIRLOCK.pausaMs.max)
-  }
-  return lista
-}
 
 // ---------- DRAGÃO (Chinatown) ----------
 // O dragão da festa serpenteia pela caixa de um lado ao outro, o corpo seguindo uma onda

@@ -4,8 +4,6 @@
 // 'malucas', 'duelo' e 'copia' não estão aqui (a arena, o Duelo.js e o Copia.js cuidam deles).
 
 import explosoes from './explosoes.js'
-import meteoros from './meteoros.js'
-import airlock from './airlock.js'
 import dragao from './dragao.js'
 import lanternas from './lanternas.js'
 import transito from './transito.js'
@@ -52,7 +50,7 @@ import armadilhas from './armadilhas.js'
 import areia from './areia.js'
 import relogio from './relogio.js'
 
-export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira, encolhendo, leoes, lancas, bigas, brasas, polegar, rede, plateia, geloSeco, ritmo, karaoke, mosh, pedra, armadilhas, areia, relogio, meteoros, airlock, dragao, lanternas, transito, obra }
+export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira, encolhendo, leoes, lancas, bigas, brasas, polegar, rede, plateia, geloSeco, ritmo, karaoke, mosh, pedra, armadilhas, areia, relogio, dragao, lanternas, transito, obra }
 
 // PRAIA e CAFÉ FRANCÊS (planos puros em planosPraiaCafe.js)
 import onda from './onda.js'
@@ -63,3 +61,15 @@ import bule from './bule.js'
 import pombos from './pombos.js'
 
 Object.assign(EFEITOS, { ondaGigante: onda, caranguejos, bolaDePraia: bola, croissants, buleQuente: bule, pombos })
+
+// ESTAÇÃO ESPACIAL (planos puros em estacao/planos.js)
+import semAtrito from './estacao/semAtrito.js'
+import minhoca from './estacao/minhoca.js'
+import radar from './estacao/radar.js'
+import orbita from './estacao/orbita.js'
+import polaridade from './estacao/polaridade.js'
+import oxigenio from './estacao/oxigenio.js'
+import trator from './estacao/trator.js'
+import manutencao from './estacao/manutencao.js'
+
+Object.assign(EFEITOS, { semAtrito, minhoca, radar, orbita, polaridade, oxigenio, trator, manutencao })
