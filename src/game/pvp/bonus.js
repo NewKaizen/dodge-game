@@ -84,9 +84,6 @@ export const EVENTOS = [
   { id: 'areia', nome: 'AREIA MOVEDIÇA', descricao: 'poças de areia prendem e puxam o coração!', cartas: 'normal', cor: 0xe8c070 },
   { id: 'relogio', nome: 'RELÓGIO DO TEMPO', descricao: 'o ataque alterna entre câmera lenta e acelerado!', cartas: 'normal', cor: 0x7fc8ff },
   // PRAIA e CAFÉ FRANCÊS
-  { id: 'ondaGigante', nome: 'ONDA GIGANTE', descricao: 'uma onda varre a caixa: passe pelo vão na água!', cartas: 'normal', cor: 0x2a9fff },
-  { id: 'caranguejos', nome: 'CARANGUEJOS', descricao: 'caranguejos andam de lado e beliscam: cuidado com as pinças!', cartas: 'normal', cor: 0xff6a4a },
-  { id: 'bolaDePraia', nome: 'BOLA DE PRAIA', descricao: 'uma bola quica pela caixa e empurra o coração!', cartas: 'normal', cor: 0xffd23a },
   // CAFÉ FRANCÊS (regras novas: a rodada muda COMO você joga; pvp/bonus/eventos/cafe/)
   { id: 'latteArt', nome: 'LATTE ART', descricao: 'o coração desenha uma linha de leite: feche um laço e apague as balas!', cartas: 'normal', cor: 0xfff3dc },
   { id: 'bandeja', nome: 'BANDEJA', descricao: 'você carrega uma xícara: ande liso ou o café derrama!', cartas: 'normal', cor: 0xc8884a },
@@ -96,6 +93,15 @@ export const EVENTOS = [
   { id: 'menuDoDia', nome: 'MENU DO DIA', descricao: 'as balas viram pratos: só o prato do dia cura!', cartas: 'normal', cor: 0x7fe08a },
   { id: 'expresso', nome: 'EXPRESSO', descricao: 'cada café te deixa mais rápido... até a tremedeira!', cartas: 'normal', cor: 0xffb060 },
   { id: 'xadrez', nome: 'XADREZ', descricao: 'a caixa vira tabuleiro: o coração pula como um cavalo!', cartas: 'normal', cor: 0xffd070 },
+  // PRAIA (regras novas: pvp/bonus/eventos/praia/)
+  { id: 'castelodeAreia', nome: 'CASTELO DE AREIA', descricao: 'sua trilha vira muro de areia: as balas batem nele!', cartas: 'normal', cor: 0xe8c070 },
+  { id: 'surf', nome: 'SURF', descricao: 'fique na crista da onda: cair dói!', cartas: 'normal', cor: 0x2ad0ff },
+  { id: 'solDoMeioDia', nome: 'SOL DO MEIO-DIA', descricao: 'só a sombra dos guarda-sóis protege do sol!', cartas: 'normal', cor: 0xffc830 },
+  { id: 'cacaTesouro', nome: 'CAÇA AO TESOURO', descricao: 'o detector apita mais perto do tesouro: cave e se cure!', cartas: 'normal', cor: 0xf0a830 },
+  { id: 'pipa', nome: 'PIPA', descricao: 'o coração balança preso numa pipa, feito pêndulo!', cartas: 'normal', cor: 0xff5a8a },
+  { id: 'pegadas', nome: 'PEGADAS', descricao: 'um fantasma refaz seus passos 2 segundos depois!', cartas: 'normal', cor: 0xcfd8ff },
+  { id: 'concha', nome: 'CONCHA', descricao: 'dentro da concha ninguém te machuca... até ela fechar!', cartas: 'normal', cor: 0xff9ac8 },
+  { id: 'gaivotaLadra', nome: 'GAIVOTA LADRA', descricao: 'ela mergulha na sombra e rouba sua energia!', cartas: 'normal', cor: 0xdfe8f0 },
 ]
 
 export const EVENTO = Object.fromEntries(EVENTOS.map((ev) => [ev.id, ev]))

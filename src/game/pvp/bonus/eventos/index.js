@@ -52,12 +52,8 @@ import relogio from './relogio.js'
 
 export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira, encolhendo, leoes, lancas, bigas, brasas, polegar, rede, plateia, geloSeco, ritmo, karaoke, mosh, pedra, armadilhas, areia, relogio, dragao, lanternas, transito, obra }
 
-// PRAIA e CAFÉ FRANCÊS (planos puros em planosPraiaCafe.js)
-import onda from './onda.js'
-import caranguejos from './caranguejos.js'
-import bola from './bola.js'
 
-Object.assign(EFEITOS, { ondaGigante: onda, caranguejos, bolaDePraia: bola })
+
 
 // ESTAÇÃO ESPACIAL (planos puros em estacao/planos.js)
 import semAtrito from './estacao/semAtrito.js'
@@ -75,3 +71,16 @@ Object.assign(EFEITOS, { semAtrito, minhoca, radar, orbita, polaridade, oxigenio
 import { EFEITOS_CAFE } from './cafe/index.js'
 
 Object.assign(EFEITOS, EFEITOS_CAFE)
+
+
+// PRAIA: 8 eventos de regra nova (planos puros em praia/planos.js)
+import castelodeAreia from './praia/castelo.js'
+import surf from './praia/surf.js'
+import solDoMeioDia from './praia/sol.js'
+import cacaTesouro from './praia/tesouro.js'
+import pipa from './praia/pipa.js'
+import pegadas from './praia/pegadas.js'
+import concha from './praia/concha.js'
+import gaivotaLadra from './praia/gaivota.js'
+
+Object.assign(EFEITOS, { castelodeAreia, surf, solDoMeioDia, cacaTesouro, pipa, pegadas, concha, gaivotaLadra })

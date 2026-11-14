@@ -75,9 +75,6 @@ const DICAS = {
   areia: { nome: 'AREIA MOVEDIÇA', dica: 'Poças de areia surgem com aviso, prendem e puxam o coração para o meio. Não dá dano, mas deixa você lento no meio das balas.' },
   relogio: { nome: 'RELÓGIO DO TEMPO', dica: 'O ataque alterna câmera lenta e acelerado (com 1 s de aviso); o coração anda normal. Use o lento para se reposicionar.' },
   // PRAIA e CAFÉ FRANCÊS
-  ondaGigante: { nome: 'ONDA GIGANTE', dica: 'A faixa azul piscando mostra por onde a água passa; o vão verde é a saída. Vá para o vão antes de a onda entrar: o próximo vão fica sempre perto do anterior.' },
-  caranguejos: { nome: 'CARANGUEJOS', dica: 'Eles andam de lado. Quando um para e ergue as pinças, o anel vermelho mostra o alcance do beliscão: saia do anel antes de ele fechar.' },
-  bolaDePraia: { nome: 'BOLA DE PRAIA', dica: 'A sombra mostra onde a bola cai e ela quica em linha reta. Encostou, ela empurra o coração (sem dano): fique longe dela e das quinas.' },
   // ESTAÇÃO ESPACIAL
   semAtrito: { nome: 'SEM ATRITO', dica: 'O direcional vira empuxo: o coração ganha velocidade e continua deslizando. Para frear, empurre para o lado CONTRÁRIO (leva uns 0,7 s). Nas paredes ele quica de leve: use isso para virar.' },
   minhoca: { nome: 'BURACO DE MINHOCA', dica: 'As bordas da caixa se ligam: sair por cima é entrar por baixo (brilho ciano), pela esquerda é entrar pela direita (violeta). Vale para as balas também, uma vez cada: uma bala que sai reaparece do lado oposto, e dá para vê-la chegando na faixa de fora. Use o portal para fugir de um canto.' },
@@ -96,6 +93,15 @@ const DICAS = {
   menuDoDia: { nome: 'MENU DO DIA', dica: 'As balas viram pratos. O quadro em cima da caixa mostra o prato do dia: encostar nele cura um pouco. Qualquer outro prato machuca. Quando o quadro pisca, o prato vai mudar (por meio segundo nenhum prato machuca).' },
   expresso: { nome: 'EXPRESSO', dica: 'Encoste nas xícaras para beber: cada uma deixa o coração mais rápido por uns 5 segundos e os efeitos se somam. Com 4 ao mesmo tempo vem a tremedeira e o direcional balança sozinho. Beba até 3 e espere.' },
   xadrez: { nome: 'XADREZ', dica: 'Você é o cavalo: o coração só pula em L (2 casas e 1 de lado). Os destinos aparecem marcados; empurre o direcional para escolher e o pulo sai na hora. No ar você não leva dano, mas depois do pulo há uma pequena recarga (o anel).' },
+  // PRAIA
+  castelodeAreia: { nome: 'CASTELO DE AREIA', dica: 'Seu rastro vira blocos de areia: molhados no começo, duros depois de meio segundo. Aí eles seguram balas (2 batidas cada) por uns 5 s. Ande em curva e fique atrás da sua muralha.' },
+  surf: { nome: 'SURF', dica: 'Fique dentro da faixa clara (a crista): o tracejado mostra onde ela estará em 0,6 s. Fora dela a barra de queda enche; cheia, você cai e leva dano. Ela nunca anda mais rápido que você.' },
+  solDoMeioDia: { nome: 'SOL DO MEIO-DIA', dica: 'Só a sombra dos guarda-sóis protege. Fora dela a barra de calor enche devagar (uns 2,6 s) e cheia queima. Siga a sombra: ela anda em órbitas lentas e previsíveis.' },
+  cacaTesouro: { nome: 'CAÇA AO TESOURO', dica: 'O detector apita mais rápido quando você chega perto do tesouro escondido (a barra embaixo esquenta). Fique em cima por 0,6 s para cavar: cura HP (ou +1 de energia). Cave nos momentos calmos.' },
+  pipa: { nome: 'PIPA', dica: 'O direcional agora é FORÇA: o coração balança em volta da pipa como um pêndulo, com inércia. Comece a frear antes e use a volta do balanço para ir ao outro lado. A corda é o limite.' },
+  pegadas: { nome: 'PEGADAS', dica: 'Um fantasma refaz o seu caminho 2 s depois, passo a passo. Ele nasce transparente (sem dano). Não fique parado nem volte pelo mesmo caminho: desenhe voltas largas.' },
+  concha: { nome: 'CONCHA', dica: 'Dentro da concha aberta você fica invulnerável. Quando as bordas piscam ela vai fechar: saia antes do estalo, senão leva dano. Ela reabre em outro lugar.' },
+  gaivotaLadra: { nome: 'GAIVOTA LADRA', dica: 'A gaivota roda e trava a mira: o anel vermelho no chão é onde ela vai pousar (0,8 s). Saia do anel! Se pegar, ela rouba 1 de energia.' },
   dragao: { nome: 'DRAGÃO', dica: 'O risco dourado ondulado no chão mostra por onde o dragão vai serpentear. O corpo todo machuca, mas a onda deixa sempre um corredor livre em cima ou embaixo.' },
   lanternas: { nome: 'LANTERNAS', dica: 'Um anel dourado fecha onde a lanterna vai nascer (ainda inofensiva). Depois ela acende e sobe balançando: desvie da coluna dela.' },
   transito: { nome: 'TRÂNSITO', dica: 'O semáforo manda: amarelo piscando = a faixa vermelha vai ter veículo (os faróis acendem na borda); verde = eles disparam. Ônibus é lento e longo, moto é rápida. Nunca as 3 faixas juntas.' },
