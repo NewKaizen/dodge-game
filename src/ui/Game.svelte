@@ -10,6 +10,7 @@
   import { instalarAvisos } from '../game/conta/avisos.js'
   import { instalarPopupBau } from '../game/conta/popupBau.js'
   import { instalarEntrada } from '../game/entrada.js'
+  import { instalarSegundoPlano } from '../game/segundoPlano.js'
   import { instalarTelaCheia } from '../lib/telaCheia.js'
   import { lan } from '../lib/lan/rede.js'
   import { ligarJogo, pingPartida, ROTAS, corDoPing } from '../lib/lan/transmissao.js'
@@ -36,6 +37,8 @@
     const desligarAvisos = instalarAvisos()
     const desligarPopupBau = instalarPopupBau(game)
     const desligarEntrada = instalarEntrada(game)
+    // aba escondida numa sala ou na campanha: o jogo continua andando (os outros não travam)
+    const desligarSegundoPlano = instalarSegundoPlano(game)
     ligarJogo(game)
 
     return () => {
@@ -44,6 +47,7 @@
       desligarAvisos()
       desligarPopupBau()
       desligarEntrada()
+      desligarSegundoPlano()
       desligarTelaCheia()
       desligarResolucao()
       desligar()

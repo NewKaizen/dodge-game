@@ -52,7 +52,7 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 // (0..N-1, o dono é a 0) e a sala tem o DONO (lobby: modo, tirar, convidar,
 // começar) e o HOST DA PARTIDA (papel 'host': a autoridade e o centro da estrela,
 // eleito pelo servidor pela melhor conexão quando o dono começa).
-//   participantes()  [{ indice (vaga), id, nome, conta, host, dono, caiu }] em ordem de vaga
+//   participantes()  [{ indice (vaga), id, nome, conta, host, dono, caiu, segundoPlano, pausado }] em ordem de vaga
 //   minhaVaga() · souDono() · parceiros() · hostDaPartida()
 //   pedirPartida()   (dono) COMEÇAR: o servidor elege o host e manda `comecar` para ele
 //   consumirComeco() (cena Lan, host eleito) o id da sala a começar agora, uma vez só
@@ -73,7 +73,10 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 // lancamento, moldura}; `baus {acao}` -> bausEstado / bauAberto / bausErro / equipado e o aviso bauGanho
 // (lib/bausConta.js)
 // ESTILOS DE CARTA (PROTOCOLO 19, docs/cosmeticos.md): conta.cosmeticos ganhou `frente` (o estilo da face)
-export const PROTOCOLO = 19
+// PAUSA ONLINE (PROTOCOLO 20, docs/rede-pvp.md "Aba em segundo plano e pausa online"): `pausado {valor}`
+// (o menu de pausa aberto por cima da partida, que continua); o membro da sala vem com `pausado` (só
+// em partida) além do `segundoPlano` (aba escondida). participantes() leva os dois
+export const PROTOCOLO = 20
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
@@ -151,7 +154,7 @@ export const souDono = () => estado().fase === 'sala' && Boolean(estado().sala?.
 export const participantes = () =>
   [...(estado().sala?.membros ?? [])]
     .sort((a, b) => (a.vaga ?? 0) - (b.vaga ?? 0))
-    .map((m) => ({ indice: m.vaga ?? 0, id: m.id, nome: m.nome, conta: m.conta ?? null, host: m.papel === 'host', dono: Boolean(m.dono), caiu: m.caiu ?? null }))
+    .map((m) => ({ indice: m.vaga ?? 0, id: m.id, nome: m.nome, conta: m.conta ?? null, host: m.papel === 'host', dono: Boolean(m.dono), caiu: m.caiu ?? null, segundoPlano: Boolean(m.segundoPlano), pausado: Boolean(m.pausado) }))
 export const minhaVaga = () => estado().sala?.membros.find((m) => m.id === estado().eu.id)?.vaga ?? 0
 export const parceiros = () => (estado().sala?.membros ?? []).filter((m) => m.id !== estado().eu.id)
 export const hostDaPartida = () => estado().sala?.membros.find((m) => m.papel === 'host') ?? null
@@ -363,6 +366,18 @@ if (typeof document !== 'undefined') document.addEventListener('visibilitychange
 const visibilidadeInicial = () => {
   visivelEnviado = true
   anunciarVisibilidade()
+  // (e se estava com o menu de pausa aberto: a volta da 2D não perde o PAUSADO)
+  if (pausadoAgora) enviar({ t: 'pausado', valor: true })
+}
+
+// o menu de pausa aberto por cima da partida em rede (scenes/Pausa.js no modo online): a partida
+// continua, e os outros veem PAUSADO no meu lugar
+let pausadoAgora = false
+export function avisarPausa(valor) {
+  const v = Boolean(valor)
+  if (v === pausadoAgora) return
+  pausadoAgora = v
+  enviar({ t: 'pausado', valor: v })
 }
 
 function comecarTimers() {

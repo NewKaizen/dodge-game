@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import Controles from '../controles.js'
+import { abrirPausaOnline } from '../pausaOnline.js'
 import { tocar, musica, tocarMusicaEspecial, voltarMusicaNormal } from '../audio.js'
 import { FONTE, LARGURA, ALTURA, CENTRO_X, CORES } from '../constants.js'
 import { menosMovimento } from '../preferencias.js'
@@ -41,7 +42,8 @@ import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 // dano chegam de lá. O quadro roda aqui com o MESMO código que o servidor refaz (campanha/quadro.js),
 // na BattleBox de verdade (recorte e faixa de aproximação como no CO-OP).
 //
-//   escolha: ←→ carta · A jogar · B passar a vez · esquiva: mover o coração · Esc: desistir (2×)
+//   escolha: ←→ carta · A jogar · B passar a vez · esquiva: mover o coração · Esc: pausa (por cima: a luta
+//   não para; SAIR DA PARTIDA desiste)
 //   scene.start('CampanhaArena', { mundo: 1, fase: 1, escolhas })
 //   scene.start('CampanhaArena', { desafio: def })   o DESAFIO DIÁRIO (docs/desafio-diario.md): a mesma
 //     luta, com a "fase" do dia (src/lib/desafio.js faseDoDesafio); o fim e a desistência voltam à cena
@@ -111,7 +113,6 @@ const estadoInicial = () => ({
   pedacos: 0,
   ultimoPedaco: 0,
   acertosLocais: 0,
-  desistir: 0,
   saindo: false,
   pararCampanha: null,
   escolhas: null,
@@ -836,15 +837,19 @@ export default class CampanhaArena extends Phaser.Scene {
     jogarCarta(this.corrida, id)
   }
 
+  // Esc / Start: a pausa das partidas online (game/pausaOnline.js). Quem roda a luta é o SERVIDOR, com
+  // os prazos dele (a esquiva tem de acabar, a carta tem de chegar): a luta não para, só abre o menu
+  // por cima com o coração parado. SAIR DA PARTIDA desiste (a luta não conta)
   pausa() {
     if (this.saindo) return this.etapa === 'erro' && this.voltarAoMapa()
-    const agora = this.time.now
-    if (agora - this.desistir < 2000) {
-      if (this.corrida) desistirDaCorrida(this.corrida)
-      return this.voltarAoMapa()
-    }
-    this.desistir = agora
-    this.frase.setText('Esc de novo para desistir (a luta não conta)')
+    abrirPausaOnline(this, {
+      subtitulo: this.desafio ? 'DESAFIO DIÁRIO · a luta não para' : 'a luta não para',
+      sair: () => {
+        if (this.saindo) return
+        if (this.corrida) desistirDaCorrida(this.corrida)
+        this.voltarAoMapa()
+      },
+    })
   }
 
   voltarAoMapa() {

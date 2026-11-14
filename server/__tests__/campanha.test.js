@@ -215,6 +215,34 @@ test('trapaça: esquiva mais rápida que o relógio do servidor -> suspeita (fut
   assert.equal(fim.xpGanho, 0)
 })
 
+test('aba escondida no meio da esquiva (o jogo anda pelo tique, mais devagar que o relógio): não é suspeita', async () => {
+  // game/segundoPlano.js: com a aba escondida o quadro continua em PASSO FIXO pelo tique do worker, com o
+  // delta limitado (motorFundo MAX_DELTA_MS): o relógio da simulação fica ATRÁS do relógio do servidor
+  // (nunca na frente), e um buraco (o navegador segurou o tique uns segundos) não vira buraco nas amostras
+  const m = montar(['ana'])
+  const ana = await m.entrar('ana')
+  await comecar(m, ana)
+  let buraco = true
+  const escondida = (m2) => ({
+    ...m2,
+    relogio: {
+      ...m2.relogio,
+      andar(ms) {
+        m2.relogio.andar(Math.round(ms * 1.3)) // a esquiva leva 30% a mais no relógio de verdade
+        if (buraco) {
+          buraco = false
+          m2.relogio.andar(5000) // e uma vez a aba ficou 5 s sem tique nenhum
+        }
+      },
+    },
+  })
+  for (let i = 0; i < 40 && !ana.ultima('campanhaFim'); i++) await rodada(escondida(m), ana)
+  const fim = ana.ultima('campanhaFim')
+  assert.ok(fim, 'a luta acabou')
+  assert.notEqual(fim.resultado, 'suspeita', `motivo: ${fim.motivo}`)
+  assert.notEqual(fim.resultado, 'abandono', `motivo: ${fim.motivo}`)
+})
+
 test('caiu no meio: a corrida é abandonada (sem recompensa); prazo sem carta também', async () => {
   const m = montar(['ana'])
   const ana = await m.entrar('ana')

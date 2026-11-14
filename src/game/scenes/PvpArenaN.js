@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
 import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, TEMPOS, ACELERACAO, fatorAceleracao, nivelAceleracao, parteDoFator } from '../constants.js'
 import Controles from '../controles.js'
+import { marcaDeAusencia, assinaturaDeAusencia, COR_AUSENCIA } from '../ausencia.js'
+import { abrirPausaOnline } from '../pausaOnline.js'
 import { tocar, musica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
@@ -22,13 +24,15 @@ import FimDePartida from '../pvp/fimDePartida/index.js'
 import ArenaRedeN from '../pvp/rede/ArenaRedeN.js'
 import HudCoopN, { CARTAO as CARTAO_HUD } from '../coop/HudCoopN.js'
 import { marcadorDaVaga, nomeNoCoracao, desenharForma, formaDaVaga } from '../coop/marcadores.js'
-import { canal, emRede, meuLado, meuIndice, souHostDaRede, irParaCena, participantesDaPartida, cosmeticosDaPartida } from '../rede.js'
+import { canal, emRede, meuLado, meuIndice, souHostDaRede, irParaCena, participantesDaPartida, cosmeticosDaPartida, versosDasVagasDaPartida } from '../rede.js'
+import { criarMonte, criarViradaEscolhida, LARGURA_MONTE, LARGURA_VIRADA } from '../entities/MonteVerso.js'
 import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 import { corDaVaga, textoDaVaga } from '../vagas.js'
 import { shake } from '../effects/shake.js'
 import { flashTela, claraoCamera } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
+import { efeitoDoEspecial, efeitoDoReflexo, escalaDaCarta } from '../pvp/efeitosAses.js'
 import { fogoArtificio } from '../effects/festa.js'
 import { entrarNoJogo, voltarAoMenu, levouGolpe, informarVida, venceu } from '../../lib/saida.js'
 import { fatores } from '../acessibilidade.js'
@@ -91,7 +95,11 @@ const campoDoLugar = (k) => {
   const c = celulaDoLugar(k)
   return { esquerda: c.x0 + LADO + 4, direita: c.x0 + CELULA.largura - LADO - 4, topo: c.y0 + 4, base: c.y0 + CELULA.altura - 4 }
 }
-const MAO = { x: CENTRO_X - 20, y: 426, monte: { x: 62, y: 404 } }
+const MAO = { x: CENTRO_X - 20, y: 426 }
+// o monte de cada jogador fica na coluna de FORA da célula dele (a da esquerda nas células da esquerda, a da direita
+// nas da direita), embaixo do nome: longe do leque da mão, das balas e do texto do cartão. A carta virada que
+// ele escolheu às cegas aparece no meio da célula (a caixa só abre depois da revelação)
+const MONTE_NA_CELULA = { dentro: 40, y: 126 }
 const PASSAR = { x: CENTRO_X + 150, y: 428 }
 const PREVIA = { x: 112, y: 214, escala: 1.4 }
 const MAO_FORA = ALTURA + 80
@@ -106,8 +114,11 @@ const estadoInicial = () => ({
   pistas: null,
   huds: null,
   cosmeticos: null, // os cosméticos dos slots novos de cada vaga (som de dano, efeito, lançamento; docs/baus.md)
+  versos: null, // o verso equipado de cada vaga { cor, arte } (o monte, a carta virada e a mão usam)
+  montes: null, // o monte de cada vaga (entities/MonteVerso.js), na célula dela
+  viradas: null, // a carta virada que cada vaga escolheu às cegas (aparece ao confirmar)
   mao: null,
-  monte: null,
+  monte: null, // o MEU monte (um dos de `montes`): o que a mão compra
   botaoPassar: null,
   previa: null,
   banner: null,
@@ -115,6 +126,8 @@ const estadoInicial = () => ({
   dica: null,
   textoRodada: null,
   textoRelogio: null,
+  proximaAusencia: 0, // AUSENTE / PAUSADO nos cartões (game/ausencia.js)
+  ausenciaVista: null,
   textoModo: null,
   celulas: null,
   avisoPista: null,
@@ -181,7 +194,10 @@ export default class PvpArenaN extends Phaser.Scene {
     this.nomes = Array.from({ length: this.n }, (_, j) => participantesDaPartida().find((p) => p.indice === j)?.nome ?? `P${j + 1}`)
     this.nomesJog = this.nomes.map((nome) => nomeNoCoracao(nome, 10))
     this.cosmeticos = cosmeticosDaPartida(this.n) // só enfeite: nunca muda a partida
+    this.versos = versosDasVagasDaPartida(this.n) // o verso de cada vaga (conta.verso de cada membro; sem conta, o padrão)
     this.controles = new Controles(this)
+    // C (Esc / Start): o menu de pausa por cima, sem parar a partida (game/pausaOnline.js)
+    this.controles.onPausaOnline(() => abrirPausaOnline(this, { subtitulo: `${this.n} JOGADORES` }))
     this.rede = new ArenaRedeN(this, { canal, meuIndice: this.meu, souHost: souHostDaRede(), participantes: participantesDaPartida, dev: Boolean(import.meta.env?.DEV) })
     this.rede.esconderBaralhos(this.estado) // o host embaralha com um sorteio só dele (pvp/sigilo.js)
     this.tempoEscolha = this.tempoBase
@@ -278,6 +294,8 @@ export default class PvpArenaN extends Phaser.Scene {
     this.fundoGrade = g
     this.objetosGrade = []
     this.celulas = []
+    this.montes = Array(this.n).fill(null)
+    this.viradas = Array(this.n).fill(null)
     for (let k = 0; k < 4; k++) {
       const c = this.celula(k)
       g.lineStyle(1, this.arena.moldura?.cor ?? 0x5a4a7a, 0.6)
@@ -315,6 +333,12 @@ export default class PvpArenaN extends Phaser.Scene {
       }
       this.celulas.push({ ...c, forma, nome, voce, personagem, estado, ataque, marca, destaque })
       this.objetosGrade.push(estado, ataque, marca, ...(voce ? [voce] : []))
+      // o monte desta vaga (o verso DELA + quantas cartas restam) e, ao confirmar, a carta virada dele
+      const direita = (this.lugares?.celula[k] ?? k) % 2 === 1
+      this.montes[k] = criarMonte(this, { x: direita ? c.x0 + CELULA.largura - MONTE_NA_CELULA.dentro : c.x0 + MONTE_NA_CELULA.dentro, y: c.y0 + MONTE_NA_CELULA.y, personagem: this.ids[k], verso: this.versos[k], largura: LARGURA_MONTE, inclinacao: direita ? 0.08 : -0.08 })
+      this.viradas[k] = criarViradaEscolhida(this, { x: c.x, y: c.y, personagem: this.ids[k], verso: this.versos[k], largura: LARGURA_VIRADA, inclinacao: direita ? 0.05 : -0.05 })
+      // o meu monte é o da mão (tem a própria animação ao sumir/voltar); os outros esmaecem com a grade
+      if (k !== this.meu) this.objetosGrade.push(...this.montes[k].objetos, this.viradas[k].carta)
     }
   }
 
@@ -365,12 +389,9 @@ export default class PvpArenaN extends Phaser.Scene {
 
   criarMao() {
     const cor = corDaVaga(this.meu)
-    const { x, y } = MAO.monte
-    this.monte = {
-      cartas: [0, 1, 2].map((k) => new Carta(this, x - k * 1.2, y - k * 1.8, { personagem: this.ids[this.meu], naipe: 'espadas', valor: 2 }, { virada: true, largura: 46 }).setDepth(5 + k).setRotation(-0.08)),
-      texto: this.add.text(x, y + 40, '', { fontFamily: FONTE, fontSize: '10px', color: TEXTO.desabilitado, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(8),
-    }
-    this.mao = new Mao(this, { jogador: this.meu, cor, rotulo: `P${this.meu + 1}`, x: MAO.x, y: MAO.y, monte: MAO.monte, larguraMax: 150, espacamento: 40, profundidade: 20, efeito: this.cosmeticos?.[this.meu]?.efeito, frente: this.cosmeticos?.[this.meu]?.frente })
+    this.monte = this.montes[this.meu]
+    const { x, y } = this.monte
+    this.mao = new Mao(this, { jogador: this.meu, cor, rotulo: `P${this.meu + 1}`, x: MAO.x, y: MAO.y, monte: { x, y }, larguraMax: 150, espacamento: 40, profundidade: 20, corVerso: this.versos[this.meu].cor, arteVerso: this.versos[this.meu].arte, efeito: this.cosmeticos?.[this.meu]?.efeito, frente: this.cosmeticos?.[this.meu]?.frente })
     this.botaoPassar = this.criarBotaoPassar(cor)
   }
 
@@ -536,6 +557,9 @@ export default class PvpArenaN extends Phaser.Scene {
     if (jog.eliminado) return [`ELIMINADO ${this.posicaoDe(j)}º${jog.eliminado.motivo === 'saiu' ? ' (saiu)' : ''}`, TEXTO.caido]
     if (!p) return ['SAIU', TEXTO.caido]
     if (p.caiu != null) return [`SEM CONEXÃO ${Math.max(0, Math.ceil(p.caiu / 1000))}s`, '#ff9a3a']
+    // aba escondida / menu de pausa aberto: só aviso (o jogo dele continua, com o coração parado)
+    const ausencia = marcaDeAusencia(p)
+    if (ausencia && !jog.eliminado) return [ausencia, COR_AUSENCIA[ausencia]]
     if (this.dupla && jog.caido) return ['CAÍDO · resgate!', TEXTO.caido]
     if (this.fase === 'escolha') return this.prontos[j] ? ['já escolheu ✓', TEXTO.cura] : ['ESCOLHENDO', TEXTO.desabilitado]
     if (this.semAlvo(j)) return ['SEM ALVO: apoio', '#7fd8ff']
@@ -548,7 +572,9 @@ export default class PvpArenaN extends Phaser.Scene {
       const [texto, cor] = this.textoDoEstado(j)
       this.huds[j].setEstado(texto, cor)
       const alvoJ = this.estado.alvos[j]
-      this.huds[j].setAlvo(this.fase !== 'escolha' && !jog.eliminado && !(this.dupla && jog.caido) && !this.rede.fora(j) && !this.semAlvo(j) && alvoJ != null ? alvoJ : null)
+      // (AUSENTE/PAUSADO fica no lugar do ícone do alvo: o texto não fica por baixo da seta)
+      const ausente = Boolean(marcaDeAusencia(participantesDaPartida().find((x) => x.indice === j))) && !jog.eliminado
+      this.huds[j].setAlvo(!ausente && this.fase !== 'escolha' && !jog.eliminado && !(this.dupla && jog.caido) && !this.rede.fora(j) && !this.semAlvo(j) && alvoJ != null ? alvoJ : null)
       this.huds[j].setApagado(Boolean(jog.eliminado) || this.rede.fora(j))
       const cel = this.celulas[j]
       if (!cel) return
@@ -573,6 +599,7 @@ export default class PvpArenaN extends Phaser.Scene {
       const apagar = this.inativo(j) ? 0.4 : 1
       for (const o of [cel.nome, cel.personagem, cel.forma]) o.setAlpha(apagar * this.alphaGrade)
     })
+    this.atualizarViradas()
   }
 
   // a grade (fundos, nomes, estados) some no foco
@@ -752,10 +779,18 @@ export default class PvpArenaN extends Phaser.Scene {
     this.mao.setEnergia(jog.energia)
   }
 
+  // o monte de cada um (o verso dele + quantas cartas restam); quem está eliminado fica sem monte
   atualizarMonte() {
-    const n = this.euEliminado ? 0 : this.estado.jogadores[this.meu].baralho.monte.length
-    this.monte.texto.setText(this.euEliminado ? '' : `${n}`)
-    this.monte.cartas.forEach((c, k) => c.setVisible(n > k))
+    this.montes.forEach((monte, j) => {
+      const fora = j === this.meu ? this.euEliminado : this.eliminado(j)
+      monte.setVisivel(!fora)
+      monte.setQuantidade(fora ? 0 : this.estado.jogadores[j].baralho.monte.length)
+    })
+  }
+
+  // a carta virada de quem já confirmou a escolha (às cegas: só o verso dele)
+  atualizarViradas() {
+    this.viradas?.forEach((v, j) => (this.fase === 'escolha' && this.prontos[j] && !this.inativo(j) && !this.rede.fora(j) ? v.mostrar() : v.esconder()))
   }
 
   // ---------- escolha ----------
@@ -1030,8 +1065,8 @@ export default class PvpArenaN extends Phaser.Scene {
     if (!this.euFora) this.dica.setText('')
     this.atualizarEstados()
     this.reveladas = r.jogadas.map((jog, j) => {
-      const hud = this.huds[j]
-      const origem = { x: hud.x0 + 95, y: hud.y0 + 30 }
+      // a carta sai de onde a virada dele estava (a célula dele); a virada some e a de verdade vem no lugar
+      const origem = { x: this.viradas[j].x, y: this.viradas[j].y }
       if (this.eliminado(j) && jog.passou) return null
       if (jog.passou) {
         if (j === this.meu) {
@@ -1048,7 +1083,7 @@ export default class PvpArenaN extends Phaser.Scene {
           return carta.setDepth(80 + j)
         }
       }
-      return new Carta(this, origem.x, origem.y, { ...jog.carta }, { virada: true, largura: 70, corFoco: corDaVaga(j), frente: this.cosmeticos?.[j]?.frente }).setDepth(80 + j).setScale(0.3)
+      return new Carta(this, origem.x, origem.y, { ...jog.carta }, { virada: true, largura: 70, corFoco: corDaVaga(j), corVerso: this.versos[j].cor, arteVerso: this.versos[j].arte, frente: this.cosmeticos?.[j]?.frente }).setDepth(80 + j).setScale(LARGURA_VIRADA / 70)
     })
     // o LANÇAMENTO equipado de cada um (da carta até a mesa): só enfeite, a partida não espera
     this.reveladas.forEach((c, j) => c instanceof Carta && lancarDoLado(this, j, { x: c.x, y: c.y }, this.mesa(j), corDaVaga(j)))
@@ -1071,6 +1106,8 @@ export default class PvpArenaN extends Phaser.Scene {
       else if (jog.especial && carta) {
         tocar(this, jog.especial === 'espelho' ? 'espelho' : jog.especial === 'roubo' ? 'roubo' : 'brilhoRank')
         particulas(this, carta.x, carta.y, { cor: 0xfff0a8, quantidade: 22, velocidade: 160 })
+        // o floreio do Ás de cada personagem (pvp/efeitosAses.js); o ♠ que vai passar um ataque adiante toca nessa hora
+        efeitoDoEspecial(this, jog, carta, { dir: Math.sign(CENTRO_X - carta.x) || 1, adiar: r.caixas.some((c) => c?.refletida && c.de === j) })
       }
       const m = this.mesa(j)
       this.textosDoEfeito(r, j).forEach(([texto, cor], k) => this.etiquetasMesa.push(this.etiquetaEm(m.x, m.y + 62 + k * 14, texto, cor, { atraso: 120 + k * 150, tamanho: 10, ms: 1700 })))
@@ -1163,6 +1200,8 @@ export default class PvpArenaN extends Phaser.Scene {
       if (caixa.refletida && this.reveladas[caixa.de]) {
         // passou adiante: a carta toca no espelho de quem a passou e segue
         const espelho = this.reveladas[caixa.de]
+        const destino = this.centroNaTela(k)
+        efeitoDoReflexo(this, r.jogadas[caixa.de], espelho, { dir: Math.sign(destino.x - espelho.x) || 1, alvo: destino, escala: escalaDaCarta(espelho) })
         await carta.arremessar({ x: espelho.x, y: espelho.y }, { destruir: false, duracao: 280, giros: 1, arco: 30, escalaFinal: carta.scaleX * 0.9 })
         this.etiquetaEm(espelho.x + 60, espelho.y, 'PASSOU ADIANTE!', '#d8ccff', { tamanho: 11, ms: 700 })
         tocar(this, 'espelho')
@@ -1779,6 +1818,16 @@ export default class PvpArenaN extends Phaser.Scene {
   // ---------- frame ----------
 
   update(_, deltaReal) {
+    // AUSENTE / PAUSADO nos cartões (game/ausencia.js), conferido a cada ~250 ms
+    const agora = Date.now()
+    if (this.huds && agora >= this.proximaAusencia) {
+      this.proximaAusencia = agora + 250
+      const assinatura = assinaturaDeAusencia(participantesDaPartida())
+      if (assinatura !== this.ausenciaVista) {
+        this.ausenciaVista = assinatura
+        this.atualizarEstados()
+      }
+    }
     const lento = this.fimDePartida?.fator ?? 1
     const delta = deltaReal * debug.acelerar * lento
     const animacao = debug.acelerar * parteDoFator(this.aceleracao, ACELERACAO.animacao) * lento

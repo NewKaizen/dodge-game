@@ -1,5 +1,6 @@
 import { iniciarRodadaCoop, fimDaRodadaCoop, definirPresenca, derrubarAusentes } from './regras.js'
 import { diferencasDeEstado, criarEspelhoCoracao } from '../pvp/rede/sincronia.js'
+import { dormirFundo } from '../../lib/relogioFundo.js'
 
 // A ponte da CoopArenaN (CO-OP de 3 e 4 jogadores, docs/rede-pvp.md "CO-OP de 3 e 4"): a mesma
 // divisão da 2D e da ArenaRedeCoop (o HOST decide toda regra; cada PC é dono do PRÓPRIO coração),
@@ -42,7 +43,8 @@ const DEBUG_PERMITIDO = new Set(['forcarMao', 'setHp', 'setEnergia', 'setHpChefe
 
 export const copiar = (estado) => structuredClone(estado)
 const PARADA = new Promise(() => {})
-const dorme = (ms) => new Promise((r) => setTimeout(r, ms))
+// (com a aba escondida o setTimeout da página fica segurado: o relógio de fundo continua, lib/relogioFundo.js)
+const dorme = (ms) => dormirFundo(ms)
 
 export default class ArenaRedeCoopN {
   // arena: { estado, saindo, fase, pistas, acertosRodada, ko, sys, aplicarAcerto(j, dano), aplicarGraze(j),

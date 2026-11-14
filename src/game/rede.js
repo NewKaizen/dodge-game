@@ -3,10 +3,11 @@ import { lan, iniciarPartida, sairSala, participantes, minhaVaga } from '../lib/
 import { enviarRapido as enviarTransporte, enviarPeloServidor, aoRapido, contagem, zerarContagem } from '../lib/lan/transmissao.js'
 import { criarCanal } from '../lib/lan/canal.js'
 import { criarSincCena } from '../lib/lan/sincCena.js'
+import { agendarFundo } from '../lib/relogioFundo.js'
 import { corDaVaga } from './vagas.js'
 import { interceptarBotao } from './controles.js'
 import { conta } from '../lib/conta.js'
-import { coresDosVersosDaPartida, artesDosVersosDaPartida } from './pvp/versos.js'
+import { coresDosVersosDaPartida, artesDosVersosDaPartida, versosDasVagas } from './pvp/versos.js'
 import { cosmeticosDosLados, cosmeticosDosParticipantes } from './cosmeticosSlots.js'
 
 // Partida EM REDE (docs/rede-pvp.md): numa sala (LAN ou ONLINE) o PVP e o
@@ -25,6 +26,7 @@ import { cosmeticosDosLados, cosmeticosDosParticipantes } from './cosmeticosSlot
 //   souHostDaRede()             o host DA PARTIDA é quem decide (sorteios, resultado da rodada)
 //   coresDosVersos()            [cor do verso de carta do lado 0, do lado 1] (null = verso padrão)
 //   artesDosVersos()            [verso ILUSTRADO do lado 0, do lado 1] (id do registro 'verso-<x>'; null = liso)
+//   versosDasVagasDaPartida(n) (salas de 3 e 4) [{ cor, arte }] do verso de cada vaga, do conta.verso de cada membro
 //   cosmeticosDaPartida(n?)     [{ som, efeito, lancamento, moldura, frente }] de cada lado (ids do registro dos
 //                               cosméticos; em rede os de cada jogador, que o lobby repassa; fora dela o
 //                               lado 0 é quem está logado). Com n > 2: por vaga (salas de N)
@@ -80,6 +82,8 @@ export const canal = criarCanal({
   enviarTodos: (msg) => enviarTransporte(msg),
   destinos,
   meuId: () => get(lan).eu.id ?? '?',
+  // o reenvio e as esperas andam também com a aba escondida (lib/relogioFundo.js)
+  agendar: agendarFundo,
 })
 // quem mandou é quem diz que mandou (pelo direto, a ligação; pelo servidor, o id que ele carimbou)
 aoRapido((dados, de) => (!de || dados?.de === de) && canal.entregar(dados))
@@ -115,6 +119,8 @@ export const souHostDaRede = () => get(lan).papel === 'host'
 // verso equipado de cada lado (0 = host/P1): em rede o de cada jogador, fora dela o de quem está logado (pvp/versos.js)
 export const coresDosVersos = () => coresDosVersosDaPartida({ sala: emRede() ? get(lan).sala : null, perfil: get(conta).perfil })
 export const artesDosVersos = () => artesDosVersosDaPartida({ sala: emRede() ? get(lan).sala : null, perfil: get(conta).perfil })
+// salas de N (as arenas de 3 e 4): [{ cor, arte }] do verso de cada VAGA (o conta.verso de cada membro; sem conta, o padrão)
+export const versosDasVagasDaPartida = (n) => versosDasVagas({ participantes: emRede() ? participantesDaPartida() : null, n, perfil: get(conta).estado === 'logado' ? get(conta).perfil : null, emRede: emRede() })
 // os cosméticos dos slots novos de cada lado (docs/baus.md); um cosmético nunca muda a partida
 export function cosmeticosDaPartida(n = 2) {
   if (n > 2 && emRede()) return cosmeticosDosParticipantes(participantesDaPartida(), n)

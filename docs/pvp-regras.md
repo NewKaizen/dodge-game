@@ -691,3 +691,19 @@ No **PVP online** (1x1 em sala de amigos e no Jogar Rápido, e o todos contra to
 
 **No fio** (o host roda as regras e sabe tudo; [rede-pvp.md](rede-pvp.md#escolha-às-cegas-no-online)): até as jogadas travarem o convidado **não recebe o id de nenhuma carta do host** (a jogada do host vai como uma **ficha** sorteada por partida, a carta virada que sai da mão dele; a do convidado só vai ao host). Travadas, o host manda a todos as jogadas e o resultado com a carta de verdade. O host também **embaralha os montes com um sorteio só dele** (a semente da partida, que os dois conhecem, refaria a ordem do baralho do outro); o RNG dos baralhos dos outros não viaja.
 
+
+## Efeitos visuais dos Ases
+
+Cada Ás de cada personagem ganha um floreio curto (até ~1,2 s), só enfeite: não espera nem atrasa a partida, nunca lança erro (tudo em try/catch), é igual nos dois lados (nada sorteado) e segue "reduzir animações" (vira só o rótulo e um anel). Código: `src/game/pvp/efeitosAses.js` (`tocarEfeitoAs`, `efeitoDoEspecial` na revelação, `efeitoDoReflexo` na devolução do ataque), usado pelas 4 arenas (PvpArena, PvpArenaN, CoopArena, CoopArenaN). O ♠ toca na devolução do ataque (se houver); o ♦ aparece na carta cortada.
+
+| Personagem | ♠ Espelho | ♦ Anular | ♣ Roubo | ♥ Suporte |
+|---|---|---|---|---|
+| Kris | Reflexo da Lâmina: dois cortes em X | Silêncio: anéis que fecham, "SHHH" | Mão Leve: luva traz uma carta | Determinação: alma vermelha e raios |
+| Susie | Revide Selvagem: três garras | Grito: ondas serrilhadas e tremor | Roubar Lanche: luva traz um chocolate | Teimosia: coração finca o pé, poeira |
+| Ralsei | Lição Invertida: livro vira de cabeça para baixo | Pacifismo: símbolo da paz | Empréstimo Educado: luva gentil | Abraço Fofo: dois braços abraçam |
+| Noelle | Espelho de Gelo: espelho que se estilhaça | Congelar: cristais e geada | Mão Fria: luva gelada | Milagre de Natal: neve e estrela |
+| Berdly | Réplica Brilhante: cópia reluzente | Objeção!: balão de quadrinhos, dedo e tremor | Cópia da Prova: scanner e folha copiada | Ego Inabalável: óculos reluzentes |
+| Dess | Rebatida: taco de beisebol de pixel-art, "TOC!" e home run | Corta o Som: cabo arrancado da tomada | Pegou Emprestado: luva traz uma palheta | Bis!: holofotes e confete |
+| Asriel | Hiper Espelho: prisma arco-íris | Apagar: borracha arco-íris | Pegar Alma: alma vermelha vem até a carta | Salvar: estrela de SAVE |
+
+Conferir no dev: `window.debugGaleria('ases')` (uma página por personagem, Z repete) ou `window.debugPalcoAses('dess', 'espadas')`.

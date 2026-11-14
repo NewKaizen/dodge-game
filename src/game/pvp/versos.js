@@ -61,3 +61,20 @@ export function artesDosVersosDaPartida({ sala = null, perfil = null } = {}) {
   if (sala && sala.membros?.length > 1) return versosDaSala(sala).map(arteDoVerso)
   return [arteDoVerso(perfil?.verso_equipado), null]
 }
+
+// Salas de N (as arenas de 3 e 4: PvpArenaN e CoopArenaN): o verso de CADA vaga, [{ cor, arte }] de tamanho n.
+//   participantes  [{ indice, conta: { verso } }] (rede.js participantesDaPartida); o verso viaja no conta.verso
+//                  de cada membro da sala, o mesmo caminho dos modos de 2
+//   perfil         quem está logado aqui: só vale fora da rede (a vaga 0 usa o verso equipado dele)
+// Vaga sem conta (convidado sem login), sem verso, com id desconhecido ou fora de 0..n-1: o verso padrão
+// ({ cor: null, arte: null }). Um verso nunca muda a partida: só desenha.
+export function versosDasVagas({ participantes = null, n = 2, perfil = null, emRede = false } = {}) {
+  const vagas = Array.from({ length: n }, () => ({ cor: null, arte: null }))
+  const de = (id) => ({ cor: corDoVerso(id), arte: arteDoVerso(id) })
+  if (emRede) {
+    for (const p of Array.isArray(participantes) ? participantes : []) if (Number.isInteger(p?.indice) && p.indice >= 0 && p.indice < n) vagas[p.indice] = de(p.conta?.verso)
+    return vagas
+  }
+  if (n > 0) vagas[0] = de(perfil?.verso_equipado)
+  return vagas
+}

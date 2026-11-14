@@ -5,6 +5,7 @@ import { particulas } from '../../effects/particulas.js'
 import { diferencasDeEstado, criarEspelhoCoracao } from './sincronia.js'
 import { criarFichas, embaralharEscondido, mascararEstado, mascararResultado, mascararJogada, mascararDadosDeCena, cartaOculta } from '../sigilo.js'
 import { somDoLado } from '../../cosmeticosSlots.js'
+import { dormirFundo } from '../../../lib/relogioFundo.js'
 
 // A PvpArena EM REDE (docs/rede-pvp.md, seção da arena): cada PC roda a arena
 // inteira, desvia na própria caixa sem atraso, e só as decisões viajam pelo
@@ -46,6 +47,14 @@ import { somDoLado } from '../../cosmeticosSlots.js'
 // virada na mão dele). A MÃO, o monte e o descarte do outro ficam virados o tempo todo (mascararEstado,
 // verMao); a retomada também vai mascarada (mascararCenaPara).
 //
+// O OUTRO AUSENTE (docs/rede-pvp.md "Aba em segundo plano e pausa online"): com a aba escondida o jogo
+// dele continua andando (game/segundoPlano.js: o coração parado, o relógio da escolha correndo) e nada
+// aqui muda. Se mesmo assim o PC dele parar de responder (o navegador congelou a aba) e o servidor o
+// marca em segundo plano (`ausente()`), as esperas por ele não seguram a partida para sempre: o HOST
+// passa a vez dele quando o relógio da escolha acabou há FOLGA_JOGADA_MS, e o fim da esquiva dele é
+// dispensado depois de ESPERA_AUSENTE_MS (como nas salas de N). Quem decide é o host: o convidado
+// sempre espera o host (sem ele não tem rodada).
+//
 // A CoopArena (CO-OP de cartas) usa esta mesma ponte estendida
 // (coop/ArenaRedeCoop.js): as esperas, a escolha, o dano/graze e o coração do
 // outro são os mesmos; mudam as regras da rodada e ONDE está o coração do
@@ -58,6 +67,8 @@ const ESPERA_PEDACO_MS = 500
 const ESPERA_AVISO_MS = 30000 // esperando há muito tempo: avisa no console (de 30 em 30 s)
 const ESPERA_RESULTADO_MS = 20000 // o host espera o replay do convidado acabar no máximo isto
 const DEBUG_PERMITIDO = new Set(['forcarMao', 'setHp', 'setEnergia', 'forcarBonus'])
+export const FOLGA_JOGADA_MS = 4000 // o outro AUSENTE: o host passa a vez dele este tanto depois do relógio
+export const ESPERA_AUSENTE_MS = 15000 // o outro AUSENTE: o fim da esquiva dele não segura mais que isto
 
 export const copiar = (estado) => structuredClone(estado)
 // a ponte foi destruída com a cena, mas a cena abriu de novo (retomada da 2D: o
@@ -66,7 +77,10 @@ export const copiar = (estado) => structuredClone(estado)
 const PARADA = new Promise(() => {})
 
 export default class ArenaRede {
-  constructor(arena, { canal, meuLado, souHost }) {
+  constructor(arena, { canal, meuLado, souHost, ausente = () => false, folgaJogadaMs = FOLGA_JOGADA_MS, esperaAusenteMs = ESPERA_AUSENTE_MS }) {
+    this.outroAusente = ausente // o outro está com a aba escondida (o servidor marcou)?
+    this.folgaJogadaMs = folgaJogadaMs
+    this.esperaAusenteMs = esperaAusenteMs
     this.arena = arena
     this.canal = canal
     this.meuLado = meuLado
@@ -119,8 +133,9 @@ export default class ArenaRede {
 
   // ---------- esperas e estado ----------
 
-  // Espera a mensagem (tipo, chave) do outro PC; null se a arena saiu antes
-  async esperar(tipo, chave) {
+  // Espera a mensagem (tipo, chave) do outro PC; null se a arena saiu antes (ou, com `ausenteMs`, se o
+  // outro está AUSENTE e já se esperou isto)
+  async esperar(tipo, chave, { ausenteMs = 0 } = {}) {
     const inicio = Date.now()
     let aviso = inicio + ESPERA_AVISO_MS
     while (!this.arena.saindo) {
@@ -128,6 +143,10 @@ export default class ArenaRede {
       const dados = await this.canal.receber(tipo, chave, { timeoutMs: ESPERA_PEDACO_MS })
       if (this.destruido) return PARADA
       if (dados) return dados
+      if (ausenteMs > 0 && Date.now() - inicio >= ausenteMs && this.outroAusente()) {
+        console.warn(`[rede] o outro está ausente e não mandou '${tipo}' (rodada ${chave}): seguindo sem ele`)
+        return null
+      }
       if (Date.now() >= aviso) {
         aviso += ESPERA_AVISO_MS
         console.warn(`[rede] esperando '${tipo}' (rodada ${chave}) há ${Math.round((Date.now() - inicio) / 1000)} s`)
@@ -208,6 +227,23 @@ export default class ArenaRede {
       if (a.escolhas[this.outroLado] !== undefined) return
       this.mostrarJogadaDoOutro(msg.jogada ?? null)
     })
+    if (this.souHost) this.vigiarJogadaAusente(rodada)
+  }
+
+  // Host: o outro AUSENTE (a aba dele congelou) não segura a escolha: passado o relógio + a folga, ele passa
+  async vigiarJogadaAusente(rodada) {
+    const a = this.arena
+    const limite = a.tempoEscolha ? a.tempoEscolha + this.folgaJogadaMs : 0
+    if (!limite) return // sem relógio na escolha: ninguém passa a vez de ninguém
+    const inicio = Date.now()
+    const esperando = () => !this.destruido && !a.saindo && a.fase === 'escolha' && a.estado.rodada === rodada && a.escolhas[this.outroLado] === undefined
+    while (esperando()) {
+      if (Date.now() - inicio >= limite && this.outroAusente()) {
+        console.warn('[rede] o outro está ausente e não jogou a tempo: passa a vez', { rodada })
+        return this.mostrarJogadaDoOutro(null)
+      }
+      await dormirFundo(ESPERA_PEDACO_MS)
+    }
   }
 
   // a carta que o outro confirmou: o cursor dele vai até ela e ela vira (como no local)
@@ -391,7 +427,7 @@ export default class ArenaRede {
     const a = this.arena
     this.fimEnviado = true
     this.enviar('fimEsquiva', rodada, { acertos: a.acertosRodada[this.meuLado], ko: Boolean(a.ko[this.meuLado]) })
-    const dele = await this.esperar('fimEsquiva', rodada)
+    const dele = await this.esperar('fimEsquiva', rodada, { ausenteMs: this.esperaAusenteMs })
     if (dele && (dele.acertos !== a.acertosRodada[this.outroLado] || Boolean(dele.ko) !== Boolean(a.ko[this.outroLado])))
       console.warn('[rede] acertos do outro divergiram', { rodada, dele, aqui: { acertos: a.acertosRodada[this.outroLado], ko: a.ko[this.outroLado] } })
   }

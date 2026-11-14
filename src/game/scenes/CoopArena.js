@@ -1,6 +1,7 @@
 import PvpArena, { LAYOUT_PVP } from './PvpArena.js'
 import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, DESAFIO, NIVEIS, DIFICULDADES } from '../constants.js'
 import Controles from '../controles.js'
+import { outroAusente } from '../ausencia.js'
 import { tocar, musica, velocidadeMusica, pausarMusica } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
@@ -39,12 +40,13 @@ import { escolherJogadaCoop } from '../coop/bot.js'
 import { superNoChefe } from '../coop/superNoChefe.js'
 import ArenaRedeCoop from '../coop/ArenaRedeCoop.js'
 import { nomesDaPartida } from '../pvp/nomesDaPartida.js'
-import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, artesDosVersos, cosmeticosDaPartida } from '../rede.js'
+import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, artesDosVersos, cosmeticosDaPartida, participantesDaPartida } from '../rede.js'
 import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
+import { efeitoDoEspecial, efeitoDoReflexo, escalaDaCarta } from '../pvp/efeitosAses.js'
 import { entrarNoJogo, voltarAoMenu, levouGolpe, venceu } from '../../lib/saida.js'
 import { fatores } from '../acessibilidade.js'
 import { ligarEscuridao } from '../coop/semanal/escuridao.js'
@@ -183,7 +185,7 @@ export default class CoopArena extends PvpArena {
     this.ids = [party[0], party[1] ?? party[0]]
 
     // partida EM REDE: cada PC roda esta cena; coop/ArenaRedeCoop.js faz a ponte
-    this.rede = emRede() ? new ArenaRedeCoop(this, { canal, meuLado: meuLado(), souHost: souHostDaRede() }) : null
+    this.rede = emRede() ? new ArenaRedeCoop(this, { canal, meuLado: meuLado(), souHost: souHostDaRede(), ausente: () => outroAusente(participantesDaPartida(), meuLado()) }) : null
     this.controles = new Controles(this)
     this.numJogadores = this.controles.numJogadores
     this.cpu = this.numJogadores < 2 ? 1 : null // sozinho: o P2 é a CPU aliada (em rede, nunca)
@@ -234,6 +236,7 @@ export default class CoopArena extends PvpArena {
     this.criarQuadro()
     this.nomesJog = nomesDaPartida({ rede: Boolean(this.rede), cpu: this.cpu }) // o jogador identifica o lado, não o personagem
     this.huds = [0, 1].map((j) => new HudPvp(this, { jogador: j, personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, rotulo: this.rotulo(j), nomeJogador: this.nomesJog[j] }))
+    this.criarSelosDeAusencia()
     this.criarTopo()
     if (this.cpu !== null) this.textoTreino.setText('COM CPU ALIADA')
     else if (!this.rede) this.textoTreino.setText('')
@@ -255,6 +258,7 @@ export default class CoopArena extends PvpArena {
       else this.apertarB(j)
     })
     this.controles.onPausa(() => this.pausar())
+    this.controles.onPausaOnline(() => this.pausarOnline())
     this.controles.onPerdaDeFoco((motivo) => this.pausar(motivo))
     this.events.on('postupdate', this.filtrarCaixas, this)
 
@@ -754,6 +758,8 @@ export default class CoopArena extends PvpArena {
       if (jog.especial && carta) {
         tocar(this, 'brilhoRank')
         particulas(this, carta.x, carta.y, { cor: 0xfff0a8, quantidade: 22, velocidade: 160 })
+        // o floreio do Ás de cada personagem (pvp/efeitosAses.js): o ♦ no ataque do chefe que ele cortou, o ♠ na devolução
+        efeitoDoEspecial(this, jog, carta, { dir: Math.sign(CENTRO_X - carta.x) || 1, alvoCarta: r.destino === 'anulada' ? v?.carta : null, adiar: r.destino === 'refletida' })
       }
       this.textosDoEfeitoCoop(r, j).forEach(([texto, cor], k) =>
         this.etiquetasMesa.push(this.etiquetaEm(MESA[j].x, MESA[j].y + 86 + k * 16, texto, cor, { atraso: 120 + k * 150, tamanho: 11, ms: 1600 })),
@@ -820,6 +826,8 @@ export default class CoopArena extends PvpArena {
         const ladrao = Math.max(0, r.efeitos.findIndex((ef) => ef.roubou))
         carta.arremessar({ x: this.huds[ladrao].pontoEnergia.x, y: this.huds[ladrao].pontoEnergia.y }, { duracao: 380 })
       } else if (carta && r.destino === 'refletida') {
+        const espelho = r.jogadas.find((jg) => jg.especial === 'espelho' && !jg.anulada)
+        if (efeitoDoReflexo(this, espelho, carta, { dir: Math.sign(CHEFE.x - carta.x) || 1, alvo: { x: CHEFE.x, y: CHEFE.y - 20 }, escala: escalaDaCarta(carta) })) await this.esperar(170)
         carta.arremessar({ x: CHEFE.x, y: CHEFE.y - 20 }, { duracao: 340, aoImpacto: () => this.inimigo.dano(0.2) })
       } else if (carta) this.tirarDaMesa(carta)
       this.mostrarBanner('NENHUM ATAQUE DO CHEFE', TEXTO.desabilitado, { y: 236, tamanho: 16, ms: 800 })

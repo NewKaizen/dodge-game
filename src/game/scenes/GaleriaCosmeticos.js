@@ -4,6 +4,7 @@ import { FONTE, LARGURA, ALTURA } from '../constants.js'
 import { semLigaduras } from '../campanha/texto.js'
 import { CATALOGO_COSMETICOS, previa } from '../cosmeticos/registro.js'
 import Carta from '../entities/Carta.js'
+import { EFEITOS_ASES, PERSONAGENS_ASES, NAIPES_ASES, tocarEfeitoAs, limparEfeitosAs } from '../pvp/efeitosAses.js'
 
 // GALERIA DE COSMÉTICOS (só para desenvolvimento): todos os cosméticos de cada tipo, com a prévia
 // animada de cada um (cosmeticos/registro.js previa). No console do navegador (npm run dev):
@@ -15,7 +16,9 @@ import Carta from '../entities/Carta.js'
 //
 //   ←/→ página · ↑/↓ tipo (som, efeito, lançamento, moldura, estilo, verso) · Z / A toca o próximo som ou repete os
 //   lançamentos · X troca o fundo (escuro/claro/verde) para conferir a visibilidade · B / Esc sai
+//   EFEITOS DOS ÁSES (pvp/efeitosAses.js): um personagem por página (os 4 Ases); Z repete os efeitos
 //   clique num som para ouvi-lo
+//   window.debugAses('dess', 'espadas')  toca um efeito no meio da cena atual
 const TIPOS = [
   { chave: 'som', titulo: 'SONS DE DANO', colunas: 6, tamanho: 64, y: 230 },
   { chave: 'efeito', titulo: 'EFEITOS DE CARTA', colunas: 4, tamanho: 150, y: 235 },
@@ -23,6 +26,7 @@ const TIPOS = [
   { chave: 'moldura', titulo: 'MOLDURAS ANIMADAS', colunas: 5, tamanho: 112, y: 235 },
   { chave: 'frente', titulo: 'ESTILOS DE CARTA', colunas: 2, tamanho: 70, y: 150 },
   { chave: 'verso', titulo: 'VERSOS ILUSTRADOS', colunas: 6, tamanho: 96, y: 210 },
+  { chave: 'ases', titulo: 'EFEITOS DOS ÁSES', colunas: 4, tamanho: 101, y: 215 },
 ]
 // as cartas de amostra de cada estilo (todos os naipes, Ás, figuras, SUPER, nome comprido e uma bloqueada)
 const AMOSTRAS = [
@@ -41,6 +45,7 @@ const COR_RARIDADE = { comum: '#bdb8d0', raro: '#4fa8ff', epico: '#c86bff', lend
 // inicial no começo do init() (testado em __tests__/cenasReaproveitadas.test.js).
 const estadoInicial = () => ({
   aba: 0,
+  palco: null,
   pagina: 0,
   fundoIdx: 0,
   proximoSom: 0,
@@ -60,7 +65,8 @@ export default class GaleriaCosmeticos extends Phaser.Scene {
 
   init(dados) {
     Object.assign(this, estadoInicial())
-    this.aba = Math.max(0, TIPOS.findIndex((t) => t.chave === dados?.tipo))
+    this.palco = dados?.palco ?? null // { personagem, naipe, dir?, alvo? }: um Ás só, do tamanho da mesa, para conferir o efeito
+    this.aba = Math.max(0, TIPOS.findIndex((t) => t.chave === (this.palco ? 'ases' : dados?.tipo)))
     this.pagina = Math.max(0, dados?.pagina ?? 0)
   }
 
@@ -106,6 +112,7 @@ export default class GaleriaCosmeticos extends Phaser.Scene {
   }
 
   itens() {
+    if (this.tipo().chave === 'ases') return PERSONAGENS_ASES.flatMap((personagem) => NAIPES_ASES.map((naipe) => ({ personagem, naipe, ...EFEITOS_ASES[personagem][naipe] })))
     return CATALOGO_COSMETICOS[this.tipo().chave]
   }
 
@@ -143,12 +150,13 @@ export default class GaleriaCosmeticos extends Phaser.Scene {
       if (!com.length) return
       com[this.proximoSom % com.length].tocar()
       this.proximoSom++
-    } else if (this.tipo().chave === 'lancamento') {
+    } else if (this.tipo().chave === 'lancamento' || this.tipo().chave === 'ases') {
       this.previas.forEach((p) => p.repetir?.())
     }
   }
 
   limpar() {
+    limparEfeitosAs(this)
     for (const p of this.previas ?? []) p.destroy()
     this.previas = []
     this.conteudo?.removeAll(true)
@@ -168,6 +176,29 @@ export default class GaleriaCosmeticos extends Phaser.Scene {
         this.previas.push({ destroy: () => carta.active && carta.destroy() })
       })
     })
+  }
+
+  // EFEITOS DOS ÁSES: o Ás de cada naipe do personagem da página, com o efeito tocando em cima
+  montarAses(pagina, t) {
+    const larg = LARGURA / t.colunas
+    const cor = this.fundoIdx === 1 ? '#201a38' : '#e8e4f4'
+    pagina.forEach((item, i) => {
+      const x = larg * (i + 0.5)
+      const carta = new Carta(this, x, t.y, { id: `galeria-as-${i}`, personagem: item.personagem, naipe: item.naipe, valor: 1, nome: item.nome, custo: 3, descricao: '' }, { largura: t.tamanho })
+      const toca = () => tocarEfeitoAs(this, item.personagem, item.naipe, { x, y: t.y, dir: 1, alvo: { x: x + 150, y: t.y - 90 }, escala: 1 })
+      this.conteudo.add(this.add.text(x, t.y + 100, semLigaduras(`${item.personagem.toUpperCase()} ${item.naipe}\n${item.nome.toUpperCase()}`), { fontFamily: FONTE, fontSize: '12px', color: cor, stroke: this.fundoIdx === 1 ? '#ffffff' : '#000000', strokeThickness: 3, align: 'center' }).setOrigin(0.5, 0))
+      this.previas.push({ destroy: () => carta.active && carta.destroy(), repetir: toca })
+      this.time.delayedCall(250, () => carta.active && toca())
+    })
+  }
+
+  // um Ás só, no tamanho da mesa da arena 1x1 (a carta com 101 px), e o efeito em cima (dev: window.debugPalcoAses)
+  montarPalco() {
+    const { personagem, naipe, dir = 1, alvo = { x: LARGURA / 2 + 190, y: 130 } } = this.palco
+    const x = LARGURA / 2
+    const y = 250
+    const carta = new Carta(this, x, y, { id: 'galeria-palco', personagem, naipe, valor: 1, nome: EFEITOS_ASES[personagem][naipe].nome, custo: 3, descricao: '' }, { largura: 101 })
+    this.previas.push({ destroy: () => carta.active && carta.destroy(), repetir: () => tocarEfeitoAs(this, personagem, naipe, { x, y, dir, alvo, escala: 1 }) })
   }
 
   // VERSOS ILUSTRADOS: cartas viradas de verdade
@@ -193,6 +224,7 @@ export default class GaleriaCosmeticos extends Phaser.Scene {
     this.titulo.setColor(this.fundoIdx === 1 ? '#201a38' : '#e8e4f4')
     if (t.chave === 'frente') return this.montarFrentes(pagina, t)
     if (t.chave === 'verso') return this.montarVersos(pagina, t)
+    if (t.chave === 'ases') return this.palco ? this.montarPalco() : this.montarAses(pagina, t)
     const larg = (LARGURA - 40) / t.colunas
     pagina.forEach((item, i) => {
       const x = 20 + larg * (i + 0.5)
@@ -209,6 +241,15 @@ export default class GaleriaCosmeticos extends Phaser.Scene {
       this.conteudo.add([nome, raridade, id])
     })
   }
+}
+
+// só no dev: window.debugAses('dess', 'espadas') toca o efeito de um Ás no meio da cena atual
+if (import.meta.env?.DEV && typeof window !== 'undefined') {
+  window.debugAses = (personagem, naipe, opcoes = {}) => {
+    const atual = window.debugJogo?.jogo?.scene.getScenes(true)[0]
+    return atual ? tocarEfeitoAs(atual, personagem, naipe, { x: LARGURA / 2, y: ALTURA / 2, ...opcoes }) : false
+  }
+  window.debugPalcoAses = (personagem, naipe, opcoes = {}) => window.debugJogo?.jogo?.scene.getScenes(true)[0]?.scene.start('GaleriaCosmeticos', { palco: { personagem, naipe, ...opcoes } })
 }
 
 // só no dev: window.debugGaleria() abre a galeria a partir de qualquer tela

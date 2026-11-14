@@ -103,12 +103,17 @@ export function iniciarSimulador() {
   window.addEventListener('keydown', aoPressionar)
   window.addEventListener('keyup', aoSoltar)
   window.addEventListener('blur', soltarTudo)
+  // aba escondida: o jogo continua andando (game/segundoPlano.js) e nenhuma tecla fica presa
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', soltarAoEsconder)
 }
+
+const soltarAoEsconder = () => document.visibilityState === 'hidden' && soltarTudo()
 
 export function pararSimulador() {
   window.removeEventListener('keydown', aoPressionar)
   window.removeEventListener('keyup', aoSoltar)
   window.removeEventListener('blur', soltarTudo)
+  if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', soltarAoEsconder)
   if (ativo) soltarTudo()
   ativo = false
   ultimoJoy.length = 0

@@ -131,6 +131,11 @@
 //                                   itensNovos, pity, desdeEpico, fechados, repetido} · bausErro {motivo, msg}
 //                        equipado {ok, tipo, item, erro?, perfil?} · bauGanho {fontes, fechados} (o aviso)
 // ('equipar' pelo lobby é o caminho do dev com contas falsas; o navegador com Supabase usa a equipar() do banco)
+//
+// PAUSA ONLINE (PROTOCOLO 20, docs/rede-pvp.md "Aba em segundo plano e pausa online"): `pausado {valor}`
+// (o menu de pausa aberto por cima da partida, que CONTINUA para todos); o membro vem com `pausado: true`
+// (só com a sala em partida) e os outros mostram PAUSADO no lugar dele. Como o `segundoPlano` (AUSENTE),
+// é só aviso: o servidor não para nada.
 import { WebSocketServer } from 'ws'
 import dgram from 'node:dgram'
 import os from 'node:os'
@@ -150,7 +155,7 @@ import { nomeSeguro } from '../src/lib/contaRegras.js'
 import { arranjoValido } from '../src/lib/times2x2.js'
 import { infoSemanal } from '../src/lib/semanal.js'
 
-export const PROTOCOLO = 19
+export const PROTOCOLO = 20
 export const PORTA_DESCOBERTA = 47777
 // Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
 // aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")
@@ -359,7 +364,7 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
     eleito: sala.eleito ?? null,
     arranjo: sala.arranjo ?? 0, // 2x2: quem joga com quem (src/lib/times2x2.js)
     party: sala.party ? { aberta: Boolean(sala.party.aberta) } : null,
-    membros: membrosDaSala(sala).map((c) => ({ id: c.id, vaga: c.vaga, nome: c.nome, papel: c.id === sala.host ? 'host' : 'convidado', dono: c.id === sala.dono, pronto: c.pronto, ping: c.ping, conta: contaPublica(c), segundoPlano: Boolean(c.segundoPlano), caiu: c.caido ? Math.max(0, c.caido.desde + RETOMADA_MS - agora()) : null })),
+    membros: membrosDaSala(sala).map((c) => ({ id: c.id, vaga: c.vaga, nome: c.nome, papel: c.id === sala.host ? 'host' : 'convidado', dono: c.id === sala.dono, pronto: c.pronto, ping: c.ping, conta: contaPublica(c), segundoPlano: Boolean(c.segundoPlano), pausado: Boolean(c.pausado && sala.emPartida), caiu: c.caido ? Math.max(0, c.caido.desde + RETOMADA_MS - agora()) : null })),
   })
 
   const resumo = (sala) => ({
@@ -878,6 +883,7 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
     }
     // BOSS SEMANAL: a semana da partida é a do relógio daqui agora (fica fixa até ela acabar)
     if (sala.emPartida && !antes) sala.semanalFixo = sala.semanal ? semanaAgora() : null
+    if (sala.emPartida && !antes) for (const id of sala.membros) if (clientes.get(id)) clientes.get(id).pausado = false
     if (sala.emPartida && !antes) partidas.iniciar(sala, membrosDaPartida(sala))
     else if (!sala.emPartida && antes) partidas.encerrou(sala)
     if (!sala.emPartida) sala.semanalFixo = null
@@ -1348,6 +1354,14 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
         const sala = salas.get(c.sala)
         if (sala) avisarSala(sala)
       }, SEGUNDO_PLANO_MS)
+    },
+    // o menu de pausa aberto/fechado por cima da partida em rede (PROTOCOLO 20): só aviso para a sala
+    pausado(c, m) {
+      const valor = m.valor === true
+      if (Boolean(c.pausado) === valor) return
+      c.pausado = valor
+      const sala = salas.get(c.sala)
+      if (sala?.emPartida) avisarSala(sala)
     },
     ping(c, m) {
       enviar(c, { t: 'pong', n: m.n })

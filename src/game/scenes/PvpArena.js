@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
 import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, ACELERACAO, fatorAceleracao, nivelAceleracao, parteDoFator } from '../constants.js'
 import Controles from '../controles.js'
+import { criarSelos, ladoDe, outroAusente } from '../ausencia.js'
+import { abrirPausaOnline } from '../pausaOnline.js'
 import { tocar, musica, pausarMusica, retomarMusica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal, tomMusica, cortarMusica, reforcarGrave } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
@@ -25,12 +27,13 @@ import { shake } from '../effects/shake.js'
 import { flashTela, claraoCamera } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
+import { efeitoDoEspecial, efeitoDoReflexo, escalaDaCarta } from '../pvp/efeitosAses.js'
 import { fogoArtificio, canhoesConfete, chuvaConfete } from '../effects/festa.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
 import FimDePartida from '../pvp/fimDePartida/index.js'
 import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe, venceu } from '../../lib/saida.js'
 import { nomesDaPartida } from '../pvp/nomesDaPartida.js'
-import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, artesDosVersos, cosmeticosDaPartida } from '../rede.js'
+import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, artesDosVersos, cosmeticosDaPartida, participantesDaPartida } from '../rede.js'
 import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 import ArenaRede from '../pvp/rede/ArenaRede.js'
 import { fatores } from '../acessibilidade.js'
@@ -193,6 +196,7 @@ const estadoInicial = () => ({
   pistas: null,
   textoRodada: null,
   textoRelogio: null,
+  selos: null, // AUSENTE / PAUSADO do outro (game/ausencia.js; só em rede)
   textoTreino: null,
   textoBonus: null,
   indicadorVelocidade: null,
@@ -232,7 +236,7 @@ export default class PvpArena extends Phaser.Scene {
     this.comecouEm = Date.now() // a duração vai no resultado (o servidor mede a dele)
     // partida EM REDE (docs/rede-pvp.md): cada PC roda esta cena; pvp/rede/ArenaRede.js
     // faz a ponte (quem decide é o host, cada um é dono do próprio coração)
-    this.rede = emRede() ? new ArenaRede(this, { canal, meuLado: meuLado(), souHost: souHostDaRede() }) : null
+    this.rede = emRede() ? new ArenaRede(this, { canal, meuLado: meuLado(), souHost: souHostDaRede(), ausente: () => outroAusente(participantesDaPartida(), meuLado()) }) : null
     this.controles = new Controles(this)
     this.numJogadores = this.controles.numJogadores
     // sozinho: o P2 é a CPU (a partida do Manual do Ralsei troca ladoDaCpu/nivelDaCpu)
@@ -280,6 +284,7 @@ export default class PvpArena extends Phaser.Scene {
     this.nomesJog = nomesDaPartida({ rede: Boolean(this.rede), cpu: this.cpu }) // o jogador identifica o lado, não o personagem
     this.huds = [0, 1].map((j) => new HudPvp(this, { jogador: j, personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, rotulo: this.rotulo(j), nomeJogador: this.nomesJog[j] }))
     this.criarTopo()
+    this.criarSelosDeAusencia()
     this.versos = coresDosVersos() // verso de carta equipado de cada lado (Fase 2F; em rede o de cada jogador)
     this.artesVerso = artesDosVersos() // o verso ILUSTRADO do baú de cada lado (0016; null = o liso)
     this.cosmeticos = cosmeticosDaPartida(2) // som de dano, efeito e lançamento de cada lado (só enfeite)
@@ -300,6 +305,7 @@ export default class PvpArena extends Phaser.Scene {
       else this.apertarB(j)
     })
     this.controles.onPausa(() => this.pausar())
+    this.controles.onPausaOnline(() => this.pausarOnline())
     this.controles.onPerdaDeFoco((motivo) => this.pausar(motivo))
 
     // objetos de fora das caixas não aparecem nas câmeras de recorte (ver filtrarCaixas)
@@ -1344,6 +1350,8 @@ export default class PvpArena extends Phaser.Scene {
       else if (jog.especial) {
         tocar(this, 'brilhoRank')
         particulas(this, carta.x, carta.y, { cor: CORES_CARTA.ouroClaro, quantidade: 22, velocidade: 160 })
+        // o floreio do Ás de cada personagem (pvp/efeitosAses.js); o ♠ que vai devolver um ataque toca na devolução
+        efeitoDoEspecial(this, jog, carta, { dir: j === 0 ? 1 : -1, alvoCarta: this.reveladas[outro(j)], adiar: r.caixas.some((c, k) => c?.refletida && outro(k) === j) })
       }
       this.textosDoEfeito(r, j).forEach(([texto, cor], k) =>
         this.etiquetasMesa.push(this.etiquetaEm(MESA[j].x, MESA[j].y + 86 + k * 17, texto, cor, { atraso: 120 + k * 160, tamanho: 12, ms: 1500 })),
@@ -1503,6 +1511,8 @@ export default class PvpArena extends Phaser.Scene {
       if (caixa.refletida) {
         // a carta vai até o espelho do outro e volta para a caixa de quem jogou
         const espelho = this.reveladas[outro(j)]
+        // o efeito do ♠ de quem refletiu (o taco da Dess, o prisma do Asriel...) começa com a carta a caminho e bate quando ela chega
+        efeitoDoReflexo(this, r.jogadas[outro(j)], espelho, { dir: Math.sign(CENTROS[j] - espelho.x) || 1, alvo: { x: CENTROS[j], y: PISTA.y }, escala: escalaDaCarta(espelho) })
         await carta.arremessar({ x: espelho.x, y: espelho.y }, { destruir: false, duracao: 300, giros: 1, arco: 30, escalaFinal: carta.scaleX * 0.9 })
         this.etiquetaEm(espelho.x, espelho.y - 80, 'DEVOLVIDA!', '#d8ccff', { tamanho: 14, ms: 700 })
         tocar(this, 'espelho')
@@ -1885,6 +1895,23 @@ export default class PvpArena extends Phaser.Scene {
     this.scene.bringToTop('Pausa') // a Pausa vem antes da arena na lista de cenas: sem isso, ela ficaria por baixo
   }
 
+  // em rede: o menu de pausa por cima, sem parar a partida (game/pausaOnline.js); os outros veem PAUSADO
+  pausarOnline() {
+    if (!this.rede || this.saindo) return
+    const nomes = this.nomesJog
+    abrirPausaOnline(this, { subtitulo: `${nomes[0]} x ${nomes[1]}` })
+  }
+
+  // em rede: AUSENTE / PAUSADO embaixo do placar do outro (game/ausencia.js)
+  criarSelosDeAusencia() {
+    if (!this.rede) return (this.selos = null)
+    this.selos = criarSelos(this, {
+      lados: [this.rede.outroLado],
+      lugar: (j) => (j === 0 ? { x: 8, y: 64 } : { x: LARGURA - 8, y: 64, origem: [1, 0] }),
+      quem: (j) => participantesDaPartida().find((p) => ladoDe(p) === j),
+    })
+  }
+
   retomarDaPausa() {
     if (!this.pausado) return
     this.pausado = false
@@ -1896,6 +1923,7 @@ export default class PvpArena extends Phaser.Scene {
   // ---------- frame ----------
 
   update(_, deltaReal) {
+    this.selos?.atualizar(Date.now())
     // câmera lenta do K.O. final (pvp/fimDePartida/): tudo da arena anda devagar
     const lento = this.fimDePartida?.fator ?? 1
     const delta = deltaReal * debug.acelerar * lento

@@ -246,10 +246,28 @@ export function contextoAudio() {
   if (!contexto) {
     if (typeof window === 'undefined') return null // no Node (o servidor roda os ataques: campanha/quadro.js)
     const AC = window.AudioContext || window.webkitAudioContext
-    if (AC) contexto = new AC()
+    if (AC) {
+      contexto = new AC()
+      // aba escondida (game/segundoPlano.js): o jogo continua andando, mas mudo. Vários lugares
+      // retomam o contexto ao tocar um som; este é o ponto único que segura todos
+      const retomar = contexto.resume.bind(contexto)
+      contexto.resume = () => (emFundo ? Promise.resolve() : retomar())
+    }
   }
   return contexto
 }
+
+// Aba escondida: o som para (o contexto suspenso; nenhum som novo o acorda). Voltou: continua
+// de onde estava (a música também: ela anda no tempo do contexto)
+let emFundo = false
+export function silenciarEmFundo(valor) {
+  const antes = emFundo
+  emFundo = Boolean(valor)
+  if (emFundo === antes || !contexto) return
+  if (emFundo) contexto.suspend?.().catch?.(() => {})
+  else contexto.resume()?.catch?.(() => {})
+}
+export const mudoEmFundo = () => emFundo
 
 function obterContexto() {
   const c = contextoAudio()
