@@ -46,6 +46,7 @@ import { shake } from '../effects/shake.js'
 import { flashTela } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
+import { efeitoDoEspecial, efeitoDoReflexo, escalaDaCarta } from '../pvp/efeitosAses.js'
 import { entrarNoJogo, voltarAoMenu, levouGolpe, venceu } from '../../lib/saida.js'
 import { fatores } from '../acessibilidade.js'
 import { ligarEscuridao } from '../coop/semanal/escuridao.js'
@@ -757,6 +758,8 @@ export default class CoopArena extends PvpArena {
       if (jog.especial && carta) {
         tocar(this, 'brilhoRank')
         particulas(this, carta.x, carta.y, { cor: 0xfff0a8, quantidade: 22, velocidade: 160 })
+        // o floreio do Ás de cada personagem (pvp/efeitosAses.js): o ♦ no ataque do chefe que ele cortou, o ♠ na devolução
+        efeitoDoEspecial(this, jog, carta, { dir: Math.sign(CENTRO_X - carta.x) || 1, alvoCarta: r.destino === 'anulada' ? v?.carta : null, adiar: r.destino === 'refletida' })
       }
       this.textosDoEfeitoCoop(r, j).forEach(([texto, cor], k) =>
         this.etiquetasMesa.push(this.etiquetaEm(MESA[j].x, MESA[j].y + 86 + k * 16, texto, cor, { atraso: 120 + k * 150, tamanho: 11, ms: 1600 })),
@@ -823,6 +826,8 @@ export default class CoopArena extends PvpArena {
         const ladrao = Math.max(0, r.efeitos.findIndex((ef) => ef.roubou))
         carta.arremessar({ x: this.huds[ladrao].pontoEnergia.x, y: this.huds[ladrao].pontoEnergia.y }, { duracao: 380 })
       } else if (carta && r.destino === 'refletida') {
+        const espelho = r.jogadas.find((jg) => jg.especial === 'espelho' && !jg.anulada)
+        if (efeitoDoReflexo(this, espelho, carta, { dir: Math.sign(CHEFE.x - carta.x) || 1, alvo: { x: CHEFE.x, y: CHEFE.y - 20 }, escala: escalaDaCarta(carta) })) await this.esperar(170)
         carta.arremessar({ x: CHEFE.x, y: CHEFE.y - 20 }, { duracao: 340, aoImpacto: () => this.inimigo.dano(0.2) })
       } else if (carta) this.tirarDaMesa(carta)
       this.mostrarBanner('NENHUM ATAQUE DO CHEFE', TEXTO.desabilitado, { y: 236, tamanho: 16, ms: 800 })

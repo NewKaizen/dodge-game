@@ -32,6 +32,7 @@ import { shake } from '../effects/shake.js'
 import { flashTela, claraoCamera } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
+import { efeitoDoEspecial, efeitoDoReflexo, escalaDaCarta } from '../pvp/efeitosAses.js'
 import { fogoArtificio } from '../effects/festa.js'
 import { entrarNoJogo, voltarAoMenu, levouGolpe, informarVida, venceu } from '../../lib/saida.js'
 import { fatores } from '../acessibilidade.js'
@@ -1105,6 +1106,8 @@ export default class PvpArenaN extends Phaser.Scene {
       else if (jog.especial && carta) {
         tocar(this, jog.especial === 'espelho' ? 'espelho' : jog.especial === 'roubo' ? 'roubo' : 'brilhoRank')
         particulas(this, carta.x, carta.y, { cor: 0xfff0a8, quantidade: 22, velocidade: 160 })
+        // o floreio do Ás de cada personagem (pvp/efeitosAses.js); o ♠ que vai passar um ataque adiante toca nessa hora
+        efeitoDoEspecial(this, jog, carta, { dir: Math.sign(CENTRO_X - carta.x) || 1, adiar: r.caixas.some((c) => c?.refletida && c.de === j) })
       }
       const m = this.mesa(j)
       this.textosDoEfeito(r, j).forEach(([texto, cor], k) => this.etiquetasMesa.push(this.etiquetaEm(m.x, m.y + 62 + k * 14, texto, cor, { atraso: 120 + k * 150, tamanho: 10, ms: 1700 })))
@@ -1197,6 +1200,8 @@ export default class PvpArenaN extends Phaser.Scene {
       if (caixa.refletida && this.reveladas[caixa.de]) {
         // passou adiante: a carta toca no espelho de quem a passou e segue
         const espelho = this.reveladas[caixa.de]
+        const destino = this.centroNaTela(k)
+        efeitoDoReflexo(this, r.jogadas[caixa.de], espelho, { dir: Math.sign(destino.x - espelho.x) || 1, alvo: destino, escala: escalaDaCarta(espelho) })
         await carta.arremessar({ x: espelho.x, y: espelho.y }, { destruir: false, duracao: 280, giros: 1, arco: 30, escalaFinal: carta.scaleX * 0.9 })
         this.etiquetaEm(espelho.x + 60, espelho.y, 'PASSOU ADIANTE!', '#d8ccff', { tamanho: 11, ms: 700 })
         tocar(this, 'espelho')

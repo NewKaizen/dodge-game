@@ -27,6 +27,7 @@ import { shake } from '../effects/shake.js'
 import { flashTela, claraoCamera } from '../effects/flash.js'
 import { numero } from '../effects/numero.js'
 import { particulas } from '../effects/particulas.js'
+import { efeitoDoEspecial, efeitoDoReflexo, escalaDaCarta } from '../pvp/efeitosAses.js'
 import { fogoArtificio, canhoesConfete, chuvaConfete } from '../effects/festa.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
 import FimDePartida from '../pvp/fimDePartida/index.js'
@@ -1349,6 +1350,8 @@ export default class PvpArena extends Phaser.Scene {
       else if (jog.especial) {
         tocar(this, 'brilhoRank')
         particulas(this, carta.x, carta.y, { cor: CORES_CARTA.ouroClaro, quantidade: 22, velocidade: 160 })
+        // o floreio do Ás de cada personagem (pvp/efeitosAses.js); o ♠ que vai devolver um ataque toca na devolução
+        efeitoDoEspecial(this, jog, carta, { dir: j === 0 ? 1 : -1, alvoCarta: this.reveladas[outro(j)], adiar: r.caixas.some((c, k) => c?.refletida && outro(k) === j) })
       }
       this.textosDoEfeito(r, j).forEach(([texto, cor], k) =>
         this.etiquetasMesa.push(this.etiquetaEm(MESA[j].x, MESA[j].y + 86 + k * 17, texto, cor, { atraso: 120 + k * 160, tamanho: 12, ms: 1500 })),
@@ -1508,6 +1511,8 @@ export default class PvpArena extends Phaser.Scene {
       if (caixa.refletida) {
         // a carta vai até o espelho do outro e volta para a caixa de quem jogou
         const espelho = this.reveladas[outro(j)]
+        // o efeito do ♠ de quem refletiu (o taco da Dess, o prisma do Asriel...) começa com a carta a caminho e bate quando ela chega
+        efeitoDoReflexo(this, r.jogadas[outro(j)], espelho, { dir: Math.sign(CENTROS[j] - espelho.x) || 1, alvo: { x: CENTROS[j], y: PISTA.y }, escala: escalaDaCarta(espelho) })
         await carta.arremessar({ x: espelho.x, y: espelho.y }, { destruir: false, duracao: 300, giros: 1, arco: 30, escalaFinal: carta.scaleX * 0.9 })
         this.etiquetaEm(espelho.x, espelho.y - 80, 'DEVOLVIDA!', '#d8ccff', { tamanho: 14, ms: 700 })
         tocar(this, 'espelho')
