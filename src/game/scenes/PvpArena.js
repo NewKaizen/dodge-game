@@ -12,7 +12,7 @@ import Pista from '../pvp/Pista.js'
 import HudPvp, { IndicadorVelocidade } from '../pvp/HudPvp.js'
 import { CARTAS, TEMAS, ehSuper, superDoPersonagem } from '../pvp/cartas.js'
 import { ataqueDaCartaNoJogo } from '../pvp/ataquesDasCartas.js'
-import { criarPartida, iniciarRodada, podeJogar, resolverRodada, aplicarDano, registrarGrazes, registrarPerfeitoCombo, energiaPerfeito, fimDaRodada, ENERGIA, COMBO_PERFEITO } from '../pvp/regras.js'
+import { criarPartida, iniciarRodada, podeJogar, resolverRodada, aplicarDano, curar, registrarGrazes, registrarPerfeitoCombo, energiaPerfeito, fimDaRodada, ENERGIA, COMBO_PERFEITO } from '../pvp/regras.js'
 import { escolherJogada, NIVEIS_BOT, NIVEL_BOT_PADRAO } from '../pvp/bot.js'
 import { EsquivaBot } from '../pvp/botEsquiva.js'
 import { criarRng, aleatorio, inteiro } from '../pvp/baralho.js'
@@ -1718,6 +1718,28 @@ export default class PvpArena extends Phaser.Scene {
     const ok = this.aplicarAcerto(j, dano)
     if (ok) this.rede?.enviarDano(j, dano)
     return ok
+  }
+
+  // Cura direta no coração do jogador j durante a esquiva (MENU DO DIA, do café). Em rede só
+  // vale para o coração daqui: aplica e manda a cura para o outro PC (aplicarCura de lá).
+  // Devolve quanto curou de fato (0 fora da esquiva, no K.O. ou com a vida cheia).
+  curarCoracao(j, n) {
+    if (this.rede && !this.rede.ehMeu(j)) return 0
+    const feito = this.aplicarCura(j, n)
+    if (feito) this.rede?.enviarCura(j, n)
+    return feito
+  }
+
+  aplicarCura(j, n) {
+    if (this.fase !== 'esquiva' || this.ko[j]) return 0
+    const jog = this.estado.jogadores[j]
+    const feito = curar(this.estado, j, n)
+    if (!feito) return 0
+    const hud = this.huds[j]
+    hud.setHp(jog.hp)
+    if (jog.hp > jog.hpMax * HP_BAIXO) this.hpAvisado[j] = false
+    numero(this, hud.pontoHp.x, hud.pontoHp.y + 6, `+${feito}`, TEXTO.cura, { tamanho: 16 })
+    return feito
   }
 
   aplicarAcerto(j, dano) {
