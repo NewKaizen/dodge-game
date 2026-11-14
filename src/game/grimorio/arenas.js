@@ -81,6 +81,12 @@ const DICAS = {
   croissants: { nome: 'CROISSANTS VOADORES', dica: 'O "!" marca por onde o croissant entra e o tracejado mostra a curva inteira que ele vai fazer. Espere ele passar ou contorne pelo lado oposto da curva.' },
   buleQuente: { nome: 'BULE QUENTE', dica: 'O bule apita e círculos de vapor pulsam: quando o aviso acaba, eles estouram e queimam por um instante. Saia dos círculos; sempre sobra espaço livre.' },
   pombos: { nome: 'POMBOS', dica: 'Linhas pálidas mostram as fileiras do bando e o vão verde é a passagem. Os pombos de fora chegam um pouco depois dos do meio.' },
+  meteoros: { nome: 'METEOROS', dica: 'Um risco vermelho tracejado (e um "!" na borda) mostra o caminho de cada pedra antes dela chegar. Saia do risco: sempre sobra uma faixa livre.' },
+  airlock: { nome: 'AIRLOCK', dica: 'A parede de um lado pisca e a sirene toca: a comporta vai abrir. Depois o ar puxa o coração para aquele lado (cada vez mais forte); segure no sentido contrário. Não dá dano.' },
+  dragao: { nome: 'DRAGÃO', dica: 'O risco dourado ondulado no chão mostra por onde o dragão vai serpentear. O corpo todo machuca, mas a onda deixa sempre um corredor livre em cima ou embaixo.' },
+  lanternas: { nome: 'LANTERNAS', dica: 'Um anel dourado fecha onde a lanterna vai nascer (ainda inofensiva). Depois ela acende e sobe balançando: desvie da coluna dela.' },
+  transito: { nome: 'TRÂNSITO', dica: 'O semáforo manda: amarelo piscando = a faixa vermelha vai ter veículo (os faróis acendem na borda); verde = eles disparam. Ônibus é lento e longo, moto é rápida. Nunca as 3 faixas juntas.' },
+  obra: { nome: 'OBRA', dica: 'A coluna listrada de amarelo e preto é onde a viga vai cair (a viga balança no cabo, avisando). Saia da coluna: a viga machuca só no instante da queda.' },
 }
 
 const NOME_ARMA = { tiro: 'tiro', espada: 'espada', bumerangue: 'bumerangue', explosao: 'bombas' }

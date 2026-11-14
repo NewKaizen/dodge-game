@@ -10,11 +10,16 @@ import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 import { tremerCamera } from '../effects/shake.js'
 import { claraoCamera } from '../effects/flash.js'
 import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
+import { layoutVoto, vizinho } from '../pvp/layoutVoto.js'
+import { ICONES_ARENAS_NOVAS } from '../pvp/iconesArenasNovas.js'
+import { semLigaduras } from '../campanha/texto.js'
 
 // Votação da arena do PvP (PvpEscolha -> PvpVoto -> PvpArena).
 //   Um cartão por arena (pvp/arenas.js) e o "?" (ALEATÓRIA: vale como voto numa
-//   arena sorteada na apuração). Cada jogador move o próprio coração (←/→) e
-//   vota (A); B desfaz o voto. Contra a CPU só o P1 vota (a CPU segue o voto).
+//   arena sorteada na apuração). Os cartões ficam numa fileira só (até 8) ou numa
+//   GRADE de 2/3 fileiras (pvp/layoutVoto.js: serve a qualquer número de arenas).
+//   Cada jogador move o próprio coração (←/→ andam em fila, ↑/↓ trocam de fileira)
+//   ou aponta com o mouse (passar em cima move, clicar vota) e vota (A); B desfaz o voto. Contra a CPU só o P1 vota (a CPU segue o voto).
 //   O fundo da tela é o fundo animado da arena em foco; o painel de baixo
 //   mostra a descrição, a música e as rodadas bônus dela.
 //   Quando todos votam (ou o tempo acaba: quem não votou fica de fora):
@@ -33,8 +38,7 @@ import { canal, emRede, meuLado, souHostDaRede, irParaCena } from '../rede.js'
 // e window.pvpVoto (votar(j, id), estadoDebug()).
 
 const TEMPO_MS = 12000
-const CARTAO = { y: 142, largura: 100, altura: 114, espaco: 10 } // 7 cartões = 760 px, a mesma largura do painel
-const PAINEL = { x: (LARGURA - 760) / 2, y: 232, largura: 760, altura: 196 }
+const PAINEL = { x: (LARGURA - 760) / 2, y: 232, largura: 760, altura: 196 } // y/altura: ver painelDaGrade (a grade de 2 fileiras empurra o painel um pouco)
 const VEU = 0.42 // véu escuro por cima do fundo da arena (o texto precisa ler)
 const CURSOR_MS = 300 // em rede: de quanto em quanto o meu cursor vai de novo para o outro PC
 
@@ -44,6 +48,7 @@ const CURSOR_MS = 300 // em rede: de quanto em quanto o meu cursor vai de novo p
 const estadoInicial = () => ({
   cartoes: null,
   painel: null,
+  grade: null,
 })
 
 export default class PvpVoto extends Phaser.Scene {
@@ -66,6 +71,7 @@ export default class PvpVoto extends Phaser.Scene {
     this.eu = this.rede ? meuLado() : 0 // em rede: o lado que este PC controla
     this.eleitores = this.solo ? [0] : [0, 1]
     this.opcoes = [...ARENAS.map((a) => a.id), ALEATORIA]
+    this.grade = layoutVoto(this.opcoes.length)
     this.votos = [null, null]
     this.restante = TEMPO_MS
     this.apurando = false
@@ -90,7 +96,8 @@ export default class PvpVoto extends Phaser.Scene {
     }))
     const salvo = this.registry.get('pvp')?.arena
     if (ARENA[salvo]) this.cursores[this.eu].indice = this.opcoes.indexOf(salvo)
-    this.dica = this.texto(LARGURA / 2, ALTURA - 14, this.rede ? '← → escolher     A: votar' : '← → escolher     A: votar     B: desfazer', 13, TEXTO.desabilitado, { strokeThickness: 0 })
+    const setas = this.grade.linhas > 1 ? '← → ↑ ↓' : '← →'
+    this.dica = this.texto(LARGURA / 2, ALTURA - 14, this.rede ? `${setas} escolher     A: votar` : `${setas} escolher     A: votar     B: desfazer`, 13, TEXTO.desabilitado, { strokeThickness: 0 })
     if (this.rede) this.status.setText(`você é o P${this.eu + 1}: vote na sua arena  ·  a mais votada ganha (empate = roleta)`)
 
     this.trocarFundo(this.opcoes[this.cursores[this.eu].indice])
@@ -133,35 +140,50 @@ export default class PvpVoto extends Phaser.Scene {
   // ---------- montagem ----------
 
   montarCartoes() {
-    const n = this.opcoes.length
-    const total = n * CARTAO.largura + (n - 1) * CARTAO.espaco
+    const g = this.grade
     this.cartoes = this.opcoes.map((id, i) => {
       const arena = ARENA[id]
       const cor = arena?.cor ?? 0xffffff
-      const x = (LARGURA - total) / 2 + CARTAO.largura / 2 + i * (CARTAO.largura + CARTAO.espaco)
-      const c = this.add.container(x, CARTAO.y).setDepth(3)
-      const brilho = this.add.rectangle(0, 0, CARTAO.largura + 10, CARTAO.altura + 10, cor, 0).setStrokeStyle(3, cor, 0)
-      const moldura = this.add.rectangle(0, 0, CARTAO.largura, CARTAO.altura, CORES.painel, 0.9).setStrokeStyle(2, cor, 0.6)
-      const faixa = this.add.rectangle(0, CARTAO.altura / 2 - 15, CARTAO.largura - 6, 24, cor, 0.18)
+      const { x, y } = g.cartoes[i]
+      const c = this.add.container(x, y).setDepth(3)
+      const brilho = this.add.rectangle(0, 0, g.largura + 10, g.altura + 10, cor, 0).setStrokeStyle(3, cor, 0)
+      const moldura = this.add.rectangle(0, 0, g.largura, g.altura, CORES.painel, 0.9).setStrokeStyle(2, cor, 0.6)
+      const faixa = this.add.rectangle(0, g.altura / 2 - (g.compacto ? 11 : 15), g.largura - 6, g.compacto ? 18 : 24, cor, 0.18)
       const icone = this.add.graphics()
+      // cartão baixo (grade): o ícone encolhe e sobe um pouco, para caber com o nome embaixo
+      const k = g.compacto ? 0.82 : 1
       desenharIcone(icone, id, 0, -12, cor)
-      const nome = this.add.text(0, CARTAO.altura / 2 - 15, arena?.curto ?? 'ALEATÓRIA', { fontFamily: FONTE, fontSize: '11px', color: corTexto(cor), stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5)
-      if (nome.width > CARTAO.largura - 8) nome.setFontSize(9)
+      icone.setScale(k).setPosition(0, g.compacto ? (-g.altura / 2 + (g.altura - 18) / 2 - 2) + 12 * k : 0)
+      const nome = this.add.text(0, g.altura / 2 - (g.compacto ? 11 : 15), semLigaduras(arena?.curto ?? 'ALEATÓRIA'), { fontFamily: FONTE, fontSize: g.compacto ? '10px' : '11px', color: corTexto(cor), stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5)
+      if (nome.width > g.largura - 8) nome.setFontSize(9)
       c.add([brilho, moldura, faixa, icone, nome])
       // selos de voto ("P1"/"P2"), nos cantos de cima
       const selos = [0, 1].map((j) => {
-        const sx = (j === 0 ? -1 : 1) * (CARTAO.largura / 2 - 14)
-        const fundo = this.add.rectangle(sx, -CARTAO.altura / 2 + 11, 24, 14, CORES.almas[j]).setStrokeStyle(2, 0x000000).setVisible(false)
+        const sx = (j === 0 ? -1 : 1) * (g.largura / 2 - 14)
+        const fundo = this.add.rectangle(sx, -g.altura / 2 + 11, 24, 14, CORES.almas[j]).setStrokeStyle(2, 0x000000).setVisible(false)
         const rotulo = this.add.text(sx, fundo.y, `P${j + 1}`, { fontFamily: FONTE, fontSize: '10px', color: '#000000' }).setOrigin(0.5).setVisible(false)
         c.add([fundo, rotulo])
         return { fundo, rotulo }
       })
-      return { id, x, c, brilho, moldura, icone, nome, selos, cor }
+      // mouse: passar em cima aponta o cursor, clicar vota
+      moldura.setInteractive({ useHandCursor: true })
+      moldura.on('pointerover', () => this.apontar(i))
+      moldura.on('pointerdown', () => {
+        this.apontar(i)
+        this.votar(this.eu)
+      })
+      return { id, x, y, c, brilho, moldura, icone, nome, selos, cor, k }
     })
   }
 
+  // o painel de baixo: no lugar de sempre, ou um pouco mais para baixo se a grade ocupa mais
+  painelDaGrade() {
+    const y = Math.max(PAINEL.y, Math.round(this.grade.base) + 10)
+    return { ...PAINEL, y, altura: Math.min(PAINEL.altura, 438 - y) }
+  }
+
   montarPainel() {
-    const p = PAINEL
+    const p = this.painelDaGrade()
     const fundoPainel = this.add.rectangle(p.x, p.y, p.largura, p.altura, CORES.painel, 0.86).setOrigin(0).setStrokeStyle(2, 0xffffff, 0.15).setDepth(2)
     const estilo = (tamanho, cor = TEXTO.normal) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 2 })
     this.painel = {
@@ -201,14 +223,29 @@ export default class PvpVoto extends Phaser.Scene {
     this.atualizarTela()
   }
 
-  mover(j, passo) {
+  mover(j, direcao) {
     const cursor = this.cursores[this.eleitores.indexOf(j)]
     if (!cursor || this.votos[j]) return
-    cursor.indice = (cursor.indice + passo + this.opcoes.length) % this.opcoes.length
+    const novo = vizinho(cursor.indice, direcao, this.opcoes.length, this.grade.colunas)
+    if (novo === cursor.indice) return
+    cursor.indice = novo
     this.focoDe = j
     tocar(this, 'mover')
     if (this.rede) this.mandarCursor()
     this.trocarFundo(this.opcoes[cursor.indice])
+    this.atualizarTela()
+  }
+
+  // mouse: o cursor do meu coração vai para o cartão `indice`
+  apontar(indice) {
+    const j = this.eu
+    const cursor = this.cursores?.[this.eleitores.indexOf(j)]
+    if (!cursor || this.apurando || this.votos[j] || cursor.indice === indice) return
+    cursor.indice = indice
+    this.focoDe = j
+    tocar(this, 'mover')
+    if (this.rede) this.mandarCursor()
+    this.trocarFundo(this.opcoes[indice])
     this.atualizarTela()
   }
 
@@ -313,7 +350,7 @@ export default class PvpVoto extends Phaser.Scene {
     for (const c of this.cartoes) {
       const sim = c === cartao
       c.brilho.setStrokeStyle(3, c.cor, sim ? 1 : 0).setFillStyle(c.cor, sim ? 0.25 : 0)
-      c.c.setScale(sim ? 1.12 : 1).setY(CARTAO.y - (sim ? 8 : 0))
+      c.c.setScale(sim ? 1.12 : 1).setY(c.y - (sim ? 8 : 0))
     }
   }
 
@@ -330,19 +367,20 @@ export default class PvpVoto extends Phaser.Scene {
     })
     tocar(this, 'voo')
     cartao.c.setDepth(10)
-    this.tweens.add({ targets: cartao.c, x: LARGURA / 2, y: 190, scale: 1.7, duration: 480, ease: 'Cubic.easeOut' })
+    const esc = this.grade.compacto ? 2.1 : 1.7 // o cartão baixo da grade cresce mais
+    this.tweens.add({ targets: cartao.c, x: LARGURA / 2, y: 190, scale: esc, duration: 480, ease: 'Cubic.easeOut' })
     await esperar(500)
     tocar(this, 'impacto')
     claraoCamera(this.cameras.main, 160, 255, 255, 255)
     tremerCamera(this.cameras.main, 260, 0.014)
     estilhacos(this, LARGURA / 2, 190, { quantidade: 30, cores: [arena.cor, 0xffffff, CORES.almas[0], CORES.almas[1]], profundidade: 11, duracao: 700 })
-    const nome = this.texto(LARGURA / 2, 345, arena.nome, arena.nome.length > 12 ? 30 : 44, corTexto(arena.cor), { strokeThickness: 7 }).setDepth(12).setScale(3).setAlpha(0)
-    const sub = this.texto(LARGURA / 2, 382, arena.tituloMusica ? `♪ ${arena.tituloMusica}` : arena.descricao, 13, '#d8d8e8').setDepth(12).setAlpha(0)
+    const nome = this.texto(LARGURA / 2, 345, semLigaduras(arena.nome), arena.nome.length > 12 ? 30 : 44, corTexto(arena.cor), { strokeThickness: 7 }).setDepth(12).setScale(3).setAlpha(0)
+    const sub = this.texto(LARGURA / 2, 382, semLigaduras(arena.tituloMusica ? `♪ ${arena.tituloMusica}` : arena.descricao), 13, '#d8d8e8').setDepth(12).setAlpha(0)
     this.tweens.add({ targets: sub, alpha: 1, delay: 250, duration: 300 })
     this.tweens.add({ targets: nome, scale: 1, alpha: 1, duration: 200, ease: 'Back.easeOut' })
     this.status.setText('A ARENA É...').setY(60)
     tocar(this, 'fanfarra')
-    this.tweens.add({ targets: cartao.c, scale: 1.8, duration: 300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
+    this.tweens.add({ targets: cartao.c, scale: esc + 0.1, duration: 300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
     const pvp = this.registry.get('pvp') ?? {}
     this.registry.set('pvp', { ...pvp, p1: this.p1, p2: this.p2, arena: id })
     await esperar(1500)
@@ -365,18 +403,18 @@ export default class PvpVoto extends Phaser.Scene {
       p.rotuloBonus.setText('ARENAS POSSÍVEIS')
       p.bonus.forEach((t, k) => {
         const a = ARENAS[k]
-        t.setText(a ? `· ${a.nome}` : '').setColor(a ? corTexto(a.cor) : '#ffffff')
+        t.setText(a ? semLigaduras(`· ${a.nome}`) : '').setColor(a ? corTexto(a.cor) : '#ffffff')
       })
       return
     }
-    p.nome.setText(arena.nome).setColor(corTexto(arena.cor))
-    p.musica.setText(arena.tituloMusica ? `♪ ${arena.tituloMusica}` : '')
-    p.descricao.setText(arena.descricao)
+    p.nome.setText(semLigaduras(arena.nome)).setColor(corTexto(arena.cor))
+    p.musica.setText(arena.tituloMusica ? semLigaduras(`♪ ${arena.tituloMusica}`) : '')
+    p.descricao.setText(semLigaduras(arena.descricao))
     const eventos = eventosDaArena(id)
     p.rotuloBonus.setText(`RODADAS BÔNUS (${eventos.length})`)
     p.bonus.forEach((t, k) => {
       const ev = eventos[k]
-      t.setText(ev ? `★ ${ev.nome}` : '').setColor(ev ? corTexto(ev.cor) : '#ffffff')
+      t.setText(ev ? semLigaduras(`★ ${ev.nome}`) : '').setColor(ev ? corTexto(ev.cor) : '#ffffff')
     })
   }
 
@@ -390,7 +428,7 @@ export default class PvpVoto extends Phaser.Scene {
       const foco = focos.has(i)
       c.brilho.setStrokeStyle(3, c.cor, foco ? 0.9 : 0).setFillStyle(c.cor, foco ? 0.18 : 0)
       c.moldura.setStrokeStyle(2, c.cor, foco ? 1 : 0.6)
-      c.c.setScale(foco ? 1.08 : 1).setY(CARTAO.y - (foco ? 6 : 0))
+      c.c.setScale(foco ? 1.08 : 1).setY(c.y - (foco ? 6 : 0))
       c.selos.forEach((s, j) => [s.fundo, s.rotulo].forEach((o) => o.setVisible(this.votos[j] === c.id)))
     })
     const foco = this.cursores.find((c) => c.j === this.focoDe) ?? this.cursores[0]
@@ -405,14 +443,13 @@ export default class PvpVoto extends Phaser.Scene {
     if (this.apurando) return
     for (const j of this.eleitores) {
       const direcao = this.controles.toque(j)
-      if (direcao === 'esquerda') this.mover(j, -1)
-      if (direcao === 'direita') this.mover(j, 1)
+      if (direcao) this.mover(j, direcao)
     }
     // corações nos cantos de cima do cartão (P1 à esquerda, P2 à direita)
     for (const cur of this.cursores) {
       const c = this.cartoes[cur.indice]
-      const x = c.x + (cur.j === 0 ? -1 : 1) * (CARTAO.largura / 2 - 12)
-      const y = c.c.y - CARTAO.altura / 2 - 12
+      const x = c.x + (cur.j === 0 ? -1 : 1) * (this.grade.largura / 2 - 12)
+      const y = c.c.y - this.grade.altura / 2 - (this.grade.compacto ? 6 : 12)
       cur.coracao.setPosition(x, y + Math.sin(time / 200 + cur.j) * 2).setVisible(!this.votos[cur.j])
     }
     // tempo: quem não votou fica de fora (em rede quem decide que acabou é o host)
@@ -431,6 +468,7 @@ export default class PvpVoto extends Phaser.Scene {
 
 // Ícone de cada arena (vetorial, ~44 px), centrado em (x, y)
 export function desenharIcone(g, id, x, y, cor) {
+  if (ICONES_ARENAS_NOVAS[id]) return ICONES_ARENAS_NOVAS[id](g, x, y, cor)
   const escuro = 0x000000
   if (id === 'castelo') {
     g.fillStyle(cor, 1)

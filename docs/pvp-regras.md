@@ -187,6 +187,9 @@ Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria 
 | Coliseu | `arena_coliseu.mid` | coração trocado, arena encolhendo, leões, chuva de lanças, corrida de bigas, chão em brasas, polegar do imperador, rede do reciário |
 | Praia | Maré Mansa (`arena_praia.mid`) | onda gigante, caranguejos, bola de praia, maré alta (aquário), brisa do mar (ventania), areia movediça, areia quente (chão em brasas), festa na praia, chuva de verão |
 | Café Francês | Valsa do Croissant (`arena_cafe.mid`) | croissants voadores, bule quente, pombos, queda de luz (apagão), luzinhas (vaga-lumes), no compasso (no ritmo), chanson (karaokê), chuva de verão, coração trocado |
+| Estação Espacial | Órbita Baixa (`arena_estacao.mid`, ambiente em Lá menor) | gravidade zero (gravidade maluca), **meteoros**, **airlock**, estação girando (ponta-cabeça), falha de energia (apagão), sinal atrasado (lag), sistema travado (tela azul), teletransporte (coração trocado), alarmes (pop-ups) |
+| Chinatown | Rua das Mil Lanternas (`arena_chinatown.mid`, Ré maior pentatônico) | fogos de artifício (explosões), **dragão**, **lanternas**, festival (festa), multidão (mosh), tambores (no ritmo), vapor das panelas (gelo seco), chuva de noite, karaokê |
+| Cidade Grande | Hora do Rush (`arena_cidade.mid`, funk/jazz-hop em Dó) | **trânsito**, **obra**, blecaute (apagão), metrô (terremoto), temporal (chuva), vento entre prédios (ventania), outdoors (pop-ups), hora do rush (mosh), fumaça de escapamento (gelo seco) |
 
 **Praia** (fundo `backgrounds/arenas/praia.js`: enseada ao pôr do sol com ondas rolando, coqueiros, guarda-sóis, caranguejo, gaivotas e veleiros; música bossa-reggae em Dó maior, `scripts/musica/arenasPraiaCafe.mjs`) e **Café Francês** (fundo `cafe.js`: terraço de Paris com marquises, luzinhas, torre de ferro genérica, gato, pombos e acordeonista; valsa musette em Lá menor). Eventos novos (planos puros e testados em `pvp/bonus/eventos/planosPraiaCafe.js`, desenho em `onda.js`, `caranguejos.js`, `bola.js`, `croissants.js`, `bule.js`, `pombos.js`; todos sorteiam só com o rng da semente da rodada, sempre com aviso >= 400 ms e saída garantida):
 
@@ -199,6 +202,10 @@ Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria 
 | Bule quente | Café | o bule apita e 2 a 3 nuvens de vapor (círculos afastados, no máximo 36% da caixa) pulsam por 1,1 s e estouram por 0,62 s |
 | Pombos | Café | um bando cruza em cunha com um VÃO de 62 px (aviso de 1 s: linhas de voo e vão verde); o vão do próximo bando fica perto do anterior |
 
+
+Os eventos em **negrito** são novos (planos puros em `pvp/bonus/eventos/planosArenas.js`, testes em `__tests__/bonusArenasNovas.test.js`): sorteados pela semente da rodada (igual nos dois PCs), o mesmo plano nas duas caixas, sempre avisados (≥ 400 ms) e com corredor de fuga ≥ 48 px. METEOROS: pedras cruzam as caixas pelo risco vermelho tracejado. AIRLOCK: a comporta de um lado avisa (sirene, parede piscando) e puxa o coração (sem dano). DRAGÃO: serpenteia pelo risco dourado ondulado. LANTERNAS: anel dourado avisa, depois a lanterna acesa sobe balançando. TRÂNSITO: o semáforo amarelo avisa a faixa (faróis acesos), verde = carro, ônibus e moto disparam. OBRA: coluna listrada de amarelo e preto avisa a viga que despenca do guindaste.
+
+**Layout da votação** (`pvp/layoutVoto.js`): até 8 cartões numa fileira; mais que isso vira grade de 2 (até 16) ou 3 fileiras, qualquer número de arenas. ← → andam em fila, ↑ ↓ trocam de fileira, o mouse aponta (passar) e vota (clicar). Músicas geradas por `scripts/musica/arenasNovas.mjs`.
 
 Testes: `scene.start('PvpVoto', { p1, p2 })` ou direto `scene.start('PvpArena', { p1, p2, arena: 'templo' })`.
 
