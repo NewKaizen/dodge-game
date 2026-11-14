@@ -21,6 +21,7 @@ import { ARENAS, ARENA, eventosDaArena } from '../pvp/arenas.js'
 import { EVENTO, BONUS, ARMAS } from '../pvp/bonus.js'
 import { CARTAS, PERSONAGENS_PVP, SIMBOLOS, ehSuper, especialDaCarta, resumoDoAtaque } from '../pvp/cartas.js'
 import { PAGINAS } from './fichas.js'
+import { semLigaduras } from '../campanha/texto.js'
 
 export const PAGINAS_ARENA = ARENAS.map((a) => ({ id: a.id, tipo: 'arena' }))
 // todas as páginas do Guia, na ordem do ↑/↓: cartas (personagens, chefes) e depois as arenas
@@ -73,6 +74,19 @@ const DICAS = {
   armadilhas: { nome: 'ARMADILHAS', dica: 'Pisou na placa? Clique: dardos saem das paredes pela linha dela. Os espinhos estalam antes de subir: saia das lajes que estalam.' },
   areia: { nome: 'AREIA MOVEDIÇA', dica: 'Poças de areia surgem com aviso, prendem e puxam o coração para o meio. Não dá dano, mas deixa você lento no meio das balas.' },
   relogio: { nome: 'RELÓGIO DO TEMPO', dica: 'O ataque alterna câmera lenta e acelerado (com 1 s de aviso); o coração anda normal. Use o lento para se reposicionar.' },
+  // PRAIA e CAFÉ FRANCÊS
+  ondaGigante: { nome: 'ONDA GIGANTE', dica: 'A faixa azul piscando mostra por onde a água passa; o vão verde é a saída. Vá para o vão antes de a onda entrar: o próximo vão fica sempre perto do anterior.' },
+  caranguejos: { nome: 'CARANGUEJOS', dica: 'Eles andam de lado. Quando um para e ergue as pinças, o anel vermelho mostra o alcance do beliscão: saia do anel antes de ele fechar.' },
+  bolaDePraia: { nome: 'BOLA DE PRAIA', dica: 'A sombra mostra onde a bola cai e ela quica em linha reta. Encostou, ela empurra o coração (sem dano): fique longe dela e das quinas.' },
+  croissants: { nome: 'CROISSANTS VOADORES', dica: 'O "!" marca por onde o croissant entra e o tracejado mostra a curva inteira que ele vai fazer. Espere ele passar ou contorne pelo lado oposto da curva.' },
+  buleQuente: { nome: 'BULE QUENTE', dica: 'O bule apita e círculos de vapor pulsam: quando o aviso acaba, eles estouram e queimam por um instante. Saia dos círculos; sempre sobra espaço livre.' },
+  pombos: { nome: 'POMBOS', dica: 'Linhas pálidas mostram as fileiras do bando e o vão verde é a passagem. Os pombos de fora chegam um pouco depois dos do meio.' },
+  meteoros: { nome: 'METEOROS', dica: 'Um risco vermelho tracejado (e um "!" na borda) mostra o caminho de cada pedra antes dela chegar. Saia do risco: sempre sobra uma faixa livre.' },
+  airlock: { nome: 'AIRLOCK', dica: 'A parede de um lado pisca e a sirene toca: a comporta vai abrir. Depois o ar puxa o coração para aquele lado (cada vez mais forte); segure no sentido contrário. Não dá dano.' },
+  dragao: { nome: 'DRAGÃO', dica: 'O risco dourado ondulado no chão mostra por onde o dragão vai serpentear. O corpo todo machuca, mas a onda deixa sempre um corredor livre em cima ou embaixo.' },
+  lanternas: { nome: 'LANTERNAS', dica: 'Um anel dourado fecha onde a lanterna vai nascer (ainda inofensiva). Depois ela acende e sobe balançando: desvie da coluna dela.' },
+  transito: { nome: 'TRÂNSITO', dica: 'O semáforo manda: amarelo piscando = a faixa vermelha vai ter veículo (os faróis acendem na borda); verde = eles disparam. Ônibus é lento e longo, moto é rápida. Nunca as 3 faixas juntas.' },
+  obra: { nome: 'OBRA', dica: 'A coluna listrada de amarelo e preto é onde a viga vai cair (a viga balança no cabo, avisando). Saia da coluna: a viga machuca só no instante da queda.' },
 }
 
 const NOME_ARMA = { tiro: 'tiro', espada: 'espada', bumerangue: 'bumerangue', explosao: 'bombas' }
@@ -125,11 +139,11 @@ export function fichaDoEvento(evento, arenaId, { efeitos = {} } = {}) {
     id: evento.id,
     nome: evento.nome,
     nomeOriginal: base.nome,
-    descricao: maiuscula(evento.descricao ?? base.descricao ?? ''),
+    descricao: semLigaduras(maiuscula(evento.descricao ?? base.descricao ?? '')), // a fonte junta "fi"/"fl" num "A"
     cor: evento.cor ?? base.cor ?? 0xffffff,
     cartas,
     numeros,
-    dica,
+    dica: dica && semLigaduras(dica),
     emTodas,
     tambemEm,
     previa: Boolean(efeitos[evento.id]),
@@ -155,10 +169,10 @@ export function fichaDaArena(id, { efeitos = {} } = {}) {
     id: arena.id,
     nome: arena.nome,
     curto: arena.curto ?? arena.nome,
-    descricao: arena.descricao ?? '',
+    descricao: semLigaduras(arena.descricao ?? ''),
     musica: arena.tituloMusica ?? null,
     cor: arena.cor ?? 0xffffff,
-    frequencia: `A cada ${BONUS.aCadaRodadas} rodadas a roleta sorteia uma destas (nunca a mesma duas vezes seguidas).`,
+    frequencia: semLigaduras(`A cada ${BONUS.aCadaRodadas} rodadas a roleta sorteia uma destas (nunca a mesma duas vezes seguidas).`),
     eventos,
     grupos,
   }

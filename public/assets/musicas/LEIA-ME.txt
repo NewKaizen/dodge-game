@@ -18,6 +18,12 @@ Músicas em MIDI (.mid), com o nome da tela ou do chefe. O jogo procura
   arena_palco.mid        arena PALCO
   arena_templo.mid       arena TEMPLO
   arena_coliseu.mid      arena COLISEU
+  arena_praia.mid        arena PRAIA ("Maré Mansa", bossa-reggae; gerada por scripts/musica/arenasPraiaCafe.mjs)
+  arena_cafe.mid         arena CAFÉ FRANCÊS ("Valsa do Croissant", valsa musette; mesmo script)
+  arena_estacao.mid      arena ESTAÇÃO ESPACIAL (Órbita Baixa)
+  arena_chinatown.mid    arena CHINATOWN (Rua das Mil Lanternas)
+  arena_cidade.mid       arena CIDADE GRANDE (Hora do Rush)
+                   As três são originais, geradas por scripts/musica/arenasNovas.mjs.
                    Sem o arquivo da arena, toca o pvp.mid. O nome que aparece na
                    votação fica em src/game/pvp/arenas.js (tituloMusica).
   lobby.mid        lobby do modo LAN (o que está aí é provisório, gerado por

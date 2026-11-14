@@ -206,6 +206,10 @@ export default class Grimorio extends Phaser.Scene {
     // abas de cada seção (só as da seção atual aparecem): personagens, um
     // respiro e os chefes; as arenas são abas largas com o nome
     const t = ABAS.tamanho
+    // as abas das arenas encolhem para caber quando há muitas (o nome se ajusta com caber())
+    const numArenas = PAGINAS_GUIA.filter((p) => p.tipo === 'arena').length
+    const passoArena = Math.min(ABAS.passoArena, Math.floor((LARGURA - 8 - ABAS.x) / Math.max(1, numArenas)))
+    const larguraArena = Math.min(ABAS.larguraArena, passoArena - 8)
     this.abas = []
     for (const secao of SECOES) {
       let x = ABAS.x
@@ -213,9 +217,9 @@ export default class Grimorio extends Phaser.Scene {
       paginas.forEach((pagina, i) => {
         if (i > 0 && pagina.tipo !== paginas[i - 1].tipo) x += ABAS.folga
         const cor = this.corDaPagina(pagina)
-        const largura = pagina.tipo === 'arena' ? ABAS.larguraArena : t
+        const largura = pagina.tipo === 'arena' ? larguraArena : t
         const cx = x + largura / 2
-        x += pagina.tipo === 'arena' ? ABAS.passoArena : ABAS.passo
+        x += pagina.tipo === 'arena' ? passoArena : ABAS.passo
         const moldura = this.add.rectangle(cx, ABAS.y, largura, t, CORES.painel, 0.9).setStrokeStyle(2, cor, 0.5)
         let sprite
         if (pagina.tipo === 'arena') {

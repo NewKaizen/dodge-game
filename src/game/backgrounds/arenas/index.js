@@ -16,6 +16,13 @@ import informatica from './informatica.js'
 import palco from './palco.js'
 import templo from './templo.js'
 import coliseu from './coliseu.js'
+import estacao from './estacao.js'
+import chinatown from './chinatown.js'
+import cidade from './cidade.js'
 
-const ARENAS = { castelo, jardim, informatica, palco, templo, coliseu }
+import praia from './praia.js'
+import cafe from './cafe.js'
+
+const ARENAS = { castelo, jardim, informatica, palco, templo, coliseu, estacao, chinatown, cidade }
+Object.assign(ARENAS, { praia, cafe })
 export const FUNDOS_ARENAS = Object.fromEntries(Object.entries(ARENAS).map(([id, f]) => [`arena-${id}`, f]))

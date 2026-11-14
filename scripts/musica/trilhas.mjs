@@ -72,7 +72,7 @@ export function acorde(nome) {
 export const paraMaior = (n) => ([5, 10, 0].includes(((n % 12) + 12) % 12) ? n + 1 : n)
 
 // ---------- o montador ----------
-function musica({ nome, bpm, compassos }) {
+export function musica({ nome, bpm, compassos }) {
   const fim = compassos * C
   const tempo = novaTrilha(nome)
   tempo.tempo(bpm)

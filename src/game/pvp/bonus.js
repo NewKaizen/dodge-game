@@ -48,6 +48,12 @@ export const EVENTOS = [
   { id: 'copia', nome: 'CTRL+C CTRL+V', descricao: 'aperte A sem parar: quem copiar mais ROUBA energia do outro!', cartas: 'copia', cor: 0x7affc8 },
   { id: 'telaAzul', nome: 'TELA AZUL', descricao: 'a caixa trava na tela azul e reinicia (travada, ninguém leva dano)', cartas: 'normal', cor: 0x5a9aff },
   { id: 'cursor', nome: 'CURSOR GIGANTE', descricao: 'um cursor enorme persegue o coração e clica nele!', cartas: 'normal', cor: 0xffffff },
+  { id: 'meteoros', nome: 'METEOROS', descricao: 'pedras do espaço cruzam as caixas: siga o risco vermelho!', cartas: 'normal', cor: 0xff8a50 },
+  { id: 'airlock', nome: 'AIRLOCK', descricao: 'a comporta abre e a descompressão puxa o coração pra fora!', cartas: 'normal', cor: 0x7fd8ff },
+  { id: 'dragao', nome: 'DRAGÃO', descricao: 'o dragão da festa serpenteia pela caixa: siga o risco dourado!', cartas: 'normal', cor: 0xff3a30 },
+  { id: 'lanternas', nome: 'LANTERNAS', descricao: 'lanternas acesas sobem balançando e fecham o caminho!', cartas: 'normal', cor: 0xffb040 },
+  { id: 'transito', nome: 'TRÂNSITO', descricao: 'o semáforo abriu: carros, ônibus e motos cruzam as faixas!', cartas: 'normal', cor: 0xffd030 },
+  { id: 'obra', nome: 'OBRA', descricao: 'vigas despencam do guindaste: fuja da coluna listrada!', cartas: 'normal', cor: 0xf4c61a },
   { id: 'chuva', nome: 'CHUVA DE VERÃO', descricao: 'a chuva empurra o coração pra baixo e as poças escorregam!', cartas: 'normal', cor: 0x6ab8ff },
   { id: 'ventania', nome: 'VENTANIA', descricao: 'rajadas de vento empurram o coração (olhe as folhas!)', cartas: 'normal', cor: 0x9ae07a },
   { id: 'abelhas', nome: 'ENXAME', descricao: 'ficou parado? as abelhas vêm atrás! (se mexer despista)', cartas: 'normal', cor: 0xffd23a },
@@ -70,6 +76,13 @@ export const EVENTOS = [
   { id: 'armadilhas', nome: 'ARMADILHAS', descricao: 'placas disparam dardos e espinhos sobem do chão!', cartas: 'normal', cor: 0xff6a3a },
   { id: 'areia', nome: 'AREIA MOVEDIÇA', descricao: 'poças de areia prendem e puxam o coração!', cartas: 'normal', cor: 0xe8c070 },
   { id: 'relogio', nome: 'RELÓGIO DO TEMPO', descricao: 'o ataque alterna entre câmera lenta e acelerado!', cartas: 'normal', cor: 0x7fc8ff },
+  // PRAIA e CAFÉ FRANCÊS
+  { id: 'ondaGigante', nome: 'ONDA GIGANTE', descricao: 'uma onda varre a caixa: passe pelo vão na água!', cartas: 'normal', cor: 0x2a9fff },
+  { id: 'caranguejos', nome: 'CARANGUEJOS', descricao: 'caranguejos andam de lado e beliscam: cuidado com as pinças!', cartas: 'normal', cor: 0xff6a4a },
+  { id: 'bolaDePraia', nome: 'BOLA DE PRAIA', descricao: 'uma bola quica pela caixa e empurra o coração!', cartas: 'normal', cor: 0xffd23a },
+  { id: 'croissants', nome: 'CROISSANTS VOADORES', descricao: 'croissants cruzam a caixa ondulando: acompanhe o tracejado!', cartas: 'normal', cor: 0xf0b050 },
+  { id: 'buleQuente', nome: 'BULE QUENTE', descricao: 'o bule apita e nuvens de vapor estouram nos círculos avisados!', cartas: 'normal', cor: 0xff8a5a },
+  { id: 'pombos', nome: 'POMBOS', descricao: 'um bando de pombos cruza a caixa: passe pelo vão!', cartas: 'normal', cor: 0xb8c4dc },
 ]
 
 export const EVENTO = Object.fromEntries(EVENTOS.map((ev) => [ev.id, ev]))

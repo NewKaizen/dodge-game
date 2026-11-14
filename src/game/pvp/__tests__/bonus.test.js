@@ -53,7 +53,7 @@ test('bonus: sorteio repetível, não repete o anterior e respeita os disponíve
   const rng = criarRng('x')
   let anterior = null
   const vistos = new Set()
-  for (let k = 0; k < 200; k++) {
+  for (let k = 0; k < 1000; k++) {
     const ev = sortearEvento(rng, { anterior })
     assert.notEqual(ev.id, anterior)
     vistos.add(ev.id)

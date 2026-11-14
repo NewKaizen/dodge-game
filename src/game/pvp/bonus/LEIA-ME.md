@@ -215,3 +215,10 @@ caixinha "Erro ao copiar", ninguém leva nada. A energia passa por `copiarEnergi
 de 0 nem acima de `ENERGIA.maxima`) e voa gema a gema de um HUD para o outro.
 A CPU usa `BotCopia` (`NIVEIS_COPIA`: ~4, 5,5 e 7 apertos/s com variação, cansaço e tropeços).
 `pvpArena.duelo.estadoDebug()` mostra apertos, cabo e o resultado.
+
+## Eventos das arenas ESTAÇÃO, CHINATOWN e CIDADE
+
+`meteoros`, `airlock`, `dragao`, `lanternas`, `transito`, `obra`. O plano de cada um (tempos, posições, faixas) sai de
+`eventos/planosArenas.js` (sem Phaser, testado em `__tests__/bonusArenasNovas.test.js`: repetível pela semente, avisado,
+com corredor de fuga); a arte (texturas de canvas) fica em `eventos/arteArenasNovas.js`. Todos usam `pista.balas.criar` com
+`aviso`/`jaAvisada` e `registrarZona` para a CPU enxergar; o AIRLOCK só mexe no `joy`.
