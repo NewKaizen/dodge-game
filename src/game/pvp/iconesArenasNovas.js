@@ -1,4 +1,4 @@
-// Ícones (vetoriais, ~44 px, centrados em (x, y)) das arenas ESTAÇÃO ESPACIAL, CHINATOWN e CIDADE GRANDE,
+// Ícones (vetoriais, ~44 px, centrados em (x, y)) das arenas ESTAÇÃO ESPACIAL, CHINATOWN, CIDADE GRANDE, PRAIA e CAFÉ,
 // para o cartão da votação (scenes/PvpVoto.js, desenharIcone). `g` é um Phaser.GameObjects.Graphics.
 //   ICONES_ARENAS_NOVAS[id](g, x, y, cor)
 
@@ -35,5 +35,28 @@ export const ICONES_ARENAS_NOVAS = {
     })
     g.fillStyle(0x4a5278, 1).fillRect(x - 3, y - 20, 2, 8)
     g.fillStyle(0xffffff, 0.35).fillRect(x - 24, y + 18, 50, 2)
+  },
+  // um guarda-sol listrado com o sol atrás e a onda embaixo
+  praia(g, x, y, cor) {
+    g.fillStyle(0xffd34d, 1).fillCircle(x + 12, y - 12, 7)
+    g.fillStyle(0xffffff, 1).slice(x - 4, y - 2, 18, Math.PI, 0, false).fillPath()
+    g.fillStyle(0xff4a5a, 1)
+    for (let k = 0; k < 3; k++) g.slice(x - 4, y - 2, 18, Math.PI + (k * 2 * Math.PI) / 6, Math.PI + ((k * 2 + 1) * Math.PI) / 6, false).fillPath()
+    g.fillStyle(0x6a4a2a, 1).fillRect(x - 5, y - 2, 2, 18)
+    g.fillStyle(0xf0d890, 1).fillRect(x - 22, y + 14, 44, 5)
+    g.lineStyle(3, cor, 1)
+    g.beginPath().moveTo(x - 22, y + 10)
+    for (let i = 1; i <= 8; i++) g.lineTo(x - 22 + i * 5.5, y + 10 + (i % 2 ? -3 : 0))
+    g.strokePath()
+  },
+  // uma xícara de café com pires e o vapor subindo
+  cafe(g, x, y, cor) {
+    g.lineStyle(2, 0xffffff, 0.75)
+    for (const dx of [-5, 2]) g.beginPath().moveTo(x + dx, y - 4).lineTo(x + dx + 3, y - 10).lineTo(x + dx, y - 16).lineTo(x + dx + 3, y - 21).strokePath()
+    g.fillStyle(0xf4ecdc, 1).fillRect(x - 12, y - 2, 20, 16)
+    g.fillStyle(0x5a3a22, 1).fillRect(x - 10, y - 1, 16, 4)
+    g.lineStyle(3, 0xf4ecdc, 1).strokeCircle(x + 11, y + 5, 5)
+    g.fillStyle(cor, 1).fillRect(x - 12, y + 6, 20, 3)
+    g.fillStyle(0xf4ecdc, 1).fillEllipse(x - 2, y + 16, 34, 6)
   },
 }
