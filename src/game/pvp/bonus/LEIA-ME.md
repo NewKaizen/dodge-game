@@ -241,3 +241,12 @@ bordas ligadas, visão, gravidade, polos, ar, raio trator, escudos). Contas pura
 Os que mexem em balas só alteram `vx/vy/x/y/morta/sprite.setVisible` (`b.segurada`, `b.marcaPlaneta`, `b.pol` são marcas
 próprias). Eventos com ação do jogador (`polaridade`, `trator`) ouvem o A por `ouvirBotao` (só o aperto, não há "segurar") e,
 em rede, mandam uma mensagem pelo canal (`estPolaridade`, `estTrator`) com a rodada junto.
+
+## Arena PRAIA (eventos de regra nova)
+
+`eventos/praia/` (regras puras e testadas em `praia/planos.js`; `util.js` tem o contexto de limpeza, `criarAjustes`
+para cura/roubo de energia que vai ao outro PC pela mensagem `praiaAjuste`): `castelodeAreia` (trilha de areia que
+bloqueia balas), `surf` (ficar na crista da onda), `solDoMeioDia` (só a sombra protege), `cacaTesouro` (detector que
+apita e cava para curar), `pipa` (o coração é pêndulo: `joy` vira força), `pegadas` (fantasma refaz o caminho 2 s
+depois, bala atravessável posta todo frame), `concha` (invulnerável dentro, estala), `gaivotaLadra` (mergulho avisado
+que rouba energia).
