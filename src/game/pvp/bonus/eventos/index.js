@@ -47,3 +47,13 @@ import areia from './areia.js'
 import relogio from './relogio.js'
 
 export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, trocado, pcEscola, aquario, cogumelo, estatua, gelo, terremoto, popups, lag, teclado, telaAzul, cursor, chuva, ventania, abelhas, vagalumes, polen, trepadeira, encolhendo, leoes, lancas, bigas, brasas, polegar, rede, plateia, geloSeco, ritmo, karaoke, mosh, pedra, armadilhas, areia, relogio }
+
+// PRAIA e CAFÉ FRANCÊS (planos puros em planosPraiaCafe.js)
+import onda from './onda.js'
+import caranguejos from './caranguejos.js'
+import bola from './bola.js'
+import croissants from './croissants.js'
+import bule from './bule.js'
+import pombos from './pombos.js'
+
+Object.assign(EFEITOS, { ondaGigante: onda, caranguejos, bolaDePraia: bola, croissants, buleQuente: bule, pombos })

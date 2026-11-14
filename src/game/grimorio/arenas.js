@@ -73,6 +73,13 @@ const DICAS = {
   armadilhas: { nome: 'ARMADILHAS', dica: 'Pisou na placa? Clique: dardos saem das paredes pela linha dela. Os espinhos estalam antes de subir: saia das lajes que estalam.' },
   areia: { nome: 'AREIA MOVEDIÇA', dica: 'Poças de areia surgem com aviso, prendem e puxam o coração para o meio. Não dá dano, mas deixa você lento no meio das balas.' },
   relogio: { nome: 'RELÓGIO DO TEMPO', dica: 'O ataque alterna câmera lenta e acelerado (com 1 s de aviso); o coração anda normal. Use o lento para se reposicionar.' },
+  // PRAIA e CAFÉ FRANCÊS
+  ondaGigante: { nome: 'ONDA GIGANTE', dica: 'A faixa azul piscando mostra por onde a água passa; o vão verde é a saída. Vá para o vão antes de a onda entrar: o próximo vão fica sempre perto do anterior.' },
+  caranguejos: { nome: 'CARANGUEJOS', dica: 'Eles andam de lado. Quando um para e ergue as pinças, o anel vermelho mostra o alcance do beliscão: saia do anel antes de ele fechar.' },
+  bolaDePraia: { nome: 'BOLA DE PRAIA', dica: 'A sombra mostra onde a bola cai e ela quica em linha reta. Encostou, ela empurra o coração (sem dano): fique longe dela e das quinas.' },
+  croissants: { nome: 'CROISSANTS VOADORES', dica: 'O "!" marca por onde o croissant entra e o tracejado mostra a curva inteira que ele vai fazer. Espere ele passar e vá pelo lado oposto da onda.' },
+  buleQuente: { nome: 'BULE QUENTE', dica: 'O bule apita e círculos de vapor pulsam: quando o aviso acaba, eles estouram e queimam por um instante. Saia dos círculos; sempre sobra espaço livre.' },
+  pombos: { nome: 'POMBOS', dica: 'Linhas pálidas mostram as fileiras do bando e o vão verde é a passagem. Os pombos de fora chegam um pouco depois dos do meio.' },
 }
 
 const NOME_ARMA = { tiro: 'tiro', espada: 'espada', bumerangue: 'bumerangue', explosao: 'bombas' }

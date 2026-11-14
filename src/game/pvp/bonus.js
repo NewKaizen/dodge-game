@@ -70,6 +70,13 @@ export const EVENTOS = [
   { id: 'armadilhas', nome: 'ARMADILHAS', descricao: 'placas disparam dardos e espinhos sobem do chão!', cartas: 'normal', cor: 0xff6a3a },
   { id: 'areia', nome: 'AREIA MOVEDIÇA', descricao: 'poças de areia prendem e puxam o coração!', cartas: 'normal', cor: 0xe8c070 },
   { id: 'relogio', nome: 'RELÓGIO DO TEMPO', descricao: 'o ataque alterna entre câmera lenta e acelerado!', cartas: 'normal', cor: 0x7fc8ff },
+  // PRAIA e CAFÉ FRANCÊS
+  { id: 'ondaGigante', nome: 'ONDA GIGANTE', descricao: 'uma onda varre a caixa: passe pelo vão na água!', cartas: 'normal', cor: 0x2a9fff },
+  { id: 'caranguejos', nome: 'CARANGUEJOS', descricao: 'caranguejos andam de lado e beliscam: cuidado com as pinças!', cartas: 'normal', cor: 0xff6a4a },
+  { id: 'bolaDePraia', nome: 'BOLA DE PRAIA', descricao: 'uma bola quica pela caixa e empurra o coração!', cartas: 'normal', cor: 0xffd23a },
+  { id: 'croissants', nome: 'CROISSANTS VOADORES', descricao: 'croissants cruzam a caixa ondulando: acompanhe o tracejado!', cartas: 'normal', cor: 0xf0b050 },
+  { id: 'buleQuente', nome: 'BULE QUENTE', descricao: 'o bule apita e nuvens de vapor estouram nos círculos avisados!', cartas: 'normal', cor: 0xff8a5a },
+  { id: 'pombos', nome: 'POMBOS', descricao: 'um bando de pombos cruza a caixa: passe pelo vão!', cartas: 'normal', cor: 0xb8c4dc },
 ]
 
 export const EVENTO = Object.fromEntries(EVENTOS.map((ev) => [ev.id, ev]))
