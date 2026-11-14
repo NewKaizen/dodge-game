@@ -87,9 +87,15 @@ export const EVENTOS = [
   { id: 'ondaGigante', nome: 'ONDA GIGANTE', descricao: 'uma onda varre a caixa: passe pelo vão na água!', cartas: 'normal', cor: 0x2a9fff },
   { id: 'caranguejos', nome: 'CARANGUEJOS', descricao: 'caranguejos andam de lado e beliscam: cuidado com as pinças!', cartas: 'normal', cor: 0xff6a4a },
   { id: 'bolaDePraia', nome: 'BOLA DE PRAIA', descricao: 'uma bola quica pela caixa e empurra o coração!', cartas: 'normal', cor: 0xffd23a },
-  { id: 'croissants', nome: 'CROISSANTS VOADORES', descricao: 'croissants cruzam a caixa ondulando: acompanhe o tracejado!', cartas: 'normal', cor: 0xf0b050 },
-  { id: 'buleQuente', nome: 'BULE QUENTE', descricao: 'o bule apita e nuvens de vapor estouram nos círculos avisados!', cartas: 'normal', cor: 0xff8a5a },
-  { id: 'pombos', nome: 'POMBOS', descricao: 'um bando de pombos cruza a caixa: passe pelo vão!', cartas: 'normal', cor: 0xb8c4dc },
+  // CAFÉ FRANCÊS (regras novas: a rodada muda COMO você joga; pvp/bonus/eventos/cafe/)
+  { id: 'latteArt', nome: 'LATTE ART', descricao: 'o coração desenha uma linha de leite: feche um laço e apague as balas!', cartas: 'normal', cor: 0xfff3dc },
+  { id: 'bandeja', nome: 'BANDEJA', descricao: 'você carrega uma xícara: ande liso ou o café derrama!', cartas: 'normal', cor: 0xc8884a },
+  { id: 'mimico', nome: 'MÍMICO', descricao: 'paredes invisíveis: encoste para revelar (as balas quicam nelas)!', cartas: 'normal', cor: 0xcfeaff },
+  { id: 'acordeao', nome: 'ACORDEÃO', descricao: 'a caixa aperta e estica no compasso da valsa: siga o aviso!', cartas: 'normal', cor: 0xc4443a },
+  { id: 'pintor', nome: 'PINTOR', descricao: 'tinta molhada congela as balas e as transforma em obstáculos!', cartas: 'normal', cor: 0xe0509a },
+  { id: 'menuDoDia', nome: 'MENU DO DIA', descricao: 'as balas viram pratos: só o prato do dia cura!', cartas: 'normal', cor: 0x7fe08a },
+  { id: 'expresso', nome: 'EXPRESSO', descricao: 'cada café te deixa mais rápido... até a tremedeira!', cartas: 'normal', cor: 0xffb060 },
+  { id: 'xadrez', nome: 'XADREZ', descricao: 'a caixa vira tabuleiro: o coração pula como um cavalo!', cartas: 'normal', cor: 0xffd070 },
 ]
 
 export const EVENTO = Object.fromEntries(EVENTOS.map((ev) => [ev.id, ev]))

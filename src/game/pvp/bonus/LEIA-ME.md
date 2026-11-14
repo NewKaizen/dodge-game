@@ -200,6 +200,16 @@ Outros recursos de audio.js usados pelos eventos:
 | `armadilhas` | placas de pressão (pisou: clique, a linha pisca, dardos das duas paredes) e espinhos em padrões avisados (colunas, faixas, xadrez, borda, miolo) | `balas.criar` (dardos com aviso; espinhos = retângulos invisíveis avisando) |
 | `areia` | poças de areia movediça (surgem avisando, prendem, secam): coração lento e puxado para o meio da poça, sem dano | `joy` |
 | `relogio` | RELÓGIO DO TEMPO: o ataque alterna câmera lenta (×0,5) / acelerado (×1,5) com 1 s de aviso; o coração anda normal (`fatorCoracao` = base / fator, devolvido no fim); a música acompanha (`velocidadeMusica`) | `passo` + `fatorCoracao` |
+| `latteArt` | (Café) LATTE ART: o coração deixa uma linha de leite (2,8 s); fechar um LAÇO em volta de balas as apaga (`b.morta`). Tinta limitada (jarrinha embaixo da caixa): gasta com a linha, recarrega mais parado, bala apagada devolve um pouco | só lê o coração (`eventos/cafe/latteArt.js`) |
+| `bandeja` | (Café) BANDEJA: xícara em cima do coração; giro/arrancada/freada bruscos enchem o medidor de BALANÇO; cheio derrama (3% do HP, `arena.acertou`). Balas ×0,92 (`passo`; `fatorCoracao` compensa); a CPU suaviza o joystick | `joy` (CPU) + `passo` + `fatorCoracao` |
+| `mimico` | (Café) MÍMICO: paredes invisíveis (moldes de `planos.js`); aparecem fracas no começo e quando alguém encosta; o coração desliza (`joy` tira só a parte que empurra para dentro) e as balas QUICAM (`vx`/`vy` mudam) | `joy` + posição do coração + balas |
+| `acordeao` | (Café) ACORDEÃO: o fole (uma por compasso de 1,875 s) avisa o alvo e anda empurrando o coração; mesmo truque do ARENA ENCOLHENDO (`coracao.caixa = { limites: interno }`) | `coracao.caixa` + `joy` (CPU) |
+| `pintor` | (Café) PINTOR: pincelada avisada (tracejado); a bala que entra na tinta molhada CONGELA (velocidade 0, `atualizar` e `arranque` zerados) e some quando a tinta seca | `balas.lista` |
+| `menuDoDia` | (Café) MENU DO DIA: balas com textura de prato (`cafe-prato-*`); o do dia é `inofensiva` e cura ao encostar (`arena.curarCoracao(j, n)`: HP + HUD + mensagem `cura` em rede; no Guia não existe e só mostra); o quadro troca com aviso e 0,5 s de graça | `balas.criar` + `arena.curarCoracao` |
+| `expresso` | (Café) EXPRESSO: xícaras (pegar = +17% de velocidade por 5,4 s, soma até 4); com 4, TREMEDEIRA (ruído no `joy` e no sprite). A CPU vai atrás das xícaras até 3 | `joy` + `pista.fatorCoracao` (devolvido no fim) |
+| `xadrez` | (Café) XADREZ: o coração vira cavalo: o `joy` só ESCOLHE o pulo em L (zerado para o coração), que teleporta o coração com i-frames de 0,15 s; recarga 0,42 s. A CPU escolhe o pulo sozinha | `joy` + posição do coração |
+
+Os 8 do Café ficam em `eventos/cafe/` (`index.js` -> `EFEITOS_CAFE`, regras puras em `planos.js`, testes em `__tests__/eventosCafe.test.js`).
 
 ## Minigame CTRL+C CTRL+V (`copia`, Copia.js)
 

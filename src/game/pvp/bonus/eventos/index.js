@@ -56,11 +56,8 @@ export const EFEITOS = { explosoes, festa, pontaCabeca, apagao, gravidade, troca
 import onda from './onda.js'
 import caranguejos from './caranguejos.js'
 import bola from './bola.js'
-import croissants from './croissants.js'
-import bule from './bule.js'
-import pombos from './pombos.js'
 
-Object.assign(EFEITOS, { ondaGigante: onda, caranguejos, bolaDePraia: bola, croissants, buleQuente: bule, pombos })
+Object.assign(EFEITOS, { ondaGigante: onda, caranguejos, bolaDePraia: bola })
 
 // ESTAÇÃO ESPACIAL (planos puros em estacao/planos.js)
 import semAtrito from './estacao/semAtrito.js'
@@ -73,3 +70,8 @@ import trator from './estacao/trator.js'
 import manutencao from './estacao/manutencao.js'
 
 Object.assign(EFEITOS, { semAtrito, minhoca, radar, orbita, polaridade, oxigenio, trator, manutencao })
+
+// CAFÉ FRANCÊS (eventos/cafe/)
+import { EFEITOS_CAFE } from './cafe/index.js'
+
+Object.assign(EFEITOS, EFEITOS_CAFE)

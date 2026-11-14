@@ -1,6 +1,6 @@
-// A parte PURA (sem Phaser) dos bônus das arenas PRAIA e CAFÉ FRANCÊS: sorteios dos
-// planos, trajetos e as contas de empurrão. Os eventos (onda.js, caranguejos.js, bola.js,
-// croissants.js, bule.js, pombos.js) só desenham e criam as balas em cima destes planos,
+// A parte PURA (sem Phaser) dos bônus da arena PRAIA (os do CAFÉ FRANCÊS ficam em eventos/cafe/planos.js): sorteios dos
+// planos, trajetos e as contas de empurrão. Os eventos (onda.js, caranguejos.js,
+// bola.js) só desenham e criam as balas em cima destes planos,
 // que são testados em Node (pvp/__tests__/praiaCafe.test.js): repetíveis pela semente
 // (o `sorte` é o rng do evento, igual nos dois PCs em rede), sempre com aviso e com saída.
 //
@@ -9,7 +9,6 @@
 import { CORACAO } from '../../../constants.js'
 
 const entre = (sorte, a, b) => a + (b - a) * sorte()
-const limitar = (v, a, b) => Math.max(a, Math.min(b, v))
 export const lado = (sorte) => (sorte() < 0.5 ? 1 : -1)
 
 // o coração anda no máximo isto (px/s): a conta de "dá tempo de chegar na saída"
@@ -133,80 +132,6 @@ export function empurraoDaBola(b, cx, cy, hitbox = CORACAO.hitbox, cfg = BOLA) {
   if (d >= alcance) return { x: 0, y: 0 }
   if (d < 0.001) return { x: cfg.forca, y: 0 }
   return { x: (dx / d) * cfg.forca, y: (dy / d) * cfg.forca }
-}
-
-// ---------- CROISSANTS VOADORES (café) ----------
-// Croissants cruzam a caixa ondulando (seno): saem de fora, com aviso. O trajeto
-// desenhado no aviso é o mesmo da bala.
-export const CROISSANT = { avisoMs: 850, velocidade: 150, raio: 8, amplitude: { min: 22, max: 44 }, freq: { min: 3.2, max: 4.6 }, intervaloMs: { min: 1250, max: 1750 }, primeiro: { min: 450, max: 950 }, folga: 12 }
-
-// { lado, y0, amp, freq, fase }: o y fica sempre dentro da caixa (com folga)
-export function planejarCroissant(sorte, l, cfg = CROISSANT) {
-  const maxima = Math.max(8, Math.min(cfg.amplitude.max, l.height / 2 - cfg.folga - cfg.raio))
-  const amp = entre(sorte, Math.min(cfg.amplitude.min, maxima), maxima)
-  const y0 = entre(sorte, l.top + amp + cfg.folga, l.bottom - amp - cfg.folga)
-  return { lado: lado(sorte), y0, amp, freq: entre(sorte, cfg.freq.min, cfg.freq.max), fase: entre(sorte, 0, Math.PI * 2) }
-}
-
-// posição do croissant `t` ms depois de começar a andar (x0 = onde nasce)
-export function posicaoDoCroissant(p, x0, t, cfg = CROISSANT) {
-  const s = t / 1000
-  return { x: x0 + p.lado * cfg.velocidade * s, y: p.y0 + p.amp * Math.sin(p.fase + p.freq * s) }
-}
-
-// ---------- BULE QUENTE (café) ----------
-// O bule apita e 2 a 3 nuvens de vapor aparecem em círculos avisados; depois estouram
-// (queimam por um instante). Sempre sobra bastante espaço livre e as nuvens não ficam
-// coladas umas nas outras nem na borda de um jeito que feche a caixa.
-export const BULE = { avisoMs: 1100, vidaMs: 620, raio: { min: 24, max: 31 }, nuvens: { min: 2, max: 3 }, intervaloMs: { min: 1900, max: 2500 }, primeiro: { min: 600, max: 1000 }, ocupacaoMax: 0.36, mirarCoracao: 0.4 }
-
-// [{ x, y, raio }]
-export function planejarVapor(sorte, l, coracao = null, cfg = BULE) {
-  const quantas = Math.round(entre(sorte, cfg.nuvens.min, cfg.nuvens.max))
-  const nuvens = []
-  for (let n = 0; n < quantas; n++) {
-    const raio = entre(sorte, cfg.raio.min, cfg.raio.max)
-    for (let tentativa = 0; tentativa < 12; tentativa++) {
-      let x = entre(sorte, l.left + raio, l.right - raio)
-      let y = entre(sorte, l.top + raio, l.bottom - raio)
-      if (n === 0 && coracao && sorte() < cfg.mirarCoracao) {
-        x = limitar(coracao.x, l.left + raio, l.right - raio)
-        y = limitar(coracao.y, l.top + raio, l.bottom - raio)
-      }
-      // afastada das outras: sempre uma folga de ~30 px entre as bordas
-      if (nuvens.every((o) => Math.hypot(o.x - x, o.y - y) >= o.raio + raio + 30)) {
-        nuvens.push({ x, y, raio })
-        break
-      }
-    }
-  }
-  return nuvens
-}
-
-export const areaDoVapor = (nuvens) => nuvens.reduce((s, n) => s + Math.PI * n.raio * n.raio, 0)
-
-// ---------- POMBOS (café) ----------
-// Um bando cruza a caixa em formação (cunha), sempre com um VÃO por onde passar; o vão
-// do bando seguinte fica perto do anterior. Os pombos chegam escalonados (cunha).
-export const POMBOS = { avisoMs: 1000, velocidade: 185, raio: 7, vao: 62, alcance: 76, passo: 16, escalonaMs: 70, intervaloMs: { min: 1900, max: 2600 }, primeiro: { min: 500, max: 900 } }
-
-// { lado, vaoY, pombos: [{ y, atraso }] }
-export function planejarBando(sorte, l, anterior = null, cfg = POMBOS) {
-  const minimo = l.top + cfg.vao / 2 + 2
-  const maximo = l.bottom - cfg.vao / 2 - 2
-  const a = anterior ? Math.max(minimo, anterior.vaoY - cfg.alcance) : minimo
-  const b = anterior ? Math.min(maximo, anterior.vaoY + cfg.alcance) : maximo
-  const vaoY = entre(sorte, a, Math.max(a, b))
-  const topoVao = vaoY - cfg.vao / 2
-  const baseVao = vaoY + cfg.vao / 2
-  const pombos = []
-  // fileiras de PASSO px nas duas faixas cheias (acima e abaixo do vão)
-  for (const [y0, y1] of [[l.top, topoVao], [baseVao, l.bottom]]) {
-    for (let y = y0 + cfg.raio + 1; y <= y1 - cfg.raio - 1; y += cfg.passo) pombos.push({ y: y + entre(sorte, -1, 1), atraso: 0 })
-  }
-  // cunha: quanto mais longe do vão, mais tarde o pombo chega
-  for (const p of pombos) p.atraso = Math.round((Math.abs(p.y - vaoY) / l.height) * 5 * cfg.escalonaMs)
-  return { lado: lado(sorte), vaoY, pombos }
 }
 
 // o vão de um bando/onda é seguro: dá para chegar ao centro do vão durante o aviso

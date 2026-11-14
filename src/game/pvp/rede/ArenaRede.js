@@ -104,6 +104,7 @@ export default class ArenaRede {
       canal.ao('coracao', (d) => this.aoCoracao(d)),
       canal.ao('dano', (d) => this.aoEventoDoOutro('dano', d)),
       canal.ao('graze', (d) => this.aoEventoDoOutro('graze', d)),
+      canal.ao('cura', (d) => this.aoEventoDoOutro('cura', d)),
     ]
     if (import.meta.env?.DEV) this.desligar.push(canal.ao('debug', (d) => this.aoDebug(d)))
   }
@@ -380,6 +381,11 @@ export default class ArenaRede {
     this.enviar('graze', null, { lado: j, n: 1, r: this.rodada })
   }
 
+  // cura direta do meu coração (MENU DO DIA do café): o outro PC aplica a mesma cura no HP dele
+  enviarCura(j, n) {
+    this.enviar('cura', null, { lado: j, cura: n, r: this.rodada })
+  }
+
   aoEventoDoOutro(tipo, dados) {
     if (!dados || this.arena.saindo) return
     if (dados.lado !== this.outroLado) return console.warn(`[rede] ${tipo} do outro para o meu coração: ignorado`, dados)
@@ -389,8 +395,9 @@ export default class ArenaRede {
 
   // Dano/graze do coração do outro: as regras daqui (escudo, 2ª chance, K.O.)
   // e, na caixa espelho, o coração dele pisca como pisca lá
-  aplicarDoOutro(tipo, { lado, dano, n = 1 }) {
+  aplicarDoOutro(tipo, { lado, dano, n = 1, cura = 0 }) {
     const a = this.arena
+    if (tipo === 'cura') return void a.aplicarCura(lado, cura)
     const coracao = a.fase === 'esquiva' ? a.coracaoDoLado(lado) : null
     if (tipo === 'dano') {
       if (!a.aplicarAcerto(lado, dano)) return

@@ -12,9 +12,7 @@ import {
   ONDA, planejarOnda, blocosDaOnda,
   CARANGUEJO, planejarCaranguejo, faseDoCaranguejo, xDoCaranguejo,
   BOLA, planejarBola, andarBola, empurraoDaBola,
-  CROISSANT, planejarCroissant, posicaoDoCroissant,
-  BULE, planejarVapor, areaDoVapor,
-  POMBOS, planejarBando, alcancavel,
+  alcancavel,
 } from '../bonus/eventos/planosPraiaCafe.js'
 
 const CAIXA = { left: 100, right: 320, top: 80, bottom: 250, width: 220, height: 170 }
@@ -25,7 +23,6 @@ const rngDe = (semente) => {
 }
 const NOVOS = {
   praia: ['ondaGigante', 'caranguejos', 'bolaDePraia'],
-  cafe: ['croissants', 'buleQuente', 'pombos'],
 }
 
 test('praia e café: arenas com no mínimo 10 bônus, os novos de esquiva e os gerais', () => {
@@ -50,7 +47,6 @@ test('praia e café: nomes próprios dos bônus reaproveitados (MARÉ ALTA, BRIS
   const nome = (arena, id) => eventosDaArena(arena).find((e) => e.id === id).nome
   assert.equal(nome('praia', 'aquario'), 'MARÉ ALTA')
   assert.equal(nome('praia', 'ventania'), 'BRISA DO MAR')
-  assert.equal(nome('cafe', 'karaoke'), 'CHANSON')
   assert.equal(EVENTO.aquario.nome, 'AQUÁRIO') // o original não muda
 })
 
@@ -148,72 +144,4 @@ test('bola de praia: quica dentro da caixa, não depende do coração e empurra 
   assert.ok(perto.x > 0 && Math.abs(perto.y) < 1e-9, 'empurra para longe da bola')
   assert.ok(BOLA.forca > 100, 'vence o direcional do jogador (não dá para atravessar a bola)')
   assert.deepEqual(planejarBola(rngDe('q'), CAIXA), planejarBola(rngDe('q'), CAIXA))
-})
-
-test('croissants: a curva fica sempre dentro da caixa (inclusive na caixa mínima) e o aviso vale', () => {
-  assert.ok(CROISSANT.avisoMs >= ATAQUE.telegrafoMs)
-  for (const caixa of [CAIXA, MENOR]) {
-    for (let s = 0; s < 80; s++) {
-      const p = planejarCroissant(rngDe(`cr${s}`), caixa)
-      for (let t = 0; t < 4000; t += 25) {
-        const { y } = posicaoDoCroissant(p, 0, t)
-        assert.ok(y >= caixa.top + CROISSANT.raio && y <= caixa.bottom - CROISSANT.raio, `y=${y}`)
-      }
-    }
-  }
-  // determinismo e sentido
-  const a = posicaoDoCroissant({ lado: -1, y0: 100, amp: 20, freq: 4, fase: 1 }, 400, 500)
-  assert.deepEqual(a, posicaoDoCroissant({ lado: -1, y0: 100, amp: 20, freq: 4, fase: 1 }, 400, 500))
-  assert.ok(a.x < 400)
-})
-
-test('bule quente: nuvens afastadas, dentro da caixa e sobra bastante área livre', () => {
-  assert.ok(BULE.avisoMs >= ATAQUE.telegrafoMs)
-  for (const caixa of [CAIXA, MENOR]) {
-    for (let s = 0; s < 120; s++) {
-      const sorte = rngDe(`bu${s}`)
-      const coracao = s % 2 ? { x: caixa.left + 40, y: caixa.top + 40 } : null
-      const nuvens = planejarVapor(sorte, caixa, coracao)
-      assert.ok(nuvens.length >= 1 && nuvens.length <= BULE.nuvens.max)
-      for (const n of nuvens) {
-        assert.ok(n.x - n.raio >= caixa.left - 1e-6 && n.x + n.raio <= caixa.right + 1e-6)
-        assert.ok(n.y - n.raio >= caixa.top - 1e-6 && n.y + n.raio <= caixa.bottom + 1e-6)
-      }
-      for (let a = 0; a < nuvens.length; a++) {
-        for (let b = a + 1; b < nuvens.length; b++) {
-          const d = Math.hypot(nuvens[a].x - nuvens[b].x, nuvens[a].y - nuvens[b].y)
-          assert.ok(d >= nuvens[a].raio + nuvens[b].raio + 30, 'sobra um corredor entre as nuvens')
-        }
-      }
-      if (caixa === CAIXA) assert.ok(areaDoVapor(nuvens) / (caixa.width * caixa.height) <= BULE.ocupacaoMax, 'a caixa nunca fica tomada')
-    }
-  }
-  assert.deepEqual(planejarVapor(rngDe('k'), CAIXA), planejarVapor(rngDe('k'), CAIXA))
-})
-
-test('pombos: o bando sempre deixa o vão, em cunha, e o vão seguinte é alcançável', () => {
-  assert.ok(POMBOS.avisoMs >= ATAQUE.telegrafoMs)
-  assert.ok(POMBOS.vao >= 3 * CORACAO.tamanho)
-  for (const caixa of [CAIXA, MENOR]) {
-    for (let s = 0; s < 60; s++) {
-      const sorte = rngDe(`po${s}`)
-      let anterior = null
-      for (let k = 0; k < 6; k++) {
-        const b = planejarBando(sorte, caixa, anterior)
-        assert.ok(b.pombos.length >= 1)
-        for (const p of b.pombos) {
-          // nenhum pombo (nem a borda dele) entra no vão
-          const dentro = p.y + POMBOS.raio > b.vaoY - POMBOS.vao / 2 && p.y - POMBOS.raio < b.vaoY + POMBOS.vao / 2
-          assert.ok(!dentro, `pombo y=${p.y} no vão ${b.vaoY}`)
-          assert.ok(p.y >= caixa.top && p.y <= caixa.bottom)
-          assert.ok(p.atraso >= 0)
-        }
-        // o vão fica livre na caixa (mesmo na caixa mínima)
-        assert.ok(b.vaoY - POMBOS.vao / 2 >= caixa.top && b.vaoY + POMBOS.vao / 2 <= caixa.bottom)
-        if (anterior) assert.ok(alcancavel(Math.abs(b.vaoY - anterior.vaoY), POMBOS.avisoMs))
-        anterior = b
-      }
-    }
-  }
-  assert.deepEqual(planejarBando(rngDe('p'), CAIXA), planejarBando(rngDe('p'), CAIXA))
 })
