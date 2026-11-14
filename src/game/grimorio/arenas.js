@@ -111,8 +111,15 @@ const DICAS = {
   dancaDoLeao: { nome: 'DANÇA DO LEÃO', dica: 'O leão mostra de 3 a 4 setas, uma de cada vez. Depois reproduza a sequência mexendo o coração naquelas direções, na ordem: escudo de recompensa. Errou, recomeça (sem dano). Os ataques seguem, então espere uma folga.' },
   gatoDaSorte: { nome: 'GATO DA SORTE', dica: 'Pata erguida: balas e ataque PARAM, só o coração anda (reposicione-se!). Pata baixa: tudo anda de novo. Antes de cada troca a pata treme, o sininho toca e as bordas piscam: saia do caminho das balas antes de elas voltarem.' },
   cestinhaDeVapor: { nome: 'CESTINHA DE VAPOR', dica: 'Dentro de um cesto de bambu você fica protegido. Mas a tampa esquenta, treme e solta vapor (o anel pisca) e ESTOURA, jogando o coração para fora. Saia antes ou aproveite o fim para pular para outro cesto.' },
-  transito: { nome: 'TRÂNSITO', dica: 'O semáforo manda: amarelo piscando = a faixa vermelha vai ter veículo (os faróis acendem na borda); verde = eles disparam. Ônibus é lento e longo, moto é rápida. Nunca as 3 faixas juntas.' },
-  obra: { nome: 'OBRA', dica: 'A coluna listrada de amarelo e preto é onde a viga vai cair (a viga balança no cabo, avisando). Saia da coluna: a viga machuca só no instante da queda.' },
+  // CIDADE GRANDE
+  cidGps: { nome: 'GPS', dica: 'O balão avisa "VIRE À DIREITA/ESQUERDA" quase 1 s antes: o direcional gira 90° (a seta do aparelho mostra para onde o CIMA leva). Pare e pense na hora: ande devagar no giro.' },
+  cidCamera: { nome: 'CÂMERA DE SEGURANÇA', dica: 'A imagem só atualiza 7 vezes por segundo, mas o jogo é ao vivo: o coração está um pouco à frente do que você vê. Quando aparecer "CAM 2?", a imagem vai espelhar (o controle não muda).' },
+  cidElevador: { nome: 'ELEVADOR', dica: 'No andar só dá para andar de lado. Para mudar de andar, entre na coluna do elevador (setas verdes) e suba ou desça; saia de lado quando estiver num corredor. Vá para o poço antes de precisar.' },
+  cidTetris: { nome: 'TETRIS DE PRÉDIOS', dica: 'A sombra vermelha mostra a coluna da peça. Prédios pousados viram parede (o coração anda em volta), e linha cheia some. Sempre sobra um caminho livre: não se encoste num canto.' },
+  cidFaixa: { nome: 'FAIXA DE PEDESTRE', dica: 'Boneco vermelho: só as listras BRANCAS são seguras. Verde: só as PRETAS. Na contagem 3-2-1 a listra segura pisca em laranja: na hora da troca, passe para a listra do lado (há uma folga curta).' },
+  cidSelfie: { nome: 'SELFIE', dica: 'Contagem 3, 2, 1 e FLASH: o coração congela por 0,8 s. Antes do clique, saia do caminho das balas e fique num canto livre; o anel mostra quanto falta para descongelar.' },
+  cidEntrega: { nome: 'ENTREGA', dica: 'Encoste no pacote (anel fechando) e leve ao ponto verde para ganhar energia (+1; o dourado, +2). Sem tempo ou com muita bala, ignore o pacote: não há castigo.' },
+  cidEscada: { nome: 'ESCADA ROLANTE', dica: 'Cada esteira carrega o coração no sentido das setas (menos que a sua velocidade: dá para andar contra). Quando as setas piscarem, todas invertem. Não deixe a esteira te levar para as balas.' },
 }
 
 const NOME_ARMA = { tiro: 'tiro', espada: 'espada', bumerangue: 'bumerangue', explosao: 'bombas' }

@@ -274,7 +274,6 @@ export function gradeValida(grade, { livreMin = TETRIS.livreMin, alturaMax = TET
   const livres = celulasLivres(grade)
   if (livres < grade.length * grade[0].length * livreMin) return false
   if (alturaDaPilha(grade) > alturaMax) return false
-  const colunas = grade[0].length
   const primeira = grade.flatMap((l, r) => l.flatMap((v, c) => (v ? [] : [[c, r]])))[0]
   if (!primeira) return false
   return regiaoLivre(grade, primeira[0], primeira[1]).size === livres

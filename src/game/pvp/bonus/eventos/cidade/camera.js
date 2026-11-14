@@ -31,7 +31,6 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
   let cam = 1
   let proxima = 0
   let anunciado = -1
-  let proximoQuadro = 0
   let quadroAnterior = -1
   let chiado = 0 // ms de chuvisco forte depois de uma troca
   let visuais = [] // por pista
@@ -200,7 +199,6 @@ export default function criar(arena, { rng, aceleracao = 1 } = {}) {
       cam = 1
       proxima = 0
       anunciado = -1
-      proximoQuadro = 0
       quadroAnterior = -1
       chiado = 0
       visuais = arena.pistas.map(criarVisual)

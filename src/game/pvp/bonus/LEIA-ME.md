@@ -226,19 +226,10 @@ de 0 nem acima de `ENERGIA.maxima`) e voa gema a gema de um HUD para o outro.
 A CPU usa `BotCopia` (`NIVEIS_COPIA`: ~4, 5,5 e 7 apertos/s com variação, cansaço e tropeços).
 `pvpArena.duelo.estadoDebug()` mostra apertos, cabo e o resultado.
 
-## Eventos das arenas ESTAÇÃO e CIDADE
+## CIDADE GRANDE: eventos que mudam a regra (`eventos/cidade/`)
 
-`meteoros`, `airlock`, `transito`, `obra` (a CHINATOWN tem a seção abaixo). O plano de cada um (tempos, posições, faixas) sai de
-`eventos/planosArenas.js` (sem Phaser, testado em `__tests__/bonusArenasNovas.test.js`: repetível pela semente, avisado,
-com corredor de fuga); a arte (texturas de canvas) fica em `eventos/arteArenasNovas.js`. Todos usam `pista.balas.criar` com
-`aviso`/`jaAvisada` e `registrarZona` para a CPU enxergar; o AIRLOCK só mexe no `joy`.
-
-## Eventos da arena CHINATOWN (`eventos/chinatown/`)
-
-Regras e planos puros em `chinatown/planos.js` (testes: `__tests__/eventosChinatown.test.js`, que também roda cada efeito numa cena de
-mentira conferindo a limpeza). Cada evento muda uma REGRA da esquiva: `biscoito` (regra sorteada: diagonal, bala dourada, parado sem
-dano, setas espelhadas/giradas, velocidade dobrada, portais; `joy` + `fatorCoracao`), `hashi` (pauzinhos miram, travam e beliscam:
-balas-segmento invisíveis + `registrarZona`), `sombrasChinesas` (esconde os sprites das balas e desenha silhuetas atrasadas),
-`abaco` (`joy` zera o vertical e `passo` põe o coração na haste), `mahjong` (peças no chão, par limpa a fileira e dá i-frames),
-`dancaDoLeao` (setas lidas do joystick em `passo`), `gatoDaSorte` (`pista.congelada` + `passo` acelerado) e `cestinhaDeVapor`
-(cestos abrigo com i-frames e empurrão no `joy`). Recompensas são i-frames locais (`coracao.invencivelMs`): nada vai à rede.
+`cidGps` (`joy` gira 90°), `cidCamera` (filtro ColorMatrix + feed de 7 fps: `passo` devolve o estado de verdade e `atualizar`
+mostra o do último quadro; espelho pelas câmeras da caixa em `postupdate`), `cidElevador` (`joy` + correção de posição),
+`cidTetris` (grade de blocos sólidos, balas retangulares caindo pelo relógio do evento), `cidFaixa` (balas retangulares paradas
+que viram `inofensiva` conforme o semáforo), `cidSelfie` (`joy` zerado), `cidEntrega` (energia via `aplicarGraze`) e `cidEscada`
+(soma ao x do coração). Planos e regras puras: `cidade/planos.js`; ajudas comuns: `cidade/util.js`.
