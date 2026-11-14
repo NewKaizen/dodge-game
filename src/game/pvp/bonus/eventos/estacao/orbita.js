@@ -99,6 +99,17 @@ export default function criar(arena) {
       if (!c?.ativo) return joy
       const { x, y } = centro(s)
       const p = puxaoDoCoracao(c.x, c.y, x, y, forca())
+      // a CPU não se deixa cair: perto do planeta ela é empurrada para fora (mais forte que o puxão)
+      if (arena.donoDaPista && (arena.donoDaPista(j) === arena.cpu || (arena.controlador === null && arena.donoDaPista(j) === 0))) {
+        const dx = c.x - x
+        const dy = c.y - y
+        const d = Math.hypot(dx, dy) || 1
+        const zona = ORBITA.raio + 34
+        if (d < zona) {
+          const k = 110 + 60 * (1 - d / zona)
+          return { x: Math.max(-100, Math.min(100, joy.x + (dx / d) * k)), y: Math.max(-100, Math.min(100, joy.y + (dy / d) * k)) }
+        }
+      }
       return { x: Math.max(-100, Math.min(100, joy.x + p.x)), y: Math.max(-100, Math.min(100, joy.y + p.y)) }
     },
 
