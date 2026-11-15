@@ -1,4 +1,4 @@
-import { pintarCeu } from './arteFundos.js'
+import { pintarCeu, assarCamadas } from './arteFundos.js'
 import Phaser from 'phaser'
 import { LARGURA, ALTURA, CENTRO_X, FONTE } from '../../constants.js'
 import { texturasPraiaCafe } from '../../arte/praiaCafe.js'
@@ -457,6 +457,10 @@ export default function cafe(scene, objetos) {
 
   const tem = () => scene.caixasDeRecorte?.length
   let ignorado = false
+
+  // as camadas paradas viram uma imagem cada (o chão de paralelepípedos sozinho tinha ~60 mil
+  // comandos de desenho refeitos a cada quadro)
+  assarCamadas(scene, objetos, [ceu, lua, telhados, torre, predios, lojas, fio, chao, mobilia, flores, gatoG, musico], 'arena-cafe', LARGURA, ALTURA)
 
   return {
     atualizar(dt, estado) {
