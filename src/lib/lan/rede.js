@@ -79,7 +79,8 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 // CO-OP 2.0 (PROTOCOLO 21, docs/coop-cartas.md "CO-OP 2.0"): a partida de CO-OP ganhou as mensagens `resgate` e
 // `regra` (pelo canal, entre os PCs; o servidor só repassa) e o `contra` leva a QUEBRA: um PC de versão velha
 // não pode jogar CO-OP com um novo
-export const PROTOCOLO = 21
+// EXPEDIÇÃO (PROTOCOLO 22, docs/coop-cartas.md "Expedição"): `resultado` do CO-OP com `expedicao`; votos no canal
+export const PROTOCOLO = 22
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas

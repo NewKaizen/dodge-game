@@ -10,6 +10,7 @@
 //
 //   sb.rpc('registrar_partida' | 'encerrar_partida' | 'conceder_recompensa', args)
 //     (0015) também conceder_bau, abrir_bau, baus_estado e equipar_conta (o espelho em src/lib/cosmeticos.js)
+//     (0017) conceder_expedicao e a fonte 'expedicao' do conceder_bau (o espelho em src/lib/expedicao.js)
 //     (Fase 1D) a mesma regra das funções de 0003_progresso.sql, em JS (com o
 //     espelho src/lib/progresso.js); sb.diaDe(t) diz o "dia" do limite de repetição
 //
@@ -22,7 +23,8 @@ import { xpDaPartida, nivelDoXp, itensAte, CATALOGO, RESULTADOS_JOGADOS, CONVIDA
 import { xpDaCorrida } from '../../src/game/campanha/recompensas.js'
 import { mundoDe, ITENS_CAMPANHA } from '../../src/game/campanha/mundos/index.js'
 import { XP_DESAFIO, DIAS_COSMETICO_SEMANA, MAX_AMIGOS_RECORDE, numeroDoDia, semanaDoDia, VERSAO_DESAFIO, diaDoDesafio } from '../../src/lib/desafio.js'
-import { ITENS_BAU, FONTES_BAU, CONQUISTAS_COM_BAU, BAU_XP_TETO_DIA, rolarBau, sorteioValido } from '../../src/lib/cosmeticos.js'
+import { ITENS_BAU, FONTES_BAU, CONQUISTAS_COM_BAU, BAU_XP_TETO_DIA, rolarBau, sorteioValido, cosmeticoDaExpedicao } from '../../src/lib/cosmeticos.js'
+import { CHEFOES_EXPEDICAO, DURACAO_MINIMA_LUTA_S, XP_EXPEDICAO, xpDaExpedicao } from '../../src/lib/expedicao.js'
 import { pontosDeMaestria, nivelDaMaestria, MAESTRIA_TETO_DIA, PERSONAGENS_MAESTRIA, IDS_CONQUISTAS, ITENS_MAESTRIA } from '../../src/lib/conquistas.js'
 
 const erro = (message) => ({ message })
@@ -141,6 +143,59 @@ function rpcs(sb) {
         if (novo) t.trofeus_semanais.push({ user_id: pp.user_id, semana: p_semana, item_id: p_item, partida_id: p_partida })
         if (!t.inventario.some((i) => i.user_id === pp.user_id && i.item_id === p_item)) t.inventario.push({ user_id: pp.user_id, item_id: p_item, obtido_em: agora().toISOString() })
         linhas.push({ usuario: pp.user_id, item_id: p_item, novo })
+      }
+      return linhas
+    },
+    // EXPEDIÇÃO (0017): o espelho de conceder_expedicao
+    conceder_expedicao({ p_partida, p_chefe, p_lutas }) {
+      if (!CHEFOES_EXPEDICAO.includes(p_chefe)) throw new Error('chefão inválido')
+      if (!Number.isInteger(p_lutas) || p_lutas < 0 || p_lutas > 3) throw new Error('lutas inválidas')
+      const p = t.partidas.find((x) => x.id === p_partida)
+      if (!p) throw new Error('partida não existe')
+      if (!['coop', 'coop4'].includes(p.modo) || p.validacao !== 'validada' || !['validada', 'recompensada'].includes(p.estado) || (p.duracao_s ?? 0) < Math.max(1, p_lutas) * DURACAO_MINIMA_LUTA_S) return []
+      const hoje = diaDoDesafio(sb.agora()).id
+      const linhas = []
+      const bauHoje = (u, dia) => t.baus.some((b) => b.user_id === u && b.chave === `expedicao:${dia}:${p_chefe}`)
+      for (const pp of t.partida_participantes
+        .filter((x) => x.partida_id === p_partida && x.user_id && ['vitoria', 'derrota'].includes(x.resultado) && x.relato?.expedicao?.chefe === p_chefe && Number.isInteger(x.relato.expedicao.lutas) && x.relato.expedicao.lutas >= p_lutas)
+        .sort((a, b) => (a.user_id < b.user_id ? -1 : 1))) {
+        const ja = t.expedicoes.find((e) => e.partida_id === p_partida && e.user_id === pp.user_id)
+        if (ja) {
+          linhas.push({ usuario: ja.user_id, xp_ganho: ja.xp, xp_total: ja.xp_total, nivel_antes: ja.nivel_antes, nivel_depois: ja.nivel_depois, itens_novos: ja.itens, completa: ja.completa, cosmetico: ja.cosmetico, cosmetico_novo: ja.cosmetico_novo, dia: ja.dia, bau_hoje: bauHoje(ja.user_id, ja.dia), repetida: true })
+          continue
+        }
+        const perfil = t.perfis.find((x) => x.id === pp.user_id)
+        if (!perfil) continue
+        perfil.xp ??= 0
+        perfil.nivel ??= 1
+        const completa = p_lutas === 3 && pp.resultado === 'vitoria'
+        const somaHoje = t.expedicoes.filter((e) => e.user_id === pp.user_id && e.dia === hoje).reduce((s, e) => s + e.xp, 0)
+        const xp = Math.min(xpDaExpedicao({ lutas: p_lutas, completa }), Math.max(0, XP_EXPEDICAO.tetoDia - somaHoje))
+        const nivelAntes = perfil.nivel
+        let itens = []
+        if (xp > 0) {
+          perfil.xp += xp
+          perfil.nivel = nivelDoXp(perfil.xp)
+          const tem = new Set(t.inventario.filter((i) => i.user_id === pp.user_id).map((i) => i.item_id))
+          itens = itensAte(perfil.nivel).filter((i) => !tem.has(i.id)).map((i) => i.id).sort()
+          for (const item_id of itens) t.inventario.push({ user_id: pp.user_id, item_id, obtido_em: agora().toISOString() })
+        }
+        let cosmetico = null
+        let novo = false
+        if (completa) {
+          cosmetico = cosmeticoDaExpedicao(p_chefe).id
+          if (!t.expedicoes_chefes.some((e) => e.user_id === pp.user_id && e.chefe === p_chefe)) {
+            t.expedicoes_chefes.push({ user_id: pp.user_id, chefe: p_chefe, partida_id: p_partida, item_id: cosmetico })
+            novo = !t.inventario.some((i) => i.user_id === pp.user_id && i.item_id === cosmetico)
+            if (novo) {
+              t.inventario.push({ user_id: pp.user_id, item_id: cosmetico, obtido_em: agora().toISOString() })
+              itens = [...itens, cosmetico]
+            }
+          }
+        }
+        const linha = { partida_id: p_partida, user_id: pp.user_id, chefe: p_chefe, lutas: p_lutas, completa, dia: hoje, xp, xp_total: perfil.xp, nivel_antes: nivelAntes, nivel_depois: perfil.nivel, itens, cosmetico, cosmetico_novo: novo }
+        t.expedicoes.push(linha)
+        linhas.push({ usuario: pp.user_id, xp_ganho: xp, xp_total: perfil.xp, nivel_antes: nivelAntes, nivel_depois: perfil.nivel, itens_novos: itens, completa, cosmetico, cosmetico_novo: novo, dia: hoje, bau_hoje: bauHoje(pp.user_id, hoje), repetida: false })
       }
       return linhas
     },
@@ -379,6 +434,10 @@ function rpcs(sb) {
         if (!t.desafio_concluidos.some((d) => d.user_id === p_user && d.dia === ref)) throw new Error('desafio não vencido')
       } else if (p_fonte === 'semanal') {
         if (!t.trofeus_semanais.some((x) => x.user_id === p_user && x.semana === ref)) throw new Error('boss semanal não vencido')
+      } else if (p_fonte === 'expedicao') {
+        // (0017) a conta completou a expedição daquele chefão naquele dia
+        const [dia, chefe] = ref.split(':')
+        if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}:(king|queen|jevil|coronel)$/.test(ref) || !t.expedicoes.some((e) => e.user_id === p_user && e.completa && e.dia === dia && e.chefe === chefe)) throw new Error('expedição não completada')
       } else if (!CONQUISTAS_COM_BAU.includes(ref) || !t.conquistas.some((c) => c.user_id === p_user && c.conquista === ref)) throw new Error('conquista sem baú')
       const chave = FONTES_BAU[p_fonte].chave(ref)
       const novo = !t.baus.some((b) => b.user_id === p_user && b.chave === chave)
@@ -499,7 +558,7 @@ function rpcs(sb) {
 
 export function criarSupabaseFalso({ usuarios = {}, perfis = [], url = 'https://falso.supabase.co', agora = Date.now } = {}) {
   const sb = {
-    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [], denuncias: [], catalogo_itens: [], trofeus_semanais: [], campanha_progresso: [], campanha_escolhas: [], campanha_corridas: [], desafio_corridas: [], desafio_recordes: [], desafio_concluidos: [], desafio_semanas: [], conta_eventos: [], maestria: [], conquistas: [], baus: [], baus_contas: [] },
+    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [], denuncias: [], catalogo_itens: [], trofeus_semanais: [], campanha_progresso: [], campanha_escolhas: [], campanha_corridas: [], desafio_corridas: [], desafio_recordes: [], desafio_concluidos: [], desafio_semanas: [], conta_eventos: [], maestria: [], conquistas: [], baus: [], baus_contas: [], expedicoes: [], expedicoes_chefes: [] },
     agora,
     diaDe: (ms) => Math.floor((ms - 3 * 3600_000) / 86_400_000), // dia em São Paulo (UTC−3)
     concederChamadas: 0,
