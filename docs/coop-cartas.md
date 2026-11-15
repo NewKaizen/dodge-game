@@ -693,7 +693,7 @@ Caos Afiado, Para Sempre, **Dados Malucos**. Os dados que quicam são balas `hex
 sozinha: quem faz isso é a face.
 
 **Expedição** (escondidos da Selecao: `oculto: true`, `expedicao: true`; `CHEFES_DA_EXPEDICAO`):
-`scene.start('CoopArena', { chefe: 'jevil_lacaios' | 'jevil_tenente', ... })`.
+`scene.start('CoopArena', { chefe: 'jevilLacaios' | 'jevilTenente', ... })`.
 - **Lacaios do Jevil** (`chefes/jevilLacaios.js`, sprite `jevil-lacaios`: duas cartas vivas e um palhacinho): sem regra,
   2 fases (cartas vivas, depois os palhacinhos), ataques simples.
 - **Mestre de Picadeiro** (`chefes/jevilTenente.js`, sprite `jevil-mestre`): o tenente. Tem o **dadinho** (a mesma regra,
