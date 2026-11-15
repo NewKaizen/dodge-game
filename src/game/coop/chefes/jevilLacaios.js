@@ -15,7 +15,7 @@ export default {
     cores: { espadas: 0x9a8bff, copas: 0xff5f8a, ouros: 0xffd24c, paus: 0x5ff0b0, bola: 0xffffff },
     cor: 0xff9ad0,
   },
-  hp: 180,
+  hp: 250,
   danoBala: 9,
   leve: (A) => A.quicantes({ forma: 'ouros', duracao: 4000, intervalo: 1600, velocidade: 130 }),
   fases: [

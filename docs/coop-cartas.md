@@ -665,6 +665,10 @@ sozinha: quem faz isso é a face.
   `criarRegraDoDado({ forca: 0.6, pequeno: true })`) com 3 faces gentis: SORTE!, GRAVIDADE INVERTIDA, RÁPIDO E LEVE,
   com efeitos 40% mais fracos. Os sprites são desenhados em código (`arte/jevilExpedicao.js`).
 
+Balanceamento (MÉDIO, `simularCoop.mjs` com as cartas medidas, sem o efeito do dado): Jevil HP 410 = 2,9 / 3,3 / 3,8 min
+(dupla perfeita / mista / média, 100% / 100% / 99% de vitória); lacaios HP 250 = ~2 min; Mestre de Picadeiro HP 380 = 2,4 a 3 min.
+Nenhum aviso novo do validador (`[telegrafo]` / `[rota de fuga]`) nas cartas novas.
+
 Testes: `coop/__tests__/jevil.test.js`.
 
 ## Arquivos
