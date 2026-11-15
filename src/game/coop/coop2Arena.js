@@ -26,6 +26,8 @@ import { aplicarGolpe, resgatarNaHora, previaCoop } from './regras.js'
 import { DUPLAS, QUEBRA, atordoadoAgora, somarQuebra } from './coop2.js'
 import { criarAlmas, posicaoDaAlma, RESGATE } from './resgate.js'
 import { RegraDaLuta, REGRAS } from './regraChefe.js'
+import { ETAPAS, NOME_ETAPA, terminarLuta } from './expedicao.js'
+import { RELIQUIAS } from './reliquias.js'
 import { criarPreviaIntencao, criarBarraQuebra, criarVisualAlmas, finalizacaoEmDupla, mostrarComoFunciona, criarDicas, pontePhaserDaRegra, COR_ATORDOADO } from './coop2Cena.js'
 
 export const METODOS_COOP2 = {
@@ -78,6 +80,39 @@ export const METODOS_COOP2 = {
       },
       enviar: (acao, dados) => this.rede?.enviarRegra(acao, dados),
     }
+  },
+
+  // EXPEDIÇÃO (coop/expedicao.js): a faixa do começo da luta, em cima ("EXPEDIÇÃO · LUTA 2 DE 3 · TENENTE") e as
+  // melhorias ativas embaixo dela; some sozinha. null fora da expedição
+  faixaDaExpedicao() {
+    const exp = this.expedicao
+    if (!exp) return null
+    const etapa = NOME_ETAPA[ETAPAS[exp.no]]
+    const estilo = (tam, cor) => ({ fontFamily: FONTE, fontSize: `${tam}px`, color: cor, stroke: '#000000', strokeThickness: 5, align: 'center' })
+    const faixa = this.add.rectangle(LARGURA / 2, 168, 460, 34, 0x000000, 0.7).setStrokeStyle(2, 0xffa040).setDepth(95)
+    const titulo = this.add.text(LARGURA / 2, 168, semLigaduras(`EXPEDIÇÃO · LUTA ${exp.no + 1} DE 3 · ${etapa}`), estilo(18, '#ffc070')).setOrigin(0.5).setDepth(96)
+    const nomes = (this.estado.reliquias ?? []).map((id) => RELIQUIAS[id]?.nome ?? id)
+    const linha = nomes.length ? this.add.text(LARGURA / 2, 194, semLigaduras(`melhorias: ${nomes.join(' · ')}`), estilo(11, '#ffe9a0')).setOrigin(0.5).setDepth(96) : null
+    const todos = [faixa, titulo, linha].filter(Boolean)
+    todos.forEach((o) => o.setAlpha(0))
+    this.tweens.add({ targets: todos, alpha: 1, duration: 220 })
+    this.tweens.add({ targets: todos, alpha: 0, delay: 2600, duration: 300, onComplete: () => todos.forEach((o) => o.destroy()) })
+    this.registrar(`expedicao:luta${exp.no + 1}:${etapa}`)
+    return todos
+  },
+
+  // EXPEDIÇÃO: o fim desta luta -> a próxima tela (Expedicao entre as lutas, ou ExpedicaoFim) com o HP de cada um
+  saidaDaExpedicao(vencedor) {
+    const jog = this.estado.jogadores
+    const resumo = this.resumo()
+    const expedicao = terminarLuta(this.expedicao, {
+      vitoria: vencedor === 'vitoria',
+      hp: jog.map((j) => (j.caido || j.saiu ? 0 : j.hp)),
+      hpMax: jog.map((j) => j.hpMax),
+      tempoMs: resumo.tempoMs,
+      rodadas: this.estado.rodada,
+    })
+    return { chave: expedicao.fase === 'fim' ? 'ExpedicaoFim' : 'Expedicao', dados: { expedicao, estatisticas: resumo } }
   },
 
   // (debug) o que o CO-OP 2.0 mostrou nesta luta (estadoDebug().coop2; os testes no navegador leem)

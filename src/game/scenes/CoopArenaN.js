@@ -36,6 +36,7 @@ import { ligarCoop2 } from '../coop/coop2Arena.js'
 import { aplicarCurasDoContra } from '../coop/reliquias.js'
 import { COR_ATORDOADO } from '../coop/coop2Cena.js'
 import { semLigaduras } from '../campanha/texto.js'
+import { expedicaoValida, ultimaLuta } from '../coop/expedicao.js'
 import { superNoChefe } from '../coop/superNoChefe.js'
 import ArenaRedeCoopN from '../coop/ArenaRedeCoopN.js'
 import HudCoopN from '../coop/HudCoopN.js'
@@ -172,6 +173,7 @@ const estadoInicial = () => ({
   marcaAtordoado: null,
   quebraParaAnunciar: false,
   logCoop2: [],
+  expedicao: null, // (EXPEDIÇÃO, coop/expedicao.js) o estado da expedição desta luta, ou null (luta rápida)
 })
 
 class CoopArenaN extends Phaser.Scene {
@@ -191,6 +193,8 @@ class CoopArenaN extends Phaser.Scene {
     // a luta que CONTINUA (a Expedição, coop/reliquias.js): o HP que vem de antes e as relíquias ativas (ids)
     this.hpDosDados = Array.isArray(dados?.hp) ? dados.hp : null
     this.reliquiasDosDados = Array.isArray(dados?.reliquias) ? dados.reliquias : []
+    // a EXPEDIÇÃO (coop/expedicao.js): no fim a luta vai para a tela entre as lutas (Expedicao) ou a do fim
+    this.expedicao = expedicaoValida(dados?.expedicao) ? dados.expedicao : null
   }
 
   create() {
@@ -686,6 +690,7 @@ class CoopArenaN extends Phaser.Scene {
     const time = this.add.text(-300, 214, lista, estilo(this.n === 4 ? 18 : 22, '#ffffff')).setOrigin(0.5).setDepth(96)
     const vs = this.add.text(LARGURA / 2, 246, 'CONTRA', estilo(14, TEXTO.selecionado)).setOrigin(0.5).setDepth(96).setScale(0)
     const chefe = this.add.text(LARGURA + 200, 278, this.defChefe.nome.toUpperCase(), estilo(26, corTexto(this.defChefe.tema.cor))).setOrigin(0.5).setDepth(96)
+    this.faixaDaExpedicao() // (EXPEDIÇÃO) "LUTA 2 DE 3 · TENENTE" em cima
     tocar(this, 'voo')
     await this.tween({ targets: time, x: LARGURA / 2, duration: 360, ease: 'Back.easeOut' })
     this.tween({ targets: vs, scale: 1, duration: 200, ease: 'Back.easeOut' })
@@ -1768,7 +1773,7 @@ class CoopArenaN extends Phaser.Scene {
       tocar(this, 'vitoria')
       venceu(0) // BUZZER do meu joystick
       await this.esperar(1100)
-      this.mostrarBanner('VITÓRIA!', TEXTO.selecionado, { y: 236, tamanho: 36 })
+      this.mostrarBanner(this.expedicao && !ultimaLuta(this.expedicao) ? `LUTA ${this.expedicao.no + 1} VENCIDA!` : 'VITÓRIA!', TEXTO.selecionado, { y: 236, tamanho: 36 })
       await this.esperar(1300)
     } else {
       tocar(this, 'gameover')
@@ -1783,6 +1788,10 @@ class CoopArenaN extends Phaser.Scene {
     this.saindo = true
     this.cameras.main.fadeOut(400, 0, 0, 0)
     await new Promise((r) => this.time.delayedCall(420, r))
+    if (this.expedicao) {
+      const s = this.saidaDaExpedicao(vencedor)
+      return irParaCena(this, s.chave, s.dados)
+    }
     irParaCena(this, vencedor === 'vitoria' ? 'Vitoria' : 'GameOver', dados)
   }
 

@@ -78,6 +78,7 @@ export function criarExpedicao({ chefe = 'king', nivel = 'facil', party = [], se
     resultado: null, // 'vitoria' | 'derrota' (no fim)
     inicio: null, // (a cena marca: Date.now() da 1ª luta) para a duração
     tempos: [], // ms de cada luta vencida
+    rodadas: 0, // rodadas somadas das lutas (vai no relato do resultado)
   }
 }
 
@@ -98,8 +99,8 @@ export const etapaAtual = (exp) => ETAPAS[exp.no]
 export const ultimaLuta = (exp) => exp.no >= ETAPAS.length - 1
 
 // O fim de uma luta: hp/hpMax = o de cada jogador no fim (caído = 0). Vitória na última = expedição completa.
-export function terminarLuta(exp, { vitoria, hp = null, hpMax = null, tempoMs = null } = {}) {
-  const e = { ...exp, hp: Array.isArray(hp) ? hp.map((x) => Math.max(0, Math.round(x ?? 0))) : exp.hp, hpMax: Array.isArray(hpMax) ? [...hpMax] : exp.hpMax, tempos: [...(exp.tempos ?? [])] }
+export function terminarLuta(exp, { vitoria, hp = null, hpMax = null, tempoMs = null, rodadas = 0 } = {}) {
+  const e = { ...exp, rodadas: (exp.rodadas ?? 0) + Math.max(0, rodadas | 0), hp: Array.isArray(hp) ? hp.map((x) => Math.max(0, Math.round(x ?? 0))) : exp.hp, hpMax: Array.isArray(hpMax) ? [...hpMax] : exp.hpMax, tempos: [...(exp.tempos ?? [])] }
   if (!vitoria) return { ...e, fase: 'fim', resultado: 'derrota', oferta: [] }
   e.vencidas = exp.no + 1
   if (tempoMs != null) e.tempos.push(Math.round(tempoMs))

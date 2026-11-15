@@ -18,7 +18,9 @@ import { barraXp, COR, texto } from './ui.js'
 export const XP_ESPERA_MS = 5000
 const BARRA = { w: 220, h: 8 }
 
-export function prepararXpCoop(cena, { vitoria, estatisticas }) {
+// expedicao: { chefe, lutas, sorteada } (a EXPEDIÇÃO, coop/expedicao.js relatoDaExpedicao): vai no relato e o
+// servidor soma o XP das lutas vencidas, o baú e o verso exclusivo (server/partidas.js expedicaoDaPartida)
+export function prepararXpCoop(cena, { vitoria, estatisticas, expedicao = null }) {
   if (!emRede()) return null
   const s = get(lan)
   const partidaId = s.sala?.partidaId ?? null
@@ -33,6 +35,7 @@ export function prepararXpCoop(cena, { vitoria, estatisticas }) {
     personagem: partyDe(cena.registry)[partyDe(cena.registry).length > 2 ? meuIndice() : meuLado()] ?? null,
     // BOSS SEMANAL: a semana do chefe desta luta (a arena guarda; null fora do boss semanal)
     semana: cena.registry.get('semanal') ?? null,
+    ...(expedicao && { expedicao }),
   })
   if (!s.eu.conta) xp.motivo = 'convidado'
   const parar = lan.subscribe((estado) => {

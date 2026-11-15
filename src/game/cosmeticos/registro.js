@@ -22,7 +22,7 @@ import { IDS_LANCAMENTO, animarLancamento } from './lancamentos.js'
 import { IDS_MOLDURA, desenharMoldura } from './molduras.js'
 import { previa as previaSlots } from './previa.js'
 import { ESTILOS_FRENTE, desenharFrente, miniaturaFrente, previaFrente, temRenderizadorFrente } from './frentes.js'
-import { VERSOS_ILUSTRADOS, desenharVerso, previaVerso, temRenderizadorVerso, texturaVerso } from './versos.js'
+import { VERSOS_ILUSTRADOS, VERSOS_EXPEDICAO, desenharVerso, previaVerso, temRenderizadorVerso, texturaVerso } from './versos.js'
 
 export const RARIDADES = ['comum', 'raro', 'epico', 'lendario']
 
@@ -84,7 +84,7 @@ export const MOLDURAS_ANIMADAS = [
 
 definirRegistroSons(SONS_DANO)
 
-export const CATALOGO_COSMETICOS = { som: SONS_DANO, efeito: EFEITOS_CARTA, lancamento: LANCAMENTOS, moldura: MOLDURAS_ANIMADAS, frente: ESTILOS_FRENTE, verso: VERSOS_ILUSTRADOS }
+export const CATALOGO_COSMETICOS = { som: SONS_DANO, efeito: EFEITOS_CARTA, lancamento: LANCAMENTOS, moldura: MOLDURAS_ANIMADAS, frente: ESTILOS_FRENTE, verso: [...VERSOS_ILUSTRADOS, ...VERSOS_EXPEDICAO] }
 
 // o id tem quem o desenhe/toque? (os padrões "nenhum" não precisam)
 export function temRenderizador(tipo, id) {

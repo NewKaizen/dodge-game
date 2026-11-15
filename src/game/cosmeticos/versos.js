@@ -11,7 +11,7 @@
 //
 // Os versos antigos (Clássico, Estrelado, Carmesim, Dourado, os semanais...) continuam lisos, na cor do item
 // (pvp/versos.js corDoVerso): só os do baú têm desenho.
-import { TAU, cartao, estrela, florSakura, folhaBordo, semente, textura } from './pintura.js'
+import { TAU, cartao, estrela, florSakura, folhaBordo, naipeCanvas, semente, textura } from './pintura.js'
 import { ligarAtualizacao, reduzido } from './util.js'
 
 export const VERSOS_ILUSTRADOS = [
@@ -1040,6 +1040,203 @@ const ARTES = {
     },
   },
 }
+
+// ---------- os versos EXCLUSIVOS da EXPEDIÇÃO (0017): um por chefão, fora do baú ----------
+// (lib/cosmeticos.js ITENS_EXPEDICAO: 'verso.exp_<x>' no banco, 'verso-exp-<x>' aqui)
+export const VERSOS_EXPEDICAO = [
+  { id: 'verso-exp-tabuleiro', nome: 'Tabuleiro Real', raridade: 'lendario' },
+  { id: 'verso-exp-sinal', nome: 'Sinal Cheio', raridade: 'lendario' },
+  { id: 'verso-exp-dado', nome: 'Dado do Caos', raridade: 'lendario' },
+  { id: 'verso-exp-reciclador', nome: 'Reciclador', raridade: 'lendario' },
+]
+
+const ARTES_EXPEDICAO = {
+  // Chaos King: o tabuleiro de xadrez em perspectiva, a coroa dourada e as casas que piscam
+  'verso-exp-tabuleiro': {
+    aro: '#d8b048',
+    pintar(c) {
+      fundo(c, vertical(c, -50, 50, [[0, '#1a0f2e'], [1, '#3a2458']]))
+      // as casas (8 x 10), escuras e roxas, com algumas "piscando" em vermelho (o aviso das peças)
+      const lado = 8
+      for (let i = 0; i < 8; i++)
+        for (let j = 0; j < 12; j++) {
+          const x = -32 + i * lado
+          const y = -48 + j * lado
+          const escura = (i + j) % 2 === 0
+          c.fillStyle = escura ? '#24163a' : '#5a3a82'
+          c.fillRect(x, y, lado, lado)
+        }
+      c.fillStyle = 'rgba(255,60,80,0.45)'
+      for (const [i, j] of [[1, 2], [6, 3], [2, 8], [5, 9], [0, 10], [7, 7]]) c.fillRect(-32 + i * lado, -48 + j * lado, lado, lado)
+      // brilho no meio
+      c.fillStyle = radial(c, 0, -4, 34, [[0, 'rgba(255,220,120,0.45)'], [1, 'rgba(255,220,120,0)']])
+      circulo(c, 0, -4, 34)
+      // a coroa
+      const ouro = vertical(c, -20, 6, [[0, '#fff0a0'], [0.5, '#e8b040'], [1, '#a06818']])
+      poli(c, ouro, [[-17, 6], [-19, -14], [-9, -4], [0, -20], [9, -4], [19, -14], [17, 6]])
+      c.fillStyle = '#a06818'
+      c.fillRect(-17, 4, 34, 5)
+      for (const [x, y, cor] of [[-19, -14, '#ff4060'], [0, -20, '#60d0ff'], [19, -14, '#ff4060'], [0, -2, '#60ff90']]) {
+        c.fillStyle = cor
+        circulo(c, x, y, 2.2)
+        c.fillStyle = 'rgba(255,255,255,0.7)'
+        circulo(c, x - 0.6, y - 0.7, 0.7)
+      }
+      // o ♠ embaixo, e um peão de cada lado
+      c.fillStyle = '#fff0c0'
+      naipeCanvas(c, 'espadas', 0, 24, 8)
+      c.fill()
+      for (const sx of [-22, 22]) {
+        c.fillStyle = '#e8d8ff'
+        circulo(c, sx, 25, 3)
+        poli(c, '#e8d8ff', [[sx - 4, 36], [sx - 2, 27], [sx + 2, 27], [sx + 4, 36]])
+        c.fillRect(sx - 5, 35, 10, 2)
+      }
+    },
+  },
+  // Queen: o sinal de Wi-Fi cheio (as 4 barrinhas), o fio entre dois corações
+  'verso-exp-sinal': {
+    aro: '#7ae0ff',
+    pintar(c) {
+      fundo(c, vertical(c, -50, 50, [[0, '#071a3a'], [1, '#14408a']]))
+      const rnd = semente(717)
+      c.fillStyle = 'rgba(120,220,255,0.18)'
+      for (let i = 0; i < 40; i++) c.fillRect(-32 + rnd() * 64, -48 + rnd() * 96, 0.6, 0.6 + rnd() * 3)
+      // os arcos do sinal (do menor para o maior), com brilho
+      c.lineCap = 'round'
+      const cores = ['#7ae0ff', '#a0f0ff', '#ffe060', '#ff9a40']
+      for (let k = 0; k < 4; k++) {
+        const r = 7 + k * 7
+        c.strokeStyle = 'rgba(122,224,255,0.25)'
+        c.lineWidth = 5
+        c.beginPath()
+        c.arc(0, 8, r, Math.PI * 1.22, Math.PI * 1.78)
+        c.stroke()
+        c.strokeStyle = cores[k]
+        c.lineWidth = 2.6
+        c.beginPath()
+        c.arc(0, 8, r, Math.PI * 1.22, Math.PI * 1.78)
+        c.stroke()
+      }
+      c.fillStyle = radial(c, 0, 8, 7, [[0, '#ffffff'], [1, 'rgba(122,224,255,0)']])
+      circulo(c, 0, 8, 7)
+      c.fillStyle = '#ffffff'
+      circulo(c, 0, 8, 2.4)
+      // os dois corações e o fio
+      c.strokeStyle = '#7ae0ff'
+      c.lineWidth = 0.9
+      c.setLineDash([2, 1.4])
+      c.beginPath()
+      c.moveTo(-18, 30)
+      c.quadraticCurveTo(0, 22, 18, 30)
+      c.stroke()
+      c.setLineDash([])
+      for (const [x, cor] of [[-18, '#ff3050'], [18, '#ffd23a']]) {
+        c.fillStyle = cor
+        naipeCanvas(c, 'copas', x, 30, 5)
+        c.fill()
+      }
+      // a coroa pequena da Queen em cima
+      poli(c, '#ff70c0', [[-7, -30], [-8, -38], [-3, -34], [0, -40], [3, -34], [8, -38], [7, -30]])
+    },
+  },
+  // Jevil: o dado do caos girando, os naipes rodopiando em volta
+  'verso-exp-dado': {
+    aro: '#c070ff',
+    pintar(c) {
+      fundo(c, vertical(c, -50, 50, [[0, '#2a0a3a'], [1, '#5a1a6a']]))
+      // a espiral do caos
+      c.lineWidth = 1.2
+      for (let k = 0; k < 3; k++) {
+        c.strokeStyle = ['rgba(255,220,80,0.35)', 'rgba(160,110,255,0.4)', 'rgba(255,120,200,0.3)'][k]
+        c.beginPath()
+        for (let t = 0; t < 14; t += 0.1) {
+          const r = 2 + t * 2.6
+          const a = t + (k * TAU) / 3
+          const x = Math.cos(a) * r
+          const y = Math.sin(a) * r * 1.3
+          t ? c.lineTo(x, y) : c.moveTo(x, y)
+        }
+        c.stroke()
+      }
+      // o dado, girado
+      c.save()
+      c.rotate(-0.32)
+      c.fillStyle = 'rgba(0,0,0,0.35)'
+      cartao(c, -14, -12, 30, 30, 5)
+      c.fill()
+      c.fillStyle = vertical(c, -16, 16, [[0, '#ffffff'], [1, '#d8c8f0']])
+      cartao(c, -15, -15, 30, 30, 5)
+      c.fill()
+      c.fillStyle = '#3a0a4a'
+      for (const [x, y] of [[-8, -8], [8, -8], [0, 0], [-8, 8], [8, 8]]) circulo(c, x, y, 2.6)
+      c.restore()
+      // os naipes em volta (as cores do Jevil)
+      const naipes = ['espadas', 'copas', 'paus', 'ouros']
+      naipes.forEach((n, k) => {
+        const a = (k * TAU) / 4 + 0.6
+        c.fillStyle = k % 2 ? '#ff5aa0' : '#ffe060'
+        naipeCanvas(c, n, Math.cos(a) * 24, Math.sin(a) * 32, 5)
+        c.fill()
+      })
+      c.fillStyle = 'rgba(255,240,180,0.9)'
+      for (const [x, y, r] of [[-24, -40, 1.6], [24, 40, 1.4], [26, -20, 1.1], [-26, 18, 1.2]]) {
+        estrela(c, x, y, r * 1.6, 4, 0.3)
+        c.fill()
+      }
+    },
+  },
+  // Coronel Caçamba: o símbolo da reciclagem (três setas), a lata verde e a faixa de obra
+  'verso-exp-reciclador': {
+    aro: '#7ad860',
+    pintar(c) {
+      fundo(c, vertical(c, -50, 50, [[0, '#0a2a14'], [1, '#1a5a2a']]))
+      c.fillStyle = radial(c, 0, -6, 30, [[0, 'rgba(140,255,120,0.4)'], [1, 'rgba(140,255,120,0)']])
+      circulo(c, 0, -6, 30)
+      // as três setas em triângulo
+      const verde = '#8cff6a'
+      for (let k = 0; k < 3; k++) {
+        c.save()
+        c.translate(0, -6)
+        c.rotate((k * TAU) / 3)
+        c.strokeStyle = 'rgba(0,0,0,0.4)'
+        c.lineWidth = 5
+        c.beginPath()
+        c.moveTo(-9, 12)
+        c.lineTo(5, -12)
+        c.stroke()
+        c.strokeStyle = verde
+        c.lineWidth = 3.4
+        c.beginPath()
+        c.moveTo(-9, 12)
+        c.lineTo(5, -12)
+        c.stroke()
+        poli(c, verde, [[2, -17], [11, -11], [2, -7]])
+        c.restore()
+      }
+      // a faixa amarela e preta embaixo (o caminhão de lixo)
+      c.save()
+      c.beginPath()
+      c.rect(-36, 30, 72, 10)
+      c.clip()
+      for (let x = -40; x < 40; x += 8) poli(c, (x / 8) % 2 ? '#1a1a1a' : '#ffd23a', [[x, 30], [x + 8, 30], [x + 4, 40], [x - 4, 40]])
+      c.restore()
+      c.fillStyle = '#ffd23a'
+      c.fillRect(-36, 29, 72, 1)
+      // latinhas e papéis espalhados
+      const rnd = semente(919)
+      for (let i = 0; i < 7; i++) {
+        c.fillStyle = ['#c0c8d0', '#e8e0c8', '#70c050'][i % 3]
+        c.save()
+        c.translate(-28 + rnd() * 56, 22 + rnd() * 4 - (i % 2) * 52 - 8)
+        c.rotate(rnd() * 3)
+        c.fillRect(-1.6, -2.4, 3.2, 4.8)
+        c.restore()
+      }
+    },
+  },
+}
+Object.assign(ARTES, ARTES_EXPEDICAO)
 
 // o verso inteiro: borda escura, o aro na cor do verso, a arte recortada e um filete claro
 function pintarVerso(arte) {

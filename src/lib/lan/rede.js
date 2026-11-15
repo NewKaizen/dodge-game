@@ -802,12 +802,13 @@ export const limparRevanche = () => mudar({ revanche: null })
 //   PVP:    { partidaId, vencedorLado: 0 | 1 | null, rodadas, duracao, personagem }
 //   CO-OP:  { partidaId, vitoria: true | false (o time venceu o chefe), rodadas, duracao, personagem }
 //   (CO-OP do BOSS SEMANAL: + semana, a semana do chefe que este PC enfrentou)
-export function enviarResultado({ partidaId, vencedorLado, vitoria, colocacoes, vencedorTime, rodadas, duracao, personagem, semana }) {
+// (EXPEDIÇÃO do CO-OP: + expedicao { chefe, lutas, sorteada }, o chefão e quantas lutas o time venceu)
+export function enviarResultado({ partidaId, vencedorLado, vitoria, colocacoes, vencedorTime, rodadas, duracao, personagem, semana, expedicao }) {
   if (typeof partidaId !== 'string' || !partidaId || relatadas.has(partidaId)) return false
   // todos contra todos (5D): as vagas do 1º ao último
   // 2x2 (5E): o time vencedor (0 | 1 | null = empate)
   const resultado = vencedorTime !== undefined ? { vencedorTime: vencedorTime === 0 || vencedorTime === 1 ? vencedorTime : null } : Array.isArray(colocacoes) ? { colocacoes: [...colocacoes] } : typeof vitoria === 'boolean' ? { vitoria } : { vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null }
-  const relato = { partidaId, ...resultado, rodadas, duracao, personagem, ...(typeof vitoria === 'boolean' && ID_SEMANA.test(semana ?? '') && { semana }) }
+  const relato = { partidaId, ...resultado, rodadas, duracao, personagem, ...(typeof vitoria === 'boolean' && ID_SEMANA.test(semana ?? '') && { semana }), ...(typeof vitoria === 'boolean' && expedicao && typeof expedicao.chefe === 'string' && { expedicao: { chefe: expedicao.chefe, lutas: expedicao.lutas | 0, sorteada: Boolean(expedicao.sorteada) } }) }
   if (ws?.readyState !== WebSocket.OPEN) {
     // caiu e está voltando (2D): o relato sai na volta, uma vez só
     if (!estado().religando) return false

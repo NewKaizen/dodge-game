@@ -40,6 +40,7 @@ import { aplicarCurasDoContra } from '../coop/reliquias.js'
 import { COR_ATORDOADO } from '../coop/coop2Cena.js'
 import { ligarCoop2 } from '../coop/coop2Arena.js'
 import { semLigaduras } from '../campanha/texto.js'
+import { expedicaoValida, ultimaLuta, dadosDaLuta } from '../coop/expedicao.js'
 import { QUADRO, inicioDoCoracao } from '../coop/quadro.js'
 import { escolherJogadaCoop } from '../coop/bot.js'
 import { superNoChefe } from '../coop/superNoChefe.js'
@@ -190,6 +191,7 @@ const estadoInicial = () => ({
   marcaAtordoado: null,
   quebraParaAnunciar: false, // a barra encheu fora do contra-ataque (resgate, regra): o QUEBROU! sai no fim dele
   logCoop2: [], // (debug) o que o CO-OP 2.0 mostrou: { rodada, tipo } (estadoDebug().coop2)
+  expedicao: null, // (EXPEDIÇÃO, coop/expedicao.js) o estado da expedição desta luta, ou null (luta rápida)
 })
 
 class CoopArena extends PvpArena {
@@ -210,6 +212,8 @@ class CoopArena extends PvpArena {
     // a luta que CONTINUA (a Expedição, coop/reliquias.js): o HP que vem de antes e as relíquias ativas (ids)
     this.hpDosDados = Array.isArray(dados?.hp) ? dados.hp : null
     this.reliquiasDosDados = Array.isArray(dados?.reliquias) ? dados.reliquias : []
+    // a EXPEDIÇÃO (coop/expedicao.js): no fim a luta vai para a tela entre as lutas (Expedicao) ou a do fim
+    this.expedicao = expedicaoValida(dados?.expedicao) ? dados.expedicao : null
     // (dev) uma regra de exemplo (coop/regraChefe.js REGRAS) numa luta de chefe sem regra
     this.regraDev = import.meta.env.DEV && REGRAS[dados?.regra] ? dados.regra : null
   }
@@ -587,6 +591,7 @@ class CoopArena extends PvpArena {
       .text(LARGURA + 200, 278, this.defChefe.nome.toUpperCase(), estilo(26, corTexto(this.defChefe.tema.cor)))
       .setOrigin(0.5)
       .setDepth(96)
+    this.faixaDaExpedicao() // (EXPEDIÇÃO) "LUTA 2 DE 3 · TENENTE" em cima
     tocar(this, 'voo')
     await this.tween({ targets: dupla, x: LARGURA / 2, duration: 360, ease: 'Back.easeOut' })
     this.tween({ targets: vs, scale: 1, duration: 200, ease: 'Back.easeOut' })
@@ -1350,7 +1355,7 @@ class CoopArena extends PvpArena {
     this.saindo = false
     this.regra?.terminar()
     this.previaChefe?.esconder()
-    const dados = {
+    let dados = {
       chefe: this.idChefe,
       turnos: this.estado.rodada,
       estatisticas: this.resumo(),
@@ -1363,7 +1368,7 @@ class CoopArena extends PvpArena {
       tocar(this, 'vitoria')
       for (let j = 0; j < 2; j++) if (this.joystickDoLado(j) >= 0) venceu(this.joystickDoLado(j)) // BUZZER dos jogadores
       await this.esperar(1100)
-      this.mostrarBanner('VITÓRIA!', TEXTO.selecionado, { y: 236, tamanho: 36 })
+      this.mostrarBanner(this.expedicao && !ultimaLuta(this.expedicao) ? `LUTA ${this.expedicao.no + 1} VENCIDA!` : 'VITÓRIA!', TEXTO.selecionado, { y: 236, tamanho: 36 })
       await this.esperar(1300)
     } else {
       tocar(this, 'gameover')
@@ -1379,7 +1384,9 @@ class CoopArena extends PvpArena {
     this.saindo = true
     this.cameras.main.fadeOut(400, 0, 0, 0)
     await new Promise((r) => this.time.delayedCall(420, r))
-    const chave = vencedor === 'vitoria' ? 'Vitoria' : 'GameOver'
+    let chave = vencedor === 'vitoria' ? 'Vitoria' : 'GameOver'
+    // EXPEDIÇÃO: a tela entre as lutas (vitória que não é a última) ou a do fim (o chefão caiu, ou o time caiu)
+    if (this.expedicao) ({ chave, dados } = this.saidaDaExpedicao(vencedor))
     // (o host recebeu o dano e os grazes dos dois: as estatísticas dele valem)
     if (this.rede) irParaCena(this, chave, dados)
     else this.scene.start(chave, dados)
@@ -1419,7 +1426,7 @@ class CoopArena extends PvpArena {
       cena: 'CoopArena',
       nome: this.defChefe.nome,
       // a party vai junto: sem ela o Phaser repetiria os dados da última abertura da cena
-      recomecar: { chefe: this.idChefe, nivel: this.idNivel, party: [...this.ids] },
+      recomecar: this.expedicao ? dadosDaLuta(this.expedicao) : { chefe: this.idChefe, nivel: this.idNivel, party: [...this.ids] }, // (EXPEDIÇÃO: a mesma luta, com o HP e as melhorias)
       sair: 'Selecao',
       motivo,
     })

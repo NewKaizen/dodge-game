@@ -9,6 +9,7 @@ import { avatarDoPerfil } from '../../lib/contaRegras.js'
 import { CATALOGO, corDaMoldura, progressoDoXp } from '../../lib/progresso.js'
 import { ITENS_CAMPANHA, mundoDe } from '../campanha/mundos/index.js'
 import { trofeuDoId, ehTrofeuSemanal, SEMANAIS } from '../../lib/semanal.js'
+import { CHEFES } from '../coop/chefes/index.js'
 import { cosmeticoDoId, cosmeticoDaSemana, ehCosmeticoDiario, DIAS_COSMETICO_SEMANA } from '../../lib/desafio.js'
 import { CONQUISTAS, ITENS_MAESTRIA, PERSONAGENS_MAESTRIA, progressoDaMaestria, MAESTRIA_MAXIMA } from '../../lib/conquistas.js'
 import { conquistasConta, pedirConquistas } from '../../lib/conquistasConta.js'
@@ -17,7 +18,7 @@ import { ESCALA } from '../arte/texturas.js'
 import { semLigaduras } from '../campanha/texto.js'
 import { lan } from '../../lib/lan/rede.js'
 import { bausConta, pedirBaus } from '../../lib/bausConta.js'
-import { TITULOS_BAU, itensDoSlot, PADRAO_REGISTRO, COLUNA_DO_SLOT, COR_RARIDADE, NOME_RARIDADE, CHANCES, PITY, FONTES_BAU, XP_DUPLICADO, BAU_XP_TETO_DIA } from '../../lib/cosmeticos.js'
+import { ITENS_EXPEDICAO, TITULOS_BAU, itensDoSlot, PADRAO_REGISTRO, COLUNA_DO_SLOT, COR_RARIDADE, NOME_RARIDADE, CHANCES, PITY, FONTES_BAU, XP_DUPLICADO, BAU_XP_TETO_DIA } from '../../lib/cosmeticos.js'
 import { previaDe, miniaturaDe } from '../cosmeticosSlots.js'
 import { desenharBau, iconeDoTipo } from '../conta/bau.js'
 import { criarRoletaBau } from '../conta/roletaBau.js'
@@ -193,7 +194,7 @@ export default class Colecao extends CenaConta {
     if (tipo === 'conquistas') return CONQUISTAS.map((c) => ({ ...c, tipo: 'conquista' }))
     if (tipo === 'maestria') return PERSONAGENS_MAESTRIA.map((p) => ({ id: `maestria.${p}`, tipo: 'maestria', personagem: p, nome: PERSONAGENS[p].nome }))
     // os da CAMPANHA (docs/campanha.md) e os da MAESTRIA entram no fim da aba do tipo deles (os versos do baú também)
-    if (tipo !== 'semanal') return [...CATALOGO.filter((i) => i.tipo === tipo), ...ITENS_CAMPANHA.filter((i) => i.tipo === tipo), ...ITENS_MAESTRIA.filter((i) => i.tipo === tipo), ...(tipo === 'verso' ? itensDoSlot('verso') : [])]
+    if (tipo !== 'semanal') return [...CATALOGO.filter((i) => i.tipo === tipo), ...ITENS_CAMPANHA.filter((i) => i.tipo === tipo), ...ITENS_MAESTRIA.filter((i) => i.tipo === tipo), ...(tipo === 'verso' ? [...itensDoSlot('verso'), ...ITENS_EXPEDICAO] : [])]
     // os ganhos (a semana mais nova primeiro) e os desta semana (boss semanal e desafio diário), se ainda não tem
     const inv = [...(get(conta).inventario ?? [])]
     const ganhos = [...inv.filter(ehTrofeuSemanal).map(trofeuDoId), ...inv.filter(ehCosmeticoDiario).map(cosmeticoDoId)].filter(Boolean)
@@ -503,7 +504,7 @@ export default class Colecao extends CenaConta {
         g.lineStyle(3, 0x9a9ab0, 1).strokeRect(lx - 5, ly - 10, 10, 10)
       }
       if (item.tipo !== 'titulo') caber(this.t(x, y + 22, item.nome, 12, tem ? COR.texto : COR.apagado).setOrigin(0.5), item.nome, cel.l - 14)
-      const estado = tem ? (this.equipado(item) ? 'EQUIPADO' : item.padrao ? 'padrão' : 'seu') : item.bau ? `baú · ${NOME_RARIDADE[item.raridade].toLowerCase()}` : item.exclusivo || item.diario ? 'esta semana' : item.maestria ? `maestria ${item.maestria}` : item.campanha ? 'campanha' : `nível ${item.nivel}`
+      const estado = tem ? (this.equipado(item) ? 'EQUIPADO' : item.padrao ? 'padrão' : 'seu') : item.expedicao ? 'expedição' : item.bau ? `baú · ${NOME_RARIDADE[item.raridade].toLowerCase()}` : item.exclusivo || item.diario ? 'esta semana' : item.maestria ? `maestria ${item.maestria}` : item.campanha ? 'campanha' : `nível ${item.nivel}`
       this.t(x, y + (item.tipo === 'titulo' ? 22 : 36), estado, 10, tem ? (this.equipado(item) ? COR.ok : COR.dica) : COR.aviso).setOrigin(0.5)
       if (sel) this.cursorEm(x - cel.l / 2 + 16, y - cel.a / 2 + 16, 0.7)
     })
@@ -571,14 +572,15 @@ export default class Colecao extends CenaConta {
     }
     if (item.tipo !== 'titulo') caber(this.t(cx, d.y + 176, item.nome, 20, COR.texto, { strokeThickness: 4 }).setOrigin(0.5), item.nome, d.largura - 24)
     const tipo = item.registro && item.tipo === 'moldura' ? NOME_SLOT.moldura : { avatar: 'AVATAR', titulo: 'TÍTULO', moldura: 'MOLDURA', verso: 'VERSO DE CARTA', ...NOME_SLOT }[item.tipo]
-    const origem = item.bau ? `${tipo} · BAÚ · ${NOME_RARIDADE[item.raridade]}` : item.campanha ? `${tipo} · CAMPANHA, MUNDO ${item.mundo}` : item.diario ? `${tipo} · DESAFIO DIÁRIO ${item.semana}` : item.exclusivo ? `${tipo} · TROFÉU SEMANAL ${item.semana}` : item.maestria ? `${tipo} · MAESTRIA ${PERSONAGENS[item.personagem].nome.toUpperCase()}` : tipo
-    this.t(cx, d.y + 200, origem, 11, item.bau ? COR_RARIDADE[item.raridade] : item.campanha ? corDoMundo(item.mundo) : item.exclusivo || item.diario ? '#ffb060' : COR.dica).setOrigin(0.5)
+    const origem = item.expedicao ? `${tipo} · EXPEDIÇÃO · ${(CHEFES[item.expedicao]?.nome ?? '').toUpperCase()}` : item.bau ? `${tipo} · BAÚ · ${NOME_RARIDADE[item.raridade]}` : item.campanha ? `${tipo} · CAMPANHA, MUNDO ${item.mundo}` : item.diario ? `${tipo} · DESAFIO DIÁRIO ${item.semana}` : item.exclusivo ? `${tipo} · TROFÉU SEMANAL ${item.semana}` : item.maestria ? `${tipo} · MAESTRIA ${PERSONAGENS[item.personagem].nome.toUpperCase()}` : tipo
+    this.t(cx, d.y + 200, origem, 11, item.expedicao ? '#ffc070' : item.bau ? COR_RARIDADE[item.raridade] : item.campanha ? corDoMundo(item.mundo) : item.exclusivo || item.diario ? '#ffb060' : COR.dica).setOrigin(0.5)
     let estado
     if (this.equipado(item)) estado = { texto: item.tipo === 'titulo' ? 'EQUIPADO  ·  A tira o título' : 'EQUIPADO', cor: COR.ok }
     else if (tem) estado = { texto: 'A: EQUIPAR', cor: COR.gold }
     else if (item.campanha) estado = { texto: item.quando === 'mundo' ? `vença o chefe de ${mundoDe(item.mundo)?.nome}` : `3 estrelas em todas as fases de ${mundoDe(item.mundo)?.nome}`, cor: COR.aviso }
     else if (item.diario) estado = { texto: `vença o desafio diário em ${DIAS_COSMETICO_SEMANA} dias da semana`, cor: COR.aviso }
     else if (item.maestria) estado = { texto: `maestria ${item.maestria} com ${PERSONAGENS[item.personagem].nome}`, cor: COR.aviso }
+    else if (item.expedicao) estado = { texto: `complete a EXPEDIÇÃO contra ${CHEFES[item.expedicao]?.nome ?? item.expedicao}`, cor: COR.aviso }
     else if (item.exclusivo) estado = { texto: `vença: ${SEMANAIS[item.chefe]?.nome ?? 'o boss semanal'}`, cor: COR.aviso }
     else if (item.bau) estado = { texto: 'sai do BAÚ (aba BAÚS)', cor: COR.aviso }
     else estado = { texto: `libera no nível ${item.nivel}`, cor: COR.aviso }
@@ -586,6 +588,7 @@ export default class Colecao extends CenaConta {
     if (!tem && item.campanha) this.t(cx, d.y + 254, 'menu → CAMPANHA (com conta)', 11, COR.dica).setOrigin(0.5)
     else if (!tem && item.diario) this.t(cx, d.y + 254, 'menu → DESAFIO DIÁRIO · só até domingo, nunca volta', 11, COR.dica).setOrigin(0.5)
     else if (!tem && item.maestria) this.t(cx, d.y + 254, 'jogue com o personagem (aba MAESTRIA)', 11, COR.dica).setOrigin(0.5)
+    else if (!tem && item.expedicao) this.t(cx, d.y + 254, 'ONLINE · CO-OP → EXPEDIÇÃO (com conta)', 11, COR.dica).setOrigin(0.5)
     else if (!tem && item.exclusivo) this.t(cx, d.y + 254, 'ONLINE · BOSS SEMANAL · só até domingo, nunca volta', 11, COR.dica).setOrigin(0.5)
     else if (!tem && item.bau) this.t(cx, d.y + 254, 'baús se ganham jogando (nunca se compram)', 11, COR.dica).setOrigin(0.5)
     else if (!tem) this.t(cx, d.y + 254, nivel >= item.nivel ? 'jogue uma partida para receber' : `faltam ${item.nivel - nivel} nível${item.nivel - nivel > 1 ? 'is' : ''}`, 11, COR.dica).setOrigin(0.5)
