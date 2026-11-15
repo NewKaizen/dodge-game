@@ -9,6 +9,40 @@ const linhas = (largura, ...mapa) => mapa.map((l) => l.padEnd(largura, '.'))
 const espelhada = (metade) => metade.map((l) => l + [...l].reverse().join(''))
 
 export const SPRITES_CORONEL = {
+  // o Coronel Caçamba: quepe laranja com distintivo, bigode, colete refletivo e macacão, com a caçamba de lixo ao lado
+  coronelLixeiro: {
+    paleta: { c: '#e8892a', C: '#a85a14', y: '#ffe14a', s: '#e8b48a', o: '#20242e', m: '#d8d8d8', v: '#ff9a2a', w: '#f2f2c8', j: '#3a5fa8', J: '#26407a', t: '#3a2a20', G: '#8a909c', d: '#5a6270', D: '#3a404c', l: '#7a828e', k: '#15151c', r: '#c8323a' },
+    mapa: linhas(
+      32,
+      '................................',
+      '.......cccccccc.................',
+      '......ccccyyccccc...............',
+      '.....cccccyyccccccc.............',
+      '....CCCCCCCCCCCCCCCC............',
+      '.......ssssssss.................',
+      '.......soossoos.................',
+      '.......ssssssss.................',
+      '.......smmmmmms.................',
+      '........ssrrss..................',
+      '......vvvvvvvvvv.......llllllll.',
+      '.....vvwvvvvvvwvv.....lddddddddl',
+      '....vvvwvvvvvvwvvv....lDDDDDDDDl',
+      '...GGvvwvvvvvvwvvvGG..ldddddddDl',
+      '...GGjjwjjjjjjwjjjGG..lDDDDDDDDl',
+      '....jjjwjjjjjjwjjj....lddddddddl',
+      '.....jjjjjjjjjjjj.....lDDDDDDDDl',
+      '.....jjjjjjjjjjjj.....lddddddddl',
+      '.....jjjjj..jjjjj.....lDDDDDDDDl',
+      '.....JJJJJ..JJJJJ.....lddddddddl',
+      '.....JJJJJ..JJJJJ.....lDDDDDDDDl',
+      '.....JJJJJ..JJJJJ.....llllllllll',
+      '....tttttt..tttttt.....k......k.',
+      '....tttttt..tttttt.....kk....kk.',
+      '................................',
+      '................................',
+    ),
+  },
+
   // o caminhão de lixo que cruza as faixas (bala), de lado, de frente para a direita
   caminhaoLixo: {
     paleta: { o: '#e8892a', O: '#a85a14', w: '#e9ecf2', W: '#aab2c0', g: '#9fd8ff', k: '#15151c', m: '#8a909c', M: '#4a4f5a', y: '#fff27a', r: '#d83a3a', b: '#2a2e38' },

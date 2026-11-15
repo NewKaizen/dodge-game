@@ -11,7 +11,7 @@ import { criarRegraReciclagem } from '../coronelRegra.js'
 export default {
   nome: 'Coronel Caçamba',
   dificuldade: 'extremo',
-  sprite: 'coronel',
+  sprite: 'coronelLixeiro',
   fundo: 'coronel',
   musica: 'coronel',
   textoInicial: 'O Coronel Caçamba chegou para a coleta!',
