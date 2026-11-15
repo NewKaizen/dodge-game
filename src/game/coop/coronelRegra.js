@@ -24,7 +24,7 @@ import { criarLixeira, desenharItemDaRegra, estouroDoItem, lancarMissil, COR_REC
 //   quebra       pontos de QUEBRA do míssil
 //   danoSujo     dano do marrom em cima do dano base do quadro (multiplicado pelo nível)
 export const PADRAO_RECICLAGEM = {
-  max: 12,
+  max: 16,
   limpos: [5, 3, 4],
   sujos: [0, 2, 2],
   valor: [2, 2, 3],
@@ -138,6 +138,7 @@ export function criarRegraReciclagem(opcoes = {}) {
       const disparar = () => {
         const dano = Math.max(1, Math.round(hpMax() * cfg.dano))
         api.banner('MÍSSIL RECICLADO!', '#6dff8a')
+        api.cena?.registrar?.('missil')
         api.dica('missil', 'Lixeira cheia: o MÍSSIL RECICLADO bate nele e enche a QUEBRA!')
         let feito = false
         const aplicar = () => {
@@ -240,6 +241,9 @@ export function criarRegraReciclagem(opcoes = {}) {
           const c = api.coracoes().find((x) => x.j === j && x.ativo)
           const l = api.limites()
           if (!c) return null
+          // o COMPACTADOR está fechando: o vão vale mais que qualquer item
+          const vao = api.cena?.vaoDoCompactador
+          if (vao && (api.cena.time?.now ?? 0) - vao.em < 250) return vao
           let melhor = null
           let d = Infinity
           for (const v of vivos) {

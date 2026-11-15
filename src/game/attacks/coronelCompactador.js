@@ -51,10 +51,12 @@ export default definirAtaque({
       a.aoAtualizar((dt) => {
         if (!g.scene) return
         t += dt
+        // a CPU aliada vai para o vão (coop/coronelRegra.js alvoDoBot lê isto enquanto estiver fresco)
+        if (t < ciclo - 350) a.cena.vaoDoCompactador = { x: centro, y: l.centerY, raio: Math.max(8, vao / 2 - 16), em: a.cena.time?.now ?? 0 }
         const p = Math.sin(t / 180) * 0.5 + 0.5
         g.clear()
-        g.fillStyle(0xb8ffc8, 0.13 + 0.1 * p).fillRect(esq, l.top, vao, l.height)
-        g.lineStyle(2, 0xc8ffd0, 0.7 + 0.25 * p)
+        g.fillStyle(0xb8ffc8, 0.24 + 0.14 * p).fillRect(esq, l.top, vao, l.height)
+        g.lineStyle(3, 0xe0ffe6, 0.8 + 0.2 * p)
         g.lineBetween(esq, l.top, esq, l.bottom)
         g.lineBetween(dir, l.top, dir, l.bottom)
         if (t > ciclo - 350) {
