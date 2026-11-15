@@ -3,6 +3,7 @@ import { PERSONAGENS } from '../data/personagens.js'
 import { TEXTURAS_QUEEN } from './queenSprites.js'
 import { GERADORES_JEVIL } from './jevilExpedicao.js'
 import { GERADORES_KING } from './kingSprites.js'
+import { SPRITES_CORONEL } from './coronelSprites.js'
 
 // Escala em que cada sprite de pixel art aparece no jogo
 export const ESCALA = { personagem: 3, chefe: 4, coracao: 1.4 }
@@ -357,6 +358,8 @@ const GERADORES = {
   ladra: sprite('ladra'),
   // colorida: a caminhonete usa cor 0xffffff na bala para não ser pintada pelo tema
   'bala-caminhonete': sprite('caminhonete'),
+  // Coronel Caçamba: o caminhão de lixo, o Compactador (tenente) e os lacaios (arte/coronelSprites.js)
+  ...Object.fromEntries(Object.entries(SPRITES_CORONEL).map(([id, s]) => [id, () => pixelArt(s.mapa, s.paleta, id)])),
 
   coracao,
   faisca: () => degrade(8, [[0, 'rgba(255,255,255,1)'], [1, 'rgba(255,255,255,0)']]),

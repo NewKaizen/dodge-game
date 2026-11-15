@@ -49,6 +49,10 @@ const TEXTO_ATAQUE = {
   caosFinal: TEXTOS.caosFinal,
   caminhonete: 'Trânsito de caminhonetes em fila pelas faixas (os faróis avisam); às vezes uma freia e volta de ré',
   brasas: 'Brasas sobem do chão balançando e estouram em fagulhas',
+  coronelCaminhao: 'Uma faixa acende e buzina; só então o caminhão de lixo cruza por ela (sempre sobra uma faixa livre)',
+  coronelEntulho: 'Sombras crescem no chão e viram pedregulhos que batem só ali',
+  coronelBuzinaco: 'Uma onda de som varre a caixa e empurra quem está dentro (não machuca)',
+  coronelCompactador: 'Duas placas de aço fecham devagar e param deixando um vão marcado, onde a dupla cabe',
 }
 
 // Biblioteca de mentira que só anota os nomes: A.juntos(A.rain(), A.aimed())

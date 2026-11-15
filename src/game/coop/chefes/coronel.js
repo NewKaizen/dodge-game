@@ -1,77 +1,73 @@
 // Coronel Caçamba (EXTREMO). Formato: ver o comentário em coop/chefes/index.js.
+//
+// CO-OP 2.0 (docs/coop-cartas.md "Coronel Caçamba"): a luta toda gira em volta da regra RECICLAGEM (coop/coronelRegra.js):
+// parte do lixo que ele joga é VERDE e não machuca, enche a LIXEIRA da dupla e, cheia, lança o MÍSSIL RECICLADO nele.
+// As cartas são poucas, longas de ler e todas AVISADAS (a faixa acende antes do caminhão, a sombra cresce antes do
+// entulho, o vão do compactador aparece antes das placas andarem): nada de trânsito cheio nem de parede de brasa.
+// Fase 1: o básico, com muito verde. Fase 2: caminhão mais rápido e o lixo MARROM (contaminado, machuca) misturado.
+// Fase 3: caminhão duplo e o COMPACTADOR; a lixeira enche mais rápido.
+import { criarRegraReciclagem } from '../coronelRegra.js'
+
 export default {
   nome: 'Coronel Caçamba',
   dificuldade: 'extremo',
   sprite: 'coronel',
   fundo: 'coronel',
   musica: 'coronel',
-  textoInicial: 'O Coronel Caçamba buzina e acelera na sua direção!',
+  textoInicial: 'O Coronel Caçamba chegou para a coleta!',
   tema: {
-    formas: ['chama', 'bola'],
-    cores: { chama: 0xff8a1c, bola: 0xffd24c, barra: 0xd8d8e0 },
-    cor: 0xff8a1c,
+    // o lixo que machuca é papelão e lata (nunca verde: o verde é só da reciclagem)
+    formas: ['bola', 'losango'],
+    cores: { bola: 0xb0875a, losango: 0xa7adb8, barra: 0x9aa7b4 },
+    cor: 0xe8892a,
   },
-  hp: 350, // CO-OP 2.0: era 320 (docs/coop-cartas.md "Lutas mais curtas")
+  hp: 400, // CO-OP 2.0: era 320; o míssil reciclado tira uma boa parte (docs/coop-cartas.md "Coronel Caçamba")
   danoBala: 12,
-  // DIFÍCIL: o trânsito e o forcado já apertam bastante no ritmo base do
-  // difícil; um pouco mais de dano (SUPER ~24 por acerto) e menos HP
+  // DIFÍCIL: o caminhão e o entulho já apertam no ritmo base do difícil; um pouco mais de dano e menos HP
   niveis: { dificil: { dano: 1.1, hp: 0.9 } },
-  leve: (A) => A.brasas({ duracao: 4000, intervalo: 700 }),
+  regra: criarRegraReciclagem(),
+  leve: (A) => A.coronelEntulho({ duracao: 4000, intervalo: 1500, maximo: 2, mirar: 0.3 }),
   fases: [
     {
       hp: 1,
-      falas: ['Sai da frente, sô!', 'Essa estrada é minha!', 'Fom-fom!'],
+      falas: ['Hora da coleta!', 'Separa o lixo, hein?', 'Fom-fom! Sai da frente!'],
       cartas: [
-        ['paus', 4, 'Churrasco', (A) => A.brasas()],
-        ['espadas', 5, 'Forcado', (A) => A.forcado()],
-        ['espadas', 6, 'Fom-Fom', (A) => A.caminhonete({ velocidade: 105, intervalo: 1700 })],
-        ['ouros', 5, 'Faísca Mirada', (A) => A.aimed({ forma: 'chama', velocidade: 170, intervalo: 700 })],
+        ['espadas', 5, 'Caminhão de Lixo', (A) => A.coronelCaminhao({ velocidade: 140, intervalo: 1700 })],
+        ['paus', 4, 'Chuva de Entulho', (A) => A.coronelEntulho({ intervalo: 900 })],
+        ['ouros', 6, 'Buzinaço', (A) => A.juntos(A.coronelBuzinaco(), A.coronelEntulho({ intervalo: 1600, maximo: 2, mirar: 0.35 }))],
         ['copas', 4, 'Pausa pro Café', null, { cura: 26 }],
       ],
     },
     {
-      hp: 0.75,
-      entrada: 'Espera aí que eu vou dar a volta!',
+      hp: 0.66,
+      entrada: 'Tá misturando o lixo! Quem separou errado?!',
       velocidadeFundo: 1.4,
-      falas: ['Olha a ré!', 'Eu dirijo muito bem!', 'Quem pôs esse coração aí?!'],
+      falas: ['Esse marrom não é reciclável!', 'Olha a buzina!', 'Quem pôs esse coração aí?!'],
       cartas: [
-        ['espadas', 8, 'Olha a Ré!', (A) => A.caminhonete({ re: 0.45 })],
-        ['paus', 8, 'Brasa e Faísca', (A) => A.juntos(A.brasas({ intervalo: 320 }), A.aimed({ forma: 'chama', intervalo: 1100, velocidade: 180 }))],
-        ['ouros', 8, 'Forcado Ligeiro', (A) => A.forcado({ intervalo: 1150, parada: 200, palha: 2 })],
-        ['ouros', 9, 'Redemoinho de Fogo', (A) => A.spiral({ forma: 'chama', velocidade: 130 })],
+        ['espadas', 8, 'Caminhão Turbo', (A) => A.coronelCaminhao({ velocidade: 185, intervalo: 1300, aviso: 900 })],
+        ['paus', 8, 'Entulho Mirado', (A) => A.coronelEntulho({ intervalo: 700, mirar: 0.7 })],
+        ['ouros', 9, 'Buzinaço Forte', (A) => A.juntos(A.coronelBuzinaco({ ondas: 3, intervalo: 2300, empurrao: 130 }), A.coronelEntulho({ intervalo: 1400, maximo: 2 }))],
+        ['espadas', 9, 'Caminhão e Entulho', (A) => A.juntos(A.coronelCaminhao({ velocidade: 150, intervalo: 2000 }), A.coronelEntulho({ intervalo: 1700, maximo: 2, mirar: 0.4 }))],
         ['copas', 7, 'Chapéu de Palha', null, { cura: 20, guarda: 0.6 }],
       ],
     },
     {
-      hp: 0.5,
-      entrada: 'AGORA EU PISO FUNDO!',
-      velocidadeFundo: 1.9,
-      falas: ['Segura o chapéu!', 'Fom-fom! FOM-FOM!', 'Não tem freio não!'],
+      hp: 0.33,
+      entrada: 'COMPACTAÇÃO TOTAL! Chamei o outro caminhão!',
+      velocidadeFundo: 2,
+      falas: ['BI-BI! Segura o vão!', 'Última coleta!', 'Aperta que cabe!'],
       cartas: [
-        ['espadas', 10, 'Pé na Tábua', (A) => A.caminhonete({ velocidade: 175, intervalo: 1300, vao: 90 })],
-        ['paus', 11, 'Rodovia em Chamas', (A) => A.juntos(A.caminhonete({ velocidade: 100, intervalo: 2100, vao: 110 }), A.brasas({ intervalo: 560 }))],
-        // o forcado estoca NO MEIO do trânsito: desvia do garfo sem cair na frente de uma caminhonete
-        ['espadas', 11, 'Atropela e Espeta', (A) => A.juntos(A.caminhonete({ velocidade: 95, intervalo: 2300, vao: 120 }), A.forcado({ intervalo: 1800, palha: 0, pinca: 0 }))],
-        ['ouros', 10, 'Fogo Cruzado', (A) => A.juntos(A.spiral({ velocidade: 130, bracos: 3 }), A.forcado({ intervalo: 2300, palha: 2 }))], // 3 braços: com o forcado, sempre sobra rota de fuga no DIFÍCIL
+        ['espadas', 11, 'Caminhão Duplo', (A) => A.coronelCaminhao({ simultaneos: 2, velocidade: 165, intervalo: 1300, aviso: 950 })],
+        ['paus', 11, 'Compactador', (A) => A.coronelCompactador()],
+        ['ouros', 10, 'Buzinaço Final', (A) => A.juntos(A.coronelBuzinaco({ ondas: 3, intervalo: 2200, empurrao: 135 }), A.coronelEntulho({ intervalo: 1100, maximo: 2, mirar: 0.55 }))],
+        ['espadas', 12, 'Caminhão e Entulho', (A) => A.juntos(A.coronelCaminhao({ velocidade: 170, intervalo: 1800 }), A.coronelEntulho({ intervalo: 1300, maximo: 2, mirar: 0.55 }))],
         ['copas', 9, 'Pit Stop', null, { cura: 22, guarda: 0.6 }],
-      ],
-    },
-    {
-      hp: 0.25,
-      entrada: 'Chamei os primos! Todo mundo de caminhonete!',
-      velocidadeFundo: 2.4,
-      falas: ['BI-BI!', 'Última volta!', 'Primo, pela esquerda!'],
-      cartas: [
-        ['espadas', 13, 'Engarrafamento', (A) => A.caminhonete({ faixas: 4, velocidade: 85, intervalo: 1100, re: 0.25 })],
-        ['ouros', 12, 'Primos de Caminhonete', (A) => A.juntos(A.caminhonete({ intervalo: 1700 }), A.aimed({ forma: 'chama', intervalo: 1300, velocidade: 190 })), { inverter: true }],
-        ['paus', 13, 'Rodeio Completo', (A) => A.sequencia(A.brasas({ duracao: 2400, intervalo: 180 }), A.forcado({ duracao: 2400, intervalo: 900, parada: 180 }), A.caminhonete({ duracao: 2800, velocidade: 150, intervalo: 1400 }))],
-        ['paus', 12, 'Churrasqueira Turbo', (A) => A.juntos(A.forcado({ intervalo: 1300 }), A.brasas({ intervalo: 300, estouro: 3 }))],
       ],
     },
   ],
   super: {
-    nome: 'Buzinaço',
-    texto: 'Todos os primos de caminhonete passam buzinando enquanto chove brasa, nas duas caixas',
-    criar: (A) => A.juntos(A.caminhonete({ duracao: 6500, velocidade: 115, intervalo: 1700, vao: 100 }), A.brasas({ duracao: 6500, intervalo: 420 })),
+    nome: 'Dia de Coleta',
+    texto: 'Dois caminhões cruzam as faixas acesas enquanto o entulho cai, tudo avisado',
+    criar: (A) => A.juntos(A.coronelCaminhao({ duracao: 6500, simultaneos: 2, velocidade: 150, intervalo: 1500 }), A.coronelEntulho({ duracao: 6500, intervalo: 1300, maximo: 2 })),
   },
 }

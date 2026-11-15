@@ -20,6 +20,10 @@ import caosFinal from './caosFinal.js'
 import garras from './garras.js'
 import mandibula from './mandibula.js'
 import arremesso from './arremesso.js'
+import coronelCaminhao from './coronelCaminhao.js'
+import coronelEntulho from './coronelEntulho.js'
+import coronelBuzinaco from './coronelBuzinaco.js'
+import coronelCompactador from './coronelCompactador.js'
 import { ataquesSuper } from './super/index.js'
 import { ataquesHabilidades } from './habilidades/index.js'
 
@@ -61,6 +65,10 @@ export const ataques = {
   garras, // (campanha) garras do Silêncio
   mandibula, // (campanha) a boca que fecha
   arremesso, // (campanha) o titã joga as cartas da sua mão
+  coronelCaminhao, // (Coronel Caçamba) o caminhão de lixo cruzando as faixas acesas
+  coronelEntulho, // (Coronel Caçamba) a chuva de entulho com a sombra crescendo
+  coronelBuzinaco, // (Coronel Caçamba) a onda de som que empurra
+  coronelCompactador, // (Coronel Caçamba) as placas que fecham, com um vão
   ...ataquesSuper, // superKris, superSusie... (cartas SUPER)
   ...ataquesHabilidades, // krisEstocadaDupla, susieCabecada... (cartas normais, ver habilidades/)
   juntos,

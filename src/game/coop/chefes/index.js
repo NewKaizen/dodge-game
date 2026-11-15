@@ -2,6 +2,8 @@ import king from './king.js'
 import queen from './queen.js'
 import jevil from './jevil.js'
 import coronel from './coronel.js'
+import coronelLacaios from './coronelLacaios.js'
+import coronelTenente from './coronelTenente.js'
 import escuridao from './escuridao.js'
 import ladra from './ladra.js'
 import jevilLacaios from './jevilLacaios.js'
@@ -37,12 +39,15 @@ import { CHEFES_CAMPANHA } from '../../campanha/chefes.js'
 //   semanal                  BOSS SEMANAL (docs/boss-semanal.md): fora da Selecao e da votação da
 //                            party; só aparece na semana dele (src/lib/semanal.js, AGENDA)
 //   escuro                   (Escuridão) a caixa no escuro e as pistas de som (coop/semanal/escuridao.js)
+//   oculto, expedicao        (Expedição) lacaios e tenentes: fora da Selecao (ORDEM_CHEFES) e das votações; abre-se com
+//                            scene.start('CoopArena', { chefe: '<id>' }). O Coronel tem coronelLacaios e coronelTenente
 //   ladra, roubadas          (Ladra) rouba e joga as cartas dos jogadores (coop/semanal/ladra.js)
 // os da campanha (campanha/chefes.js, `campanha: true`) também moram aqui: a luta da campanha usa as
 // regras do CO-OP. Ficam fora da Selecao (ORDEM_CHEFES) e do semanal (SEMANAIS)
 export const CHEFES = { king, queen, jevil, coronel, escuridao, ladra, ...CHEFES_CAMPANHA, jevil_lacaios: jevilLacaios, jevil_tenente: jevilTenente }
 // EXPEDIÇÃO (`expedicao: true`: fora da Selecao, que só mostra ORDEM_CHEFES): os lacaios e o tenente de cada chefe
 Object.assign(CHEFES, { kingLacaios, kingTenente })
+Object.assign(CHEFES, { coronelLacaios, coronelTenente })
 
 const FATORES = ['velocidade', 'densidade', 'velocidadeMax', 'dano', 'hp']
 
