@@ -1,12 +1,22 @@
 // Chaos King (FÁCIL). Formato: ver o comentário em coop/chefes/index.js.
+//
+// CO-OP 2.0, regra TABULEIRO REAL (kingRegra.js, kingTabuleiro.js, kingAtaques.js): o quadro vira um
+// tabuleiro de xadrez e cada peça PISCA as casas que vai golpear antes de golpear. Fase 1: peões e torres;
+// fase 2: bispos e cavalos entram; fase 3: um peão vira RAINHA e o ROQUE troca os corações de lado. Nas
+// cartas de XEQUE uma peça prende UM coração numa gaiola e o parceiro tem de CAPTURÁ-LA (pisar na casa
+// dela). As jogadas de cada carta estão em kingCartas.js.
+import { criarRegraKing } from './kingRegra.js'
+import { ESPEC, ataqueKing } from './kingCartas.js'
+
+const carta = (nome) => () => ataqueKing('king', nome)
+
 export default {
   nome: 'Chaos King',
   dificuldade: 'facil',
   sprite: 'king',
   fundo: 'king',
   musica: 'king',
-  desafio: { velocidade: 1.15, densidade: 1.2 },
-  textoInicial: 'O Chaos King bloqueia o caminho!',
+  textoInicial: 'O Chaos King vira o quadro num tabuleiro de xadrez!',
   tema: {
     formas: ['losango', 'coroa'],
     cores: { losango: 0xb48cff, coroa: 0xffd23c, barra: 0xd8c8ff, bola: 0xb48cff },
@@ -17,36 +27,57 @@ export default {
   // DIFÍCIL: o King é o chefe mais fraco de base (dano por bala baixo e padrões
   // fáceis de ler): no difícil ele aperta bem mais o ritmo (SUPER ~23 por acerto)
   niveis: { dificil: { velocidade: 1.5, densidade: 1.7, velocidadeMax: 1.4, dano: 1.8, hp: 1.2 } },
-  leve: (A) => A.rain({ duracao: 4000, intervalo: 520, velocidade: 110 }),
+  leve: carta('leve'),
+  regra: criarRegraKing({
+    descricao: 'As peças piscam as casas que vão golpear; no XEQUE, capture a peça para soltar o parceiro.',
+    fases: {
+      1: { descricao: 'Bispos e cavalos entram no tabuleiro.' },
+      2: { descricao: 'Um peão chega ao fim e vira RAINHA; o ROQUE troca vocês de lado.' },
+    },
+    espec: ESPEC,
+  }),
   fases: [
     {
       hp: 1,
       falas: ['Ajoelhem-se diante da coroa!', 'Um peão ousa me desafiar?', 'Xeque! Hahaha!'],
       cartas: [
-        ['espadas', 3, 'Chuva de Peões', (A) => A.rain({ intervalo: 260, velocidade: 120 })],
-        ['paus', 4, 'Torres em Marcha', (A) => A.colunas({ quantidade: 2, velocidade: 140, intervalo: 1500 })],
-        ['ouros', 5, 'Olhar Real', (A) => A.aimed({ intervalo: 950, velocidade: 120 })],
-        ['espadas', 6, 'Investida do Cavalo', (A) => A.sides({ intervalo: 1150, velocidade: 160 })],
+        ['espadas', 3, 'Peões em Marcha', carta('Peões em Marcha')],
+        ['paus', 4, 'Torre à Vista', carta('Torre à Vista')],
+        ['espadas', 6, 'Torres Gêmeas', carta('Torres Gêmeas')],
+        ['ouros', 5, 'Xeque!', carta('Xeque!')],
         ['copas', 4, 'Ajeitar a Coroa', null, { cura: 22 }],
       ],
     },
     {
-      hp: 0.5,
-      entrada: 'Chega de brincadeira! Agora é xeque-mate!',
-      velocidadeFundo: 1.4,
-      falas: ['Minhas torres vão esmagar vocês!', 'Curvem-se!', 'Isso é traição!'],
+      hp: 0.66,
+      entrada: 'Os bispos e os cavalos! Joguem o meu jogo!',
+      velocidadeFundo: 1.3,
+      falas: ['Minhas diagonais não perdoam!', 'Cavalo em L, morte em L!', 'O rei nunca perde!'],
       cartas: [
-        ['espadas', 9, 'Xeque', (A) => A.juntos(A.rain({ intervalo: 340, velocidade: 130 }), A.aimed({ intervalo: 1400, velocidade: 130 }))],
-        ['paus', 10, 'Roque', (A) => A.colunas({ quantidade: 3, velocidade: 160, intervalo: 1200 })],
-        ['ouros', 11, 'Tabuleiro Virado', (A) => A.sequencia(A.colunas({ duracao: 3000, intervalo: 1300 }), A.rain({ duracao: 3000, intervalo: 200, velocidade: 140 }))],
-        ['espadas', 12, 'Fúria da Torre', (A) => A.sides({ intervalo: 1000, velocidade: 170 })],
+        ['espadas', 8, 'Bispos em V', carta('Bispos em V')],
+        ['paus', 9, 'Salto do Cavalo', carta('Salto do Cavalo')],
+        ['espadas', 11, 'Corte Real', carta('Corte Real')],
+        ['ouros', 10, 'Xeque Duplo', carta('Xeque Duplo')],
         ['copas', 8, 'Guarda Real', null, { cura: 16, guarda: 0.6 }],
+      ],
+    },
+    {
+      hp: 0.33,
+      entrada: 'Chega! Meu peão vira RAINHA e o tabuleiro vira de lado!',
+      velocidadeFundo: 1.6,
+      falas: ['Promoção! Hahaha!', 'Roque! Troquem de lado!', 'Xeque-mate se aproxima!'],
+      cartas: [
+        ['espadas', 10, 'Promoção', carta('Promoção')],
+        ['paus', 11, 'Roque', carta('Roque')],
+        ['espadas', 13, 'Tabuleiro Virado', carta('Tabuleiro Virado')],
+        ['ouros', 12, 'Xeque da Rainha', carta('Xeque da Rainha')],
+        ['copas', 9, 'Coroa Reforçada', null, { cura: 14, guarda: 0.55 }],
       ],
     },
   ],
   super: {
     nome: 'Xeque-Mate',
-    texto: 'Torres e olhares reais ao mesmo tempo, nas duas caixas',
-    criar: (A) => A.juntos(A.colunas({ duracao: 6500, quantidade: 3, velocidade: 165, intervalo: 1300 }), A.aimed({ duracao: 6500, intervalo: 1250, velocidade: 135 })),
+    texto: 'Torres, bispos, cavalos e uma rainha, jogada atrás de jogada',
+    criar: () => ataqueKing('king', 'Xeque-Mate'),
   },
 }

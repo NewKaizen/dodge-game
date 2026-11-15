@@ -6,6 +6,8 @@ import escuridao from './escuridao.js'
 import ladra from './ladra.js'
 import jevilLacaios from './jevilLacaios.js'
 import jevilTenente from './jevilTenente.js'
+import kingLacaios from './kingLacaios.js'
+import kingTenente from './kingTenente.js'
 import { NIVEIS } from '../../constants.js'
 import { CHEFES_CAMPANHA } from '../../campanha/chefes.js'
 
@@ -39,6 +41,8 @@ import { CHEFES_CAMPANHA } from '../../campanha/chefes.js'
 // os da campanha (campanha/chefes.js, `campanha: true`) também moram aqui: a luta da campanha usa as
 // regras do CO-OP. Ficam fora da Selecao (ORDEM_CHEFES) e do semanal (SEMANAIS)
 export const CHEFES = { king, queen, jevil, coronel, escuridao, ladra, ...CHEFES_CAMPANHA, jevil_lacaios: jevilLacaios, jevil_tenente: jevilTenente }
+// EXPEDIÇÃO (`expedicao: true`: fora da Selecao, que só mostra ORDEM_CHEFES): os lacaios e o tenente de cada chefe
+Object.assign(CHEFES, { kingLacaios, kingTenente })
 
 const FATORES = ['velocidade', 'densidade', 'velocidadeMax', 'dano', 'hp']
 

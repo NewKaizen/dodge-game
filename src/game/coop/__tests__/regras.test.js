@@ -70,8 +70,9 @@ test('todo chefe tem baralho em todas as fases, com SUPER e ataques montáveis',
 
 test('fase do chefe pelo HP', () => {
   assert.equal(faseDoChefe('king', 1), 0)
-  assert.equal(faseDoChefe('king', 0.6), 0)
-  assert.equal(faseDoChefe('king', 0.5), 1)
+  assert.equal(faseDoChefe('king', 0.7), 0)
+  assert.equal(faseDoChefe('king', 0.66), 1) // (Chaos King: 3 fases, 1 / 0,66 / 0,33)
+  assert.equal(faseDoChefe('king', 0.33), 2)
   assert.equal(faseDoChefe('jevil', 0.2), 3)
 })
 
