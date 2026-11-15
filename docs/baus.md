@@ -26,9 +26,11 @@ nunca dá dois. O banco confere a fonte de novo antes de conceder.
 | desafio diário | `desafio:<dia>` | a 1ª vitória do desafio do dia | `desafio_concluidos` (0013) |
 | boss semanal | `semanal:<semana>` | vencer o boss da semana (o troféu) | `trofeus_semanais` (0010) |
 | conquistas | `conquista:<id>` | `primeira_vitoria`, `casa_silenciosa`, `cacador_semanal`, `sete_sois`, `mao_firme`, `lenda_da_mesa`, `cadeira_cativa`, `alma_gemea` (uma vez cada) | a conta tem a conquista (0014) |
+| expedição (0017) | `expedicao:<dia>:<chefão>` | completar a EXPEDIÇÃO do CO-OP online (lacaios → tenente → chefão): **50% de chance** (o servidor sorteia com `crypto.randomInt`), no máximo **1 por dia por chefão** (`king`, `queen`, `jevil`, `coronel`) | a conta completou a expedição daquele chefão naquele dia (`expedicoes`, 0017) |
 
 Ritmo esperado de quem joga todo dia: 1 (baú do dia) + 1 se vencer o desafio + 1 a cada nível (um nível leva de 3 a
-10 partidas, conforme o nível) ≈ **1–2 por dia**; o boss semanal e as conquistas são extras raros.
+10 partidas, conforme o nível) ≈ **1–2 por dia**; o boss semanal e as conquistas são extras raros. A expedição (0017)
+soma no máximo 4 por dia (um por chefão, metade das vezes): uma expedição leva ~10–12 minutos.
 
 ## O que tem dentro (as chances publicadas)
 
@@ -121,6 +123,11 @@ xpGanho, teto, xpTotal, nivelAntes, nivelDepois, itensNovos, pity, desdeEpico, f
 (o caminho do dev com contas falsas) · aviso do servidor: `bauGanho {fontes, fechados}` (o pop-up "VOCÊ GANHOU UM BAÚ!", abaixo).
 
 ## Migration
+
+A **`0017_expedicao.sql`** (depois da 0016; `docs/supabase.md` 2.11) recria o `conceder_bau` com a fonte `expedicao`
+(chave `expedicao:<dia>:<chefão>`, conferida em `expedicoes`) e troca as checagens de `baus.fonte` e `baus.chave`. O
+conteúdo do baú não muda: os versos exclusivos da Expedição **não** saem do baú (`bau = false`; o servidor os dá na 1ª
+expedição completa contra cada chefão). Sem a 0017 tudo segue igual (só não há o baú da expedição).
 
 A **`0016_cartas_estilos.sql`** (depois da 0015) põe o tipo `frente`, `perfis.frente_equipada`, os 22 itens novos
 do baú e a `equipar_conta`/`equipar` com o tipo `frente` (só o que a conta tem). Sem ela o jogo entra normal (o

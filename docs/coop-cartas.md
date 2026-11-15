@@ -5,10 +5,118 @@ de cartas: os dois jogadores (ou 1 jogador + CPU aliada) jogam cartas juntos
 contra um chefe que também joga cartas. O chefe aparece no meio da mesa, com o
 fundo maluco dele atrás, e os personagens da party ficam nos cantos reagindo.
 
-Fluxo: Menu → CO-OP → EscolhaParty → Selecao (chefe) → Dificuldade (nível) →
-**CoopArena** → Vitoria / GameOver (A: revanche na CoopArena). Numa sala (LAN
-ou ONLINE) a arena roda no PC de cada um: ver "CO-OP em rede" em
+Fluxo: Menu → CO-OP → EscolhaParty → **ModoCoop** (LUTA RÁPIDA ou EXPEDIÇÃO) → Selecao (chefe) → Dificuldade
+(nível) → **CoopArena** → Vitoria / GameOver (A: revanche na CoopArena). A EXPEDIÇÃO (3 lutas seguidas) está na
+seção [Expedição](#expedição). Numa sala (LAN ou ONLINE) a arena roda no PC de cada um: ver "CO-OP em rede" em
 [rede-pvp.md](rede-pvp.md).
+
+## Expedição
+
+Pedido do dono: um modo mais longo (~10–12 min) **sem ficar complexo**: "não torne o modo complexo demais de
+entender". Depois da party vem uma escolha clara (`scenes/ModoCoop.js`): **LUTA RÁPIDA** (a luta de sempre, igual
+a antes) ou **EXPEDIÇÃO**. Na Selecao da expedição aparecem os 4 chefões e a **SORTEADA** (na mesma fila: os
+lacaios de um chefão, o tenente de outro e um chefão surpresa, os três diferentes, pela semente; o chefão fica
+"???" no mapa até o time chegar nele). Depois o nível (Dificuldade, o mesmo para as 3 lutas).
+
+```
+[1] LACAIOS  →  escolha  →  [2] TENENTE  →  escolha  →  [3] CHEFÃO
+```
+
+| Peça | Onde |
+|---|---|
+| máquina de estados (pura, JSON): rota, oferta, votos, cura, fim | `src/game/coop/expedicao.js` |
+| relíquias (as melhorias) e as curas delas | `src/game/coop/reliquias.js` (lidas em `coop/regras.js` e `coop/coop2.js`) |
+| escolha do modo | `scenes/ModoCoop.js` |
+| mapa + cartão de 1ª vez + votos + cura (entre as lutas) | `scenes/Expedicao.js` (o mapa: `coop/expedicaoCena.js`) |
+| fim (até onde chegou, recompensas, revanche) | `scenes/ExpedicaoFim.js` |
+| a faixa "EXPEDIÇÃO · LUTA 2 DE 3 · TENENTE" e a saída da luta | `coop/coop2Arena.js` (`faixaDaExpedicao`, `saidaDaExpedicao`), nas duas arenas |
+| recompensas (servidor e banco) | `server/partidas.js` (`expedicaoDaPartida`), `src/lib/expedicao.js`, `supabase/migrations/0017_expedicao.sql` |
+| versos exclusivos (desenho por código) | `src/lib/cosmeticos.js` (`ITENS_EXPEDICAO`), `src/game/cosmeticos/versos.js` (`VERSOS_EXPEDICAO`) |
+
+**As lutas** são as entradas `expedicao: true` de `CHEFES_DA_EXPEDICAO` (`LUTAS` em `coop/expedicao.js`):
+`kingLacaios → kingTenente → king`, `queenLacaios → queenTenente → queen`, `jevilLacaios → jevilTenente → jevil` e
+`coronelLacaios → coronelTenente → coronel`. Cada luta abre a `CoopArena` (ou a `CoopArenaN` com 3–4) com os
+ganchos da luta que continua: `{ chefe, nivel, party, semente, hp, reliquias, expedicao }` (`dadosDaLuta`). O banner do
+começo da luta ganha uma faixa em cima ("EXPEDIÇÃO · LUTA 2 DE 3 · TENENTE" e as melhorias ativas). A vitória que não é a
+última diz "LUTA N VENCIDA!" e abre a `Expedicao`; o chefão caído ou o time caído abrem a `ExpedicaoFim`.
+
+**O HP passa** de uma luta para a outra (`terminarLuta` guarda o HP de cada um; caído = 0). **Entre as lutas** o time
+recupera **35% do HP máximo** (`CURA_ENTRE`; quem caiu volta com isso) e a tela mostra, embaixo, a barra de cada um,
+o "+N de HP na próxima luta" e a barra subindo depois da escolha. **Caiu numa luta: a expedição acaba ali** (a tela do
+fim mostra o mapa com um X no nó, quantas lutas o time venceu, REVANCHE ou MENU).
+
+### Entre as lutas: 3 melhorias, votem
+
+A tela (`Expedicao`) tem o **mapa** (3 nós: feito em verde com o "visto", agora em laranja pulsando, depois em
+cinza), **3 cartas** de relíquia (uma frase cada), um **relógio** de 20 s e o HP do time. Cada um escolhe com ←/→ e
+vota com A (o voto trava; o coraçãozinho na cor do jogador aparece embaixo da carta).
+
+- **Maioria** leva. **Empate**: vale o voto de quem está com **menos HP** (fração do máximo; empate de HP, a vaga
+  menor). O **relógio** acabou: valem os votos que chegaram; ninguém votou, a **sugestão da CPU** (`votoDaCpu`).
+- Sozinho, a **CPU aliada** vota com bom senso (time com HP médio abaixo de 55%: uma de defesa; senão ataque/equipe).
+- A oferta sai da **semente** da expedição e da etapa (`gerarOferta`): 3 diferentes, nunca uma que o time já tem;
+  igual em todos os PCs. As melhorias **se acumulam** até o fim da expedição (`estado.reliquias`).
+- **Primeira vez neste PC**: antes da 1ª luta, o cartão **COMO FUNCIONA A EXPEDIÇÃO** (3 linhas; A fecha; some
+  sozinho em 20 s, 9 s em rede; `localStorage` `dodge:expedicaoVista`).
+
+| Relíquia | Na carta | Efeito (`estado.mods`) |
+|---|---|---|
+| AMULETO DA DUPLA | A barra de QUEBRA enche 25% mais rápido. | `quebra` ×1,25 |
+| LÂMINA AFIADA | Seu ♠ dá +20% de dano. | `naipe.espadas` ×1,2 |
+| TREVO DE PAUS | Sua armadilha de ♣ dá +25% de dano. | `naipe.paus` ×1,25 |
+| DIAMANTE BRUTO | Seu ♦ dá +25% de dano. | `naipe.ouros` ×1,25 |
+| LUVA DE FERRO | Todo golpe do time dá +10% de dano. | `golpe` ×1,1 |
+| OLHO DE ÁGUIA | O CRÍTICO bate 20% mais forte. | `critico` ×1,2 |
+| ESTRELINHAS | Chefe ATORDOADO leva o dobro nos golpes. | `atordoado` (×1,5 → ×2) |
+| MARTELO DE DUPLA | A FINALIZAÇÃO tira o dobro de HP. | `finalizacao` ×2 |
+| CASCA GROSSA | O ataque do chefe tira 15% menos. | `danoQuadro` ×0,85 |
+| BATERIA EXTRA | Comecem cada luta com +2 de energia. | `energiaInicial` +2 |
+| PENA DE FÊNIX | O resgate levanta com 50% do HP. | `retornoHp` 0,5 (resgate, volta sozinho, rodada limpa) |
+| LAÇO DE AMIZADE | Grazes curam o parceiro. | `curaGraze`: cada graze (até 6 por rodada) cura 1 no parceiro de pé com menos HP |
+| PRESA DE VAMPIRO | Cada CRÍTICO cura 4 HP de quem bateu. | `curaCritico` 4 |
+
+As curas (laço e presa) saem no fim do contra-ataque (`curasDasReliquias`, no máximo 8 por jogador por rodada): o
+host calcula, manda no `contra` (`curas`) e o convidado aplica igual (`aplicarCurasDoContra`); a tela mostra "+N".
+
+### Em rede (2, 3 e 4 jogadores)
+
+Tudo vai por id e pela semente: o host leva todos para a `Expedicao` e para cada luta com `irParaCena` (os dados
+levam o estado inteiro da expedição). Na escolha cada PC vota pela SUA vaga e manda ao host (`expVoto {s, no, j,
+voto}`); o host junta e manda o placar (`expVotos`) e, com todos os votos ou o relógio dele acabando, a decisão
+(`expEscolha {escolha, motivo, desempate, votos}`); depois abre a próxima luta em todos. Com **3 e 4** a mesma coisa
+na `CoopArenaN` (as lutas da expedição são entradas comuns de `CHEFES`, que a arena do grupo já aceita; o HP e as
+relíquias vão pelos mesmos ganchos). PROTOCOLO 22.
+
+### Recompensas (servidor; online com conta)
+
+A expedição em rede é **uma partida só** no servidor (a sala fica em partida da 1ª luta ao fim). No fim, cada PC
+manda o resultado de sempre do CO-OP (`resultado {partidaId, vitoria, ...}`) com **`expedicao {chefe, lutas,
+sorteada}`** (o chefão e as lutas vencidas). A validação é a mesma do XP do CO-OP (os relatos concordam: `decidirCoop`
+/ `decidirN`) e, por cima (`expedicaoDaPartida`): todos os relatos com a mesma expedição (o mesmo chefão; as lutas
+valem as menores relatadas), resultado coerente (vitória = 3 lutas) e **60 s de partida por luta vencida**. Aí o
+banco (`conceder_expedicao`, 0017) confere tudo de novo, conta por conta, e dá:
+
+| Recompensa | Quanto | Trava |
+|---|---|---|
+| XP por luta vencida | +15 (`XP_EXPEDICAO.porLuta`) | somado ao XP de sempre da partida |
+| bônus de completar | +40 | teto de 255 de XP a mais por dia (`tetoDia`) |
+| baú | 50% de chance ao completar (o servidor sorteia, `crypto.randomInt`) | 1 por dia por chefão (`expedicao:<dia>:<chefão>`, [baus.md](baus.md)) |
+| verso exclusivo | na **1ª** expedição completa contra cada chefão | uma vez por conta (`expedicoes_chefes`) |
+
+Os 4 versos (desenhados por código, como os versos ilustrados do baú; fora do baú e da trilha): **Tabuleiro Real**
+(King: o tabuleiro com casas piscando e a coroa), **Sinal Cheio** (Queen: as 4 barrinhas do Wi-Fi e o fio entre dois
+corações), **Dado do Caos** (Jevil: o dado girando e os naipes em espiral) e **Reciclador** (Coronel: as três setas da
+reciclagem e a faixa do caminhão). A `recompensa` volta com `expedicao {xp, completa, cosmetico, cosmeticoNovo, bau,
+bauHoje}` (o XP a mais já entra no `xpGanho` e na barra) e a `ExpedicaoFim` mostra tudo, com a carta do verso. O baú
+ganho também chega pelo pop-up de sempre (a `ExpedicaoFim` está em `CENAS_DO_POPUP`).
+
+**Contra a CPU aliada (fora da rede) não há recompensa**, como na LUTA RÁPIDA contra a CPU: o servidor não vê a
+partida local e não há outro relato para conferir. A tela do fim diz isso e mostra o que a expedição online dá.
+
+Testes: `coop/__tests__/expedicao.test.js` (máquina de estados, HP, cura, oferta pela semente, votos, CPU, SORTEADA,
+relíquias acumulando e as curas), `server/__tests__/expedicao.test.js` (relato, validação, XP, baú 1 por dia por
+chefão, verso uma vez, idempotência, 3–4 jogadores, catálogo JS = 0017) e `expedicaoSql.test.js` (Postgres, com
+`DODGE_PG`). No navegador (dev): `window.expedicao.estadoDebug()` na tela entre as lutas e `window.expedicaoFim`.
 
 ## CO-OP 2.0
 
@@ -214,7 +322,7 @@ manda a mensagem `regra` (no caminho do dano, antes do `fimEsquiva` dele); os ou
 `aoPegar`/`aoEntrar`/`aoSair`. Por isso o que o `aoPegar` faz (quebra, dano no chefe, cura) acontece uma vez em
 cada PC, igual em todos. Um gancho que quebra só avisa no console (a luta segue).
 
-**Para a Expedição** (3 lutas seguidas: lacaios → tenente → chefão; ainda não existe): a luta pode
+**Para a Expedição** (3 lutas seguidas: lacaios → tenente → chefão; ver [Expedição](#expedição)): a luta pode
 **continuar** de outra. `criarPartidaCoop({ ..., hp: [30, null], reliquias: ['amuleto'] })` (e os mesmos `hp` e
 `reliquias` nos dados da cena: `scene.start('CoopArena', { chefe, nivel, party, hp, reliquias })`, também na
 `CoopArenaN` e em rede, porque tudo vai por id) começa com o HP que veio de antes (`null` = cheio) e com as
@@ -720,7 +828,7 @@ Testes: `coop/__tests__/jevil.test.js`.
 | `src/game/coop/ArenaRedeCoop.js` | a ponte da partida em rede (estende `pvp/rede/ArenaRede.js`) |
 | `src/game/coop/ArenaRedeCoopN.js` · `scenes/CoopArenaN.js` · `scenes/EscolhaPartyN.js` · `coop/HudCoopN.js` · `coop/partyN.js` · `coop/marcadores.js` | o CO-OP de 3 e 4: ponte em estrela, arena, escolha de party, HUD, party e formas dos corações (5B) |
 | `src/game/coop/coop2.js` · `coop/resgate.js` · `coop/regraChefe.js` · `coop/duracao.js` · `coop/dicas.js` | CO-OP 2.0 (puro): QUEBRA, ATORDOADO, cartas de dupla, prévia; o resgate na hora; a regra do chefe; a duração das lutas; as dicas de 1ª vez |
-| `src/game/coop/reliquias.js` | a luta que continua (HP de antes) e as relíquias (`estado.mods`), para a Expedição |
+| `src/game/coop/reliquias.js` · `coop/expedicao.js` · `coop/expedicaoCena.js` · `scenes/ModoCoop.js` · `scenes/Expedicao.js` · `scenes/ExpedicaoFim.js` | a EXPEDIÇÃO: a luta que continua (HP de antes), as relíquias (`estado.mods`), a máquina de estados, o mapa e as telas |
 | `src/game/coop/coop2Cena.js` · `coop/coop2Arena.js` | CO-OP 2.0 na tela: a prévia, a barra, as almas, a finalização, o COMO FUNCIONA, as dicas; os métodos que as duas arenas ligam (`ligarCoop2`) |
 | `src/game/coop/jevilRegra.js` · `jevilDado.js` · `jevilDadoCena.js` · `chefes/jevilLacaios.js` · `chefes/jevilTenente.js` · `arte/jevilExpedicao.js` | Jevil: o DADO DO CAOS, os lacaios e o Mestre de Picadeiro |
 | `src/game/coop/__tests__/` | testes |
