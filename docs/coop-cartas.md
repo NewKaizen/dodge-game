@@ -10,6 +10,214 @@ Fluxo: Menu → CO-OP → EscolhaParty → Selecao (chefe) → Dificuldade (nív
 ou ONLINE) a arena roda no PC de cada um: ver "CO-OP em rede" em
 [rede-pvp.md](rede-pvp.md).
 
+## CO-OP 2.0
+
+Pedido do dono: "o PvP tá muito legal, mas o CO-OP não chama nem um pouquinho a atenção" e "deixe de um jeito
+que não torne o modo complexo demais de entender". Antes o CO-OP era um PvP com chefe: ele mostra uma carta, os
+dois desviam, os dois batem, repete; nada pedia trabalho em equipe e as lutas se arrastavam. O CO-OP 2.0 junta
+**três ideias simples** (o cartão COMO FUNCIONA da primeira luta tem exatamente estas três linhas) e uma
+**prévia**. Nenhum botão novo: tudo funciona com ←/→, A e B e o direcional na esquiva.
+
+| O quê | Em uma frase | Onde |
+|---|---|---|
+| **QUEBRA** | batam juntos e acertem CRÍTICOS: a barra cheia deixa o chefe **ATORDOADO** | `coop/coop2.js` |
+| **RESGATE** | caiu na esquiva? Vira uma alma: o parceiro encosta nela 1 s e te levanta | `coop/resgate.js` |
+| **CARTAS DE DUPLA** | ♠ + ♣ PINÇA, ♥ + ♦ BARREIRA, mesmo naipe COMBO, mesmo valor PAR | `coop/coop2.js` |
+| prévia | ao lado da carta do chefe, a da PRÓXIMA rodada (menor e apagada) | `regras.js` `previaCoop` |
+
+A tela é a mesma de antes, com três coisas a mais: a **barra de QUEBRA** (laranja, embaixo do HP do chefe), a
+**prévia** (uma minicarta com "DEPOIS" e o nome, à esquerda da carta do chefe; some quando o quadro abre) e a
+**alma** no quadro quando alguém cai. Um conceito por vez: cada coisa nova aparece com uma dica curta só na
+PRIMEIRA vez que acontece neste PC (`coop/dicas.js`, no navegador): "Encoste na alma para levantar o
+parceiro!", "Batam juntos e acertem CRÍTICOS para encher a QUEBRA!", a da carta de dupla e a do ATORDOADO.
+O cartão COMO FUNCIONA aparece só na primeira luta (A fecha; sozinho some em 15 s, 7 s em rede).
+
+### Intenção 2 rodadas à frente
+
+O chefe já tira do monte a carta da rodada seguinte (`chefe.proxima`): a prévia mostra o naipe, o tipo (ATAQUE,
+CONTROLE, ARMADILHA, SE CURA) e o nome. A promessa vale: na rodada seguinte ele joga essa carta, mesmo que a fase
+dele mude no meio (a carta da fase velha não volta ao baralho novo). A prévia também avisa: **★ SUPER DO CHEFE!**
+(a carga enche na próxima; um A♦ que tira carga desfaz o aviso), **ATORDOADO: não ataca** (a barra encheu) e, na
+Ladra, **carta roubada?** (a rodada em que ela pode jogar uma roubada). Determinística: sai do RNG do estado,
+igual nos PCs da sala.
+
+### QUEBRA e ATORDOADO
+
+A barra enche com trabalho em equipe (`QUEBRA` em `coop/coop2.js`), somada no fim do contra-ataque
+(`resolverContraCoop` em `coop/regras.js`):
+
+| Ação | Pontos |
+|---|---|
+| os dois (no grupo: 2 ou mais) acertam o chefe na mesma rodada | 20 |
+| cada CRÍTICO (passou pela esquiva sem levar dano) | 12 |
+| ATAQUE EM PINÇA / BARREIRA DUPLA / COMBO / PAR | 30 / 10 / 15 / 20 |
+| cada resgate na hora | 25 |
+| a regra do chefe (`api.adicionarQuebra`) | o que ela der |
+
+A barra cheia tem **100** (2 jogadores; +25% por jogador a mais: 125 com 3, 150 com 4). Cheia: **QUEBROU!** e,
+na rodada seguinte, o chefe fica **ATORDOADO** (estrelinhas em cima dele): não joga carta (sem quadro, sem
+esquiva, a carga do SUPER dele não sobe), os golpes comuns batem **×1,5** e a rodada fecha com a
+**FINALIZAÇÃO EM DUPLA** (EM GRUPO com 3–4): os personagens de pé correm até o chefe e batem juntos, **10% do HP
+máximo** dele. Depois a barra volta a zero. Com a dupla média no MÉDIO isso acontece ~1 vez por luta.
+
+### Resgate na hora
+
+Quem zera o HP no meio da esquiva deixa uma **alma** (coraçãozinho fantasma na cor dele, com "AJUDA!") no lugar
+onde caiu, dentro do quadro. Um parceiro de pé que encosta nela e **fica 1 s** (o anel verde enche) levanta o
+caído **ali mesmo**: ele volta com **30% do HP**, o coração reaparece piscando (1,4 s sem levar dano) e continua
+a esquiva; o golpe que estava carregando volta a valer e a QUEBRA ganha 25. Saiu de perto: o anel para; longe
+mais de 0,3 s, zera. A alma some quando o quadro fecha.
+
+**Regras de voltar, todas com 30%** (`COOP.retornoHp`): o resgate na hora, a volta sozinha depois de 2 rodadas e
+a cura de ♥ que levanta (antes o ♥ levantava com 25%; agora `COOP.reviverMin` = 30%). O A♥ (Segunda chance) e a
+rodada limpa do grupo continuam como eram.
+
+Em rede cada PC é dono do próprio coração, então só o PC de quem encostou decide que o resgate aconteceu e manda
+`resgate` (pelo caminho do dano, antes do `fimEsquiva`); os outros veem o anel encher pelo coração espelho, mas
+ele para perto do fim e espera a mensagem. A CPU aliada vai buscar a alma (`EsquivaBot` com `alvo`: desvia e
+puxa para lá).
+
+### Cartas de dupla
+
+Combinações de naipe de dois jogadores **na mesma rodada** (no grupo de 3–4: qualquer par conta). Só cartas
+comuns (2 a K; Ás especial e SUPER não entram). O nome aparece grande no meio da mesa quando acontece; o Guia
+lista as quatro (o texto "NO CO-OP" de cada carta diz com qual ela fecha).
+
+| Dupla | Naipes | Efeito | Quebra |
+|---|---|---|---|
+| ATAQUE EM PINÇA | ♠ + ♣ | os golpes de ♠ e ♣ batem ×1,3 | 30 |
+| BARREIRA DUPLA | ♥ + ♦ | escudo de 50% em todos de pé nesta esquiva (sem quadro, na próxima) | 10 |
+| COMBO | mesmo naipe | ×1,25 (como antes) | 15 |
+| PAR | mesmo valor | ×1,5 (como antes) | 20 |
+
+Num mesmo golpe as duplas **não se somam**: vale a mais forte (♠9 + ♣9 é PAR ×1,5, não PAR × PINÇA). A CPU
+aliada olha a carta em que o parceiro está com o cursor e fecha a dupla quando vale a pena.
+
+### Lutas mais curtas
+
+Medido com as ferramentas de `scripts/balanceamento/` (`medirChefes.mjs` com 3 sementes; `simularCoop.mjs`
+agora joga o CO-OP 2.0 inteiro: `resolverContraCoop`, a finalização e o resgate na hora, com 50% de chance de
+o parceiro médio chegar na alma) e convertido em minutos por `coop/duracao.js`: o tempo de cada parte da rodada
+medido na `CoopArena` (Playwright: início 1,1 s, revelação 2,0, arremesso 0,8, esquiva ~7, contra-ataque 2,4,
+fim 0,8) mais **12 s de escolha** (uma dupla de gente que conversa; o relógio dá 15). O alvo era ~4–6 minutos
+no MÉDIO com dois jogadores médios. A medição mostrou que as lutas já ficavam entre 3 e 4,5 minutos, mas
+**desiguais** (o King acabava em 6 rodadas e o Coronel arrastava quase 10), e que o CO-OP 2.0 sozinho (PINÇA,
+ATORDOADO ×1,5, finalização, resgate) encurtava tudo ~20%. O ajuste: **HP de base** (`hp` de cada chefe) para
+que todas fiquem perto da mesma duração, com espaço para ~1 QUEBRA por luta:
+
+| Chefe | `hp` (FÁCIL) | MÉDIO, dupla média: rodadas (minutos) antes → depois | vitória antes → depois |
+|---|---|---|---|
+| King | 240 → 360 | 6,2 (~2,8) → 7,1 (3,0) | 100% → 100% |
+| Queen | 270 → 340 | 8,4 (~3,8) → 7,6 (3,3) | 97% → 100% |
+| Jevil | 310 → 345 | 8,5 (~3,8) → 7,9 (3,4) | 97% → 100% |
+| Coronel | 320 → 350 | 9,7 (~4,4) → 8,2 (3,5) | 91% → 98% |
+
+(minutos "antes" sem as rodadas sem quadro; com a escolha de 15 s inteira e os anúncios de SUPER, as lutas
+ficam ~0,5–1 min mais longas: a dupla de gente fica na faixa de 4 minutos, e nenhuma passa de 6.) O teste
+`coop/__tests__/duracao.test.js` confere a faixa (3–6 min no MÉDIO, o FÁCIL mais curto) com uma simulação
+grossa sem o navegador.
+
+O resto das linhas (`simularCoop.mjs` 300 partidas, antes → depois, vitórias e rodadas):
+
+| | perfeita F / M / D | mista F / M / D | média F / M / D |
+|---|---|---|---|
+| King | 100/100/100 (4,6 / 5,3 / 8,6 rod) → 100/100/100 (4,8 / 5,6 / 9,4) | 100/100/99 → 100/100/99 | 100/100/58 → 100/100/74 |
+| Queen | 100/100/100 (5,4 / 6,3 / 7,8) → igual (5,1 / 6,4 / 7,7) | 100/100/98 → 100/100/100 | 100/97/29 → 100/100/59 |
+| Jevil | 100/100/92 (5,7 / 6,7 / 10,1) → 100/100/96 (5,0 / 6,1 / 9,4) | 100/100/82 → 100/100/93 | 100/97/15 → 100/100/22 |
+| Coronel | 100/100/100 (6,1 / 6,8 / 9,0) → igual (5,2 / 5,8 / 8,1) | 100/100/99 → 100/100/100 | 99/91/22 → 100/98/53 |
+
+O DIFÍCIL ficou mais vencível para a dupla média (o resgate e o ATORDOADO são exatamente o que ela precisava);
+a dupla perfeita e a mista continuam como estavam. A luta da CAMPANHA usa estas regras com `coop2: false`
+(`criarPartidaCoop`): nada do CO-OP 2.0 muda lá.
+
+### CO-OP de 3 e 4
+
+Tudo vale na `CoopArenaN` (os mesmos métodos: `coop/coop2Arena.js`, ligados nas duas arenas): a barra cresce
+com o grupo (125 / 150), "juntos" pede 2 ou mais acertando, qualquer aliado de pé levanta a alma de qualquer
+caído, qualquer par fecha uma carta de dupla e a finalização é EM GRUPO (todos de pé). As mensagens `resgate` e
+`regra` vão ao host, que confere o `lado` e repassa, como o `dano` (`coop/ArenaRedeCoopN.js`).
+
+## Regra do chefe (API)
+
+Para os agentes de cada chefe: cada chefe pode ganhar **UMA mecânica própria que dura a luta toda** (tabuleiro de
+xadrez, fio de Wi-Fi entre os corações, dado do caos que troca uma regra por rodada, lixo para reciclar que enche
+um balde e lança um míssil...). Ela entra no arquivo do chefe (`coop/chefes/<id>.js`) como `regra`, e a arena
+(`CoopArena` e `CoopArenaN`) liga sozinha (`coop/regraChefe.js`, `RegraDaLuta`). Simples para o jogador: o banner
+do começo da luta mostra o **nome** e **uma frase** (`descricao`, até 90 letras, sem ponto no meio).
+
+```js
+// coop/chefes/king.js
+regra: {
+  id: 'xadrez',
+  nome: 'TABULEIRO REAL',
+  descricao: 'Casas escuras no quadro dão dano dobrado.',
+  fases: { 1: { descricao: 'Agora as casas mudam a cada rodada.' } }, // opcional: aviso na fase nova
+  criar(api) {
+    let casas = []
+    return {
+      comecarEsquiva({ carta }) {
+        const l = api.limites()
+        const r = api.rng('casas') // o MESMO sorteio em todos os PCs
+        casas = [0, 1, 2].map(() =>
+          api.adicionarZona({ x: l.x + r() * l.width, y: l.y + r() * l.height, largura: 40, altura: 40, cor: 0x202020, alpha: 0.5,
+            aoEntrar: (j) => api.dica('casa', 'Casa escura: saia dela!') }),
+        )
+        api.adicionarItem({ x: l.x + l.width / 2, y: l.y + 20, forma: 'estrela', aoPegar: () => api.adicionarQuebra(15, 'coroa') })
+      },
+      atualizar(dt) {},
+      // troca o ataque de uma carta (A = biblioteca attacks/, padrao = o de sempre); null = o padrão
+      ataque(carta, A, padrao) {
+        return carta.naipe === 'espadas' ? A.juntos(padrao, A.rain({ intervalo: 900, velocidade: 110 })) : null
+      },
+      terminar() {},
+    }
+  },
+},
+```
+
+**Ganchos** (todos opcionais; rodam em TODOS os PCs, no mesmo ponto da rodada):
+
+| Gancho | Quando |
+|---|---|
+| `criar(api)` | uma vez, ao abrir a arena (devolve o objeto com os ganchos) |
+| `comecar()` | a luta começou (depois do banner da regra) |
+| `inicioDaRodada(rodada)` | a carta do chefe já está na mesa |
+| `ataque(carta, A, padrao)` | antes do quadro abrir: devolva outro ataque ou `null` |
+| `comecarEsquiva({ carta })` · `atualizar(dt)` · `terminarEsquiva()` | o quadro abriu / todo frame da esquiva (ms) / fechou |
+| `fimDaRodada({ novaFase })` · `faseNova(f)` | a rodada acabou / o chefe mudou de fase (o texto de `fases[f]` aparece sozinho) |
+| `aoMensagem(lado, acao, dados)` | chegou um `api.enviar` (de qualquer PC, também deste) |
+| `alvoDoBot(j)` | `{ x, y }` para onde a CPU aliada vai (sem isto: o item mais perto) |
+| `terminar()` | a luta acabou (itens, zonas e objetos guardados já são limpos) |
+
+**A API** (`api`):
+
+| | |
+|---|---|
+| `api.rodada` · `api.n` · `api.nivel` · `api.semente` | leitura |
+| `api.rng(tag)` | `() => [0, 1)`: o sorteio da rodada, o mesmo em todos os PCs para a mesma `(semente, rodada, tag)` |
+| `api.jogadores()` · `api.coracoes()` · `api.limites()` | o estado (só leitura), `[{ j, x, y, ativo }]`, `{ x, y, width, height }` do quadro |
+| `api.adicionarItem({ x, y, raio, cor, forma, rotulo, fica, aoPegar(j, item) })` | item que se pega encostando o coração (some ao pegar; sem `fica`, no fim da esquiva) |
+| `api.adicionarZona({ x, y, largura, altura, cor, alpha, fica, aoEntrar(j), aoSair(j) })` | área no quadro |
+| `api.removerItem` · `api.removerZona` · `api.itens()` · `api.zonas()` · `api.dentro(zona, x, y)` | |
+| `api.adicionarQuebra(pontos, motivo)` | enche a barra de QUEBRA |
+| `api.danoNoChefe(dano, motivo)` | golpe extra no chefe (o número aparece) |
+| `api.curar(j, hp)` · `api.ferir(j, dano)` · `api.empurrar(j, dx, dy)` | os corações (o acerto passa pelo escudo; empurrar só no PC dono do coração) |
+| `api.banner(texto, cor)` · `api.dica(id, texto)` | aviso curto / dica que aparece UMA vez por PC |
+| `api.enviar(acao, dados)` | efeito de UM jogador para todos: roda `aoMensagem(lado, acao, dados)` aqui e nos outros |
+| `api.meu(j)` | o coração j é simulado neste PC (o meu, ou a CPU aliada daqui)? |
+| `api.cena` · `api.guardar(obj)` | enfeite Phaser próprio (guardado é destruído no fim); use pouco |
+
+**Rede (por que a regra é segura com 2 a 4 PCs).** Os ganchos rodam em todos os PCs com o mesmo estado; tudo que
+eles fazem tem de sair do estado, do tempo da esquiva ou do `api.rng` (nunca `Math.random`). O que nasce num PC
+só é o que um **coração** faz (pegar item, entrar/sair de zona): só o PC dono daquele coração decide, e a API
+manda a mensagem `regra` (no caminho do dano, antes do `fimEsquiva` dele); os outros PCs repetem o
+`aoPegar`/`aoEntrar`/`aoSair`. Por isso o que o `aoPegar` faz (quebra, dano no chefe, cura) acontece uma vez em
+cada PC, igual em todos. Um gancho que quebra só avisa no console (a luta segue).
+
+**Exemplo neutro**: `REGRA_EXEMPLO` (`exemplo`, "ESTRELA CADENTE": uma estrela por esquiva, pegar enche 15 de
+QUEBRA, 30 na fase 2). Nenhum chefe usa; os testes (`coop/__tests__/regraChefe.test.js`) e o dev usam:
+`debugJogo.jogo.scene.start('CoopArena', { chefe: 'king', nivel: 'medio', regra: 'exemplo' })`.
+
 ## Quadro único
 
 Pedido do dono: "ser um quadro só: o ataque do chefe vai para os dois, que
@@ -425,6 +633,8 @@ exclusivo em [boss-semanal.md](boss-semanal.md).
 | `src/game/scenes/CoopArena.js` | a cena (estende a PvpArena: mesma escolha de cartas) |
 | `src/game/coop/ArenaRedeCoop.js` | a ponte da partida em rede (estende `pvp/rede/ArenaRede.js`) |
 | `src/game/coop/ArenaRedeCoopN.js` · `scenes/CoopArenaN.js` · `scenes/EscolhaPartyN.js` · `coop/HudCoopN.js` · `coop/partyN.js` · `coop/marcadores.js` | o CO-OP de 3 e 4: ponte em estrela, arena, escolha de party, HUD, party e formas dos corações (5B) |
+| `src/game/coop/coop2.js` · `coop/resgate.js` · `coop/regraChefe.js` · `coop/duracao.js` · `coop/dicas.js` | CO-OP 2.0 (puro): QUEBRA, ATORDOADO, cartas de dupla, prévia; o resgate na hora; a regra do chefe; a duração das lutas; as dicas de 1ª vez |
+| `src/game/coop/coop2Cena.js` · `coop/coop2Arena.js` | CO-OP 2.0 na tela: a prévia, a barra, as almas, a finalização, o COMO FUNCIONA, as dicas; os métodos que as duas arenas ligam (`ligarCoop2`) |
 | `src/game/coop/__tests__/` | testes |
 
 ## Testes
@@ -432,6 +642,10 @@ exclusivo em [boss-semanal.md](boss-semanal.md).
 - `npm test` roda também `src/game/coop/__tests__/` (regras do quadro único,
   cartas dos chefes, CPU aliada, a geometria do quadro e uma partida simulada até
   o fim contra cada chefe).
+- CO-OP 2.0: `coop2.test.js` (prévia, QUEBRA/ATORDOADO, cartas de dupla, resgate), `regraChefe.test.js` (o ciclo
+  de vida da regra, a rede, o sorteio) e `duracao.test.js` (a duração das lutas). No navegador,
+  `estadoDebug().coop2` traz a prévia, a barra, as almas, os itens da regra e o `log` do que apareceu na tela
+  (`dupla:pinca`, `alma:0`, `resgate:1>0`, `quebrou`, `atordoado`, `finalizacao:N`); `setQuebra(n)` enche a barra.
 - No navegador (dev): `window.coopArena` (`estadoDebug()`, com `quadro`:
   carta, destino, quem está nele e o dano de cada um; `setHp(j, hp)`,
   `setHpChefe(hp)`, `forcarMao(j, ids)`, `setEnergia(j, n)`). Em rede valem nos

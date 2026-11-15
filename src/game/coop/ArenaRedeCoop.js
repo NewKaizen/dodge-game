@@ -20,13 +20,41 @@ import { iniciarRodadaCoop, fimDaRodadaCoop } from './regras.js'
 // { jogadas, resultado, estado }, contra { golpes, combo }, fimRodada { estado,
 // vencedor, novaFase }. O resto (jogada, cursor, coracao, dano, graze,
 // fimEsquiva, resultadoPronto, debug) é o da PvpArena; o debug ganha o
-// setHpChefe.
+// setHpChefe e o setQuebra.
+//
+// CO-OP 2.0 (PROTOCOLO 21): o `contra` leva também as cartas de dupla, a QUEBRA da rodada e a finalização
+// (resolverContraCoop em coop/regras.js); e duas mensagens novas, no mesmo caminho do dano (com `lado` =
+// o coração de quem mandou e `r` = a rodada, aplicadas na mesma ordem, antes do fimEsquiva dele):
+//   resgate { lado, alvo, r }          o meu coração levantou o do outro (coop/resgate.js)
+//   regra   { lado, acao, dados, r }   o meu coração pegou um item / entrou numa zona da regra do chefe, ou
+//                                      um api.enviar dela (coop/regraChefe.js)
 export default class ArenaRedeCoop extends ArenaRede {
   constructor(arena, opcoes) {
     super(arena, opcoes)
     this.esconderCartas = false // no CO-OP os dois estão do mesmo lado: as cartas não se escondem
     this.debugPermitido.add('setHpChefe')
+    this.debugPermitido.add('setQuebra')
+    this.desligar.push(
+      this.canal.ao('resgate', (d) => this.aoEventoDoOutro('resgate', d)),
+      this.canal.ao('regra', (d) => this.aoEventoDoOutro('regra', d)),
+    )
     this.debugPermitido.delete('forcarBonus') // o CO-OP não tem rodada bônus
+  }
+
+  // ---------- CO-OP 2.0: resgate e regra do chefe ----------
+
+  enviarResgate(quem, alvo) {
+    this.enviar('resgate', null, { lado: quem, alvo, r: this.rodada })
+  }
+
+  enviarRegra(acao, dados) {
+    this.enviar('regra', null, { lado: this.meuLado, acao, dados, r: this.rodada })
+  }
+
+  aplicarDoOutro(tipo, dados) {
+    if (tipo === 'resgate') return void this.arena.aplicarResgate(dados.lado, dados.alvo)
+    if (tipo === 'regra') return void this.arena.regra?.aoMensagem(dados.lado, dados.acao, dados.dados)
+    return super.aplicarDoOutro(tipo, dados)
   }
 
   // ---------- o quadro único ----------
@@ -82,17 +110,18 @@ export default class ArenaRedeCoop extends ArenaRede {
 
   // ---------- contra-ataque ----------
 
-  // Host: os golpes da rodada (calcularGolpes, com o desempenho dos dois que já
+  // Host: o contra-ataque da rodada (resolverContraCoop, com o desempenho dos dois que já
   // chegou: o fimEsquiva do outro vem depois de todo dano/graze dele)
-  // (combo: 'super' | 'par' | 'combo' | null, comboDosGolpes com quem está de pé no host)
-  enviarContra(golpes, combo) {
-    this.enviar('contra', this.rodada, { golpes, combo })
+  // { golpes, combo ('super' | 'par' | 'combo' | null), duplas, quebra, finalizacao }
+  enviarContra(decisao) {
+    const { golpes, combo, duplas, quebra, finalizacao } = decisao
+    this.enviar('contra', this.rodada, { golpes, combo, duplas, quebra, finalizacao })
   }
 
-  // Convidado: { golpes, combo } do host (null: a arena saiu)
+  // Convidado: o contra-ataque do host (null: a arena saiu)
   async receberContra() {
     const msg = await this.esperar('contra', this.rodada)
-    return msg ? { golpes: msg.golpes ?? [], combo: msg.combo ?? null } : null
+    return msg ? { golpes: msg.golpes ?? [], combo: msg.combo ?? null, duplas: msg.duplas ?? [], quebra: msg.quebra ?? null, finalizacao: msg.finalizacao ?? null } : null
   }
 
   // ---------- fim da rodada ----------

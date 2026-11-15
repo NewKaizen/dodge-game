@@ -12,7 +12,7 @@ export default {
     cores: { hex: 0x40f0ff, barra: 0xff4fc8, bola: 0x40f0ff },
     cor: 0x40f0ff,
   },
-  hp: 270,
+  hp: 340, // CO-OP 2.0: era 270 (docs/coop-cartas.md "Lutas mais curtas")
   danoBala: 11,
   // DIFÍCIL: os padrões da Queen já ficam muito densos no difícil: ritmo um
   // pouco mais calmo que o dos outros e menos HP (fica entre o King e o Jevil)

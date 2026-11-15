@@ -27,14 +27,18 @@ import {
   podeJogarCoop,
   resolverRodadaCoop,
   aplicarDanoCoop,
-  calcularGolpes,
-  comboDosGolpes,
   aplicarGolpe,
   fimDaRodadaCoop,
   fracaoDoCombo,
   danoComEscudo,
   registrarPerfeitoCombo,
+  resolverContraCoop,
+  aplicarQuebraDoContra,
 } from '../coop/regras.js'
+import { REGRAS } from '../coop/regraChefe.js'
+import { COR_ATORDOADO } from '../coop/coop2Cena.js'
+import { ligarCoop2 } from '../coop/coop2Arena.js'
+import { semLigaduras } from '../campanha/texto.js'
 import { QUADRO, inicioDoCoracao } from '../coop/quadro.js'
 import { escolherJogadaCoop } from '../coop/bot.js'
 import { superNoChefe } from '../coop/superNoChefe.js'
@@ -100,12 +104,29 @@ import { ligarLadra } from '../coop/semanal/ladraCena.js'
 //   - no fim, o convidado avisa que acabou a animação (`resultadoPronto`) e o host
 //     abre a Vitoria/GameOver nos dois (irParaCena)
 //   jogada, cursor, coracao, dano, graze e fimEsquiva são as mesmas da PvpArena.
-// No dev: window.coopArena (estadoDebug, setHp, setHpChefe, forcarMao...); em rede
-// forcarMao/setHp/setEnergia/setHpChefe valem nos dois PCs.
+// No dev: window.coopArena (estadoDebug, setHp, setHpChefe, forcarMao, setQuebra...); em rede
+// forcarMao/setHp/setEnergia/setHpChefe/setQuebra valem nos dois PCs.
+//
+// CO-OP 2.0 (docs/coop-cartas.md "CO-OP 2.0"; regras em coop/coop2.js, coop/resgate.js e coop/regraChefe.js,
+// o desenho em coop/coop2Cena.js):
+//   - a PRÉVIA: ao lado da carta do chefe, a da próxima rodada (menor, apagada; some no quadro)
+//   - a QUEBRA: a barra embaixo do HP do chefe. O contra-ataque (resolverContraCoop) soma; cheia: "QUEBROU!",
+//     e na rodada seguinte ele fica ATORDOADO (sem ataque, golpes x1,5) e ela fecha com a FINALIZAÇÃO EM DUPLA
+//   - o RESGATE NA HORA: quem cai na esquiva vira uma alma no quadro; o parceiro encosta 1 s e ele volta.
+//     Em rede só o PC do salvador decide e manda `resgate` (o canal do dano); a CPU aliada vai buscar
+//   - as CARTAS DE DUPLA: ♥+♦ BARREIRA (na revelação), ♠+♣ PINÇA, COMBO e PAR (no contra-ataque)
+//   - a REGRA DO CHEFE (def.regra; no dev também `regra: 'exemplo'` nos dados): ganchos em cada ponto da
+//     rodada; o que um coração faz nela vai pela mensagem `regra`
+//   - o cartão COMO FUNCIONA na primeira luta (A fecha) e as dicas de primeira vez (coop/dicas.js)
 
 const { MAOS, ESCALA_MESA, HP_BAIXO } = LAYOUT_PVP
 
 const CHEFE = { x: CENTRO_X, y: 196 }
+// CO-OP 2.0: a barra de QUEBRA embaixo do HP do chefe (o HP fica em y - 94) e o texto do SUPER dele embaixo dela
+const BARRA_QUEBRA = { x: CHEFE.x, y: CHEFE.y - 85 }
+const Y_TEXTO_CHEFE = 124
+// a prévia da próxima carta do chefe, à esquerda da carta desta rodada
+const PREVIA = { x: QUADRO.x - 40, y: 278 }
 // a carta do chefe (a intenção), embaixo dele: uma só, para os dois. O nome
 // (ATAQUE, CONTROLE...) fica do lado dela: embaixo passa a dica da escolha
 const INTENCAO = { x: QUADRO.x, y: 278 }
@@ -156,9 +177,21 @@ const estadoInicial = () => ({
   etiquetasMesa: [],
   perfeitoCoop: [false, false],
   cosmeticos: null, // os cosméticos dos slots novos de cada lado (som de dano, efeito, lançamento; docs/baus.md)
+  // CO-OP 2.0 (coop/coop2Arena.js)
+  previaChefe: null, // a prévia da próxima carta do chefe (coop2Cena.js)
+  barraQuebra: null,
+  almas: null, // as almas do resgate na hora (coop/resgate.js) e o desenho delas
+  visualAlmas: null,
+  regra: null, // a regra do chefe (coop/regraChefe.js)
+  regraDev: null,
+  dicasCoop: null,
+  comoFunciona: null, // o cartão COMO FUNCIONA aberto: a função que fecha (o A chama)
+  marcaAtordoado: null,
+  quebraParaAnunciar: false, // a barra encheu fora do contra-ataque (resgate, regra): o QUEBROU! sai no fim dele
+  logCoop2: [], // (debug) o que o CO-OP 2.0 mostrou: { rodada, tipo } (estadoDebug().coop2)
 })
 
-export default class CoopArena extends PvpArena {
+class CoopArena extends PvpArena {
   constructor() {
     super('CoopArena')
   }
@@ -173,6 +206,8 @@ export default class CoopArena extends PvpArena {
     this.semente = dados?.semente ?? `coop:${Date.now()}`
     this.tempoBase = dados?.tempo ?? 15000
     this.bonusForcado = null
+    // (dev) uma regra de exemplo (coop/regraChefe.js REGRAS) numa luta de chefe sem regra
+    this.regraDev = import.meta.env.DEV && REGRAS[dados?.regra] ? dados.regra : null
   }
 
   create() {
@@ -234,6 +269,7 @@ export default class CoopArena extends PvpArena {
     this.criarChefe()
     this.criarPersonagens()
     this.criarQuadro()
+    this.criarCoop2({ previa: PREVIA, barra: BARRA_QUEBRA, regraDev: this.regraDev })
     this.nomesJog = nomesDaPartida({ rede: Boolean(this.rede), cpu: this.cpu }) // o jogador identifica o lado, não o personagem
     this.huds = [0, 1].map((j) => new HudPvp(this, { jogador: j, personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, rotulo: this.rotulo(j), nomeJogador: this.nomesJog[j] }))
     this.criarSelosDeAusencia()
@@ -254,6 +290,7 @@ export default class CoopArena extends PvpArena {
 
     this.controles.onBotao((j, botao) => {
       if (this.pausado || this.saindo) return
+      if (this.comoFunciona) return botao === 'A' && this.comoFunciona()
       if (botao === 'A') this.apertarA(j)
       else this.apertarB(j)
     })
@@ -307,7 +344,7 @@ export default class CoopArena extends PvpArena {
     this.inimigo = new Inimigo(this, CHEFE.x, CHEFE.y, def)
     this.inimigo.nome.setFontSize(13).setStroke('#000000', 3)
     this.textoChefe = this.add
-      .text(CHEFE.x, 115, '', { fontFamily: FONTE, fontSize: '9px', color: '#ffd23c', stroke: '#000000', strokeThickness: 3, align: 'center' })
+      .text(CHEFE.x, Y_TEXTO_CHEFE, '', { fontFamily: FONTE, fontSize: '9px', color: '#ffd23c', stroke: '#000000', strokeThickness: 3, align: 'center' })
       .setOrigin(0.5)
       .setDepth(30)
     this.balao = new Balao(this)
@@ -363,6 +400,33 @@ export default class CoopArena extends PvpArena {
     this.avisoPista.forEach((t, j) => t.setPosition(AVISO[j].x, AVISO[j].y))
   }
 
+  // ---------- CO-OP 2.0 (coop/coop2Arena.js) ----------
+
+  vagasCoop2() {
+    return 2
+  }
+
+  corDoJogador(j) {
+    return CORES.almas[j]
+  }
+
+  nomeCurto(j) {
+    return this.nomesJog?.[j] ?? this.rotulo(j)
+  }
+
+  avisoDe(j) {
+    return this.avisoPista[j]
+  }
+
+  get chefePos() {
+    return CHEFE
+  }
+
+  // o coração j é simulado NESTE PC? (o meu, ou o da CPU aliada; em rede o do outro é espelho)
+  souDonoDoCoracao(j) {
+    return this.rede ? j === this.rede.meuLado : true
+  }
+
   // ritmo base da luta (o aperto geral DESAFIO, o do chefe, o do nível e o do quadro)
   get ritmoBase() {
     const d = this.defChefe.desafio ?? {}
@@ -396,9 +460,10 @@ export default class CoopArena extends PvpArena {
     return danoComEscudo(dano, this.rodadaAtual?.quadro?.escudos[j] ?? null)
   }
 
-  atualizarChefe() {
+  atualizarChefe({ animado = true } = {}) {
     const c = this.estado.chefe
     this.inimigo.atualizar(c.hp, c.hpMax)
+    this.atualizarCoop2Chefe({ animado })
     const partes = []
     if (c.guarda != null) partes.push(`GUARDA -${Math.round((1 - c.guarda) * 100)}%`)
     const faltam = c.cargaMax - c.carga
@@ -529,6 +594,7 @@ export default class CoopArena extends PvpArena {
     await this.esperar(1300)
     await this.tween({ targets: [dupla, vs, chefe], alpha: 0, duration: 260 })
     ;[dupla, vs, chefe].forEach((t) => t.destroy())
+    await this.aberturaCoop2()
   }
 
   async inicioDaRodada() {
@@ -559,7 +625,11 @@ export default class CoopArena extends PvpArena {
     if (this.saindo) return
     if (eventos.some((e) => e.tipo === 'superChefe')) await this.anunciarSuperChefe()
     if (this.saindo) return
+    if (eventos.some((e) => e.tipo === 'atordoado')) await this.anunciarAtordoado()
+    if (this.saindo) return
     await this.mostrarIntencao()
+    this.atualizarPreviaChefe()
+    this.regra?.inicioDaRodada(this.estado.rodada)
   }
 
   // O chefe joga UMA carta virada embaixo dele, com o naipe à vista: o ataque
@@ -671,8 +741,11 @@ export default class CoopArena extends PvpArena {
     return podeJogarCoop(this.estado, j, id)
   }
 
+  // (a CPU olha a carta em que o parceiro está com o cursor: às vezes fecha uma carta de dupla)
   decidirJogadaCpu(j) {
-    return escolherJogadaCoop(this.estado, j, { rng: this.rngBot })
+    const mao = this.maos[1 - j]
+    const dica = !this.noPassar[1 - j] && mao?.selecionada ? { carta: mao.selecionada.dados } : null
+    return escolherJogadaCoop(this.estado, j, { rng: this.rngBot, dica })
   }
 
   // ---------- revelação ----------
@@ -785,6 +858,8 @@ export default class CoopArena extends PvpArena {
     this.atualizarHuds()
     this.atualizarCaidos()
     this.atualizarChefe()
+    this.atualizarPreviaChefe() // (o A♦ pode ter tirado a carga do SUPER dele)
+    await this.duplasDaRevelacao(r) // CARTA DE DUPLA da resolução: ♥ + ♦ = BARREIRA DUPLA
     if (r.efeitos.some((ef) => ef.compradas.length)) {
       await this.esperar(400)
       await this.sincronizarMaos({ intervalo: 140 })
@@ -830,11 +905,13 @@ export default class CoopArena extends PvpArena {
         if (efeitoDoReflexo(this, espelho, carta, { dir: Math.sign(CHEFE.x - carta.x) || 1, alvo: { x: CHEFE.x, y: CHEFE.y - 20 }, escala: escalaDaCarta(carta) })) await this.esperar(170)
         carta.arremessar({ x: CHEFE.x, y: CHEFE.y - 20 }, { duracao: 340, aoImpacto: () => this.inimigo.dano(0.2) })
       } else if (carta) this.tirarDaMesa(carta)
-      this.mostrarBanner('NENHUM ATAQUE DO CHEFE', TEXTO.desabilitado, { y: 236, tamanho: 16, ms: 800 })
+      if (r.atordoado) this.mostrarBanner('ELE ESTÁ ATORDOADO!', corTexto(COR_ATORDOADO), { y: 236, tamanho: 18, ms: 800 })
+      else this.mostrarBanner('NENHUM ATAQUE DO CHEFE', TEXTO.desabilitado, { y: 236, tamanho: 16, ms: 800 })
       tocar(this, 'vazio')
       await this.esperar(1000)
       return
     }
+    this.previaChefe?.esconder() // o quadro abre por cima dela
     this.maos.forEach((m) => m.setPosicao({ y: MAO_FORA }))
     this.botoesPassar.forEach((b) => b.descer(true))
     this.status.forEach((s) => s.setText(''))
@@ -893,18 +970,21 @@ export default class CoopArena extends PvpArena {
     const q = r.destino === 'quadro' ? r.quadro : null
     this.superDoChefeNoQuadro = Boolean(q && ehSuper(q.carta))
     if (!q) return
-    const ataque = ataqueDaCartaChefe(q.carta, { ataques })
+    // a regra do chefe pode trocar o ataque da carta (coop/regraChefe.js: ataque(carta, A, padrao))
+    const ataque = this.regra.ataque(q.carta, ataques, ataqueDaCartaChefe(q.carta, { ataques }))
     if (q.inverter) this.invertido[0] = { avisado: false }
     const base = this.ritmoBase
     const ritmo = { velocidade: base.velocidade * q.ritmo.velocidade, densidade: base.densidade * q.ritmo.densidade }
     // a mesma semente nos dois PCs (em rede): o mesmo ataque
     const promessa = this.quadro.rodar(ataque, { dano: q.dano, ritmo, semente: `${this.semente}:${this.estado.rodada}:quadro`, aceleracao: this.aceleracao })
+    this.comecarEsquivaCoop2(q)
     if (this.rede) {
       // o dano que o outro já mandou vale agora; termina quando o quadro acabou
       // aqui E o outro avisou que acabou o dele (aí já chegou todo dano/graze dele)
       this.rede.comecarLuta()
       await this.rede.esperarFimEsquiva([promessa])
     } else await promessa
+    this.terminarEsquivaCoop2()
     if (this.saindo) return
     // perfeitoCoop = CRÍTICO no contra-ataque (x1,5 fixo, o combo de perfeitos não mexe nele);
     // registrarPerfeitosNoQuadro = energia do perfeito x combo (festa da PvpArena)
@@ -960,6 +1040,7 @@ export default class CoopArena extends PvpArena {
       return invertendo ? { x: -joy.x, y: -joy.y } : joy
     })
     quadro.atualizar(delta, (jogador) => joys[jogador] ?? { x: 0, y: 0 })
+    this.atualizarCoop2NoQuadro(delta)
   }
 
   // joystick da CPU aliada no quadro (pvp/botEsquiva.js), no coração dela
@@ -976,6 +1057,7 @@ export default class CoopArena extends PvpArena {
       fatorVelocidade: quadro.balas.fatorVelocidade,
       velocidadeMax: quadro.balas.velocidadeMax,
       invertido,
+      alvo: this.alvoDaCpu(this.cpu),
     })
   }
 
@@ -1021,6 +1103,7 @@ export default class CoopArena extends PvpArena {
     flashTela(this, CORES.almas[j], 0.3, 220)
     this.quadro.caixa.tremer(260, 4)
     if (coracao?.ativo) particulas(this, coracao.x, coracao.y, { cor: CORES.almas[j], quantidade: 30, velocidade: 220, vida: 700 })
+    this.deixarAlma(j) // RESGATE NA HORA: fica a alma dele no quadro (se tem parceiro de pé para buscar)
     coracao?.esconder()
     this.avisoPista[j].setText('CAIU!').setColor(TEXTO.caido).setFontSize(20)
     this.atualizarCaidos()
@@ -1046,24 +1129,39 @@ export default class CoopArena extends PvpArena {
 
   // ---------- contra-ataque ----------
 
-  // Os golpes da rodada: o host calcula (em rede manda para o convidado, com o combo)
+  // O contra-ataque da rodada (resolverContraCoop: golpes, combo, cartas de dupla, QUEBRA e a finalização):
+  // o host calcula (em rede manda para o convidado); o convidado soma a mesma quebra no estado dele
   async golpesDaRodada(r) {
-    if (this.rede && !this.rede.souHost) return this.rede.receberContra()
+    if (this.rede && !this.rede.souHost) {
+      const decisao = await this.rede.receberContra()
+      if (decisao) aplicarQuebraDoContra(this.estado, decisao.quebra)
+      return decisao
+    }
     const desempenho = [0, 1].map((j) => ({ perfeito: this.perfeitoCoop?.[j], grazes: this.grazesRodada[j] }))
-    const golpes = calcularGolpes(this.estado, r.golpes, desempenho)
-    const combo = comboDosGolpes(r.golpes.map((g, j) => (this.estado.jogadores[j].caido ? null : g)))
-    this.rede?.enviarContra(golpes, combo)
-    return { golpes, combo }
+    const decisao = resolverContraCoop(this.estado, r.golpes, desempenho)
+    this.rede?.enviarContra(decisao)
+    return decisao
   }
 
   async contraAtaque(r) {
     const decisao = await this.golpesDaRodada(r)
     if (!decisao || this.saindo) return
-    const { golpes: lista, combo } = decisao
-    if (!lista.length) return
+    const { golpes: lista, combo, duplas = [], quebra = null, finalizacao = null } = decisao
     this.fase = 'contra'
+    if (lista.length) await this.golpesDoContra(lista, combo, duplas)
+    if (this.saindo) return
+    // a QUEBRA da rodada (já somada no estado), o QUEBROU! e, na rodada ATORDOADO, a FINALIZAÇÃO EM DUPLA
+    await this.fecharContraCoop2({ quebra, finalizacao })
+  }
+
+  // as cartas carregadas voam no chefe (com o banner do combo ou da carta de dupla)
+  async golpesDoContra(lista, combo, duplas) {
     if (combo === 'super') await this.superCombo(lista)
     else {
+      if (duplas.some((d) => d.id === 'pinca')) {
+        this.combos++
+        await this.anunciarDupla('pinca', { ms: 1000 })
+      }
       if (combo) {
         this.combos++
         tocar(this, 'combo')
@@ -1097,6 +1195,11 @@ export default class CoopArena extends PvpArena {
         if (this.estado.chefe.hp <= 0) break
       }
     }
+    this.limparArmadas()
+    await this.esperar(400)
+  }
+
+  limparArmadas() {
     // sobrou alguma (o chefe caiu antes): some
     this.armadas.forEach((c) => {
       if (!c) return
@@ -1104,7 +1207,6 @@ export default class CoopArena extends PvpArena {
       this.tirarDaMesa(c)
     })
     this.armadas = [null, null]
-    await this.esperar(400)
   }
 
   mostrarMultiplicadores(g) {
@@ -1189,6 +1291,7 @@ export default class CoopArena extends PvpArena {
     const fim = this.rede ? await this.rede.fimDaRodada() : fimDaRodadaCoop(this.estado)
     if (this.saindo || !fim) return null
     const { vencedor, novaFase } = fim
+    this.regra?.fimDaRodada({ novaFase: novaFase ?? null })
     this.huds.forEach((hud, j) => {
       hud.setProtegido(false)
       hud.setEscudo(this.estado.jogadores[j].escudo)
@@ -1231,12 +1334,17 @@ export default class CoopArena extends PvpArena {
       ms: 1400,
     })
     if (fase.entrada) this.falar(fase.entrada, 2200)
+    // a regra do chefe na fase nova (def.regra.fases[f].descricao)
+    const regra = this.regra?.faseNova(f)
+    if (regra) this.etiquetaEm(LARGURA / 2, 290, semLigaduras(regra), '#ffe9a0', { atraso: 600, tamanho: 11, ms: 1600 })
     await this.esperar(2000)
   }
 
   async resultado(vencedor) {
     this.fase = 'resultado'
     this.saindo = false
+    this.regra?.terminar()
+    this.previaChefe?.esconder()
     const dados = {
       chefe: this.idChefe,
       turnos: this.estado.rodada,
@@ -1341,7 +1449,8 @@ export default class CoopArena extends PvpArena {
       rede: this.rede ? { meuLado: this.rede.meuLado, souHost: this.rede.souHost, espelhos: q.coracoes.map((x) => Boolean(x.espelho)) } : null,
       escolhas: this.escolhas.map((e) => (e === undefined ? 'escolhendo' : e)),
       vencedor: this.estado.vencedor,
-      chefe: { id: c.id, hp: c.hp, hpMax: c.hpMax, fase: c.fase, carga: c.carga, guarda: c.guarda, intencao: c.intencao?.id ?? null },
+      chefe: { id: c.id, hp: c.hp, hpMax: c.hpMax, fase: c.fase, carga: c.carga, guarda: c.guarda, intencao: c.intencao?.id ?? null, proxima: c.proxima?.id ?? null, quebra: c.quebra, quebraMax: c.quebraMax, atordoado: c.atordoado, atordoadoEm: c.atordoadoEm },
+      coop2: this.debugCoop2(), // { previa, almas, regra, itensRegra, log, ... } (coop/coop2Arena.js)
       quadro: {
         rodando: q.ataque?.nome ?? null,
         aberta: q.aberta,
@@ -1375,3 +1484,6 @@ export default class CoopArena extends PvpArena {
     }
   }
 }
+
+// o CO-OP 2.0 (prévia, QUEBRA, resgate na hora, cartas de dupla, regra do chefe): os métodos iguais aos da CoopArenaN
+export default ligarCoop2(CoopArena)

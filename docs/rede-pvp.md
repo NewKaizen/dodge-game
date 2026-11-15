@@ -349,12 +349,14 @@ As mesmas regras de autoridade do PVP:
 | `dano` | | dono → outro | `{ lado, dano, r }`: o dano por acerto já com o escudo do dono (o outro aplica com `aplicarDanoCoop`) |
 | `graze` | | dono → outro | `{ lado, n, r }` |
 | `fimEsquiva` | rodada | os dois | `{ acertos, ko }`: o quadro acabou aqui |
-| `contra` | rodada | host → conv. | `{ golpes, combo }`: a lista de `calcularGolpes` (com o desempenho dos dois, que já chegou: o `fimEsquiva` do outro vem depois de todo dano/graze dele) e o combo da rodada |
+| `contra` | rodada | host → conv. | `{ golpes, combo, duplas, quebra, finalizacao }` de `resolverContraCoop` (com o desempenho dos dois, que já chegou: o `fimEsquiva` do outro vem depois de todo dano/graze dele): os golpes, o combo, as cartas de dupla, a QUEBRA da rodada (o convidado soma com `aplicarQuebraDoContra`) e, na rodada ATORDOADO, a finalização (CO-OP 2.0) |
+| `resgate` | | dono → outro | (CO-OP 2.0) `{ lado, alvo, r }`: o MEU coração ficou 1 s na alma de `alvo` (`coop/resgate.js`); o outro aplica `resgatarNaHora` e, se o caído é ele, o coração dele volta no lugar da alma. Vai no caminho do `dano` (antes do `fimEsquiva`) |
+| `regra` | | dono → outro | (CO-OP 2.0) `{ lado, acao, dados, r }`: o MEU coração pegou um item / entrou numa zona da regra do chefe, ou um `api.enviar` dela (`coop/regraChefe.js`); o outro repete o `aoPegar`/`aoMensagem` |
 | `fimRodada` | rodada | host → conv. | `{ estado, vencedor, novaFase }` de `fimDaRodadaCoop` |
 | `resultadoPronto` | rodada | conv. → host | `{}`: a animação do fim acabou aqui; o host (espera até 20 s) abre a `Vitoria`/`GameOver` nos dois com `irParaCena(this, chave, { chefe, turnos, estatisticas, hpChefe, hpMaxChefe })` (as estatísticas do host valem) |
-| `debug` (só no dev) | | os dois | `forcarMao`/`setHp`/`setEnergia`/`setHpChefe` valem nos dois PCs |
+| `debug` (só no dev) | | os dois | `forcarMao`/`setHp`/`setEnergia`/`setHpChefe`/`setQuebra` valem nos dois PCs |
 
-Uma rodada: `inicio` → escolha (`jogada`, `cursor`) → `resolucao` → revelação e arremesso iguais nos dois → esquiva (`coracao`, `dano`, `graze`, e os dois trocam `fimEsquiva`) → `contra` → `fimRodada`. O outro saiu no meio: `game/rede.js` tira os dois da cena e toda espera solta (`this.saindo`).
+Uma rodada: `inicio` → escolha (`jogada`, `cursor`) → `resolucao` → revelação e arremesso iguais nos dois → esquiva (`coracao`, `dano`, `graze`, `resgate`, `regra`, e os dois trocam `fimEsquiva`) → `contra` → `fimRodada`. As mensagens `resgate` e `regra` e o `contra` novo são do CO-OP 2.0 (**PROTOCOLO 21**); na `CoopArenaN` (3 e 4) elas vão ao host, que confere o `lado` e repassa, como o `dano`. O outro saiu no meio: `game/rede.js` tira os dois da cena e toda espera solta (`this.saindo`).
 
 Testando: no host, `debugRede.iniciar('CoopArena', { chefe: 'king', nivel: 'facil', party: ['kris', 'susie'] })` abre a arena nos dois; `window.coopArena.estadoDebug()` traz `rede: { meuLado, souHost, espelhos }` (`espelhos[j]`: o coração j é espelho aqui) e o `quadro`; `forcarMao`/`setHp`/`setEnergia`/`setHpChefe` valem nos dois PCs. Com `debugRede.atraso(150, 50)` nas duas abas o coração de cada um continua respondendo na hora.
 

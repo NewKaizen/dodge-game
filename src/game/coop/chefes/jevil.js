@@ -25,7 +25,7 @@ export default {
     },
     cor: 0xffffff,
   },
-  hp: 310,
+  hp: 345, // CO-OP 2.0: era 310 (docs/coop-cartas.md "Lutas mais curtas")
   danoBala: 13,
   // DIFÍCIL: padrões mais rápidos e densos (os dele são os mais fáceis de ler),
   // um pouco mais de dano (SUPER ~27 por acerto)

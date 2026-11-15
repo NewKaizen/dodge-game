@@ -265,11 +265,11 @@ test('combos de grupo: 3 do mesmo naipe valem mais que 2; PAR vale por valor; o 
   const fator = (g) => g.multiplicadores.find(([n]) => n === 'COMBO')?.[1]
   assert.equal(lista.length, 3)
   for (const g of lista) assert.equal(fator(g), 1.35, 'COMBO 1,25 + 0,10 pelo terceiro jogador')
-  // dois do mesmo naipe + um de outro: só os dois combinam
+  // dois do mesmo naipe + um de outro: só os dois combinam (♦: com ♣ seria a carta de dupla PINÇA, coop2.js)
   const f = nova(3)
   iniciarRodadaCoop(f)
   intencao(f, 9)
-  const rf = resolverRodadaCoop(f, naMao(f, 0, 'kris-espadas-9'), naMao(f, 1, 'susie-espadas-8'), naMao(f, 2, 'ralsei-paus-3'))
+  const rf = resolverRodadaCoop(f, naMao(f, 0, 'kris-espadas-9'), naMao(f, 1, 'susie-espadas-8'), naMao(f, 2, 'ralsei-ouros-4'))
   const lf = calcularGolpes(f, rf.golpes, [{}, {}, {}])
   assert.equal(fator(lf[0]), COOP.combo)
   assert.equal(fator(lf[1]), COOP.combo)

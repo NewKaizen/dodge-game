@@ -62,7 +62,8 @@ import { ENERGIA, hpInicial, aplicarDano, curar, motivoBloqueio } from '../pvp/r
 export { COMBO_PERFEITO, multiplicadorPerfeito, registrarPerfeitoCombo, quebrarSequencia } from '../pvp/regras.js'
 import { especialDaCarta, efeitosDaCarta, ehSuper } from '../pvp/cartas.js'
 import { CHEFES, nivelDoChefe } from './chefes/index.js'
-import { roubar, jogaRoubada, cartaDaLadra, devolver, largarRoubada } from './semanal/ladra.js'
+import { roubar, jogaRoubada, cartaDaLadra, devolver, largarRoubada, LADRA } from './semanal/ladra.js'
+import { QUEBRA, DUPLAS, somarQuebra, duplasDaResolucao, duplasDoContra, ganhosDeQuebra, finalizacaoDaDupla, atordoadoAgora, previaDoChefe, maxQuebra } from './coop2.js'
 import { CARTAS_CHEFES, faseDoChefe, suporteDoChefe, danoDaCartaChefe, ritmoDaCartaChefe, inverteControles, poderDaCartaChefe } from './cartasChefe.js'
 
 
@@ -98,7 +99,7 @@ import { CARTAS_CHEFES, faseDoChefe, suporteDoChefe, danoDaCartaChefe, ritmoDaCa
 export const COOP = {
   retornoRodadas: 2,
   retornoHp: 0.3,
-  reviverMin: 0.25,
+  reviverMin: 0.3, // (CO-OP 2.0) igual ao retornoHp: quem levanta, de qualquer jeito, volta com pelo menos 30%
   critico: 1.5,
   combo: 1.25,
   par: 1.5,
@@ -193,7 +194,9 @@ const ID_JOGADOR = ['p1', 'p2', 'p3', 'p4']
 
 // ---------- partida ----------
 
-export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coop' }) {
+// coop2: false desliga o CO-OP 2.0 (a prévia, a QUEBRA, as cartas de dupla novas): a luta da CAMPANHA usa estas
+// regras do jeito de antes (campanha/luta.js)
+export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coop', coop2 = true }) {
   const def = CHEFES[chefe]
   if (!def) throw new Error(`chefe sem baralho de cartas: ${chefe}`)
   const niv = nivelDoChefe(chefe, nivel)
@@ -230,6 +233,7 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
   }
   return {
     modo: 'coop',
+    coop2: coop2 !== false,
     semente: String(semente),
     nivel: nivelDaLuta,
     fatorDano: niv.dano,
@@ -253,6 +257,12 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
       // BOSS SEMANAL · Ladra (coop/semanal/ladra.js): as cartas roubadas (viradas para cima) e o rodízio
       ...(def.ladra && { roubadas: [], alvoRoubo: 0 }),
       mira: null, // (3+ jogadores) quem o chefe mira nesta rodada: índices dos jogadores (escolherMira)
+      // CO-OP 2.0 (coop/coop2.js): a próxima carta (a prévia, já fora do monte), a barra de QUEBRA e o atordoado
+      proxima: null,
+      quebra: 0,
+      quebraMax: maxQuebra(n),
+      atordoado: false, // a barra encheu: ele fica parado na próxima rodada
+      atordoadoEm: null, // a rodada em que ele está parado
     },
     vencedor: null,
     historico: [],
@@ -361,8 +371,12 @@ export function iniciarRodadaCoop(estado) {
   const c = estado.chefe
   c.intencao = null
   c.mira = null
-  c.carga = Math.min(c.cargaMax, c.carga + 1)
-  if (emPe(estado).length) {
+  // ATORDOADO (a QUEBRA encheu na rodada passada): ele não joga carta nesta rodada e a carga do SUPER não sobe
+  if (c.atordoado) {
+    c.atordoadoEm = estado.rodada
+    eventos.push({ tipo: 'atordoado' })
+  } else c.carga = Math.min(c.cargaMax, c.carga + 1)
+  if (emPe(estado).length && !c.atordoado) {
     if (c.carga >= c.cargaMax) {
       c.carga = 0
       c.intencao = { ...CARTAS_CHEFES[c.id].super }
@@ -371,7 +385,11 @@ export function iniciarRodadaCoop(estado) {
       // a Ladra joga a roubada mais antiga contra o time
       c.intencao = cartaDaLadra(estado)
       eventos.push({ tipo: 'ladraJoga', dono: c.intencao.roubada.dono, carta: c.intencao.roubada.carta.id })
-    } else c.intencao = comprarDoChefe(estado)
+    } else {
+      // a carta da prévia da rodada passada (a promessa vale, mesmo se a fase mudou)
+      c.intencao = c.proxima ?? comprarDoChefe(estado)
+      c.proxima = null
+    }
     if (estado.n > 2) c.mira = escolherMira(estado)
     // a Ladra rouba uma carta do próximo do rodízio (sai da mão dele nesta rodada)
     if (c.roubadas) {
@@ -379,9 +397,15 @@ export function iniciarRodadaCoop(estado) {
       if (r) eventos.push({ tipo: 'roubo', j: r.j, carta: r.carta.id })
     }
   }
+  // a PRÉVIA: a próxima carta já sai do monte (previaCoop mostra; a próxima rodada joga ela)
+  if (!c.proxima && estado.coop2 !== false) c.proxima = comprarDoChefe(estado)
   estado.fase = 'escolha'
   return eventos
 }
+
+// A carta do chefe da PRÓXIMA rodada (coop2.js previaDoChefe), com a regra da Ladra
+export const previaCoop = (estado) =>
+  previaDoChefe(estado, { ladraJoga: (r) => (estado.chefe.roubadas?.length ?? 0) > 0 && (r % LADRA.jogaACada === 0 || estado.chefe.roubadas.length >= LADRA.maxMao) })
 
 // ---------- jogadas ----------
 
@@ -516,6 +540,22 @@ export function resolverRodadaCoop(estado, ...entradas) {
     if (sup.compra) efeitos[j].compradas.push(...comprar(jog.baralho, sup.compra).map((x) => x.id))
   }
 
+  // 2b. CARTA DE DUPLA na resolução (coop2.js): ♥ + ♦ = BARREIRA DUPLA, escudo em todos de pé (vale na
+  // esquiva desta rodada; sem quadro, na próxima). Enche a QUEBRA
+  const duplas = estado.coop2 === false ? [] : duplasDaResolucao(cartas, noQuadro)
+  for (const d of duplas) {
+    const escudo = DUPLAS[d.id].escudo
+    if (!escudo) continue
+    estado.jogadores.forEach((alvo, k) => {
+      if (alvo.caido || fora(alvo)) return
+      alvo.escudo = Math.min(alvo.escudo ?? 1, escudo)
+      efeitos[k].escudo = alvo.escudo
+      efeitos[k].barreira = true
+    })
+    d.quebra = somarQuebra(estado, DUPLAS[d.id].quebra)
+    eventos.push(`carta de dupla: ${DUPLAS[d.id].nome}`)
+  }
+
   // 3. contra a carta do chefe (o SUPER dos jogadores primeiro, depois Espelho, Anular e Roubo)
   const intencao = c.intencao
   let destino = intencao ? 'quadro' : null // 'quadro' | 'varrida' | 'refletida' | 'anulada' | 'roubada'
@@ -608,7 +648,8 @@ export function resolverRodadaCoop(estado, ...entradas) {
 
   // a carta do chefe vai para o descarte dele (o SUPER não)
   // (a roubada da Ladra volta ao descarte do DONO)
-  if (intencao && !ehSuper(intencao) && !largarRoubada(estado, intencao)) c.descarte.push(intencao)
+  // (a carta de uma fase que já passou, a da prévia que veio da fase anterior, não volta ao baralho)
+  if (intencao && !ehSuper(intencao) && !largarRoubada(estado, intencao) && (intencao.fase == null || intencao.fase === c.fase)) c.descarte.push(intencao)
   c.intencao = null
   estado.fase = 'esquiva'
   const resultado = {
@@ -619,7 +660,9 @@ export function resolverRodadaCoop(estado, ...entradas) {
     quadro,
     golpes,
     efeitos,
-    chefe: { cura: curaChefe, guarda: c.guarda, carga: c.carga },
+    chefe: { cura: curaChefe, guarda: c.guarda, carga: c.carga, quebra: c.quebra, atordoado: c.atordoado },
+    duplas, // cartas de dupla da resolução (BARREIRA): [{ id, jogadores, quebra }]
+    atordoado: atordoadoAgora(estado), // o chefe está parado nesta rodada (sem carta, sem quadro)
     eventos,
   }
   estado.historico.push({ rodada: estado.rodada, cartas: cartas.map((x) => x?.id ?? null), chefe: intencao?.id ?? null, destino })
@@ -722,6 +765,9 @@ export function calcularGolpes(estado, golpes, desempenho = []) {
 function golpesSemLimite(estado, golpes, desempenho) {
   const caidos = estado.jogadores.map((jog) => jog.caido)
   const combos = combosDosGolpes(golpes, caidos)
+  // CO-OP 2.0: ATAQUE EM PINÇA (♠ + ♣) e o chefe ATORDOADO (coop2.js)
+  const pinca = new Set(estado.coop2 === false ? [] : (duplasDoContra(golpes, caidos).find((d) => d.id === 'pinca')?.jogadores ?? []))
+  const parado = atordoadoAgora(estado)
   const nSuper = supersDaRodada(golpes, caidos).length
   const guarda = estado.chefe.guarda
   return golpes
@@ -735,14 +781,59 @@ function golpesSemLimite(estado, golpes, desempenho) {
       if (golpe.tipo === 'paus' && d.grazes) mult.push([`+${d.grazes} GRAZE`, 1 + Math.min(COOP.grazeArmadilhaMax, d.grazes * COOP.grazeArmadilha)])
       const combo = combos[j]
       const extra = combo ? COOP.comboGrupo * (combo.grupo - 2) : 0 // 2 jogadores: 0 (o combo de sempre)
-      if (combo?.tipo === 'par') mult.push(['PAR', Math.round((COOP.par + extra) * 100) / 100])
-      if (combo?.tipo === 'combo') mult.push(['COMBO', Math.round((COOP.combo + extra) * 100) / 100])
+      // as cartas de dupla não se somam no mesmo golpe: vale a mais forte (PAR, COMBO ou PINÇA)
+      const dupla = []
+      if (combo?.tipo === 'par') dupla.push(['PAR', Math.round((COOP.par + extra) * 100) / 100])
+      if (combo?.tipo === 'combo') dupla.push(['COMBO', Math.round((COOP.combo + extra) * 100) / 100])
+      if (pinca.has(j)) dupla.push(['PINÇA', DUPLAS.pinca.fator])
+      if (dupla.length) mult.push(dupla.sort((a, b) => b[1] - a[1])[0])
+      if (parado && golpe.tipo !== 'super') mult.push(['ATORDOADO', QUEBRA.danoAtordoado])
       if (guarda != null) mult.push(['GUARDA', guarda])
       const fator = mult.reduce((m, [, f]) => m * f, 1)
       // SUPER COMBO: cada SUPER vira a parte dele do combo do nível (no lugar do golpe sozinho)
       const base = golpe.tipo === 'super' && nSuper >= 2 ? danoNoCombo(estado, nSuper) : golpe.base
       return { j, golpe, dano: Math.max(1, Math.round(base * fator)), falhou: false, multiplicadores: mult }
     })
+}
+
+// O CONTRA-ATAQUE da rodada inteiro (CO-OP 2.0), num lugar só para a arena e a rede: os golpes
+// (calcularGolpes), o combo do banner, as cartas de dupla do contra (PINÇA, COMBO, PAR), o que a rodada
+// põe na QUEBRA (já somado no estado) e, na rodada ATORDOADO, a FINALIZAÇÃO EM DUPLA (o dano dela a arena
+// aplica com aplicarGolpe depois dos golpes). Só o host chama em rede; o convidado recebe isto e
+// soma a quebra com aplicarQuebraDoContra.
+//   -> { golpes, combo, duplas, quebra: { ganhos, total, quebrou, valor, max }, finalizacao }
+export function resolverContraCoop(estado, golpes, desempenho = []) {
+  const caidos = estado.jogadores.map((jog) => jog.caido)
+  const lista = calcularGolpes(estado, golpes, desempenho)
+  const combo = comboDosGolpes(golpes.map((g, j) => (caidos[j] ? null : g)))
+  const duplas = duplasDoContra(golpes, caidos)
+  const ganhos = atordoadoAgora(estado) ? [] : ganhosDeQuebra(lista, duplas)
+  const total = ganhos.reduce((t, g) => t + g.pontos, 0)
+  const { quebrou } = somarQuebra(estado, total)
+  const quebra = { ganhos, total, quebrou, valor: estado.chefe.quebra, max: estado.chefe.quebraMax ?? maxQuebra(estado.n) }
+  return { golpes: lista, combo, duplas, quebra, finalizacao: finalizacaoDaDupla(estado) }
+}
+
+// Convidado: a quebra que o host somou no contra (o estado dele chega inteiro no fimRodada)
+export function aplicarQuebraDoContra(estado, quebra) {
+  if (!quebra) return
+  estado.chefe.quebra = quebra.valor
+  if (quebra.quebrou) {
+    estado.chefe.atordoado = true
+    estado.chefe.atordoadoEm = null
+  }
+}
+
+// RESGATE NA HORA (coop/resgate.js): `quem` encostou na alma de `alvo` (caído nesta esquiva) o tempo todo.
+// Ele levanta com COOP.retornoHp (como a volta sozinha) e enche a QUEBRA. Roda em todos os PCs (quem
+// completou manda `resgate`); repetido não faz nada. Devolve { ok, hp, quebrou }
+export function resgatarNaHora(estado, alvo, quem) {
+  const jog = estado.jogadores[alvo]
+  const salvador = estado.jogadores[quem]
+  if (!jog?.caido || fora(jog) || !salvador || salvador.caido || alvo === quem || estado.chefe.hp <= 0) return { ok: false }
+  const hp = levantar(estado, alvo, jog.hpMax * COOP.retornoHp)
+  const { quebrou } = somarQuebra(estado, QUEBRA.resgate)
+  return { ok: true, hp, quebrou }
 }
 
 // Tira o dano do HP do chefe. Devolve o dano efetivo.
@@ -777,6 +868,12 @@ export function fimDaRodadaCoop(estado, limpa = null) {
   const c = estado.chefe
   for (const jog of estado.jogadores) jog.protegido = false
   c.guarda = null
+  // a rodada ATORDOADO acabou: a barra volta a zero e ele volta a jogar
+  if (atordoadoAgora(estado)) {
+    c.atordoado = false
+    c.atordoadoEm = null
+    c.quebra = 0
+  }
   const resgatados = limpa ? resgatarPorRodadaLimpa(estado, limpa) : []
   let novaFase = null
   if (c.hp > 0) {

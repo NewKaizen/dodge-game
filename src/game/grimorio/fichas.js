@@ -12,6 +12,7 @@
 //                                    ou { semAtaque: 'motivo' }
 import { CARTAS, PERSONAGENS_PVP, TEMAS, SIMBOLOS, SUPER, ehSuper, especialDaCarta, nomeDoValor, ataqueDaCarta, resumoDoAtaque, DIFICULDADE_PVP } from '../pvp/cartas.js'
 import { descricaoCoop, COOP } from '../coop/regras.js'
+import { dicaDeDupla } from '../coop/coop2.js'
 import { CARTAS_CHEFES, ataqueDaCartaChefe, danoDaCartaChefe, ritmoDaCartaChefe, inverteControles, poderDaCartaChefe, suporteDoChefe, TIPOS_CHEFE } from '../coop/cartasChefe.js'
 import { CHEFES, ORDEM_CHEFES } from '../coop/chefes/index.js'
 import { DESAFIO, DIFICULDADES } from '../constants.js'
@@ -140,7 +141,7 @@ function fichaDoJogador(carta) {
     numeros,
     textos: [
       { titulo: 'NO PVP', texto: carta.descricao, modo: 'pvp' },
-      { titulo: 'NO CO-OP', texto: descricaoCoop(carta), modo: 'coop' },
+      { titulo: 'NO CO-OP', texto: [descricaoCoop(carta), dicaDeDupla(carta)].filter(Boolean).join(' '), modo: 'coop' },
     ],
   }
 }
@@ -164,6 +165,8 @@ function fichaDoChefe(carta) {
   } else {
     respostas = `A♠ Espelho devolve (golpe de ${poderDaCartaChefe(carta)} no chefe), A♦ Anular cancela, A♣ Roubo tira ela da caixa do parceiro e um SUPER varre. ♦ deixa as balas mais lentas na sua caixa.`
   }
+  // CO-OP 2.0 (coop/coop2.js): a barra de QUEBRA embaixo do HP dele
+  if (!sup) respostas += ' Em dupla: batam juntos para encher a QUEBRA e deixá-lo ATORDOADO.'
   return {
     tipo,
     numeros,

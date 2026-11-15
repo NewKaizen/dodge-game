@@ -11,7 +11,7 @@ export default {
     cores: { chama: 0xff8a1c, bola: 0xffd24c, barra: 0xd8d8e0 },
     cor: 0xff8a1c,
   },
-  hp: 320,
+  hp: 350, // CO-OP 2.0: era 320 (docs/coop-cartas.md "Lutas mais curtas")
   danoBala: 12,
   // DIFÍCIL: o trânsito e o forcado já apertam bastante no ritmo base do
   // difícil; um pouco mais de dano (SUPER ~24 por acerto) e menos HP

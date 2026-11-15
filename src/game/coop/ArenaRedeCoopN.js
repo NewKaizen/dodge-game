@@ -12,6 +12,9 @@ import { dormirFundo } from '../../lib/relogioFundo.js'
 //                       coracao (rápida)         { x, y, r }: o meu coração no quadro
 //                       dano / graze             { lado, dano|n, r }: o que ACERTOU o meu coração
 //                       fimEsquiva               { acertos, ko, r }: o meu quadro acabou
+//                       resgate / regra          (CO-OP 2.0) { lado, alvo, r } o meu coração levantou o de `alvo`;
+//                                                { lado, acao, dados, r } o meu coração pegou um item da regra do chefe
+//                                                (ou um api.enviar dela): como o dano, o host confere e repassa
 //                       resultadoPronto          a animação do fim acabou aqui
 //   host -> todos       inicio / resolucao / contra / fimRodada     como na ArenaRedeCoop, com N jogadores
 //                       pronto {j}               o jogador j já escolheu (o PRONTO do cartão dele; ninguém vê a carta)
@@ -39,7 +42,7 @@ const ESPERA_AVISO_MS = 30000
 const ESPERA_FIM_MS = 15000 // a esquiva de cada um acaba junto; um PC travado não segura os outros mais que isto
 const ESPERA_RESULTADO_MS = 20000
 const FOLGA_JOGADAS_MS = 4000 // o host espera as jogadas até o relógio dos outros + isto
-const DEBUG_PERMITIDO = new Set(['forcarMao', 'setHp', 'setEnergia', 'setHpChefe'])
+const DEBUG_PERMITIDO = new Set(['forcarMao', 'setHp', 'setEnergia', 'setHpChefe', 'setQuebra'])
 
 export const copiar = (estado) => structuredClone(estado)
 const PARADA = new Promise(() => {})
@@ -80,6 +83,8 @@ export default class ArenaRedeCoopN {
       canal.ao('coracoes', (d) => this.aoCoracoes(d)),
       canal.ao('dano', (d, _c, de) => this.aoEvento('dano', d, de)),
       canal.ao('graze', (d, _c, de) => this.aoEvento('graze', d, de)),
+      canal.ao('resgate', (d, _c, de) => this.aoEvento('resgate', d, de)),
+      canal.ao('regra', (d, _c, de) => this.aoEvento('regra', d, de)),
       canal.ao('fimEsquiva', (d, _c, de) => this.aoFim(d, de)),
       canal.ao('resultadoPronto', (_d, rodada, de) => this.souHost && this.prontosResultado.set(rodada, (this.prontosResultado.get(rodada) ?? new Set()).add(de))),
     ]
@@ -327,6 +332,15 @@ export default class ArenaRedeCoopN {
     this.enviar('graze', null, { lado: j, n: 1, r: this.rodada })
   }
 
+  // CO-OP 2.0: o meu coração levantou o de `alvo` / pegou um item da regra (lado = o meu coração)
+  enviarResgate(quem, alvo) {
+    this.enviar('resgate', null, { lado: quem, alvo, r: this.rodada })
+  }
+
+  enviarRegra(acao, dados) {
+    this.enviar('regra', null, { lado: this.meu, acao, dados, r: this.rodada })
+  }
+
   aoEvento(tipo, d, de) {
     if (!d || this.arena.saindo || d.r <= this.entrouNaRodada) return
     if (this.souHost) {
@@ -342,8 +356,10 @@ export default class ArenaRedeCoopN {
 
   // dano/graze do coração de outro jogador: as regras daqui (escudo, 2ª chance, K.O.) e, no quadro, o
   // coração dele pisca como pisca no PC dele
-  aplicarDoOutro(tipo, { lado, dano, n = 1 }) {
+  aplicarDoOutro(tipo, { lado, dano, n = 1, alvo, acao, dados }) {
     const a = this.arena
+    if (tipo === 'resgate') return void a.aplicarResgate?.(lado, alvo)
+    if (tipo === 'regra') return void a.regra?.aoMensagem(lado, acao, dados)
     if (tipo === 'dano') return void a.aplicarAcerto(lado, dano, { doOutro: true })
     for (let k = 0; k < n; k++) a.aplicarGraze(lado, { doOutro: true })
   }
@@ -395,13 +411,14 @@ export default class ArenaRedeCoopN {
 
   // ---------- contra-ataque e fim da rodada ----------
 
-  enviarContra(golpes, combo) {
-    this.enviar('contra', this.rodada, { golpes, combo })
+  // o contra-ataque da rodada (resolverContraCoop): golpes, combo, cartas de dupla, QUEBRA e finalização
+  enviarContra({ golpes, combo, duplas, quebra, finalizacao }) {
+    this.enviar('contra', this.rodada, { golpes, combo, duplas, quebra, finalizacao })
   }
 
   async receberContra() {
     const msg = await this.esperar('contra', this.rodada)
-    return msg ? { golpes: msg.golpes ?? [], combo: msg.combo ?? null } : null
+    return msg ? { golpes: msg.golpes ?? [], combo: msg.combo ?? null, duplas: msg.duplas ?? [], quebra: msg.quebra ?? null, finalizacao: msg.finalizacao ?? null } : null
   }
 
   // Host: fimDaRodadaCoop (com a rodada limpa para o resgate) e manda o estado. Convidado: espera o do host

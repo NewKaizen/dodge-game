@@ -155,7 +155,10 @@ import { nomeSeguro } from '../src/lib/contaRegras.js'
 import { arranjoValido } from '../src/lib/times2x2.js'
 import { infoSemanal } from '../src/lib/semanal.js'
 
-export const PROTOCOLO = 20
+// CO-OP 2.0 (PROTOCOLO 21, docs/coop-cartas.md "CO-OP 2.0"): a partida de CO-OP ganhou as mensagens `resgate` e
+// `regra` (pelo canal, entre os PCs; o servidor só repassa) e o `contra` leva a QUEBRA: um PC de versão velha
+// não pode jogar CO-OP com um novo
+export const PROTOCOLO = 21
 export const PORTA_DESCOBERTA = 47777
 // Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
 // aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")
