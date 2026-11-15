@@ -5,6 +5,7 @@
 export default {
   nome: 'Robozinhos',
   expedicao: true,
+  oculto: true,
   dificuldade: 'facil',
   sprite: 'queen-lacaios',
   fundo: 'queen',

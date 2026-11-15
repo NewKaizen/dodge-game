@@ -16,6 +16,7 @@ const muroComGotas = (A, opcoesMuro, opcoesGotas) => {
 export default {
   nome: 'O Firewall',
   expedicao: true,
+  oculto: true,
   dificuldade: 'facil',
   sprite: 'queen-firewall',
   fundo: 'queen',

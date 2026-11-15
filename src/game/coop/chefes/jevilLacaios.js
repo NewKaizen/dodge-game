@@ -1,6 +1,6 @@
 // Expedição do Jevil, 1ª luta: os LACAIOS (cartas vivas e palhacinhos). Aquecimento curto (~2 min), sem regra:
 // só ataques simples e fáceis de ler. Um "chefe" cujo sprite mostra o grupo e cujo baralho mistura as cartas deles.
-// Fora da seleção de chefes (oculto: true): `scene.start('CoopArena', { chefe: 'jevil_lacaios' })`.
+// Fora da seleção de chefes (oculto: true): `scene.start('CoopArena', { chefe: 'jevilLacaios' })`.
 export default {
   nome: 'Lacaios do Jevil',
   oculto: true,

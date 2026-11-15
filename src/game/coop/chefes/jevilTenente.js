@@ -1,6 +1,6 @@
 // Expedição do Jevil, 2ª luta: o MESTRE DE PICADEIRO (tenente, ~3 min). Apresenta o DADO DO CAOS de leve: um dadinho
 // de só 3 faces gentis (SORTE!, GRAVIDADE INVERTIDA, RÁPIDO E LEVE) com efeitos mais fracos (coop/jevilRegra.js).
-// Fora da seleção de chefes (oculto: true): `scene.start('CoopArena', { chefe: 'jevil_tenente' })`.
+// Fora da seleção de chefes (oculto: true): `scene.start('CoopArena', { chefe: 'jevilTenente' })`.
 import { criarRegraDoDado } from '../jevilRegra.js'
 import { DADOS_DO_TENENTE } from '../jevilDado.js'
 

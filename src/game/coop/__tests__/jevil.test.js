@@ -302,8 +302,8 @@ test('o baralho do Jevil por fase: a marca dele (carrossel e foice) continua e t
 })
 
 test('lacaios e tenente: registrados, escondidos da seleção, com baralho e regra válidos', () => {
-  assert.deepEqual([...CHEFES_DA_EXPEDICAO].sort(), ['jevil_lacaios', 'jevil_tenente'])
-  for (const id of CHEFES_DA_EXPEDICAO) {
+  assert.deepEqual([...CHEFES_DA_EXPEDICAO].sort(), ['coronelLacaios', 'coronelTenente', 'jevilLacaios', 'jevilTenente', 'kingLacaios', 'kingTenente', 'queenLacaios', 'queenTenente'])
+  for (const id of ['jevilLacaios', 'jevilTenente']) {
     const def = CHEFES[id]
     assert.ok(def.oculto && def.expedicao)
     assert.ok(!ORDEM_CHEFES.includes(id))
@@ -311,10 +311,10 @@ test('lacaios e tenente: registrados, escondidos da seleção, com baralho e reg
     for (const f of def.fases) for (const [, , , ataque] of f.cartas) if (ataque) assert.ok(ataque(ataques).iniciar)
     assert.ok(def.super.criar(ataques).iniciar)
   }
-  assert.equal(CHEFES.jevil_lacaios.regra, undefined) // aquecimento: sem regra
-  const t = CHEFES.jevil_tenente.regra
+  assert.equal(CHEFES.jevilLacaios.regra, undefined) // aquecimento: sem regra
+  const t = CHEFES.jevilTenente.regra
   assert.ok(t && descricaoValida(t.descricao))
-  const { regra } = luta('jevil_tenente')
+  const { regra } = luta('jevilTenente')
   regra.inicioDaRodada(1)
   assert.equal(regra.inst.facesDaRodada().length, 1)
   assert.ok(facesDaFase(DADOS_DO_TENENTE, 0).includes(regra.inst.facesDaRodada()[0]))

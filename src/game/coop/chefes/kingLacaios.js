@@ -8,6 +8,7 @@ const carta = (nome) => () => ataqueKing('kingLacaios', nome)
 export default {
   nome: 'Lacaios do Rei',
   expedicao: true,
+  oculto: true,
   dificuldade: 'facil',
   sprite: 'king-lacaios',
   fundo: 'king',

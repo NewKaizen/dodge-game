@@ -10,6 +10,7 @@ const carta = (nome) => () => ataqueKing('kingTenente', nome)
 export default {
   nome: 'O Cavaleiro',
   expedicao: true,
+  oculto: true,
   dificuldade: 'facil',
   sprite: 'king-cavaleiro',
   fundo: 'king',

@@ -44,7 +44,7 @@ import { CHEFES_CAMPANHA } from '../../campanha/chefes.js'
 //   ladra, roubadas          (Ladra) rouba e joga as cartas dos jogadores (coop/semanal/ladra.js)
 // os da campanha (campanha/chefes.js, `campanha: true`) também moram aqui: a luta da campanha usa as
 // regras do CO-OP. Ficam fora da Selecao (ORDEM_CHEFES) e do semanal (SEMANAIS)
-export const CHEFES = { king, queen, jevil, coronel, escuridao, ladra, ...CHEFES_CAMPANHA, jevil_lacaios: jevilLacaios, jevil_tenente: jevilTenente }
+export const CHEFES = { king, queen, jevil, coronel, escuridao, ladra, ...CHEFES_CAMPANHA, jevilLacaios, jevilTenente }
 // EXPEDIÇÃO (`expedicao: true`: fora da Selecao, que só mostra ORDEM_CHEFES): os lacaios e o tenente de cada chefe
 Object.assign(CHEFES, { kingLacaios, kingTenente })
 Object.assign(CHEFES, { coronelLacaios, coronelTenente })
