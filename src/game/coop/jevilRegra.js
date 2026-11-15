@@ -148,7 +148,6 @@ export function criarRegraDoDado({
           faseDaMesa = api.rng('mesa')()
           angulo = 0
           if (tem('espelhados')) inverterControles()
-          if (tem('inclinada') && cena) cena.cameras.main.setRotation(0)
         },
 
         atualizar(dt) {
@@ -183,13 +182,10 @@ export function criarRegraDoDado({
           }
 
           // GRAVIDADE INVERTIDA e MESA INCLINADA: os corações (deste PC) escorregam
-          if (tem('gravidade') || tem('inclinada')) {
-            if (tem('inclinada')) {
+          if (tem('gravidade') || tem('vento')) {
+            if (tem('vento')) {
               angulo = anguloDaMesa(tempo, faseDaMesa, forca)
-              if (cena) {
-                const graus = Math.abs(angulo)
-                cena.cameras.main.setRotation(angulo).setZoom(1 + graus * 0.9)
-              }
+              visuais?.desenharVento(angulo / ((AJUSTES.vento.graus * Math.PI) / 180), api.limites())
             }
             const { dx, dy } = derivaDosCoracoes(faces, { velocidade: vel, dt, angulo, forca })
             for (const c of ativos()) if (api.meu(c.j)) api.empurrar(c.j, dx, dy)
@@ -280,9 +276,7 @@ export function criarRegraDoDado({
           visuais?.limparTroca()
           visuais?.limparMarcas?.()
           if (cena) {
-            if (tem('inclinada')) {
-              cena.tweens.add({ targets: cena.cameras.main, zoom: 1, rotation: 0, duration: 260, ease: 'Cubic.easeOut' })
-            }
+            visuais?.limparVento()
             for (const j of tintas.keys()) {
               const h = coracaoDaCena(j)
               if (h?.sprite?.scene) h.sprite.setTint(h.cor).setAlpha(1)
@@ -309,8 +303,6 @@ export function criarRegraDoDado({
         terminar() {
           visuais?.destruir()
           if (cena) {
-            cena.tweens.killTweensOf(cena.cameras.main)
-            cena.cameras.main.setRotation(0).setZoom(1)
           }
         },
       }

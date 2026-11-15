@@ -1,6 +1,7 @@
 import { SPRITES, CORACAO_MAPA } from './sprites.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { TEXTURAS_QUEEN } from './queenSprites.js'
+import { GERADORES_JEVIL } from './jevilExpedicao.js'
 
 // Escala em que cada sprite de pixel art aparece no jogo
 export const ESCALA = { personagem: 3, chefe: 4, coracao: 1.4 }
@@ -348,6 +349,7 @@ const GERADORES = {
   king: sprite('king'),
   queen: sprite('queen'),
   jevil: sprite('jevil'),
+  ...GERADORES_JEVIL, // os lacaios e o Mestre de Picadeiro (Expedição)
   coronel: sprite('coronel'),
   // BOSS SEMANAL (coop/chefes/escuridao.js, ladra.js)
   escuridao: sprite('escuridao'),

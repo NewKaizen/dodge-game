@@ -14,12 +14,12 @@ export const FACES = {
   trocados: { id: 'trocados', titulo: 'CORAÇÕES TROCADOS', texto: 'de tempos em tempos vocês trocam de lugar', cor: 0xff7ad0 },
   espelhados: { id: 'espelhados', titulo: 'CONTROLES ESPELHADOS', texto: 'esquerda é direita, cima é baixo', cor: 0xff9a3a },
   umPorVez: { id: 'umPorVez', titulo: 'UM CORAÇÃO POR VEZ', texto: 'só um se mexe; o parado fica protegido', cor: 0xa6b4ff },
-  inclinada: { id: 'inclinada', titulo: 'MESA INCLINADA', texto: 'o quadro balança e os corações escorregam', cor: 0xc89bff },
+  vento: { id: 'vento', titulo: 'VENTO MALUCO', texto: 'o vento muda de lado e empurra os corações', cor: 0xc89bff },
 }
 
 // Pares que não entram juntos no CHAOS CHAOS (os dois puxariam os corações ou os controles ao mesmo tempo)
 export const CONFLITOS = [
-  ['gravidade', 'inclinada'],
+  ['gravidade', 'vento'],
   ['espelhados', 'umPorVez'],
 ]
 
@@ -33,7 +33,7 @@ export const AJUSTES = {
   trocados: { primeiroMs: 2400, intervaloMs: 3400, avisoMs: 1000, gracaMs: 500 },
   espelhados: { velocidade: 0.92, densidade: 0.88 }, // o ataque aperta menos: os controles já pesam
   umPorVez: { trocaMs: 1500, avisoMs: 450, gracaMs: 400, densidade: 0.92 },
-  inclinada: { graus: 6, periodoMs: 6500, deriva: 0.3 },
+  vento: { graus: 6, periodoMs: 6500, deriva: 0.3 },
 }
 
 // ---------- os dados de cada fase ----------
@@ -41,9 +41,9 @@ export const AJUSTES = {
 // `dado`: as 6 faces do dado (repetir uma face a deixa mais provável); `dado2`: o segundo dado (CHAOS CHAOS)
 export const DADOS_DO_JEVIL = [
   { dado: ['sorte', 'gravidade', 'rapido', 'sorte', 'gravidade', 'rapido'] }, // 1: só faces leves
-  { dado: ['sorte', 'trocados', 'espelhados', 'umPorVez', 'inclinada', 'rapido'] }, // 2: as malucas
-  { dado: ['trocados', 'espelhados', 'umPorVez', 'inclinada', 'rapido', 'sorte'], dado2: ['gravidade', 'rapido', 'sorte', 'trocados', 'inclinada', 'umPorVez'] }, // 3: CAOS CAOS, DOIS dados
-  { dado: ['trocados', 'espelhados', 'umPorVez', 'inclinada', 'trocados', 'umPorVez'], dado2: ['inclinada', 'rapido', 'gravidade', 'trocados', 'sorte', 'espelhados'] }, // 4: dois dados, quase só malucas
+  { dado: ['sorte', 'trocados', 'espelhados', 'umPorVez', 'vento', 'rapido'] }, // 2: as malucas
+  { dado: ['trocados', 'espelhados', 'umPorVez', 'vento', 'rapido', 'sorte'], dado2: ['gravidade', 'rapido', 'sorte', 'trocados', 'vento', 'umPorVez'] }, // 3: CAOS CAOS, DOIS dados
+  { dado: ['trocados', 'espelhados', 'umPorVez', 'vento', 'trocados', 'umPorVez'], dado2: ['vento', 'rapido', 'gravidade', 'trocados', 'sorte', 'espelhados'] }, // 4: dois dados, quase só malucas
 ]
 
 // O Mestre de Picadeiro (tenente): um dado pequeno de 3 faces, todas gentis
@@ -99,24 +99,24 @@ export function ajusteDoAtaque(faces, forca = 1) {
   return { velocidade, densidade, dano }
 }
 
-// A deriva (px por frame) dos corações: gravidade (para cima) e mesa inclinada (de lado, com o ângulo).
-// velocidade = px/s do coração; dt em ms; angulo = o ângulo da mesa agora, em radianos (positivo = pende para a direita)
+// A deriva (px por frame) dos corações: gravidade (para cima) e mesa vento (de lado, com o ângulo).
+// velocidade = px/s do coração; dt em ms; angulo = o vento agora, em radianos (positivo = pende para a direita)
 export function derivaDosCoracoes(faces, { velocidade, dt, angulo = 0, forca = 1 }) {
   let dx = 0
   let dy = 0
   const passo = (velocidade * dt) / 1000
   if (faces.includes('gravidade')) dy -= passo * AJUSTES.gravidade.deriva * forca
-  if (faces.includes('inclinada')) {
-    const max = (AJUSTES.inclinada.graus * Math.PI) / 180
-    dx += passo * AJUSTES.inclinada.deriva * forca * (angulo / max)
+  if (faces.includes('vento')) {
+    const max = (AJUSTES.vento.graus * Math.PI) / 180
+    dx += passo * AJUSTES.vento.deriva * forca * (angulo / max)
   }
   return { dx, dy }
 }
 
-// O ângulo da mesa inclinada (radianos) no tempo t (ms de ataque): vai e volta devagar; `fase` (0..1) vem da semente
+// O vento vento (radianos) no tempo t (ms de ataque): vai e volta devagar; `fase` (0..1) vem da semente
 export function anguloDaMesa(t, fase = 0, forca = 1) {
-  const max = (AJUSTES.inclinada.graus * Math.PI) / 180 * forca
-  return Math.sin((t / AJUSTES.inclinada.periodoMs + fase) * Math.PI * 2) * max
+  const max = (AJUSTES.vento.graus * Math.PI) / 180 * forca
+  return Math.sin((t / AJUSTES.vento.periodoMs + fase) * Math.PI * 2) * max
 }
 
 // Troca-troca: os instantes (ms de ataque) das trocas até `ate`

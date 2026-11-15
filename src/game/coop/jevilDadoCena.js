@@ -45,11 +45,6 @@ function pintasDoDado(g, t, pips) {
 
 // O ícone de cada face, desenhado com formas (a fonte pixelada não tem estas setas). (x, y) = centro, r = raio.
 export function desenharIcone(g, id, x, y, r, c = FACES[id]?.cor ?? 0xffffff) {
-  const contorno = Math.max(2, r * 0.22)
-  const linha = (pts, fechar = true) => {
-    g.lineStyle(contorno + 3, 0x000000, 0.9).strokePoints(pts, fechar)
-    g.lineStyle(contorno, c, 1).strokePoints(pts, fechar)
-  }
   const pt = (px, py) => ({ x: x + px * r, y: y + py * r })
   const cheio = (pts) => {
     g.fillStyle(0x000000, 0.9).fillPoints(pts.map((p) => ({ x: x + (p.x - x) * 1.22, y: y + (p.y - y) * 1.22 })), true)
@@ -80,12 +75,12 @@ export function desenharIcone(g, id, x, y, r, c = FACES[id]?.cor ?? 0xffffff) {
   } else if (id === 'umPorVez') {
     cheio([pt(-0.78, -0.85), pt(-0.22, -0.85), pt(-0.22, 0.85), pt(-0.78, 0.85)])
     cheio([pt(0.22, -0.85), pt(0.78, -0.85), pt(0.78, 0.85), pt(0.22, 0.85)])
-  } else if (id === 'inclinada') {
-    const a = -0.34
-    const rot = (px, py) => pt(px * Math.cos(a) - py * Math.sin(a), px * Math.sin(a) + py * Math.cos(a))
-    cheio([rot(-1, -0.28), rot(1, -0.28), rot(1, 0.28), rot(-1, 0.28)])
-    linha([pt(-0.95, 0.88), pt(0.95, 0.88)], false)
-    cheio([pt(-0.25, 0.62), pt(0.25, 0.62), pt(0, 0.28)])
+  } else if (id === 'vento') {
+    for (const [py, c0, c1] of [[-0.55, -0.9, 0.5], [0, -0.5, 0.9], [0.55, -0.9, 0.3]]) {
+      g.fillStyle(0x000000, 0.9).fillRect(x + c0 * r - 2, y + py * r - r * 0.17, (c1 - c0) * r + 4, r * 0.34 + 4)
+      g.fillStyle(c, 1).fillRect(x + c0 * r, y + py * r - r * 0.13, (c1 - c0) * r, r * 0.26)
+    }
+    cheio([pt(0.5, -0.9), pt(1, -0.55), pt(0.5, -0.2)])
   }
 }
 
@@ -100,6 +95,8 @@ export function criarVisuaisDoDado(cena, { pequeno = false, corTema = 0xffd24c }
   let previaIds = null
   const graficoTroca = cena.add.graphics().setDepth(PROFUNDIDADE - 2)
   const graficoMarcas = cena.add.graphics().setDepth(11.5)
+  const graficoVento = cena.add.graphics().setDepth(11.4)
+  objs.add(graficoVento)
   objs.add(graficoTroca)
   objs.add(graficoMarcas)
   let alturaAtual = 0 // a altura do cartãozinho da rodada (a prévia fica embaixo dele)
@@ -121,12 +118,12 @@ export function criarVisuaisDoDado(cena, { pequeno = false, corTema = 0xffd24c }
     fundo.fillStyle(0x140f24, apagado ? 0.78 : 0.92).fillRoundedRect(0, 0, largura, altura, 6)
     fundo.lineStyle(2, FACES[ids[0]].cor, apagado ? 0.6 : 1).strokeRoundedRect(0, 0, largura, altura, 6)
     c.add(fundo)
-    c.add(cena.add.text(5, 3, rotulo, estilo(7, apagado ? '#a89cc8' : cor(corTema), { align: 'left', strokeThickness: 2 })))
+    c.add(cena.add.text(5, 3, rotulo, estilo(8, apagado ? '#a89cc8' : cor(corTema), { align: 'left', strokeThickness: 2 })))
     ids.forEach((id, k) => {
       const g = cena.add.graphics()
       desenharIcone(g, id, 14, 25 + k * 22, apagado ? 6.5 : 8)
       c.add(g)
-      c.add(cena.add.text(28, 25 + k * 22, semLigaduras(FACES[id].titulo), estilo(apagado ? 7 : 8, apagado ? '#d8d0f0' : '#ffffff', { align: 'left', wordWrap: { width: largura - 32 }, strokeThickness: 2 })).setOrigin(0, 0.5))
+      c.add(cena.add.text(28, 25 + k * 22, semLigaduras(FACES[id].titulo), estilo(apagado ? 8 : 9, apagado ? '#d8d0f0' : '#ffffff', { align: 'left', wordWrap: { width: largura - 32 }, strokeThickness: 2 })).setOrigin(0, 0.5))
     })
     cena.tweens.add({ targets: c, alpha: 1, x: { from: x - 18, to: x }, duration: 260, ease: 'Cubic.easeOut' })
     return guardar(c)
@@ -159,7 +156,12 @@ export function criarVisuaisDoDado(cena, { pequeno = false, corTema = 0xffd24c }
         pintasDoDado(pintas, t, 1 + Math.floor(Math.random() * 6))
         const nome = cena.add.text(x, ROLO.y + t / 2 + 14, semLigaduras(FACES[face.id].titulo), estilo(n > 1 ? 11 : pequeno ? 11 : 15, cor(FACES[face.id].cor), { strokeThickness: 5, wordWrap: { width: largura } })).setOrigin(0.5, 0).setDepth(PROFUNDIDADE).setAlpha(0)
         const texto = cena.add.text(x, ROLO.y + t / 2 + (n > 1 ? 48 : pequeno ? 34 : 38), semLigaduras(FACES[face.id].texto), estilo(n > 1 ? 8 : 9, '#ffffff', { strokeThickness: 3, wordWrap: { width: largura } })).setOrigin(0.5, 0).setDepth(PROFUNDIDADE).setAlpha(0)
-        objetos.push(c, nome, texto)
+        const placa = cena.add.graphics().setDepth(PROFUNDIDADE - 0.5).setAlpha(0)
+        const py = ROLO.y + t / 2 + 6
+        placa.fillStyle(0x0b0618, 0.82).fillRoundedRect(x - largura / 2 - 6, py, largura + 12, n > 1 ? 74 : 62, 8)
+        placa.lineStyle(2, FACES[face.id].cor, 0.9).strokeRoundedRect(x - largura / 2 - 6, py, largura + 12, n > 1 ? 74 : 62, 8)
+        cena.tweens.add({ targets: placa, alpha: 1, duration: 220, delay: 200 + k * 170 })
+        objetos.push(c, nome, texto, placa)
         // a queda: quica no "chão" da mesa
         cena.tweens.add({ targets: c, y: ROLO.y, duration: 720, delay: k * 170, ease: 'Bounce.easeOut' })
         cena.tweens.add({ targets: c, rotation: 0, duration: 760, delay: k * 170, ease: 'Cubic.easeOut' })
@@ -278,6 +280,22 @@ export function criarVisuaisDoDado(cena, { pequeno = false, corTema = 0xffd24c }
         const ay = s.y2 - uy * 14
         graficoTroca.fillStyle(s.cor, pisca + 0.2).fillTriangle(s.x2 - ux * 8, s.y2 - uy * 8, ax - uy * 6, ay + ux * 6, ax + uy * 6, ay - ux * 6)
       }
+    },
+    // VENTO MALUCO: setas em cima do quadro, para o lado e do tamanho do vento (-1..1)
+    desenharVento(forca, l) {
+      const g = graficoVento
+      g.clear()
+      const n = Math.max(1, Math.round(Math.abs(forca) * 4))
+      const dir = forca >= 0 ? 1 : -1
+      const cx = l.x + l.width / 2
+      for (let k = 0; k < n; k++) {
+        const x = cx + dir * (k * 22 - (n - 1) * 11)
+        g.fillStyle(0x000000, 0.7).fillTriangle(x - dir * 9, l.y - 15, x - dir * 9, l.y - 1, x + dir * 8, l.y - 8)
+        g.fillStyle(0xc89bff, 1).fillTriangle(x - dir * 7, l.y - 13, x - dir * 7, l.y - 3, x + dir * 6, l.y - 8)
+      }
+    },
+    limparVento() {
+      graficoVento.clear()
     },
     limparTroca() {
       graficoTroca.clear()

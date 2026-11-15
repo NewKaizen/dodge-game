@@ -4,6 +4,8 @@ import jevil from './jevil.js'
 import coronel from './coronel.js'
 import escuridao from './escuridao.js'
 import ladra from './ladra.js'
+import jevilLacaios from './jevilLacaios.js'
+import jevilTenente from './jevilTenente.js'
 import { NIVEIS } from '../../constants.js'
 import { CHEFES_CAMPANHA } from '../../campanha/chefes.js'
 
@@ -36,7 +38,7 @@ import { CHEFES_CAMPANHA } from '../../campanha/chefes.js'
 //   ladra, roubadas          (Ladra) rouba e joga as cartas dos jogadores (coop/semanal/ladra.js)
 // os da campanha (campanha/chefes.js, `campanha: true`) também moram aqui: a luta da campanha usa as
 // regras do CO-OP. Ficam fora da Selecao (ORDEM_CHEFES) e do semanal (SEMANAIS)
-export const CHEFES = { king, queen, jevil, coronel, escuridao, ladra, ...CHEFES_CAMPANHA }
+export const CHEFES = { king, queen, jevil, coronel, escuridao, ladra, ...CHEFES_CAMPANHA, jevil_lacaios: jevilLacaios, jevil_tenente: jevilTenente }
 
 const FATORES = ['velocidade', 'densidade', 'velocidadeMax', 'dano', 'hp']
 
@@ -57,3 +59,5 @@ export const CHEFES_DA_CAMPANHA = Object.keys(CHEFES).filter((id) => CHEFES[id].
 import queenLacaios from './queenLacaios.js'
 import queenTenente from './queenTenente.js'
 Object.assign(CHEFES, { queenLacaios, queenTenente })
+// Expedição (`expedicao: true`, `oculto: true`): lacaios e tenentes; fora da Selecao (ORDEM_CHEFES) e do semanal
+export const CHEFES_DA_EXPEDICAO = Object.keys(CHEFES).filter((id) => CHEFES[id].expedicao)
