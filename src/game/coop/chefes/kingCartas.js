@@ -20,16 +20,16 @@ export const ESPEC = {
     'Peões em Marcha': { cfg: { duracao: 6500, jogadas: [[peao, peao], [peao, peao]], aviso: 950, primeira: 500, intervalo: 500 } },
     'Torre à Vista': { cfg: { duracao: 7000, jogadas: [[torreLinha], [torreColuna], [torre, peao]], aviso: 1000, intervalo: 650 } },
     'Torres Gêmeas': { cfg: { duracao: 7000, jogadas: [[torreLinha, torreColuna]], aviso: 950, intervalo: 800 } },
-    'Xeque!': { cfg: { duracao: 8000, jogadas: [[peao]], aviso: 1000, primeira: 2200, intervalo: 800 }, xeque: { aviso: 3600, peca: 'torre' } },
+    'Xeque!': { cfg: { duracao: 8000, jogadas: [[peao]], aviso: 1000, primeira: 2200, intervalo: 800 }, xeque: { aviso: 3000, peca: 'torre' } },
     // fase 2: bispos e cavalos entram
     'Bispos em V': { cfg: { duracao: 7000, jogadas: [[bispo], [bispo, torreLinha]], aviso: 950, intervalo: 650 } },
     'Salto do Cavalo': { cfg: { duracao: 7000, jogadas: [[cavalo], [cavalo, peao], [cavalo, cavalo]], aviso: 900, intervalo: 650 } },
     'Corte Real': { cfg: { duracao: 8000, jogadas: [[torre, bispo], [cavalo, torre], [bispo, cavalo]], aviso: 900, intervalo: 700 } },
-    'Xeque Duplo': { cfg: { duracao: 8000, jogadas: [[bispo], [cavalo]], aviso: 950, primeira: 2000, intervalo: 800 }, xeque: { aviso: 3300, peca: 'torre' } },
+    'Xeque Duplo': { cfg: { duracao: 8000, jogadas: [[bispo], [cavalo]], aviso: 950, primeira: 2000, intervalo: 800 }, xeque: { aviso: 2800, peca: 'torre' } },
     // fase 3: promoção e roque
     Promoção: { cfg: { duracao: 8500, jogadas: [[peaoRainha, torre]], aviso: 900, primeira: 400, intervalo: 600 } },
     Roque: { cfg: { duracao: 8000, jogadas: [[torre, bispo], [cavalo, peao]], aviso: 900, primeira: 1800, intervalo: 700 }, roque: true },
-    'Xeque da Rainha': { cfg: { duracao: 8500, jogadas: [[bispo], [cavalo, peao]], aviso: 950, primeira: 2000, intervalo: 800 }, xeque: { aviso: 3100, peca: 'rainha' } },
+    'Xeque da Rainha': { cfg: { duracao: 8500, jogadas: [[bispo], [cavalo, peao]], aviso: 950, primeira: 2000, intervalo: 800 }, xeque: { aviso: 2600, peca: 'rainha' } },
     'Tabuleiro Virado': { cfg: { duracao: 8500, jogadas: [[torreLinha, torreColuna, bispo], [cavalo, torre, bispo]], aviso: 900, primeira: 1800, intervalo: 800 }, roque: true },
     // o SUPER: todas as peças, uma jogada atrás da outra
     'Xeque-Mate': { cfg: { duracao: 9500, jogadas: [[torreLinha, torreColuna, bispo], [cavalo, bispo, torre], [peaoRainha, cavalo]], aviso: 850, primeira: 500, intervalo: 450 } },

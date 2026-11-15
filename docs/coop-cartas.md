@@ -734,3 +734,52 @@ na simulação).
 muro por ataque, sem Interferência nem REBOOT; HP 380, ~2,6-3,2 min). Os dois têm `expedicao: true`, ficam fora de
 `ORDEM_CHEFES` (a Selecao não lista) e abrem com `scene.start('CoopArena', { chefe: 'queenLacaios' | 'queenTenente' })`.
 Sprites desenhados por código em `arte/queenSprites.js`. Testes: `coop/__tests__/queenWifi.test.js` e `queenRegra.test.js`.
+
+## Chaos King: TABULEIRO REAL (CO-OP 2.0)
+
+**A regra** (`coop/chefes/kingRegra.js`): *"As peças piscam as casas que vão golpear; no XEQUE, capture a peça para
+soltar o parceiro."* O quadro vira um tabuleiro de xadrez (8 x 4 casas; 4 x 4 no Cavaleiro). Cada peça mostra o
+ícone e pisca em vermelho as casas que vai golpear (`telegrafoMs` de 560 a 1100 ms) e só depois golpeia: é o aviso
+das cartas, e o validador `[telegrafo]` / `[rota de fuga]` fica limpo (os golpes são `jaAvisada` depois do `a.aviso`;
+as linhas inteiras da torre passam por `a.parede`).
+
+| Peça | Golpeia |
+|---|---|
+| peão | as duas diagonais da frente, e marcha uma casa por golpe (3 golpes até o fim) |
+| torre | a linha OU a coluna inteira, mirada no coração |
+| bispo | as duas diagonais, a partir da borda de cima ou de baixo |
+| cavalo | as casas em L (a dele fica livre) |
+| rainha | linha + coluna + diagonais; nasce da PROMOÇÃO de um peão (aviso 35% maior) |
+
+**Justiça e rede** (`coop/chefes/kingTabuleiro.js`, puro e testado): cada peça só entra na jogada se sobrar um
+REFÚGIO (bloco livre de 2 x 2 casas) ao alcance de cada coração durante o aviso; nada cai nas casas protegidas; ao
+menos uma peça mira a casa do coração parado (`a.alvo()` dentro de `a.isolado`). O dano é de balas comuns: cada PC
+decide o dos corações dele.
+
+**XEQUE** (cartas `Xeque!`, `Xeque Duplo`, `Xeque da Rainha`; só com 2 ou mais de pé): uma torre (rainha na fase 3)
+prende UM coração numa gaiola dourada de 2 x 2 casas (a regra empurra o coração de volta, só no PC dono dele) e
+mostra uma contagem 3-2-1: no fim, golpeia a gaiola toda. O parceiro (qualquer outro, no grupo) **captura a torre
+pisando na casa dourada dela** (zona da regra, lá em cima, perto dele): o golpe some, a gaiola abre (seta verde = a
+saída) e a QUEBRA ganha 25. O aviso vai de 3 s (fase 1) a 2,6 s; a CPU aliada corre para a casa (`alvoDoBot`). A gaiola, a
+casa e o preso saem só do estado (`api.rng('xeque')`, quem está de pé, onde cada coração nasce): igual em todos os PCs.
+
+**ROQUE** (fase 3: cartas `Roque` e `Tabuleiro Virado`): "ROQUE!" e, 1,3 s depois, cada coração vai ao ponto
+espelhado do tabuleiro (`api.empurrar`, só no PC dono); a primeira peça só avisa depois da troca.
+
+**Cartas por fase** (♠ ataque, ♣ armadilha, ♦ controle, ♥ cura; jogadas em `chefes/kingCartas.js`):
+
+| Fase (HP) | Cartas |
+|---|---|
+| 1 (100%): peões e torres | ♠3 Peões em Marcha · ♣4 Torre à Vista · ♠6 Torres Gêmeas · ♦5 Xeque! · ♥4 Ajeitar a Coroa |
+| 2 (66%): bispos e cavalos | ♠8 Bispos em V · ♣9 Salto do Cavalo · ♠11 Corte Real · ♦10 Xeque Duplo · ♥8 Guarda Real |
+| 3 (33%): promoção e roque | ♠10 Promoção · ♣11 Roque · ♠13 Tabuleiro Virado · ♦12 Xeque da Rainha · ♥9 Coroa Reforçada |
+| SUPER | Xeque-Mate: torres, bispos, cavalos e a rainha, jogada atrás de jogada |
+
+**Expedição** (`expedicao: true`, fora da `Selecao`; `scene.start('CoopArena', { chefe: 'kingLacaios' | 'kingTenente', ... })`):
+- `kingLacaios` (**Lacaios do Rei**, HP 190, sem regra): a torre e dois peões num só sprite (`king-lacaios`); cartas de
+  peões e torre, 2 fases. Aquecimento de ~2 min.
+- `kingTenente` (**O Cavaleiro**, HP 270): tabuleiro 4 x 4 (a caixa vira 190 x 190) e só cavalos; a regra vem em
+  versão leve (`O TABULEIRO`: ler as casas piscando), sem XEQUE nem ROQUE. ~3 min.
+
+Arte por código: `arte/kingSprites.js` (os ícones `king-p-*`, `king-lacaios`, `king-cavaleiro`). Testes:
+`coop/__tests__/kingTabuleiro.test.js`.
