@@ -1,5 +1,6 @@
 import { SPRITES, CORACAO_MAPA } from './sprites.js'
 import { PERSONAGENS } from '../data/personagens.js'
+import { TEXTURAS_QUEEN } from './queenSprites.js'
 
 // Escala em que cada sprite de pixel art aparece no jogo
 export const ESCALA = { personagem: 3, chefe: 4, coracao: 1.4 }
@@ -381,4 +382,5 @@ const GERADORES = {
   'fundo-king-losangos': tileLosangos,
   'fundo-queen-cidade': () => cidade(false),
   'fundo-queen-cidade-perto': () => cidade(true),
+  ...TEXTURAS_QUEEN, // EXPEDIÇÃO: os lacaios e o tenente da Queen (arte/queenSprites.js)
 }

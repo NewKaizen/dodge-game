@@ -51,3 +51,9 @@ export function nivelDoChefe(chefe, nivel) {
 export const ORDEM_CHEFES = ['king', 'queen', 'jevil', 'coronel'] // (os semanais ficam fora: SEMANAIS)
 export const SEMANAIS = Object.keys(CHEFES).filter((id) => CHEFES[id].semanal)
 export const CHEFES_DA_CAMPANHA = Object.keys(CHEFES).filter((id) => CHEFES[id].campanha)
+
+// EXPEDIÇÃO (lacaios -> tenente -> chefão): lutas que ficam FORA da seleção (`expedicao: true`; a Selecao anda só
+// por ORDEM_CHEFES). Queen: os robozinhos e O Firewall (a regra dela em versão leve).
+import queenLacaios from './queenLacaios.js'
+import queenTenente from './queenTenente.js'
+Object.assign(CHEFES, { queenLacaios, queenTenente })
