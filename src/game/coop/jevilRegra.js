@@ -292,14 +292,6 @@ export function criarRegraDoDado({
           mostrarPrevia()
         },
 
-        alvoDoBot(j) {
-          // a CPU só corre atrás da SORTE se tiver HP para recuperar
-          const item = api.itens().find((i) => i.rotulo === 'SORTE!')
-          const jog = api.jogadores()[j]
-          if (!item || !jog || jog.hp >= jog.hpMax) return null
-          return item
-        },
-
         terminar() {
           visuais?.destruir()
           if (cena) {

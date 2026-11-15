@@ -629,6 +629,44 @@ Dois chefes fora da Selecao (`semanal: true`), um por semana, só no CO-OP onlin
 som) e a **Ladra de Cartas** (rouba e joga as suas cartas; ♣ recupera). Regras, acessibilidade e o troféu
 exclusivo em [boss-semanal.md](boss-semanal.md).
 
+## Jevil: DADO DO CAOS (CO-OP 2.0)
+
+**A regra** (`coop/jevilRegra.js`, números em `coop/jevilDado.js`, desenho em `coop/jevilDadoCena.js`): *"Um dado
+gigante rola a cada rodada e muda a regra para todos"*. No começo da rodada o dado cai quicando, mostra a face (ícone
++ o nome em até 5 palavras + uma linha do que muda) e o resultado fica num cartãozinho à esquerda durante a rodada.
+O sorteio sai da **semente** (`rngDaRegra`): é o mesmo nos PCs e a rodada de depois já aparece em **DADO DEPOIS**
+(a prévia). Se a fase mudar no meio, a prévia é refeita com o dado novo. Chefe ATORDOADO: sem carta, sem dado.
+
+| Face | O que muda na rodada | Como (rede) |
+|---|---|---|
+| SORTE! | um coração verde no quadro cura 18 HP de quem pegar (depois que o ataque começou) | item da API; a CPU corre atrás |
+| GRAVIDADE INVERTIDA | os corações flutuam para cima (34% da velocidade deles) | `api.empurrar` só no PC dono |
+| RÁPIDO E LEVE | balas x1,45 mais rápidas, metade do dano | embrulha o `iniciar` do ataque (`ataque()`) |
+| CORAÇÕES TROCADOS | a cada ~3,4 s todos trocam de lugar (seta de aviso 1 s antes, 0,5 s de proteção depois; em 3-4 a troca gira em roda) | posições do quadro, no PC dono |
+| CONTROLES ESPELHADOS | esquerda é direita, cima é baixo (o aviso de sempre; o ataque aperta menos) | o `invertido` da arena |
+| UM CORAÇÃO POR VEZ | só um anda; a vez alterna a cada 1,5 s; o parado fica gelado, com pausa em cima e **protegido** | o parado volta ao lugar; invencibilidade |
+| VENTO MALUCO | um vento muda de lado e empurra os corações; setas em cima do quadro mostram o lado e a força | `api.empurrar` |
+
+Fases: **1** dado leve (SORTE, GRAVIDADE, RÁPIDO E LEVE) · **2** as malucas (TROCADOS, ESPELHADOS, UM POR VEZ, VENTO) ·
+**3** CAOS CAOS: dois dados por rodada · **4** dois dados, quase só malucas. Dois dados nunca repetem a face, nem
+juntam GRAVIDADE+VENTO, nem as duas faces de controle (ESPELHADOS+UM POR VEZ).
+
+Cartas (a marca dele, carrossel e foice, continua): fase 1 Espadas Dançantes, **Dados Quicantes**, Anel de Copas,
+Divisão de Paus, **Chuva de Naipes**, Pipoca (♥) · fase 2 Carrossel, Foice Giratória, Tique-Taque, **Dados Loucos**,
+Pirueta (♥) · fase 3 Carrossel Maluco, Lâmina Louca, Chuva de Naipes, BUM!, Gargalhada (♥) · fase 4 Naipes em Fila,
+Caos Afiado, Para Sempre, **Dados Malucos**. Os dados que quicam são balas `hex`. Nenhuma carta inverte os controles
+sozinha: quem faz isso é a face.
+
+**Expedição** (escondidos da Selecao: `oculto: true`, `expedicao: true`; `CHEFES_DA_EXPEDICAO`):
+`scene.start('CoopArena', { chefe: 'jevil_lacaios' | 'jevil_tenente', ... })`.
+- **Lacaios do Jevil** (`chefes/jevilLacaios.js`, sprite `jevil-lacaios`: duas cartas vivas e um palhacinho): sem regra,
+  2 fases (cartas vivas, depois os palhacinhos), ataques simples.
+- **Mestre de Picadeiro** (`chefes/jevilTenente.js`, sprite `jevil-mestre`): o tenente. Tem o **dadinho** (a mesma regra,
+  `criarRegraDoDado({ forca: 0.6, pequeno: true })`) com 3 faces gentis: SORTE!, GRAVIDADE INVERTIDA, RÁPIDO E LEVE,
+  com efeitos 40% mais fracos. Os sprites são desenhados em código (`arte/jevilExpedicao.js`).
+
+Testes: `coop/__tests__/jevil.test.js`.
+
 ## Arquivos
 
 | Arquivo | O que faz |
@@ -645,6 +683,7 @@ exclusivo em [boss-semanal.md](boss-semanal.md).
 | `src/game/coop/coop2.js` · `coop/resgate.js` · `coop/regraChefe.js` · `coop/duracao.js` · `coop/dicas.js` | CO-OP 2.0 (puro): QUEBRA, ATORDOADO, cartas de dupla, prévia; o resgate na hora; a regra do chefe; a duração das lutas; as dicas de 1ª vez |
 | `src/game/coop/reliquias.js` | a luta que continua (HP de antes) e as relíquias (`estado.mods`), para a Expedição |
 | `src/game/coop/coop2Cena.js` · `coop/coop2Arena.js` | CO-OP 2.0 na tela: a prévia, a barra, as almas, a finalização, o COMO FUNCIONA, as dicas; os métodos que as duas arenas ligam (`ligarCoop2`) |
+| `src/game/coop/jevilRegra.js` · `jevilDado.js` · `jevilDadoCena.js` · `chefes/jevilLacaios.js` · `chefes/jevilTenente.js` · `arte/jevilExpedicao.js` | Jevil: o DADO DO CAOS, os lacaios e o Mestre de Picadeiro |
 | `src/game/coop/__tests__/` | testes |
 
 ## Testes
