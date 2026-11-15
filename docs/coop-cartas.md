@@ -663,3 +663,31 @@ exclusivo em [boss-semanal.md](boss-semanal.md).
 - Balanceamento: com o jogo rodando, `node scripts/balanceamento/medirChefes.mjs
   chefes.json` (modo quadro) e `node scripts/balanceamento/simularCoop.mjs
   chefes.json 600`.
+
+## Queen: SINAL DE WI-FI (CO-OP 2.0)
+
+**Regra** (`regra` em `coop/chefes/queen.js`; lógica pura em `coop/queenWifi.js`, ligação com a API em
+`coop/queenRegra.js`, desenho em `coop/queenWifiCena.js`): *"Fiquem pertinho: sem sinal entre os corações, os dois
+levam dano."* Cada coração mostra o **raio do sinal** (disco leve) e o fio até o parceiro, com 3 barrinhas (ciano,
+amarelo, laranja; fora do raio vira pontilhado vermelho). Sem parceiro no raio por mais que a **carência** (1,4 s, a
+barrinha "SEM SINAL" enche), a conexão cai e o coração leva um **tique** (20% do dano por bala do chefe, ~3 HP) a cada
+1 s até reconectar. Com 2 jogadores (ou 1 + CPU aliada) os dois caem juntos; com 3 e 4 cada coração só precisa de UM
+parceiro no raio (corrente) e quem fica isolado leva o tique. A CPU aliada segue o alcance (`alvoDoBot`). Rede: cada
+PC manda só o tique do coração dele (`api.enviar('queda')`); o REBOOT sorteia pelo `api.rng`.
+
+| Fase | Raio | Cartas (naipe valor nome) |
+|---|---|---|
+| 1 | 150 px | ♠4 Gotas de Ácido (caem ENTRE os corações) · ♣5 Atualização Obrigatória (um muro divide o quadro, vão de 92 px) · ♦6 Laser do Roteador · ♥4 Reiniciar |
+| 2 (66%) | 120 px | ♦8 Interferência (empurra cada coração para um lado, setas avisam) · ♠9 Chuva de Ácido · ♣10 Atualização 2.0 (dois muros) · ♥9 Antivírus |
+| 3 (33%) | 100 px | ♦12 REBOOT (os corações vão para cantos opostos; reconectar a tempo dá +16 QUEBRA) · ♠11 Interferência Total · ♣13 Atualização Crítica · ♥10 Backup na Nuvem |
+
+Os ataques próprios ficam em `coop/chefes/queenAtaques.js` (`gotas`, `muro`): tudo nasce fora do quadro e entra devagar,
+o vão do muro é declarado com `a.parede` (>= 3x o coração) e a coluna nunca nasce a menos de 38 px de um coração.
+HP 460 no FÁCIL (simularCoop, MÉDIO: ~3,1 min dupla perfeita, ~3,4 mista, ~3,8 média; os tiques da regra não entram
+na simulação).
+
+**Expedição:** `queenLacaios` (Robozinhos e pop-ups: 1 fase, 4 cartas simples, sem regra, HP 230, ~1,7-2,0 min) e
+`queenTenente` (O Firewall: a mesma regra em versão leve, raio 190/170, carência 2,2 s, tique a cada 1,3 s, só um
+muro por ataque, sem Interferência nem REBOOT; HP 380, ~2,6-3,2 min). Os dois têm `expedicao: true`, ficam fora de
+`ORDEM_CHEFES` (a Selecao não lista) e abrem com `scene.start('CoopArena', { chefe: 'queenLacaios' | 'queenTenente' })`.
+Sprites desenhados por código em `arte/queenSprites.js`. Testes: `coop/__tests__/queenWifi.test.js` e `queenRegra.test.js`.

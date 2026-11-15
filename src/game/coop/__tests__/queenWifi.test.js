@@ -5,12 +5,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { WIFI, raioDaFase, danoDoTique, sinalDeCada, arestas, barras, todosLigados, MonitorDeSinal, empurrao, janelasDeEmpurrao, janelaAgora, destinosDoReboot } from '../queenWifi.js'
 import { colunaDoMuro, posicaoDaBarra } from '../chefes/queenAtaques.js'
-import { RegraDaLuta, rngDaRegra, descricaoValida } from '../regraChefe.js'
-import { CHEFES, ORDEM_CHEFES } from '../chefes/index.js'
-import { CARTAS_CHEFES, ataqueDaCartaChefe, faseDoChefe } from '../cartasChefe.js'
-import { ataques } from '../../attacks/index.js'
-import { criarPartidaCoop } from '../regras.js'
-import { LACUNA_MINIMA } from '../../attacks/validacao.js'
+import { rngDaRegra } from '../regraChefe.js'
 
 const c = (j, x, y = 100, ativo = true) => ({ j, x, y, ativo })
 
@@ -123,56 +118,4 @@ test('barra do muro entra, fica e recua (fora no começo e no fim)', () => {
   assert.equal(posicaoDaBarra(p, 900, t), 220)
   assert.ok(posicaoDaBarra(p, 2900, t) < 220)
   assert.equal(posicaoDaBarra(p, 3300, t), null)
-})
-
-// ---------- os ataques rodam numa caixa de mentira: as paredes têm lacuna, as balas nascem FORA ----------
-
-function rodarAtaque(ataque, { coracoes, semente = 'a' }) {
-  const paredes = []
-  const balas = []
-  let tempo = 0
-  const timers = []
-  const caixa = { left: 100, right: 436, top: 200, bottom: 380, centerX: 268, centerY: 290, width: 336, height: 180 }
-  let proximo = 0
-  // rng simples e determinístico
-  let s = [...semente].reduce((t, ch) => t + ch.charCodeAt(0), 7)
-  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647)
-  const a = {
-    caixa,
-    coracoes,
-    ritmo: { velocidade: 1, densidade: 1 },
-    lacunaMinima: LACUNA_MINIMA,
-    aleatorio: (min, max) => min + rnd() * (max - min),
-    inteiro: (min, max) => Math.floor(min + rnd() * (max - min + 1)),
-    aCada: (ms, fn, vezes = Infinity, atraso = null) => timers.push({ ms, fn, resto: atraso ?? ms, vezes, i: 0 }),
-    depois: (ms, fn) => timers.push({ ms: 1, fn, resto: ms, vezes: 1, i: 0 }),
-    alvo: () => ({ x: coracoes[proximo++ % coracoes.length].x, y: coracoes[0].y }),
-    deFora: (lado, fracao = 0.5, recuo = 12) => ({ x: caixa.left + fracao * caixa.width, y: caixa.top - recuo, dx: 0, dy: 1 }),
-    parede: (p) => paredes.push(p),
-    bala: (o) => balas.push(o) && o,
-    limitar: () => a,
-    get tempo() {
-      return tempo
-    },
-  }
-  ataque.iniciar(a)
-  for (; tempo < ataque.ativa; tempo += 16) {
-    for (const t of [...timers]) {
-      t.resto -= 16
-      while (t.resto <= 0 && t.vezes > 0) {
-        t.fn(t.i++)
-        t.vezes--
-        t.resto += t.ms
-      }
-    }
-  }
-  return { paredes, balas, caixa }
-}
-
-test('muro: toda parede declara uma lacuna >= mínimo e as barras nascem fora da caixa', () => {
-  for (const [nome, cfg] of [['queen', { muros: 1, abertura: 92 }], ['dois', { muros: 2, abertura: 80, fica: 1900 }], ['tenente', { muros: 1, abertura: 104 }]]) {
-    const m = ataques.juntos ? null : null
-    void m
-    return void nome && cfg // (placeholder removido abaixo)
-  }
 })
