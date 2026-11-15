@@ -227,6 +227,41 @@ leve", a Expedição pode passar uma regra própria (um `regra` com números men
 QUEBRA, 30 na fase 2). Nenhum chefe usa; os testes (`coop/__tests__/regraChefe.test.js`) e o dev usam:
 `debugJogo.jogo.scene.start('CoopArena', { chefe: 'king', nivel: 'medio', regra: 'exemplo' })`.
 
+## Coronel Caçamba: RECICLAGEM
+
+Pedido do dono: as cartas do Coronel eram "muito difíceis e chatas" (trânsito cheio, parede de brasas, forcado,
+sequências longas). Saíram todas; o chefe virou o coletor de lixo, com UMA regra e cartas poucas e avisadas.
+
+**Regra RECICLAGEM** (`coop/coronelRegra.js`, desenho em `coop/coronelCena.js`): *"Lixo VERDE não machuca: peguem
+para encher a lixeira e lançar o míssil!"* Parte do lixo que cai no quadro é verde (lata com ♻, halo pulsando):
+encostar enche a **LIXEIRA** (barra única da dupla, no HUD ao lado do chefe, 24 gomos, +3 por jogador além de 2).
+Cheia, o **MÍSSIL RECICLADO** sobe e bate nele: 8% do HP máximo e +30 de QUEBRA (dois mísseis e meio enchem a
+barra). O lixo comum (as cartas) continua machucando; um desvia e atrai o ataque enquanto o outro pega.
+Rede: todos os itens da esquiva nascem juntos no `comecarEsquiva` (mesmos ids, escondidos em cima da caixa) e andam
+por uma função do tempo; só o PC dono do coração decide o toque; o míssil aplica o dano no impacto ou, no mais
+tardar, no `terminarEsquiva` (estado igual em todos os PCs). A CPU aliada mira só o verde (e o vão do compactador).
+
+| Fase (HP) | Itens por esquiva | Cartas |
+|---|---|---|
+| 1 (100%) | 5 verdes (cada um +2) | ♠ Caminhão de Lixo · ♣ Chuva de Entulho · ♦ Buzinaço · ♥ Pausa pro Café |
+| 2 (66%) | 3 verdes + 2 **marrons** (contaminado: machuca; marrom com X vermelho, nunca verde) | ♠ Caminhão Turbo · ♣ Entulho Mirado · ♦ Buzinaço Forte · ♠ Caminhão e Entulho · ♥ Chapéu de Palha |
+| 3 (33%) | 4 verdes (+3 cada: a lixeira enche mais rápido) + 2 marrons | ♠ Caminhão Duplo · ♣ Compactador · ♦ Buzinaço Final · ♠ Caminhão e Entulho · ♥ Pit Stop |
+
+SUPER: *Dia de Coleta* (dois caminhões e entulho, tudo avisado). Ataques novos em `attacks/`:
+`coronelCaminhao` (uma faixa acende em amarelo, com setas e buzina, e só depois o caminhão cruza; sempre sobra uma
+faixa livre), `coronelEntulho` (a sombra cresce até o tamanho do estrago, ~1 s, e vira o pedregulho),
+`coronelBuzinaco` (onda de som que EMPURRA, não machuca; só o PC dono move o coração) e `coronelCompactador` (duas
+placas fecham devagar e deixam um vão de 104 px marcado desde o começo; o grupo cabe). Arte original em
+`arte/coronelSprites.js` (caminhão, Caminhão Compactador, lacaios).
+
+**Expedição** (não aparecem na seleção: `oculto`/`expedicao`; `scene.start('CoopArena', { chefe: 'coronelLacaios' })`):
+- `coronelLacaios` *Turma do Lixão* (~2 min): guaxinins e um saco de lixo num sprite só, 2 fases, sem regra, só
+  `aimed` e `coronelEntulho`.
+- `coronelTenente` *Caminhão Compactador* (~3 min): a RECICLAGEM leve (só verde, lixeira de 8 gomos, míssil de 10% e
+  +20 de QUEBRA); na 2ª fase, o compactador uma vez com vão de 124 px.
+
+Testes: `coop/__tests__/coronelRegra.test.js`.
+
 ## Quadro único
 
 Pedido do dono: "ser um quadro só: o ataque do chefe vai para os dois, que

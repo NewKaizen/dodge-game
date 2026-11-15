@@ -24,12 +24,12 @@ import { criarLixeira, desenharItemDaRegra, estouroDoItem, lancarMissil, COR_REC
 //   quebra       pontos de QUEBRA do míssil
 //   danoSujo     dano do marrom em cima do dano base do quadro (multiplicado pelo nível)
 export const PADRAO_RECICLAGEM = {
-  max: 16,
+  max: 24,
   limpos: [5, 3, 4],
   sujos: [0, 2, 2],
   valor: [2, 2, 3],
   velocidade: [1, 1.1, 1.2],
-  dano: 0.09,
+  dano: 0.08,
   quebra: 30,
   danoSujo: 7,
   hpMaxPadrao: 350,

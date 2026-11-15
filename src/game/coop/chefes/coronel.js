@@ -21,7 +21,7 @@ export default {
     cores: { bola: 0xb0875a, losango: 0xa7adb8, barra: 0x9aa7b4 },
     cor: 0xe8892a,
   },
-  hp: 400, // CO-OP 2.0: era 320; o míssil reciclado tira uma boa parte (docs/coop-cartas.md "Coronel Caçamba")
+  hp: 440, // CO-OP 2.0: era 320; o míssil reciclado tira uma boa parte (docs/coop-cartas.md "Coronel Caçamba")
   danoBala: 12,
   // DIFÍCIL: o caminhão e o entulho já apertam no ritmo base do difícil; um pouco mais de dano e menos HP
   niveis: { dificil: { dano: 1.1, hp: 0.9 } },
