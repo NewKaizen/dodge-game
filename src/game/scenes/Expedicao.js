@@ -12,7 +12,7 @@ import { nomesDaPartida } from '../pvp/nomesDaPartida.js'
 import { semLigaduras } from '../campanha/texto.js'
 import { RELIQUIAS } from '../coop/reliquias.js'
 import { desenharMapaExpedicao } from '../coop/expedicaoCena.js'
-import { ETAPAS, NOME_ETAPA, VOTO_MS, CURA_ENTRE, dadosDaLuta, escolherReliquia, resolverVotos, votoDaCpu, curaEntreLutas, expedicaoValida } from '../coop/expedicao.js'
+import { ETAPAS, NOME_ETAPA, VOTO_MS, dadosDaLuta, escolherReliquia, resolverVotos, votoDaCpu, curaEntreLutas, expedicaoValida } from '../coop/expedicao.js'
 
 // EXPEDIÇÃO (docs/coop-cartas.md "Expedição"; regras em coop/expedicao.js): a tela ENTRE as lutas.
 //   inicio    antes da 1ª luta: o mapa das 3 lutas e, só na primeira vez neste PC, o cartão COMO FUNCIONA
@@ -137,12 +137,12 @@ export default class Expedicao extends Phaser.Scene {
   // ---------- antes da 1ª luta ----------
 
   montarInicio() {
-    const id = this.exp.lutas[0]
+    const id = this.exp.lutas[this.exp.no]
     const def = CHEFES[id]
-    this.texto(LARGURA / 2, 140, '1ª LUTA: OS LACAIOS', 24, '#ffc070')
+    this.texto(LARGURA / 2, 140, this.exp.no === 0 ? '1ª LUTA: OS LACAIOS' : `${this.exp.no + 1}ª LUTA: ${NOME_ETAPA[ETAPAS[this.exp.no]]}`, 24, '#ffc070')
     this.add.image(LARGURA / 2, 236, def.sprite).setScale(ESCALA.chefe * 0.85)
     this.texto(LARGURA / 2, 318, def.nome.toUpperCase(), 18)
-    this.desenharHp(curaEntreLutas(null, null), false)
+    this.desenharHp(this.exp.hp, false)
     this.dica = this.texto(LARGURA / 2, ALTURA - 20, this.host ? 'A: começar agora' : 'a luta começa em instantes...', 13, TEXTO.desabilitado, { strokeThickness: 2 })
     if (!jaViu()) this.abrirCartao()
     else this.time.delayedCall(INICIO_MS, () => this.comecarLuta())
@@ -185,7 +185,7 @@ export default class Expedicao extends Phaser.Scene {
   montarEscolha() {
     const exp = this.exp
     const proxima = exp.no + 1
-    this.texto(LARGURA / 2, 120, `LUTA ${exp.no + 1} VENCIDA!  ESCOLHAM UMA MELHORIA`, 18, '#ffc070')
+    this.texto(LARGURA / 2, 125, `LUTA ${exp.no + 1} VENCIDA!  ESCOLHAM UMA MELHORIA`, 18, '#ffc070')
     this.cartas = exp.oferta.map((id, k) => this.desenharCarta(id, LARGURA / 2 + (k - 1) * CARTA.passo, CARTA.y))
     // o cursor de cada vaga local (e o da CPU, que anda sozinho)
     this.cursores = Array.from({ length: this.n }, (_, j) => {
@@ -195,12 +195,12 @@ export default class Expedicao extends Phaser.Scene {
     this.marcas = Array.from({ length: this.n }, () => null)
     // o relógio
     this.barraRelogio = this.add.graphics()
-    this.textoRelogio = this.texto(LARGURA / 2 + 160, 153, '', 11, TEXTO.desabilitado, { strokeThickness: 2 }).setOrigin(0, 0.5)
+    this.textoRelogio = this.texto(LARGURA / 2 + 160, 157, '', 11, TEXTO.desabilitado, { strokeThickness: 2 }).setOrigin(0, 0.5)
     this.relogio = { passou: 0, ms: VOTO_MS }
     this.textoResultado = this.texto(LARGURA / 2, 366, '', 14, '#ffe9a0', { strokeThickness: 3 }).setDepth(30)
     this.desenharHp(exp.hp, true)
     const proximoNome = exp.sorteada && proxima === 2 ? '???' : CHEFES[exp.lutas[proxima]]?.nome ?? ''
-    this.texto(LARGURA / 2, 137, `depois: ${NOME_ETAPA[ETAPAS[proxima]]} (${proximoNome})`, 11, TEXTO.desabilitado, { strokeThickness: 2 }).setOrigin(0.5)
+    this.texto(LARGURA / 2, 142, `depois: ${NOME_ETAPA[ETAPAS[proxima]]} (${proximoNome})`, 11, TEXTO.desabilitado, { strokeThickness: 2 }).setOrigin(0.5)
     this.dica = this.texto(LARGURA / 2, ALTURA - 12, '← → escolher     A: votar     (empate: vale o voto de quem tem menos HP)', 12, TEXTO.desabilitado, { strokeThickness: 2 })
     this.posicionarCursores()
     if (this.rede) this.ligarRede()
@@ -244,7 +244,8 @@ export default class Expedicao extends Phaser.Scene {
       desenhar(a)
       const valor = a == null ? 'HP cheio' : `HP ${a}/${m}`
       const texto = this.texto(x, HP_Y + 38, valor, 11, TEXTO.normal, { strokeThickness: 3 })
-      const cura = comCura && a != null ? this.texto(x, HP_Y + 54, `+${Math.round((m ?? 0) * CURA_ENTRE)} de HP na próxima luta${a <= 0 ? ' (volta!)' : ''}`, 10, '#7dff9a', { strokeThickness: 3 }) : null
+      const ganho = depois?.[j] != null && a != null ? depois[j] - Math.max(0, a) : 0
+      const cura = comCura && a != null ? this.texto(x, HP_Y + 54, ganho > 0 ? `+${ganho} de HP na próxima luta${a <= 0 ? ' (volta!)' : ''}` : 'HP cheio', 10, '#7dff9a', { strokeThickness: 3 }) : null
       return { nome, g, texto, cura, desenhar, antes: a, depois: depois?.[j] ?? null, max: m }
     })
   }
@@ -422,8 +423,8 @@ export default class Expedicao extends Phaser.Scene {
     const resto = Math.max(0, this.relogio.ms - this.relogio.passou)
     const g = this.barraRelogio
     g.clear()
-    g.fillStyle(0x000000, 0.7).fillRect(LARGURA / 2 - 152, 149, 304, 8)
-    g.fillStyle(resto < 5000 ? 0xff5050 : 0xffa040, 1).fillRect(LARGURA / 2 - 150, 151, 300 * (resto / this.relogio.ms), 4)
+    g.fillStyle(0x000000, 0.7).fillRect(LARGURA / 2 - 152, 153, 304, 8)
+    g.fillStyle(resto < 5000 ? 0xff5050 : 0xffa040, 1).fillRect(LARGURA / 2 - 150, 155, 300 * (resto / this.relogio.ms), 4)
     this.textoRelogio.setText(`${Math.ceil(resto / 1000)} s`)
     if (resto <= 0 && this.host) this.decidir()
   }

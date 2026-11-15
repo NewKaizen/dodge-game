@@ -42,6 +42,6 @@ export function desenharMapaExpedicao(cena, exp, { y = 56, atual = 0, perdeu = f
   escrever(cena, LARGURA / 2 - 252, y - 30, 'EXPEDIÇÃO', 11, '#ffc070').setOrigin(0, 0.5)
   if (reliquias && exp.reliquias.length) {
     const nomes = exp.reliquias.map((id) => RELIQUIAS[id]?.nome ?? id).join(' · ')
-    escrever(cena, LARGURA / 2, y + 50, `melhorias: ${nomes}`, 10, '#ffe9a0')
+    escrever(cena, LARGURA / 2, y + 44, `melhorias: ${nomes}`, 10, '#ffe9a0')
   }
 }

@@ -2,6 +2,7 @@ import { writable, get } from 'svelte/store'
 import { jogo } from '../estado.js'
 import { tokenConta, aoMudarConta, recarregarPerfil, ganhouItem } from '../conta.js'
 import { lerInfoSemanal, ID_SEMANA, ehTrofeuSemanal } from '../semanal.js'
+import { itemDaExpedicao } from '../cosmeticos.js'
 import { codigoDaBusca, limparSalaDaUrl } from '../salaLink.js'
 import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 
@@ -527,9 +528,12 @@ function receber(m) {
         motivo: typeof m.motivo === 'string' ? m.motivo : '',
         // BOSS SEMANAL: o troféu exclusivo da semana (novo: ganhou agora; false: já tinha)
         trofeu: m.trofeu && ehTrofeuSemanal(m.trofeu.id) && ID_SEMANA.test(m.trofeu.semana) ? { id: m.trofeu.id, semana: m.trofeu.semana, novo: Boolean(m.trofeu.novo) } : null,
+        // EXPEDIÇÃO (0017): o XP a mais (já somado no xpGanho), o verso exclusivo e o baú
+        expedicao: m.expedicao && typeof m.expedicao === 'object' ? { chefe: String(m.expedicao.chefe ?? ''), lutas: Number(m.expedicao.lutas) || 0, xp: Math.max(0, Number(m.expedicao.xp) || 0), completa: Boolean(m.expedicao.completa), cosmetico: itemDaExpedicao(m.expedicao.cosmetico) ? m.expedicao.cosmetico : null, cosmeticoNovo: Boolean(m.expedicao.cosmeticoNovo), bau: Boolean(m.expedicao.bau), bauHoje: Boolean(m.expedicao.bauHoje) } : null,
       }
       mudar({ recompensa: r })
       if (r.trofeu) ganhouItem(r.trofeu.id)
+      if (r.expedicao?.cosmeticoNovo && r.expedicao.cosmetico) ganhouItem(r.expedicao.cosmetico)
       // o nível, o XP, o inventário e as estatísticas mudaram no banco
       if (r.xpTotal != null) recarregarPerfil()
       break

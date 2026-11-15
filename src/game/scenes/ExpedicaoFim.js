@@ -91,7 +91,8 @@ export default class ExpedicaoFim extends Phaser.Scene {
     // as recompensas
     const RX = LARGURA / 2 + 30 // o texto das recompensas (à direita fica a carta do verso exclusivo)
     this.add.rectangle(LARGURA / 2 + 60, 340, 520, 108, CORES.painel, 0.9).setStrokeStyle(2, 0x5a4a30)
-    const item = cosmeticoDaExpedicao(exp.chefao)
+    // (SORTEADA: o chefão é surpresa até o time chegar nele; o verso dele não aparece antes)
+    const item = !exp.sorteada || venceu || exp.no >= 2 ? cosmeticoDaExpedicao(exp.chefao) : null
     if (item) {
       previaDe(this, 'verso', item.registro, LARGURA / 2 + 280, 340, 92, 5)
       t(LARGURA / 2 + 280, 384, item.nome, 10, '#ffc070', { strokeThickness: 3 }).setDepth(6)
@@ -108,7 +109,7 @@ export default class ExpedicaoFim extends Phaser.Scene {
       }
       this.mostrarRecompensaExp()
     } else {
-      t(RX, 342, ['Recompensas só na expedição ONLINE (com conta):', `+${XP_EXPEDICAO.porLuta} XP por luta vencida, +${XP_EXPEDICAO.completa} ao completar,`, `chance de baú e, na 1ª vez, o verso ${item?.nome ?? 'exclusivo'}.`].join('\n'), 11, TEXTO.normal, { lineSpacing: 4, strokeThickness: 3 })
+      t(RX, 342, ['Recompensas só na expedição ONLINE (com conta):', `+${XP_EXPEDICAO.porLuta} XP por luta vencida, +${XP_EXPEDICAO.completa} ao completar,`, `chance de baú e, na 1ª vez, o verso ${item?.nome ?? 'exclusivo do chefão'}.`].join('\n'), 11, TEXTO.normal, { lineSpacing: 4, strokeThickness: 3 })
     }
 
     t(LARGURA / 2, ALTURA - 22, this.naSala ? 'A: voltar ao lobby' : 'A: revanche (expedição nova)     B: menu', 13, TEXTO.desabilitado, { strokeThickness: 2 })
