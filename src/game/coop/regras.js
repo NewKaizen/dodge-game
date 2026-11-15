@@ -63,7 +63,7 @@ export { COMBO_PERFEITO, multiplicadorPerfeito, registrarPerfeitoCombo, quebrarS
 import { especialDaCarta, efeitosDaCarta, ehSuper } from '../pvp/cartas.js'
 import { CHEFES, nivelDoChefe } from './chefes/index.js'
 import { roubar, jogaRoubada, cartaDaLadra, devolver, largarRoubada, LADRA } from './semanal/ladra.js'
-import { aplicarReliquias } from './reliquias.js'
+import { aplicarReliquias, curasDasReliquias } from './reliquias.js'
 import { QUEBRA, DUPLAS, somarQuebra, duplasDaResolucao, duplasDoContra, ganhosDeQuebra, finalizacaoDaDupla, atordoadoAgora, previaDoChefe, maxQuebra } from './coop2.js'
 import { CARTAS_CHEFES, faseDoChefe, suporteDoChefe, danoDaCartaChefe, ritmoDaCartaChefe, inverteControles, poderDaCartaChefe } from './cartasChefe.js'
 
@@ -284,6 +284,9 @@ function comprarDoChefe(estado) {
   return c.monte.shift() ?? null
 }
 
+// quem levanta volta com esta fração do HP máx (a PENA DE FÊNIX da Expedição sobe; coop/reliquias.js)
+export const retornoHp = (estado) => Math.max(COOP.retornoHp, estado?.mods?.retornoHp ?? 0)
+
 function levantar(estado, j, hp) {
   const jog = estado.jogadores[j]
   jog.caido = false
@@ -366,7 +369,7 @@ export function iniciarRodadaCoop(estado) {
   const eventos = []
   estado.jogadores.forEach((jog, j) => {
     if (jog.caido && !fora(jog) && estado.rodada >= jog.voltaEm) {
-      levantar(estado, j, jog.hpMax * COOP.retornoHp)
+      levantar(estado, j, jog.hpMax * retornoHp(estado))
       eventos.push({ tipo: 'voltou', j })
     }
     jog.energia = estado.rodada === 1 ? Math.min(ENERGIA.maxima, ENERGIA.inicial + (estado.mods?.energiaInicial ?? 0)) : Math.min(ENERGIA.maxima, jog.energia + ENERGIA.porRodada)
@@ -783,7 +786,7 @@ function golpesSemLimite(estado, golpes, desempenho) {
       if (estado.jogadores[j].caido) return { j, golpe, dano: 0, falhou: true, multiplicadores: [] }
       const d = desempenho[j] ?? {}
       const mult = []
-      if (d.perfeito) mult.push(['CRÍTICO', COOP.critico])
+      if (d.perfeito) mult.push(['CRÍTICO', Math.round(COOP.critico * (estado.mods?.critico ?? 1) * 100) / 100])
       if (golpe.tipo === 'paus' && d.grazes) mult.push([`+${d.grazes} GRAZE`, 1 + Math.min(COOP.grazeArmadilhaMax, d.grazes * COOP.grazeArmadilha)])
       const combo = combos[j]
       const extra = combo ? COOP.comboGrupo * (combo.grupo - 2) : 0 // 2 jogadores: 0 (o combo de sempre)
@@ -793,9 +796,10 @@ function golpesSemLimite(estado, golpes, desempenho) {
       if (combo?.tipo === 'combo') dupla.push(['COMBO', Math.round((COOP.combo + extra) * 100) / 100])
       if (pinca.has(j)) dupla.push(['PINÇA', DUPLAS.pinca.fator])
       if (dupla.length) mult.push(dupla.sort((a, b) => b[1] - a[1])[0])
-      if (parado && golpe.tipo !== 'super') mult.push(['ATORDOADO', QUEBRA.danoAtordoado])
+      if (parado && golpe.tipo !== 'super') mult.push(['ATORDOADO', Math.round(QUEBRA.danoAtordoado * (estado.mods?.atordoado ?? 1) * 100) / 100])
       if (guarda != null) mult.push(['GUARDA', guarda])
-      if ((estado.mods?.golpe ?? 1) !== 1) mult.push(['RELÍQUIA', estado.mods.golpe])
+      const reliquia = (estado.mods?.golpe ?? 1) * (estado.mods?.naipe?.[golpe.tipo] ?? 1)
+      if (Math.abs(reliquia - 1) > 1e-9) mult.push(['RELÍQUIA', Math.round(reliquia * 100) / 100])
       const fator = mult.reduce((m, [, f]) => m * f, 1)
       // SUPER COMBO: cada SUPER vira a parte dele do combo do nível (no lugar do golpe sozinho)
       const base = golpe.tipo === 'super' && nSuper >= 2 ? danoNoCombo(estado, nSuper) : golpe.base
@@ -818,7 +822,9 @@ export function resolverContraCoop(estado, golpes, desempenho = []) {
   const total = ganhos.reduce((t, g) => t + g.pontos, 0)
   const { quebrou } = somarQuebra(estado, total)
   const quebra = { ganhos, total, quebrou, valor: estado.chefe.quebra, max: estado.chefe.quebraMax ?? maxQuebra(estado.n) }
-  return { golpes: lista, combo, duplas, quebra, finalizacao: finalizacaoDaDupla(estado) }
+  // (Expedição) as curas das relíquias: LAÇO DE AMIZADE (grazes) e PRESA DE VAMPIRO (críticos)
+  const curas = curasDasReliquias(estado, desempenho)
+  return { golpes: lista, combo, duplas, quebra, finalizacao: finalizacaoDaDupla(estado), ...(curas.length && { curas }) }
 }
 
 // Convidado: a quebra que o host somou no contra (o estado dele chega inteiro no fimRodada)
@@ -838,7 +844,7 @@ export function resgatarNaHora(estado, alvo, quem) {
   const jog = estado.jogadores[alvo]
   const salvador = estado.jogadores[quem]
   if (!jog?.caido || fora(jog) || !salvador || salvador.caido || alvo === quem || estado.chefe.hp <= 0) return { ok: false }
-  const hp = levantar(estado, alvo, jog.hpMax * COOP.retornoHp)
+  const hp = levantar(estado, alvo, jog.hpMax * retornoHp(estado))
   const { quebrou } = somarQuebra(estado, QUEBRA.resgate)
   return { ok: true, hp, quebrou }
 }
@@ -864,7 +870,7 @@ export function resgatarPorRodadaLimpa(estado, { quadro, acertos = [] } = {}) {
     .filter((j) => estado.jogadores[j].caido && !fora(estado.jogadores[j]))
     .sort((a, b) => (estado.jogadores[a].voltaEm ?? 0) - (estado.jogadores[b].voltaEm ?? 0) || a - b)
   if (!caidos.length) return []
-  levantar(estado, caidos[0], estado.jogadores[caidos[0]].hpMax * COOP.retornoHp)
+  levantar(estado, caidos[0], estado.jogadores[caidos[0]].hpMax * retornoHp(estado))
   return [caidos[0]]
 }
 

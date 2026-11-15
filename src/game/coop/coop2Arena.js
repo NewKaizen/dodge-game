@@ -317,7 +317,17 @@ export const METODOS_COOP2 = {
   // ---------- depois dos golpes do contra-ataque ----------
 
   // a QUEBRA da rodada (já somada no estado), o QUEBROU! e, na rodada ATORDOADO, a FINALIZAÇÃO EM DUPLA
-  async fecharContraCoop2({ quebra = null, finalizacao = null } = {}) {
+  async fecharContraCoop2({ quebra = null, finalizacao = null, curas = null } = {}) {
+    // (Expedição) as curas das relíquias (LAÇO DE AMIZADE, PRESA DE VAMPIRO): o HP já está no estado
+    if (curas?.length) {
+      for (const { j, hp } of curas) {
+        const p = this.personagens?.[j]
+        if (p) this.etiquetaEm(p.x, p.y - 70, `+${hp}`, TEXTO.cura ?? '#7dff9a', { tamanho: 14, ms: 1000 })
+      }
+      tocar(this, 'cura')
+      this.atualizarHuds?.()
+      this.registrar(`curaReliquia:${curas.map((c) => `${c.j}+${c.hp}`).join(',')}`)
+    }
     if (quebra?.total) {
       this.barraQuebra.ganhou(quebra.total)
       this.dicasCoop.mostrar('quebra', 'Batam juntos e acertem CRÍTICOS para encher a QUEBRA!')

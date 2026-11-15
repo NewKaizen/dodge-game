@@ -149,7 +149,7 @@ export function finalizacaoDaDupla(estado) {
   if (!atordoadoAgora(estado) || estado.chefe.hp <= 0) return null
   const jogadores = estado.jogadores.map((jog, j) => (!jog.caido && !jog.ausente && !jog.saiu ? j : -1)).filter((j) => j >= 0)
   if (!jogadores.length) return null
-  return { dano: Math.max(1, Math.round(estado.chefe.hpMax * QUEBRA.finalizacao)), jogadores }
+  return { dano: Math.max(1, Math.round(estado.chefe.hpMax * QUEBRA.finalizacao * (estado.mods?.finalizacao ?? 1))), jogadores }
 }
 
 // A carta do chefe da PRÓXIMA rodada, para a prévia (a intenção 2 rodadas à frente):

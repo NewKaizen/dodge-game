@@ -36,6 +36,7 @@ import {
   aplicarQuebraDoContra,
 } from '../coop/regras.js'
 import { REGRAS } from '../coop/regraChefe.js'
+import { aplicarCurasDoContra } from '../coop/reliquias.js'
 import { COR_ATORDOADO } from '../coop/coop2Cena.js'
 import { ligarCoop2 } from '../coop/coop2Arena.js'
 import { semLigaduras } from '../campanha/texto.js'
@@ -1138,6 +1139,7 @@ class CoopArena extends PvpArena {
     if (this.rede && !this.rede.souHost) {
       const decisao = await this.rede.receberContra()
       if (decisao) aplicarQuebraDoContra(this.estado, decisao.quebra)
+      if (decisao) aplicarCurasDoContra(this.estado, decisao.curas)
       return decisao
     }
     const desempenho = [0, 1].map((j) => ({ perfeito: this.perfeitoCoop?.[j], grazes: this.grazesRodada[j] }))
@@ -1149,12 +1151,12 @@ class CoopArena extends PvpArena {
   async contraAtaque(r) {
     const decisao = await this.golpesDaRodada(r)
     if (!decisao || this.saindo) return
-    const { golpes: lista, combo, duplas = [], quebra = null, finalizacao = null } = decisao
+    const { golpes: lista, combo, duplas = [], quebra = null, finalizacao = null, curas = null } = decisao
     this.fase = 'contra'
     if (lista.length) await this.golpesDoContra(lista, combo, duplas)
     if (this.saindo) return
     // a QUEBRA da rodada (já somada no estado), o QUEBROU! e, na rodada ATORDOADO, a FINALIZAÇÃO EM DUPLA
-    await this.fecharContraCoop2({ quebra, finalizacao })
+    await this.fecharContraCoop2({ quebra, finalizacao, curas })
   }
 
   // as cartas carregadas voam no chefe (com o banner do combo ou da carta de dupla)

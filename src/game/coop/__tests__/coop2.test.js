@@ -3,6 +3,7 @@
 // cartas de dupla e o resgate na hora (as regras; o desenho é da arena)
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { MODS_PADRAO } from '../reliquias.js'
 import { criarPartidaCoop, iniciarRodadaCoop, resolverRodadaCoop, aplicarDanoCoop, aplicarGolpe, fimDaRodadaCoop, resolverContraCoop, aplicarQuebraDoContra, resgatarNaHora, previaCoop, calcularGolpes, GOLPE, COOP } from '../regras.js'
 import { QUEBRA, DUPLAS, ORDEM_DUPLAS, maxQuebra, somarQuebra, duplasDaResolucao, duplasDoContra, ganhosDeQuebra, finalizacaoDaDupla, atordoadoAgora } from '../coop2.js'
 import { criarAlmas, posicaoDaAlma, RESGATE } from '../resgate.js'
@@ -350,7 +351,7 @@ test('a luta que continua (Expedição): HP de antes e relíquias por id', () =>
   assert.equal(e.chefe.quebra, 25, 'o amuleto enche a QUEBRA 25% mais rápido')
   const sem = nova()
   assert.deepEqual(sem.reliquias, [])
-  assert.deepEqual(sem.mods, { golpe: 1, quebra: 1, danoQuadro: 1, energiaInicial: 0 })
+  assert.deepEqual(sem.mods, MODS_PADRAO())
   // relíquia de golpe aparece no contra-ataque
   const f = nova({ reliquias: [{ id: 'forca', aplicar: (x) => (x.mods.golpe = 1.2) }] })
   iniciarRodadaCoop(f)
