@@ -18,7 +18,7 @@ export default {
     cores: { bola: 0xb0875a, losango: 0xa7adb8, barra: 0x9aa7b4 },
     cor: 0xe8892a,
   },
-  hp: 270,
+  hp: 400,
   danoBala: 10,
   // a versão leve da regra do Coronel: só verde, lixeira pequena, míssil menor
   regra: criarRegraReciclagem({
