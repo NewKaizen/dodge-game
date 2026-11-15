@@ -89,3 +89,41 @@ export function pintarCeu(g, cores, largura, altura) {
     g.fillRect(0, y, largura, Math.min(2, altura - y))
   }
 }
+
+// "Assa" camadas PARADAS de um fundo (Graphics que nunca mudam depois de desenhadas)
+// numa textura desenhada uma vez só na GPU. Um Graphics é refeito comando a comando em
+// TODO quadro: um cenário com dezenas de milhares de retângulos (paralelepípedos,
+// tijolos, janelas) derruba o FPS. Camadas vizinhas na lista de desenho (sem nada
+// animado entre elas) viram UMA imagem só, para não pintar a tela inteira várias vezes.
+// A imagem fica no lugar da primeira camada do grupo, com a mesma profundidade.
+// As texturas ficam no jogo e são reaproveitadas na próxima partida (o cenário é sempre o
+// mesmo: tudo sorteado com semente). Se a GPU não deixar criar a textura, ficam os Graphics.
+export function assarCamadas(scene, objetos, camadas, prefixo, largura, altura) {
+  const lista = scene.children.list
+  const paradas = new Set(camadas)
+  const grupos = []
+  for (const g of camadas.slice().sort((a, b) => lista.indexOf(a) - lista.indexOf(b))) {
+    const ultimo = grupos.at(-1)
+    const anterior = ultimo?.at(-1)
+    const vizinhas = anterior && lista.slice(lista.indexOf(anterior) + 1, lista.indexOf(g)).every((o) => paradas.has(o) || !o.visible)
+    if (vizinhas && anterior.depth === g.depth) ultimo.push(g)
+    else grupos.push([g])
+  }
+  grupos.forEach((grupo, i) => {
+    const chave = `${prefixo}-assado-${i}`
+    if (!scene.textures.exists(chave)) {
+      const dt = scene.textures.addDynamicTexture?.(chave, largura, altura)
+      if (!dt) return
+      dt.draw(grupo, 0, 0)
+      dt.render?.()
+    }
+    const img = scene.add.image(0, 0, chave).setOrigin(0, 0).setDepth(grupo[0].depth)
+    scene.children.moveBelow(img, grupo[0])
+    for (const g of grupo) {
+      const k = objetos.indexOf(g)
+      if (k >= 0) objetos.splice(k, 1)
+      g.destroy()
+    }
+    objetos.push(img)
+  })
+}
