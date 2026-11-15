@@ -206,6 +206,9 @@ class CoopArena extends PvpArena {
     this.semente = dados?.semente ?? `coop:${Date.now()}`
     this.tempoBase = dados?.tempo ?? 15000
     this.bonusForcado = null
+    // a luta que CONTINUA (a Expedição, coop/reliquias.js): o HP que vem de antes e as relíquias ativas (ids)
+    this.hpDosDados = Array.isArray(dados?.hp) ? dados.hp : null
+    this.reliquiasDosDados = Array.isArray(dados?.reliquias) ? dados.reliquias : []
     // (dev) uma regra de exemplo (coop/regraChefe.js REGRAS) numa luta de chefe sem regra
     this.regraDev = import.meta.env.DEV && REGRAS[dados?.regra] ? dados.regra : null
   }
@@ -229,7 +232,7 @@ class CoopArena extends PvpArena {
     this.esquivaBot = this.cpu === null ? null : new EsquivaBot({ nivel: this.nivelBot })
     this.tempoEscolha = this.tempoBase
     this.hpAvisado = [false, false]
-    this.estado = criarPartidaCoop({ party: this.ids, chefe: this.idChefe, nivel: this.idNivel, semente: this.semente })
+    this.estado = criarPartidaCoop({ party: this.ids, chefe: this.idChefe, nivel: this.idNivel, semente: this.semente , hp: this.hpDosDados, reliquias: this.reliquiasDosDados })
     this.fase = 'abertura'
     this.saindo = false
     this.pausado = false

@@ -63,6 +63,7 @@ export { COMBO_PERFEITO, multiplicadorPerfeito, registrarPerfeitoCombo, quebrarS
 import { especialDaCarta, efeitosDaCarta, ehSuper } from '../pvp/cartas.js'
 import { CHEFES, nivelDoChefe } from './chefes/index.js'
 import { roubar, jogaRoubada, cartaDaLadra, devolver, largarRoubada, LADRA } from './semanal/ladra.js'
+import { aplicarReliquias } from './reliquias.js'
 import { QUEBRA, DUPLAS, somarQuebra, duplasDaResolucao, duplasDoContra, ganhosDeQuebra, finalizacaoDaDupla, atordoadoAgora, previaDoChefe, maxQuebra } from './coop2.js'
 import { CARTAS_CHEFES, faseDoChefe, suporteDoChefe, danoDaCartaChefe, ritmoDaCartaChefe, inverteControles, poderDaCartaChefe } from './cartasChefe.js'
 
@@ -196,7 +197,9 @@ const ID_JOGADOR = ['p1', 'p2', 'p3', 'p4']
 
 // coop2: false desliga o CO-OP 2.0 (a prévia, a QUEBRA, as cartas de dupla novas): a luta da CAMPANHA usa estas
 // regras do jeito de antes (campanha/luta.js)
-export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coop', coop2 = true }) {
+// hp / reliquias: a luta que CONTINUA (a Expedição): o HP que vem da luta anterior e as melhorias ativas
+// (coop/reliquias.js)
+export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coop', coop2 = true, hp = null, reliquias = [] }) {
   const def = CHEFES[chefe]
   if (!def) throw new Error(`chefe sem baralho de cartas: ${chefe}`)
   const niv = nivelDoChefe(chefe, nivel)
@@ -231,7 +234,7 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
     }
     return jog
   }
-  return {
+  const estado = {
     modo: 'coop',
     coop2: coop2 !== false,
     semente: String(semente),
@@ -267,6 +270,9 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
     vencedor: null,
     historico: [],
   }
+  // a luta que continua: o HP de antes (null = cheio) e as relíquias (estado.mods)
+  if (Array.isArray(hp)) estado.jogadores.forEach((jog, j) => hp[j] != null && (jog.hp = Math.max(1, Math.min(jog.hpMax, Math.round(hp[j])))))
+  return aplicarReliquias(estado, reliquias)
 }
 
 function comprarDoChefe(estado) {
@@ -363,7 +369,7 @@ export function iniciarRodadaCoop(estado) {
       levantar(estado, j, jog.hpMax * COOP.retornoHp)
       eventos.push({ tipo: 'voltou', j })
     }
-    jog.energia = estado.rodada === 1 ? ENERGIA.inicial : Math.min(ENERGIA.maxima, jog.energia + ENERGIA.porRodada)
+    jog.energia = estado.rodada === 1 ? Math.min(ENERGIA.maxima, ENERGIA.inicial + (estado.mods?.energiaInicial ?? 0)) : Math.min(ENERGIA.maxima, jog.energia + ENERGIA.porRodada)
     jog.protegido = false
     completarMao(jog.baralho, MAO.tamanho)
   })
@@ -632,7 +638,7 @@ export function resolverRodadaCoop(estado, ...entradas) {
   if (destino === 'quadro' && noQuadro.some(Boolean)) {
     const ritmo = ritmoDaCartaChefe(intencao)
     if (lentidao < 1) ritmo.velocidade = Math.round(ritmo.velocidade * lentidao * 100) / 100
-    const dano = danoDaCartaChefe(intencao, estado.fatorDano * COOP.danoQuadro)
+    const dano = danoDaCartaChefe(intencao, estado.fatorDano * COOP.danoQuadro * (estado.mods?.danoQuadro ?? 1))
     const escudos = todos.map(() => null)
     const danos = todos.map((j) => {
       if (!noQuadro[j]) return null
@@ -789,6 +795,7 @@ function golpesSemLimite(estado, golpes, desempenho) {
       if (dupla.length) mult.push(dupla.sort((a, b) => b[1] - a[1])[0])
       if (parado && golpe.tipo !== 'super') mult.push(['ATORDOADO', QUEBRA.danoAtordoado])
       if (guarda != null) mult.push(['GUARDA', guarda])
+      if ((estado.mods?.golpe ?? 1) !== 1) mult.push(['RELÍQUIA', estado.mods.golpe])
       const fator = mult.reduce((m, [, f]) => m * f, 1)
       // SUPER COMBO: cada SUPER vira a parte dele do combo do nível (no lugar do golpe sozinho)
       const base = golpe.tipo === 'super' && nSuper >= 2 ? danoNoCombo(estado, nSuper) : golpe.base

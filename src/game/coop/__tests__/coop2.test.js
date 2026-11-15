@@ -339,3 +339,21 @@ test('coop2: false (a luta da campanha): sem prévia, sem QUEBRA e sem as cartas
   const [a] = calcularGolpes(e, [golpe('kris-espadas-9'), golpe('susie-paus-5')], [])
   assert.equal(a.dano, GOLPE.espadas(9), 'sem PINÇA')
 })
+
+test('a luta que continua (Expedição): HP de antes e relíquias por id', () => {
+  const e = nova({ hp: [30, null], reliquias: ['amuleto', 'nao-existe'] })
+  assert.equal(e.jogadores[0].hp, 30)
+  assert.equal(e.jogadores[1].hp, e.jogadores[1].hpMax)
+  assert.deepEqual(e.reliquias, ['amuleto'])
+  iniciarRodadaCoop(e)
+  somarQuebra(e, 20)
+  assert.equal(e.chefe.quebra, 25, 'o amuleto enche a QUEBRA 25% mais rápido')
+  const sem = nova()
+  assert.deepEqual(sem.reliquias, [])
+  assert.deepEqual(sem.mods, { golpe: 1, quebra: 1, danoQuadro: 1, energiaInicial: 0 })
+  // relíquia de golpe aparece no contra-ataque
+  const f = nova({ reliquias: [{ id: 'forca', aplicar: (x) => (x.mods.golpe = 1.2) }] })
+  iniciarRodadaCoop(f)
+  const [g] = calcularGolpes(f, [golpe('kris-espadas-9'), null], [])
+  assert.equal(g.dano, Math.round(GOLPE.espadas(9) * 1.2))
+})

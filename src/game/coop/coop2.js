@@ -132,7 +132,7 @@ export function somarQuebra(estado, pontos) {
   if (estado.coop2 === false || c.atordoado || c.hp <= 0 || !(pontos > 0)) return { ganho: 0, quebrou: false }
   const max = maxQuebra(estado.n)
   const antes = c.quebra
-  c.quebra = Math.min(max, c.quebra + Math.round(pontos))
+  c.quebra = Math.min(max, c.quebra + Math.round(pontos * (estado.mods?.quebra ?? 1))) // (relíquias: coop/reliquias.js)
   const quebrou = c.quebra >= max
   if (quebrou) {
     c.atordoado = true

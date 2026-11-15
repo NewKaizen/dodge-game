@@ -214,6 +214,15 @@ manda a mensagem `regra` (no caminho do dano, antes do `fimEsquiva` dele); os ou
 `aoPegar`/`aoEntrar`/`aoSair`. Por isso o que o `aoPegar` faz (quebra, dano no chefe, cura) acontece uma vez em
 cada PC, igual em todos. Um gancho que quebra só avisa no console (a luta segue).
 
+**Para a Expedição** (3 lutas seguidas: lacaios → tenente → chefão; ainda não existe): a luta pode
+**continuar** de outra. `criarPartidaCoop({ ..., hp: [30, null], reliquias: ['amuleto'] })` (e os mesmos `hp` e
+`reliquias` nos dados da cena: `scene.start('CoopArena', { chefe, nivel, party, hp, reliquias })`, também na
+`CoopArenaN` e em rede, porque tudo vai por id) começa com o HP que veio de antes (`null` = cheio) e com as
+melhorias ativas. Uma relíquia mora em `RELIQUIAS` (`coop/reliquias.js`): `{ id, nome, descricao, aplicar(estado) }`;
+o `aplicar` roda uma vez e mexe em `estado.mods` (`golpe`, `quebra`, `danoQuadro`, `energiaInicial`, todos lidos pelas
+regras) ou no HP/energia; `estado.reliquias` guarda os ids ativos. Para o tenente "apresentar a regra do chefe de
+leve", a Expedição pode passar uma regra própria (um `regra` com números menores) no `def` do tenente.
+
 **Exemplo neutro**: `REGRA_EXEMPLO` (`exemplo`, "ESTRELA CADENTE": uma estrela por esquiva, pegar enche 15 de
 QUEBRA, 30 na fase 2). Nenhum chefe usa; os testes (`coop/__tests__/regraChefe.test.js`) e o dev usam:
 `debugJogo.jogo.scene.start('CoopArena', { chefe: 'king', nivel: 'medio', regra: 'exemplo' })`.
@@ -634,6 +643,7 @@ exclusivo em [boss-semanal.md](boss-semanal.md).
 | `src/game/coop/ArenaRedeCoop.js` | a ponte da partida em rede (estende `pvp/rede/ArenaRede.js`) |
 | `src/game/coop/ArenaRedeCoopN.js` · `scenes/CoopArenaN.js` · `scenes/EscolhaPartyN.js` · `coop/HudCoopN.js` · `coop/partyN.js` · `coop/marcadores.js` | o CO-OP de 3 e 4: ponte em estrela, arena, escolha de party, HUD, party e formas dos corações (5B) |
 | `src/game/coop/coop2.js` · `coop/resgate.js` · `coop/regraChefe.js` · `coop/duracao.js` · `coop/dicas.js` | CO-OP 2.0 (puro): QUEBRA, ATORDOADO, cartas de dupla, prévia; o resgate na hora; a regra do chefe; a duração das lutas; as dicas de 1ª vez |
+| `src/game/coop/reliquias.js` | a luta que continua (HP de antes) e as relíquias (`estado.mods`), para a Expedição |
 | `src/game/coop/coop2Cena.js` · `coop/coop2Arena.js` | CO-OP 2.0 na tela: a prévia, a barra, as almas, a finalização, o COMO FUNCIONA, as dicas; os métodos que as duas arenas ligam (`ligarCoop2`) |
 | `src/game/coop/__tests__/` | testes |
 

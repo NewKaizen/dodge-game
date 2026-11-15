@@ -187,6 +187,9 @@ class CoopArenaN extends Phaser.Scene {
     this.partyDosDados = Array.isArray(dados?.party) && dados.party.filter((id) => PERSONAGENS[id]).length >= 3 ? dados.party.filter((id) => PERSONAGENS[id]).slice(0, 4) : null
     this.semente = dados?.semente ?? `coop4:${Date.now()}`
     this.tempoBase = dados?.tempo ?? TEMPO_ESCOLHA
+    // a luta que CONTINUA (a Expedição, coop/reliquias.js): o HP que vem de antes e as relíquias ativas (ids)
+    this.hpDosDados = Array.isArray(dados?.hp) ? dados.hp : null
+    this.reliquiasDosDados = Array.isArray(dados?.reliquias) ? dados.reliquias : []
   }
 
   create() {
@@ -201,7 +204,7 @@ class CoopArenaN extends Phaser.Scene {
     this.n = Math.min(4, Math.max(3, party.length))
     this.registry.set('party', this.ids)
     this.meu = meuIndice()
-    this.estado = criarPartidaCoop({ party: this.ids, chefe: this.idChefe, nivel: this.idNivel, semente: this.semente })
+    this.estado = criarPartidaCoop({ party: this.ids, chefe: this.idChefe, nivel: this.idNivel, semente: this.semente , hp: this.hpDosDados, reliquias: this.reliquiasDosDados })
     this.grupo = this.estado.grupo
     this.quadroCfg = quadroDoGrupo(this.grupo)
     this.nomes = Array.from({ length: this.n }, (_, j) => participantesDaPartida().find((p) => p.indice === j)?.nome ?? `P${j + 1}`)
