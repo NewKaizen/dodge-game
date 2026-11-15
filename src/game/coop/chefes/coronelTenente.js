@@ -22,7 +22,7 @@ export default {
   danoBala: 10,
   // a versão leve da regra do Coronel: só verde, lixeira pequena, míssil menor
   regra: criarRegraReciclagem({
-    max: 8,
+    max: 12,
     limpos: [4, 4],
     sujos: [0, 0],
     valor: [2, 2],
