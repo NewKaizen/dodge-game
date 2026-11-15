@@ -209,7 +209,7 @@ export const METODOS_COOP2 = {
     this.inimigo.dano(0.9)
     particulas(this, x, y - 20, { cor: COR_ATORDOADO, quantidade: 34, velocidade: 260, vida: 800 })
     this.mostrarBanner('QUEBROU!', corTexto(COR_ATORDOADO), { y: 236, tamanho: 36, ms: 1100 })
-    this.etiquetaEm(LARGURA / 2, 270, 'na próxima rodada ele fica ATORDOADO', '#ffffff', { atraso: 200, tamanho: 11, ms: 1100 })
+    this.etiquetaEm(LARGURA / 2, 270, semLigaduras('na próxima rodada ele fica ATORDOADO'), '#ffffff', { atraso: 200, tamanho: 11, ms: 1100 })
     this.atualizarChefe()
     this.atualizarPreviaChefe()
     await this.esperar(1300)
@@ -218,6 +218,7 @@ export const METODOS_COOP2 = {
   // começo da rodada ATORDOADO: ele não joga carta nesta rodada
   async anunciarAtordoado() {
     this.registrar('atordoado')
+    this.atualizarPreviaChefe() // (a prévia passa a mostrar a carta de depois dele)
     tocar(this, 'tensao')
     this.mostrarBanner('ATORDOADO!', corTexto(COR_ATORDOADO), { y: 236, tamanho: 32, ms: 1200 })
     this.etiquetaEm(LARGURA / 2, 268, semLigaduras(`ele não ataca: batam com tudo (x${String(QUEBRA.danoAtordoado).replace('.', ',')})!`), '#ffffff', { atraso: 200, tamanho: 11, ms: 1200 })

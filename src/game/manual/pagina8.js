@@ -88,7 +88,7 @@ export const PASSOS8 = [
     errou: ['Os dois caíram! Na luta de verdade isso é game over. Vamos treinar de novo?', 'Quase! Olhem cada um o seu cantinho e não parem de se mexer.', 'Dica: um olha a chuva, o outro olha a fileira. Dupla é combinar!'],
     acertou: ({ t }) => {
       const vivos = t.alvos.filter((a) => a.ativo).length
-      return vivos === t.alvos.length ? 'Os dois de pé! Que dupla! No CO-OP, golpes do mesmo naipe viram COMBO ×1,25 e do mesmo valor, PAR ×1,5.' : 'Um caiu, mas o outro segurou! No CO-OP, uma carta de copas (♥) levanta quem caiu.'
+      return vivos === t.alvos.length ? 'Os dois de pé! Que dupla! No CO-OP, ♠ e ♣ na mesma rodada viram ATAQUE EM PINÇA, e baterem juntos enche a QUEBRA do chefe.' : 'Um caiu, mas o outro segurou! No CO-OP, quem cai vira uma alma: encoste nela por 1 segundo para levantar o parceiro.'
     },
     iniciar({ caixa, humanos }) {
       return {

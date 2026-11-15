@@ -65,6 +65,9 @@ export function dicaDeDupla(carta) {
   return `DUPLA: com ${outro} de um parceiro na mesma rodada, ${d.nome} (${d.curto}).`
 }
 
+// "DUPLAS: ♠ + ♣ PINÇA · ♥ + ♦ BARREIRA · mesmo naipe COMBO · mesmo valor PAR" (o Guia, a página do chefe)
+export const listaDeDuplas = () => `DUPLAS: ${ORDEM_DUPLAS.map((id) => `${DUPLAS[id].simbolos} ${DUPLAS[id].nome.replace('ATAQUE EM ', '').replace(' DUPLA', '')}`).join(' · ')}`
+
 // carta comum (2 a K, sem Ás especial nem SUPER): a que entra numa carta de dupla
 const comum = (carta) => Boolean(carta) && !ehSuper(carta) && !especialDaCarta(carta) && carta.valor >= 2 && carta.valor <= 13
 

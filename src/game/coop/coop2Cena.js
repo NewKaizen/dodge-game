@@ -50,7 +50,7 @@ export function criarPreviaIntencao(cena, { x, y }) {
         selo.setText('★').setColor('#ffd23c')
         nome.setText('SUPER DO CHEFE!').setColor('#ff8a6a')
       } else if (t === 'atordoado') {
-        selo.setText('Z').setColor(corTexto(COR_ATORDOADO))
+        selo.setText('!').setColor(corTexto(COR_ATORDOADO))
         nome.setText('ATORDOADO: não ataca').setColor(corTexto(COR_ATORDOADO))
       } else if (t === 'oculta') {
         selo.setText('?').setColor('#d0b8ff')
@@ -226,7 +226,7 @@ export async function finalizacaoEmDupla(cena, { personagens, chefe, dano, titul
   flashTela(cena, 0xffffff, 0.6, 260)
   shake(cena, 420, 0.024)
   aoImpacto?.()
-  numero(cena, chefe.x, chefe.y - 86, `${dano}!!`, corTexto(COR_ATORDOADO), { tamanho: 34 })
+  numero(cena, chefe.x, chefe.y - 50, `${dano}!!`, corTexto(COR_ATORDOADO), { tamanho: 34 })
   cena.tweens.add({ targets: cortes, alpha: 0, duration: 500 })
   await esperar(650)
   if (!vivo()) return limpar()

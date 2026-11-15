@@ -328,3 +328,14 @@ test('resgate: a alma fica dentro do quadro', () => {
   assert.deepEqual(posicaoDaAlma(90, 400, l), { x: 100 + RESGATE.margem, y: 350 - RESGATE.margem })
   assert.deepEqual(posicaoDaAlma(200, 260, l), { x: 200, y: 260 })
 })
+
+test('coop2: false (a luta da campanha): sem prévia, sem QUEBRA e sem as cartas de dupla novas', () => {
+  const e = nova({ coop2: false })
+  iniciarRodadaCoop(e)
+  assert.equal(e.chefe.proxima, null)
+  const r = resolverRodadaCoop(e, naMao(e, 0, 'kris-copas-3'), naMao(e, 1, 'susie-ouros-7'))
+  assert.deepEqual(r.duplas, [])
+  assert.deepEqual(somarQuebra(e, 999), { ganho: 0, quebrou: false })
+  const [a] = calcularGolpes(e, [golpe('kris-espadas-9'), golpe('susie-paus-5')], [])
+  assert.equal(a.dano, GOLPE.espadas(9), 'sem PINÇA')
+})
