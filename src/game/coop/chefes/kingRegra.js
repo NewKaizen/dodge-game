@@ -41,9 +41,9 @@ export function criarRegraKing({ id = 'tabuleiro', nome = 'TABULEIRO REAL', desc
 
         // a gaiola: grades douradas em volta das casas 2 x 2 e uma seta verde (a SAÍDA) para cima
         const g = a.cena.add.graphics().setDepth(4.4)
-        g.fillStyle(OURO, 0.1).fillRect(ret.left, ret.top, ret.right - ret.left, ret.bottom - ret.top)
-        g.lineStyle(2, OURO, 0.95).strokeRect(ret.left + 1, ret.top + 1, ret.right - ret.left - 2, ret.bottom - ret.top - 2)
-        g.lineStyle(2, OURO, 0.55)
+        g.fillStyle(OURO, 0.22).fillRect(ret.left, ret.top, ret.right - ret.left, ret.bottom - ret.top)
+        g.lineStyle(3, OURO, 1).strokeRect(ret.left + 1, ret.top + 1, ret.right - ret.left - 2, ret.bottom - ret.top - 2)
+        g.lineStyle(2, OURO, 0.85)
         for (let x = ret.left + 14; x < ret.right - 6; x += 14) g.lineBetween(x, ret.top + 1, x, ret.bottom - 1)
         a.decoracao(g)
         const seta = a.cena.add.graphics().setDepth(4.5)
@@ -73,7 +73,7 @@ export function criarRegraKing({ id = 'tabuleiro', nome = 'TABULEIRO REAL', desc
         marca.lineStyle(3, OURO, 1).strokeRect(q.x + 2, q.y + 2, q.largura - 4, q.altura - 4)
         a.decoracao(marca)
         a.cena.tweens.add({ targets: marca, alpha: 0.3, duration: 320, yoyo: true, repeat: -1 })
-        const rotulo = a.cena.add.text(q.cx, q.y + q.altura + 6, 'CAPTURE!', { fontFamily: 'monospace', fontSize: '9px', color: TEXTO_OURO, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5).setDepth(4.7)
+        const rotulo = a.cena.add.text(q.cx, q.y + q.altura + 6, 'CAPTURE!', { fontFamily: 'monospace', fontSize: '13px', color: TEXTO_OURO, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5).setDepth(4.7)
         a.decoracao(rotulo)
 
         api.banner('XEQUE!', TEXTO_OURO)
