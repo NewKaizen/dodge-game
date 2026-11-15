@@ -22,7 +22,7 @@ export default {
     cores: { losango: 0xb48cff, coroa: 0xffd23c, barra: 0xd8c8ff, bola: 0xb48cff },
     cor: 0xb48cff,
   },
-  hp: 360, // CO-OP 2.0: era 240 (a QUEBRA, a finalização e as cartas de dupla batem mais; docs/coop-cartas.md)
+  hp: 520, // CO-OP 2.0: era 240 (QUEBRA, finalização e cartas de dupla batem mais; as peças são legíveis, então a luta pede HP: ~3,3 min no MÉDIO, simularCoop.mjs)
   danoBala: 7,
   // DIFÍCIL: o King é o chefe mais fraco de base (dano por bala baixo e padrões
   // fáceis de ler): no difícil ele aperta bem mais o ritmo (SUPER ~23 por acerto)

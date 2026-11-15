@@ -18,7 +18,7 @@ export default {
     cores: { losango: 0xb48cff, coroa: 0xffd23c, barra: 0xd8c8ff, bola: 0xb48cff },
     cor: 0xd8c8ff,
   },
-  hp: 190, // (o SUPER vale pelo menos coop/regras.js COOP.superPiso: abaixo disto o combo não passaria do SUPER sozinho)
+  hp: 260, // ~1,9 min no MÉDIO; o SUPER vale no mínimo COOP.superPiso (60): com menos HP o combo não passaria do SUPER sozinho
   danoBala: 5,
   leve: carta('leve'),
   fases: [

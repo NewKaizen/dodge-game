@@ -50,14 +50,14 @@ export const PECAS = {
   cavalo: [
     '..kk........',
     '.kffk.......',
-    '.kfffkkk....',
-    'kfffffffkk..',
-    'kfekfffffsk.',
+    '.kfffkk.....',
+    'kfffffffk...',
+    'kfekfffffk..',
     'kffffffffsk.',
-    '.kkfffffffsk',
+    'kkkfffffffsk',
+    '..kfffffffsk',
     '...kffffffsk',
-    '...kfffffsk.',
-    '..kffffffssk',
+    '..kfffffffsk',
     '.kfffffffssk',
     '.kkkkkkkkkkk',
   ],
@@ -122,14 +122,34 @@ function lacaios() {
   return c
 }
 
-// O CAVALEIRO (tenente): o cavalo em tamanho de chefe, roxo, com a crina dourada e o olho vermelho
+// O CAVALEIRO (tenente): a cabeça de cavalo em tamanho de chefe, roxa, com a crina dourada e o olho vermelho
+const CAVALEIRO = [
+  '..........kk............',
+  '.........kffk.yy........',
+  '........kfffkyyyy.......',
+  '.......kfffffkyyyyk.....',
+  '......kfffffffkyyyyk....',
+  '.....kfffffffffkyyyk....',
+  '....kfffffffffffkyyk....',
+  '...kffeekffffffffkyk....',
+  '..kfffeekffffffffffk....',
+  '.kffffffkfffffffffsk....',
+  'kfffffffffffffffffsk....',
+  'kffffkkffffffffffssk....',
+  'kfffkk.kffffffffffsk....',
+  '.kkkk..kfffffffffssk....',
+  '.......kffffffffsssk....',
+  '......kfffffffffssk.....',
+  '.....kffffffffffssk.....',
+  '....kfffffffffffssk.....',
+  '...kffffffffffffssk.....',
+  '..kfffffffffffffssk.....',
+  '..kkkkkkkkkkkkkkkkk.....',
+]
+
 function cavaleiro() {
-  const [c, g] = tela(28, 30)
-  mapa(g, PECAS.cavalo, 2, 2, 2, { f: '#a98be8', s: '#6a4fb0', e: '#ff3040' }) // 24 x 24
-  g.fillStyle = PALETA.y
-  for (let k = 0; k < 6; k++) g.fillRect(14 + k * 2, 3 + k, 2, 4) // a crina
-  g.fillStyle = PALETA.e
-  g.fillRect(6, 10, 3, 2) // o olho
+  const [c, g] = tela(24, CAVALEIRO.length)
+  mapa(g, CAVALEIRO, 0, 0, 1, { f: '#a98be8', s: '#6a4fb0' })
   return c
 }
 

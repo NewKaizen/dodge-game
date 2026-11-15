@@ -776,10 +776,14 @@ espelhado do tabuleiro (`api.empurrar`, só no PC dono); a primeira peça só av
 | SUPER | Xeque-Mate: torres, bispos, cavalos e a rainha, jogada atrás de jogada |
 
 **Expedição** (`expedicao: true`, fora da `Selecao`; `scene.start('CoopArena', { chefe: 'kingLacaios' | 'kingTenente', ... })`):
-- `kingLacaios` (**Lacaios do Rei**, HP 190, sem regra): a torre e dois peões num só sprite (`king-lacaios`); cartas de
+- `kingLacaios` (**Lacaios do Rei**, HP 260, sem regra): a torre e dois peões num só sprite (`king-lacaios`); cartas de
   peões e torre, 2 fases. Aquecimento de ~2 min.
-- `kingTenente` (**O Cavaleiro**, HP 270): tabuleiro 4 x 4 (a caixa vira 190 x 190) e só cavalos; a regra vem em
+- `kingTenente` (**O Cavaleiro**, HP 430): tabuleiro 4 x 4 (a caixa vira 190 x 190) e só cavalos; a regra vem em
   versão leve (`O TABULEIRO`: ler as casas piscando), sem XEQUE nem ROQUE. ~3 min.
 
 Arte por código: `arte/kingSprites.js` (os ícones `king-p-*`, `king-lacaios`, `king-cavaleiro`). Testes:
 `coop/__tests__/kingTabuleiro.test.js`.
+
+Balanceamento (`medirChefes.mjs` + `simularCoop.mjs`, MÉDIO, 300 partidas, zero avisos `[telegrafo]`/`[rota de fuga]`):
+chefão 3,0 a 3,7 min (7,5 a 8,8 rodadas, HP 520), lacaios 1,9 a 2,0 min (HP 260), Cavaleiro 2,8 a 3,0 min (HP 430).
+A medição não liga a regra: o XEQUE e o ROQUE não entram nas médias (o baralho sem regra joga só as peças).

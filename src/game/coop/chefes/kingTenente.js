@@ -20,7 +20,7 @@ export default {
     cores: { losango: 0xa98be8, coroa: 0xffd23c, barra: 0xd8c8ff, bola: 0xa98be8 },
     cor: 0xa98be8,
   },
-  hp: 270,
+  hp: 430, // ~3 min no MÉDIO (simularCoop.mjs)
   danoBala: 6,
   leve: carta('leve'),
   regra: criarRegraKing({
