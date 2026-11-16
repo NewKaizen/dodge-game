@@ -192,6 +192,31 @@ e o navegador leem `frente_equipada` numa consulta à parte) e o baú só sortei
 com erro, porque já existem itens `frente.*`). Para reaplicar, rode só a 0016. `bausSql.test.js` roda a 0001–0015
 duas vezes e depois a 0016 duas vezes (com `DODGE_PG`).
 
+### 2.11 Migration 0017: a Expedição do CO-OP
+
+Rode `supabase/migrations/0017_expedicao.sql` depois da 0016 (depende da 0001, 0003, 0006, 0010, 0013 e 0015;
+roda de novo sem estragar). Ela cria:
+
+- os 4 **versos exclusivos** da Expedição no catálogo (`verso.exp_tabuleiro`, `verso.exp_sinal`, `verso.exp_dado`,
+  `verso.exp_reciclador`; coluna nova `catalogo_itens.expedicao` = o chefão), com `nivel_requerido` 1000 e
+  `bau = false` (nem a trilha nem o baú entregam);
+- as tabelas `expedicoes` (uma linha por partida e conta: o XP a mais, a âncora da idempotência e do teto do dia) e
+  `expedicoes_chefes` (a 1ª expedição completa de cada conta contra cada chefão: a trava do verso), com RLS (cada
+  conta lê só as suas; o navegador não escreve);
+- a função `conceder_expedicao(partida, chefão, lutas)` (SECURITY DEFINER, só o servidor): confere a partida de
+  CO-OP **validada**, a duração mínima por luta e, conta por conta, o relato dela dizendo o mesmo chefão e as
+  mesmas lutas; soma `expedicao_xp_luta()` por luta vencida + `expedicao_xp_completa()` (teto
+  `expedicao_xp_teto_dia()`) e dá o verso na 1ª vez; chamar de novo devolve o que já foi;
+- a fonte de baú nova **`expedicao`** (chave `expedicao:<AAAA-MM-DD>:<chefão>`; o `conceder_bau` é recriado com o
+  ramo novo e as checagens de `baus.fonte`/`baus.chave` trocadas): o banco só concede se a conta completou a
+  expedição daquele chefão naquele dia.
+
+Sem a 0017 o jogo entra e joga normal (inclusive a Expedição): o servidor loga o erro de `conceder_expedicao` e
+segue com o XP de sempre da partida. Depois da 0017, para reaplicar a 0015 rode a 0017 em seguida (a 0015 recria
+o `conceder_bau` sem a fonte nova). Detalhes em [coop-cartas.md](coop-cartas.md) ("Expedição") e
+[baus.md](baus.md). `expedicaoSql.test.js` roda a 0001–0015 duas vezes e depois a 0016 e a 0017 duas vezes (com
+`DODGE_PG`).
+
 ## 3. Conferir o bucket
 
 Em **Storage** deve aparecer o bucket `avatares`, marcado como **Public**.

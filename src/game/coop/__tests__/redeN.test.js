@@ -129,6 +129,31 @@ test('dano e graze: o dono manda ao host, que confere, repassa a todos e aplica;
   m.fechar()
 })
 
+test('CO-OP 2.0: o resgate na hora e a regra do chefe vão como o dano (o host confere o dono, repassa e aplica)', async () => {
+  const m = montar()
+  await comecar(m)
+  const recebido = {}
+  for (const id of m.ids) {
+    recebido[id] = { resgates: [], regra: [] }
+    m.nos[id].arena.aplicarResgate = (quem, alvo) => recebido[id].resgates.push([quem, alvo])
+    m.nos[id].arena.regra = { aoMensagem: (lado, acao, dados) => recebido[id].regra.push([lado, acao, dados?.id]) }
+    m.nos[id].rede.comecarLuta()
+  }
+  // o A (vaga 0) encostou na alma do B (vaga 1); o C pegou um item da regra
+  m.nos.A.rede.enviarResgate(0, 1)
+  m.nos.C.rede.enviarRegra('item', { id: 'item:1:0', j: 3 })
+  await espera()
+  for (const id of ['H', 'B', 'C']) assert.deepEqual(recebido[id].resgates, [[0, 1]], id)
+  assert.deepEqual(recebido.A.resgates, [], 'o A já aplicou o dele')
+  for (const id of ['H', 'A', 'B']) assert.deepEqual(recebido[id].regra, [[3, 'item', 'item:1:0']], id)
+  assert.deepEqual(recebido.C.regra, [])
+  // ninguém levanta pelo coração dos outros
+  m.nos.A.rede.enviar('resgate', null, { lado: 1, alvo: 2, r: 1 })
+  await espera()
+  assert.ok(!recebido.H.resgates.some(([q]) => q === 1))
+  m.fechar()
+})
+
 test('dano que chega antes da esquiva começar aqui espera por ela', async () => {
   const m = montar({ n: 3 })
   await comecar(m)

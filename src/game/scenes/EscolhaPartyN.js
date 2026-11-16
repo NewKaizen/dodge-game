@@ -67,7 +67,7 @@ export default class EscolhaPartyN extends Phaser.Scene {
     if (semanal && CHEFES[semanal.chefe]) return irParaCena(this, 'Dificuldade', { chefe: semanal.chefe, party: lista, nivel: this.registry.get('nivel') })
     const chefe = this.sys.settings.data?.chefe
     if (partyAtiva() && CHEFES[chefe]) return irParaCena(this, 'Dificuldade', { chefe, party: lista, nivel: this.registry.get('nivel') })
-    irParaCena(this, 'Selecao', { party: lista, chefe: this.registry.get('chefe') })
+    irParaCena(this, 'ModoCoop', { party: lista }) // LUTA RÁPIDA ou EXPEDIÇÃO, depois a Selecao
   }
 
   create() {

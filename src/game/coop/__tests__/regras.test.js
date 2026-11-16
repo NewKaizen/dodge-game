@@ -21,6 +21,7 @@ import { CARTAS_CHEFES, ataqueDaCartaChefe, danoDaCartaChefe, faseDoChefe } from
 import { CHEFES, nivelDoChefe } from '../chefes/index.js'
 import { NIVEIS } from '../../constants.js'
 import { escolherJogadaCoop } from '../bot.js'
+import { DUPLAS } from '../coop2.js'
 import { CARTAS } from '../../pvp/cartas.js'
 import { criarRng } from '../../pvp/baralho.js'
 
@@ -69,8 +70,9 @@ test('todo chefe tem baralho em todas as fases, com SUPER e ataques montáveis',
 
 test('fase do chefe pelo HP', () => {
   assert.equal(faseDoChefe('king', 1), 0)
-  assert.equal(faseDoChefe('king', 0.6), 0)
-  assert.equal(faseDoChefe('king', 0.5), 1)
+  assert.equal(faseDoChefe('king', 0.7), 0)
+  assert.equal(faseDoChefe('king', 0.66), 1) // (Chaos King: 3 fases, 1 / 0,66 / 0,33)
+  assert.equal(faseDoChefe('king', 0.33), 2)
   assert.equal(faseDoChefe('jevil', 0.2), 3)
 })
 
@@ -381,9 +383,10 @@ test('golpes: crítico, armadilha, combo, par, guarda e caído', () => {
   par[1] = { ...par[1], carta: { ...par[1].carta, valor: 7 } }
   assert.equal(comboDosGolpes(par), 'par')
   const golpes = [g('kris-espadas-9'), g('kris-paus-10')]
+  // (♠ + ♣ na mesma rodada é a carta de dupla ATAQUE EM PINÇA, coop2.js: x1,3 nos dois)
   const [a, b] = calcularGolpes(e, golpes, [{ perfeito: true }, { grazes: 5 }])
-  assert.equal(a.dano, Math.round(GOLPE.espadas(9) * COOP.critico))
-  assert.equal(b.dano, Math.round(GOLPE.paus(10) * (1 + 5 * COOP.grazeArmadilha)))
+  assert.equal(a.dano, Math.round(GOLPE.espadas(9) * COOP.critico * DUPLAS.pinca.fator))
+  assert.equal(b.dano, Math.round(GOLPE.paus(10) * (1 + 5 * COOP.grazeArmadilha) * DUPLAS.pinca.fator))
   e.chefe.guarda = 0.5
   const [c] = calcularGolpes(e, [golpes[0], null])
   assert.equal(c.dano, Math.round(GOLPE.espadas(9) * 0.5))

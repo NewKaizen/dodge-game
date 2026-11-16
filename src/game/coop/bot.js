@@ -11,6 +11,28 @@
 import { especialDaCarta, efeitosDaCarta, ehSuper } from '../pvp/cartas.js'
 import { aleatorio } from '../pvp/baralho.js'
 import { GOLPE } from './regras.js'
+import { DUPLAS, atordoadoAgora } from './coop2.js'
+
+// CO-OP 2.0: a CPU joga CARTAS DE DUPLA às vezes (coop2.js). Ela olha a carta em que o parceiro está com o
+// cursor (dica.carta: segue quem joga) e, sem isso, a mão dele (com menos peso)
+const comum = (c) => Boolean(c) && !ehSuper(c) && !especialDaCarta(c) && c.valor >= 2 && c.valor <= 13
+const PARES = [
+  [...DUPLAS.pinca.naipes, 22],
+  [...DUPLAS.barreira.naipes, 16],
+]
+function bonusDeDupla(carta, outra) {
+  if (!comum(carta) || !comum(outra)) return 0
+  for (const [a, b, bonus] of PARES) if ((carta.naipe === a && outra.naipe === b) || (carta.naipe === b && outra.naipe === a)) return bonus
+  if (carta.naipe === outra.naipe && carta.naipe !== 'copas') return 8 // COMBO
+  return 0
+}
+function notaDeDupla(estado, j, carta, dica) {
+  if (dica?.carta) return bonusDeDupla(carta, dica.carta)
+  const parceiro = estado.jogadores.find((jog, k) => k !== j && !jog.caido && !jog.saiu && !jog.ausente)
+  if (!parceiro) return 0
+  const possiveis = parceiro.baralho.mao.filter((c) => c.custo <= parceiro.energia)
+  return Math.max(0, ...possiveis.map((c) => bonusDeDupla(carta, c))) * 0.35
+}
 
 const fracao = (jog) => (jog.caido ? 0 : jog.hp / jog.hpMax)
 
@@ -53,12 +75,20 @@ function notaDaCartaCoop(estado, j, carta) {
   return golpe(carta.valor) * (carta.naipe === 'paus' ? 1.1 : 1) - carta.custo * 1.2
 }
 
-export function escolherJogadaCoop(estado, j, { rng = null } = {}) {
+// dica = { carta } (opcional): a carta em que o parceiro está agora (a CPU tenta fechar uma carta de dupla)
+export function escolherJogadaCoop(estado, j, { rng = null, dica = null } = {}) {
   const jog = estado.jogadores[j]
   if (jog.caido) return null
   const jogaveis = jog.baralho.mao.filter((c) => c.custo <= jog.energia)
   const sorte = () => (rng ? aleatorio(rng) : Math.random())
-  const notas = jogaveis.map((carta) => ({ carta, nota: notaDaCartaCoop(estado, j, carta) + sorte() * 3 }))
+  // chefe ATORDOADO (coop2.js): os golpes batem mais e não há ataque para tirar: bater com tudo
+  const parado = atordoadoAgora(estado)
+  const nota = (carta) => {
+    const base = notaDaCartaCoop(estado, j, carta)
+    const golpe = GOLPE[carta.naipe] && comum(carta)
+    return base * (parado && golpe ? 1.5 : 1) + notaDeDupla(estado, j, carta, dica)
+  }
+  const notas = jogaveis.map((carta) => ({ carta, nota: nota(carta) + sorte() * 3 }))
   notas.sort((a, b) => b.nota - a.nota)
   const melhor = notas[0]
   // com o SUPER na mão e perto da energia dele, junta energia (se não for emergência)

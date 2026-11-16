@@ -46,7 +46,8 @@ export function criarLuta({ mundo, fase: n, semente, desafio = null }) {
   if (!m || !fase) throw new Error(`fase da campanha não existe: ${mundo}-${n}`)
   if (!CHEFES[fase.inimigo]) throw new Error(`chefe da campanha não existe: ${fase.inimigo}`)
   const aliado = fase.aliado ?? null
-  const estado = criarPartidaCoop({ party: [m.personagem, aliado ?? m.personagem], chefe: fase.inimigo, nivel: fase.nivel ?? 'facil', semente: `campanha:${semente}` })
+  // (coop2: false: a campanha continua com as regras do CO-OP de antes; o CO-OP 2.0 é só do modo CO-OP)
+  const estado = criarPartidaCoop({ party: [m.personagem, aliado ?? m.personagem], chefe: fase.inimigo, nivel: fase.nivel ?? 'facil', semente: `campanha:${semente}`, coop2: false })
   // sozinho (fase 1): a vaga 2 sai da luta (fora do quadro, sem jogar, sem mira)
   if (!aliado) definirPresenca(estado, { saiu: [1] })
   // só um naipe: o seu baralho (o monte) fica só com ele

@@ -21,7 +21,7 @@ export const ESTAVEL_MS = 700
 export const CENAS_DO_POPUP = new Set([
   'Menu', 'Lan', 'Perfil', 'Amigos', 'Config', 'Grimorio', 'GuiaBonus', 'GuiaEntrada', 'GaleriaCosmeticos',
   'ManualRalsei', 'ManualRalsei2', 'ManualRalsei3', 'ManualRalsei4', 'ManualRalsei5', 'ManualRalsei6', 'ManualRalsei7', 'ManualRalsei8', 'ManualRalsei9',
-  'PvpResultado', 'PvpResultadoN', 'Vitoria', 'GameOver', 'CampanhaFim', 'PartyFim', 'DesafioDiario', 'Campanha',
+  'PvpResultado', 'PvpResultadoN', 'Vitoria', 'GameOver', 'ExpedicaoFim', 'CampanhaFim', 'PartyFim', 'DesafioDiario', 'Campanha',
 ])
 
 export const podeMostrarPopup = (cenas) => Array.isArray(cenas) && cenas.length > 0 && cenas.every((k) => CENAS_DO_POPUP.has(k))

@@ -345,10 +345,10 @@ export default class EscolhaParty extends Phaser.Scene {
     // que a cena abriu). Em rede o host leva os dois, com o chefe da última
     // luta, para os dois cursores começarem no mesmo lugar; o convidado espera
     this.time.delayedCall(740, () => {
-      if (!this.rede) irCarregando(this, 'Selecao', { party })
+      if (!this.rede) irCarregando(this, 'ModoCoop', { party })
       // BOSS SEMANAL: o chefe é o da semana (sem Selecao), direto para o nível
       else if (souHostDaRede() && salaSemanal()) irParaCena(this, 'Dificuldade', { party, chefe: salaSemanal().chefe, nivel: this.registry.get('nivel') })
-      else if (souHostDaRede()) irParaCena(this, 'Selecao', { party, chefe: this.registry.get('chefe') })
+      else if (souHostDaRede()) irParaCena(this, 'ModoCoop', { party })
     })
   }
 

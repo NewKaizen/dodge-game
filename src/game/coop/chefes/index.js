@@ -2,8 +2,14 @@ import king from './king.js'
 import queen from './queen.js'
 import jevil from './jevil.js'
 import coronel from './coronel.js'
+import coronelLacaios from './coronelLacaios.js'
+import coronelTenente from './coronelTenente.js'
 import escuridao from './escuridao.js'
 import ladra from './ladra.js'
+import jevilLacaios from './jevilLacaios.js'
+import jevilTenente from './jevilTenente.js'
+import kingLacaios from './kingLacaios.js'
+import kingTenente from './kingTenente.js'
 import { NIVEIS } from '../../constants.js'
 import { CHEFES_CAMPANHA } from '../../campanha/chefes.js'
 
@@ -33,10 +39,15 @@ import { CHEFES_CAMPANHA } from '../../campanha/chefes.js'
 //   semanal                  BOSS SEMANAL (docs/boss-semanal.md): fora da Selecao e da votação da
 //                            party; só aparece na semana dele (src/lib/semanal.js, AGENDA)
 //   escuro                   (Escuridão) a caixa no escuro e as pistas de som (coop/semanal/escuridao.js)
+//   oculto, expedicao        (Expedição) lacaios e tenentes: fora da Selecao (ORDEM_CHEFES) e das votações; abre-se com
+//                            scene.start('CoopArena', { chefe: '<id>' }). O Coronel tem coronelLacaios e coronelTenente
 //   ladra, roubadas          (Ladra) rouba e joga as cartas dos jogadores (coop/semanal/ladra.js)
 // os da campanha (campanha/chefes.js, `campanha: true`) também moram aqui: a luta da campanha usa as
 // regras do CO-OP. Ficam fora da Selecao (ORDEM_CHEFES) e do semanal (SEMANAIS)
-export const CHEFES = { king, queen, jevil, coronel, escuridao, ladra, ...CHEFES_CAMPANHA }
+export const CHEFES = { king, queen, jevil, coronel, escuridao, ladra, ...CHEFES_CAMPANHA, jevilLacaios, jevilTenente }
+// EXPEDIÇÃO (`expedicao: true`: fora da Selecao, que só mostra ORDEM_CHEFES): os lacaios e o tenente de cada chefe
+Object.assign(CHEFES, { kingLacaios, kingTenente })
+Object.assign(CHEFES, { coronelLacaios, coronelTenente })
 
 const FATORES = ['velocidade', 'densidade', 'velocidadeMax', 'dano', 'hp']
 
@@ -51,3 +62,11 @@ export function nivelDoChefe(chefe, nivel) {
 export const ORDEM_CHEFES = ['king', 'queen', 'jevil', 'coronel'] // (os semanais ficam fora: SEMANAIS)
 export const SEMANAIS = Object.keys(CHEFES).filter((id) => CHEFES[id].semanal)
 export const CHEFES_DA_CAMPANHA = Object.keys(CHEFES).filter((id) => CHEFES[id].campanha)
+
+// EXPEDIÇÃO (lacaios -> tenente -> chefão): lutas que ficam FORA da seleção (`expedicao: true`; a Selecao anda só
+// por ORDEM_CHEFES). Queen: os robozinhos e O Firewall (a regra dela em versão leve).
+import queenLacaios from './queenLacaios.js'
+import queenTenente from './queenTenente.js'
+Object.assign(CHEFES, { queenLacaios, queenTenente })
+// Expedição (`expedicao: true`, `oculto: true`): lacaios e tenentes; fora da Selecao (ORDEM_CHEFES) e do semanal
+export const CHEFES_DA_EXPEDICAO = Object.keys(CHEFES).filter((id) => CHEFES[id].expedicao)

@@ -155,7 +155,13 @@ import { nomeSeguro } from '../src/lib/contaRegras.js'
 import { arranjoValido } from '../src/lib/times2x2.js'
 import { infoSemanal } from '../src/lib/semanal.js'
 
-export const PROTOCOLO = 20
+// CO-OP 2.0 (PROTOCOLO 21, docs/coop-cartas.md "CO-OP 2.0"): a partida de CO-OP ganhou as mensagens `resgate` e
+// `regra` (pelo canal, entre os PCs; o servidor só repassa) e o `contra` leva a QUEBRA: um PC de versão velha
+// não pode jogar CO-OP com um novo
+// EXPEDIÇÃO (PROTOCOLO 22, docs/coop-cartas.md "Expedição"): o relato do CO-OP leva `expedicao {chefe, lutas, sorteada}`
+// e a `recompensa` volta com `expedicao {xp, completa, cosmetico, cosmeticoNovo, bau, bauHoje}`; no canal da partida, os
+// votos entre as lutas (`expVoto`, `expVotos`, `expEscolha`; o host decide)
+export const PROTOCOLO = 22
 export const PORTA_DESCOBERTA = 47777
 // Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
 // aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")
@@ -276,7 +282,7 @@ export const trocarMdns = (texto, ip) => (typeof texto === 'string' ? texto.repl
 // sem ele as partidas não dão XP)
 // eleicaoMs: a janela de medição da eleição do host (anexarLan usa ELEICAO_MS; sem
 // ela, 0: decide na hora só com os pings que o servidor já tem)
-export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null, relacoes = null, registro = null, agendar = agendarPadrao, log = () => {}, metricas = METRICAS_NULA } = {}) {
+export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null, relacoes = null, registro = null, agendar = agendarPadrao, log = () => {}, metricas = METRICAS_NULA, sortearBauExpedicao = undefined } = {}) {
   // BOSS SEMANAL: a semana do relógio daqui (deslocarSemana: só no dev, DODGE_SEMANA=n semanas para a frente)
   const semanaAgora = () => infoSemanal(agora() + deslocarSemana)
   const clientes = new Map() // id -> cliente
@@ -298,7 +304,7 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
   const conquistas = criarConquistas({ registro, log })
   // BAÚS (0015): concedidos depois do XP (partidas, campanha, desafio, conquistas), abertos aqui
   const baus = criarBaus({ registro, log })
-  const partidas = criarPartidas({ registro, agora, agendar, entregar, log, versao: PROTOCOLO, metricas, conquistas, baus })
+  const partidas = criarPartidas({ registro, agora, agendar, entregar, log, versao: PROTOCOLO, metricas, conquistas, baus, sortearBau: sortearBauExpedicao })
   // CAMPANHA (e o DESAFIO DIÁRIO): a partida single-player que o servidor roda (o envio é direto para a conexão)
   const campanha = criarCampanha({ registro, agora, agendar, enviar: (c, msg) => c && enviar(c, msg), log, conquistas, baus })
   const saiuDaConta = new Map() // conta -> quando caiu (só para contar reconexões; nada por jogador sai daqui)

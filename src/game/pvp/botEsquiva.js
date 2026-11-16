@@ -209,7 +209,9 @@ export class EsquivaBot {
     return vistas
   }
 
-  decidir({ coracao, limites, balas, zonas, velocidade = 180, fatorVelocidade = 1, velocidadeMax = Infinity, invertido = false }) {
+  // alvo (opcional, CO-OP 2.0): { x, y } para onde ir enquanto desvia (a alma do parceiro caído, um item da
+  // regra do chefe): no lugar do "perto do centro", o fim do caminho perto do alvo pesa (o perigo continua mandando)
+  decidir({ coracao, limites, balas, zonas, velocidade = 180, fatorVelocidade = 1, velocidadeMax = Infinity, invertido = false, alvo = null }) {
     const chanceErro = this.cfg.erro + (invertido ? this.confusaoAgora() : 0)
     if (this.sorte() < chanceErro) return DIRECOES[1 + Math.floor(this.sorte() * 16)]
     const ativas = balas.filter((b) => !b.morta && !b.inofensiva)
@@ -258,8 +260,14 @@ export class EsquivaBot {
       // fim do caminho: longe das paredes e perto do centro (mais espaço para fugir depois)
       const nx = (x - cx) / meiaLargura
       const ny = (y - cy) / meiaAltura
-      custo += (nx * nx + ny * ny) * 4
-      if (Math.abs(nx) > 0.85 || Math.abs(ny) > 0.85) custo += 10
+      if (alvo) {
+        const ax = (x - alvo.x) / meiaLargura
+        const ay = (y - alvo.y) / meiaAltura
+        custo += (ax * ax + ay * ay) * 14
+        // fora do alcance do alvo (a alma pede ~1 s encostado): um degrau, para a CPU não sair à toa
+        if (Math.hypot(x - alvo.x, y - alvo.y) > (alvo.raio ?? 12)) custo += 6
+      } else custo += (nx * nx + ny * ny) * 4
+      if (!alvo && (Math.abs(nx) > 0.85 || Math.abs(ny) > 0.85)) custo += 10
       // leve preferência por continuar o movimento (menos tremedeira)
       if (d.x !== this.direcao.x || d.y !== this.direcao.y) custo += 0.5
       if (custo < menor) {

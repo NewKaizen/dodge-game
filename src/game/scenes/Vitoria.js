@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import Controles from '../controles.js'
 import { CHEFES } from '../coop/chefes/index.js'
 import { criarFundo } from '../backgrounds/index.js'
-import { ESCALA } from '../arte/texturas.js'
+import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { tocar, musica } from '../audio.js'
 import { calcularRank, formatarTempo } from '../coop/nota.js'
 import { partyDe } from '../data/batalha.js'
@@ -305,7 +305,7 @@ export default class Vitoria extends Phaser.Scene {
 
   // Chefe (retrato à esquerda) e party comemorando embaixo dele
   entrarParty(rapido) {
-    const chefe = this.add.image(COLUNA_PARTY, 192, this.def.sprite).setScale(ESCALA.chefe * 0.62).setDepth(5)
+    const chefe = this.add.image(COLUNA_PARTY, 192, this.def.sprite).setScale(escalaDe(this.def.sprite, ESCALA.chefe * 0.62)).setDepth(5)
     chefe.setTint(0x6a6a6a).setAlpha(0.6).setAngle(-12)
     this.tweens.add({ targets: chefe, angle: -9, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' })
 

@@ -167,5 +167,5 @@ test('ITENS_BAU = os itens com bau das migrations 0015 e 0016 (id, tipo, nome, r
 test('baú nunca se compra: nada no catálogo fala de preço ou moeda', () => {
   const fonte = readFileSync(new URL('../cosmeticos.js', import.meta.url), 'utf8')
   assert.doesNotMatch(fonte, /preco|preço|moeda_|comprar\(|pagamento/i)
-  assert.deepEqual(Object.keys(C.FONTES_BAU).sort(), ['conquista', 'desafio', 'dia', 'nivel', 'semanal'])
+  assert.deepEqual(Object.keys(C.FONTES_BAU).sort(), ['conquista', 'desafio', 'dia', 'expedicao', 'nivel', 'semanal'])
 })

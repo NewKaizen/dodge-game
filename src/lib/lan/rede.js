@@ -2,6 +2,7 @@ import { writable, get } from 'svelte/store'
 import { jogo } from '../estado.js'
 import { tokenConta, aoMudarConta, recarregarPerfil, ganhouItem } from '../conta.js'
 import { lerInfoSemanal, ID_SEMANA, ehTrofeuSemanal } from '../semanal.js'
+import { itemDaExpedicao } from '../cosmeticos.js'
 import { codigoDaBusca, limparSalaDaUrl } from '../salaLink.js'
 import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 
@@ -76,7 +77,11 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 // PAUSA ONLINE (PROTOCOLO 20, docs/rede-pvp.md "Aba em segundo plano e pausa online"): `pausado {valor}`
 // (o menu de pausa aberto por cima da partida, que continua); o membro da sala vem com `pausado` (só
 // em partida) além do `segundoPlano` (aba escondida). participantes() leva os dois
-export const PROTOCOLO = 20
+// CO-OP 2.0 (PROTOCOLO 21, docs/coop-cartas.md "CO-OP 2.0"): a partida de CO-OP ganhou as mensagens `resgate` e
+// `regra` (pelo canal, entre os PCs; o servidor só repassa) e o `contra` leva a QUEBRA: um PC de versão velha
+// não pode jogar CO-OP com um novo
+// EXPEDIÇÃO (PROTOCOLO 22, docs/coop-cartas.md "Expedição"): `resultado` do CO-OP com `expedicao`; votos no canal
+export const PROTOCOLO = 22
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
@@ -523,9 +528,12 @@ function receber(m) {
         motivo: typeof m.motivo === 'string' ? m.motivo : '',
         // BOSS SEMANAL: o troféu exclusivo da semana (novo: ganhou agora; false: já tinha)
         trofeu: m.trofeu && ehTrofeuSemanal(m.trofeu.id) && ID_SEMANA.test(m.trofeu.semana) ? { id: m.trofeu.id, semana: m.trofeu.semana, novo: Boolean(m.trofeu.novo) } : null,
+        // EXPEDIÇÃO (0017): o XP a mais (já somado no xpGanho), o verso exclusivo e o baú
+        expedicao: m.expedicao && typeof m.expedicao === 'object' ? { chefe: String(m.expedicao.chefe ?? ''), lutas: Number(m.expedicao.lutas) || 0, xp: Math.max(0, Number(m.expedicao.xp) || 0), completa: Boolean(m.expedicao.completa), cosmetico: itemDaExpedicao(m.expedicao.cosmetico) ? m.expedicao.cosmetico : null, cosmeticoNovo: Boolean(m.expedicao.cosmeticoNovo), bau: Boolean(m.expedicao.bau), bauHoje: Boolean(m.expedicao.bauHoje) } : null,
       }
       mudar({ recompensa: r })
       if (r.trofeu) ganhouItem(r.trofeu.id)
+      if (r.expedicao?.cosmeticoNovo && r.expedicao.cosmetico) ganhouItem(r.expedicao.cosmetico)
       // o nível, o XP, o inventário e as estatísticas mudaram no banco
       if (r.xpTotal != null) recarregarPerfil()
       break
@@ -799,12 +807,13 @@ export const limparRevanche = () => mudar({ revanche: null })
 //   PVP:    { partidaId, vencedorLado: 0 | 1 | null, rodadas, duracao, personagem }
 //   CO-OP:  { partidaId, vitoria: true | false (o time venceu o chefe), rodadas, duracao, personagem }
 //   (CO-OP do BOSS SEMANAL: + semana, a semana do chefe que este PC enfrentou)
-export function enviarResultado({ partidaId, vencedorLado, vitoria, colocacoes, vencedorTime, rodadas, duracao, personagem, semana }) {
+// (EXPEDIÇÃO do CO-OP: + expedicao { chefe, lutas, sorteada }, o chefão e quantas lutas o time venceu)
+export function enviarResultado({ partidaId, vencedorLado, vitoria, colocacoes, vencedorTime, rodadas, duracao, personagem, semana, expedicao }) {
   if (typeof partidaId !== 'string' || !partidaId || relatadas.has(partidaId)) return false
   // todos contra todos (5D): as vagas do 1º ao último
   // 2x2 (5E): o time vencedor (0 | 1 | null = empate)
   const resultado = vencedorTime !== undefined ? { vencedorTime: vencedorTime === 0 || vencedorTime === 1 ? vencedorTime : null } : Array.isArray(colocacoes) ? { colocacoes: [...colocacoes] } : typeof vitoria === 'boolean' ? { vitoria } : { vencedorLado: vencedorLado === 0 || vencedorLado === 1 ? vencedorLado : null }
-  const relato = { partidaId, ...resultado, rodadas, duracao, personagem, ...(typeof vitoria === 'boolean' && ID_SEMANA.test(semana ?? '') && { semana }) }
+  const relato = { partidaId, ...resultado, rodadas, duracao, personagem, ...(typeof vitoria === 'boolean' && ID_SEMANA.test(semana ?? '') && { semana }), ...(typeof vitoria === 'boolean' && expedicao && typeof expedicao.chefe === 'string' && { expedicao: { chefe: expedicao.chefe, lutas: expedicao.lutas | 0, sorteada: Boolean(expedicao.sorteada) } }) }
   if (ws?.readyState !== WebSocket.OPEN) {
     // caiu e está voltando (2D): o relato sai na volta, uma vez só
     if (!estado().religando) return false

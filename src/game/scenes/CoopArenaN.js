@@ -24,14 +24,19 @@ import {
   podeJogarCoop,
   resolverRodadaCoop,
   aplicarDanoCoop,
-  calcularGolpes,
-  comboDosGolpes,
   aplicarGolpe,
+  resolverContraCoop,
+  aplicarQuebraDoContra,
   fracaoDoCombo,
   danoComEscudo,
   registrarPerfeitoCombo,
 } from '../coop/regras.js'
 import { quadroDoGrupo, inicioDoCoracao } from '../coop/quadro.js'
+import { ligarCoop2 } from '../coop/coop2Arena.js'
+import { aplicarCurasDoContra } from '../coop/reliquias.js'
+import { COR_ATORDOADO } from '../coop/coop2Cena.js'
+import { semLigaduras } from '../campanha/texto.js'
+import { expedicaoValida, ultimaLuta } from '../coop/expedicao.js'
 import { superNoChefe } from '../coop/superNoChefe.js'
 import ArenaRedeCoopN from '../coop/ArenaRedeCoopN.js'
 import HudCoopN from '../coop/HudCoopN.js'
@@ -70,11 +75,18 @@ import { fatores } from '../acessibilidade.js'
 //     voltou, entra na próxima rodada ainda caído ("voltou caído: precisa de resgate");
 //     não voltou, SAIU e a luta segue sem ele
 //
+//   - o CO-OP 2.0 (coop/coop2Arena.js, o mesmo da CoopArena): a prévia da próxima carta do chefe, a barra de
+//     QUEBRA (o ATORDOADO e a FINALIZAÇÃO EM GRUPO), o resgate na hora (a alma; qualquer aliado de pé levanta), as
+//     cartas de dupla (qualquer par do grupo) e a regra do chefe. resgate/regra vão pela ponte como o dano
+//
 //   irParaCena(this, 'CoopArenaN', { chefe, nivel, party: [p1..pN] (por vaga), semente })
 //   window.coopArena (dev): estadoDebug, setHp, setEnergia, setHpChefe, forcarMao (valem em todos os PCs)
 
 const CHEFE = { x: CENTRO_X, y: 196 }
 const INTENCAO = { x: CENTRO_X, y: 278 }
+// CO-OP 2.0: a barra de QUEBRA embaixo do HP do chefe e a prévia da próxima carta à esquerda da carta da rodada
+const BARRA_QUEBRA = { x: CHEFE.x, y: CHEFE.y - 85 }
+const PREVIA_CHEFE = { x: INTENCAO.x - 40, y: INTENCAO.y }
 const LARGURA_INTENCAO = 42
 const ROTULO_INTENCAO = { x: INTENCAO.x + 30, y: INTENCAO.y }
 // onde ficam, por vaga: a carta revelada na mesa, o golpe carregando e o personagem. Vagas 0 e 1 à esquerda, 2 e 3 à direita
@@ -150,9 +162,21 @@ const estadoInicial = () => ({
   prontos: [],
   musicaEspecial: null,
   vigia: 0,
+  // CO-OP 2.0 (coop/coop2Arena.js)
+  previaChefe: null,
+  barraQuebra: null,
+  almas: null,
+  visualAlmas: null,
+  regra: null,
+  dicasCoop: null,
+  comoFunciona: null,
+  marcaAtordoado: null,
+  quebraParaAnunciar: false,
+  logCoop2: [],
+  expedicao: null, // (EXPEDIÇÃO, coop/expedicao.js) o estado da expedição desta luta, ou null (luta rápida)
 })
 
-export default class CoopArenaN extends Phaser.Scene {
+class CoopArenaN extends Phaser.Scene {
   constructor() {
     super('CoopArenaN')
   }
@@ -166,6 +190,11 @@ export default class CoopArenaN extends Phaser.Scene {
     this.partyDosDados = Array.isArray(dados?.party) && dados.party.filter((id) => PERSONAGENS[id]).length >= 3 ? dados.party.filter((id) => PERSONAGENS[id]).slice(0, 4) : null
     this.semente = dados?.semente ?? `coop4:${Date.now()}`
     this.tempoBase = dados?.tempo ?? TEMPO_ESCOLHA
+    // a luta que CONTINUA (a Expedição, coop/reliquias.js): o HP que vem de antes e as relíquias ativas (ids)
+    this.hpDosDados = Array.isArray(dados?.hp) ? dados.hp : null
+    this.reliquiasDosDados = Array.isArray(dados?.reliquias) ? dados.reliquias : []
+    // a EXPEDIÇÃO (coop/expedicao.js): no fim a luta vai para a tela entre as lutas (Expedicao) ou a do fim
+    this.expedicao = expedicaoValida(dados?.expedicao) ? dados.expedicao : null
   }
 
   create() {
@@ -180,7 +209,7 @@ export default class CoopArenaN extends Phaser.Scene {
     this.n = Math.min(4, Math.max(3, party.length))
     this.registry.set('party', this.ids)
     this.meu = meuIndice()
-    this.estado = criarPartidaCoop({ party: this.ids, chefe: this.idChefe, nivel: this.idNivel, semente: this.semente })
+    this.estado = criarPartidaCoop({ party: this.ids, chefe: this.idChefe, nivel: this.idNivel, semente: this.semente , hp: this.hpDosDados, reliquias: this.reliquiasDosDados })
     this.grupo = this.estado.grupo
     this.quadroCfg = quadroDoGrupo(this.grupo)
     this.nomes = Array.from({ length: this.n }, (_, j) => participantesDaPartida().find((p) => p.indice === j)?.nome ?? `P${j + 1}`)
@@ -226,6 +255,7 @@ export default class CoopArenaN extends Phaser.Scene {
     this.criarChefe()
     this.criarPersonagens()
     this.criarQuadro()
+    this.criarCoop2({ previa: PREVIA_CHEFE, barra: BARRA_QUEBRA })
     this.huds = Array.from({ length: this.n }, (_, j) => new HudCoopN(this, { vaga: j, n: this.n, nome: this.nomes[j], personagem: this.ids[j], hpMax: this.estado.jogadores[j].hpMax, meu: j === this.meu }))
     this.criarTopo()
     this.criarMao()
@@ -233,6 +263,7 @@ export default class CoopArenaN extends Phaser.Scene {
 
     this.controles.onBotao((_, botao) => {
       if (this.saindo) return
+      if (this.comoFunciona) return botao === 'A' && this.comoFunciona()
       if (botao === 'A') this.apertarA()
       else if (botao === 'B') this.apertarB()
     })
@@ -279,7 +310,7 @@ export default class CoopArenaN extends Phaser.Scene {
     const def = this.defChefe
     this.inimigo = new Inimigo(this, CHEFE.x, CHEFE.y, def)
     this.inimigo.nome.setFontSize(13).setStroke('#000000', 3)
-    this.textoChefe = this.add.text(CHEFE.x, 115, '', { fontFamily: FONTE, fontSize: '9px', color: '#ffd23c', stroke: '#000000', strokeThickness: 3, align: 'center' }).setOrigin(0.5).setDepth(30)
+    this.textoChefe = this.add.text(CHEFE.x, 124, '', { fontFamily: FONTE, fontSize: '9px', color: '#ffd23c', stroke: '#000000', strokeThickness: 3, align: 'center' }).setOrigin(0.5).setDepth(30)
     this.balao = new Balao(this)
     this.balao.grafico.setDepth(62)
     this.balao.texto.setDepth(63)
@@ -467,6 +498,33 @@ export default class CoopArenaN extends Phaser.Scene {
     return this.nomes[j] ?? `P${j + 1}`
   }
 
+  // ---------- CO-OP 2.0 (coop/coop2Arena.js) ----------
+
+  vagasCoop2() {
+    return this.n
+  }
+
+  corDoJogador(j) {
+    return corDaVaga(j)
+  }
+
+  nomeCurto(j) {
+    return nomeNoCoracao(this.nomeDe(j), 8)
+  }
+
+  avisoDe(j) {
+    return this.avisos?.[j] ?? null
+  }
+
+  get chefePos() {
+    return CHEFE
+  }
+
+  // só o MEU coração é simulado aqui (os outros são espelho)
+  souDonoDoCoracao(j) {
+    return j === this.meu
+  }
+
   // o texto do estado da mão de cada jogador no cartão dele
   textoDoEstado(j) {
     const jog = this.estado.jogadores[j]
@@ -507,9 +565,10 @@ export default class CoopArenaN extends Phaser.Scene {
     this.atualizarEstados()
   }
 
-  atualizarChefe() {
+  atualizarChefe({ animado = true } = {}) {
     const c = this.estado.chefe
     this.inimigo.atualizar(c.hp, c.hpMax)
+    this.atualizarCoop2Chefe({ animado })
     const partes = []
     if (c.guarda != null) partes.push(`GUARDA -${Math.round((1 - c.guarda) * 100)}%`)
     const faltam = c.cargaMax - c.carga
@@ -631,6 +690,7 @@ export default class CoopArenaN extends Phaser.Scene {
     const time = this.add.text(-300, 214, lista, estilo(this.n === 4 ? 18 : 22, '#ffffff')).setOrigin(0.5).setDepth(96)
     const vs = this.add.text(LARGURA / 2, 246, 'CONTRA', estilo(14, TEXTO.selecionado)).setOrigin(0.5).setDepth(96).setScale(0)
     const chefe = this.add.text(LARGURA + 200, 278, this.defChefe.nome.toUpperCase(), estilo(26, corTexto(this.defChefe.tema.cor))).setOrigin(0.5).setDepth(96)
+    this.faixaDaExpedicao() // (EXPEDIÇÃO) "LUTA 2 DE 3 · TENENTE" em cima
     tocar(this, 'voo')
     await this.tween({ targets: time, x: LARGURA / 2, duration: 360, ease: 'Back.easeOut' })
     this.tween({ targets: vs, scale: 1, duration: 200, ease: 'Back.easeOut' })
@@ -642,6 +702,7 @@ export default class CoopArenaN extends Phaser.Scene {
     await this.esperar(1300)
     await this.tween({ targets: [time, vs, chefe], alpha: 0, duration: 260 })
     ;[time, vs, chefe].forEach((t) => t.destroy())
+    await this.aberturaCoop2()
   }
 
   async inicioDaRodada() {
@@ -676,7 +737,11 @@ export default class CoopArenaN extends Phaser.Scene {
     this.atualizarMonte()
     if (eventos.some((e) => e.tipo === 'superChefe')) await this.anunciarSuperChefe()
     if (this.saindo) return
+    if (eventos.some((e) => e.tipo === 'atordoado')) await this.anunciarAtordoado()
+    if (this.saindo) return
     await this.mostrarIntencao()
+    this.atualizarPreviaChefe()
+    this.regra?.inicioDaRodada(this.estado.rodada)
   }
 
   // O chefe joga UMA carta virada embaixo dele, com o naipe à vista: o ataque dela vai no quadro, nos dois
@@ -711,7 +776,7 @@ export default class CoopArenaN extends Phaser.Scene {
   // o chefe mira em quem? (rodízio de mira): o nome dos alvos no alto do quadro e, na esquiva, a mira girando no coração
   mostrarAlvos(mira) {
     const nomes = mira.map((j) => nomeNoCoracao(this.nomeDe(j), 8)).join(' · ')
-    this.etiquetaEm(CENTRO_X, 126, `ALVO: ${nomes}`, '#ff7a6a', { tamanho: 11, ms: 2200 })
+    this.etiquetaEm(CENTRO_X, 138, `ALVO: ${nomes}`, '#ff7a6a', { tamanho: 11, ms: 2200 })
     mira.forEach((j) => {
       const p = this.personagens[j]
       this.etiquetaEm(p.x + (p.direita ? -22 : 22), p.y - 62, 'ALVO!', '#ff7a6a', { tamanho: 9, ms: 1800, atraso: 100 })
@@ -1120,6 +1185,9 @@ export default class CoopArenaN extends Phaser.Scene {
     this.atualizarHuds()
     this.atualizarCaidos()
     this.atualizarChefe()
+    this.atualizarPreviaChefe() // (o A♦ pode ter tirado a carga do SUPER dele)
+    await this.duplasDaRevelacao(r) // CARTA DE DUPLA da resolução: ♥ + ♦ = BARREIRA DUPLA
+    if (this.saindo) return
     if (r.efeitos[this.meu].compradas.length) {
       await this.esperar(400)
       await this.sincronizarMao({ intervalo: 140 })
@@ -1188,11 +1256,13 @@ export default class CoopArenaN extends Phaser.Scene {
         if (efeitoDoReflexo(this, espelho, carta, { dir: Math.sign(CHEFE.x - carta.x) || 1, alvo: { x: CHEFE.x, y: CHEFE.y - 20 }, escala: escalaDaCarta(carta) })) await this.esperar(170)
         carta.arremessar({ x: CHEFE.x, y: CHEFE.y - 20 }, { duracao: 340, aoImpacto: () => this.inimigo.dano(0.2) })
       } else if (carta) this.tirarDaMesa(carta)
-      this.mostrarBanner('NENHUM ATAQUE DO CHEFE', TEXTO.desabilitado, { y: 236, tamanho: 16, ms: 800 })
+      if (r.atordoado) this.mostrarBanner('ELE ESTÁ ATORDOADO!', corTexto(COR_ATORDOADO), { y: 236, tamanho: 18, ms: 800 })
+      else this.mostrarBanner('NENHUM ATAQUE DO CHEFE', TEXTO.desabilitado, { y: 236, tamanho: 16, ms: 800 })
       tocar(this, 'vazio')
       await this.esperar(1000)
       return
     }
+    this.previaChefe?.esconder() // o quadro abre por cima dela
     this.mao.setPosicao({ y: MAO_FORA })
     this.botaoPassar.descer(true)
     this.status.setText('')
@@ -1271,13 +1341,16 @@ export default class CoopArenaN extends Phaser.Scene {
     const q = r.destino === 'quadro' ? r.quadro : null
     this.superDoChefeNoQuadro = Boolean(q && ehSuper(q.carta))
     if (!q) return
-    const ataque = ataqueDaCartaChefe(q.carta, { ataques })
+    // a regra do chefe pode trocar o ataque da carta (coop/regraChefe.js: ataque(carta, A, padrao))
+    const ataque = this.regra.ataque(q.carta, ataques, ataqueDaCartaChefe(q.carta, { ataques }))
     if (q.inverter) this.invertido = { avisado: false }
     const base = this.ritmoBase
     const ritmo = { velocidade: base.velocidade * q.ritmo.velocidade, densidade: base.densidade * q.ritmo.densidade }
     const promessa = this.quadro.rodar(ataque, { dano: q.dano, ritmo, semente: `${this.semente}:${this.estado.rodada}:quadro`, aceleracao: 1, mira: q.mira ?? null })
+    this.comecarEsquivaCoop2(q)
     this.rede.comecarLuta()
     await this.rede.esperarFimEsquiva(promessa, q.jogadores)
+    this.terminarEsquivaCoop2()
     if (this.saindo) return
     for (let j = 0; j < this.n; j++) this.perfeitoCoop[j] = q.jogadores[j] && !this.acertosRodada[j] && !this.ko[j] && !this.estado.jogadores[j].caido && !this.rede.fora(j)
     const perfeitos = this.registrarPerfeitosNoQuadro(q)
@@ -1349,6 +1422,7 @@ export default class CoopArenaN extends Phaser.Scene {
     const joy = this.controles.joy(meuLado())
     const meu = invertendo ? { x: -joy.x, y: -joy.y } : joy
     quadro.atualizar(delta, (jogador) => (jogador === this.meu ? meu : { x: 0, y: 0 }))
+    this.atualizarCoop2NoQuadro(delta)
   }
 
   // Quem caiu da rede no meio da esquiva some do quadro; a luta continua sem ele
@@ -1427,6 +1501,7 @@ export default class CoopArenaN extends Phaser.Scene {
     flashTela(this, corDaVaga(j), 0.25, 220)
     this.quadro.caixa.tremer(260, 4)
     if (coracao?.ativo) particulas(this, coracao.x, coracao.y, { cor: coracao.cor, quantidade: 30, velocidade: 220, vida: 700 })
+    this.deixarAlma(j) // RESGATE NA HORA: fica a alma dele no quadro (qualquer aliado de pé pode levantar)
     coracao?.esconder()
     this.avisos[j].setText('CAIU!').setColor(TEXTO.caido).setFontSize(12)
     this.atualizarCaidos()
@@ -1466,23 +1541,40 @@ export default class CoopArenaN extends Phaser.Scene {
 
   // ---------- contra-ataque ----------
 
+  // o contra-ataque da rodada (resolverContraCoop: golpes, combo, cartas de dupla, QUEBRA, finalização): o
+  // host calcula e manda; o convidado soma a mesma quebra no estado dele
   async golpesDaRodada(r) {
-    if (!this.rede.souHost) return this.rede.receberContra()
+    if (!this.rede.souHost) {
+      const decisao = await this.rede.receberContra()
+      if (decisao) aplicarQuebraDoContra(this.estado, decisao.quebra)
+      if (decisao) aplicarCurasDoContra(this.estado, decisao.curas)
+      return decisao
+    }
     const desempenho = this.estado.jogadores.map((_, j) => ({ perfeito: this.perfeitoCoop?.[j], grazes: this.grazesRodada[j] }))
-    const golpes = calcularGolpes(this.estado, r.golpes, desempenho)
-    const combo = comboDosGolpes(r.golpes, this.estado.jogadores.map((jog) => jog.caido))
-    this.rede.enviarContra(golpes, combo)
-    return { golpes, combo }
+    const decisao = resolverContraCoop(this.estado, r.golpes, desempenho)
+    this.rede.enviarContra(decisao)
+    return decisao
   }
 
   async contraAtaque(r) {
     const decisao = await this.golpesDaRodada(r)
     if (!decisao || this.saindo) return
-    const { golpes: lista, combo } = decisao
-    if (!lista.length) return
+    const { golpes: lista, combo, duplas = [], quebra = null, finalizacao = null, curas = null } = decisao
     this.fase = 'contra'
+    if (lista.length) await this.golpesDoContra(lista, combo, duplas)
+    if (this.saindo) return
+    // a QUEBRA da rodada, o QUEBROU! e, na rodada ATORDOADO, a FINALIZAÇÃO EM GRUPO (coop/coop2Arena.js)
+    await this.fecharContraCoop2({ quebra, finalizacao, curas })
+  }
+
+  // as cartas carregadas voam no chefe (com o banner do combo ou da carta de dupla)
+  async golpesDoContra(lista, combo, duplas) {
     if (combo === 'super') await this.superCombo(lista)
     else {
+      if (duplas.some((d) => d.id === 'pinca')) {
+        this.combos++
+        await this.anunciarDupla('pinca', { ms: 1000 })
+      }
       if (combo) {
         this.combos++
         tocar(this, 'combo')
@@ -1612,6 +1704,7 @@ export default class CoopArenaN extends Phaser.Scene {
     const fim = await this.rede.fimDaRodada(limpa)
     if (this.saindo || !fim) return null
     const { vencedor, novaFase, resgatados = [] } = fim
+    this.regra?.fimDaRodada({ novaFase: novaFase ?? null })
     this.huds.forEach((hud, j) => {
       hud.setProtegido(false)
       hud.setEscudo(this.estado.jogadores[j].escudo)
@@ -1655,12 +1748,17 @@ export default class CoopArenaN extends Phaser.Scene {
     this.mostrarBanner(`FASE ${f + 1}!`, corTexto(this.defChefe.tema.cor), { y: 236, tamanho: 30, ms: 1500 })
     this.etiquetaEm(LARGURA / 2, 268, 'cartas novas no baralho do chefe', TEXTO.normal, { atraso: 250, tamanho: 11, ms: 1400 })
     if (fase.entrada) this.falar(fase.entrada, 2200)
+    // a regra do chefe na fase nova (def.regra.fases[f].descricao)
+    const regra = this.regra?.faseNova(f)
+    if (regra) this.etiquetaEm(LARGURA / 2, 290, semLigaduras(regra), '#ffe9a0', { atraso: 600, tamanho: 11, ms: 1600 })
     await this.esperar(2000)
   }
 
   async resultado(vencedor) {
     this.fase = 'resultado'
     this.saindo = false
+    this.regra?.terminar()
+    this.previaChefe?.esconder()
     const dados = {
       chefe: this.idChefe,
       turnos: this.estado.rodada,
@@ -1675,7 +1773,7 @@ export default class CoopArenaN extends Phaser.Scene {
       tocar(this, 'vitoria')
       venceu(0) // BUZZER do meu joystick
       await this.esperar(1100)
-      this.mostrarBanner('VITÓRIA!', TEXTO.selecionado, { y: 236, tamanho: 36 })
+      this.mostrarBanner(this.expedicao && !ultimaLuta(this.expedicao) ? `LUTA ${this.expedicao.no + 1} VENCIDA!` : 'VITÓRIA!', TEXTO.selecionado, { y: 236, tamanho: 36 })
       await this.esperar(1300)
     } else {
       tocar(this, 'gameover')
@@ -1690,6 +1788,10 @@ export default class CoopArenaN extends Phaser.Scene {
     this.saindo = true
     this.cameras.main.fadeOut(400, 0, 0, 0)
     await new Promise((r) => this.time.delayedCall(420, r))
+    if (this.expedicao) {
+      const s = this.saidaDaExpedicao(vencedor)
+      return irParaCena(this, s.chave, s.dados)
+    }
     irParaCena(this, vencedor === 'vitoria' ? 'Vitoria' : 'GameOver', dados)
   }
 
@@ -1803,6 +1905,7 @@ export default class CoopArenaN extends Phaser.Scene {
       rede: { souHost: this.rede.souHost, espelhos: q.coracoes.map((x) => Boolean(x.espelho)) },
       vencedor: this.estado.vencedor,
       chefe: { id: c.id, hp: c.hp, hpMax: c.hpMax, fase: c.fase, carga: c.carga, intencao: c.intencao?.id ?? null, mira: c.mira },
+      coop2: this.debugCoop2(), // { previa, quebra, atordoado, almas, regra, log, ... } (coop/coop2Arena.js)
       quadro: {
         rodando: q.ataque?.nome ?? null,
         aberta: q.aberta,
@@ -1822,3 +1925,5 @@ export default class CoopArenaN extends Phaser.Scene {
   }
 }
 
+// o CO-OP 2.0 (prévia, QUEBRA, resgate na hora, cartas de dupla, regra do chefe): os métodos iguais aos da CoopArena
+export default ligarCoop2(CoopArenaN)

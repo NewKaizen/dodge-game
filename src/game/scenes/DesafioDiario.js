@@ -6,7 +6,7 @@ import { FONTE, LARGURA, ALTURA } from '../constants.js'
 import { menosMovimento } from '../preferencias.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { CHEFES } from '../coop/chefes/index.js'
-import { ESCALA } from '../arte/texturas.js'
+import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { desenharCenario } from '../campanha/desenharCenario.js'
 import { semLigaduras } from '../campanha/texto.js'
 import { montarAvisos } from '../conta/avisos.js'
@@ -174,7 +174,7 @@ export default class DesafioDiario extends Phaser.Scene {
     this.t(b.x + 16, b.y + 168, descreverDesafio(def).join('\n') || 'sem regra especial hoje', 11, COR_TEXTO.tema, { wordWrap: { width: 230 }, lineSpacing: 4 })
     // os retratos: você e o eco do chefe (violeta, como na campanha)
     const voce = this.add.image(b.x + b.largura - 116, b.y + b.altura - 14, def.personagem).setOrigin(0.5, 1).setScale(ESCALA.personagem * 0.8)
-    const eco = chefe ? this.add.image(b.x + b.largura - 46, b.y + b.altura - 14, chefe.sprite).setOrigin(0.5, 1).setScale(ESCALA.personagem * 0.8).setTint(TINTA_ECO).setAlpha(0.8).setFlipX(true) : null
+    const eco = chefe ? this.add.image(b.x + b.largura - 46, b.y + b.altura - 14, chefe.sprite).setOrigin(0.5, 1).setScale(escalaDe(chefe.sprite, ESCALA.personagem * 0.8)).setTint(TINTA_ECO).setAlpha(0.8).setFlipX(true) : null
     this.retratos.add([voce, eco].filter(Boolean))
   }
 

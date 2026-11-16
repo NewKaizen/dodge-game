@@ -12,6 +12,7 @@
 //                                    ou { semAtaque: 'motivo' }
 import { CARTAS, PERSONAGENS_PVP, TEMAS, SIMBOLOS, SUPER, ehSuper, especialDaCarta, nomeDoValor, ataqueDaCarta, resumoDoAtaque, DIFICULDADE_PVP } from '../pvp/cartas.js'
 import { descricaoCoop, COOP } from '../coop/regras.js'
+import { dicaDeDupla, listaDeDuplas } from '../coop/coop2.js'
 import { CARTAS_CHEFES, ataqueDaCartaChefe, danoDaCartaChefe, ritmoDaCartaChefe, inverteControles, poderDaCartaChefe, suporteDoChefe, TIPOS_CHEFE } from '../coop/cartasChefe.js'
 import { CHEFES, ORDEM_CHEFES } from '../coop/chefes/index.js'
 import { DESAFIO, DIFICULDADES } from '../constants.js'
@@ -48,6 +49,10 @@ const TEXTO_ATAQUE = {
   caosFinal: TEXTOS.caosFinal,
   caminhonete: 'Trânsito de caminhonetes em fila pelas faixas (os faróis avisam); às vezes uma freia e volta de ré',
   brasas: 'Brasas sobem do chão balançando e estouram em fagulhas',
+  coronelCaminhao: 'Uma faixa acende e buzina; só então o caminhão de lixo cruza por ela (sempre sobra uma faixa livre)',
+  coronelEntulho: 'Sombras crescem no chão e viram pedregulhos que batem só ali',
+  coronelBuzinaco: 'Uma onda de som varre a caixa e empurra quem está dentro (não machuca)',
+  coronelCompactador: 'Duas placas de aço fecham devagar e param deixando um vão marcado, onde a dupla cabe',
 }
 
 // Biblioteca de mentira que só anota os nomes: A.juntos(A.rain(), A.aimed())
@@ -140,7 +145,7 @@ function fichaDoJogador(carta) {
     numeros,
     textos: [
       { titulo: 'NO PVP', texto: carta.descricao, modo: 'pvp' },
-      { titulo: 'NO CO-OP', texto: descricaoCoop(carta), modo: 'coop' },
+      { titulo: 'NO CO-OP', texto: [descricaoCoop(carta), dicaDeDupla(carta)].filter(Boolean).join(' '), modo: 'coop' },
     ],
   }
 }
@@ -164,6 +169,8 @@ function fichaDoChefe(carta) {
   } else {
     respostas = `A♠ Espelho devolve (golpe de ${poderDaCartaChefe(carta)} no chefe), A♦ Anular cancela, A♣ Roubo tira ela da caixa do parceiro e um SUPER varre. ♦ deixa as balas mais lentas na sua caixa.`
   }
+  // CO-OP 2.0 (coop/coop2.js): a barra de QUEBRA embaixo do HP dele
+  if (!sup) respostas += ` Em dupla: batam juntos para encher a QUEBRA (cheia: ATORDOADO). ${listaDeDuplas()}.`
   return {
     tipo,
     numeros,

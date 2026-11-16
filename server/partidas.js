@@ -78,6 +78,7 @@ import { infoSemanal, ID_SEMANA } from '../src/lib/semanal.js'
 import { msgConquistas } from './conquistas.js'
 import { msgBauGanho } from './baus.js'
 import { RESULTADOS_JOGADOS } from '../src/lib/progresso.js'
+import { lerExpedicao, DURACAO_MINIMA_LUTA_S, LUTAS_EXPEDICAO, CHANCE_BAU_EXPEDICAO, ESCALA_BAU_EXPEDICAO } from '../src/lib/expedicao.js'
 
 export const RELATO_JANELA_MS = 20_000
 export const ABANDONO_GRACA_MS = 3_000
@@ -201,6 +202,22 @@ export function criarRegistro(supabase) {
       const d = await chamar('desbloquear_conquistas', { p_user: usuario, p_ids: ids })
       return Array.isArray(d) ? d.filter((x) => typeof x === 'string') : []
     },
+    // EXPEDIÇÃO (0017): o XP das lutas vencidas, o bônus de completar e o verso exclusivo (o banco confere tudo)
+    concederExpedicao: async (id, e) =>
+      ((await chamar('conceder_expedicao', { p_partida: id, p_chefe: e.chefe, p_lutas: e.lutas })) ?? []).map((l) => ({
+        usuario: l.usuario,
+        xpGanho: Number(l.xp_ganho) || 0,
+        xpTotal: l.xp_total ?? null,
+        nivelAntes: l.nivel_antes ?? null,
+        nivelDepois: l.nivel_depois ?? null,
+        itensNovos: Array.isArray(l.itens_novos) ? l.itens_novos : [],
+        completa: Boolean(l.completa),
+        cosmetico: l.cosmetico ?? null,
+        cosmeticoNovo: Boolean(l.cosmetico_novo),
+        dia: typeof l.dia === 'string' ? l.dia.slice(0, 10) : l.dia ?? null,
+        bauHoje: Boolean(l.bau_hoje),
+        repetida: Boolean(l.repetida),
+      })),
     // BAÚS e SLOTS NOVOS (0015, server/baus.js)
     concederBau: async (usuario, fonte, ref) => {
       const d = (await chamar('conceder_bau', { p_user: usuario, p_fonte: fonte, p_ref: ref })) ?? {}
@@ -428,6 +445,25 @@ export function ladosDoTrofeu(p, d) {
   return p.participantes.filter((x) => x.usuario && d.resultados[x.lado] === 'vitoria' && x.relato?.semana === semana).map((x) => x.lado)
 }
 
+// EXPEDIÇÃO (docs/coop-cartas.md "Expedição", 0017): o que a partida rende a mais. A MESMA validação do XP do
+// CO-OP (a decisão `d` é a dos relatos que concordam); por cima dela, todos os relatos que chegaram dizem a
+// mesma expedição (o mesmo chefão; as lutas valem as MENORES relatadas), o resultado combina com as lutas
+// (vitória = as 3; derrota = menos de 3) e a duração cobre DURACAO_MINIMA_LUTA_S por luta vencida.
+// Devolve { chefe, lutas, completa } ou null. O banco confere tudo de novo (conceder_expedicao).
+export function expedicaoDaPartida(p, d) {
+  if ((p.modo !== 'coop' && p.modo !== 'coop4') || d?.validacao !== 'validada') return null
+  const relatos = p.participantes.filter((x) => x.relato).map((x) => x.relato)
+  if (!relatos.length || relatos.some((r) => !r.expedicao)) return null
+  const chefe = relatos[0].expedicao.chefe
+  if (relatos.some((r) => r.expedicao.chefe !== chefe)) return null
+  const lutas = Math.min(...relatos.map((r) => r.expedicao.lutas))
+  const venceu = Object.values(d.resultados).includes('vitoria')
+  if (venceu !== (lutas === LUTAS_EXPEDICAO)) return null
+  if ((d.duracaoS ?? 0) < Math.max(1, lutas) * DURACAO_MINIMA_LUTA_S) return null
+  return { chefe, lutas, completa: venceu && lutas === LUTAS_EXPEDICAO }
+}
+export const sortearBauExpedicao = () => crypto.randomInt(0, ESCALA_BAU_EXPEDICAO) < CHANCE_BAU_EXPEDICAO
+
 // o que o cliente mandou, limpo (null = não serve). n: quantos lados a partida tem (modos de N)
 export function lerRelato(m, modo = 'pvp', n = 2) {
   if (!m || typeof m.partidaId !== 'string' || m.partidaId.length > 64) return null
@@ -438,7 +474,8 @@ export function lerRelato(m, modo = 'pvp', n = 2) {
     personagem: typeof m.personagem === 'string' && PERSONAGEM.test(m.personagem) ? m.personagem : null,
   }
   // (BOSS SEMANAL: `semana` = a semana do chefe que este PC enfrentou; não muda o XP)
-  if (modo === 'coop' || modo === 'coop4') return typeof m.vitoria === 'boolean' ? { vitoria: m.vitoria, ...base, ...(typeof m.semana === 'string' && ID_SEMANA.test(m.semana) && { semana: m.semana }) } : null
+  // (EXPEDIÇÃO: `expedicao` = { chefe, lutas, sorteada }, o chefão e as lutas vencidas; src/lib/expedicao.js)
+  if (modo === 'coop' || modo === 'coop4') return typeof m.vitoria === 'boolean' ? { vitoria: m.vitoria, ...base, ...(typeof m.semana === 'string' && ID_SEMANA.test(m.semana) && { semana: m.semana }), ...(lerExpedicao(m.expedicao) && { expedicao: lerExpedicao(m.expedicao) }) } : null
   if (modo === 'ffa') {
     const c = m.colocacoes
     const ok = Array.isArray(c) && c.length === n && c.every((l) => Number.isInteger(l) && l >= 0 && l < n) && new Set(c).size === n
@@ -455,7 +492,7 @@ export function lerRelato(m, modo = 'pvp', n = 2) {
 
 // ---------- o registro no lobby ----------
 
-export function criarPartidas({ registro = null, agora = Date.now, agendar = agendarPadrao, entregar = () => {}, log = () => {}, versao = 1, metricas = METRICAS_NULA, conquistas = null, baus = null } = {}) {
+export function criarPartidas({ registro = null, agora = Date.now, agendar = agendarPadrao, entregar = () => {}, log = () => {}, versao = 1, metricas = METRICAS_NULA, conquistas = null, baus = null, sortearBau = sortearBauExpedicao } = {}) {
   const partidas = new Map() // id -> partida (em andamento e as guardadas)
   const doCliente = new Map() // id do cliente -> Set de partidas em andamento
   // os timers daqui (prazo dos relatos, esquecer a decisão): fechar() cancela todos
@@ -679,26 +716,37 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
       linhas = await registro.conceder(p.id)
     }
     const trofeus = await trofeusDaPartida(p, d)
+    // EXPEDIÇÃO (0017): o XP a mais, o verso exclusivo e a chance de baú (uma falha aqui não tira o XP de sempre)
+    const exps = await expedicoesDaPartida(p, d)
     for (const x of comConta) {
       const l = linhas.find((y) => y.usuario === x.usuario)
       if (!l) {
         avisar(p, x, msgSemXp(p, 'erro'))
         continue
       }
+      const e = exps.get(x.usuario)
       avisar(p, x, {
         t: 'recompensa',
         partidaId: p.id,
-        xpGanho: l.xp_ganho,
-        xpTotal: l.xp_total,
+        // (EXPEDIÇÃO: o XP a mais entra no total; a barra e o nível já são os de depois)
+        xpGanho: (l.xp_ganho ?? 0) + (e?.xpGanho ?? 0),
+        xpTotal: e?.xpTotal ?? l.xp_total,
         nivelAntes: l.nivel_antes,
-        nivelDepois: l.nivel_depois,
-        itensNovos: Array.isArray(l.itens_novos) ? l.itens_novos : [],
+        nivelDepois: e?.nivelDepois ?? l.nivel_depois,
+        itensNovos: [...(Array.isArray(l.itens_novos) ? l.itens_novos : []), ...(e?.itensNovos ?? [])],
         motivo: l.motivo,
         ...(trofeus.has(x.usuario) && { trofeu: trofeus.get(x.usuario) }),
+        ...(e && { expedicao: { chefe: e.chefe, lutas: e.lutas, xp: e.xpGanho, completa: e.completa, cosmetico: e.cosmetico, cosmeticoNovo: e.cosmeticoNovo, bau: e.bau, bauHoje: e.bauHoje } }),
       })
     }
     // BAÚS (0015): nível novo, o baú do dia (partida jogada até o fim) e o boss semanal; nunca derruba o XP
-    if (baus) for (const x of comConta) bausDaConta(p, d, x, linhas.find((y) => y.usuario === x.usuario), trofeus)
+    // (o nível depois da EXPEDIÇÃO também conta para o baú de nível)
+    if (baus)
+      for (const x of comConta) {
+        const l = linhas.find((y) => y.usuario === x.usuario)
+        const e = exps.get(x.usuario)
+        bausDaConta(p, d, x, l && e?.nivelDepois != null ? { ...l, nivel_depois: Math.max(l.nivel_depois ?? 0, e.nivelDepois) } : l, trofeus)
+      }
     // CONQUISTAS e MAESTRIA (4B): depois do XP, um evento por conta (o personagem do relato; só cosmético)
     if (conquistas) for (const x of comConta) eventoDaConta(p, d, x, trofeus)
   }
@@ -726,6 +774,38 @@ export function criarPartidas({ registro = null, agora = Date.now, agendar = age
         const aviso = msgBauGanho(novos)
         if (aviso) entregar(x, aviso)
       })
+  }
+
+  // EXPEDIÇÃO: usuario -> { chefe, lutas, xpGanho, xpTotal, nivelDepois, itensNovos, completa, cosmetico, cosmeticoNovo,
+  // bau, bauHoje }. Completa: a chance de baú (sortearBau, crypto) com a chave do dia e do chefão (o banco confere
+  // que a conta completou; repetir não dá outro). Uma falha aqui não tira o XP de sempre
+  async function expedicoesDaPartida(p, d) {
+    const mapa = new Map()
+    const e = expedicaoDaPartida(p, d)
+    if (!e || !registro?.concederExpedicao) return mapa
+    let linhas = []
+    try {
+      linhas = await registro.concederExpedicao(p.id, e)
+    } catch (erro) {
+      log(`[partidas] não deu para conceder a expedição de ${p.id}: ${erro.message}`)
+      return mapa
+    }
+    for (const l of linhas) {
+      if (!l?.usuario || !p.participantes.some((x) => x.usuario === l.usuario)) continue
+      let bau = false
+      if (l.completa && !l.repetida && !l.bauHoje && baus && l.dia && sortearBau()) {
+        const r = await baus.conceder(l.usuario, 'expedicao', `${l.dia}:${e.chefe}`)
+        bau = Boolean(r?.novo)
+        if (bau) {
+          const x = p.participantes.find((y) => y.usuario === l.usuario)
+          const msg = msgBauGanho([r])
+          if (x && msg) entregar(x, msg)
+        }
+      }
+      mapa.set(l.usuario, { ...l, chefe: e.chefe, lutas: e.lutas, bau })
+    }
+    log(`[partidas] ${p.id} expedição ${e.chefe} (${e.lutas} luta${e.lutas === 1 ? '' : 's'}${e.completa ? ', completa' : ''}): ${mapa.size} conta(s)`)
+    return mapa
   }
 
   // BOSS SEMANAL: usuario -> { id, semana, novo } de quem levou o troféu (uma falha aqui não tira o XP)

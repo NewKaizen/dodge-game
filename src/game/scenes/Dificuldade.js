@@ -3,7 +3,7 @@ import { irCarregando } from '../carregando.js'
 import Controles from '../controles.js'
 import { CHEFES, nivelDoChefe } from '../coop/chefes/index.js'
 import { criarFundo } from '../backgrounds/index.js'
-import { ESCALA } from '../arte/texturas.js'
+import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { tocar, musica, pararMusica } from '../audio.js'
 import { rachadura, estilhacos, faixasDiagonais, corNumero } from '../effects/entrada.js'
 import { CORES, DIFICULDADES, NIVEIS, ORDEM_NIVEIS, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
@@ -13,6 +13,8 @@ import { partyDe } from '../data/batalha.js'
 import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
 import { partyAtiva } from '../party/cliente.js'
 import { salaSemanal } from '../../lib/lan/rede.js'
+import { criarExpedicao, SORTEADA } from '../coop/expedicao.js'
+import { semLigaduras } from '../campanha/texto.js'
 
 // painel do chefe à esquerda (62..282) e as opções à direita (322..792): bloco centralizado em 854
 const OPCAO = { x: 557, largura: 470, altura: 100, y: 128, passo: 112 }
@@ -29,6 +31,9 @@ const CURSOR_MS = 300 // em rede: de quanto em quanto o host manda o cursor de n
 // Testado em src/game/__tests__/cenasReaproveitadas.test.js.
 const estadoInicial = () => ({
   indice: null,
+  modo: 'rapida',
+  escolhidoExp: null,
+  sorteada: false,
 })
 
 // Tela do nível da luta, depois de escolher o chefe (Selecao -> Dificuldade -> CoopArena).
@@ -52,10 +57,15 @@ export default class Dificuldade extends Phaser.Scene {
     this.idChefe = dados?.chefe ?? this.registry.get('chefe') ?? 'king'
     this.party = Array.isArray(dados?.party) ? dados.party : null
     this.nivelInicial = dados?.nivel ?? null
+    // EXPEDIÇÃO (ModoCoop -> Selecao): o chefão escolhido ou a SORTEADA (o chefão é surpresa: o desenho fica escuro)
+    this.modo = dados?.modo === 'expedicao' ? 'expedicao' : 'rapida'
+    this.escolhidoExp = this.modo === 'expedicao' ? (dados?.chefe === SORTEADA ? SORTEADA : this.idChefe) : null
+    this.sorteada = this.escolhidoExp === SORTEADA
+    if (this.sorteada || !CHEFES[this.idChefe]) this.idChefe = this.sorteada ? 'jevil' : 'king'
   }
 
   create() {
-    this.registry.set('chefe', this.idChefe)
+    if (!this.sorteada) this.registry.set('chefe', this.idChefe)
     if (this.party) this.registry.set('party', this.party) // (a Vitoria mostra a party do registry)
     this.controles = new Controles(this)
     this.controles.onBotao((_, botao) => (botao === 'A' ? this.confirmar() : this.voltar()))
@@ -72,14 +82,23 @@ export default class Dificuldade extends Phaser.Scene {
     this.fundo = criarFundo(this, def.fundo)
     this.fundo.escurecer()
 
-    texto(LARGURA / 2, 36, 'ESCOLHA O NÍVEL', 28, TEXTO.normal, { strokeThickness: 4 })
+    const exp = this.modo === 'expedicao'
+    texto(LARGURA / 2, 36, exp ? 'EXPEDIÇÃO: ESCOLHA O NÍVEL' : 'ESCOLHA O NÍVEL', exp ? 26 : 28, exp ? '#ffc070' : TEXTO.normal, { strokeThickness: 4 })
 
     // chefe escolhido, à esquerda
     const cx = CHEFE.x
     this.add.rectangle(cx, 240, 220, 290, CORES.painel, 0.88).setStrokeStyle(3, 0x505050)
-    this.sprite = this.add.image(cx, CHEFE.y, def.sprite).setScale(ESCALA.chefe * 0.9)
-    texto(cx, 310, def.nome.toUpperCase(), def.nome.length > 11 ? 16 : 20)
-    texto(cx, 336, `base: ${base.rotulo}`, 14, base.cor)
+    this.sprite = this.add.image(cx, CHEFE.y, def.sprite).setScale(escalaDe(def.sprite, ESCALA.chefe * 0.9))
+    if (this.sorteada) {
+      // SORTEADA: o chefão é surpresa (silhueta e "?")
+      this.sprite.setTintFill(0x101018)
+      texto(cx, CHEFE.y, '?', 64, '#ffc070', { strokeThickness: 6 })
+      texto(cx, 310, 'SORTEADA', 20, '#ffc070')
+      texto(cx, 336, semLigaduras('chefão surpresa'), 14, TEXTO.normal)
+    } else {
+      texto(cx, 310, def.nome.toUpperCase(), def.nome.length > 11 ? 16 : 20)
+      texto(cx, 336, exp ? semLigaduras('expedição: 3 lutas') : `base: ${base.rotulo}`, 14, exp ? '#ffc070' : base.cor)
+    }
     const maxEstrelas = Math.max(...Object.values(DIFICULDADES).map((d) => d.estrelas))
     for (let k = 0; k < maxEstrelas; k++) {
       this.add.image(cx + (k - (maxEstrelas - 1) / 2) * 20, 360, 'coracao').setTint(k < base.estrelas ? parseInt(base.cor.slice(1), 16) : 0x303030)
@@ -145,6 +164,12 @@ export default class Dificuldade extends Phaser.Scene {
   // Linhas do que o nível muda para este chefe (HP do modo cartas)
   descrever(nivel) {
     const hp = Math.round(CHEFES[this.idChefe].hp * nivel.hp)
+    // EXPEDIÇÃO: 3 lutas (o HP de cada chefe muda): só o ritmo e o dano
+    if (this.modo === 'expedicao') {
+      if (nivel.dano === 1) return ['Os chefes como eles são.', 'Ritmo e dano normais nas 3 lutas.']
+      const mais = (f) => `+${Math.round((f - 1) * 100)}%`
+      return [`Balas ${mais(nivel.velocidade)} rápidas, ${mais(nivel.densidade)} frequentes`, `Dano ${mais(nivel.dano)}   HP dos chefes ${mais(nivel.hp)}`]
+    }
     if (nivel.dano === 1) return ['O chefe como ele é.', `Ritmo e dano normais. HP do chefe ${hp}.`]
     const mais = (f) => `+${Math.round((f - 1) * 100)}%`
     return [`Balas ${mais(nivel.velocidade)} rápidas, ${mais(nivel.densidade)} frequentes`, `Dano ${mais(nivel.dano)}   HP do chefe ${hp} (${mais(nivel.hp)})`]
@@ -163,7 +188,7 @@ export default class Dificuldade extends Phaser.Scene {
     })
     // prévia: o fundo fica mais agitado e o chefe mais inquieto
     this.fundo.estado.agito = nivel.fundo
-    this.tweens.add({ targets: this.sprite, scale: ESCALA.chefe * (0.9 + this.indice * 0.06), duration: 150 })
+    this.tweens.add({ targets: this.sprite, scale: escalaDe(this.sprite.texture.key, ESCALA.chefe * (0.9 + this.indice * 0.06)), duration: 150 })
   }
 
   // doHost: em rede, no convidado, o índice que o host confirmou
@@ -221,7 +246,7 @@ export default class Dificuldade extends Phaser.Scene {
       duration: climax,
       ease: 'Quad.easeIn',
     })
-    this.tweens.add({ targets: this.sprite, scale: ESCALA.chefe * (2 + k * 0.35), duration: climax, ease: 'Cubic.easeIn' })
+    this.tweens.add({ targets: this.sprite, scale: escalaDe(this.sprite.texture.key, ESCALA.chefe * (2 + k * 0.35)), duration: climax, ease: 'Cubic.easeIn' })
 
     // carimbo com o nome do nível, batendo no meio da tensão
     const rotulo = this.add
@@ -281,10 +306,18 @@ export default class Dificuldade extends Phaser.Scene {
       if (!this.host) return
       const party = this.party ?? partyDe(this.registry)
       // 3 ou 4 jogadores na sala: a arena do grupo (CoopArenaN); 2: a de sempre
+      if (this.modo === 'expedicao') return this.comecarExpedicao(nivel, party)
       if (this.rede) irParaCena(this, party.length > 2 ? 'CoopArenaN' : 'CoopArena', { chefe: this.idChefe, nivel, party, semente: `rede:${Date.now()}` })
       else irCarregando(this, 'CoopArena', { chefe: this.idChefe, nivel, party }, () => this.scene.launch('Entrada', { nivel }))
       if (this.rede) this.scene.launch('Entrada', { nivel })
     })
+  }
+
+  // EXPEDIÇÃO: o mapa das 3 lutas (Expedicao) antes da 1ª; em rede o host leva todos (a semente é a mesma)
+  comecarExpedicao(nivel, party) {
+    const expedicao = criarExpedicao({ chefe: this.escolhidoExp, nivel, party, semente: `exp:${Date.now()}` })
+    if (this.rede) irParaCena(this, 'Expedicao', { expedicao })
+    else this.scene.start('Expedicao', { expedicao })
   }
 
   voltar() {
@@ -294,7 +327,7 @@ export default class Dificuldade extends Phaser.Scene {
     this.saindo = true
     tocar(this, 'mover')
     this.cameras.main.fadeOut(200, 0, 0, 0)
-    const dados = { chefe: this.idChefe, party: this.party ?? partyDe(this.registry) } // o cursor volta no chefe de agora
+    const dados = { chefe: this.modo === 'expedicao' ? this.escolhidoExp : this.idChefe, party: this.party ?? partyDe(this.registry), modo: this.modo } // o cursor volta no chefe de agora
     this.time.delayedCall(220, () => (this.rede ? irParaCena(this, 'Selecao', dados) : this.scene.start('Selecao', dados)))
   }
 

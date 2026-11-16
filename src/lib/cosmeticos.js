@@ -60,6 +60,8 @@ export const FONTES_BAU = {
   desafio: { nome: 'venceu o desafio diário', chave: (ref) => `desafio:${ref}` },
   semanal: { nome: 'venceu o boss semanal', chave: (ref) => `semanal:${ref}` },
   conquista: { nome: 'conquista', chave: (ref) => `conquista:${ref}` },
+  // (0017) completou a EXPEDIÇÃO do CO-OP: chance de baú, no máximo 1 por dia por chefão (ref = '<dia>:<chefão>')
+  expedicao: { nome: 'completou uma expedição', chave: (ref) => `expedicao:${ref}` },
 }
 // as conquistas que dão um baú (uma vez cada; espelho de bau_conquistas() da 0015)
 export const CONQUISTAS_COM_BAU = ['primeira_vitoria', 'casa_silenciosa', 'cacador_semanal', 'sete_sois', 'mao_firme', 'lenda_da_mesa', 'cadeira_cativa', 'alma_gemea']
@@ -220,7 +222,22 @@ export function cosmeticosPublicos(perfil) {
 }
 
 // verso ILUSTRADO do baú? id do banco -> o do registro ('verso-<x>'); os versos lisos (trilha, semanais...): null
-export const arteDoVerso = (id) => (POR_ID.get(id)?.slot === 'verso' ? POR_ID.get(id).registro : null)
+export const arteDoVerso = (id) => (POR_ID.get(id)?.slot === 'verso' ? POR_ID.get(id).registro : POR_ID_EXP.get(id)?.registro ?? null)
+
+// ---------- os versos EXCLUSIVOS da EXPEDIÇÃO (0017; docs/coop-cartas.md "Expedição") ----------
+// Um por chefão, na 1ª expedição completa contra ele (o servidor concede: conceder_expedicao). NÃO saem do baú
+// (bau = false, fora de ITENS_BAU e do POOL_BAU) nem da trilha (nivel_exclusivo, exclusivo = true no banco).
+// O desenho é por código (cosmeticos/versos.js VERSOS_EXPEDICAO): o mesmo caminho dos versos ilustrados.
+const itemExp = (slug, nome, chefe, cor) => ({ id: `verso.exp_${slug}`, tipo: 'verso', slot: 'verso', registro: `verso-exp-${slug}`, nome, raridade: 'lendario', bau: false, expedicao: chefe, cor })
+export const ITENS_EXPEDICAO = [
+  itemExp('tabuleiro', 'Tabuleiro Real', 'king', '#3a2a5a'),
+  itemExp('sinal', 'Sinal Cheio', 'queen', '#1a3a6a'),
+  itemExp('dado', 'Dado do Caos', 'jevil', '#4a1a5a'),
+  itemExp('reciclador', 'Reciclador', 'coronel', '#1a4a2a'),
+]
+const POR_ID_EXP = new Map(ITENS_EXPEDICAO.map((i) => [i.id, i]))
+export const itemDaExpedicao = (id) => POR_ID_EXP.get(id) ?? null
+export const cosmeticoDaExpedicao = (chefe) => ITENS_EXPEDICAO.find((i) => i.expedicao === chefe) ?? null
 
 // ---------- o sorteio (espelho de abrir_bau da 0015) ----------
 

@@ -1,8 +1,28 @@
 import { SPRITES, CORACAO_MAPA } from './sprites.js'
 import { PERSONAGENS } from '../data/personagens.js'
+import { GERADORES_KING } from './kingSprites.js'
+import { SPRITES_CORONEL } from './coronelSprites.js'
+import { CHEFOES, QUADROS_IDLE } from './chefoes.js'
+import { EXPEDICAO } from './expedicao.js'
+import { gradeEmCanvas } from './pintor.js'
 
 // Escala em que cada sprite de pixel art aparece no jogo
 export const ESCALA = { personagem: 3, chefe: 4, coracao: 1.4 }
+
+// Texturas em densidade maior (mais pixels no mesmo espaço da tela): os chefões do CO-OP (arte/chefoes.js) e os
+// lacaios e tenentes da Expedição (arte/expedicao.js) têm o dobro de pixels e aparecem na metade da escala. Use
+// escalaDe(chave, ESCALA.chefe) onde mostrar o sprite de um chefe.
+const CHAVE_CHEFAO = { king: 'king', queen: 'queen', jevil: 'jevil', coronel: 'coronelLixeiro' }
+// as texturas com animação parada (QUADROS_IDLE quadros cada)
+const ANIMADAS = new Set([...Object.values(CHAVE_CHEFAO), ...Object.keys(EXPEDICAO)])
+export const DENSIDADE = Object.fromEntries(['coronel', ...[...ANIMADAS].flatMap(quadrosDe)].map((k) => [k, 2]))
+export const escalaDe = (chave, escala) => escala / (DENSIDADE[chave] ?? 1)
+
+// Quadros da animação parada (idle) de uma textura: [chave, 'chave-q1', 'chave-q2'] nos chefões e nos lacaios e
+// tenentes da Expedição, só [chave] no resto
+export function quadrosDe(chave) {
+  return ANIMADAS.has(chave) ? Array.from({ length: QUADROS_IDLE }, (_, q) => (q ? `${chave}-q${q}` : chave)) : [chave]
+}
 
 // Tamanho do "miolo" das texturas de bala (a borda restante é o brilho).
 // Uma bala de raio r é desenhada com escala r / RAIO_BALA.
@@ -344,15 +364,18 @@ const personagens = Object.fromEntries(Object.keys(PERSONAGENS).map((id) => [id,
 
 const GERADORES = {
   ...personagens,
-  king: sprite('king'),
-  queen: sprite('queen'),
-  jevil: sprite('jevil'),
-  coronel: sprite('coronel'),
+  // os chefões do CO-OP, com os quadros da animação parada (arte/chefoes.js); 'coronel' é o mesmo desenho do Coronel
+  ...Object.fromEntries(Object.entries(CHAVE_CHEFAO).flatMap(([id, chave]) => quadrosDe(chave).map((k, q) => [k, () => gradeEmCanvas(CHEFOES[id](q))]))),
+  coronel: () => gradeEmCanvas(CHEFOES.coronel(0)),
+  // EXPEDIÇÃO: os lacaios e os tenentes dos quatro chefões, com os quadros da animação parada (arte/expedicao.js)
+  ...Object.fromEntries(Object.entries(EXPEDICAO).flatMap(([chave, desenhar]) => quadrosDe(chave).map((k, q) => [k, () => gradeEmCanvas(desenhar(q))]))),
   // BOSS SEMANAL (coop/chefes/escuridao.js, ladra.js)
   escuridao: sprite('escuridao'),
   ladra: sprite('ladra'),
   // colorida: a caminhonete usa cor 0xffffff na bala para não ser pintada pelo tema
   'bala-caminhonete': sprite('caminhonete'),
+  // Coronel Caçamba: o caminhão de lixo das cartas (arte/coronelSprites.js)
+  ...Object.fromEntries(Object.entries(SPRITES_CORONEL).map(([id, s]) => [id, () => pixelArt(s.mapa, s.paleta, id)])),
 
   coracao,
   faisca: () => degrade(8, [[0, 'rgba(255,255,255,1)'], [1, 'rgba(255,255,255,0)']]),
@@ -381,4 +404,6 @@ const GERADORES = {
   'fundo-king-losangos': tileLosangos,
   'fundo-queen-cidade': () => cidade(false),
   'fundo-queen-cidade-perto': () => cidade(true),
+
+  ...GERADORES_KING, // Chaos King: as peças do tabuleiro (arte/kingSprites.js)
 }
