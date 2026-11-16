@@ -32,7 +32,7 @@ export const LUTAS = {
   jevil: { lacaios: 'jevilLacaios', tenente: 'jevilTenente', chefao: 'jevil' },
   coronel: { lacaios: 'coronelLacaios', tenente: 'coronelTenente', chefao: 'coronel' },
 }
-export const CURA_ENTRE = 0.35 // o time recupera 35% do HP máximo entre as lutas
+export const CURA_ENTRE = 0.25 // o time recupera 25% do HP máximo entre as lutas (era 35%: com as relíquias o chefão chegava fácil)
 export const OFERTA = 3 // cartas por escolha
 export const VOTO_MS = 20_000 // o relógio da escolha (acabou: vale o que foi votado, ou a sugestão)
 

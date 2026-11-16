@@ -36,7 +36,7 @@ import { ligarCoop2 } from '../coop/coop2Arena.js'
 import { aplicarCurasDoContra } from '../coop/reliquias.js'
 import { COR_ATORDOADO } from '../coop/coop2Cena.js'
 import { semLigaduras } from '../campanha/texto.js'
-import { expedicaoValida, ultimaLuta } from '../coop/expedicao.js'
+import { expedicaoValida, ultimaLuta, etapaAtual } from '../coop/expedicao.js'
 import { superNoChefe } from '../coop/superNoChefe.js'
 import ArenaRedeCoopN from '../coop/ArenaRedeCoopN.js'
 import HudCoopN from '../coop/HudCoopN.js'
@@ -209,7 +209,7 @@ class CoopArenaN extends Phaser.Scene {
     this.n = Math.min(4, Math.max(3, party.length))
     this.registry.set('party', this.ids)
     this.meu = meuIndice()
-    this.estado = criarPartidaCoop({ party: this.ids, chefe: this.idChefe, nivel: this.idNivel, semente: this.semente , hp: this.hpDosDados, reliquias: this.reliquiasDosDados })
+    this.estado = criarPartidaCoop({ party: this.ids, chefe: this.idChefe, nivel: this.idNivel, semente: this.semente, hp: this.hpDosDados, reliquias: this.reliquiasDosDados, etapa: this.expedicao ? etapaAtual(this.expedicao) : null })
     this.grupo = this.estado.grupo
     this.quadroCfg = quadroDoGrupo(this.grupo)
     this.nomes = Array.from({ length: this.n }, (_, j) => participantesDaPartida().find((p) => p.indice === j)?.nome ?? `P${j + 1}`)

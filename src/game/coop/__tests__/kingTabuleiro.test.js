@@ -10,6 +10,7 @@ import { RegraDaLuta, descricaoValida } from '../regraChefe.js'
 import { criarPartidaCoop } from '../regras.js'
 import { CARTAS_CHEFES, ataqueDaCartaChefe } from '../cartasChefe.js'
 import { criarRng, aleatorio } from '../../pvp/baralho.js'
+import { ataques } from '../../attacks/index.js'
 
 const LIM = { x: 100, y: 200, width: 336, height: 180 }
 const grade = criarGrade(LIM, TABULEIRO)
@@ -142,10 +143,12 @@ test('a regra do King: UMA frase curta, ataque das peças, XEQUE só com parceir
   const regra = new RegraDaLuta(def, p)
   const xeque = CARTAS_CHEFES.king.fases.flat().find((c) => c.nome === 'Xeque!')
   const normal = CARTAS_CHEFES.king.fases[0].find((c) => c.nome === 'Torre à Vista')
-  const A = new Proxy({}, { get: () => () => ({}) })
+  const A = ataques
+  // a carta comum: as peças E o ataque de assinatura dela (as linhas de xeque da torre), juntos
   const at = regra.ataque(normal, A, { nome: 'padrao' })
-  assert.equal(at.nome, 'tabuleiro')
-  // dois de pé: o ataque do xeque nasce; a regra guarda a gaiola quando a esquiva começa (via aoIniciar, no jogo)
+  assert.equal(at.nome, 'tabuleiro + kingXeque')
+  // dois de pé: o ataque do xeque nasce (só as peças: nada cai em quem está preso); a regra guarda a gaiola
+  // quando a esquiva começa (via aoIniciar, no jogo)
   assert.equal(regra.ataque(xeque, A, null).nome, 'tabuleiro')
   estado.jogadores[1].caido = true
   assert.equal(regra.ataque(xeque, A, null).nome, 'tabuleiro') // sem parceiro: só as peças
@@ -165,9 +168,12 @@ test('o baralho do King: 3 fases, peões/torres, depois bispos/cavalos, depois p
   assert.ok(tipos('Bispos em V').has('bispo') && tipos('Salto do Cavalo').has('cavalo'))
   assert.ok(tipos('Promoção').has('peao') && ESPEC.king.Promoção.cfg.jogadas[0][0].promove)
   assert.ok(ESPEC.king.Roque.roque && ESPEC.king['Tabuleiro Virado'].roque)
-  // todas as cartas montam ataque (sem a biblioteca: não usam `A`)
-  for (const c of CARTAS_CHEFES.king.fases.flat()) assert.ok(ataqueDaCartaChefe(c, { ataques: {} }))
-  assert.ok(ataqueDaCartaChefe(CARTAS_CHEFES.king.super, { ataques: {} }))
+  // todas as cartas montam ataque; as de XEQUE e de ROQUE ficam sem o ataque de assinatura por cima
+  for (const c of CARTAS_CHEFES.king.fases.flat()) assert.ok(ataqueDaCartaChefe(c, { ataques }))
+  assert.ok(ataqueDaCartaChefe(CARTAS_CHEFES.king.super, { ataques }))
+  for (const e of Object.values(ESPEC.king)) if (e.xeque || e.roque) assert.equal(e.extra, undefined)
+  // cada fase tem pelo menos duas cartas com ataque de assinatura (muralha, xeque, cavalgada)
+  for (let f = 0; f < 3; f++) assert.ok(nomes(f).filter((n) => ESPEC.king[n]?.extra).length >= 2, `fase ${f + 1}`)
 })
 
 test('lacaios e Cavaleiro: registrados, da Expedição, escondidos da seleção, sem XEQUE', () => {

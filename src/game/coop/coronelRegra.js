@@ -25,10 +25,10 @@ import { criarLixeira, desenharItemDaRegra, estouroDoItem, lancarMissil, COR_REC
 //   danoSujo     dano do marrom em cima do dano base do quadro (multiplicado pelo nível)
 export const PADRAO_RECICLAGEM = {
   max: 36,
-  limpos: [5, 3, 4],
-  sujos: [0, 2, 2],
-  valor: [2, 2, 3],
-  velocidade: [1, 1.1, 1.2],
+  limpos: [5, 4, 4, 4],
+  sujos: [1, 2, 3, 4], // (dificuldade do CO-OP: o marrom já aparece na fase 1 e aperta junto com as cartas)
+  valor: [2, 2, 3, 3],
+  velocidade: [1, 1.1, 1.2, 1.3],
   dano: 0.07,
   quebra: 30,
   danoSujo: 7,

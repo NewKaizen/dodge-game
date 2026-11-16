@@ -124,6 +124,16 @@ export const COOP = {
   superComboGrupo: 0.25, // 3+ SUPER na mesma rodada: soma isto ao teto do SUPER COMBO por SUPER a mais
 }
 
+// EXPEDIÇÃO (coop/expedicao.js): cada luta aperta mais que a anterior. O time chega nas lutas de depois com as
+// relíquias acumuladas (mais golpe, mais QUEBRA, mais cura), então o tenente e o chefão vêm com mais vida, mais dano
+// por acerto e (o chefão) o SUPER mais vezes (cargaSuper rodadas em vez de COOP.cargaSuper)
+//   hp     multiplica a vida do chefe · dano  multiplica o dano por acerto do ataque dele (mods.danoQuadro)
+export const ETAPA_EXPEDICAO = {
+  lacaios: { hp: 1, dano: 1 },
+  tenente: { hp: 1.15, dano: 1.1 },
+  chefao: { hp: 1.3, dano: 1.2, cargaSuper: 7 },
+}
+
 // Equilíbrio por tamanho do grupo (online, 5B; a 5C mede e ajusta). Mais corações no quadro
 // = mais lugares para uma bala acertar, então o chefe aperta em TRÊS frentes, não só na vida:
 //   hpChefe      multiplica a vida do chefe (cada jogador a mais bate nele)
@@ -198,8 +208,8 @@ const ID_JOGADOR = ['p1', 'p2', 'p3', 'p4']
 // coop2: false desliga o CO-OP 2.0 (a prévia, a QUEBRA, as cartas de dupla novas): a luta da CAMPANHA usa estas
 // regras do jeito de antes (campanha/luta.js)
 // hp / reliquias: a luta que CONTINUA (a Expedição): o HP que vem da luta anterior e as melhorias ativas
-// (coop/reliquias.js)
-export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coop', coop2 = true, hp = null, reliquias = [] }) {
+// (coop/reliquias.js); etapa: a luta da Expedição ('lacaios' | 'tenente' | 'chefao', ETAPA_EXPEDICAO)
+export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coop', coop2 = true, hp = null, reliquias = [], etapa = null }) {
   const def = CHEFES[chefe]
   if (!def) throw new Error(`chefe sem baralho de cartas: ${chefe}`)
   const niv = nivelDoChefe(chefe, nivel)
@@ -225,7 +235,8 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
       baralho: criarBaralho(personagem, `${semente}:${ID_JOGADOR[j]}`),
     }
   }
-  const hpChefe = Math.round(def.hp * niv.hp * (grupo?.hpChefe ?? 1))
+  const daEtapa = ETAPA_EXPEDICAO[etapa] ?? null
+  const hpChefe = Math.round(def.hp * niv.hp * (grupo?.hpChefe ?? 1) * (daEtapa?.hp ?? 1))
   const nivelDaLuta = NIVEIS[nivel] ? nivel : 'facil'
   const comTextoCoop = (jog) => {
     for (const carta of jog.baralho.monte) {
@@ -253,7 +264,7 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
       fase: 0,
       guarda: null, // fator do dano do próximo contra-ataque (♥ do chefe)
       carga: 0, // carga do SUPER: cheia a cada COOP.cargaSuper rodadas
-      cargaMax: COOP.cargaSuper,
+      cargaMax: daEtapa?.cargaSuper ?? COOP.cargaSuper,
       monte: embaralhar(CARTAS_CHEFES[chefe].fases[0].map((c) => ({ ...c })), rng),
       descarte: [],
       intencao: null, // a carta virada que o chefe vai jogar nesta rodada (no quadro, nos dois)
@@ -272,7 +283,12 @@ export function criarPartidaCoop({ party, chefe, nivel = 'facil', semente = 'coo
   }
   // a luta que continua: o HP de antes (null = cheio) e as relíquias (estado.mods)
   if (Array.isArray(hp)) estado.jogadores.forEach((jog, j) => hp[j] != null && (jog.hp = Math.max(1, Math.min(jog.hpMax, Math.round(hp[j])))))
-  return aplicarReliquias(estado, reliquias)
+  aplicarReliquias(estado, reliquias)
+  if (daEtapa) {
+    estado.etapa = etapa
+    estado.mods.danoQuadro *= daEtapa.dano
+  }
+  return estado
 }
 
 function comprarDoChefe(estado) {

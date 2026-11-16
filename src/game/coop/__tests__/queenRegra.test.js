@@ -239,12 +239,15 @@ test('regra: terminar limpa e os ganchos não quebram sem Phaser', () => {
 
 // ---------- o baralho e a Expedição ----------
 
-test('Queen: 4 cartas por fase, ataques montáveis e as cartas da regra no lugar certo', () => {
+test('Queen: 5 ou 6 cartas por fase, ataques montáveis, os de assinatura e as cartas da regra no lugar certo', () => {
   const { fases } = CARTAS_CHEFES.queen
   assert.equal(fases.length, 3)
   for (const lista of fases) {
-    assert.equal(lista.length, 4)
+    assert.ok(lista.length >= 5 && lista.length <= 6)
     for (const k of lista) assert.ok(ataqueDaCartaChefe(k, { ataques }))
+    // (dificuldade do CO-OP) pelo menos 3 cartas por fase com um ataque de assinatura dela
+    const nomes = lista.filter((k) => k.naipe !== 'copas').map((k) => ataqueDaCartaChefe(k, { ataques }).nome)
+    assert.ok(nomes.filter((n) => /queenPopup|queenCarregando|queenCursor|queenPulso/.test(n)).length >= 3, String(nomes))
   }
   const nomes = new Set(fases.flat().map((k) => k.nome))
   for (const nome of ['Atualização Obrigatória', 'Gotas de Ácido', 'Interferência', 'REBOOT']) assert.ok(nomes.has(nome), nome)

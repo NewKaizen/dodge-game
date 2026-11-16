@@ -53,6 +53,20 @@ const TEXTO_ATAQUE = {
   coronelEntulho: 'Sombras crescem no chão e viram pedregulhos que batem só ali',
   coronelBuzinaco: 'Uma onda de som varre a caixa e empurra quem está dentro (não machuca)',
   coronelCompactador: 'Duas placas de aço fecham devagar e param deixando um vão marcado, onde a dupla cabe',
+  coronelLatas: 'Latas caem do alto e quicam no chão, mudando de lugar a cada pulo',
+  coronelRatos: 'Olhinhos vermelhos piscam na borda e um bando de ratos atravessa em fila, ziguezagueando',
+  coronelTriagem: 'Três colunas de coleta seletiva: o lixo só machuca na coluna da cor errada',
+  coronelRe: 'O caminhão entra de ré (BIP, BIP) na faixa acesa, despeja um leque de entulho e arranca',
+  kingXeque: 'As linhas da torre e do bispo acendem cruzando no coração e viram raios',
+  kingMuralha: 'Uma muralha de peões desce casa por casa, com uma brecha; na última casa eles são promovidos e atiram',
+  kingCavalgada: 'Cavalos saltam em L e caem onde o coração estava, soltando lascas',
+  queenPopup: 'Janelas de pop-up abrem, o X fecha e elas estouram em pixels',
+  queenCarregando: 'Uma barra de progresso enche na linha do coração e vira laser em 100%',
+  queenCursor: 'A setinha do mouse persegue o coração e clica onde ele estava',
+  queenPulso: 'Anéis de Wi-Fi se espalham e só machucam na batida',
+  jevilRoleta: 'Lâminas giram na roleta e a bolinha solta um leque de naipes pela fatia acesa',
+  jevilMalabares: 'Bombas voam em arco, caem na sombra que cresce e explodem em naipes',
+  jevilOrbita: 'Um anel de losangos gira em volta do coração e fecha',
 }
 
 // Biblioteca de mentira que só anota os nomes: A.juntos(A.rain(), A.aimed())

@@ -27,8 +27,10 @@ export default {
     cores: { espadas: 0x9a8bff, copas: 0xff5f8a, ouros: 0xffd24c, paus: 0x5ff0b0, hex: 0xf4f0ff, bola: 0xffffff },
     cor: 0xff6a4a,
   },
-  hp: 380,
-  danoBala: 11,
+  hp: 420, // era 380: a 2ª luta da Expedição aperta mais que os lacaios
+  desafio: { velocidade: 1.05, densidade: 1.08 },
+  danoBala: 13, // era 11
+  niveis: { medio: { dano: 1.8 }, dificil: { dano: 1.35 } }, // (dificuldade do CO-OP: o tenente aperta mais que os lacaios)
   leve: (A) => A.quicantes({ forma: 'ouros', duracao: 4000, intervalo: 1500, velocidade: 140 }),
   fases: [
     {
@@ -39,6 +41,7 @@ export default {
         ['ouros', 5, 'Dadinhos Quicantes', (A) => A.quicantes({ forma: 'hex', intervalo: 950, velocidade: 170 })],
         ['paus', 5, 'Argola de Fogo', (A) => A.anel({ forma: 'copas' })],
         ['paus', 6, 'Número Duplo', (A) => A.divisores({ forma: 'paus' })],
+        ['espadas', 6, 'Roleta do Picadeiro', (A) => A.jevilRoleta({ bola: 1500, leque: 4 })],
         ['copas', 4, 'Pipoca', null, { cura: 22 }],
       ],
     },
@@ -50,7 +53,8 @@ export default {
       cartas: [
         ['ouros', 7, 'Mini Carrossel', (A) => A.carrossel({ aneis: [{ raio: 50, quantidade: 8, giro: 0.9 }, { raio: 115, quantidade: 16, giro: -0.7 }] })],
         ['espadas', 7, 'Chicote Giratório', (A) => A.foice({ varridas: 2 })],
-        ['paus', 7, 'Bomba do Palhaço', (A) => A.bombas({ intervalo: 1600, fragmentos: 8, velocidade: 140 })],
+        ['paus', 7, 'Bomba do Palhaço', (A) => A.juntos(A.bombas({ intervalo: 1600, fragmentos: 8, velocidade: 140 }), A.jevilMalabares({ intervalo: 1600, naipes: 5 }))],
+        ['ouros', 8, 'Argola de Ouros', (A) => A.juntos(A.jevilOrbita({ intervalo: 1500 }), A.quicantes({ forma: 'hex', intervalo: 1300, velocidade: 170 }))],
         ['espadas', 8, 'Chuva de Naipes', (A) => A.rain({ forma: 'espadas', intervalo: 380, velocidade: 140 })],
         ['copas', 6, 'Reverência', null, { cura: 18, guarda: 0.7 }],
       ],
@@ -59,6 +63,6 @@ export default {
   super: {
     nome: 'Gran Finale',
     texto: 'O carrossel gira e a foice varre a caixa',
-    criar: (A) => A.sequencia(A.carrossel({ duracao: 3600 }), A.foice({ duracao: 3600, varridas: 2 })),
+    criar: (A) => A.sequencia(A.juntos(A.carrossel({ duracao: 3600 }), A.jevilMalabares({ duracao: 3600, intervalo: 1400 })), A.juntos(A.foice({ duracao: 3600, varridas: 2 }), A.jevilOrbita({ duracao: 3600, intervalo: 1700 }))),
   },
 }

@@ -60,21 +60,31 @@ function lutar(chefe, nivel, i) {
 
 const media = (lista, campo) => lista.reduce((t, x) => t + x[campo], 0) / lista.length
 
-test('MÉDIO com dois jogadores médios: ~4 minutos por chefe (entre 3 e 6), quase sempre com uma QUEBRA', () => {
+// (dificuldade do CO-OP, docs/coop-cartas.md "Dificuldade do CO-OP"): o MÉDIO é um desafio de verdade (a dupla
+// média às vezes perde), o FÁCIL continua acessível e o DIFÍCIL derruba mais que o MÉDIO
+test('MÉDIO com dois jogadores médios: ~4 minutos por chefe (entre 3 e 6), às vezes ganha e às vezes perde', () => {
   for (const chefe of ORDEM_CHEFES) {
     const lutas = Array.from({ length: 40 }, (_, i) => lutar(chefe, 'medio', i))
     const min = minutos(media(lutas, 'segundos'))
     assert.ok(min >= 3 && min <= 6, `${chefe}: ${min} min`)
-    assert.ok(lutas.filter((l) => l.vitoria).length >= 30, `${chefe}: a dupla média ganha quase sempre no MÉDIO`)
-    assert.ok(media(lutas, 'finalizacoes') >= 0.5, `${chefe}: a luta costuma ter uma rodada ATORDOADO`)
+    const vitorias = lutas.filter((l) => l.vitoria).length
+    assert.ok(vitorias >= 8 && vitorias <= 36, `${chefe}: a dupla média ganhou ${vitorias} de 40 no MÉDIO`)
+    assert.ok(media(lutas.filter((l) => l.vitoria), 'finalizacoes') >= 0.5, `${chefe}: a luta vencida costuma ter uma rodada ATORDOADO`)
   }
 })
 
-test('o FÁCIL é mais curto que o MÉDIO, e nenhum passa de 6 minutos', () => {
+test('o FÁCIL é acessível e mais curto que o MÉDIO; o DIFÍCIL derruba mais que o MÉDIO; nenhum passa de 6 minutos', () => {
   for (const chefe of ORDEM_CHEFES) {
-    const facil = media(Array.from({ length: 30 }, (_, i) => lutar(chefe, 'facil', i)), 'segundos')
-    const medio = media(Array.from({ length: 30 }, (_, i) => lutar(chefe, 'medio', i)), 'segundos')
-    assert.ok(facil < medio, `${chefe}: fácil ${minutos(facil)} min, médio ${minutos(medio)} min`)
-    assert.ok(minutos(medio) <= 6)
+    const facil = Array.from({ length: 30 }, (_, i) => lutar(chefe, 'facil', i))
+    const medio = Array.from({ length: 30 }, (_, i) => lutar(chefe, 'medio', i))
+    const dificil = Array.from({ length: 30 }, (_, i) => lutar(chefe, 'dificil', i))
+    const vitorias = (lista) => lista.filter((l) => l.vitoria)
+    assert.ok(vitorias(facil).length >= 24, `${chefe}: o FÁCIL ganhou ${vitorias(facil).length} de 30`)
+    assert.ok(vitorias(dificil).length < vitorias(medio).length, `${chefe}: o DIFÍCIL tem de derrubar mais que o MÉDIO`)
+    // (as lutas perdidas acabam cedo: a duração compara as vencidas)
+    const fs = media(vitorias(facil), 'segundos')
+    const ms = media(vitorias(medio), 'segundos')
+    assert.ok(fs < ms, `${chefe}: fácil ${minutos(fs)} min, médio ${minutos(ms)} min`)
+    assert.ok(minutos(media(medio, 'segundos')) <= 6)
   }
 })

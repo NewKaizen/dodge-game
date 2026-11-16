@@ -24,6 +24,20 @@ import coronelCaminhao from './coronelCaminhao.js'
 import coronelEntulho from './coronelEntulho.js'
 import coronelBuzinaco from './coronelBuzinaco.js'
 import coronelCompactador from './coronelCompactador.js'
+import coronelLatas from './coronelLatas.js'
+import coronelRatos from './coronelRatos.js'
+import coronelTriagem from './coronelTriagem.js'
+import coronelRe from './coronelRe.js'
+import kingXeque from './kingXeque.js'
+import kingMuralha from './kingMuralha.js'
+import kingCavalgada from './kingCavalgada.js'
+import queenPopup from './queenPopup.js'
+import queenCarregando from './queenCarregando.js'
+import queenCursor from './queenCursor.js'
+import queenPulso from './queenPulso.js'
+import jevilRoleta from './jevilRoleta.js'
+import jevilMalabares from './jevilMalabares.js'
+import jevilOrbita from './jevilOrbita.js'
 import { ataquesSuper } from './super/index.js'
 import { ataquesHabilidades } from './habilidades/index.js'
 
@@ -69,6 +83,21 @@ export const ataques = {
   coronelEntulho, // (Coronel Caçamba) a chuva de entulho com a sombra crescendo
   coronelBuzinaco, // (Coronel Caçamba) a onda de som que empurra
   coronelCompactador, // (Coronel Caçamba) as placas que fecham, com um vão
+  // os ataques de assinatura do CO-OP difícil (docs/coop-cartas.md "Dificuldade do CO-OP")
+  coronelLatas, // (Coronel Caçamba) latas que caem e quicam no chão
+  coronelRatos, // (Coronel Caçamba) bandos de ratos avisados pelos olhinhos na borda
+  coronelTriagem, // (Coronel Caçamba) coleta seletiva: o lixo só machuca na coluna da cor errada
+  coronelRe, // (Coronel Caçamba) o caminhão de ré que despeja a caçamba
+  kingXeque, // (Chaos King) as linhas de xeque da torre e do bispo cruzando no coração
+  kingMuralha, // (Chaos King) a muralha de peões que marcha e é promovida
+  kingCavalgada, // (Chaos King) cavalos que saltam em L e caem onde o coração estava
+  queenPopup, // (Queen) janelas de pop-up que fecham e estouram
+  queenCarregando, // (Queen) a barra de progresso que vira laser
+  queenCursor, // (Queen) a setinha que persegue e clica
+  queenPulso, // (Queen) anéis de sinal que só machucam na batida
+  jevilRoleta, // (Jevil) a roleta com lâminas e o leque da bolinha
+  jevilMalabares, // (Jevil) bombas em malabarismo que explodem em naipes
+  jevilOrbita, // (Jevil) o anel de ouros que fecha em volta do coração
   ...ataquesSuper, // superKris, superSusie... (cartas SUPER)
   ...ataquesHabilidades, // krisEstocadaDupla, susieCabecada... (cartas normais, ver habilidades/)
   juntos,
