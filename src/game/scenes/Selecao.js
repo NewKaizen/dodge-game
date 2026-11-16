@@ -3,7 +3,7 @@ import Controles from '../controles.js'
 import { CHEFES, ORDEM_CHEFES } from '../coop/chefes/index.js'
 import { partyDe } from '../data/batalha.js'
 import { criarFundo } from '../backgrounds/index.js'
-import { ESCALA } from '../arte/texturas.js'
+import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { tocar, musica } from '../audio.js'
 import { CORES, DIFICULDADES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 import { claraoCamera } from '../effects/flash.js'
@@ -81,7 +81,7 @@ export default class Selecao extends Phaser.Scene {
       }
       const def = CHEFES[id]
       const dif = DIFICULDADES[def.dificuldade]
-      const sprite = this.add.image(x, y - 40, def.sprite).setScale(ESCALA.chefe * 0.8)
+      const sprite = this.add.image(x, y - 40, def.sprite).setScale(escalaDe(def.sprite, ESCALA.chefe * 0.8))
       texto(x, y + 62, def.nome.toUpperCase(), def.nome.length > 11 ? 14 : 18, TEXTO.normal)
       texto(x, y + 86, dif.rotulo, 16, dif.cor)
       const maxEstrelas = Math.max(...Object.values(DIFICULDADES).map((d) => d.estrelas))
@@ -131,7 +131,7 @@ export default class Selecao extends Phaser.Scene {
       const selecionada = k === this.indice
       c.moldura.setStrokeStyle(3, selecionada ? CORES.selecionado : 0x505050)
       c.sprite.setAlpha(selecionada ? 1 : 0.45)
-      this.tweens.add({ targets: c.sprite, scale: c.mistura ? (selecionada ? 1.1 : 1) : ESCALA.chefe * (selecionada ? 0.9 : 0.8), duration: 150 })
+      this.tweens.add({ targets: c.sprite, scale: c.mistura ? (selecionada ? 1.1 : 1) : escalaDe(c.sprite.texture.key, ESCALA.chefe * (selecionada ? 0.9 : 0.8)), duration: 150 })
     })
     const c = this.cartas[this.indice]
     this.cursor.setPosition(c.x, c.y - this.carta.altura / 2 - 18)

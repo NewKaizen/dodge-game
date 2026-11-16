@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import { irCarregando } from '../carregando.js'
 import Controles from '../controles.js'
 import { CHEFES } from '../coop/chefes/index.js'
-import { ESCALA } from '../arte/texturas.js'
+import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { tocar, musica, pararMusica } from '../audio.js'
 import { formatarTempo } from '../coop/nota.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, NIVEIS } from '../constants.js'
@@ -327,7 +327,7 @@ export default class GameOver extends Phaser.Scene {
   // ---------- chefe ao fundo ----------
 
   chefeRindo(rapido) {
-    const escala = ESCALA.chefe * 1.5
+    const escala = escalaDe(this.def.sprite, ESCALA.chefe * 1.5)
     const x = LARGURA / 2
     const y = 150
     const chefe = this.add.image(x, y, this.def.sprite).setScale(escala).setTint(0x9a3040).setAlpha(0).setDepth(-4)

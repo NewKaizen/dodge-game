@@ -8,7 +8,7 @@ import { vigiarParty } from '../party/cliente.js'
 import { desenharCoroa } from '../party/coroa.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { arteElenco } from '../arte/elenco.js'
-import { ESCALA } from '../arte/texturas.js'
+import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { tocar } from '../audio.js'
 import { claraoCamera } from '../effects/flash.js'
 import { estilhacos } from '../effects/entrada.js'
@@ -206,7 +206,7 @@ export default class PartyIntro extends Phaser.Scene {
     const objetos = [g]
     if (this.textures.exists(chefe.sprite)) {
       const s = this.add.image(0, PALCO.base - 4, chefe.sprite).setOrigin(0.5, 1)
-      s.setScale(Math.min(ESCALA.chefe * 1.1, 230 / s.height, 210 / s.width))
+      s.setScale(Math.min(escalaDe(chefe.sprite, ESCALA.chefe * 1.1), 230 / s.height, 210 / s.width))
       objetos.push(s)
     }
     objetos.push(this.add.text(0, PALCO.base + 20, chefe.nome.toUpperCase(), { fontFamily: FONTE, fontSize: '20px', color: '#ff7a9a', stroke: '#000000', strokeThickness: 5 }).setOrigin(0.5))

@@ -40,7 +40,7 @@ import {
 } from '../../lib/lan/rede.js'
 import { textoRestante } from '../../lib/semanal.js'
 import { CHEFES } from '../coop/chefes/index.js'
-import { ESCALA } from '../arte/texturas.js'
+import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { jogo } from '../../lib/estado.js'
 import { timesDoArranjo, proximoArranjo, ROTULO_TIME } from '../../lib/times2x2.js'
 import { pingPartida, ligacoes, ROTAS, corDoPing } from '../../lib/lan/transmissao.js'
@@ -563,7 +563,7 @@ export default class Lan extends Phaser.Scene {
     }
     const def = CHEFES[info.chefe]
     if (def && this.textures.exists(def.sprite)) {
-      const img = this.add2(this.add.image(x + 42, y + 74, def.sprite).setScale(ESCALA.chefe * 0.72))
+      const img = this.add2(this.add.image(x + 42, y + 74, def.sprite).setScale(escalaDe(def.sprite, ESCALA.chefe * 0.72)))
       this.dinamicos.push({ tipo: 'flutuar', obj: img, y: y + 74 })
     }
     const xt = x + 86

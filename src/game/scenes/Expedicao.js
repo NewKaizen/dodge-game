@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import Controles from '../controles.js'
 import { CHEFES } from '../coop/chefes/index.js'
 import { criarFundo } from '../backgrounds/index.js'
-import { ESCALA } from '../arte/texturas.js'
+import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { tocar, musica } from '../audio.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 import { corDaVaga } from '../vagas.js'
@@ -140,7 +140,7 @@ export default class Expedicao extends Phaser.Scene {
     const id = this.exp.lutas[this.exp.no]
     const def = CHEFES[id]
     this.texto(LARGURA / 2, 140, this.exp.no === 0 ? '1ª LUTA: OS LACAIOS' : `${this.exp.no + 1}ª LUTA: ${NOME_ETAPA[ETAPAS[this.exp.no]]}`, 24, '#ffc070')
-    this.add.image(LARGURA / 2, 236, def.sprite).setScale(ESCALA.chefe * 0.85)
+    this.add.image(LARGURA / 2, 236, def.sprite).setScale(escalaDe(def.sprite, ESCALA.chefe * 0.85))
     this.texto(LARGURA / 2, 318, def.nome.toUpperCase(), 18)
     this.desenharHp(this.exp.hp, false)
     this.dica = this.texto(LARGURA / 2, ALTURA - 20, this.host ? 'A: começar agora' : 'a luta começa em instantes...', 13, TEXTO.desabilitado, { strokeThickness: 2 })

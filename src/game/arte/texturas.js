@@ -4,9 +4,22 @@ import { TEXTURAS_QUEEN } from './queenSprites.js'
 import { GERADORES_JEVIL } from './jevilExpedicao.js'
 import { GERADORES_KING } from './kingSprites.js'
 import { SPRITES_CORONEL } from './coronelSprites.js'
+import { CHEFOES, QUADROS_IDLE } from './chefoes.js'
+import { gradeEmCanvas } from './pintor.js'
 
 // Escala em que cada sprite de pixel art aparece no jogo
 export const ESCALA = { personagem: 3, chefe: 4, coracao: 1.4 }
+
+// Texturas em densidade maior (mais pixels no mesmo espaço da tela): os chefões do CO-OP (arte/chefoes.js) têm o
+// dobro de pixels e aparecem na metade da escala. Use escalaDe(chave, ESCALA.chefe) onde mostrar o sprite de um chefe.
+const CHAVE_CHEFAO = { king: 'king', queen: 'queen', jevil: 'jevil', coronel: 'coronelLixeiro' }
+export const DENSIDADE = Object.fromEntries(['coronel', ...Object.values(CHAVE_CHEFAO).flatMap(quadrosDe)].map((k) => [k, 2]))
+export const escalaDe = (chave, escala) => escala / (DENSIDADE[chave] ?? 1)
+
+// Quadros da animação parada (idle) de uma textura: [chave, 'chave-q1', 'chave-q2'] nos chefões, só [chave] no resto
+export function quadrosDe(chave) {
+  return Object.values(CHAVE_CHEFAO).includes(chave) ? Array.from({ length: QUADROS_IDLE }, (_, q) => (q ? `${chave}-q${q}` : chave)) : [chave]
+}
 
 // Tamanho do "miolo" das texturas de bala (a borda restante é o brilho).
 // Uma bala de raio r é desenhada com escala r / RAIO_BALA.
@@ -348,11 +361,10 @@ const personagens = Object.fromEntries(Object.keys(PERSONAGENS).map((id) => [id,
 
 const GERADORES = {
   ...personagens,
-  king: sprite('king'),
-  queen: sprite('queen'),
-  jevil: sprite('jevil'),
+  // os chefões do CO-OP, com os quadros da animação parada (arte/chefoes.js); 'coronel' é o mesmo desenho do Coronel
+  ...Object.fromEntries(Object.entries(CHAVE_CHEFAO).flatMap(([id, chave]) => quadrosDe(chave).map((k, q) => [k, () => gradeEmCanvas(CHEFOES[id](q))]))),
+  coronel: () => gradeEmCanvas(CHEFOES.coronel(0)),
   ...GERADORES_JEVIL, // os lacaios e o Mestre de Picadeiro (Expedição)
-  coronel: sprite('coronel'),
   // BOSS SEMANAL (coop/chefes/escuridao.js, ladra.js)
   escuridao: sprite('escuridao'),
   ladra: sprite('ladra'),

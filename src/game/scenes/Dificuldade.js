@@ -3,7 +3,7 @@ import { irCarregando } from '../carregando.js'
 import Controles from '../controles.js'
 import { CHEFES, nivelDoChefe } from '../coop/chefes/index.js'
 import { criarFundo } from '../backgrounds/index.js'
-import { ESCALA } from '../arte/texturas.js'
+import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { tocar, musica, pararMusica } from '../audio.js'
 import { rachadura, estilhacos, faixasDiagonais, corNumero } from '../effects/entrada.js'
 import { CORES, DIFICULDADES, NIVEIS, ORDEM_NIVEIS, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
@@ -88,7 +88,7 @@ export default class Dificuldade extends Phaser.Scene {
     // chefe escolhido, à esquerda
     const cx = CHEFE.x
     this.add.rectangle(cx, 240, 220, 290, CORES.painel, 0.88).setStrokeStyle(3, 0x505050)
-    this.sprite = this.add.image(cx, CHEFE.y, def.sprite).setScale(ESCALA.chefe * 0.9)
+    this.sprite = this.add.image(cx, CHEFE.y, def.sprite).setScale(escalaDe(def.sprite, ESCALA.chefe * 0.9))
     if (this.sorteada) {
       // SORTEADA: o chefão é surpresa (silhueta e "?")
       this.sprite.setTintFill(0x101018)
@@ -188,7 +188,7 @@ export default class Dificuldade extends Phaser.Scene {
     })
     // prévia: o fundo fica mais agitado e o chefe mais inquieto
     this.fundo.estado.agito = nivel.fundo
-    this.tweens.add({ targets: this.sprite, scale: ESCALA.chefe * (0.9 + this.indice * 0.06), duration: 150 })
+    this.tweens.add({ targets: this.sprite, scale: escalaDe(this.sprite.texture.key, ESCALA.chefe * (0.9 + this.indice * 0.06)), duration: 150 })
   }
 
   // doHost: em rede, no convidado, o índice que o host confirmou
@@ -246,7 +246,7 @@ export default class Dificuldade extends Phaser.Scene {
       duration: climax,
       ease: 'Quad.easeIn',
     })
-    this.tweens.add({ targets: this.sprite, scale: ESCALA.chefe * (2 + k * 0.35), duration: climax, ease: 'Cubic.easeIn' })
+    this.tweens.add({ targets: this.sprite, scale: escalaDe(this.sprite.texture.key, ESCALA.chefe * (2 + k * 0.35)), duration: climax, ease: 'Cubic.easeIn' })
 
     // carimbo com o nome do nível, batendo no meio da tensão
     const rotulo = this.add

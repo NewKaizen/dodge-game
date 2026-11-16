@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import Controles from '../controles.js'
 import { CHEFES } from '../coop/chefes/index.js'
 import { criarFundo } from '../backgrounds/index.js'
-import { ESCALA } from '../arte/texturas.js'
+import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { tocar, musica } from '../audio.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
@@ -77,7 +77,7 @@ export default class ExpedicaoFim extends Phaser.Scene {
     // o chefão (no lado) e o resumo
     const def = CHEFES[venceu ? exp.chefao : exp.lutas[exp.no]]
     if (def?.sprite) {
-      const s = this.add.image(140, 270, def.sprite).setScale(ESCALA.chefe * 0.75)
+      const s = this.add.image(140, 270, def.sprite).setScale(escalaDe(def.sprite, ESCALA.chefe * 0.75))
       if (venceu) s.setAlpha(0.55).setTint(0x8080a0)
     }
     const tempo = (exp.tempos ?? []).reduce((a, b) => a + b, 0) + (venceu ? 0 : this.stats?.tempoMs ?? 0)

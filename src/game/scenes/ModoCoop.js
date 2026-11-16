@@ -2,7 +2,7 @@ import Phaser from 'phaser'
 import Controles from '../controles.js'
 import { partyDe } from '../data/batalha.js'
 import { criarFundo } from '../backgrounds/index.js'
-import { ESCALA } from '../arte/texturas.js'
+import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { tocar, musica } from '../audio.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 import { claraoCamera } from '../effects/flash.js'
@@ -100,7 +100,7 @@ export default class ModoCoop extends Phaser.Scene {
         g,
         this.add.image(x - 52, y - 10, 'coracao').setTint(CORES.almas[0]).setScale(1.6),
         this.add.image(x - 34, y + 12, 'coracao').setTint(CORES.almas[1]).setScale(1.6),
-        this.add.image(x + 34, y, 'king').setScale(ESCALA.chefe * 0.4),
+        this.add.image(x + 34, y, 'king').setScale(escalaDe('king', ESCALA.chefe * 0.4)),
       ])
       return grupo
     }

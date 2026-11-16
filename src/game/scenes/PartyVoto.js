@@ -4,7 +4,7 @@ import { ARENAS, ARENA } from '../pvp/arenas.js'
 import { CHEFES, ORDEM_CHEFES } from '../coop/chefes/index.js'
 import { criarRng } from '../pvp/baralho.js'
 import { criarFundo } from '../backgrounds/index.js'
-import { ESCALA } from '../arte/texturas.js'
+import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { tocar, musica } from '../audio.js'
 import { estilhacos } from '../effects/entrada.js'
 import { claraoCamera } from '../effects/flash.js'
@@ -212,10 +212,10 @@ export default class PartyVoto extends Phaser.Scene {
   montarArte(id, cor) {
     // BOSS SEMANAL: o chefe da semana no cartão
     const semanal = this.fase === 'modo' && id === 'semanal' ? CHEFES[semanalAtual()?.chefe] : null
-    if (semanal && this.textures.exists(semanal.sprite)) return [this.add.image(0, -40, semanal.sprite).setScale(ESCALA.chefe * 0.62)]
+    if (semanal && this.textures.exists(semanal.sprite)) return [this.add.image(0, -40, semanal.sprite).setScale(escalaDe(semanal.sprite, ESCALA.chefe * 0.62))]
     if (this.fase === 'mapa' && this.modo === 'coop4') {
       const def = CHEFES[id]
-      return def && this.textures.exists(def.sprite) ? [this.add.image(0, -40, def.sprite).setScale(ESCALA.chefe * 0.62)] : []
+      return def && this.textures.exists(def.sprite) ? [this.add.image(0, -40, def.sprite).setScale(escalaDe(def.sprite, ESCALA.chefe * 0.62))] : []
     }
     const g = this.add.graphics()
     if (this.fase === 'mapa') {

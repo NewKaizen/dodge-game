@@ -5,7 +5,7 @@ import { tocar, musica, tocarMusicaEspecial, voltarMusicaNormal } from '../audio
 import { FONTE, LARGURA, ALTURA, CENTRO_X, CORES } from '../constants.js'
 import { menosMovimento } from '../preferencias.js'
 import { PERSONAGENS } from '../data/personagens.js'
-import { ESCALA } from '../arte/texturas.js'
+import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { SIMBOLOS, ehSuper } from '../pvp/cartas.js'
 import Mao from '../entities/Mao.js'
 import Carta from '../entities/Carta.js'
@@ -191,7 +191,7 @@ export default class CampanhaArena extends Phaser.Scene {
       this.inimigo = new Inimigo(this, CHEFE.x, CHEFE.y + 46, this.def)
       this.inimigo.sprite.setVisible(false)
     } else {
-      this.ecoChefe = criarEco(this, CHEFE.x, CHEFE.y + 48, this.def.sprite, { escala: ESCALA.chefe, profundidade: 1.5, alpha: 0, origemY: 1 })
+      this.ecoChefe = criarEco(this, CHEFE.x, CHEFE.y + 48, this.def.sprite, { escala: escalaDe(this.def.sprite, ESCALA.chefe), profundidade: 1.5, alpha: 0, origemY: 1 })
       this.inimigo = new Inimigo(this, CHEFE.x, CHEFE.y, this.def)
       this.inimigo.sprite.setTint(TINTA_ECO)
     }
