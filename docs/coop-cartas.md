@@ -360,7 +360,7 @@ SUPER: *Dia de Coleta* (dois caminhões e entulho, tudo avisado). Ataques novos 
 faixa livre), `coronelEntulho` (a sombra cresce até o tamanho do estrago, ~1 s, e vira o pedregulho),
 `coronelBuzinaco` (onda de som que EMPURRA, não machuca; só o PC dono move o coração) e `coronelCompactador` (duas
 placas fecham devagar e deixam um vão de 104 px marcado desde o começo; o grupo cabe). Arte original em
-`arte/coronelSprites.js` (caminhão, Caminhão Compactador, lacaios).
+`arte/coronelSprites.js` (o caminhão das cartas) e `arte/expedicao.js` (Caminhão Compactador e lacaios).
 
 **Expedição** (não aparecem na seleção: `oculto`/`expedicao`; `scene.start('CoopArena', { chefe: 'coronelLacaios' })`):
 - `coronelLacaios` *Turma do Lixão* (~2 min): guaxinins e um saco de lixo num sprite só, 2 fases, sem regra, só
@@ -806,7 +806,7 @@ sozinha: quem faz isso é a face.
   2 fases (cartas vivas, depois os palhacinhos), ataques simples.
 - **Mestre de Picadeiro** (`chefes/jevilTenente.js`, sprite `jevil-mestre`): o tenente. Tem o **dadinho** (a mesma regra,
   `criarRegraDoDado({ forca: 0.6, pequeno: true })`) com 3 faces gentis: SORTE!, GRAVIDADE INVERTIDA, RÁPIDO E LEVE,
-  com efeitos 40% mais fracos. Os sprites são desenhados em código (`arte/jevilExpedicao.js`).
+  com efeitos 40% mais fracos. Os sprites são desenhados em código (`arte/expedicao.js`, densidade 2 com 3 quadros de animação parada).
 
 Balanceamento (MÉDIO, `simularCoop.mjs` com as cartas medidas, sem o efeito do dado): Jevil HP 410 = 2,9 / 3,3 / 3,8 min
 (dupla perfeita / mista / média, 100% / 100% / 99% de vitória); lacaios HP 250 = ~2 min; Mestre de Picadeiro HP 380 = 2,4 a 3 min.
@@ -830,7 +830,7 @@ Testes: `coop/__tests__/jevil.test.js`.
 | `src/game/coop/coop2.js` · `coop/resgate.js` · `coop/regraChefe.js` · `coop/duracao.js` · `coop/dicas.js` | CO-OP 2.0 (puro): QUEBRA, ATORDOADO, cartas de dupla, prévia; o resgate na hora; a regra do chefe; a duração das lutas; as dicas de 1ª vez |
 | `src/game/coop/reliquias.js` · `coop/expedicao.js` · `coop/expedicaoCena.js` · `scenes/ModoCoop.js` · `scenes/Expedicao.js` · `scenes/ExpedicaoFim.js` | a EXPEDIÇÃO: a luta que continua (HP de antes), as relíquias (`estado.mods`), a máquina de estados, o mapa e as telas |
 | `src/game/coop/coop2Cena.js` · `coop/coop2Arena.js` | CO-OP 2.0 na tela: a prévia, a barra, as almas, a finalização, o COMO FUNCIONA, as dicas; os métodos que as duas arenas ligam (`ligarCoop2`) |
-| `src/game/coop/jevilRegra.js` · `jevilDado.js` · `jevilDadoCena.js` · `chefes/jevilLacaios.js` · `chefes/jevilTenente.js` · `arte/jevilExpedicao.js` | Jevil: o DADO DO CAOS, os lacaios e o Mestre de Picadeiro |
+| `src/game/coop/jevilRegra.js` · `jevilDado.js` · `jevilDadoCena.js` · `chefes/jevilLacaios.js` · `chefes/jevilTenente.js` · `arte/expedicao.js` | Jevil: o DADO DO CAOS, os lacaios e o Mestre de Picadeiro |
 | `src/game/coop/__tests__/` | testes |
 
 ## Testes
@@ -876,7 +876,7 @@ na simulação).
 `queenTenente` (O Firewall: a mesma regra em versão leve, raio 190/170, carência 2,2 s, tique a cada 1,3 s, só um
 muro por ataque, sem Interferência nem REBOOT; HP 380, ~2,6-3,2 min). Os dois têm `expedicao: true`, ficam fora de
 `ORDEM_CHEFES` (a Selecao não lista) e abrem com `scene.start('CoopArena', { chefe: 'queenLacaios' | 'queenTenente' })`.
-Sprites desenhados por código em `arte/queenSprites.js`. Testes: `coop/__tests__/queenWifi.test.js` e `queenRegra.test.js`.
+Sprites desenhados por código em `arte/expedicao.js`. Testes: `coop/__tests__/queenWifi.test.js` e `queenRegra.test.js`.
 
 ## Chaos King: TABULEIRO REAL (CO-OP 2.0)
 
@@ -924,7 +924,7 @@ espelhado do tabuleiro (`api.empurrar`, só no PC dono); a primeira peça só av
 - `kingTenente` (**O Cavaleiro**, HP 430): tabuleiro 4 x 4 (a caixa vira 190 x 190) e só cavalos; a regra vem em
   versão leve (`O TABULEIRO`: ler as casas piscando), sem XEQUE nem ROQUE. ~3 min.
 
-Arte por código: `arte/kingSprites.js` (os ícones `king-p-*`, `king-lacaios`, `king-cavaleiro`). Testes:
+Arte por código: `arte/kingSprites.js` (os ícones `king-p-*`) e `arte/expedicao.js` (`king-lacaios`, `king-cavaleiro`). Testes:
 `coop/__tests__/kingTabuleiro.test.js`.
 
 Balanceamento (`medirChefes.mjs` + `simularCoop.mjs`, MÉDIO, 300 partidas, zero avisos `[telegrafo]`/`[rota de fuga]`):

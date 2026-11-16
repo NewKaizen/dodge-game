@@ -9,10 +9,10 @@ import { ignorarNasCaixas } from '../recorte.js'
 
 const LARGURA_BARRA = 100
 const TREMOR_MS = 750 // tempo tremendo antes de estourar (no relógio da cena: a câmera lenta estica)
-const QUADRO_IDLE_MS = 240 // troca de quadro da animação parada dos chefões (arte/chefoes.js)
+const QUADRO_IDLE_MS = 240 // troca de quadro da animação parada (arte/chefoes.js e arte/expedicao.js)
 
 // Chefe na arena do CO-OP: sprite com animação parada (idle: o balanço em tween e, nos chefões, os quadros da
-// arte), nome, barra de HP, piscar/tremer ao levar dano e estourar em pedaços quando cai
+// arte, também nos lacaios e tenentes da Expedição), nome, barra de HP, piscar/tremer ao levar dano e estourar em pedaços quando cai
 export default class Inimigo {
   constructor(scene, x, y, def) {
     this.scene = scene
