@@ -3,7 +3,7 @@
 // scene.start('CoopArena', { chefe: 'kingLacaios', ... }). As jogadas estão em kingCartas.js.
 import { ataqueKing } from './kingCartas.js'
 
-const carta = (nome) => () => ataqueKing('kingLacaios', nome)
+const carta = (nome) => (A) => ataqueKing('kingLacaios', nome, A)
 
 export default {
   nome: 'Lacaios do Rei',
@@ -20,7 +20,8 @@ export default {
     cor: 0xd8c8ff,
   },
   hp: 260, // ~1,9 min no MÉDIO; o SUPER vale no mínimo COOP.superPiso (60): com menos HP o combo não passaria do SUPER sozinho
-  danoBala: 5,
+  danoBala: 7, // era 5 (dificuldade do CO-OP)
+  niveis: { medio: { dano: 1.6 }, dificil: { dano: 1.25 } }, // (dificuldade do CO-OP: os lacaios já gastam o HP que o time leva para o tenente)
   leve: carta('leve'),
   fases: [
     {
@@ -49,6 +50,6 @@ export default {
   super: {
     nome: 'Cerco do Tabuleiro',
     texto: 'Torres e peões cercando o quadro, jogada atrás de jogada',
-    criar: () => ataqueKing('kingLacaios', 'super'),
+    criar: (A) => ataqueKing('kingLacaios', 'super', A),
   },
 }

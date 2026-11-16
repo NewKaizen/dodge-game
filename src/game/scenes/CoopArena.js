@@ -40,7 +40,7 @@ import { aplicarCurasDoContra } from '../coop/reliquias.js'
 import { COR_ATORDOADO } from '../coop/coop2Cena.js'
 import { ligarCoop2 } from '../coop/coop2Arena.js'
 import { semLigaduras } from '../campanha/texto.js'
-import { expedicaoValida, ultimaLuta, dadosDaLuta } from '../coop/expedicao.js'
+import { expedicaoValida, ultimaLuta, dadosDaLuta, etapaAtual } from '../coop/expedicao.js'
 import { QUADRO, inicioDoCoracao } from '../coop/quadro.js'
 import { escolherJogadaCoop } from '../coop/bot.js'
 import { superNoChefe } from '../coop/superNoChefe.js'
@@ -237,7 +237,7 @@ class CoopArena extends PvpArena {
     this.esquivaBot = this.cpu === null ? null : new EsquivaBot({ nivel: this.nivelBot })
     this.tempoEscolha = this.tempoBase
     this.hpAvisado = [false, false]
-    this.estado = criarPartidaCoop({ party: this.ids, chefe: this.idChefe, nivel: this.idNivel, semente: this.semente , hp: this.hpDosDados, reliquias: this.reliquiasDosDados })
+    this.estado = criarPartidaCoop({ party: this.ids, chefe: this.idChefe, nivel: this.idNivel, semente: this.semente, hp: this.hpDosDados, reliquias: this.reliquiasDosDados, etapa: this.expedicao ? etapaAtual(this.expedicao) : null })
     this.fase = 'abertura'
     this.saindo = false
     this.pausado = false

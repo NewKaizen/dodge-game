@@ -15,8 +15,9 @@ export default {
     cores: { espadas: 0x9a8bff, copas: 0xff5f8a, ouros: 0xffd24c, paus: 0x5ff0b0, bola: 0xffffff },
     cor: 0xff9ad0,
   },
-  hp: 250,
-  danoBala: 9,
+  hp: 280, // era 250
+  danoBala: 11, // era 9 (dificuldade do CO-OP)
+  niveis: { medio: { dano: 1.6 }, dificil: { dano: 1.25 } }, // (dificuldade do CO-OP: os lacaios já gastam o HP que o time leva para o tenente)
   leve: (A) => A.quicantes({ forma: 'ouros', duracao: 4000, intervalo: 1600, velocidade: 130 }),
   fases: [
     {
@@ -27,7 +28,8 @@ export default {
         ['espadas', 4, 'Espadas Marchando', (A) => A.colunas({ forma: 'espadas', quantidade: 2, velocidade: 170, intervalo: 1300 })],
         ['copas', 5, 'Corações em Roda', (A) => A.anel({ forma: 'copas' })],
         ['paus', 4, 'Paus Cadentes', (A) => A.rain({ forma: 'paus', intervalo: 420, velocidade: 115 })],
-        ['espadas', 5, 'Carta Marcada', (A) => A.aimed({ forma: 'espadas', intervalo: 1100, velocidade: 130 })],
+        ['espadas', 5, 'Carta Marcada', (A) => A.aimed({ forma: 'espadas', intervalo: 900, velocidade: 150 })],
+        ['ouros', 5, 'Malabares', (A) => A.jevilMalabares({ intervalo: 1300, naipes: 5, velocidadeNaipe: 130 })],
         ['copas', 3, 'Descansar', null, { cura: 18 }],
       ],
     },
@@ -39,7 +41,8 @@ export default {
       falas: ['Hihihi! Pega!', 'Pula-pula!', 'Palhaçada!'],
       cartas: [
         ['ouros', 5, 'Bolinhas Pulantes', (A) => A.quicantes({ forma: 'ouros', intervalo: 900, velocidade: 170 })],
-        ['paus', 5, 'Palhaçada em Dois', (A) => A.divisores({ forma: 'paus' })],
+        ['paus', 5, 'Palhaçada em Dois', (A) => A.juntos(A.divisores({ forma: 'paus' }), A.jevilMalabares({ intervalo: 1800, naipes: 4 }))],
+        ['ouros', 6, 'Roda de Ouros', (A) => A.jevilOrbita({ intervalo: 1600, pontos: 12 })],
         ['espadas', 6, 'Chuva de Confete', (A) => A.rain({ forma: 'espadas', intervalo: 380, velocidade: 125 })],
         ['copas', 5, 'Risadinha', null, { cura: 14, guarda: 0.7 }],
       ],
@@ -48,6 +51,6 @@ export default {
   super: {
     nome: 'Cambalhota Geral',
     texto: 'Os palhacinhos jogam bolinhas pela caixa toda',
-    criar: (A) => A.juntos(A.quicantes({ forma: 'ouros', duracao: 4500, intervalo: 800, velocidade: 150 }), A.rain({ forma: 'paus', duracao: 4500, intervalo: 520, velocidade: 110 })),
+    criar: (A) => A.juntos(A.quicantes({ forma: 'ouros', duracao: 5500, intervalo: 800, velocidade: 160 }), A.rain({ forma: 'paus', duracao: 5500, intervalo: 480, velocidade: 120 }), A.jevilMalabares({ duracao: 5500, intervalo: 1700 })),
   },
 }

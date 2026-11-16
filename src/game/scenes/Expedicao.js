@@ -219,7 +219,7 @@ export default class Expedicao extends Phaser.Scene {
     return { id, x, y, moldura, faixa, icone, nome, desc }
   }
 
-  // o HP de cada um embaixo: agora -> depois da cura (+35%)
+  // o HP de cada um embaixo: agora -> depois da cura (+CURA_ENTRE, 25%)
   desenharHp(hp, comCura) {
     const exp = this.exp
     const max = exp.hpMax ?? Array(this.n).fill(null)

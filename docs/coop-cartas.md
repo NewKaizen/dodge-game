@@ -41,7 +41,7 @@ começo da luta ganha uma faixa em cima ("EXPEDIÇÃO · LUTA 2 DE 3 · TENENTE"
 última diz "LUTA N VENCIDA!" e abre a `Expedicao`; o chefão caído ou o time caído abrem a `ExpedicaoFim`.
 
 **O HP passa** de uma luta para a outra (`terminarLuta` guarda o HP de cada um; caído = 0). **Entre as lutas** o time
-recupera **35% do HP máximo** (`CURA_ENTRE`; quem caiu volta com isso) e a tela mostra, embaixo, a barra de cada um,
+recupera **25% do HP máximo** (`CURA_ENTRE`; quem caiu volta com isso; era 35%, ver "Dificuldade do CO-OP") e a tela mostra, embaixo, a barra de cada um,
 o "+N de HP na próxima luta" e a barra subindo depois da escolha. **Caiu numa luta: a expedição acaba ali** (a tela do
 fim mostra o mapa com um X no nó, quantas lutas o time venceu, REVANCHE ou MENU).
 
@@ -335,6 +335,75 @@ leve", a Expedição pode passar uma regra própria (um `regra` com números men
 QUEBRA, 30 na fase 2). Nenhum chefe usa; os testes (`coop/__tests__/regraChefe.test.js`) e o dev usam:
 `debugJogo.jogo.scene.start('CoopArena', { chefe: 'king', nivel: 'medio', regra: 'exemplo' })`.
 
+## Dificuldade do CO-OP
+
+Pedido do dono: "Os bosses ficaram easy demais. O Coronel Caçamba, que era um terror de vencer, agora tá MUITO
+fácil. Testei a expedição no hit!" e depois "A quebra está boa. O problema são os ataques" e "Quero ataques
+criativos". A QUEBRA, o ATORDOADO, a FINALIZAÇÃO, o resgate e as cartas de dupla ficaram **como estavam**; o que
+mudou foi o que o chefe joga no quadro.
+
+**O que deixava fácil** (medido com `medirChefes.mjs`, bot "normal" = jogador médio, no MÉDIO): o Coronel do CO-OP
+2.0 soltava **0,7 bala/s a 81 px/s** e a dupla passava **74% das rodadas sem levar nada** (0,31 acerto por
+rodada); o Coronel de antes do CO-OP 2.0 soltava **9 balas/s a 146 px/s** (1,73 acerto por rodada, 13% de rodadas
+limpas). O tenente dele (Caminhão Compactador) dava 0,06 acerto por rodada (94% limpas). O King tinha perdido o
+`desafio` (o aperto próprio) e o dano por bala era 7. Na simulação, a dupla média vencia **100%** das lutas do MÉDIO
+de todos os chefes e **100%** das Expedições.
+
+**Ataques de assinatura** (14 novos em `attacks/`, todos com aviso, semente e escala por nível e por fase; cada
+chefe os mistura com os de sempre e com a própria regra, ao mesmo tempo):
+
+| Chefe | Ataque | O que faz | Aviso |
+|---|---|---|---|
+| King | `kingXeque` | linhas da torre (+), do bispo (x) ou da dama (as duas) cruzando no coração; o `eco` repete onde ele vai | a linha acende 0,5–0,85 s |
+| King | `kingMuralha` | uma fileira de peões com uma brecha de 2 casas desce casa por casa; a brecha da próxima é outra; na última casa eles viram coroas e atiram para cima | a casa de destino acende; a coluna do tiro pisca |
+| King | `kingCavalgada` | o cavalo salta em L e cai onde o coração estava; o casco solta lascas nas direções do L | o alvo fecha na casa de pouso |
+| Queen | `queenPopup` | janelas abrem longe dos corações, o X fecha, a janela bate e estoura em pixels | a moldura inteira, 0,7–1 s |
+| Queen | `queenCarregando` | barra de progresso na linha/coluna de um coração; em 100% vira laser (com `cruz`, as duas) | 0% → 100% escrito |
+| Queen | `queenCursor` | a setinha persegue (no máximo a velocidade de fuga) e clica; o clique estoura em pixels | anel encolhendo na ponta |
+| Queen | `queenPulso` | anéis de Wi-Fi que só machucam na batida (compasso fixo, não acelera) | o roteador brilha e faz tique |
+| Jevil | `jevilRoleta` | lâminas giram em volta do miolo que passeia; a bolinha para numa fatia e solta um leque de naipes | as lâminas piscam; a fatia acende |
+| Jevil | `jevilMalabares` | bombas em arco caem na sombra que cresce e explodem em naipes | a sombra cresce o voo inteiro |
+| Jevil | `jevilOrbita` | um anel de losangos gira em volta do coração e fecha; no fim os losangos voam | o anel pisca; sempre tem brecha |
+| Coronel | `coronelLatas` | latas caem do alto e quicam no chão perdendo força | entram pela borda |
+| Coronel | `coronelRatos` | olhinhos vermelhos na borda e um bando atravessa em fila, ziguezagueando | os olhinhos, 0,65 s |
+| Coronel | `coronelTriagem` | 3 colunas (PAPEL, METAL, PLÁSTICO): o lixo só machuca na coluna da cor errada | pisca ao trocar de coluna |
+| Coronel | `coronelRe` | BIP BIP: o caminhão entra de ré até o ponto marcado, despeja um leque e arranca | faixa listrada + risco do leque |
+
+Eventos grandes (um xeque, um pop-up, um salto, um bando) usam `a.aCadaEvento` (`attacks/contexto.js`): a densidade
+do nível aperta só pela raiz, para os avisos de um evento não se empilharem nos do próximo.
+
+**Os baralhos:** o Coronel voltou a ter **4 fases** (como antes do CO-OP 2.0), a última sem ♥ e com os primos de
+caminhonete (`caminhonete`, `brasas`) de volta, e um `desafio` próprio; o lixo MARROM da RECICLAGEM aparece desde a
+fase 1 (1, 2, 3, 4 por esquiva). O King tem as peças (`kingOnda`) e, por cima, o `extra` da carta (`kingCartas.js`;
+as cartas de XEQUE e de ROQUE ficam sem extra) e o `desafio` de volta. Queen e Jevil ganharam cartas novas em cada
+fase. Lacaios e tenentes usam versões leves dos mesmos ataques.
+
+**Dano:** `danoBala` maior em todos (King 7 → 12, Queen 11 → 13, Jevil 13 → 15, Coronel 12 → 15, lacaios e tenentes
++2 a +3) e o ajuste por nível de cada chefe (`niveis`) passou a mexer no MÉDIO também: King MÉDIO dano x2,6 e HP
+x1,35; Queen x2; Jevil x1,8; Coronel x2,3 e HP x1,15; no DIFÍCIL King x1,8, Queen x1,4, Jevil x1,3, Coronel x1,6.
+O FÁCIL continua o chefe como ele é. (A campanha não muda: `NIVEIS` é o mesmo.)
+
+**Expedição:** cada luta aperta mais (`ETAPA_EXPEDICAO` em `coop/regras.js`, a cena passa `etapa` ao
+`criarPartidaCoop`): tenente HP x1,15 e dano x1,1; chefão HP x1,3, dano x1,2 e o SUPER a cada 7 rodadas (não 10). A
+cura entre as lutas caiu de 35% para **25%** (`CURA_ENTRE`). Os lacaios e tenentes ganharam dano no MÉDIO (x1,6 e
+x1,8) e no DIFÍCIL (x1,25 e x1,35). Rede: a etapa sai da expedição que já vai nos dados da cena (mesma nos PCs).
+
+**Medido** (`medirChefes.mjs` 6 sementes, `simularCoop.mjs` 300 partidas; antes → depois; "média" = dois bots
+normais, "mista" = um perfeito e um normal; `EXPEDICAO=1` simula a Expedição inteira):
+
+| Chefe | acertos/rodada no MÉDIO (normal · perfeito) | vitória dupla média F / M / D | vitória mista M / D |
+|---|---|---|---|
+| King | 0,51 · 0,04 → 1,29 · 0,45 | 100 / 100 / 100 → 100 / 63 / 22 | 100 / 100 → 96 / 87 |
+| Queen | 1,06 · 0,03 → 1,47 · 0,39 | 100 / 100 / 88 → 100 / 64 / 21 | 100 / 100 → 99 / 83 |
+| Jevil | 1,33 · 0,27 → 1,58 · 0,33 | 100 / 99 / 20 → 99 / 56 / 5 | 100 / 89 → 99 / 61 |
+| Coronel | 0,31 · 0,01 → 1,09 · 0,40 | 100 / 100 / 100 → 100 / 62 / 19 | 100 / 100 → 98 / 85 |
+
+Expedição completa, dupla média, MÉDIO: 100% → King 33%, Queen 27%, Jevil 26%, Coronel 24% (DIFÍCIL: 0–5%).
+A simulação não tem a regra do chefe (o míssil do Coronel ajuda a dupla; o Wi-Fi da Queen machuca), por isso o
+Coronel fica um pouco abaixo de 50% nela. O bot perfeito leva 0,3–0,45 acerto por rodada: luta sem levar nada
+ficou praticamente impossível. Testes: `coop/__tests__/duracao.test.js` (o MÉDIO às vezes perde, o FÁCIL é
+acessível, o DIFÍCIL derruba mais), `expedicao.test.js` (as etapas) e os baralhos de cada chefe.
+
 ## Coronel Caçamba: RECICLAGEM
 
 Pedido do dono: as cartas do Coronel eram "muito difíceis e chatas" (trânsito cheio, parede de brasas, forcado,
@@ -351,9 +420,13 @@ tardar, no `terminarEsquiva` (estado igual em todos os PCs). A CPU aliada mira s
 
 | Fase (HP) | Itens por esquiva | Cartas |
 |---|---|---|
-| 1 (100%) | 5 verdes (cada um +2) | ♠ Caminhão de Lixo · ♣ Chuva de Entulho · ♦ Buzinaço · ♥ Pausa pro Café |
-| 2 (66%) | 3 verdes + 2 **marrons** (contaminado: machuca; marrom com X vermelho, nunca verde) | ♠ Caminhão Turbo · ♣ Entulho Mirado · ♦ Buzinaço Forte · ♠ Caminhão e Entulho · ♥ Chapéu de Palha |
-| 3 (33%) | 4 verdes (+3 cada: a lixeira enche mais rápido) + 2 marrons | ♠ Caminhão Duplo · ♣ Compactador · ♦ Buzinaço Final · ♠ Caminhão e Entulho · ♥ Pit Stop |
+| 1 (100%) | 5 verdes (cada um +2) + 1 marrom | ♠ Caminhão de Lixo · ♣ Chuva de Entulho · ♦ Ratazanas · ♣ Buzinaço · ♥ Pausa pro Café |
+| 2 (75%) | 4 verdes + 2 **marrons** (contaminado: machuca; marrom com X vermelho, nunca verde) | ♠ Caminhão Turbo · ♣ Coleta Seletiva · ♦ Buzinaço Forte · ♠ Marcha à Ré · ♥ Chapéu de Palha |
+| 3 (50%) | 4 verdes (+3 cada: a lixeira enche mais rápido) + 3 marrons | ♠ Caminhão Duplo · ♣ Compactador · ♦ Triagem Turbo · ♠ Atropela e Despeja · ♥ Pit Stop |
+| 4 (25%) | 4 verdes (+3) + 4 marrons | ♠ Engarrafamento · ♣ Lixão em Chamas · ♦ Ratos no Compactador · ♠ Rodeio do Lixo (sem ♥) |
+
+(Dificuldade do CO-OP, seção acima: as cartas viraram combinações com os ataques novos `coronelLatas`,
+`coronelRatos`, `coronelTriagem` e `coronelRe`, e a fase 4 com os primos de caminhonete voltou.)
 
 SUPER: *Dia de Coleta* (dois caminhões e entulho, tudo avisado). Ataques novos em `attacks/`:
 `coronelCaminhao` (uma faixa acende em amarelo, com setas e buzina, e só depois o caminhão cruza; sempre sobra uma
@@ -363,10 +436,10 @@ placas fecham devagar e deixam um vão de 104 px marcado desde o começo; o grup
 `arte/coronelSprites.js` (o caminhão das cartas) e `arte/expedicao.js` (Caminhão Compactador e lacaios).
 
 **Expedição** (não aparecem na seleção: `oculto`/`expedicao`; `scene.start('CoopArena', { chefe: 'coronelLacaios' })`):
-- `coronelLacaios` *Turma do Lixão* (~2 min): guaxinins e um saco de lixo num sprite só, 2 fases, sem regra, só
-  `aimed` e `coronelEntulho`.
-- `coronelTenente` *Caminhão Compactador* (~3 min): a RECICLAGEM leve (só verde, lixeira de 8 gomos, míssil de 10% e
-  +20 de QUEBRA); na 2ª fase, o compactador uma vez com vão de 124 px.
+- `coronelLacaios` *Turma do Lixão* (~2 min): guaxinins e um saco de lixo num sprite só, 2 fases, sem regra:
+  `aimed`, `coronelEntulho`, `coronelLatas` e `coronelRatos`.
+- `coronelTenente` *Caminhão Compactador* (~3,5 min): a RECICLAGEM leve (só verde, lixeira de 12 gomos); a marcha à
+  ré, a triagem e, na 2ª fase, o compactador duas vezes com vão de 108 px.
 
 Testes: `coop/__tests__/coronelRegra.test.js`.
 

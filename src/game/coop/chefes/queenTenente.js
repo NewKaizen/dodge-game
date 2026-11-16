@@ -6,7 +6,7 @@
 import { criarRegraWifi } from '../queenRegra.js'
 import { gotas, muro } from './queenAtaques.js'
 
-const DANO_BALA = 9
+const DANO_BALA = 12 // era 9
 
 const muroComGotas = (A, opcoesMuro, opcoesGotas) => {
   const m = muro(opcoesMuro)
@@ -27,8 +27,10 @@ export default {
     cores: { hex: 0xff8a1c, barra: 0xff4fc8, bola: 0xff8a1c },
     cor: 0xff8a1c,
   },
-  hp: 380,
+  hp: 420, // era 380: a 2ª luta da Expedição aperta mais que os lacaios
+  desafio: { velocidade: 1.06, densidade: 1.12 },
   danoBala: DANO_BALA,
+  niveis: { medio: { dano: 1.8 }, dificil: { dano: 1.35 } }, // (dificuldade do CO-OP: o tenente aperta mais que os lacaios)
   regra: criarRegraWifi({
     id: 'wifi',
     nome: 'SINAL DE WI-FI',
@@ -46,9 +48,10 @@ export default {
       hp: 1,
       falas: ['Acesso negado!', 'Eu bloqueio tudo que passa por aqui!', 'Fiquem juntinhos... eu vigio o sinal!'],
       cartas: [
-        ['espadas', 5, 'Gotas de Ácido', () => gotas({ duracao: 5200, intervalo: 950, velocidade: 125, entre: 0.45 })],
+        ['espadas', 5, 'Gotas de Ácido', (A) => A.juntos(gotas({ duracao: 6000, intervalo: 750, velocidade: 145, entre: 0.5 }), A.queenCursor({ duracao: 6000, clique: 1700 }))],
         ['paus', 6, 'Firewall', (A) => muroComGotas(A, { muros: 1, abertura: 104, fica: 2400 }, { intervalo: 1300, velocidade: 120, entre: 0.4, inicio: 900 })],
-        ['ouros', 6, 'Laser do Roteador', (A) => A.lasers({ quantidade: 1, intervalo: 1400, duracao: 5200 })],
+        ['ouros', 6, 'Laser do Roteador', (A) => A.juntos(A.lasers({ quantidade: 1, intervalo: 1300, duracao: 6000 }), A.queenCarregando({ duracao: 6000, intervalo: 1400, carga: 1100 }))],
+        ['paus', 6, 'Porta Bloqueada', (A) => A.queenPulso({ duracao: 6500, emite: 1150, batida: 720 })],
         ['copas', 4, 'Reiniciar', null, { cura: 20 }],
       ],
     },
@@ -57,9 +60,10 @@ export default {
       entrada: 'Firewall reforçado! Ninguém passa!',
       falas: ['Reforçando as paredes!', 'Sem sinal, sem diversão!', 'Acesso negado, de novo!'],
       cartas: [
-        ['espadas', 7, 'Chuva de Ácido', () => gotas({ duracao: 5400, intervalo: 780, velocidade: 140, entre: 0.5 })],
+        ['espadas', 7, 'Chuva de Ácido', (A) => A.juntos(gotas({ duracao: 6500, intervalo: 600, velocidade: 160, entre: 0.55 }), A.queenPopup({ duracao: 6500, intervalo: 1300 }))],
         ['paus', 8, 'Firewall Reforçado', (A) => muroComGotas(A, { muros: 1, abertura: 96, fica: 2600 }, { intervalo: 1000, velocidade: 135, entre: 0.45, inicio: 800 })],
-        ['ouros', 7, 'Pacote Rápido', (A) => A.ondas({ direcao: 'baixo', duracao: 5400, velocidade: 115, intervalo: 1500, abertura: 92, amplitude: 60 })],
+        ['ouros', 7, 'Pacote Rápido', (A) => A.juntos(A.ondas({ direcao: 'baixo', duracao: 6500, velocidade: 130, intervalo: 1300, abertura: 86, amplitude: 65 }), A.queenCursor({ duracao: 6500, clique: 1500 }))],
+        ['espadas', 8, 'Firewall Carregando', (A) => A.juntos(muroComGotas(A, { muros: 1, abertura: 92, fica: 2400 }, { intervalo: 1100, velocidade: 140, entre: 0.45, inicio: 800 }), A.queenCarregando({ intervalo: 1500, carga: 1050 }))],
         ['copas', 6, 'Antivírus', null, { cura: 14, guarda: 0.7 }],
       ],
     },
@@ -67,6 +71,6 @@ export default {
   super: {
     nome: 'Parede de Fogo',
     texto: 'Um firewall fecha o quadro e as gotas de ácido caem',
-    criar: (A) => muroComGotas(A, { muros: 1, abertura: 100, fica: 2400 }, { intervalo: 900, velocidade: 140, entre: 0.5, inicio: 700 }),
+    criar: (A) => A.juntos(muroComGotas(A, { muros: 1, abertura: 96, fica: 2400 }, { intervalo: 750, velocidade: 150, entre: 0.5, inicio: 700 }), A.queenPulso({ emite: 1200, batida: 700 })),
   },
 }

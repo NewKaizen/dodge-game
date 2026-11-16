@@ -6,7 +6,8 @@
 // Rede: o XEQUE sai só do estado (api.rng, quem está de pé, onde cada coração NASCE), igual em todos os PCs;
 // o que um coração faz (pisar na casa da captura) é uma zona (api.adicionarZona): só o PC dono dele decide e
 // a API repassa. A gaiola só empurra o coração que é deste PC (api.empurrar).
-import { kingOnda, golpearCasas, criarIcone, apagarIcone } from './kingAtaques.js'
+import { golpearCasas, criarIcone, apagarIcone } from './kingAtaques.js'
+import { ataqueDaJogada } from './kingCartas.js'
 import { criarGrade, retanguloDe, retanguloDaGaiola, empurraoParaDentro, empurraoDoRoque, planejarXeque, TABULEIRO } from './kingTabuleiro.js'
 import { tocar } from '../../audio.js'
 
@@ -147,8 +148,9 @@ export function criarRegraKing({ id = 'tabuleiro', nome = 'TABULEIRO REAL', desc
       }
 
       return {
-        // o ataque da carta: o do tabuleiro (as peças), com o XEQUE e o ROQUE se a carta pede
-        ataque(carta) {
+        // o ataque da carta: o do tabuleiro (as peças), com o XEQUE e o ROQUE se a carta pede, e o ataque de
+        // assinatura dela (`extra`, kingCartas.js) por cima
+        ataque(carta, A) {
           const e = espec[carta.chefe]?.[carta.nome]
           if (!e) return null
           const cfg = { ...e.cfg }
@@ -161,7 +163,7 @@ export function criarRegraKing({ id = 'tabuleiro', nome = 'TABULEIRO REAL', desc
               if (e.roque) iniciarRoque(a, g)
             }
           }
-          return kingOnda(cfg)
+          return ataqueDaJogada(cfg, e.extra, A)
         },
         comecarEsquiva() {
           gaiola = null

@@ -9,9 +9,9 @@ import { CHEFES, ORDEM_CHEFES } from '../chefes/index.js'
 import { CARTAS_CHEFES, ataqueDaCartaChefe } from '../cartasChefe.js'
 import { criarPartidaCoop } from '../regras.js'
 import { somarQuebra } from '../coop2.js'
+import { ataques } from '../../attacks/index.js'
 
 const L = { x: 100, y: 200, width: 336, height: 180 }
-const A = new Proxy({}, { get: (_, nome) => (...args) => ({ nome, args, duracao: 1000 }) })
 
 test('a regra é válida e o Coronel a usa', () => {
   const def = CHEFES.coronel.regra
@@ -38,8 +38,9 @@ test('os itens saem do sorteio da rodada: iguais para a mesma semente, e justos'
         assert.ok(p.x >= L.x && p.x <= L.x + L.width)
       }
     }
-    // fase 1: sem marrom; fase 2 e 3: tem
-    assert.equal(slots.some((s) => s.tipo === 'sujo'), fase > 0)
+    // (dificuldade do CO-OP) o marrom aparece desde a fase 1 e aumenta a cada fase
+    assert.ok(slots.some((s) => s.tipo === 'sujo'))
+    if (fase > 0) assert.ok(PADRAO_RECICLAGEM.sujos[fase] >= PADRAO_RECICLAGEM.sujos[fase - 1])
   }
   // mais jogadores, mais lixo verde
   assert.ok(planejarItens({ rng: rngDaRegra('s', 1, 'lixo'), fase: 0, n: 4, limites: L }).length > planejarItens({ rng: rngDaRegra('s', 1, 'lixo'), fase: 0, n: 2, limites: L }).length)
@@ -171,21 +172,25 @@ test('a CPU aliada só mira o verde (nunca o marrom) e sem itens não mira nada'
   if (alvo) assert.equal(alvo.tipo, 'limpo')
 })
 
-test('o baralho do Coronel: 3 fases, cartas avisadas e sem trânsito antigo', () => {
+test('o baralho do Coronel: 4 fases, os ataques do lixão em todas, o trânsito antigo só na última', () => {
   const def = CHEFES.coronel
-  assert.equal(def.fases.length, 3)
+  assert.equal(def.fases.length, 4)
   const { fases, super: sup } = CARTAS_CHEFES.coronel
-  for (const lista of fases) {
+  const assinatura = /coronelLatas|coronelRatos|coronelTriagem|coronelRe\b/
+  fases.forEach((lista, f) => {
     assert.ok(lista.length >= 4 && lista.length <= 5)
-    assert.ok(lista.some((c) => c.naipe === 'copas'))
-    for (const c of lista) {
-      const nome = ataqueDaCartaChefe(c, { ataques: A }).nome
-      assert.ok(!/caminhonete|brasas|forcado|spiral/.test(nome), `${c.id}: ${nome}`)
-    }
-  }
+    // as 3 primeiras fases têm a pausa (♥); na última ele não para
+    assert.equal(lista.some((c) => c.naipe === 'copas'), f < 3)
+    const nomes = lista.filter((c) => c.naipe !== 'copas').map((c) => ataqueDaCartaChefe(c, { ataques }).nome)
+    // o forcado e o redemoinho não voltam; caminhonete e brasas (os primos) só na fase 4
+    for (const nome of nomes) assert.ok(!/forcado|spiral/.test(nome) && (f === 3 || !/caminhonete|brasas/.test(nome)), `fase ${f + 1}: ${nome}`)
+    // toda carta de ataque é combinada (juntos/sequência) e a maioria traz um ataque de assinatura novo
+    assert.ok(nomes.every((n) => /[+>]/.test(n)), `fase ${f + 1}: ${nomes}`)
+    assert.ok(nomes.filter((n) => assinatura.test(n)).length >= 2, `fase ${f + 1}: ${nomes}`)
+  })
   assert.ok(fases[2].some((c) => c.nome === 'Compactador'), 'a fase 3 tem o compactador')
-  assert.ok(fases[2].some((c) => ataqueDaCartaChefe(c, { ataques: A }).args?.[0]?.simultaneos === 2), 'e o caminhão duplo')
-  assert.ok(ataqueDaCartaChefe(sup, { ataques: A }))
+  assert.ok(fases[2].some((c) => c.nome === 'Caminhão Duplo'), 'e o caminhão duplo')
+  assert.ok(ataqueDaCartaChefe(sup, { ataques }))
   // o verde é só da reciclagem: nenhuma cor de bala do chefe é verde
   for (const cor of Object.values(def.tema.cores)) {
     const g = (cor >> 8) & 255

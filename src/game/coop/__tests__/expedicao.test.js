@@ -20,7 +20,7 @@ import {
 } from '../expedicao.js'
 import { RELIQUIAS, IDS_RELIQUIAS, MODS_PADRAO, curasDasReliquias, aplicarCurasDoContra } from '../reliquias.js'
 import { CHEFES, CHEFES_DA_EXPEDICAO } from '../chefes/index.js'
-import { criarPartidaCoop, iniciarRodadaCoop, calcularGolpes, resolverContraCoop, resgatarNaHora, aplicarDanoCoop, GOLPE, COOP } from '../regras.js'
+import { criarPartidaCoop, iniciarRodadaCoop, calcularGolpes, resolverContraCoop, resgatarNaHora, aplicarDanoCoop, GOLPE, COOP, ETAPA_EXPEDICAO } from '../regras.js'
 import { QUEBRA, finalizacaoDaDupla } from '../coop2.js'
 import { CARTAS } from '../../pvp/cartas.js'
 
@@ -54,7 +54,7 @@ test('máquina de estados: 3 lutas, o HP passa, a cura entre as lutas, a relíqu
   exp = escolherReliquia(exp, escolhida)
   assert.equal(exp.no, 1)
   assert.equal(exp.fase, 'luta')
-  assert.deepEqual(exp.hp, [40 + Math.round(100 * CURA_ENTRE), Math.round(120 * CURA_ENTRE)], 'cura 35% do máx; quem caiu volta com isso')
+  assert.deepEqual(exp.hp, [40 + Math.round(100 * CURA_ENTRE), Math.round(120 * CURA_ENTRE)], 'cura 25% do máx; quem caiu volta com isso')
   assert.deepEqual(exp.reliquias, [escolhida])
   d = dadosDaLuta(exp)
   assert.equal(d.chefe, 'queenTenente')
@@ -136,7 +136,7 @@ test('a CPU aliada vota com bom senso (defesa com o time machucado, ataque com o
 })
 
 test('cura entre as lutas', () => {
-  assert.deepEqual(curaEntreLutas([0, 50, 100], [100, 100, 100]), [35, 85, 100])
+  assert.deepEqual(curaEntreLutas([0, 50, 100], [100, 100, 100]), [25, 75, 100])
   assert.equal(curaEntreLutas(null, null), null)
 })
 
@@ -230,4 +230,16 @@ test('relíquias de cura: grazes curam o parceiro, crítico cura quem bateu (com
   const e3 = criarPartidaCoop({ party: ['kris', 'susie'], chefe: 'king', semente: 'r3' })
   iniciarRodadaCoop(e3)
   assert.equal(resolverContraCoop(e3, [golpe('kris-espadas-9'), null], [{ grazes: 5, perfeito: true }, {}]).curas, undefined)
+})
+
+test('cada luta da Expedição aperta mais: o tenente e o chefão com mais vida, mais dano e o SUPER mais cedo', () => {
+  const de = (etapa, reliquias = []) => criarPartidaCoop({ party: ['kris', 'susie'], chefe: 'coronel', nivel: 'medio', semente: 'et', etapa, reliquias })
+  const solta = de(null)
+  const [lacaios, tenente, chefao] = ETAPAS.map((e) => de(e))
+  assert.equal(lacaios.chefe.hpMax, solta.chefe.hpMax, 'os lacaios são a luta de sempre')
+  assert.ok(tenente.chefe.hpMax > lacaios.chefe.hpMax && chefao.chefe.hpMax > tenente.chefe.hpMax)
+  assert.ok(chefao.mods.danoQuadro > tenente.mods.danoQuadro && tenente.mods.danoQuadro > lacaios.mods.danoQuadro)
+  assert.ok(chefao.chefe.cargaMax < COOP.cargaSuper && solta.chefe.cargaMax === COOP.cargaSuper, 'o chefão solta o SUPER mais vezes')
+  // a etapa vale junto com as relíquias (a CASCA GROSSA continua tirando 15% do dano)
+  assert.ok(Math.abs(de('chefao', ['casca']).mods.danoQuadro - 0.85 * ETAPA_EXPEDICAO.chefao.dano) < 1e-9)
 })

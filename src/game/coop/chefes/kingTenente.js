@@ -5,7 +5,7 @@
 import { criarRegraKing } from './kingRegra.js'
 import { ESPEC, ataqueKing } from './kingCartas.js'
 
-const carta = (nome) => () => ataqueKing('kingTenente', nome)
+const carta = (nome) => (A) => ataqueKing('kingTenente', nome, A)
 
 export default {
   nome: 'O Cavaleiro',
@@ -21,8 +21,9 @@ export default {
     cores: { losango: 0xa98be8, coroa: 0xffd23c, barra: 0xd8c8ff, bola: 0xa98be8 },
     cor: 0xa98be8,
   },
-  hp: 430, // ~3 min no MÉDIO (simularCoop.mjs)
-  danoBala: 6,
+  hp: 450, // era 430: a 2ª luta da Expedição aperta mais que os lacaios
+  danoBala: 9, // era 6 (dificuldade do CO-OP)
+  niveis: { medio: { dano: 1.8 }, dificil: { dano: 1.35 } }, // (dificuldade do CO-OP: o tenente aperta mais que os lacaios)
   leve: carta('leve'),
   regra: criarRegraKing({
     id: 'tabuleiro-leve',
@@ -58,6 +59,6 @@ export default {
   super: {
     nome: 'Cavalgada Real',
     texto: 'Saltos em L, dois a dois, por todo o tabuleirinho',
-    criar: () => ataqueKing('kingTenente', 'super'),
+    criar: (A) => ataqueKing('kingTenente', 'super', A),
   },
 }
