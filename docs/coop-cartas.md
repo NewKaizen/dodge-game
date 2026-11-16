@@ -379,7 +379,7 @@ as cartas de XEQUE e de ROQUE ficam sem extra) e o `desafio` de volta. Queen e J
 fase. Lacaios e tenentes usam versões leves dos mesmos ataques.
 
 **Dano:** `danoBala` maior em todos (King 7 → 12, Queen 11 → 13, Jevil 13 → 15, Coronel 12 → 15, lacaios e tenentes
-+2 a +3) e o ajuste por nível de cada chefe (`niveis`) passou a mexer no MÉDIO também: King MÉDIO dano x2,6 e HP
++2 a +3) e o ajuste por nível de cada chefe (`niveis`) passou a mexer no MÉDIO também: King MÉDIO dano x2,5 e HP
 x1,35; Queen x2; Jevil x1,8; Coronel x2,3 e HP x1,15; no DIFÍCIL King x1,8, Queen x1,4, Jevil x1,3, Coronel x1,6.
 O FÁCIL continua o chefe como ele é. (A campanha não muda: `NIVEIS` é o mesmo.)
 
@@ -393,14 +393,16 @@ normais, "mista" = um perfeito e um normal; `EXPEDICAO=1` simula a Expedição i
 
 | Chefe | acertos/rodada no MÉDIO (normal · perfeito) | vitória dupla média F / M / D | vitória mista M / D |
 |---|---|---|---|
-| King | 0,51 · 0,04 → 1,29 · 0,45 | 100 / 100 / 100 → 100 / 63 / 22 | 100 / 100 → 96 / 87 |
+| King | 0,51 · 0,04 → 1,19 · 0,21 | 100 / 100 / 100 → 100 / 66 / 22 | 100 / 100 → 100 / 97 |
 | Queen | 1,06 · 0,03 → 1,47 · 0,39 | 100 / 100 / 88 → 100 / 64 / 21 | 100 / 100 → 99 / 83 |
 | Jevil | 1,33 · 0,27 → 1,58 · 0,33 | 100 / 99 / 20 → 99 / 56 / 5 | 100 / 89 → 99 / 61 |
 | Coronel | 0,31 · 0,01 → 1,09 · 0,40 | 100 / 100 / 100 → 100 / 62 / 19 | 100 / 100 → 98 / 85 |
 
-Expedição completa, dupla média, MÉDIO: 100% → King 33%, Queen 27%, Jevil 26%, Coronel 24% (DIFÍCIL: 0–5%).
+Expedição completa, dupla média, MÉDIO: 100% → King 41%, Queen 27%, Jevil 26%, Coronel 24% (DIFÍCIL: 0–6%).
+No navegador (bot normal + CPU aliada, MÉDIO): antes o time venceu a Expedição do Coronel levando 14 + 11 + 27 de
+dano; depois levou 65 nos lacaios, 156 no tenente e caiu no Coronel.
 A simulação não tem a regra do chefe (o míssil do Coronel ajuda a dupla; o Wi-Fi da Queen machuca), por isso o
-Coronel fica um pouco abaixo de 50% nela. O bot perfeito leva 0,3–0,45 acerto por rodada: luta sem levar nada
+Coronel fica um pouco abaixo de 50% nela. O bot perfeito leva 0,2–0,45 acerto por rodada: luta sem levar nada
 ficou praticamente impossível. Testes: `coop/__tests__/duracao.test.js` (o MÉDIO às vezes perde, o FÁCIL é
 acessível, o DIFÍCIL derruba mais), `expedicao.test.js` (as etapas) e os baralhos de cada chefe.
 
