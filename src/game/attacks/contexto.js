@@ -201,6 +201,12 @@ export default class ContextoAtaque {
     this.timers.push({ intervalo, restante: atraso ?? intervalo, fn, vezes, contador: 0, fim: this.fim, respiro: this.respiro })
   }
 
+  // aCada para EVENTOS grandes e avisados (um xeque, um pop-up, um salto, um bando): o ritmo da densidade aperta só
+  // pela raiz (densidade 2 = 1,41x mais vezes), para os avisos de um evento não se empilharem com os do próximo
+  aCadaEvento(ms, fn, vezes = Infinity, atraso = null) {
+    this.aCada(ms * Math.sqrt(Math.max(0.01, this.ritmo.densidade)), fn, vezes, atraso)
+  }
+
   depois(ms, fn) {
     this.timers.push({ intervalo: 1, restante: ms, fn, vezes: 1, contador: 0, fim: this.fim, respiro: this.respiro })
   }
