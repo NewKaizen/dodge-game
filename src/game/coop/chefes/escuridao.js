@@ -33,7 +33,7 @@ export default {
   hp: 520, // era 280 (a regra dos olhos fere a sombra e enche a QUEBRA)
   danoBala: 15, // era 9 (no escuro quem joga só vê os avisos: um pouco menos que a Ladra)
   // MÉDIO: um pouco mais de ritmo também (o semanal é o desafio da semana); DIFÍCIL: o ritmo do nível já aperta
-  niveis: { medio: { velocidade: 1.08, densidade: 1.12, dano: 2.5, hp: 1.25 }, dificil: { dano: 1.8, hp: 1.15 } },
+  niveis: { medio: { velocidade: 1.08, densidade: 1.12, dano: 1.7, hp: 1.15 }, dificil: { dano: 1.8, hp: 1.15 } },
   regra: REGRA_ESCURIDAO,
   leve: (A) => A.juntos(A.rain({ duracao: 4500, intervalo: 650, velocidade: 95, caixa: null }), A.escuridaoVelas({ duracao: 4500, intervalo: 1700, estilhacos: 6 })),
   fases: [

@@ -39,7 +39,7 @@ export default {
   hp: 520, // era 270 (pegar a carta marcada enche a QUEBRA)
   danoBala: 16, // era 10
   // MÉDIO: um pouco mais de ritmo também (o semanal é o desafio da semana); DIFÍCIL: o ritmo do nível já aperta
-  niveis: { medio: { velocidade: 1.05, densidade: 1.12, dano: 2.7, hp: 1.25 }, dificil: { dano: 1.9, hp: 1.15 } },
+  niveis: { medio: { velocidade: 1.05, densidade: 1.12, dano: 2.1, hp: 1.25 }, dificil: { dano: 1.9, hp: 1.15 } },
   regra: REGRA_LADRA,
   leve: (A) => A.juntos(A.quicantes({ forma: 'ouros', duracao: 4500, intervalo: 1600, velocidade: 140 }), A.ladraBumerangue({ duracao: 4500, intervalo: 1700 })),
   roubadas: {
