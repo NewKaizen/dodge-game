@@ -23,7 +23,8 @@
 //   duplasDoContra(golpes, caidos)                    PINÇA, COMBO e PAR (no contra-ataque)
 //   ganhosDeQuebra(lista, duplas)                     [{ motivo, pontos }] da rodada
 //   finalizacaoDaDupla(estado)                        null ou { dano, jogadores } (rodada ATORDOADO)
-//   previaDoChefe(estado)                             { tipo: 'carta' | 'super' | 'atordoado' | 'oculta', carta? }
+//   previaDoChefe(estado)                             { tipo: 'carta' | 'super' | 'atordoado' | 'roubada', carta?, dono? }
+//                                                     (a regra do chefe ainda pode trocar: regraChefe.js `previa`)
 //   dicaDeDupla(carta)                                a linha "DUPLA: ..." da carta (o Guia)
 import { especialDaCarta, ehSuper } from '../pvp/cartas.js'
 
@@ -155,7 +156,8 @@ export function finalizacaoDaDupla(estado) {
 // A carta do chefe da PRÓXIMA rodada, para a prévia (a intenção 2 rodadas à frente):
 //   'atordoado'  a barra encheu: na próxima ele não ataca
 //   'super'      a carga do SUPER enche na próxima
-//   'oculta'     a Ladra pode jogar uma carta roubada (não dá para saber)
+//   'roubada'    a Ladra joga a roubada mais antiga ({ carta, dono }: a carta MARCADA, que foge na esquiva e que
+//                o time ainda pode recuperar; coop/semanal/ladraRegra.js)
 //   'carta'      a próxima do monte (estado.chefe.proxima, já tirada do monte: a promessa vale)
 // null = sem prévia (sem carta, a luta acabou)
 export function previaDoChefe(estado, { ladraJoga = null } = {}) {
@@ -164,6 +166,6 @@ export function previaDoChefe(estado, { ladraJoga = null } = {}) {
   if (c.atordoado && !atordoadoAgora(estado)) return { tipo: 'atordoado' }
   // (na rodada atordoado a carga não sobe: a próxima sobe 1, como sempre)
   if (c.carga + 1 >= c.cargaMax) return { tipo: 'super' }
-  if (c.roubadas && ladraJoga?.(estado.rodada + 1)) return { tipo: 'oculta' }
+  if (c.roubadas?.length && ladraJoga?.(estado.rodada + 1)) return { tipo: 'roubada', carta: c.roubadas[0].carta, dono: c.roubadas[0].dono }
   return c.proxima ? { tipo: 'carta', carta: c.proxima } : null
 }

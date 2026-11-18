@@ -25,6 +25,7 @@ import { numero } from '../effects/numero.js'
 export const COR_QUEBRA = 0xffa23a
 export const COR_ATORDOADO = 0xffe14a
 const estilo = (tamanho, cor, extra = {}) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra })
+const NOME_VALOR = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }
 const corDoNaipe = (naipe) => (naipe === 'copas' || naipe === 'ouros' ? '#ff6a80' : '#ffffff')
 
 // ---------- prévia da intenção ----------
@@ -55,6 +56,15 @@ export function criarPreviaIntencao(cena, { x, y }) {
       } else if (t === 'oculta') {
         selo.setText('?').setColor('#d0b8ff')
         nome.setText('carta roubada?').setColor('#d0b8ff')
+      } else if (t === 'roubada') {
+        // (Ladra) a roubada que ela vai jogar: a carta MARCADA, que foge na esquiva (coop/semanal/ladraRegra.js)
+        const carta = previa.carta
+        selo.setText(SIMBOLOS[carta.naipe] ?? '?').setColor(corDoNaipe(carta.naipe))
+        nome.setText(semLigaduras(`ROUBADA do P${(previa.dono ?? 0) + 1}: ${NOME_VALOR[carta.valor] ?? carta.valor}${SIMBOLOS[carta.naipe] ?? ''}`)).setColor('#ffb060')
+      } else if (t === 'escuro') {
+        // (Escuridão) olho aberto no fim da esquiva: a próxima carta ficou no escuro (coop/semanal/escuridaoRegra.js)
+        selo.setText('?').setColor('#8a7cff')
+        nome.setText(semLigaduras('NO ESCURO: fechem os olhos')).setColor('#b8b0ff')
       } else {
         const carta = previa.carta
         selo.setText(ehSuper(carta) ? '★' : SIMBOLOS[carta.naipe]).setColor(corDoNaipe(carta.naipe))

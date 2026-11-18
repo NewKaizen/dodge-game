@@ -9,7 +9,8 @@ import { corDaVaga } from '../../vagas.js'
 //     time planejar quem precisa recuperar o quê;
 //   - carta nova na mão dela: a MÃO DA LADRA vai até o personagem do dono e volta com a carta (o roubo
 //     telegrafado);
-//   - carta que saiu: volta voando para o dono (recuperada pela ♣ ou pelo SUPER) ou some no meio da mesa
+//   - a MARCADA (a mais antiga: a que ela joga na próxima vez e que foge na esquiva, ladraRegra.js) brilha;
+//   - carta que saiu: volta voando para o dono (recuperada pela ♣, pelo SUPER ou pega no quadro) ou some no meio da mesa
 //     (ela jogou contra o time: a carta virada dela da rodada).
 //   const l = ligarLadra(cena, { chefe: {x, y}, jogadores: () => estado.jogadores, chefeEstado: () => estado.chefe, alvoDe: (j) => {x, y} })
 // a mão dela: uma coluna à direita do sprite (em cima ficam o HP e a carga do SUPER)
@@ -83,8 +84,10 @@ export function ligarLadra(cena, { chefe, jogadores, chefeEstado, alvoDe }) {
       }
       o.c.x += (alvo.x - o.c.x) * 0.25
       o.c.y += (alvo.y - o.c.y) * 0.25
+      // a marcada (a próxima que ela joga, a que foge na esquiva) pulsa
+      o.c.setScale(i === 0 ? 1.1 + 0.08 * Math.sin(cena.time.now / 140) : 1)
     })
-    rotulo.setText(roubadas.length ? `ROUBADAS ${roubadas.length}\n♣ recupera\na última` : '')
+    rotulo.setText(roubadas.length ? `ROUBADAS ${roubadas.length}\n♣ ou pegue\na que foge` : '')
   }
 
   cena.events.on('update', atualizar)

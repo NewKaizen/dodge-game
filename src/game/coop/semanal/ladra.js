@@ -14,6 +14,8 @@
 //      Depois de jogada (ou anulada/refletida/roubada/varrida) a carta volta para o DESCARTE do dono.
 //   3. Na resolução: cada ♣ (armadilha) jogado por quem está de pé pega a ladra e devolve a ÚLTIMA
 //      roubada (a mais recente) para a MÃO do dono; um SUPER de jogador devolve TODAS.
+//   4. Na esquiva (a regra PEGA LADRA!, coop/semanal/ladraRegra.js): a carta MARCADA (a mais antiga, a que ela
+//      vai jogar) foge pelo quadro; quem encosta nela devolve para a MÃO do dono (recuperarRoubada).
 import { ehSuper } from '../../pvp/cartas.js'
 import { inteiro } from '../../pvp/baralho.js'
 
@@ -71,6 +73,16 @@ export function devolver(estado, todas = false) {
   const saem = todas ? c.roubadas.splice(0) : [c.roubadas.pop()]
   for (const { carta, dono } of saem) estado.jogadores[dono].baralho.mao.push(carta)
   return saem
+}
+
+// uma roubada específica (pelo id da carta) volta para a MÃO do dono, de qualquer lugar da mão dela (a regra
+// PEGA LADRA!: a carta que fugia pelo quadro foi pega). chefe/jogadores = os do estado. Devolve { dono, carta } ou null
+export function recuperarRoubada(chefe, jogadores, id) {
+  const i = chefe?.roubadas?.findIndex((r) => r.carta.id === id) ?? -1
+  if (i < 0) return null
+  const [r] = chefe.roubadas.splice(i, 1)
+  jogadores[r.dono]?.baralho.mao.push(r.carta)
+  return r
 }
 
 // a roubada que ela jogou (ou que foi tirada do quadro) volta ao descarte do dono
