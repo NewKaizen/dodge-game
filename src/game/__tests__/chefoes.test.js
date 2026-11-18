@@ -27,8 +27,8 @@ test('cada chefão: quadros do mesmo tamanho, cores válidas e o desenho dentro 
 
 // Os lacaios e os tenentes da Expedição (arte/expedicao.js): mesma altura e mesma linha do chão dos chefões, e o
 // tamanho conta a hierarquia (o grupo de lacaios é mais baixo que o tenente, que é mais baixo que o chefão)
-const LACAIOS = ['king-lacaios', 'queen-lacaios', 'jevil-lacaios', 'lacaios']
-const TENENTES = ['king-cavaleiro', 'queen-firewall', 'jevil-mestre', 'caminhaoCompactador']
+const LACAIOS = ['king-lacaios', 'queen-lacaios', 'jevil-lacaios', 'lacaios', 'escuridao-lacaios', 'ladra-lacaios']
+const TENENTES = ['king-cavaleiro', 'queen-firewall', 'jevil-mestre', 'caminhaoCompactador', 'escuridao-apagavelas', 'ladra-receptador']
 test('expedição: lacaios e tenentes em densidade 2, quadros iguais e o desenho no chão dos chefões', () => {
   assert.deepEqual(Object.keys(EXPEDICAO).sort(), [...LACAIOS, ...TENENTES].sort())
   for (const [chave, desenhar] of Object.entries(EXPEDICAO)) {

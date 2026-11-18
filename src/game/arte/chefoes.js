@@ -6,6 +6,7 @@
 // Cada chefão tem QUADROS_IDLE quadros (respiração/balanço): o quadro 0 é a chave do chefe ('king') e os outros
 // são '<chave>-q1', '<chave>-q2' (entities/Inimigo.js alterna entre eles).
 import { pintor } from './pintor.js'
+import { SEMANAIS_ARTE } from './semanais.js'
 
 export const QUADROS_IDLE = 3
 // Todos com a mesma altura de tela. O desenho fica nas linhas 2..66 e o resto é folga (o sprite é centrado em
@@ -424,4 +425,5 @@ function coronel(q) {
   return p.grade
 }
 
-export const CHEFOES = { king, queen, jevil, coronel }
+// (os bosses semanais, Escuridão e Ladra, moram em arte/semanais.js e entram aqui com os outros)
+export const CHEFOES = { king, queen, jevil, coronel, ...SEMANAIS_ARTE }

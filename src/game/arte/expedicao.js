@@ -9,6 +9,7 @@
 // Cada um tem QUADROS_IDLE quadros (o quadro 0 é a própria chave, os outros '<chave>-q1' e '<chave>-q2';
 // texturas.js: quadrosDe e entities/Inimigo.js, que alterna entre eles).
 import { pintor } from './pintor.js'
+import { SEMANAIS_EXPEDICAO } from './semanais.js'
 
 const ALTURA = 72
 
@@ -594,4 +595,6 @@ export const EXPEDICAO = {
   'jevil-mestre': jevilMestre,
   lacaios: coronelLacaios,
   caminhaoCompactador,
+  // EXPEDIÇÃO SEMANAL (arte/semanais.js): os da Escuridão e os da Ladra
+  ...SEMANAIS_EXPEDICAO,
 }
