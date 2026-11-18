@@ -9,10 +9,10 @@ import { gradeEmCanvas } from './pintor.js'
 // Escala em que cada sprite de pixel art aparece no jogo
 export const ESCALA = { personagem: 3, chefe: 4, coracao: 1.4 }
 
-// Texturas em densidade maior (mais pixels no mesmo espaço da tela): os chefões do CO-OP (arte/chefoes.js) e os
-// lacaios e tenentes da Expedição (arte/expedicao.js) têm o dobro de pixels e aparecem na metade da escala. Use
-// escalaDe(chave, ESCALA.chefe) onde mostrar o sprite de um chefe.
-const CHAVE_CHEFAO = { king: 'king', queen: 'queen', jevil: 'jevil', coronel: 'coronelLixeiro' }
+// Texturas em densidade maior (mais pixels no mesmo espaço da tela): os chefões do CO-OP (arte/chefoes.js), os bosses
+// semanais (arte/semanais.js) e os lacaios e tenentes da Expedição (arte/expedicao.js) têm o dobro de pixels e aparecem
+// na metade da escala. Use escalaDe(chave, ESCALA.chefe) onde mostrar o sprite de um chefe.
+const CHAVE_CHEFAO = { king: 'king', queen: 'queen', jevil: 'jevil', coronel: 'coronelLixeiro', escuridao: 'escuridao', ladra: 'ladra' }
 // as texturas com animação parada (QUADROS_IDLE quadros cada)
 const ANIMADAS = new Set([...Object.values(CHAVE_CHEFAO), ...Object.keys(EXPEDICAO)])
 export const DENSIDADE = Object.fromEntries(['coronel', ...[...ANIMADAS].flatMap(quadrosDe)].map((k) => [k, 2]))
@@ -364,14 +364,12 @@ const personagens = Object.fromEntries(Object.keys(PERSONAGENS).map((id) => [id,
 
 const GERADORES = {
   ...personagens,
-  // os chefões do CO-OP, com os quadros da animação parada (arte/chefoes.js); 'coronel' é o mesmo desenho do Coronel
+  // os chefões do CO-OP e os bosses semanais, com os quadros da animação parada (arte/chefoes.js, arte/semanais.js);
+  // 'coronel' é o mesmo desenho do Coronel
   ...Object.fromEntries(Object.entries(CHAVE_CHEFAO).flatMap(([id, chave]) => quadrosDe(chave).map((k, q) => [k, () => gradeEmCanvas(CHEFOES[id](q))]))),
   coronel: () => gradeEmCanvas(CHEFOES.coronel(0)),
   // EXPEDIÇÃO: os lacaios e os tenentes dos quatro chefões, com os quadros da animação parada (arte/expedicao.js)
   ...Object.fromEntries(Object.entries(EXPEDICAO).flatMap(([chave, desenhar]) => quadrosDe(chave).map((k, q) => [k, () => gradeEmCanvas(desenhar(q))]))),
-  // BOSS SEMANAL (coop/chefes/escuridao.js, ladra.js)
-  escuridao: sprite('escuridao'),
-  ladra: sprite('ladra'),
   // colorida: a caminhonete usa cor 0xffffff na bala para não ser pintada pelo tema
   'bala-caminhonete': sprite('caminhonete'),
   // Coronel Caçamba: o caminhão de lixo das cartas (arte/coronelSprites.js)

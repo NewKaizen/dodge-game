@@ -163,7 +163,13 @@ export const METODOS_COOP2 = {
 
   // a prévia da próxima carta (some quando o quadro abre e volta depois do contra-ataque)
   atualizarPreviaChefe() {
-    this.previaChefe?.mostrar(previaCoop(this.estado))
+    this.previaChefe?.mostrar(this.previaComRegra())
+  },
+
+  // a prévia das regras (coop/regras.js previaCoop) passando pela regra do chefe (o gancho `previa`)
+  previaComRegra() {
+    const p = previaCoop(this.estado)
+    return this.regra ? this.regra.previa(p) : p
   },
 
   // estrelinhas girando em cima do chefe enquanto ele está atordoado
@@ -428,7 +434,7 @@ export const METODOS_COOP2 = {
       quebraMax: c.quebraMax,
       atordoado: c.atordoado,
       atordoadoEm: c.atordoadoEm,
-      previa: previaCoop(this.estado),
+      previa: this.previaComRegra(),
       almas: (this.almas?.lista ?? []).map((a) => ({ alvo: a.alvo, x: Math.round(a.x), y: Math.round(a.y), progresso: Math.round(a.progresso), quem: a.quem })),
       regra: this.regra?.def?.id ?? null,
       itensRegra: (this.regra?.itensVivos ?? []).map((i) => ({ id: i.id, x: Math.round(i.x), y: Math.round(i.y) })),

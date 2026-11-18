@@ -3,7 +3,8 @@
 // depois (cinza). Na SORTEADA o chefão fica "???" até o time chegar nele.
 //   desenharMapaExpedicao(cena, exp, { y, atual, perdeu })   atual: o nó de agora (0..2; 3 = todos feitos)
 import { CHEFES } from './chefes/index.js'
-import { ETAPAS, NOME_ETAPA } from './expedicao.js'
+import { ETAPAS, NOME_ETAPA, ehExpedicaoSemanal } from './expedicao.js'
+import { nomeDaSemana } from '../../lib/semanal.js'
 import { RELIQUIAS } from './reliquias.js'
 import { FONTE, LARGURA, TEXTO } from '../constants.js'
 import { semLigaduras } from '../campanha/texto.js'
@@ -39,7 +40,9 @@ export function desenharMapaExpedicao(cena, exp, { y = 56, atual = 0, perdeu = f
     escrever(cena, x, yn + 24, NOME_ETAPA[etapa], 11, caiu ? '#ff8080' : agora ? '#ffc070' : feito ? '#7dd88a' : TEXTO.desabilitado)
     escrever(cena, x, yn + 38, escondido ? '???' : CHEFES[id]?.nome ?? id, 10, TEXTO.normal)
   })
-  escrever(cena, LARGURA / 2 - 252, y - 30, 'EXPEDIÇÃO', 11, '#ffc070').setOrigin(0, 0.5)
+  // (BOSS SEMANAL: a semana do chefe; o troféu da semana sai ao completar, online)
+  const semanal = ehExpedicaoSemanal(exp)
+  escrever(cena, LARGURA / 2 - 252, y - 30, semanal ? `EXPEDIÇÃO SEMANAL${exp.semana ? ` · ${nomeDaSemana(exp.semana)}` : ''}` : 'EXPEDIÇÃO', 11, semanal ? '#ff9a3d' : '#ffc070').setOrigin(0, 0.5)
   if (reliquias && exp.reliquias.length) {
     const nomes = exp.reliquias.map((id) => RELIQUIAS[id]?.nome ?? id).join(' · ')
     escrever(cena, LARGURA / 2, y + 44, `melhorias: ${nomes}`, 10, '#ffe9a0')

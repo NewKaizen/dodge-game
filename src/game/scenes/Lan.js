@@ -555,7 +555,7 @@ export default class Lan extends Phaser.Scene {
     const L = CARTAO_SEMANAL.largura
     const ouro = 0xffb060
     this.add2(this.add.rectangle(x, y, L, altura, 0x140c08, 0.9).setOrigin(0).setStrokeStyle(sel ? 3 : 2, ouro, sel ? 1 : 0.7))
-    t(x + L / 2, y + 14, 'BOSS SEMANAL', 14, '#ffb060').setOrigin(0.5)
+    t(x + L / 2, y + 14, 'BOSS SEMANAL · EXPEDIÇÃO', 13, '#ffb060').setOrigin(0.5)
     const info = s.semanal
     if (!info) {
       t(x + L / 2, y + altura / 2, s.fase === 'conectando' ? 'conectando…' : 'o servidor ainda não mandou a semana', 11, COR.apagado, { strokeThickness: 0, wordWrap: { width: L - 20 }, align: 'center' }).setOrigin(0.5)
@@ -581,11 +581,11 @@ export default class Lan extends Phaser.Scene {
     }
     const trofeu = t(x + 34, yT, `troféu: ${info.trofeu.nome}`, 11, tem ? COR.ok : '#ffe0b0', { strokeThickness: 0 }).setOrigin(0, 0.5)
     if (trofeu.width > L - 44) caber(trofeu, trofeu.text, L - 44)
-    t(x + L / 2, yT + 18, tem ? 'já é seu: dá para jogar de novo pelo XP' : s.eu.conta ? 'vença uma vez para levar (só esta semana)' : 'convidado: entre com o Google para levar', 10, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0.5)
+    t(x + L / 2, yT + 18, tem ? 'já é seu: dá para jogar de novo pelo XP' : s.eu.conta ? 'complete a expedição para levar (só esta semana)' : 'convidado: entre com o Google para levar', 10, '#9a9ab0', { strokeThickness: 0 }).setOrigin(0.5)
     if (sel) {
       this.cursor(x + 12, y + 14)
-      t(x + L / 2, y + altura - 14, 'A: criar a sala (CO-OP de 2 a 4)', 11, COR.ok, { strokeThickness: 0 }).setOrigin(0.5)
-    } else t(x + L / 2, y + altura - 14, 'online · CO-OP de 2 a 4 jogadores', 10, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
+      t(x + L / 2, y + altura - 14, 'A: criar a sala (expedição, 2 a 4)', 11, COR.ok, { strokeThickness: 0 }).setOrigin(0.5)
+    } else t(x + L / 2, y + altura - 14, 'online · expedição de 2 a 4 jogadores', 10, COR.apagado, { strokeThickness: 0 }).setOrigin(0.5)
   }
 
   // JOGAR RÁPIDO: procurando (com a espera), o oponente achado (aceitar com

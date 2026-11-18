@@ -10,7 +10,8 @@
 // Lógica pura e serializável (JSON): o estado vai nos dados das cenas (e pela rede, com irParaCena). Nada aqui
 // usa Math.random: a oferta sai da semente da expedição (igual em todos os PCs).
 //
-//   criarExpedicao({ chefe, nivel, party, semente })   chefe: 'king' | 'queen' | 'jevil' | 'coronel' | 'sorteada'
+//   criarExpedicao({ chefe, nivel, party, semente, semana })   chefe: 'king' | 'queen' | 'jevil' | 'coronel' | 'sorteada'
+//                                                       | um BOSS SEMANAL ('escuridao' | 'ladra'; semana = 'AAAA-Sxx')
 //   dadosDaLuta(exp)                                    os dados da CoopArena/CoopArenaN da luta atual
 //   terminarLuta(exp, { vitoria, hp, hpMax })           -> exp com fase 'escolha' (oferta pronta) ou 'fim'
 //   gerarOferta(semente, no, ja)                        3 ids de relíquia sem repetir (e sem as que o time já tem)
@@ -31,7 +32,12 @@ export const LUTAS = {
   queen: { lacaios: 'queenLacaios', tenente: 'queenTenente', chefao: 'queen' },
   jevil: { lacaios: 'jevilLacaios', tenente: 'jevilTenente', chefao: 'jevil' },
   coronel: { lacaios: 'coronelLacaios', tenente: 'coronelTenente', chefao: 'coronel' },
+  // BOSS SEMANAL (docs/boss-semanal.md): o chefe da semana é SEMPRE uma expedição (fora da SORTEADA)
+  escuridao: { lacaios: 'escuridaoLacaios', tenente: 'escuridaoTenente', chefao: 'escuridao' },
+  ladra: { lacaios: 'ladraLacaios', tenente: 'ladraTenente', chefao: 'ladra' },
 }
+export const SEMANAIS_EXPEDICAO = ['escuridao', 'ladra'] // (os chefões que só vêm na semana deles)
+export const ehExpedicaoSemanal = (exp) => SEMANAIS_EXPEDICAO.includes(exp?.chefao) && !exp?.sorteada
 export const CURA_ENTRE = 0.25 // o time recupera 25% do HP máximo entre as lutas (era 35%: com as relíquias o chefão chegava fácil)
 export const OFERTA = 3 // cartas por escolha
 export const VOTO_MS = 20_000 // o relógio da escolha (acabou: vale o que foi votado, ou a sugestão)
@@ -55,7 +61,7 @@ export function rotaDa(chefe, semente) {
   return { chefao: origem[2], origem, lutas: ETAPAS.map((e, k) => LUTAS[origem[k]][e]) }
 }
 
-export function criarExpedicao({ chefe = 'king', nivel = 'facil', party = [], semente = `exp:${Date.now()}` } = {}) {
+export function criarExpedicao({ chefe = 'king', nivel = 'facil', party = [], semente = `exp:${Date.now()}`, semana = null } = {}) {
   const sorteada = chefe === SORTEADA
   const rota = rotaDa(sorteada ? SORTEADA : chefe, semente)
   return {
@@ -79,6 +85,8 @@ export function criarExpedicao({ chefe = 'king', nivel = 'facil', party = [], se
     inicio: null, // (a cena marca: Date.now() da 1ª luta) para a duração
     tempos: [], // ms de cada luta vencida
     rodadas: 0, // rodadas somadas das lutas (vai no relato do resultado)
+    // BOSS SEMANAL: a semana do chefe ('AAAA-Sxx'; o mapa mostra; o troféu sai da semana da SALA, no servidor)
+    semana: SEMANAIS_EXPEDICAO.includes(rota.chefao) && typeof semana === 'string' ? semana : null,
   }
 }
 

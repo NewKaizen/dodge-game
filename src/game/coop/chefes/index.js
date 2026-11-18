@@ -10,6 +10,10 @@ import jevilLacaios from './jevilLacaios.js'
 import jevilTenente from './jevilTenente.js'
 import kingLacaios from './kingLacaios.js'
 import kingTenente from './kingTenente.js'
+import escuridaoLacaios from './escuridaoLacaios.js'
+import escuridaoTenente from './escuridaoTenente.js'
+import ladraLacaios from './ladraLacaios.js'
+import ladraTenente from './ladraTenente.js'
 import { NIVEIS } from '../../constants.js'
 import { CHEFES_CAMPANHA } from '../../campanha/chefes.js'
 
@@ -48,6 +52,8 @@ export const CHEFES = { king, queen, jevil, coronel, escuridao, ladra, ...CHEFES
 // EXPEDIÇÃO (`expedicao: true`: fora da Selecao, que só mostra ORDEM_CHEFES): os lacaios e o tenente de cada chefe
 Object.assign(CHEFES, { kingLacaios, kingTenente })
 Object.assign(CHEFES, { coronelLacaios, coronelTenente })
+// EXPEDIÇÃO SEMANAL (docs/boss-semanal.md): o boss semanal é sempre uma expedição; os lacaios e o tenente dele
+Object.assign(CHEFES, { escuridaoLacaios, escuridaoTenente, ladraLacaios, ladraTenente })
 
 const FATORES = ['velocidade', 'densidade', 'velocidadeMax', 'dano', 'hp']
 

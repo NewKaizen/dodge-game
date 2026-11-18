@@ -24,6 +24,8 @@
 //         faseNova(f) {},                   o chefe mudou de fase
 //         aoMensagem(lado, acao, dados) {}, chegou um api.enviar (de qualquer PC, também deste)
 //         alvoDoBot(j) {},                  opcional: { x, y } para onde a CPU aliada quer ir
+//         previa(p) {},                     opcional: a PRÉVIA da próxima carta (coop2.js previaDoChefe) passa
+//                                           por aqui; devolva outra (ex.: { tipo: 'escuro' }) ou nada (= a mesma)
 //         terminar() {},                    a luta acabou (a API já limpa itens, zonas e objetos guardados)
 //       }
 //     },
@@ -34,6 +36,7 @@
 //   api.rng(tag)                 sorteio DETERMINÍSTICO da rodada: () => [0, 1), o mesmo em todos os PCs
 //                                para a mesma (semente, rodada, tag)
 //   api.jogadores()              os jogadores do estado (só leitura: HP, caído, energia...)
+//   api.chefe()                  o chefe do estado (leitura; a Ladra devolve as roubadas por ele, igual em todos os PCs)
 //   api.coracoes()               [{ j, x, y, ativo }] os corações no quadro agora
 //   api.limites()                { x, y, width, height } do quadro agora
 //   api.adicionarItem({ x, y, raio, cor, forma, rotulo, fica, aoPegar(j, item) })   item que se PEGA
@@ -113,6 +116,7 @@ export class RegraDaLuta {
       cena: p.cena ?? null,
       rng: (tag = '') => rngDaRegra(p.semente, p.rodada(), tag),
       jogadores: () => p.estado().jogadores,
+      chefe: () => p.estado().chefe,
       coracoes: () => p.coracoes(),
       limites: () => p.limites(),
       adicionarItem: (opcoes) => regra.adicionarItem(opcoes),
@@ -285,6 +289,12 @@ export class RegraDaLuta {
     if (!this.ativa) return null
     this.chamar('faseNova', f)
     return this.def.fases?.[f]?.descricao ?? null
+  }
+
+  // a prévia da próxima carta passando pela regra (o gancho `previa` pode trocar; sem gancho, a mesma)
+  previa(p) {
+    const nova = this.chamar('previa', p)
+    return nova === undefined ? p : nova
   }
 
   alvoDoBot(j) {

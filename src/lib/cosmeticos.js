@@ -234,6 +234,9 @@ export const ITENS_EXPEDICAO = [
   itemExp('sinal', 'Sinal Cheio', 'queen', '#1a3a6a'),
   itemExp('dado', 'Dado do Caos', 'jevil', '#4a1a5a'),
   itemExp('reciclador', 'Reciclador', 'coronel', '#1a4a2a'),
+  // (0018) os bosses semanais (a expedição deles é a semanal; docs/boss-semanal.md)
+  itemExp('breu', 'Breu Absoluto', 'escuridao', '#14102a'),
+  itemExp('cofre', 'Cofre Arrombado', 'ladra', '#3a1608'),
 ]
 const POR_ID_EXP = new Map(ITENS_EXPEDICAO.map((i) => [i.id, i]))
 export const itemDaExpedicao = (id) => POR_ID_EXP.get(id) ?? null

@@ -38,6 +38,14 @@ import queenPulso from './queenPulso.js'
 import jevilRoleta from './jevilRoleta.js'
 import jevilMalabares from './jevilMalabares.js'
 import jevilOrbita from './jevilOrbita.js'
+import escuridaoMaos from './escuridaoMaos.js'
+import escuridaoEco from './escuridaoEco.js'
+import escuridaoOlhar from './escuridaoOlhar.js'
+import escuridaoVelas from './escuridaoVelas.js'
+import ladraTruque from './ladraTruque.js'
+import ladraBumerangue from './ladraBumerangue.js'
+import ladraAlarme from './ladraAlarme.js'
+import ladraEspelho from './ladraEspelho.js'
 import { ataquesSuper } from './super/index.js'
 import { ataquesHabilidades } from './habilidades/index.js'
 
@@ -98,6 +106,14 @@ export const ataques = {
   jevilRoleta, // (Jevil) a roleta com lâminas e o leque da bolinha
   jevilMalabares, // (Jevil) bombas em malabarismo que explodem em naipes
   jevilOrbita, // (Jevil) o anel de ouros que fecha em volta do coração
+  escuridaoMaos, // (Escuridão, semanal) a mão da sombra que sai da poça na borda pela faixa acesa
+  escuridaoEco, // (Escuridão, semanal) o sino que toca um anel com brecha e ecoa do lado espelhado
+  escuridaoOlhar, // (Escuridão, semanal) o olho na borda que varre um leque com o olhar
+  escuridaoVelas, // (Escuridão, semanal) velas que tremem e apagam estourando em estilhaços
+  ladraTruque, // (Ladra, semanal) o truque das três cartas: sigam a dama, chove nas colunas das bombas
+  ladraBumerangue, // (Ladra, semanal) cartas que vão pela trilha pontilhada e voltam
+  ladraAlarme, // (Ladra, semanal) feixes do alarme que atravessam a caixa com um vão
+  ladraEspelho, // (Ladra, semanal) a cópia larga cartas-bomba no espelho do coração
   ...ataquesSuper, // superKris, superSusie... (cartas SUPER)
   ...ataquesHabilidades, // krisEstocadaDupla, susieCabecada... (cartas normais, ver habilidades/)
   juntos,

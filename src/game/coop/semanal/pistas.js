@@ -7,6 +7,7 @@
 //   altura      grave embaixo, agudo em cima: a bala acima do coração soa mais aguda (FREQ, 2 oitavas)
 //   tique       o intervalo entre os bipes ENCURTA quando a bala chega perto (TIQUE.maxMs -> minMs)
 //   timbre      um por tipo de ataque (TIMBRES): chuva = chiado, laser = zumbido, bomba = tambor, o resto = sino
+//               (mão da sombra = tambor, olhar = zumbido, velas = chiado, eco = sino)
 //   urgência    0..1: o maior entre a proximidade (ALCANCE) e o tempo até chegar (HORIZONTE_MS). Uma bala
 //               ainda avisando (telegrafo) entra como "chega quando o aviso acabar": dá ~0,6 s de som antes
 //   vozes       no máximo VOZES ao mesmo tempo, as mais urgentes (a mistura não embola)
@@ -20,7 +21,9 @@ export const HORIZONTE_MS = 1600 // ms: a bala que chega em menos que isto já s
 export const AVISO_SOM_MS = 600 // ms: o mínimo de som antes de uma bala chegar (o telegrafo de ouvido)
 export const TIQUE = { maxMs: 520, minMs: 70 }
 export const FREQ = { base: 330, oitavas: 2 } // do grave (embaixo) ao agudo (em cima)
-export const TIMBRES = { rain: 'chiado', lasers: 'zumbido', bombas: 'tambor' }
+// (os ataques de assinatura dela também: a mão da sombra bate como tambor, o olhar zumbe como o laser e o
+// estouro das velas chia como a chuva; o eco é sino, como o resto)
+export const TIMBRES = { rain: 'chiado', lasers: 'zumbido', bombas: 'tambor', escuridaoMaos: 'tambor', escuridaoOlhar: 'zumbido', escuridaoVelas: 'chiado' }
 
 const limitar = (v, a, b) => Math.min(b, Math.max(a, v))
 

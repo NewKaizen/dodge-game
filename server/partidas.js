@@ -78,7 +78,7 @@ import { infoSemanal, ID_SEMANA } from '../src/lib/semanal.js'
 import { msgConquistas } from './conquistas.js'
 import { msgBauGanho } from './baus.js'
 import { RESULTADOS_JOGADOS } from '../src/lib/progresso.js'
-import { lerExpedicao, DURACAO_MINIMA_LUTA_S, LUTAS_EXPEDICAO, CHANCE_BAU_EXPEDICAO, ESCALA_BAU_EXPEDICAO } from '../src/lib/expedicao.js'
+import { lerExpedicao, DURACAO_MINIMA_LUTA_S, LUTAS_EXPEDICAO, CHANCE_BAU_EXPEDICAO, ESCALA_BAU_EXPEDICAO, completouExpedicaoDe } from '../src/lib/expedicao.js'
 
 export const RELATO_JANELA_MS = 20_000
 export const ABANDONO_GRACA_MS = 3_000
@@ -436,13 +436,15 @@ export function decidirN(p, agora) {
 // servidor (p.semanal, a semana do relógio dele quando a partida começou), decisão 'validada', duração
 // e rodadas mínimas, e o lado com conta, resultado 'vitoria' e o relato dizendo a MESMA semana.
 // Convidado, contestada, curta ou relato de outra semana: nada. O banco confere tudo de novo (0010).
+// EXPEDIÇÃO SEMANAL (0018): o boss semanal é sempre uma expedição; o troféu só sai para quem COMPLETOU a
+// expedição do chefe da semana (o relato diz o chefão da semana e as 3 lutas vencidas)
 export const DURACAO_MINIMA_TROFEU_S = 60 // = duracao_minima_s() (0003)
 export const RODADAS_MINIMAS_TROFEU = 2 // = rodadas_minimas() (0003)
 export function ladosDoTrofeu(p, d) {
   const semana = p.semanal?.semana
   if (!semana || (p.modo !== 'coop' && p.modo !== 'coop4') || d?.validacao !== 'validada') return []
   if ((d.duracaoS ?? 0) < DURACAO_MINIMA_TROFEU_S || (d.rodadas != null && d.rodadas < RODADAS_MINIMAS_TROFEU)) return []
-  return p.participantes.filter((x) => x.usuario && d.resultados[x.lado] === 'vitoria' && x.relato?.semana === semana).map((x) => x.lado)
+  return p.participantes.filter((x) => x.usuario && d.resultados[x.lado] === 'vitoria' && x.relato?.semana === semana && completouExpedicaoDe(x.relato, p.semanal.chefe)).map((x) => x.lado)
 }
 
 // EXPEDIÇÃO (docs/coop-cartas.md "Expedição", 0017): o que a partida rende a mais. A MESMA validação do XP do

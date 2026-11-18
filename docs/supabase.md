@@ -217,6 +217,31 @@ o `conceder_bau` sem a fonte nova). Detalhes em [coop-cartas.md](coop-cartas.md)
 [baus.md](baus.md). `expedicaoSql.test.js` roda a 0001–0015 duas vezes e depois a 0016 e a 0017 duas vezes (com
 `DODGE_PG`).
 
+### 2.12 Migration 0018: a Expedição semanal
+
+O BOSS SEMANAL virou SEMPRE uma expedição (lacaios → tenente → o chefe da semana; [boss-semanal.md](boss-semanal.md)).
+Rode `supabase/migrations/0018_expedicao_semanal.sql` **depois da 0017** (depende da 0010 e da 0017; roda de novo sem
+estragar). A 0017 **não** foi editada; a 0018:
+
+- abre a lista dos chefões da expedição para os semanais: `expedicao_chefes()` ganha `escuridao` e `ladra` (o
+  `conceder_expedicao` passa a aceitar os dois: XP por luta, bônus de completar, baú do dia por chefão) e a função
+  nova `semanal_chefes()` (`escuridao`, `ladra`);
+- os 2 **versos exclusivos** novos (`verso.exp_breu` da Escuridão, `verso.exp_cofre` da Ladra; `expedicao_item()`
+  e o check `catalogo_expedicao_formato` com os chefes novos);
+- troca os checks de `expedicoes.chefe` e `expedicoes_chefes.chefe` (os da 0017 tinham a lista fixa) por
+  `expedicoes_chefe_valido` / `expedicoes_chefes_chefe_valido`, com os semanais;
+- recria o `conceder_bau`: a fonte `expedicao` confere o chefão por `expedicao_chefes()` (era a regex fixa da 0017);
+- recria o `conceder_trofeu_semanal` (0010): o troféu da semana só sai para a conta cujo relato **completou a
+  expedição semanal** (`relato.expedicao.chefe` em `semanal_chefes()` e `relato.expedicao.lutas = 3`), além de tudo
+  o que a 0010 já conferia. O servidor Node confere o mesmo antes (`ladosDoTrofeu`, com o chefe da semana da partida).
+
+Sem a 0018 o jogo funciona: a expedição semanal só não rende o extra da expedição (o `conceder_expedicao` recusa o
+chefão semanal e o servidor loga) e o troféu sai como na 0010. **Atenção**: depois da 0018, **não rode a 0017 de novo
+sozinha** (ela recria o check do catálogo só com os 4 chefões e para com erro, porque já existem os versos dos
+semanais); para reaplicar, rode a 0017 e logo depois a 0018. `expedicaoSql.test.js` roda a 0001–0015 duas vezes, a
+0016 e a 0017 duas vezes e depois a 0018 duas vezes (com `DODGE_PG`), e confere o verso e o baú da Ladra e o troféu só
+para quem completou a expedição.
+
 ## 3. Conferir o bucket
 
 Em **Storage** deve aparecer o bucket `avatares`, marcado como **Public**.

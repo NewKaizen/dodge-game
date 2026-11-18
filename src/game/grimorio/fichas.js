@@ -67,6 +67,14 @@ const TEXTO_ATAQUE = {
   jevilRoleta: 'Lâminas giram na roleta e a bolinha solta um leque de naipes pela fatia acesa',
   jevilMalabares: 'Bombas voam em arco, caem na sombra que cresce e explodem em naipes',
   jevilOrbita: 'Um anel de losangos gira em volta do coração e fecha',
+  escuridaoMaos: 'Uma poça de breu borbulha na borda e a mão da sombra estica pela faixa acesa',
+  escuridaoEco: 'Um sino toca um anel de notas com uma brecha e o eco volta do lado espelhado',
+  escuridaoOlhar: 'Um olho enorme se abre na borda e o olhar varre o leque aceso',
+  escuridaoVelas: 'Velas acendem no breu, tremem e apagam estourando em estilhaços',
+  ladraTruque: 'Sigam a dama: as cartas embaralham e chove naipe nas colunas das bombas',
+  ladraBumerangue: 'Cartas voam pela trilha pontilhada, param e voltam pelo mesmo caminho',
+  ladraAlarme: 'Feixes do alarme atravessam a caixa devagar; passe pelo vão verde',
+  ladraEspelho: 'O vulto da ladra larga cartas-bomba no lado espelhado do coração',
 }
 
 // Biblioteca de mentira que só anota os nomes: A.juntos(A.rain(), A.aimed())

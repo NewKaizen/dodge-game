@@ -30,12 +30,12 @@ lacaios de um chefão, o tenente de outro e um chefão surpresa, os três difere
 | mapa + cartão de 1ª vez + votos + cura (entre as lutas) | `scenes/Expedicao.js` (o mapa: `coop/expedicaoCena.js`) |
 | fim (até onde chegou, recompensas, revanche) | `scenes/ExpedicaoFim.js` |
 | a faixa "EXPEDIÇÃO · LUTA 2 DE 3 · TENENTE" e a saída da luta | `coop/coop2Arena.js` (`faixaDaExpedicao`, `saidaDaExpedicao`), nas duas arenas |
-| recompensas (servidor e banco) | `server/partidas.js` (`expedicaoDaPartida`), `src/lib/expedicao.js`, `supabase/migrations/0017_expedicao.sql` |
+| recompensas (servidor e banco) | `server/partidas.js` (`expedicaoDaPartida`), `src/lib/expedicao.js`, `supabase/migrations/0017_expedicao.sql` (e a `0018_expedicao_semanal.sql`: os semanais) |
 | versos exclusivos (desenho por código) | `src/lib/cosmeticos.js` (`ITENS_EXPEDICAO`), `src/game/cosmeticos/versos.js` (`VERSOS_EXPEDICAO`) |
 
 **As lutas** são as entradas `expedicao: true` de `CHEFES_DA_EXPEDICAO` (`LUTAS` em `coop/expedicao.js`):
 `kingLacaios → kingTenente → king`, `queenLacaios → queenTenente → queen`, `jevilLacaios → jevilTenente → jevil` e
-`coronelLacaios → coronelTenente → coronel`. Cada luta abre a `CoopArena` (ou a `CoopArenaN` com 3–4) com os
+`coronelLacaios → coronelTenente → coronel`; e os **bosses semanais**, que agora são SEMPRE uma expedição (fora da SORTEADA; [boss-semanal.md](boss-semanal.md) "Expedição semanal"): `escuridaoLacaios → escuridaoTenente → escuridao` e `ladraLacaios → ladraTenente → ladra` (o troféu da semana pede a expedição semanal completa; 0018). Cada luta abre a `CoopArena` (ou a `CoopArenaN` com 3–4) com os
 ganchos da luta que continua: `{ chefe, nivel, party, semente, hp, reliquias, expedicao }` (`dadosDaLuta`). O banner do
 começo da luta ganha uma faixa em cima ("EXPEDIÇÃO · LUTA 2 DE 3 · TENENTE" e as melhorias ativas). A vitória que não é a
 última diz "LUTA N VENCIDA!" e abre a `Expedicao`; o chefão caído ou o time caído abrem a `ExpedicaoFim`.
@@ -295,6 +295,7 @@ regra: {
 | `fimDaRodada({ novaFase })` · `faseNova(f)` | a rodada acabou / o chefe mudou de fase (o texto de `fases[f]` aparece sozinho) |
 | `aoMensagem(lado, acao, dados)` | chegou um `api.enviar` (de qualquer PC, também deste) |
 | `alvoDoBot(j)` | `{ x, y }` para onde a CPU aliada vai (sem isto: o item mais perto) |
+| `previa(p)` | a PRÉVIA da próxima carta (`previaDoChefe`) passa por aqui: devolva outra (ex.: `{ tipo: 'escuro' }`, a Escuridão) ou nada (a mesma) |
 | `terminar()` | a luta acabou (itens, zonas e objetos guardados já são limpos) |
 
 **A API** (`api`):
@@ -304,6 +305,7 @@ regra: {
 | `api.rodada` · `api.n` · `api.nivel` · `api.semente` | leitura |
 | `api.rng(tag)` | `() => [0, 1)`: o sorteio da rodada, o mesmo em todos os PCs para a mesma `(semente, rodada, tag)` |
 | `api.jogadores()` · `api.coracoes()` · `api.limites()` | o estado (só leitura), `[{ j, x, y, ativo }]`, `{ x, y, width, height }` do quadro |
+| `api.chefe()` | o chefe do estado (a Ladra devolve as roubadas por ele, igual em todos os PCs) |
 | `api.adicionarItem({ x, y, raio, cor, forma, rotulo, fica, aoPegar(j, item) })` | item que se pega encostando o coração (some ao pegar; sem `fica`, no fim da esquiva) |
 | `api.adicionarZona({ x, y, largura, altura, cor, alpha, fica, aoEntrar(j), aoSair(j) })` | área no quadro |
 | `api.removerItem` · `api.removerZona` · `api.itens()` · `api.zonas()` · `api.dentro(zona, x, y)` | |
@@ -843,9 +845,11 @@ derrota: perde quando todos os que ainda estão na luta caíram).
 
 ## Boss semanal
 
-Dois chefes fora da Selecao (`semanal: true`), um por semana, só no CO-OP online: a **Escuridão** (desvie pelo
-som) e a **Ladra de Cartas** (rouba e joga as suas cartas; ♣ recupera). Regras, acessibilidade e o troféu
-exclusivo em [boss-semanal.md](boss-semanal.md).
+Dois chefes fora da Selecao rápida (`semanal: true`), um por semana, sempre como **EXPEDIÇÃO** (lacaios → tenente →
+ele): a **Escuridão** (desvie pelo som; regra OLHOS NO BREU) e a **Ladra de Cartas** (rouba e joga as suas cartas; ♣
+recupera; regra PEGA LADRA!). Cada um tem a regra CO-OP 2.0 dele (o gancho `previa` e `api.chefe()` da API vieram
+deles), 4 ataques de assinatura e a dificuldade na ponta dura. Regras, ataques, números, acessibilidade e o troféu
+exclusivo (só completando a expedição semanal online) em [boss-semanal.md](boss-semanal.md).
 
 ## Jevil: DADO DO CAOS (CO-OP 2.0)
 

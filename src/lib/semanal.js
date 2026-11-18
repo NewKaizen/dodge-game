@@ -22,8 +22,8 @@ const TIPOS_TROFEU = ['titulo', 'moldura', 'verso']
 
 // nome do chefe, a mecânica em até 6 palavras e os troféus (nome por tipo; cor das molduras/versos)
 export const SEMANAIS = {
-  escuridao: { nome: 'Escuridão', mecanica: 'desvie pelo som, no escuro', cor: '#8a7cff', trofeus: { titulo: 'Ouvido Absoluto', moldura: 'Breu', verso: 'Eclipse' }, cores: { moldura: '#8a7cff', verso: '#0d0a24' } },
-  ladra: { nome: 'Ladra de Cartas', mecanica: 'ela rouba e joga suas cartas', cor: '#ff7a3d', trofeus: { titulo: 'Mão Leve', moldura: 'Cofre', verso: 'Baralho Roubado' }, cores: { moldura: '#ff9a3d', verso: '#3a1608' } },
+  escuridao: { nome: 'Escuridão', mecanica: 'no escuro: fechem os olhos dela', cor: '#8a7cff', trofeus: { titulo: 'Ouvido Absoluto', moldura: 'Breu', verso: 'Eclipse' }, cores: { moldura: '#8a7cff', verso: '#0d0a24' } },
+  ladra: { nome: 'Ladra de Cartas', mecanica: 'ela rouba: peguem a carta fujona', cor: '#ff7a3d', trofeus: { titulo: 'Mão Leve', moldura: 'Cofre', verso: 'Baralho Roubado' }, cores: { moldura: '#ff9a3d', verso: '#3a1608' } },
 }
 
 // ---------- calendário no fuso ----------
@@ -86,6 +86,11 @@ function segundaDaSemanaIso(ano, numero) {
 }
 
 export const ID_SEMANA = /^(\d{4})-S(\d{2})$/
+// 'S47/26' (o mapa da expedição semanal e a Dificuldade mostram); '' sem semana válida
+export function nomeDaSemana(id) {
+  const m = ID_SEMANA.exec(String(id ?? ''))
+  return m ? `S${m[2]}/${m[1].slice(2)}` : ''
+}
 export function semanaDoId(id) {
   const m = ID_SEMANA.exec(String(id ?? ''))
   if (!m) return null

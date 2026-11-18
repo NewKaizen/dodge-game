@@ -14,6 +14,7 @@ import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
 import { partyAtiva } from '../party/cliente.js'
 import { salaSemanal } from '../../lib/lan/rede.js'
 import { criarExpedicao, SORTEADA } from '../coop/expedicao.js'
+import { infoSemanal, nomeDaSemana } from '../../lib/semanal.js'
 import { semLigaduras } from '../campanha/texto.js'
 
 // painel do chefe à esquerda (62..282) e as opções à direita (322..792): bloco centralizado em 854
@@ -60,6 +61,12 @@ export default class Dificuldade extends Phaser.Scene {
     // EXPEDIÇÃO (ModoCoop -> Selecao): o chefão escolhido ou a SORTEADA (o chefão é surpresa: o desenho fica escuro)
     this.modo = dados?.modo === 'expedicao' ? 'expedicao' : 'rapida'
     this.escolhidoExp = this.modo === 'expedicao' ? (dados?.chefe === SORTEADA ? SORTEADA : this.idChefe) : null
+    // BOSS SEMANAL (docs/boss-semanal.md): o chefe da semana é SEMPRE uma expedição (lacaios -> tenente -> ele),
+    // venha da sala do boss, da party ou da Selecao
+    if (CHEFES[this.idChefe]?.semanal) {
+      this.modo = 'expedicao'
+      this.escolhidoExp = this.idChefe
+    }
     this.sorteada = this.escolhidoExp === SORTEADA
     if (this.sorteada || !CHEFES[this.idChefe]) this.idChefe = this.sorteada ? 'jevil' : 'king'
   }
@@ -83,7 +90,8 @@ export default class Dificuldade extends Phaser.Scene {
     this.fundo.escurecer()
 
     const exp = this.modo === 'expedicao'
-    texto(LARGURA / 2, 36, exp ? 'EXPEDIÇÃO: ESCOLHA O NÍVEL' : 'ESCOLHA O NÍVEL', exp ? 26 : 28, exp ? '#ffc070' : TEXTO.normal, { strokeThickness: 4 })
+    const semanal = exp && CHEFES[this.idChefe]?.semanal
+    texto(LARGURA / 2, 36, semanal ? 'EXPEDIÇÃO SEMANAL: ESCOLHA O NÍVEL' : exp ? 'EXPEDIÇÃO: ESCOLHA O NÍVEL' : 'ESCOLHA O NÍVEL', semanal ? 24 : exp ? 26 : 28, exp ? '#ffc070' : TEXTO.normal, { strokeThickness: 4 })
 
     // chefe escolhido, à esquerda
     const cx = CHEFE.x
@@ -97,7 +105,7 @@ export default class Dificuldade extends Phaser.Scene {
       texto(cx, 336, semLigaduras('chefão surpresa'), 14, TEXTO.normal)
     } else {
       texto(cx, 310, def.nome.toUpperCase(), def.nome.length > 11 ? 16 : 20)
-      texto(cx, 336, exp ? semLigaduras('expedição: 3 lutas') : `base: ${base.rotulo}`, 14, exp ? '#ffc070' : base.cor)
+      texto(cx, 336, semanal ? semLigaduras(`boss semanal · ${nomeDaSemana(this.semana())}`) : exp ? semLigaduras('expedição: 3 lutas') : `base: ${base.rotulo}`, 14, exp ? '#ffc070' : base.cor)
     }
     const maxEstrelas = Math.max(...Object.values(DIFICULDADES).map((d) => d.estrelas))
     for (let k = 0; k < maxEstrelas; k++) {
@@ -315,9 +323,15 @@ export default class Dificuldade extends Phaser.Scene {
 
   // EXPEDIÇÃO: o mapa das 3 lutas (Expedicao) antes da 1ª; em rede o host leva todos (a semente é a mesma)
   comecarExpedicao(nivel, party) {
-    const expedicao = criarExpedicao({ chefe: this.escolhidoExp, nivel, party, semente: `exp:${Date.now()}` })
+    const expedicao = criarExpedicao({ chefe: this.escolhidoExp, nivel, party, semente: `exp:${Date.now()}`, semana: this.semana() })
     if (this.rede) irParaCena(this, 'Expedicao', { expedicao })
     else this.scene.start('Expedicao', { expedicao })
+  }
+
+  // BOSS SEMANAL: a semana desta expedição (a da sala, que o servidor fixou; fora da rede, a do relógio daqui)
+  semana() {
+    if (!CHEFES[this.escolhidoExp]?.semanal) return null
+    return (this.rede ? salaSemanal()?.semana : null) ?? infoSemanal(Date.now()).semana
   }
 
   voltar() {
