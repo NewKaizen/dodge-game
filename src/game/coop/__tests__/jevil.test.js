@@ -302,7 +302,7 @@ test('o baralho do Jevil por fase: a marca dele (carrossel e foice) continua e t
 })
 
 test('lacaios e tenente: registrados, escondidos da seleção, com baralho e regra válidos', () => {
-  assert.deepEqual([...CHEFES_DA_EXPEDICAO].sort(), ['coronelLacaios', 'coronelTenente', 'jevilLacaios', 'jevilTenente', 'kingLacaios', 'kingTenente', 'queenLacaios', 'queenTenente'])
+  assert.deepEqual([...CHEFES_DA_EXPEDICAO].sort(), ['coronelLacaios', 'coronelTenente', 'escuridaoLacaios', 'escuridaoTenente', 'jevilLacaios', 'jevilTenente', 'kingLacaios', 'kingTenente', 'ladraLacaios', 'ladraTenente', 'queenLacaios', 'queenTenente'])
   for (const id of ['jevilLacaios', 'jevilTenente']) {
     const def = CHEFES[id]
     assert.ok(def.oculto && def.expedicao)

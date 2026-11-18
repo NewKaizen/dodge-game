@@ -9,7 +9,10 @@
 export const XP_EXPEDICAO = { porLuta: 15, completa: 40, tetoDia: 255 } // XP a mais (além do da partida)
 export const CHANCE_BAU_EXPEDICAO = 500_000 // em 1.000.000 (50%): ao completar, no máximo 1 baú por dia por chefão
 export const ESCALA_BAU_EXPEDICAO = 1_000_000
-export const CHEFOES_EXPEDICAO = ['king', 'queen', 'jevil', 'coronel']
+// (0018: + os BOSSES SEMANAIS, que são sempre uma expedição; docs/boss-semanal.md)
+export const CHEFOES_EXPEDICAO = ['king', 'queen', 'jevil', 'coronel', 'escuridao', 'ladra']
+// o padrão do chefão na chave do baú ('expedicao:<dia>:<chefão>'): o mesmo do conceder_bau (0018)
+export const RE_REF_BAU_EXPEDICAO = new RegExp(`^[0-9]{4}-[0-9]{2}-[0-9]{2}:(${CHEFOES_EXPEDICAO.join('|')})$`)
 export const DURACAO_MINIMA_LUTA_S = 60 // cada luta vencida pede pelo menos isto de partida (medido pelo servidor)
 export const LUTAS_EXPEDICAO = 3
 
@@ -24,4 +27,7 @@ export function lerExpedicao(x) {
 }
 
 // o XP a mais de UMA expedição (antes do teto do dia, que o banco aplica)
+// EXPEDIÇÃO SEMANAL (0018): o relato completou a expedição do chefe da semana (o troféu da semana pede isto)
+export const completouExpedicaoDe = (relato, chefe) => Boolean(chefe) && relato?.expedicao?.chefe === chefe && relato.expedicao.lutas === LUTAS_EXPEDICAO
+
 export const xpDaExpedicao = ({ lutas, completa }) => Math.max(0, Math.min(LUTAS_EXPEDICAO, lutas | 0)) * XP_EXPEDICAO.porLuta + (completa ? XP_EXPEDICAO.completa : 0)

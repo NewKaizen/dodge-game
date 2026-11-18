@@ -62,6 +62,8 @@ async function salaSemanal(m, nomes) {
 }
 const relatar = (p, partidaId, vitoria, extra = {}) => p.mandar({ t: 'resultado', partidaId, vitoria, rodadas: 8, duracao: 300, personagem: 'kris', ...extra })
 const SEMANA = infoSemanal(INICIO)
+// (0018) o boss semanal é sempre uma EXPEDIÇÃO: o troféu pede a expedição do chefe da semana completa
+const EXP = { expedicao: { chefe: SEMANA.chefe, lutas: 3, sorteada: false } }
 
 test('protocolo 16 nos dois lados (15 trouxe o boss semanal); o bemvindo traz a semana do relógio do servidor', async () => {
   assert.ok(PROTOCOLO >= 15)
@@ -111,7 +113,7 @@ test('vitória validada: o troféu da semana para quem tem conta, uma vez só; X
   const { ps, partidaId } = await salaSemanal(m, ['ana', 'beto', 'caio'])
   await esperar()
   m.relogio.andar(200_000)
-  for (const p of ps) relatar(p, partidaId, true, { semana: SEMANA.semana })
+  for (const p of ps) relatar(p, partidaId, true, { semana: SEMANA.semana, ...EXP })
   await esperar()
   for (const p of ps.slice(0, 2)) {
     const r = p.ultima('recompensa')
@@ -128,7 +130,7 @@ test('vitória validada: o troféu da semana para quem tem conta, uma vez só; X
   ps[0].mandar({ t: 'partida', valor: true })
   const outra = ps[0].ultima('sala').sala.partidaId
   m.relogio.andar(200_000)
-  for (const p of ps) relatar(p, outra, true, { semana: SEMANA.semana })
+  for (const p of ps) relatar(p, outra, true, { semana: SEMANA.semana, ...EXP })
   await esperar()
   assert.equal(ps[0].ultima('recompensa').partidaId, outra)
   assert.equal(ps[0].ultima('recompensa').trofeu.novo, false)
@@ -174,7 +176,7 @@ test('a semana fica a do começo da partida (virou no meio: o troféu é o da se
   assert.equal(sala.semanal.semana, '2026-S45')
   relogio.andar(300_000) // já é segunda
   assert.equal(ps[0].ultima('sala').sala.semanal.semana, '2026-S45')
-  for (const p of ps) relatar(p, partidaId, true, { semana: '2026-S45' })
+  for (const p of ps) relatar(p, partidaId, true, { semana: '2026-S45', expedicao: { chefe: sala.semanal.chefe, lutas: 3 } })
   await esperar()
   assert.equal(ps[0].ultima('recompensa').trofeu.semana, '2026-S45')
 })
@@ -184,10 +186,10 @@ test('ladosDoTrofeu: a regra pura (host decide + maioria já na decisão)', () =
     modo: 'coop4',
     semanal: SEMANA,
     participantes: [
-      { lado: 0, usuario: 'a', relato: { semana: SEMANA.semana } },
-      { lado: 1, usuario: 'b', relato: { semana: SEMANA.semana } },
-      { lado: 2, usuario: null, relato: { semana: SEMANA.semana } },
-      { lado: 3, usuario: 'd', relato: { semana: '2026-S44' } },
+      { lado: 0, usuario: 'a', relato: { semana: SEMANA.semana, ...EXP } },
+      { lado: 1, usuario: 'b', relato: { semana: SEMANA.semana, ...EXP } },
+      { lado: 2, usuario: null, relato: { semana: SEMANA.semana, ...EXP } },
+      { lado: 3, usuario: 'd', relato: { semana: '2026-S44', ...EXP } },
     ],
     ...extra,
   })
@@ -199,4 +201,10 @@ test('ladosDoTrofeu: a regra pura (host decide + maioria já na decisão)', () =
   assert.deepEqual(ladosDoTrofeu(p(), d({ resultados: { 0: 'vitoria', 1: 'abandono', 2: 'vitoria', 3: 'vitoria' } })), [0])
   assert.deepEqual(ladosDoTrofeu(p({ semanal: null }), d()), [])
   assert.deepEqual(ladosDoTrofeu(p({ modo: 'pvp' }), d()), [])
+  // (0018) a EXPEDIÇÃO SEMANAL: sem a expedição do chefe da semana completa, nada
+  const sem = (relato) => p({ participantes: [{ lado: 0, usuario: 'a', relato }] })
+  assert.deepEqual(ladosDoTrofeu(sem({ semana: SEMANA.semana }), d()), [], 'luta solta (sem expedição)')
+  assert.deepEqual(ladosDoTrofeu(sem({ semana: SEMANA.semana, expedicao: { chefe: SEMANA.chefe, lutas: 2 } }), d()), [], 'expedição pela metade')
+  assert.deepEqual(ladosDoTrofeu(sem({ semana: SEMANA.semana, expedicao: { chefe: 'king', lutas: 3 } }), d()), [], 'expedição de outro chefão')
+  assert.deepEqual(ladosDoTrofeu(sem({ semana: SEMANA.semana, ...EXP }), d()), [0])
 })

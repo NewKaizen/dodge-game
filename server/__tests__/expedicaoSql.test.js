@@ -61,13 +61,15 @@ const hoje = () => psql(`select to_char(public.desafio_hoje(), 'YYYY-MM-DD')`)
 const conceder = (ref, user = A) => `select (public.conceder_bau('${user}', 'expedicao', '${ref}') ->> 'novo')`
 const comoNavegador = (sql, uid = A) => `begin; set local role authenticated; set local "request.jwt.claim.sub" = '${uid}'; ${sql}; commit;`
 
-test('0017 no Postgres (duas vezes): expedição, verso exclusivo e o baú do dia por chefão', { skip: !ARGS && 'defina DODGE_PG para rodar no Postgres' }, async () => {
+test('0017 e 0018 no Postgres (duas vezes): expedição, verso exclusivo e o baú do dia por chefão', { skip: !ARGS && 'defina DODGE_PG para rodar no Postgres' }, async () => {
   psql(`drop database if exists ${BANCO}`, 'postgres')
   psql(`create database ${BANCO}`, 'postgres')
   try {
     psql(STUB)
     for (let vez = 0; vez < 2; vez++) for (const n of ANTIGAS) arquivo(migration(n))
     for (let vez = 0; vez < 2; vez++) for (const n of ['0016_cartas_estilos', '0017_expedicao']) arquivo(migration(n))
+    // (0018 depois da 0017, também duas vezes: rodar a 0017 de novo DEPOIS da 0018 estreitaria o catálogo)
+    for (let vez = 0; vez < 2; vez++) arquivo(migration('0018_expedicao_semanal'))
     psql(`insert into auth.users (id, raw_user_meta_data) values ('${A}', '{"full_name":"Ana"}'), ('${B}', '{"full_name":"Beto"}')`)
 
     // os números e o catálogo são os do navegador
@@ -120,9 +122,23 @@ test('0017 no Postgres (duas vezes): expedição, verso exclusivo e o baú do di
     assert.match(falha(exped(9, 'kingTenente')) ?? '', /chefão inválido/)
     assert.match(falha(exped(9, 'king', 4)) ?? '', /lutas inválidas/)
 
+    // (0018) a EXPEDIÇÃO SEMANAL: o chefe semanal vale na expedição (o verso dele e o baú do dia)
+    assert.match(jogar(10, { chefe: 'ladra' }, 'ladra'), /verso\.exp_cofre:true:false$/)
+    assert.equal(psql(conceder(`${dia}:ladra`)), 'true')
+    assert.match(falha(conceder(`${dia}:escuridao`)) ?? '', /expedição não completada/)
+    // o troféu da semana: só quem COMPLETOU a expedição semanal (B venceu, mas o relato dele não tem a expedição)
+    psql(registrar(11))
+    const semana = '2026-S47'
+    const lados = [0, 1].map((lado) => ({ lado, resultado: 'vitoria', personagem: 'kris', relato: { vitoria: true, semana, ...(lado === 0 && { expedicao: { chefe: 'ladra', lutas: 3, sorteada: false } }) } }))
+    psql(`select public.encerrar_partida('${partida(11)}', 'validada', null, 'normal', 900, 24, '${JSON.stringify(lados)}');`)
+    psql(xp(11))
+    assert.equal(psql(`select string_agg(usuario::text, ',') from public.conceder_trofeu_semanal('${partida(11)}', '${semana}', 'titulo.semanal_2026_47', 'titulo', 'Mão Leve S47/26')`), A)
+    assert.equal(psql(`select public.semanal_chefes()::text`), '{escuridao,ladra}')
+
     // o teto do dia: 85 + 85 + 15 + 70 + 0
     assert.equal(psql(`select sum(xp) from public.expedicoes where user_id = '${A}'`), String(XP_EXPEDICAO.tetoDia))
-    assert.equal(psql(`select count(*) from public.expedicoes where user_id = '${A}' and xp = 0`), '1')
+    // (a da Ladra, depois do teto, também saiu com 0 de XP)
+    assert.equal(psql(`select count(*) from public.expedicoes where user_id = '${A}' and xp = 0`), '2')
 
     // o navegador: lê só o que é seu e não chama nada do servidor
     assert.equal(psql(comoNavegador(`select count(*) from public.expedicoes`)), String(psql(`select count(*) from public.expedicoes where user_id = '${A}'`)))

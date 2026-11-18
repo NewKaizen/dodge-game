@@ -283,7 +283,8 @@ class CoopArenaN extends Phaser.Scene {
     // BOSS SEMANAL: a semana desta luta (a da sala, que o servidor fixou quando a partida começou; vai no
     // relato do resultado, conta/painelXp.js). Fora da sala do boss (ou outro chefe): null
     const semanal = this.rede ? salaSemanal() : null
-    this.registry.set('semanal', semanal && semanal.chefe === this.idChefe ? semanal.semana : null)
+    // (EXPEDIÇÃO SEMANAL: as 3 lutas são do boss da semana; o troféu sai no fim, ao completar: ExpedicaoFim)
+    this.registry.set('semanal', semanal && (semanal.chefe === this.idChefe || semanal.chefe === this.expedicao?.chefao) ? semanal.semana : null)
     // BOSS SEMANAL: a caixa no escuro com pistas de som (Escuridão) e a mão da Ladra em cima dela
     this.escuridao = this.defChefe.escuro ? ligarEscuridao(this, { quadro: this.quadro, meu: this.meu, jogadores: () => this.estado.jogadores }) : null
     this.ladra = this.defChefe.ladra ? ligarLadra(this, { chefe: CHEFE, jogadores: () => this.estado.jogadores, chefeEstado: () => this.estado.chefe, alvoDe: (j) => PERSONAGEM[j] }) : null

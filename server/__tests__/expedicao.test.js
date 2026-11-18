@@ -8,7 +8,7 @@ import { PROTOCOLO as PROTOCOLO_CLIENTE } from '../../src/lib/lan/rede.js'
 import { XP_EXPEDICAO, xpDaExpedicao, lerExpedicao, CHEFOES_EXPEDICAO, DURACAO_MINIMA_LUTA_S, chaveBauExpedicao } from '../../src/lib/expedicao.js'
 import { ITENS_EXPEDICAO, ITENS_BAU, POOL_BAU, FONTES_BAU, arteDoVerso, cosmeticoDaExpedicao } from '../../src/lib/cosmeticos.js'
 import { itemDoCatalogo } from '../../src/lib/progresso.js'
-import { CHEFOES } from '../../src/game/coop/expedicao.js'
+import { CHEFOES, SEMANAIS_EXPEDICAO } from '../../src/game/coop/expedicao.js'
 
 // EXPEDIÇÃO (0017): o XP a mais por luta vencida, o bônus de completar, a chance de baú (1 por dia por chefão) e
 // o verso exclusivo na 1ª vez contra cada chefão. A mesma validação do XP do CO-OP (os relatos concordam), por
@@ -88,7 +88,9 @@ test('relato: a expedição limpa (chefão conhecido, 0 a 3 lutas)', () => {
   assert.equal(lerRelato({ partidaId: 'x', vitoria: true, expedicao: { chefe: 'king', lutas: 9 } }, 'coop4').expedicao, undefined)
   assert.equal(lerRelato({ partidaId: 'x', vencedorLado: 0, expedicao: completa() }, 'pvp').expedicao, undefined, 'só CO-OP')
   assert.equal(lerExpedicao(null), null)
-  assert.deepEqual(CHEFOES_EXPEDICAO, CHEFOES)
+  // (0018) + os bosses semanais (sempre uma expedição)
+  assert.deepEqual(CHEFOES_EXPEDICAO, [...CHEFOES, ...SEMANAIS_EXPEDICAO])
+  assert.deepEqual(lerRelato({ partidaId: 'x', vitoria: true, expedicao: { chefe: 'ladra', lutas: 3 } }, 'coop').expedicao, { chefe: 'ladra', lutas: 3, sorteada: false })
 })
 
 test('expedicaoDaPartida: concordância, resultado coerente e duração mínima', () => {
@@ -244,11 +246,12 @@ test('3 e 4 jogadores (coop4): a mesma regra, para todas as contas', async () =>
   assert.equal(m.sb.tabelas.expedicoes.length, 3)
 })
 
-test('catálogo: os 4 versos exclusivos (JS = 0017), fora do baú, com desenho e a fonte de baú nova', () => {
-  const sql = readFileSync(new URL('../../supabase/migrations/0017_expedicao.sql', import.meta.url), 'utf8')
+test('catálogo: os versos exclusivos (JS = 0017 + 0018), fora do baú, com desenho e a fonte de baú nova', () => {
+  // (0018: + os versos dos bosses semanais)
+  const sql = ['0017_expedicao', '0018_expedicao_semanal'].map((n) => readFileSync(new URL(`../../supabase/migrations/${n}.sql`, import.meta.url), 'utf8')).join('\n')
   const doSql = [...sql.matchAll(/^\s*\('(verso\.exp_[a-z]+)', 'verso', '([^']+)', public\.nivel_exclusivo\(\), false, false, 'lendario', false, '([a-z]+)'\)/gm)].map((x) => `${x[1]}:${x[2]}:${x[3]}`).sort()
   assert.deepEqual(doSql, ITENS_EXPEDICAO.map((i) => `${i.id}:${i.nome}:${i.expedicao}`).sort())
-  for (const c of CHEFOES) {
+  for (const c of [...CHEFOES, ...SEMANAIS_EXPEDICAO]) {
     const item = cosmeticoDaExpedicao(c)
     assert.ok(item, c)
     assert.match(sql, new RegExp(`when '${c}' then '${item.id.replace('.', '\\.')}'`))

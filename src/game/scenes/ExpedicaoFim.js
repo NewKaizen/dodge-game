@@ -13,7 +13,7 @@ import { semLigaduras } from '../campanha/texto.js'
 import { chuvaConfete } from '../effects/festa.js'
 import { formatarTempo } from '../coop/nota.js'
 import { RELIQUIAS } from '../coop/reliquias.js'
-import { NOME_ETAPA, ETAPAS, criarExpedicao, expedicaoValida, relatoDaExpedicao, CHEFOES } from '../coop/expedicao.js'
+import { NOME_ETAPA, ETAPAS, criarExpedicao, expedicaoValida, relatoDaExpedicao, CHEFOES, ehExpedicaoSemanal } from '../coop/expedicao.js'
 import { desenharMapaExpedicao } from '../coop/expedicaoCena.js'
 import { itemDaExpedicao, cosmeticoDaExpedicao } from '../../lib/cosmeticos.js'
 import { previaDe } from '../cosmeticosSlots.js'
@@ -109,7 +109,7 @@ export default class ExpedicaoFim extends Phaser.Scene {
       }
       this.mostrarRecompensaExp()
     } else {
-      t(RX, 342, ['Recompensas só na expedição ONLINE (com conta):', `+${XP_EXPEDICAO.porLuta} XP por luta vencida, +${XP_EXPEDICAO.completa} ao completar,`, `chance de baú e, na 1ª vez, o verso ${item?.nome ?? 'exclusivo do chefão'}.`].join('\n'), 11, TEXTO.normal, { lineSpacing: 4, strokeThickness: 3 })
+      t(RX, 342, ['Recompensas só na expedição ONLINE (com conta):', `+${XP_EXPEDICAO.porLuta} XP por luta vencida, +${XP_EXPEDICAO.completa} ao completar,`, `chance de baú e, na 1ª vez, o verso ${item?.nome ?? 'exclusivo do chefão'}.`, ...(ehExpedicaoSemanal(exp) ? ['Boss semanal: completar dá o TROFÉU da semana (online).'] : [])].join('\n'), 11, TEXTO.normal, { lineSpacing: 4, strokeThickness: 3 })
     }
 
     t(LARGURA / 2, ALTURA - 22, this.naSala ? 'A: voltar ao lobby' : 'A: revanche (expedição nova)     B: menu', 13, TEXTO.desabilitado, { strokeThickness: 2 })
@@ -153,7 +153,7 @@ export default class ExpedicaoFim extends Phaser.Scene {
     this.cameras.main.fadeOut(250, 0, 0, 0)
     if (botao === 'A') {
       const e = this.exp
-      const nova = criarExpedicao({ chefe: e.sorteada ? 'sorteada' : CHEFOES.includes(e.escolhido) ? e.escolhido : e.chefao, nivel: e.nivel, party: e.party, semente: `exp:${Date.now()}` })
+      const nova = criarExpedicao({ chefe: e.sorteada ? 'sorteada' : CHEFOES.includes(e.escolhido) ? e.escolhido : e.chefao, nivel: e.nivel, party: e.party, semente: `exp:${Date.now()}`, semana: e.semana ?? null })
       return this.time.delayedCall(260, () => this.scene.start('Expedicao', { expedicao: nova }))
     }
     this.time.delayedCall(260, () => this.scene.start('Menu'))

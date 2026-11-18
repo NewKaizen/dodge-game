@@ -9,11 +9,15 @@ import { CORES, DIFICULDADES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants
 import { claraoCamera } from '../effects/flash.js'
 import { SORTEADA } from '../coop/expedicao.js'
 import { semLigaduras } from '../campanha/texto.js'
+import { infoSemanal, nomeDaSemana } from '../../lib/semanal.js'
+import { semanalAtual } from '../../lib/lan/rede.js'
 import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
 
 const CARTA = { largura: 176, altura: 270, y: 245, passo: 200 } // 4 cartas largas: usam o 16:9 inteiro
 // EXPEDIÇÃO: 5 cartas (os 4 chefões e a SORTEADA), um pouco mais estreitas
 const CARTA_EXP = { largura: 150, altura: 270, y: 250, passo: 162 }
+// (com o BOSS SEMANAL da semana: 6 cartas, mais estreitas ainda)
+const CARTA_EXP6 = { largura: 136, altura: 270, y: 250, passo: 148 }
 const CURSOR_MS = 300 // em rede: de quanto em quanto o host manda o cursor de novo
 
 // A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
@@ -35,6 +39,13 @@ const estadoInicial = () => ({
 // tempos) e o A dele também ('confirmou'), para o convidado ver a mesma
 // confirmação; o host leva os dois para a Dificuldade (irParaCena). O B do
 // host volta os dois para a EscolhaParty; o do convidado só lembra quem escolhe.
+// o boss semanal que a Selecao da expedição mostra: { chefe, semana } (o da sala online; fora dela, o do relógio)
+function semanalDaSelecao() {
+  const online = semanalAtual()
+  const s = online && CHEFES[online.chefe]?.semanal ? online : infoSemanal(Date.now())
+  return CHEFES[s?.chefe]?.semanal ? { chefe: s.chefe, semana: s.semana } : null
+}
+
 export default class Selecao extends Phaser.Scene {
   constructor() {
     super('Selecao')
@@ -46,8 +57,11 @@ export default class Selecao extends Phaser.Scene {
     this.chefeInicial = dados?.chefe ?? null
     // EXPEDIÇÃO (ModoCoop): os 4 chefões e a SORTEADA (lacaios de um, tenente de outro, chefão surpresa)
     this.modo = dados?.modo === 'expedicao' ? 'expedicao' : 'rapida'
-    this.ordem = this.modo === 'expedicao' ? [...ORDEM_CHEFES, SORTEADA] : ORDEM_CHEFES
-    this.carta = this.modo === 'expedicao' ? CARTA_EXP : CARTA
+    // + o BOSS SEMANAL da semana (docs/boss-semanal.md: ele é sempre uma expedição; o da sala online, ou o do relógio
+    // daqui contra a CPU, sem troféu). Fica entre os chefões e a SORTEADA (que nunca sorteia um semanal)
+    this.semanal = this.modo === 'expedicao' ? semanalDaSelecao() : null
+    this.ordem = this.modo === 'expedicao' ? [...ORDEM_CHEFES, ...(this.semanal ? [this.semanal.chefe] : []), SORTEADA] : ORDEM_CHEFES
+    this.carta = this.modo !== 'expedicao' ? CARTA : this.semanal ? CARTA_EXP6 : CARTA_EXP
   }
 
   create() {
@@ -81,6 +95,11 @@ export default class Selecao extends Phaser.Scene {
       }
       const def = CHEFES[id]
       const dif = DIFICULDADES[def.dificuldade]
+      if (def.semanal) {
+        // o boss semanal: a faixa laranja em cima e a semana embaixo
+        this.add.rectangle(x, y - CARTA_.altura / 2 + 12, CARTA_.largura - 10, 18, 0xff9a3d, 0.9)
+        texto(x, y - CARTA_.altura / 2 + 12, semLigaduras(`SEMANAL ${nomeDaSemana(this.semanal.semana)}`), 11, '#1a0a00')
+      }
       const sprite = this.add.image(x, y - 40, def.sprite).setScale(escalaDe(def.sprite, ESCALA.chefe * 0.8))
       texto(x, y + 62, def.nome.toUpperCase(), def.nome.length > 11 ? 14 : 18, TEXTO.normal)
       texto(x, y + 86, dif.rotulo, 16, dif.cor)

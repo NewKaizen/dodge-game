@@ -24,7 +24,8 @@ import { xpDaCorrida } from '../../src/game/campanha/recompensas.js'
 import { mundoDe, ITENS_CAMPANHA } from '../../src/game/campanha/mundos/index.js'
 import { XP_DESAFIO, DIAS_COSMETICO_SEMANA, MAX_AMIGOS_RECORDE, numeroDoDia, semanaDoDia, VERSAO_DESAFIO, diaDoDesafio } from '../../src/lib/desafio.js'
 import { ITENS_BAU, FONTES_BAU, CONQUISTAS_COM_BAU, BAU_XP_TETO_DIA, rolarBau, sorteioValido, cosmeticoDaExpedicao } from '../../src/lib/cosmeticos.js'
-import { CHEFOES_EXPEDICAO, DURACAO_MINIMA_LUTA_S, XP_EXPEDICAO, xpDaExpedicao } from '../../src/lib/expedicao.js'
+import { CHEFOES_EXPEDICAO, DURACAO_MINIMA_LUTA_S, XP_EXPEDICAO, xpDaExpedicao, RE_REF_BAU_EXPEDICAO, completouExpedicaoDe } from '../../src/lib/expedicao.js'
+import { SEMANAIS as SEMANAIS_INFO } from '../../src/lib/semanal.js'
 import { pontosDeMaestria, nivelDaMaestria, MAESTRIA_TETO_DIA, PERSONAGENS_MAESTRIA, IDS_CONQUISTAS, ITENS_MAESTRIA } from '../../src/lib/conquistas.js'
 
 const erro = (message) => ({ message })
@@ -127,7 +128,7 @@ function rpcs(sb) {
       Object.assign(p, { estado: p_validacao, validacao: p_validacao, vencedor_lado: p_vencedor_lado, motivo_termino: p_motivo, duracao_s: p_duracao_s, rodadas: p_rodadas, encerrada_em: agora().toISOString() })
       return p_validacao
     },
-    // BOSS SEMANAL (0010): o espelho de conceder_trofeu_semanal
+    // BOSS SEMANAL (0010, 0018): o espelho de conceder_trofeu_semanal (0018: só quem completou a expedição semanal)
     conceder_trofeu_semanal({ p_partida, p_semana, p_item, p_tipo, p_nome }) {
       if (!/^[0-9]{4}-S[0-9]{2}$/.test(p_semana ?? '')) throw new Error('semana inválida')
       if (!['titulo', 'moldura', 'verso'].includes(p_tipo) || p_item !== `${p_tipo}.semanal_${p_semana.replace('-S', '_')}`) throw new Error('troféu inválido')
@@ -138,7 +139,9 @@ function rpcs(sb) {
       else if (p.semana !== p_semana) return []
       if (!t.catalogo_itens.some((c) => c.id === p_item)) t.catalogo_itens.push({ id: p_item, tipo: p_tipo, nome: String(p_nome || p_item).slice(0, 32), nivel_requerido: 1000, padrao: false, exclusivo: true, semana: p_semana })
       const linhas = []
-      for (const pp of t.partida_participantes.filter((x) => x.partida_id === p_partida && x.user_id && x.resultado === 'vitoria' && x.relato?.semana === p_semana).sort((a, b) => (a.user_id < b.user_id ? -1 : 1))) {
+      // (0018) a EXPEDIÇÃO SEMANAL: o relato completou a expedição de um boss semanal (as 3 lutas)
+      const semanal = (pp) => Object.keys(SEMANAIS_INFO).some((chefe) => completouExpedicaoDe(pp.relato, chefe))
+      for (const pp of t.partida_participantes.filter((x) => x.partida_id === p_partida && x.user_id && x.resultado === 'vitoria' && x.relato?.semana === p_semana && semanal(x)).sort((a, b) => (a.user_id < b.user_id ? -1 : 1))) {
         const novo = !t.trofeus_semanais.some((x) => x.user_id === pp.user_id && x.semana === p_semana)
         if (novo) t.trofeus_semanais.push({ user_id: pp.user_id, semana: p_semana, item_id: p_item, partida_id: p_partida })
         if (!t.inventario.some((i) => i.user_id === pp.user_id && i.item_id === p_item)) t.inventario.push({ user_id: pp.user_id, item_id: p_item, obtido_em: agora().toISOString() })
@@ -437,7 +440,8 @@ function rpcs(sb) {
       } else if (p_fonte === 'expedicao') {
         // (0017) a conta completou a expedição daquele chefão naquele dia
         const [dia, chefe] = ref.split(':')
-        if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}:(king|queen|jevil|coronel)$/.test(ref) || !t.expedicoes.some((e) => e.user_id === p_user && e.completa && e.dia === dia && e.chefe === chefe)) throw new Error('expedição não completada')
+        // (0018) + os bosses semanais
+        if (!RE_REF_BAU_EXPEDICAO.test(ref) || !t.expedicoes.some((e) => e.user_id === p_user && e.completa && e.dia === dia && e.chefe === chefe)) throw new Error('expedição não completada')
       } else if (!CONQUISTAS_COM_BAU.includes(ref) || !t.conquistas.some((c) => c.user_id === p_user && c.conquista === ref)) throw new Error('conquista sem baú')
       const chave = FONTES_BAU[p_fonte].chave(ref)
       const novo = !t.baus.some((b) => b.user_id === p_user && b.chave === chave)

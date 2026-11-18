@@ -1048,6 +1048,9 @@ export const VERSOS_EXPEDICAO = [
   { id: 'verso-exp-sinal', nome: 'Sinal Cheio', raridade: 'lendario' },
   { id: 'verso-exp-dado', nome: 'Dado do Caos', raridade: 'lendario' },
   { id: 'verso-exp-reciclador', nome: 'Reciclador', raridade: 'lendario' },
+  // (0018) os bosses semanais: a 1ª expedição semanal completa contra cada um
+  { id: 'verso-exp-breu', nome: 'Breu Absoluto', raridade: 'lendario' },
+  { id: 'verso-exp-cofre', nome: 'Cofre Arrombado', raridade: 'lendario' },
 ]
 
 const ARTES_EXPEDICAO = {
@@ -1232,6 +1235,99 @@ const ARTES_EXPEDICAO = {
         c.rotate(rnd() * 3)
         c.fillRect(-1.6, -2.4, 3.2, 4.8)
         c.restore()
+      }
+    },
+  },
+  // (0018) Escuridão: o breu com o OLHO enorme no meio, os olhinhos em volta e uma vela que acabou de apagar
+  'verso-exp-breu': {
+    aro: '#8a7cff',
+    pintar(c) {
+      fundo(c, vertical(c, -50, 50, [[0, '#05030c'], [1, '#1c1538']]))
+      // a névoa roxa subindo
+      const rnd = semente(4711)
+      for (let i = 0; i < 26; i++) {
+        c.fillStyle = `rgba(138,124,255,${0.05 + rnd() * 0.1})`
+        circulo(c, -32 + rnd() * 64, -48 + rnd() * 96, 2 + rnd() * 6)
+      }
+      // os olhinhos espalhados (uns fechados)
+      for (const [x, y, aberto] of [[-22, -34, 1], [20, -30, 0], [-24, 18, 0], [22, 22, 1], [-8, 38, 1], [12, -42, 1]]) {
+        if (!aberto) {
+          c.fillStyle = '#6a58d0'
+          c.fillRect(x - 3, y, 6, 1)
+          continue
+        }
+        c.fillStyle = '#d8d0ff'
+        elipse(c, x, y, 3.4, 2)
+        c.fillStyle = '#d02a4a'
+        circulo(c, x, y, 1.2)
+      }
+      // o OLHO grande: o halo, o branco, a íris e a pupila de fenda
+      c.fillStyle = radial(c, 0, -2, 30, [[0, 'rgba(138,124,255,0.5)'], [1, 'rgba(138,124,255,0)']])
+      circulo(c, 0, -2, 30)
+      c.fillStyle = '#e8e0ff'
+      elipse(c, 0, -2, 20, 11)
+      c.fillStyle = radial(c, 0, -2, 9, [[0, '#ff6a8a'], [0.6, '#d02a4a'], [1, '#6a0a1c']])
+      circulo(c, 0, -2, 9)
+      c.fillStyle = '#05030c'
+      elipse(c, 0, -2, 1.8, 8)
+      c.fillStyle = 'rgba(255,255,255,0.85)'
+      circulo(c, -4, -6, 1.8)
+      // a vela apagada embaixo, com o fio de fumaça
+      c.fillStyle = '#e8e0d0'
+      c.fillRect(-3, 26, 6, 12)
+      c.fillStyle = '#8a7cff'
+      c.fillRect(-5, 37, 10, 2)
+      c.strokeStyle = 'rgba(200,190,230,0.6)'
+      c.lineWidth = 0.8
+      c.beginPath()
+      c.moveTo(0, 26)
+      c.quadraticCurveTo(4, 20, -1, 15)
+      c.quadraticCurveTo(-5, 11, 1, 8)
+      c.stroke()
+    },
+  },
+  // (0018) Ladra de Cartas: o cofre arrombado, as cartas voando para fora e as moedas
+  'verso-exp-cofre': {
+    aro: '#ff9a3d',
+    pintar(c) {
+      fundo(c, vertical(c, -50, 50, [[0, '#2a0e06'], [1, '#5a2410']]))
+      c.fillStyle = radial(c, 0, 4, 34, [[0, 'rgba(255,200,90,0.45)'], [1, 'rgba(255,200,90,0)']])
+      circulo(c, 0, 4, 34)
+      // o cofre (de frente), a porta aberta para o lado e o segredo
+      c.fillStyle = '#3a3e4a'
+      cartao(c, -18, -4, 36, 34, 3)
+      c.fill()
+      c.fillStyle = '#14100a'
+      cartao(c, -14, 0, 28, 26, 2)
+      c.fill()
+      c.fillStyle = '#646e82'
+      poli(c, '#646e82', [[14, -4], [28, -10], [28, 34], [14, 30]])
+      c.fillStyle = '#c8ccd8'
+      circulo(c, 21, 12, 4)
+      c.fillStyle = '#3a3e4a'
+      circulo(c, 21, 12, 1.6)
+      // as cartas saindo do cofre, em leque
+      const naipes = ['espadas', 'copas', 'ouros', 'paus']
+      naipes.forEach((n, k) => {
+        c.save()
+        c.translate(-10 + k * 7, -14 - (k % 2) * 8)
+        c.rotate(-0.5 + k * 0.33)
+        c.fillStyle = '#fbf6ea'
+        cartao(c, -5, -7, 10, 14, 1.5)
+        c.fill()
+        c.fillStyle = n === 'copas' || n === 'ouros' ? '#c8283a' : '#1a1a2e'
+        naipeCanvas(c, n, 0, 0, 3.4)
+        c.fill()
+        c.restore()
+      })
+      // as moedas
+      for (const [x, y] of [[-24, 36], [-14, 40], [16, 40], [26, 34], [-26, -36], [24, -38]]) {
+        c.fillStyle = '#b07a14'
+        circulo(c, x, y, 3.4)
+        c.fillStyle = '#f2c235'
+        circulo(c, x - 0.4, y - 0.4, 2.6)
+        c.fillStyle = 'rgba(255,255,255,0.8)'
+        circulo(c, x - 1.2, y - 1.2, 0.7)
       }
     },
   },
