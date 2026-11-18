@@ -41,6 +41,8 @@ const resultado = await page.evaluate(
     const { CARTAS_CHEFES, ataqueDaCartaChefe, danoDaCartaChefe, ritmoDaCartaChefe, inverteControles } = await import('/src/game/coop/cartasChefe.js')
     const { DESAFIO, DIFICULDADES } = await import('/src/game/constants.js')
     const { ataques } = await import('/src/game/attacks/index.js')
+    // (a CPU do jogo segue o vão do ALARME da Ladra pela regra dela; aqui o bot recebe o mesmo alvo)
+    const { alvoDoAlarme } = await import('/src/game/attacks/ladraAlarme.js')
     // os avisos de área (a.aviso / a.zonaPerigo) o bot já enxerga sozinho, pelas
     // zonas de perigo da pista (pista.balas.zonas), como a CPU do jogo
     const VE_MOVIMENTO = true
@@ -166,6 +168,7 @@ const resultado = await page.evaluate(
             fatorVelocidade: pista.balas.fatorVelocidade,
             velocidadeMax: pista.balas.velocidadeMax,
             invertido: inv,
+            alvo: alvoDoAlarme(cena, c),
           })
           return inv ? { x: -joy.x, y: -joy.y } : joy
         })
