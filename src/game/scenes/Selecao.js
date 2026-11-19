@@ -17,8 +17,9 @@ import VotacaoCena from '../coop/votacaoCena.js'
 const CARTA = { largura: 176, altura: 270, y: 245, passo: 200 } // 4 cartas largas: usam o 16:9 inteiro
 // EXPEDIÇÃO: 5 cartas (os 4 chefões e a SORTEADA), um pouco mais estreitas
 const CARTA_EXP = { largura: 150, altura: 270, y: 250, passo: 162 }
-// (com o BOSS SEMANAL da semana: 6 cartas, mais estreitas ainda)
-const CARTA_EXP6 = { largura: 136, altura: 270, y: 250, passo: 148 }
+// (com o BOSS SEMANAL da semana: 6 cartas, mais estreitas ainda; 5 passos + 1 carta = 794 de 854,
+// sobrando 30 de cada lado — com 136/148 passava de 854 e as cartas das pontas saíam cortadas)
+const CARTA_EXP6 = { largura: 124, altura: 270, y: 250, passo: 134 }
 
 // A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
 // deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do init().
@@ -86,6 +87,7 @@ export default class Selecao extends Phaser.Scene {
     if (exp) texto(LARGURA / 2, 66, semLigaduras('lacaios  >  tenente  >  chefão'), 14, TEXTO.desabilitado, { stroke: '#000000', strokeThickness: 3 })
     const CARTA_ = this.carta
 
+    const estreita = CARTA_.largura < 136 // as 6 cartas: sprite e textos um pouco menores para caber
     this.cartas = this.ordem.map((id, i) => {
       const x = LARGURA / 2 + (i - (this.ordem.length - 1) / 2) * CARTA_.passo
       const y = CARTA_.y
@@ -94,7 +96,7 @@ export default class Selecao extends Phaser.Scene {
         // a SORTEADA: um "?" grande e as três etapas embaralhadas
         const sprite = texto(x, y - 40, '?', 96, '#ffc070', { stroke: '#000000', strokeThickness: 6 })
         texto(x, y + 62, 'SORTEADA', 18, '#ffc070')
-        texto(x, y + 92, semLigaduras('lacaios de um,\ntenente de outro,\nchefão surpresa'), 11, TEXTO.normal, { align: 'center', lineSpacing: 2 })
+        texto(x, y + 92, semLigaduras('lacaios de um,\ntenente de outro,\nchefão surpresa'), estreita ? 10 : 11, TEXTO.normal, { align: 'center', lineSpacing: 2 })
         return { moldura, sprite, x, y, mistura: true }
       }
       const def = CHEFES[id]
@@ -104,8 +106,8 @@ export default class Selecao extends Phaser.Scene {
         this.add.rectangle(x, y - CARTA_.altura / 2 + 12, CARTA_.largura - 10, 18, 0xff9a3d, 0.9)
         texto(x, y - CARTA_.altura / 2 + 12, semLigaduras(`SEMANAL ${nomeDaSemana(this.semanal.semana)}`), 11, '#1a0a00')
       }
-      const sprite = this.add.image(x, y - 40, def.sprite).setScale(escalaDe(def.sprite, ESCALA.chefe * 0.8))
-      texto(x, y + 62, def.nome.toUpperCase(), def.nome.length > 11 ? 14 : 18, TEXTO.normal)
+      const sprite = this.add.image(x, y - 40, def.sprite).setScale(escalaDe(def.sprite, ESCALA.chefe * 0.8 * (estreita ? 0.88 : 1)))
+      texto(x, y + 62, def.nome.toUpperCase(), def.nome.length > 11 ? (estreita ? 12 : 14) : estreita ? 16 : 18, TEXTO.normal)
       texto(x, y + 86, dif.rotulo, 16, dif.cor)
       const maxEstrelas = Math.max(...Object.values(DIFICULDADES).map((d) => d.estrelas))
       for (let k = 0; k < maxEstrelas; k++) {
