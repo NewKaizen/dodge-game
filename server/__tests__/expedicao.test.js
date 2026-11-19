@@ -77,8 +77,8 @@ async function novaPartida(host) {
 const relatar = (p, partidaId, vitoria, expedicao) => p.mandar({ t: 'resultado', partidaId, vitoria, rodadas: 24, duracao: 600, personagem: 'kris', ...(expedicao && { expedicao }) })
 const completa = (chefe = 'king') => ({ chefe, lutas: 3, sorteada: false })
 
-test('protocolo 22 nos dois lados (a expedição no relato e na recompensa)', () => {
-  assert.equal(PROTOCOLO, 22)
+test('protocolo 23 nos dois lados (a votação do CO-OP; a expedição no relato e na recompensa desde o 22)', () => {
+  assert.equal(PROTOCOLO, 23)
   assert.equal(PROTOCOLO_CLIENTE, PROTOCOLO)
 })
 

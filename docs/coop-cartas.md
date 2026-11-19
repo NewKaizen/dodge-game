@@ -118,6 +118,17 @@ relíquias acumulando e as curas), `server/__tests__/expedicao.test.js` (relato,
 chefão, verso uma vez, idempotência, 3–4 jogadores, catálogo JS = 0017) e `expedicaoSql.test.js` (Postgres, com
 `DODGE_PG`). No navegador (dev): `window.expedicao.estadoDebug()` na tela entre as lutas e `window.expedicaoFim`.
 
+## Votação do CO-OP
+
+No CO-OP **online de 2 a 4**, ninguém escolhe sozinho (nem o host): o **modo** (LUTA RÁPIDA x EXPEDIÇÃO, `ModoCoop`), o **chefe** (`Selecao`: os 4 chefões, mais o BOSS SEMANAL da semana e a SORTEADA na Expedição; todos são só opções do voto) e o **nível** (`Dificuldade`) são votados. Antes, nas três telas, só o host movia o cursor e confirmava.
+
+- **Como se vota**: cada PC move o próprio coração (←/→, ↑/↓) e vota com A; dá para trocar o voto até o relógio de **20 s** (`VOTO_MS`) acabar. Os votos aparecem em todos os PCs como a forma + cor de cada vaga embaixo da opção (o meu com um anel branco) e "X/Y votaram" no canto; a barra do tempo fica no topo e os 3 últimos segundos têm contagem grande. A linha da tela diz: "Votem no chefão — o mais votado ganha; empate: sorteio".
+- **Apuração**: acaba quando todos os presentes votaram ou o tempo acaba (quem não votou se abstém). O mais votado vence; **empate, ou ninguém votar, é um sorteio entre as empatadas** com uma **roleta** curta (acende as opções em círculo e para na vencedora; com "reduzir animações" só o destaque). O rng é o da semente da sala (`semente` vai nos dados das cenas + a tela, `sementeDaVotacao`); o host sorteia uma vez e manda o resultado pronto, então todos veem o mesmo.
+- **Autoridade**: o host da partida (como na `PartyVoto` e na escolha de melhoria da Expedição). `coopVoto` (conv. → host), `coopVotos` e `coopResultado` (host → todos), PROTOCOLO 23 (tabela em [rede-pvp.md](rede-pvp.md)). Quem cai da sala perde o voto (`sair`) e não segura a apuração; o host confere a cada 250 ms (relógio de fundo, vale com a aba escondida).
+- **Onde vale**: sala de 2 (`CoopArena`) e de 3 e 4 (`CoopArenaN`), a party (o chefe já é votado na `PartyVoto`; o nível passou a ser votado em vez de o host confirmar em 3 s) e a sala do BOSS SEMANAL (chefe fixo da sala; nível votado). B (só o host, antes da apuração) volta uma tela.
+- **Fora da rede não muda**: 1 jogador (a CPU aliada não vota) ou 2 no mesmo PC escolhem como sempre.
+- **Código**: `coop/votacao.js` (regras puras: `novaVotacao`, `votar`, `sair`, `placar`, `apurarVotacao`, `passosDaRoleta`; reaproveita `party/regras.js`), `coop/votacaoCena.js` (a classe `VotacaoCena` por cima das cenas: marcadores, tempo, canal, roleta). Testes: `coop/__tests__/votacao.test.js` (contagem, empate determinístico pela semente, tempo, queda). No dev: `window.coopVoto` (`votar(id)`, `estadoDebug()`), `window.coopVotoMs` e `window.coopRoletaLenta`.
+
 ## CO-OP 2.0
 
 Pedido do dono: "o PvP tá muito legal, mas o CO-OP não chama nem um pouquinho a atenção" e "deixe de um jeito

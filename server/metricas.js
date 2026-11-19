@@ -33,8 +33,17 @@ export const CONTADORES = [
   'avatar_envios_ok',
   'avatar_envios_falha',
   'avatar_bloqueios_ip', // /api/avatar recusado pelo limite por endereço
+  // BOTS DO JOGAR RÁPIDO (server/bots/): à parte das de gente, só para o dono do servidor
+  'bots_fila_pares', // pares jogador x bot formados (não entram em fila_pares)
+  'bots_fila_desfeitos', // ...que não fecharam (não entram em fila_pares_desfeitos)
+  'bots_partidas_iniciadas', // partidas com bot que começaram (também contam em partidas_iniciadas)
+  'bots_partidas', // partidas com bot que chegaram ao fim (o relato do bot)
+  'bots_vitorias_jogador',
+  'bots_derrotas_jogador',
+  'bots_empates',
+  'bots_suspeitas', // o host mandou um estado que o bot não aceitou (HP do bot forjado)
 ]
-export const AMOSTRAS = ['fila_espera_ms']
+export const AMOSTRAS = ['fila_espera_ms', 'bots_espera_ms']
 export const MAX_AMOSTRAS = 2000 // por janela (as mais antigas saem)
 export const INTERVALO_PADRAO_MS = 15 * 60_000
 

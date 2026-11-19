@@ -11,6 +11,7 @@
 //   sb.rpc('registrar_partida' | 'encerrar_partida' | 'conceder_recompensa', args)
 //     (0015) também conceder_bau, abrir_bau, baus_estado e equipar_conta (o espelho em src/lib/cosmeticos.js)
 //     (0017) conceder_expedicao e a fonte 'expedicao' do conceder_bau (o espelho em src/lib/expedicao.js)
+//     (0019) criar_bot, bots_listar, bot_perfil e bot_atividade (os bots do JOGAR RÁPIDO; a tabela t.bots)
 //     (Fase 1D) a mesma regra das funções de 0003_progresso.sql, em JS (com o
 //     espelho src/lib/progresso.js); sb.diaDe(t) diz o "dia" do limite de repetição
 //
@@ -496,6 +497,69 @@ function rpcs(sb) {
       const lista = t.baus.filter((b) => b.user_id === p_user && b.aberto_em == null).sort((x, y) => x.criado_em - y.criado_em || x.ordem - y.ordem)
       return { fechados: lista.length, abertos: c?.abertos ?? 0, desde_epico: c?.desde_epico ?? 0, lista: lista.slice(0, 20).map((b) => ({ id: b.id, fonte: b.fonte, chave: b.chave, em: new Date(b.criado_em).toISOString() })) }
     },
+    // BOTS DO JOGAR RÁPIDO (0019): os espelhos de criar_bot, bots_listar, bot_perfil e bot_atividade. A conta
+    // do bot é um perfil como qualquer outro (a tag nasce do apelido, como a criar_perfil da 0001); a marca
+    // "é bot" mora só em t.bots (no banco de verdade, sem policy nenhuma: o navegador não lê)
+    criar_bot({ p_spec = {} }) {
+      const nome = String(p_spec.nome ?? '').trim().replace(/\s+/g, ' ')
+      if (!/^[A-Za-z0-9 _.-]{3,16}$/.test(nome)) throw new Error('nome de bot inválido')
+      if (!['iniciante', 'casual', 'medio', 'bom', 'muito_bom'].includes(p_spec.faixa)) throw new Error('faixa inválida')
+      const id = crypto.randomUUID()
+      const xp = Math.min(200000, Math.max(0, Math.floor(Number(p_spec.xp) || 0)))
+      const nivel = nivelDoXp(xp)
+      const partidas = Math.min(100000, Math.max(0, Math.floor(Number(p_spec.partidas) || 0)))
+      const vitorias = Math.min(partidas, Math.max(0, Math.floor(Number(p_spec.vitorias) || 0)))
+      const dias = Math.min(3650, Math.max(0, Math.floor(Number(p_spec.dias_de_conta ?? 30))))
+      const criado = new Date(sb.agora() - dias * 86_400_000 - Math.floor(Math.random() * 86_400_000)).toISOString()
+      let base = nome.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12)
+      if (base.length < 3) base = 'jogador'
+      let tag
+      do tag = `${base}#${String(Math.floor(Math.random() * 10000)).padStart(4, '0')}`
+      while (t.perfis.some((p) => p.tag === tag))
+      const tipo = p_spec.avatar_tipo === 'jogo' ? 'jogo' : 'padrao'
+      const perfil = { id, tag, nome_exibicao: nome, avatar_tipo: tipo, avatar_id: tipo === 'jogo' ? (p_spec.avatar_id ?? null) : null, avatar_url: null, titulo_equipado: null, moldura_equipada: null, verso_equipado: null, som_equipado: null, efeito_equipado: null, lancamento_equipado: null, frente_equipada: null, nivel, xp, criado_em: criado, atualizado_em: criado }
+      t.perfis.push(perfil)
+      for (const i of itensAte(nivel)) t.inventario.push({ user_id: id, item_id: i.id, obtido_em: criado })
+      for (const item_id of p_spec.itens ?? []) if (ITENS_BAU.some((i) => i.id === item_id) && !t.inventario.some((x) => x.user_id === id && x.item_id === item_id)) t.inventario.push({ user_id: id, item_id, obtido_em: criado })
+      for (const [tipoItem, item] of Object.entries(p_spec.equipar ?? {})) {
+        try {
+          sb.funcoes.equipar_conta({ p_uid: id, p_tipo: tipoItem, p_item: item })
+        } catch {
+          // item que não serve: fica o padrão
+        }
+      }
+      const favoritos = (p_spec.favoritos ?? []).filter((f) => /^[a-z0-9_]{1,16}$/.test(f)).slice(0, 4)
+      t.estatisticas_basicas.push({ usuario_id: id, partidas, vitorias, personagem_favorito: p_spec.favorito ?? favoritos[0] ?? null })
+      t.bots.push({ user_id: id, faixa: p_spec.faixa, q: Math.min(1, Math.max(0, Number(p_spec.q) || 0.5)), favoritos, atividade: Math.min(48, Math.max(0, Number(p_spec.atividade) || 4)), ativo: true, criado_em: new Date(sb.agora()).toISOString(), atividade_em: new Date(sb.agora()).toISOString() })
+      return id
+    },
+    bots_listar() {
+      return t.bots.filter((b) => b.ativo).map((b) => ({ bot: { ...b }, perfil: { ...t.perfis.find((p) => p.id === b.user_id) } })).filter((x) => x.perfil.id)
+    },
+    bot_perfil({ p_user }) {
+      if (!t.bots.some((b) => b.user_id === p_user)) return null
+      const p = t.perfis.find((x) => x.id === p_user)
+      return p ? { ...p } : null
+    },
+    bot_atividade({ p_user, p_partidas, p_vitorias, p_xp }) {
+      const bot = t.bots.find((b) => b.user_id === p_user)
+      if (!bot) throw new Error('não é um bot')
+      const perfil = t.perfis.find((x) => x.id === p_user)
+      if (!perfil) throw new Error('perfil não encontrado')
+      const partidas = Math.min(20, Math.max(0, Math.floor(Number(p_partidas) || 0)))
+      const vitorias = Math.min(partidas, Math.max(0, Math.floor(Number(p_vitorias) || 0)))
+      const xp = Math.min(partidas * 60, Math.max(0, Math.floor(Number(p_xp) || 0)))
+      perfil.xp = (perfil.xp ?? 0) + xp
+      perfil.nivel = nivelDoXp(perfil.xp)
+      const tem = new Set(t.inventario.filter((i) => i.user_id === p_user).map((i) => i.item_id))
+      for (const i of itensAte(perfil.nivel)) if (!tem.has(i.id)) t.inventario.push({ user_id: p_user, item_id: i.id, obtido_em: agora().toISOString() })
+      let est = t.estatisticas_basicas.find((e) => e.usuario_id === p_user)
+      if (!est) t.estatisticas_basicas.push((est = { usuario_id: p_user, partidas: 0, vitorias: 0, personagem_favorito: null }))
+      est.partidas += partidas
+      est.vitorias += vitorias
+      bot.atividade_em = agora().toISOString()
+      return { xp_total: perfil.xp, nivel: perfil.nivel, partidas, vitorias }
+    },
     conceder_recompensa({ p_partida }) {
       sb.concederChamadas++
       const p = t.partidas.find((x) => x.id === p_partida)
@@ -562,7 +626,7 @@ function rpcs(sb) {
 
 export function criarSupabaseFalso({ usuarios = {}, perfis = [], url = 'https://falso.supabase.co', agora = Date.now } = {}) {
   const sb = {
-    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [], denuncias: [], catalogo_itens: [], trofeus_semanais: [], campanha_progresso: [], campanha_escolhas: [], campanha_corridas: [], desafio_corridas: [], desafio_recordes: [], desafio_concluidos: [], desafio_semanas: [], conta_eventos: [], maestria: [], conquistas: [], baus: [], baus_contas: [], expedicoes: [], expedicoes_chefes: [] },
+    tabelas: { perfis: perfis.map((p) => ({ ...p })), amizades: [], bloqueios: [], pedidos_amizade: [], partidas: [], partida_participantes: [], concessoes: [], inventario: [], estatisticas_basicas: [], denuncias: [], catalogo_itens: [], trofeus_semanais: [], campanha_progresso: [], campanha_escolhas: [], campanha_corridas: [], desafio_corridas: [], desafio_recordes: [], desafio_concluidos: [], desafio_semanas: [], conta_eventos: [], maestria: [], conquistas: [], baus: [], baus_contas: [], expedicoes: [], expedicoes_chefes: [], bots: [] },
     agora,
     diaDe: (ms) => Math.floor((ms - 3 * 3600_000) / 86_400_000), // dia em São Paulo (UTC−3)
     concederChamadas: 0,

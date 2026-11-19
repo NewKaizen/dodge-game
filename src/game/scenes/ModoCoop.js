@@ -6,15 +6,17 @@ import { ESCALA, escalaDe } from '../arte/texturas.js'
 import { tocar, musica } from '../audio.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO } from '../constants.js'
 import { claraoCamera } from '../effects/flash.js'
-import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
+import { emRede, souHostDaRede, irParaCena, meuLado } from '../rede.js'
+import VotacaoCena from '../coop/votacaoCena.js'
 import { semLigaduras } from '../campanha/texto.js'
 
 // O MODO do CO-OP, logo depois da party (EscolhaParty / EscolhaPartyN -> ModoCoop -> Selecao):
 //   LUTA RÁPIDA   um chefe, uma luta (o CO-OP de sempre)
 //   EXPEDIÇÃO     3 lutas seguidas: lacaios -> tenente -> chefão, com melhorias entre elas (coop/expedicao.js)
 // ← → escolhem, A confirma, B volta para a party. Dados: { party, modo? } (modo: onde o cursor começa).
-// EM REDE (como a Selecao): quem escolhe é o HOST; o cursor dele vai para os outros ('cursor', tela 'modo')
-// e o A também ('confirmou'); o host leva todos para a Selecao (irParaCena).
+// EM REDE (docs/coop-cartas.md "Votação do CO-OP"): NINGUÉM escolhe sozinho. Cada um move o próprio coração e vota
+// com A (dá para trocar até acabar os 20 s); o mais votado vence, empate = sorteio com roleta (coop/votacaoCena.js).
+// O host apura e leva todos para a Selecao (irParaCena). B (só o host) volta para a party.
 const OPCOES = [
   {
     id: 'rapida',
@@ -32,7 +34,6 @@ const OPCOES = [
   },
 ]
 const PAINEL = { largura: 320, altura: 250, y: 230, passo: 360 }
-const CURSOR_MS = 300
 
 // a instância da cena é REAPROVEITADA pelo Phaser (cenasReaproveitadas.test.js)
 const estadoInicial = () => ({
@@ -44,6 +45,8 @@ const estadoInicial = () => ({
   cursor: null,
   info: null,
   escolhido: false,
+  voto: null,
+  semente: null,
   rede: false,
   host: true,
   controles: null,
@@ -58,13 +61,15 @@ export default class ModoCoop extends Phaser.Scene {
     Object.assign(this, estadoInicial())
     this.party = Array.isArray(dados?.party) ? dados.party : null
     this.modoInicial = dados?.modo ?? null
+    this.semente = typeof dados?.semente === 'string' ? dados.semente : null // o sorteio dos empates (igual em todos os PCs)
   }
 
   create() {
     this.controles = new Controles(this)
-    this.controles.onBotao((_, botao) => (botao === 'A' ? this.confirmar() : this.voltar()))
+    this.controles.onBotao((_, botao) => (botao === 'A' ? this.aoA() : this.voltar()))
     this.rede = emRede()
     this.host = !this.rede || souHostDaRede()
+    this.semente ??= `coop:${Date.now()}`
     if (this.party) this.registry.set('party', this.party)
     this.fundo = criarFundo(this, 'king')
     this.fundo.escurecer()
@@ -82,7 +87,8 @@ export default class ModoCoop extends Phaser.Scene {
     })
     this.cursor = this.add.image(0, 0, 'coracao').setTint(CORES.almas[0]).setScale(1.8)
     this.info = texto(LARGURA / 2, ALTURA - 58, '', 14, TEXTO.desabilitado, { strokeThickness: 2 })
-    texto(LARGURA / 2, ALTURA - 30, this.host ? '← → escolher     A: confirmar     B: party' : '', 14, TEXTO.desabilitado, { strokeThickness: 0 })
+    const dica = this.rede ? '← → escolher     A: votar (dá para trocar)' + (this.host ? '     B: party' : '') : '← → escolher     A: confirmar     B: party'
+    texto(LARGURA / 2, ALTURA - 30, dica, 14, TEXTO.desabilitado, { strokeThickness: 0 })
     const inicial = Math.max(0, OPCOES.findIndex((o) => o.id === (this.modoInicial ?? this.registry.get('modoCoop'))))
     this.selecionar(inicial, false)
     if (this.rede) this.ligarRede()
@@ -113,21 +119,29 @@ export default class ModoCoop extends Phaser.Scene {
     return g
   }
 
+  // EM REDE: a votação por cima das duas opções (os votos embaixo de cada painel)
   ligarRede() {
-    if (this.host) {
-      this.mandarCursor()
-      this.time.addEvent({ delay: CURSOR_MS, loop: true, callback: () => this.mandarCursor() })
-      return
-    }
-    const desligar = [
-      canal.ao('cursor', (d) => d?.tela === 'modo' && !this.escolhido && OPCOES[d.indice] && d.indice !== this.indice && this.selecionar(d.indice)),
-      canal.ao('confirmou', (d) => d?.tela === 'modo' && OPCOES[d.indice] && this.confirmar(d.indice)),
-    ]
-    this.events.once('shutdown', () => desligar.forEach((fn) => fn()))
+    this.voto = new VotacaoCena(this, {
+      tela: 'modo',
+      opcoes: OPCOES.map((o) => o.id),
+      semente: this.semente,
+      caixa: (i) => ({ x: this.paineis[i].x, y: PAINEL.y, w: PAINEL.largura + 12, h: PAINEL.altura + 12 }),
+      posMarca: (i, k, n) => ({ x: this.paineis[i].x + (k - (n - 1) / 2) * 32, y: PAINEL.y + PAINEL.altura / 2 + 24 }),
+      anuncioY: ALTURA - 56,
+      contagemY: PAINEL.y,
+      nomeDe: (id) => OPCOES.find((o) => o.id === id).titulo,
+      aoRevelar: () => {
+        this.cursor.setVisible(false)
+        this.info.setVisible(false)
+      },
+      aoApurar: (_id, indice) => this.confirmar(indice),
+    })
+    this.events.once('shutdown', () => this.voto?.destruir())
   }
 
-  mandarCursor() {
-    if (!this.escolhido) canal.enviarRapido('cursor', { tela: 'modo', indice: this.indice })
+  aoA() {
+    if (this.rede) return this.voto?.votar(OPCOES[this.indice].id)
+    this.confirmar()
   }
 
   selecionar(indice, comSom = true) {
@@ -140,9 +154,9 @@ export default class ModoCoop extends Phaser.Scene {
     })
   }
 
+  // doHost: em rede, o índice que a votação elegeu (em todos os PCs)
   confirmar(doHost = null) {
     if (this.escolhido) return
-    if (!this.host && doHost == null) return this.soHost()
     if (doHost != null) this.selecionar(doHost, false)
     this.escolhido = true
     const modo = OPCOES[this.indice].id
@@ -150,14 +164,13 @@ export default class ModoCoop extends Phaser.Scene {
     tocar(this, 'confirmar')
     claraoCamera(this.cameras.main, 200, 255, 255, 255)
     this.cameras.main.fadeOut(300, 0, 0, 0)
-    if (this.rede && this.host) canal.enviar('confirmou', null, { tela: 'modo', indice: this.indice })
-    if (!this.host) return
-    const dados = { party: this.party ?? partyDe(this.registry), modo, chefe: this.registry.get('chefe') }
+    if (!this.host) return // o convidado espera a Selecao chegar
+    const dados = { party: this.party ?? partyDe(this.registry), modo, chefe: this.registry.get('chefe'), semente: this.semente }
     this.time.delayedCall(320, () => (this.rede ? irParaCena(this, 'Selecao', dados) : this.scene.start('Selecao', dados)))
   }
 
   voltar() {
-    if (this.escolhido) return
+    if (this.escolhido || this.voto?.apurando) return
     if (!this.host) return this.soHost()
     this.escolhido = true
     tocar(this, 'cancelar')
@@ -175,15 +188,18 @@ export default class ModoCoop extends Phaser.Scene {
 
   update(time, delta) {
     this.controles.atualizar()
-    for (let j = 0; j < this.controles.numJogadores && this.host && !this.escolhido; j++) {
+    // em rede cada PC move o próprio coração (o meu lado); fora dela, todos os controles daqui
+    const lados = this.rede ? [meuLado()] : [...Array(this.controles.numJogadores).keys()]
+    for (const j of lados) {
+      if (this.escolhido || this.voto?.apurando) break
       const d = this.controles.toque(j)
       if (d === 'esquerda' || d === 'cima') this.selecionar(this.indice - 1)
       if (d === 'direita' || d === 'baixo') this.selecionar(this.indice + 1)
-      if (this.rede && d) this.mandarCursor()
     }
+    this.voto?.atualizar(delta)
     this.fundo?.atualizar(delta)
     const p = this.paineis[this.indice]
     this.cursor.setPosition(p.x, PAINEL.y - PAINEL.altura / 2 - 18 + Math.sin(time / 200) * 3)
-    this.info.setText(this.rede ? (this.host ? 'você é o host da partida: você escolhe' : 'o host da partida está escolhendo o modo...') : '')
+    this.info.setText(this.rede ? 'Votem no modo — o mais votado ganha; empate: sorteio' : '')
   }
 }

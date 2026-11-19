@@ -21,6 +21,8 @@
 //                                UMA linha "[metricas] {...}" no log, com contadores agregados
 //                                (sem nomes, sem IP, sem chat; docs/online.md). 0 desliga.
 //                                Ao desligar (SIGTERM/SIGINT) escreve a última.
+//   DODGE_BOTS=0                 desliga os bots do JOGAR RÁPIDO (padrão: ligados quando o banco tem a 0019;
+//                                docs/online.md "Bots do Jogar Rápido"). Log [bots] e métricas bots_*.
 //   CONFIAR_PROXY=1              (padrão: ligado no modo online) o endereço de quem chama
 //                                /api/avatar vem do X-Forwarded-For do proxy (Render)
 import http from 'node:http'
@@ -30,6 +32,7 @@ import { fileURLToPath } from 'node:url'
 import { anexarLan, enderecosDoJogo } from './lan.js'
 import { iniciarContas } from './contas.js'
 import { criarMetricas, METRICAS_NULA, INTERVALO_PADRAO_MS } from './metricas.js'
+import { botsLigados } from './bots/index.js'
 
 const PORTA = Number(process.env.PORTA ?? process.env.PORT ?? 5180)
 const ONLINE = process.argv.includes('--online') || ['1', 'true', 'sim'].includes(String(process.env.ONLINE ?? '').toLowerCase())
@@ -115,7 +118,7 @@ const servidor = http.createServer((req, res) => {
 })
 
 const ice = servidoresIce()
-anexarLan(servidor, { online: ONLINE, ice, autenticar: contas.autenticar, relacoes: contas.relacoes, registro: contas.registro, metricas })
+anexarLan(servidor, { online: ONLINE, ice, autenticar: contas.autenticar, relacoes: contas.relacoes, registro: contas.registro, metricas, bots: { ligado: botsLigados() } })
 servidor.on('error', (erro) => {
   console.error(erro.code === 'EADDRINUSE' ? `A porta ${PORTA} já está em uso. Tente: PORTA=5181 npm run ${ONLINE ? 'start' : 'lan'}` : erro)
   process.exit(1)
