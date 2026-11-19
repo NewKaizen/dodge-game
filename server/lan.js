@@ -756,8 +756,8 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
       enviar(c, { t: 'fechada', casual: true, motivo: 'a partida não começou (o host não respondeu): procurando outra' })
       atualizarStatus(c)
     }
-    // o convidado primeiro (ele não teve culpa)
-    for (const c of [...membros].reverse()) if (clientes.has(c.id) && fila.entrar(c)) metricas.contar('fila_entradas')
+    // o convidado primeiro (ele não teve culpa); o bot não volta para a fila (ele sai com o 'fechada')
+    for (const c of [...membros].reverse()) if (clientes.has(c.id) && !ehBot(c) && fila.entrar(c)) metricas.contar('fila_entradas')
   }
 
   // revanche na sala casual: os dois aceitam em REVANCHE_MS

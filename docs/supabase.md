@@ -242,6 +242,45 @@ semanais); para reaplicar, rode a 0017 e logo depois a 0018. `expedicaoSql.test.
 0016 e a 0017 duas vezes e depois a 0018 duas vezes (com `DODGE_PG`), e confere o verso e o baú da Ladra e o troféu só
 para quem completou a expedição.
 
+### 2.13 Migration 0019: os bots do JOGAR RÁPIDO
+
+Rode `supabase/migrations/0019_bots.sql` **depois da 0018** (depende de 0001–0016; roda de novo sem estragar). Ela
+prepara os **bots do JOGAR RÁPIDO** ([online.md](online.md#bots-do-jogar-rápido)): perfis de jogadores que o
+servidor controla para a fila casual de PVP 1x1 não ficar vazia. A 0019:
+
+- cria a tabela **`public.bots`** (`user_id`, `faixa`, `q`, `favoritos`, `atividade`, `ativo`, `atividade_em`): é o
+  ÚNICO lugar que diz que uma conta é bot. **RLS ligada e nenhuma policy**, sem grant para `anon`/`authenticated`: o
+  navegador não lê nem sabe que ela existe (só a `service_role` do servidor);
+- a função **`criar_bot(p_spec)`**: cria a conta do bot em `auth.users` **sem e-mail, telefone, senha ou identidade**
+  (não dá para entrar nela; com o `banned_until` eterno de garantia) e o gatilho da 0001 cria o perfil e as
+  estatísticas como para qualquer conta (a tag sai do apelido). Depois grava o nível e o XP, a data da conta no
+  passado, a trilha toda até o nível no inventário (como a `conceder_recompensa` daria), os itens de baú sorteados, os
+  cosméticos equipados (pela `equipar_conta`: só o que ele tem) e as estatísticas. Confere o nome pelas regras de
+  sempre (`normalizar_nome`) e a faixa;
+- **`bots_listar()`** e **`bot_perfil(p_user)`**: o servidor lê o grupo de bots e o perfil atual de um deles;
+- **`bot_atividade(p_user, p_partidas, p_vitorias, p_xp)`**: a "vida fora da fila" (XP, nível, itens da trilha e
+  estatísticas de partidas que o bot "jogou por aí"); só para contas de `public.bots` e com teto (20 partidas e 60 XP
+  por partida de uma vez).
+
+Nada mais muda: o perfil, as estatísticas e o inventário do bot são linhas das tabelas de sempre, lidas pelas mesmas
+consultas e RLS das contas de gente; o XP das partidas contra bot sai pela mesma `conceder_recompensa` (para os dois
+lados, com os mesmos limites do dia). Os bots **nascem sozinhos**: o servidor semeia o grupo (60 bots) na primeira vez
+que liga com a 0019 (e de novo se ficarem menos de 40). Sem a 0019 o jogo funciona como antes (sem bots: o servidor
+loga `[bots] não deu para carregar os bots` e a fila é só de gente). `DODGE_BOTS=0` no ambiente desliga os bots sem
+mexer no banco.
+
+- **Ver os bots** (SQL Editor): `select p.nome_exibicao, p.tag, p.nivel, b.faixa from public.bots b join public.perfis p
+  on p.id = b.user_id order by p.nivel;`
+- **Tirar todos os bots**: `delete from auth.users where id in (select user_id from public.bots);` (o perfil, as
+  estatísticas, o inventário, as concessões de XP dele, os pedidos de amizade e a linha em `public.bots` vão junto, em
+  cascata; nas partidas já registradas o lado dele fica sem conta, como o de um convidado, e o XP de quem jogou contra
+  ele continua). Com o servidor ligado e os bots ligados, ele semeia um grupo novo na próxima vez que ligar: desligue com
+  `DODGE_BOTS=0` antes.
+
+`botsSql.test.js` roda a 0001–0019 (a 0019 duas vezes) com `DODGE_PG` e confere a conta do bot igual às outras, o
+navegador lendo o perfil dele mas sem ver `public.bots` nem chamar as funções do servidor, o XP de uma partida contra o
+bot para os dois, o teto da atividade e a remoção em cascata.
+
 ## 3. Conferir o bucket
 
 Em **Storage** deve aparecer o bucket `avatares`, marcado como **Public**.

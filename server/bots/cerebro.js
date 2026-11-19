@@ -770,8 +770,8 @@ export function criarCerebro({ cliente, faixa = 'medio', q = null, favoritos = [
         if (m.estado === 'recusada' || m.estado === 'expirada' || m.estado === 'indisponivel') depois(entre(sorte, 800, 2500), ir)
       },
     }
-    // ninguém escolheu nada: depois de olhar o resultado, sai (às vezes pede revanche antes)
-    depois(entre(sorte, 5000, 12000), () => {
+    // ninguém escolheu nada: depois de olhar o resultado (o XP, as estatísticas), sai (às vezes pede revanche antes)
+    depois(entre(sorte, 9000, 22000), () => {
       if (!vivo(v) || fim.minha) return
       if (revanches < REVANCHES_SEGUIDAS && um(sorte, 0.12)) {
         revanches++

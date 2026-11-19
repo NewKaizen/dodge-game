@@ -266,9 +266,14 @@ conta e para convidado (convidado joga, mas a partida não dá XP: aviso na tela
   os dois para a escolha de personagem, como numa sala normal.
 - Um recusou ou deixou o tempo acabar: ele sai da fila; o outro volta a
   procurar **na frente da fila**, com o tempo de espera de antes.
-- **CPU**: depois de **30 s** sem ninguém, a tela pergunta "Ninguém por enquanto
-  — jogar contra a CPU?". Aceitar sai da fila e abre o PVP local contra a CPU
-  (sempre dita como CPU, nunca como pessoa). Dá para continuar procurando.
+- **Sem ninguém**: depois de **8 a 20 s** (sorteado a cada entrada) procurando sem
+  achar gente, o servidor completa o par com um **jogador do servidor** (os
+  [bots do Jogar Rápido](#bots-do-jogar-rápido), abaixo); o resto é igual a uma
+  partida contra gente (achou, confirmar, sala casual, XP).
+- **CPU**: depois de **30 s** sem ninguém (bots desligados, ou nenhum livre), a
+  tela pergunta "Ninguém por enquanto — jogar contra a CPU?". Aceitar sai da fila
+  e abre o PVP local contra a CPU (sempre dita como CPU, nunca como pessoa). Dá
+  para continuar procurando.
 - **Fim da partida**: **REVANCHE** (os dois precisam aceitar em **15 s**; aí o
   host leva os dois direto para a arena, com os mesmos personagens), **TROCAR PERSONAGEM**
   (como na sala de amigos, pelo canal), **JOGAR NOVAMENTE**
@@ -281,7 +286,8 @@ conta e para convidado (convidado joga, mas a partida não dá XP: aviso na tela
 ### Regras do servidor (`server/fila.js`, `server/lan.js`)
 
 - **FIFO**, sem rating: do mais antigo para o mais novo, cada um pareia com o
-  primeiro compatível depois dele. Não pareia a mesma conta (duas abas; a conta
+  primeiro compatível depois dele. Gente sempre pareia com gente primeiro; o bot
+  só entra para quem passou do próprio limiar (8–20 s) sem par. Não pareia a mesma conta (duas abas; a conta
   também não entra duas vezes na fila) nem quem se bloqueou (em qualquer direção).
 - Só entra na fila quem não está em sala e não está na fila; uma conta logada
   espera os bloqueios carregarem.
@@ -612,6 +618,8 @@ o aviso de desligamento (SIGTERM/SIGINT). Janela sem nada não escreve.
 | `reconexoes` | a **mesma conta** voltando em até 2 min depois de cair (a memória do "quando caiu" some em 2 min) |
 | `fila_entradas`, `fila_pares`, `fila_pares_desfeitos` | entradas na fila, pares formados, pares que não fecharam |
 | `fila_espera_ms` | n, p50, p90 e máximo do tempo esperado até achar par (uma amostra por jogador pareado) |
+| `bots_fila_pares`, `bots_fila_desfeitos`, `bots_espera_ms` | o mesmo para os pares com bot (fora de `fila_*`) |
+| `bots_partidas_iniciadas`, `bots_partidas`, `bots_vitorias_jogador`, `bots_derrotas_jogador`, `bots_empates`, `bots_suspeitas` | partidas com bot (as iniciadas também contam em `partidas_iniciadas`), quem venceu pelo relato do bot e quantas vezes o host mandou um estado forjado |
 | `partidas_iniciadas`, `partidas_finalizadas`, `partidas_abandonadas`, `partidas_contestadas` | PVP e CO-OP online registradas (revanche abre outra); abandonada = alguém saiu no meio |
 | `partidas_quedas`, `partidas_retomadas` | alguém caiu no meio da partida (a vaga ficou guardada) e voltou a tempo (Fase 2D) |
 | `revanches_pedidas`, `revanches_aceitas` | pedidos e aceites duplos |

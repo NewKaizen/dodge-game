@@ -6,7 +6,7 @@
 // paciência do pvp/bot.js, mais um erro de vez em quando), o duelo (pvp/bonus/botDuelo.js), o
 // CTRL+C CTRL+V (pvp/bonus/botCopia.js) e o tempo de pensar. Cada FAIXA de bot é um q:
 //
-//   iniciante 0.10 · casual 0.30 · medio 0.48 · bom 0.66 · muito_bom 0.85
+//   iniciante 0.07 · casual 0.27 · medio 0.47 · bom 0.67 · muito_bom 0.87   (cada bot: ± 0.07)
 //
 // O jogador NUNCA vê nada disso: a faixa mora na tabela do servidor (public.bots, 0019) e a
 // estimativa do jogador só na memória do servidor.
@@ -16,9 +16,13 @@
 //   faixaPara(q)                       a faixa do bot para quem joga em q (a de baixo mais perto)
 //   ajustarRecentes(lista, venceu)     o histórico curto (as últimas RECENTES partidas contra bot)
 
-export const FAIXAS = { iniciante: 0.1, casual: 0.3, medio: 0.48, bom: 0.66, muito_bom: 0.85 }
+export const FAIXAS = { iniciante: 0.07, casual: 0.27, medio: 0.47, bom: 0.67, muito_bom: 0.87 }
+// cada bot tem o seu q: a faixa ± VARIACAO_Q (cobre o espaço entre as faixas: o jogador acha um bot perto)
+export const VARIACAO_Q = 0.07
 export const ORDEM_FAIXAS = Object.keys(FAIXAS)
 export const RECENTES = 8
+export const PASSO_RECENTE = 0.08 // quanto cada resultado recente mexe na estimativa (o mais novo, inteiro)
+export const FOLGA_ALVO = 0.02 // o bot escolhido fica um pouco abaixo da estimativa (o jogador ganha um pouco mais da metade)
 
 const lerp = (a, b, q) => a + (b - a) * q
 const limitar = (v, a, b) => Math.max(a, Math.min(b, v))
@@ -70,12 +74,12 @@ export const numerosDaFaixa = (faixa) => numerosDe(FAIXAS[faixa] ?? FAIXAS.medio
 //   recentes  [true | false, ...] do mais velho ao mais novo (true = o jogador venceu)
 export function estimarJogador({ nivel = 1, recentes = [] } = {}) {
   const n = Math.max(1, Number(nivel) || 1)
-  const base = 0.12 + 0.42 * (1 - Math.exp(-(n - 1) / 14))
+  const base = 0.12 + 0.55 * (1 - Math.exp(-(n - 1) / 15))
   let ajuste = 0
   // os mais novos pesam mais
   recentes.slice(-RECENTES).forEach((venceu, i, lista) => {
     const peso = 0.5 + (0.5 * (i + 1)) / lista.length
-    ajuste += (venceu ? 0.07 : -0.07) * peso
+    ajuste += (venceu ? PASSO_RECENTE : -PASSO_RECENTE) * peso
   })
   return limitar(base + ajuste, 0.02, 0.98)
 }

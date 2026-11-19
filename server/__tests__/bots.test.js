@@ -110,7 +110,7 @@ test('perfil de bot: nível, XP, partidas e cosméticos coerentes (só itens que
     const p = gerarPerfilDeBot({ nome: gerarApelido(rng), rng })
     assert.equal(nivelDoXp(p.xp), p.nivel)
     assert.ok(ORDEM_FAIXAS.includes(p.faixa))
-    assert.ok(Math.abs(p.q - FAIXAS[p.faixa]) <= 0.05)
+    assert.ok(Math.abs(p.q - FAIXAS[p.faixa]) <= 0.071)
     assert.ok(p.vitorias <= p.partidas)
     assert.ok(p.favoritos.every((f) => IDS_PERSONAGENS.includes(f)))
     for (const [tipo, id] of Object.entries(p.equipar)) {

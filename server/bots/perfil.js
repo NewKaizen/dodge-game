@@ -10,7 +10,7 @@
 import { xpTotalDoNivel, xpParaProximo, itensAte } from '../../src/lib/progresso.js'
 import { ITENS_BAU } from '../../src/lib/cosmeticos.js'
 import { AVATARES_JOGO } from '../../src/lib/contaRegras.js'
-import { FAIXAS, ORDEM_FAIXAS, estimarJogador } from './habilidade.js'
+import { FAIXAS, ORDEM_FAIXAS, VARIACAO_Q, estimarJogador } from './habilidade.js'
 import { IDS_PERSONAGENS } from './decisoes.js'
 
 const escolher = (rng, lista) => lista[Math.floor(rng() * lista.length)]
@@ -50,7 +50,7 @@ function sortearComPeso(rng, lista) {
 }
 
 export function gerarPerfilDeBot({ nome, rng = Math.random, nivel = nivelSorteado(rng), faixa = faixaDoBot(nivel, rng) }) {
-  const q = Math.round(Math.max(0.02, Math.min(0.98, FAIXAS[faixa] + entre(rng, -0.045, 0.045))) * 1000) / 1000
+  const q = Math.round(Math.max(0.01, Math.min(0.98, FAIXAS[faixa] + entre(rng, -VARIACAO_Q, VARIACAO_Q))) * 1000) / 1000
   const xp = xpTotalDoNivel(nivel) + Math.floor(rng() * xpParaProximo(nivel))
   // quase todo XP veio de partidas (40 a 60 cada), o resto da campanha, desafios e baús
   const partidas = Math.max(0, Math.round((xp * entre(rng, 0.7, 0.92)) / entre(rng, 46, 54)))

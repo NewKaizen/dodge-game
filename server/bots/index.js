@@ -22,7 +22,7 @@
 // 30 s). Sem banco com a 0019 (registro sem listarBots) também fica desligado. As métricas (bots_*) e o log
 // ([bots] ...) contam as partidas com bot à parte, só para o dono do servidor.
 import crypto from 'node:crypto'
-import { estimarJogador, ajustarRecentes } from './habilidade.js'
+import { estimarJogador, ajustarRecentes, FOLGA_ALVO } from './habilidade.js'
 import { gerarApelidos } from './nomes.js'
 import { gerarPerfilDeBot } from './perfil.js'
 
@@ -136,7 +136,7 @@ export function criarBots({ registro = null, ligado = true, agora = Date.now, so
     const t = agora()
     const chave = chaveDe(humano)
     const q = estimarJogador({ nivel: humano.perfil?.nivel ?? 1, recentes: recentesDe.get(chave) ?? [] })
-    const alvoQ = q - 0.03
+    const alvoQ = q - FOLGA_ALVO
     let livres = [...pool.values()].filter((e) => !e.ocupado && e.livreEm <= t && e.id !== humano.usuario && !humano.bloqueios?.has?.(e.id))
     const semRepetir = livres.filter((e) => e.id !== ultimoDe.get(chave))
     if (semRepetir.length) livres = semRepetir
