@@ -323,7 +323,150 @@ A sala ganhou `casual` no `sala {...}` e o `fechada` da sala casual vem com
 
 `ONLINE=1 npm run dev` (ou `npm run online`), abra o jogo em duas janelas (uma
 anônima serve de convidado; a outra pode estar logada), aperte uma tecla do jogo nas duas (o teclado liga sozinho), ONLINE → JOGAR RÁPIDO nas duas e aceite com A. Para ver a
-oferta da CPU, entre só com uma e espere 30 s.
+oferta da CPU, entre só com uma e espere 30 s (com `DODGE_BOTS=0`: com os bots ligados, um bot aparece antes, em 8–20 s).
+
+## Bots do Jogar Rápido
+
+Para o online não ficar vazio, o servidor completa a fila do **JOGAR RÁPIDO** (só ela: CO-OP, party, salas de
+amigos e o contador de online não mudam) com **jogadores que ele mesmo controla**. Para quem joga, o bot é um
+jogador como outro qualquer: tem conta, apelido, avatar, cosméticos, nível, XP e histórico de partidas, confirma a
+partida, escolhe personagem, vota na arena, joga as cartas, desvia, luta o duelo e, no fim, às vezes topa a revanche.
+O XP de uma partida contra bot é o **XP normal**, pelo mesmo caminho e com os mesmos limites do dia de uma partida
+contra gente (o bot também ganha o dele). Código: `server/bots/`; banco: a migration **0019** ([supabase.md](supabase.md)).
+
+### Quando entra um bot
+
+- Cada entrada na fila sorteia um **limiar de 8 a 20 s** (`LIMIAR_MS`, `server/bots/index.js`). Gente sempre pareia
+  primeiro (a fila FIFO de sempre); quem passou do limiar sem par ganha um bot (`server/fila.js`, `bots.oferecer`).
+  Sem bot livre, tenta de novo a cada 4 s; a oferta da CPU do cliente aos **30 s** continua valendo.
+- O par é o de sempre: `pareado` → os dois confirmam (o bot depois de **1,1 a 3,4 s**, às vezes um pouco mais, como
+  gente lendo a tela) → `partidaCasual` → a sala casual. Recusou ou não confirmou: o bot sai (não volta para a fila).
+- O mesmo jogador **nunca pega o mesmo bot duas vezes seguidas** (a não ser a revanche, que os dois escolhem).
+- O bot só sabe ser o **convidado**: o jogador é sempre o host da sala casual com bot. O ping que o bot mostra é um
+  valor de gente (38–135 ms, com tremida a cada 2 s) e fica pelo menos 30 ms acima do ping do jogador, para a regra
+  do host ("o de menor ping") continuar batendo com o que a tela mostra.
+
+### Quem joga o bot (o desenho)
+
+O PVP em rede roda **no PC de cada um** ([rede-pvp.md](rede-pvp.md)): o host roda as regras, cada PC desvia na
+caixa do próprio coração e só as decisões viajam. O servidor não roda a partida. Então o bot é **o PC do convidado,
+rodando no servidor**:
+
+- No lobby (`server/lan.js`), o bot é um **cliente como outro qualquer**: o mesmo objeto de cliente, a mesma sala, o
+  mesmo registro da partida e o mesmo `resultado`. O "WebSocket" dele é de mentira: o que o lobby manda para ele vai
+  para o **cérebro** (`server/bots/cerebro.js`), e o que o cérebro manda entra pelo mesmo `receber()` de todo mundo
+  (com o mesmo limite de mensagens). O lobby sabe quem é bot por um `WeakSet` (nenhum campo do cliente diz isso).
+- O canal da partida é o **mesmo código do navegador** (`src/lib/lan/canal.js`: sessão, numeração, recibos,
+  reenvio). O WebRTC nunca abre: o bot pede a ligação (`quero`) como um convidado, responde a oferta do host com uma
+  resposta bem formada cujos candidatos são só nomes `.local` (que não resolvem), e o canal vai **pelo servidor**,
+  como o de quem está atrás de um NAT difícil ou de um firewall de escola.
+- **Escolha e voto**: o cursor anda pela grade (uma casa por vez, olhando um ou dois personagens antes) e confirma um
+  dos "mains" do bot (às vezes outro); na arena, vota (às vezes na aleatória, às vezes nem vota).
+- **Cartas**: a nota do `pvp/bot.js` com o ruído e a paciência da faixa, mais erros de gente (às vezes uma jogável
+  qualquer, às vezes passa sem precisar). O tempo de pensar é uma log-normal em volta do típico da faixa (às vezes
+  hesita bem mais), sempre antes do relógio da rodada; o cursor passa por uma ou duas cartas antes de confirmar.
+- **Esquiva**: o bot roda a caixa dele **de verdade, sem tela** (`server/bots/esquiva.js`): o ataque da carta
+  (`attacks/` + `entities/Bullets.js`, como a campanha faz no servidor), com a **mesma semente** que a caixa espelho
+  do humano usa, e o coração anda pelo `EsquivaBot` com os números da faixa (tempo de reação, lapsos, erros, avisos).
+  A caixa começa quando chega a primeira posição do coração do humano (a caixa dele abriu na mesma hora que a
+  espelho) e a posição do bot vai ~30 vezes por segundo: na tela do humano o coração do bot desvia das **mesmas
+  balas** que ele vê. O bot decide o próprio dano (`dano`, `graze`, `fimEsquiva`), como todo convidado.
+- **Duelo e CTRL+C CTRL+V**: `server/bots/duelo.js` faz o papel do `Duelo.js` do convidado (anda pelo `BotDuelo`,
+  ataca com a arma dele, confere os golpes das réplicas das armas do humano no coração dele, a espada apara); a cópia
+  aperta no ritmo do `BotCopia` da faixa. Os números das armas são os do jogo (`pvp/bonus/dueloRegras.js`).
+- **Fim**: o replay, o `resultadoPronto`, o `resultado` ao servidor; na tela de resultado o bot às vezes topa a
+  revanche ou a troca de personagem (no máximo 2 seguidas), às vezes pede revanche, e sai depois de 9 a 22 s (dá
+  tempo de ver o XP e o perfil dele na sala).
+
+Limites conhecidos (só desenho, nunca regra): a caixa sem tela não muda de forma (o espelho do humano prende a
+posição na caixa dele) e os efeitos dos eventos bônus não rodam no bot (ele não leva dano deles); no CORAÇÃO TROCADO
+o coração do bot fica parado na tela do humano depois da troca. Contra bot o jogador é sempre o host.
+
+### Validação (o bot não facilita a trapaça)
+
+O servidor continua decidindo pelos dois relatos (`server/partidas.js`), e o lado do bot é **dele**: o bot é dono do
+próprio coração (só ele decide o dano que leva, como qualquer convidado) e guarda a **própria vida**. Um estado do host
+com o HP do bot menor do que o que o bot sabe é recusado (o bot fica com o dele, conta `bots_suspeitas` e escreve no
+log). No fim, o bot relata o que **ele** viu: se o host diz que o bot caiu e o bot não caiu, os relatos divergem e a
+partida fica **contestada** (só participação, ninguém leva a vitória). Contra gente, o convidado aceita o estado do
+host; contra bot, nem isso: forjar uma vitória contra bot é mais difícil que contra gente. O que vale para os dois é o
+mesmo: o coração do humano é decidido pelo PC dele (como sempre).
+
+### Disfarce (o jogador não tem como saber)
+
+- **Mensagens**: o bot recebe e manda exatamente as mensagens de um navegador; nenhuma mensagem para o jogador tem
+  campo, valor ou prefixo que diga "bot" (o `bots.test.js` compara a **forma** de tudo o que o jogador recebe numa
+  partida contra bot com uma contra gente, e procura "bot" nos valores). O id do cliente é o de sempre; o relógio das
+  posições do duelo é o de uma página aberta há um tempo; os tempos (confirmar, pensar, cursor, votar, sair) são
+  sorteados em faixas de gente.
+- **Banco**: cada bot é uma linha em `auth.users` **sem e-mail, telefone, senha ou identidade** (ninguém entra nela),
+  e o perfil, as estatísticas e o inventário são linhas das tabelas de sempre, lidas pelas **mesmas consultas e RLS**
+  das contas de gente. A marca "é bot" mora só em `public.bots`: RLS ligada, **nenhuma policy**, sem grant para o
+  navegador (`botsSql.test.js` confere). Assim o perfil do bot aparece no fim da partida, na lista de quem está na sala
+  e nos pedidos de amizade como o de qualquer um.
+- **Apelidos**: nicks de jogo com cara de brasileiro, montados de bichos, comidas, folclore e coisas
+  (`CapivaraBraba`, `pastel2009`, `xXPamonhaXx`, `TatuDeNeon`...; `server/bots/nomes.js`), nunca nome de gente ou de
+  conta de verdade; passam pelo filtro de palavras e pelas regras do nome. Avatar: o padrão ou um personagem do jogo
+  (os da trilha só com nível para eles); cosméticos: a trilha até o nível e alguns do baú, equipados só se ele tem.
+- **Amizade**: o pedido de amizade para um bot fica **pendente** (ele nunca responde), como o de alguém que não abre
+  o jogo. Os bots aparecem **offline** fora da partida (presença é só entre amigos, e bot não tem amigo).
+- **Conta que evolui**: o XP e o nível do bot sobem pelas partidas dele (a mesma `conceder_recompensa`) e por uma
+  "vida fora da fila": a cada 20 min (e na volta do servidor, até 3 dias de atraso) cada bot livre "jogou" algumas
+  partidas por aí (Poisson com a média de partidas por dia dele), com o XP de partida de verdade
+  (`bot_atividade`, 0019).
+
+### Dificuldade e o jogador
+
+Cinco faixas, todas da mesma família de números (`server/bots/habilidade.js`, de q = 0 a q = 1): **iniciante** 0,07 ·
+**casual** 0,27 · **médio** 0,47 · **bom** 0,67 · **muito bom** 0,87. Cada bot tem o seu q (a faixa ± 0,07: cobre o
+espaço entre as faixas). Cada q
+define a esquiva (reação, lapsos, erros, visão dos avisos), as cartas (ruído, paciência, erros, passes à toa), o duelo,
+a cópia e o tempo de pensar.
+
+O jogador tem uma **estimativa escondida** (só na memória do servidor): o nível da conta (quem já jogou muito tende a
+jogar melhor) mais os **últimos 8 resultados contra bots** (cada vitória sobe, cada derrota desce, os mais novos
+pesam mais). O bot escolhido é o mais perto da estimativa menos `FOLGA_ALVO` (0,02), entre os 3 mais perto. Quem
+acabou de chegar pega bots ganháveis; quem vem ganhando sobe de faixa; quem vem perdendo desce.
+
+**Taxas de vitória medidas** (`node scripts/balanceamento/simularBots.mjs`: as regras e as caixas de verdade, sem
+tela; o "jogador" é o mesmo modelo de esquiva e cartas, com o q dele):
+
+| Faixa do bot | q | 1) jogador do mesmo q (60 partidas) | 2) caminho de verdade: taxa contra esta faixa |
+| --- | --- | --- | --- |
+| iniciante | 0,07 | 45% | 50% (42/84) |
+| casual | 0,27 | 53% | 56% (65/116) |
+| médio | 0,47 | 57% | 52% (89/172) |
+| bom | 0,67 | 43% | 69% (116/168) |
+| muito bom | 0,87 | 47% | 60% (60/100) |
+
+No caminho de verdade (5 jogadores por nível, 16 partidas seguidas cada, a estimativa e a escolha do bot como no
+servidor), por nível de quem joga: q 0,10 → **43%**, 0,22 → **49%**, 0,35 → **49%**, 0,50 → **49%**, 0,62 → **56%**,
+0,75 → 65%, 0,88 → 75%, 0,95 → 80%; **58% no total** (372/640). Quem joga até o nível de um bot "muito bom" fica
+dentro do alvo (45–60%); os mais fortes que isso (perto do "imbatível" da CPU) ganham mais, porque nenhum bot joga
+como eles (é de propósito: um bot imbatível seria fácil de notar). Com 60–80 partidas por linha, ±6 pontos são ruído.
+A simulação é o modelo da CPU dos dois lados: gente de verdade erra de outro jeito, então o que vale é a estimativa
+corrigir com os resultados (as métricas `bots_vitorias_jogador` / `bots_derrotas_jogador` mostram a taxa real).
+
+### Ligar, desligar e acompanhar
+
+- `DODGE_BOTS=0` no ambiente desliga (o servidor e o `npm run dev`); sem a 0019 no banco também fica desligado. O
+  padrão é ligado. Na primeira vez com a 0019, o servidor **semeia 60 bots** em níveis espalhados (muitos baixos,
+  alguns altos; de novo se ficarem menos de 40).
+- **Log** (`[bots] ...`): o grupo carregado, cada par (o jogador, a estimativa dele e o bot com a faixa), cada fim
+  (quem venceu) e cada estado suspeito do host.
+- **Métricas** (só para o dono do servidor, à parte das de gente): `bots_fila_pares`, `bots_fila_desfeitos`,
+  `bots_espera_ms`, `bots_partidas_iniciadas`, `bots_partidas`, `bots_vitorias_jogador`, `bots_derrotas_jogador`,
+  `bots_empates` e `bots_suspeitas` ([Métricas](#métricas-fase-1e)).
+- **Riscos**: o XP contra bot não tem limite a mais (decisão do dono): como o jogador quase nunca pega o mesmo bot no
+  dia, o limite "contra o mesmo oponente" quase não pesa e dá para **farmar XP** contra bots (uma partida a cada ~2–3
+  min, 40–60 XP). O que segura é o tempo mínimo de partida (60 s e 2 rodadas) e a estimativa, que sobe quem vence
+  muito para bots mais fortes. Se virar problema, o lugar de mexer é o banco (a `conceder_recompensa`), com a lista de
+  `public.bots` na mão.
+- Testes: `server/__tests__/bots.test.js` (faixas, apelidos, perfis, decisões, caixa, duelo, WebRTC, a fila, uma
+  partida inteira contra um host simulado com duelo e cópia, o XP, a validação com um host trapaceiro, a comparação
+  de forma com uma partida contra gente, a vida fora da fila, a semeadura) e `botsSql.test.js` (Postgres, `DODGE_PG`).
+- **No navegador**: `DODGE_CONTAS_FALSAS=1 ONLINE=1 npx vite` (o banco falso semeia os bots ao ligar), entre com
+  uma conta de teste (`debugConta.fingir`) e JOGAR RÁPIDO: em 8–20 s aparece o oponente.
 
 ## XP, níveis e Coleção (Fase 1D)
 
