@@ -132,6 +132,12 @@
 //                        equipado {ok, tipo, item, erro?, perfil?} · bauGanho {fontes, fechados} (o aviso)
 // ('equipar' pelo lobby é o caminho do dev com contas falsas; o navegador com Supabase usa a equipar() do banco)
 //
+// BOTS DO JOGAR RÁPIDO (docs/online.md "Bots do Jogar Rápido", server/bots/): quem procura na fila casual sem
+// achar gente em 8–20 s ganha um bot de oponente. O bot é um CLIENTE deste lobby como outro qualquer (o ws dele
+// é de mentira e o cérebro, server/bots/cerebro.js, responde como o navegador de um convidado): as mensagens
+// que o jogador vê são as de sempre, sem marca nenhuma. O jogador é sempre o host da sala casual com bot.
+// `bots: { ligado }` em criarLobby/anexarLan (DODGE_BOTS=0 desliga; sem a 0019 no banco também).
+//
 // PAUSA ONLINE (PROTOCOLO 20, docs/rede-pvp.md "Aba em segundo plano e pausa online"): `pausado {valor}`
 // (o menu de pausa aberto por cima da partida, que CONTINUA para todos); o membro vem com `pausado: true`
 // (só com a sala em partida) e os outros mostram PAUSADO no lugar dele. Como o `segundoPlano` (AUSENTE),
@@ -154,6 +160,8 @@ import { nomeOfensivo, censurarTexto } from '../src/lib/palavrasBloqueadas.js'
 import { nomeSeguro } from '../src/lib/contaRegras.js'
 import { arranjoValido } from '../src/lib/times2x2.js'
 import { infoSemanal } from '../src/lib/semanal.js'
+import { criarBots } from './bots/index.js'
+import { criarCerebro } from './bots/cerebro.js'
 
 // CO-OP 2.0 (PROTOCOLO 21, docs/coop-cartas.md "CO-OP 2.0"): a partida de CO-OP ganhou as mensagens `resgate` e
 // `regra` (pelo canal, entre os PCs; o servidor só repassa) e o `contra` leva a QUEBRA: um PC de versão velha
@@ -282,7 +290,7 @@ export const trocarMdns = (texto, ip) => (typeof texto === 'string' ? texto.repl
 // sem ele as partidas não dão XP)
 // eleicaoMs: a janela de medição da eleição do host (anexarLan usa ELEICAO_MS; sem
 // ela, 0: decide na hora só com os pings que o servidor já tem)
-export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null, relacoes = null, registro = null, agendar = agendarPadrao, log = () => {}, metricas = METRICAS_NULA, sortearBauExpedicao = undefined } = {}) {
+export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderecosLocais, salasRede = () => [], enderecos = () => [], online = false, ice = [], maxSalas = MAX_SALAS, agora = Date.now, autenticar = null, relacoes = null, registro = null, agendar = agendarPadrao, log = () => {}, metricas = METRICAS_NULA, sortearBauExpedicao = undefined, bots: opcoesBots = null } = {}) {
   // BOSS SEMANAL: a semana do relógio daqui (deslocarSemana: só no dev, DODGE_SEMANA=n semanas para a frente)
   const semanaAgora = () => infoSemanal(agora() + deslocarSemana)
   const clientes = new Map() // id -> cliente
@@ -591,16 +599,74 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
   const oponente = (c) => ({ nome: c.nome, ...(c.perfil && { tag: c.perfil.tag, avatar: c.perfil.avatar, nivel: c.perfil.nivel }) })
   const MOTIVO_FORA = { tempo: 'você não confirmou a tempo', recusou: 'você recusou a partida' }
   const MOTIVO_VOLTA = { tempo: 'o oponente não confirmou a tempo', recusou: 'o oponente recusou a partida' }
+  // ---------- BOTS (server/bots/) ----------
+  // quem é bot só se sabe aqui (nenhum campo do cliente diz isso)
+  const clientesBot = new WeakSet()
+  const ehBot = (c) => Boolean(c && clientesBot.has(c))
+  // o cliente de um bot: o mesmo objeto de um navegador; o "ws" entrega ao cérebro (depois do que o lobby
+  // está fazendo agora, como a rede faria) e o cérebro manda pelo mesmo receber() de todo mundo
+  function conectarBot(e, { pingBase, aoSair, aoResultado }) {
+    let cerebro = null
+    const ws = {
+      readyState: 1,
+      bufferedAmount: 0,
+      send(texto) {
+        if (typeof texto === 'string') queueMicrotask(() => cerebro?.receber(JSON.parse(texto)))
+      },
+      terminate() {},
+      close() {},
+    }
+    const perfil = resumoPerfil(e.perfil)
+    const c = { id: novoId(), ws, ip: '', nome: perfil?.nome || 'JOGADOR', sala: null, pronto: false, ping: null, ok: true, validando: false, usuario: e.id, perfil, amigos: new Set(), bloqueios: new Set(), pedidos: new Set(), statusPub: 'offline', fichas: MAX_FICHAS, recarga: agora() }
+    clientesBot.add(c)
+    clientes.set(c.id, c)
+    cerebro = criarCerebro({
+      cliente: c,
+      faixa: e.bot.faixa,
+      q: Number(e.bot.q),
+      favoritos: e.bot.favoritos ?? [],
+      pingBase,
+      enviar: (m) => clientes.has(c.id) && receberTexto(c, JSON.stringify(m)),
+      agendar,
+      agora,
+      log,
+      ...(opcoesBots?.sorte && { sorte: opcoesBots.sorte }),
+      aoResultado,
+      aoSair: (motivo) => {
+        removerBot(c)
+        aoSair(motivo)
+      },
+    })
+    return c
+  }
+  // o bot saiu (fim da partida, par desfeito): some do lobby
+  function removerBot(c) {
+    if (!clientes.has(c.id)) return
+    removerDaFila(c, 'saiu')
+    sair(c)
+    clientes.delete(c.id)
+  }
+  const bots = criarBots({ registro, ligado: Boolean(opcoesBots?.ligado), agora, log, metricas, conectar: conectarBot, ...(opcoesBots?.sorte && { sorte: opcoesBots.sorte }) })
+
   const fila = criarFila({
     agora,
     agendar,
     podeParear,
+    // (sem bots ligados, a fila é a de sempre: nenhum timer a mais)
+    bots: bots.ligado() ? { ehBot, limiarMs: () => opcoesBots?.limiarMs?.() ?? bots.limiarMs(), oferecer: (c) => (ehBot(c) ? null : bots.oferecer(c)) } : null,
     avisos: {
       procurando: (c, desde) => enviar(c, { t: 'fila', estado: 'procurando', desde, esperaMs: Math.max(0, agora() - desde), convidado: !c.usuario }),
       pareado(par) {
-        metricas.contar('fila_pares')
-        metricas.amostra('fila_espera_ms', agora() - par.desde.a)
-        metricas.amostra('fila_espera_ms', agora() - par.desde.b)
+        // (as métricas das partidas com bot ficam à parte: bots_*)
+        const comBot = ehBot(par.a) || ehBot(par.b)
+        if (comBot) {
+          metricas.contar('bots_fila_pares')
+          metricas.amostra('bots_espera_ms', agora() - (ehBot(par.a) ? par.desde.b : par.desde.a))
+        } else {
+          metricas.contar('fila_pares')
+          metricas.amostra('fila_espera_ms', agora() - par.desde.a)
+          metricas.amostra('fila_espera_ms', agora() - par.desde.b)
+        }
         for (const [eu, outro] of [[par.a, par.b], [par.b, par.a]])
           enviar(eu, { t: 'pareado', id: par.id, oponente: oponente(outro), expiraEm: par.expira, restanteMs: Math.max(0, par.expira - agora()) })
       },
@@ -608,7 +674,7 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
         for (const [eu, outro] of [[par.a, par.b], [par.b, par.a]]) enviar(eu, { t: 'pareadoEstado', id: par.id, eu: par.confirmados.includes(eu), oponente: par.confirmados.includes(outro) })
       },
       desfeito(par, { volta, fora }) {
-        metricas.contar('fila_pares_desfeitos')
+        metricas.contar(ehBot(par.a) || ehBot(par.b) ? 'bots_fila_desfeitos' : 'fila_pares_desfeitos')
         const culpa = fora[0]?.motivo
         for (const c of volta) enviar(c, { t: 'pareadoFim', id: par.id, voltou: true, motivo: `${MOTIVO_VOLTA[culpa] ?? 'o oponente desistiu'}: voltando para a fila` })
         for (const { c, motivo } of fora) {
@@ -635,6 +701,9 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
 
   // os dois confirmaram: a sala casual, com o host já escolhido
   function escolherHost([primeiro, segundo]) {
+    // com bot, o host é sempre o jogador (o bot só sabe ser o convidado; o ping do bot já fica acima do dele)
+    if (ehBot(primeiro)) return { host: segundo, outro: primeiro, regra: 'bot' }
+    if (ehBot(segundo)) return { host: primeiro, outro: segundo, regra: 'bot' }
     const [p, q] = [primeiro.ping, segundo.ping]
     const medidos = Number.isFinite(p) && Number.isFinite(q)
     if (medidos && Math.abs(p - q) >= FOLGA_PING_MS) return p <= q ? { host: primeiro, outro: segundo, regra: 'menor ping' } : { host: segundo, outro: primeiro, regra: 'menor ping' }
@@ -890,7 +959,10 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
     // BOSS SEMANAL: a semana da partida é a do relógio daqui agora (fica fixa até ela acabar)
     if (sala.emPartida && !antes) sala.semanalFixo = sala.semanal ? semanaAgora() : null
     if (sala.emPartida && !antes) for (const id of sala.membros) if (clientes.get(id)) clientes.get(id).pausado = false
-    if (sala.emPartida && !antes) partidas.iniciar(sala, membrosDaPartida(sala))
+    if (sala.emPartida && !antes) {
+      partidas.iniciar(sala, membrosDaPartida(sala))
+      if (membrosDaSala(sala).some(ehBot)) metricas.contar('bots_partidas_iniciadas')
+    }
     else if (!sala.emPartida && antes) partidas.encerrou(sala)
     if (!sala.emPartida) sala.semanalFixo = null
     if (!sala.emPartida) {
@@ -1412,32 +1484,12 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
       return cliente
     },
     // ws: de qual conexão veio (a velha de uma vaga retomada não manda mais nada)
-    receber(c, texto, binario, ws = c.ws) {
-      const cliente = atual(c)
-      if (ws !== cliente.ws) return
-      if (!temFicha(cliente)) return
-      if (binario) {
-        const sala = salas.get(cliente.sala)
-        if (!sala || sala.host !== cliente.id) return // só o host transmite
-        for (const id of sala.membros) {
-          const outro = clientes.get(id)
-          // quadro velho não serve: se o outro lado está atrasado, pula
-          if (id !== cliente.id && outro.ws.readyState === 1 && outro.ws.bufferedAmount < 1_500_000) outro.ws.send(texto, { binary: true })
-        }
-        return
-      }
-      let m
-      try {
-        m = JSON.parse(texto)
-      } catch {
-        return
-      }
-      if (!m || typeof m.t !== 'string' || !Object.hasOwn(acoes, m.t)) return
-      if (!cliente.ok && m.t !== 'ola') return
-      acoes[m.t](cliente, m)
-    },
+    receber: (c, texto, binario, ws = c.ws) => receberTexto(c, texto, binario, ws),
     // convites pendentes (os testes conferem a expiração)
     expirarConvites,
+    // bots do JOGAR RÁPIDO (os testes conferem)
+    bots,
+    ehBot,
     // fila casual (os testes conferem os estados e vencem os prazos)
     fila,
     // registro das partidas (os testes conferem a política)
@@ -1456,6 +1508,31 @@ export function criarLobby({ deslocarSemana = 0, eleicaoMs = 0, locais = enderec
     },
     // vagas guardadas (os testes conferem)
     retomadas: () => retomadas.size,
+  }
+
+  function receberTexto(c, texto, binario, ws = c.ws) {
+    const cliente = atual(c)
+    if (ws !== cliente.ws) return
+    if (!temFicha(cliente)) return
+    if (binario) {
+      const sala = salas.get(cliente.sala)
+      if (!sala || sala.host !== cliente.id) return // só o host transmite
+      for (const id of sala.membros) {
+        const outro = clientes.get(id)
+        // quadro velho não serve: se o outro lado está atrasado, pula
+        if (id !== cliente.id && outro.ws.readyState === 1 && outro.ws.bufferedAmount < 1_500_000) outro.ws.send(texto, { binary: true })
+      }
+      return
+    }
+    let m
+    try {
+      m = JSON.parse(texto)
+    } catch {
+      return
+    }
+    if (!m || typeof m.t !== 'string' || !Object.hasOwn(acoes, m.t)) return
+    if (!cliente.ok && m.t !== 'ola') return
+    acoes[m.t](cliente, m)
   }
 }
 
@@ -1519,10 +1596,12 @@ function criarDescoberta(lobby, porta, log) {
 
 // online: servidor na internet (sem descoberta UDP, salas por código)
 // ice: [{ urls, username?, credential? }] para o WebRTC dos navegadores
-export function anexarLan(httpServer, { deslocarSemana = 0, log = console.log, descoberta = true, online = false, ice = [], maxClientes = MAX_CLIENTES, autenticar = null, relacoes = null, registro = null, metricas = METRICAS_NULA } = {}) {
+// bots: { ligado } (os bots do JOGAR RÁPIDO, server/bots/; DODGE_BOTS=0 desliga)
+export function anexarLan(httpServer, { deslocarSemana = 0, log = console.log, descoberta = true, online = false, ice = [], maxClientes = MAX_CLIENTES, autenticar = null, relacoes = null, registro = null, metricas = METRICAS_NULA, bots = null } = {}) {
   let rede = null
   const porta = () => httpServer.address()?.port
-  const lobby = criarLobby({ deslocarSemana, eleicaoMs: ELEICAO_MS, online, ice, autenticar, relacoes, registro, metricas, log, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
+  const lobby = criarLobby({ deslocarSemana, eleicaoMs: ELEICAO_MS, online, ice, autenticar, relacoes, registro, metricas, log, bots, salasRede: () => rede?.salas() ?? [], enderecos: () => (porta() ? enderecosDoJogo(porta()) : []) })
+  lobby.bots.iniciar()
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4 * 1024 * 1024 })
   if (descoberta && !online) rede = criarDescoberta(lobby, porta, log)
 
@@ -1561,6 +1640,7 @@ export function anexarLan(httpServer, { deslocarSemana = 0, log = console.log, d
     lobby,
     fechar() {
       clearInterval(batimento)
+      lobby.bots.fechar()
       lobby.partidas.fechar()
       lobby.campanha.fechar()
       rede?.fechar()
