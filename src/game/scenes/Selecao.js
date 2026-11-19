@@ -11,14 +11,14 @@ import { SORTEADA } from '../coop/expedicao.js'
 import { semLigaduras } from '../campanha/texto.js'
 import { infoSemanal, nomeDaSemana } from '../../lib/semanal.js'
 import { semanalAtual } from '../../lib/lan/rede.js'
-import { canal, emRede, souHostDaRede, irParaCena } from '../rede.js'
+import { emRede, souHostDaRede, irParaCena, meuLado } from '../rede.js'
+import VotacaoCena from '../coop/votacaoCena.js'
 
 const CARTA = { largura: 176, altura: 270, y: 245, passo: 200 } // 4 cartas largas: usam o 16:9 inteiro
 // EXPEDIÇÃO: 5 cartas (os 4 chefões e a SORTEADA), um pouco mais estreitas
 const CARTA_EXP = { largura: 150, altura: 270, y: 250, passo: 162 }
 // (com o BOSS SEMANAL da semana: 6 cartas, mais estreitas ainda)
 const CARTA_EXP6 = { largura: 136, altura: 270, y: 250, passo: 148 }
-const CURSOR_MS = 300 // em rede: de quanto em quanto o host manda o cursor de novo
 
 // A instância da cena é REAPROVEITADA pelo Phaser: o que a partida/abertura anterior
 // deixou aqui (objetos já destruídos, flags) volta ao inicial no começo do init().
@@ -28,17 +28,19 @@ const estadoInicial = () => ({
   modo: 'rapida',
   ordem: ORDEM_CHEFES,
   carta: CARTA,
+  voto: null,
+  semente: null,
 })
 
 // Tela de seleção de chefe (com a dificuldade base); depois vem a tela do nível (Dificuldade)
 // B: volta para a escolha da party (EscolhaParty)
 // Dados (opcionais): { party, chefe } (party: os ids, na ordem; sem ela, a do
 // registry 'party'; chefe: onde o cursor começa)
-// EM REDE (sala CO-OP, game/rede.js, docs/rede-pvp.md): quem escolhe é o HOST.
-// O cursor dele vai para o convidado ('cursor', rápida, repetida de tempos em
-// tempos) e o A dele também ('confirmou'), para o convidado ver a mesma
-// confirmação; o host leva os dois para a Dificuldade (irParaCena). O B do
-// host volta os dois para a EscolhaParty; o do convidado só lembra quem escolhe.
+// EM REDE (sala CO-OP, game/rede.js, docs/rede-pvp.md): NINGUÉM escolhe sozinho (docs/coop-cartas.md "Votação do
+// CO-OP"). Cada um move o próprio coração e vota com A (dá para trocar até os 20 s acabarem); o mais votado
+// vence, empate = sorteio com roleta (coop/votacaoCena.js). Na EXPEDIÇÃO a SORTEADA e o BOSS SEMANAL da semana
+// são cartas como as outras. O host apura e leva todos para a Dificuldade (irParaCena). O B do host volta
+// os dois para o ModoCoop; o do convidado só lembra quem manda nas telas.
 // o boss semanal que a Selecao da expedição mostra: { chefe, semana } (o da sala online; fora dela, o do relógio)
 function semanalDaSelecao() {
   const online = semanalAtual()
@@ -55,6 +57,7 @@ export default class Selecao extends Phaser.Scene {
     Object.assign(this, estadoInicial())
     this.party = Array.isArray(dados?.party) ? dados.party : null
     this.chefeInicial = dados?.chefe ?? null
+    this.semente = typeof dados?.semente === 'string' ? dados.semente : null // o sorteio dos empates (igual em todos os PCs)
     // EXPEDIÇÃO (ModoCoop): os 4 chefões e a SORTEADA (lacaios de um, tenente de outro, chefão surpresa)
     this.modo = dados?.modo === 'expedicao' ? 'expedicao' : 'rapida'
     // + o BOSS SEMANAL da semana (docs/boss-semanal.md: ele é sempre uma expedição; o da sala online, ou o do relógio
@@ -66,9 +69,10 @@ export default class Selecao extends Phaser.Scene {
 
   create() {
     this.controles = new Controles(this)
-    this.controles.onBotao((_, botao) => (botao === 'A' ? this.confirmar() : this.voltar()))
+    this.controles.onBotao((_, botao) => (botao === 'A' ? this.aoA() : this.voltar()))
     this.rede = emRede()
-    this.host = !this.rede || souHostDaRede() // quem escolhe (fora da rede, quem está jogando)
+    this.host = !this.rede || souHostDaRede() // quem leva a turma adiante (fora da rede, quem está jogando)
+    this.semente ??= `coop:${Date.now()}`
     // em rede a party vem nos dados (o registry é de cada PC): guarda aqui também
     // (a Vitoria mostra a party do registry)
     if (this.party) this.registry.set('party', this.party)
@@ -112,8 +116,7 @@ export default class Selecao extends Phaser.Scene {
 
     this.cursor = this.add.image(0, 0, 'coracao').setTint(CORES.almas[0]).setScale(1.8)
     this.info = texto(LARGURA / 2, ALTURA - 56, '', 15)
-    // (o convidado só olha: o texto de cima já diz que o host está escolhendo)
-    const dica = this.host ? '← → escolher     A: confirmar     B: voltar' : ''
+    const dica = this.rede ? '← → escolher     A: votar (dá para trocar)' + (this.host ? '     B: voltar' : '') : '← → escolher     A: confirmar     B: voltar'
     texto(LARGURA / 2, ALTURA - 30, dica, 14, TEXTO.desabilitado)
 
     const atual = this.ordem.indexOf(this.chefeInicial ?? this.registry.get('chefe'))
@@ -125,21 +128,29 @@ export default class Selecao extends Phaser.Scene {
 
   // ---------- em rede ----------
 
+  // a votação por cima das cartas (os votos embaixo de cada uma)
   ligarRede() {
-    if (this.host) {
-      this.mandarCursor()
-      this.time.addEvent({ delay: CURSOR_MS, loop: true, callback: () => this.mandarCursor() })
-      return
-    }
-    const desligar = [
-      canal.ao('cursor', (d) => d?.tela === 'chefe' && !this.escolhido && this.ordem[d.indice] && d.indice !== this.indice && this.selecionar(d.indice)),
-      canal.ao('confirmou', (d) => d?.tela === 'chefe' && this.ordem[d.indice] && this.confirmar(d.indice)),
-    ]
-    this.events.once('shutdown', () => desligar.forEach((fn) => fn()))
+    this.voto = new VotacaoCena(this, {
+      tela: 'chefe',
+      opcoes: [...this.ordem],
+      semente: this.semente,
+      caixa: (i) => ({ x: this.cartas[i].x, y: this.cartas[i].y, w: this.carta.largura + 10, h: this.carta.altura + 10 }),
+      posMarca: (i, k, n) => ({ x: this.cartas[i].x + (k - (n - 1) / 2) * 30, y: this.carta.y + this.carta.altura / 2 + 16 }),
+      anuncioY: ALTURA - 56,
+      contagemY: 190,
+      nomeDe: (id) => (id === SORTEADA ? 'SORTEADA' : CHEFES[id].nome.toUpperCase()),
+      aoRevelar: () => {
+        this.cursor.setVisible(false)
+        this.info.setVisible(false)
+      },
+      aoApurar: (_id, indice) => this.confirmar(indice),
+    })
+    this.events.once('shutdown', () => this.voto?.destruir())
   }
 
-  mandarCursor() {
-    if (!this.escolhido) canal.enviarRapido('cursor', { tela: 'chefe', indice: this.indice })
+  aoA() {
+    if (this.rede) return this.voto?.votar(this.ordem[this.indice])
+    this.confirmar()
   }
 
   selecionar(indice, comSom = true) {
@@ -159,30 +170,28 @@ export default class Selecao extends Phaser.Scene {
     this.fundo.escurecer()
   }
 
-  // doHost: em rede, no convidado, o índice que o host confirmou
+  // doHost: em rede, o índice que a votação elegeu (em todos os PCs)
   confirmar(doHost = null) {
     if (this.escolhido) return
-    if (!this.host && doHost == null) return this.soHost()
     if (doHost != null) this.selecionar(doHost, false)
     this.escolhido = true
     tocar(this, 'confirmar')
     claraoCamera(this.cameras.main, 200, 255, 255, 255)
     this.cameras.main.fadeOut(300, 0, 0, 0)
-    if (this.rede && this.host) canal.enviar('confirmou', null, { tela: 'chefe', indice: this.indice })
     if (!this.host) return // o convidado espera a Dificuldade chegar
     // a party vai junto: em rede o registry do convidado não é o do host
-    const dados = { chefe: this.ordem[this.indice], party: this.party ?? partyDe(this.registry), nivel: this.registry.get('nivel'), modo: this.modo }
+    const dados = { chefe: this.ordem[this.indice], party: this.party ?? partyDe(this.registry), nivel: this.registry.get('nivel'), modo: this.modo, semente: this.semente }
     this.time.delayedCall(320, () => (this.rede ? irParaCena(this, 'Dificuldade', dados) : this.scene.start('Dificuldade', dados)))
   }
 
   voltar() {
-    if (this.escolhido) return
+    if (this.escolhido || this.voto?.apurando) return
     if (!this.host) return this.soHost()
     this.escolhido = true
     tocar(this, 'cancelar')
     this.cameras.main.fadeOut(200, 0, 0, 0)
     // B volta para a escolha do modo (ModoCoop), com a party
-    const dados = { party: this.party ?? partyDe(this.registry), modo: this.modo }
+    const dados = { party: this.party ?? partyDe(this.registry), modo: this.modo, semente: this.semente }
     this.time.delayedCall(220, () => (this.rede ? irParaCena(this, 'ModoCoop', dados) : this.scene.start('ModoCoop', dados)))
   }
 
@@ -196,16 +205,18 @@ export default class Selecao extends Phaser.Scene {
 
   update(time, delta) {
     this.controles.atualizar()
-    const n = this.controles.numJogadores
-    for (let j = 0; j < n && this.host && !this.escolhido; j++) {
+    // em rede cada PC move o próprio coração (o meu lado); fora dela, todos os controles daqui
+    const lados = this.rede ? [meuLado()] : [...Array(this.controles.numJogadores).keys()]
+    for (const j of lados) {
+      if (this.escolhido || this.voto?.apurando) break
       const direcao = this.controles.toque(j)
       if (direcao === 'esquerda' || direcao === 'cima') this.selecionar(this.indice - 1)
       if (direcao === 'direita' || direcao === 'baixo') this.selecionar(this.indice + 1)
-      if (this.rede && direcao) this.mandarCursor()
     }
+    this.voto?.atualizar(delta)
     this.fundo?.atualizar(delta)
     this.cursor.setY(this.cartas[this.indice].y - this.carta.altura / 2 - 18 + Math.sin(time / 200) * 3)
-    if (this.rede) this.info.setText(this.host ? 'você é o host da partida: você escolhe o chefe' : 'o host da partida está escolhendo o chefe...')
+    if (this.rede) this.info.setText(`Votem no ${this.modo === 'expedicao' ? 'chefão' : 'chefe'} — o mais votado ganha; empate: sorteio`)
     else {
       const jogadores = this.registry.get('numJogadores') ?? 1
       this.info.setText(`${jogadores} ${jogadores > 1 ? 'JOGADORES' : 'JOGADOR'}  (o 2º entra na escolha da party)`)

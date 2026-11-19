@@ -161,7 +161,9 @@ import { infoSemanal } from '../src/lib/semanal.js'
 // EXPEDIÇÃO (PROTOCOLO 22, docs/coop-cartas.md "Expedição"): o relato do CO-OP leva `expedicao {chefe, lutas, sorteada}`
 // e a `recompensa` volta com `expedicao {xp, completa, cosmetico, cosmeticoNovo, bau, bauHoje}`; no canal da partida, os
 // votos entre as lutas (`expVoto`, `expVotos`, `expEscolha`; o host decide)
-export const PROTOCOLO = 22
+// VOTAÇÃO DO CO-OP (PROTOCOLO 23, docs/coop-cartas.md "Votação do CO-OP"): o modo, o chefe e o nível do CO-OP online são votados
+// por todos (`coopVoto`, `coopVotos`, `coopResultado` no canal da partida; o servidor só repassa e o host apura)
+export const PROTOCOLO = 23
 export const PORTA_DESCOBERTA = 47777
 // Fase 5A: o tamanho de cada modo (min para começar, max da sala). emBreve: a sala
 // aceita o modo, mas a partida dele ainda não existe (o lobby mostra "em breve")

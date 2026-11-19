@@ -81,7 +81,10 @@ import { criarReligar, guardarChave, lerChave, apagarChave } from './religar.js'
 // `regra` (pelo canal, entre os PCs; o servidor só repassa) e o `contra` leva a QUEBRA: um PC de versão velha
 // não pode jogar CO-OP com um novo
 // EXPEDIÇÃO (PROTOCOLO 22, docs/coop-cartas.md "Expedição"): `resultado` do CO-OP com `expedicao`; votos no canal
-export const PROTOCOLO = 22
+// VOTAÇÃO DO CO-OP (PROTOCOLO 23, docs/coop-cartas.md "Votação do CO-OP"): modo, chefe e nível do CO-OP online são votados por todos
+// (canal da partida: `coopVoto`, `coopVotos`, `coopResultado`; o host apura). Um PC de versão velha, onde só o host escolhe, não
+// joga CO-OP com um novo
+export const PROTOCOLO = 23
 export const PORTA_PADRAO = 5180
 const CHAVE_NOME = 'dodge-lan-nome'
 const MAX_CHAT = 40 // mensagens guardadas
