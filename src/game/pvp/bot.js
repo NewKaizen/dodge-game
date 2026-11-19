@@ -2,6 +2,7 @@
 // testável em Node. A esquiva do bot fica em pvp/botEsquiva.js.
 //
 //   const id = escolherJogada(estado, 1, { nivel: 'normal', rng })   // id da carta ou null (passar)
+//   (nivel também pode ser o próprio objeto { ruido, paciencia }: os bots do JOGAR RÁPIDO, server/bots/)
 //
 // Como pensa (cada carta jogável ganha uma nota; a maior vence, com um pouco de
 // sorteio para não ficar previsível):
@@ -94,7 +95,7 @@ function notaDeGuardarSuper(estado, j, nivel) {
 
 // id da carta que o bot joga (ou null para passar)
 export function escolherJogada(estado, j, { nivel = NIVEL_BOT_PADRAO, rng } = {}) {
-  const cfg = NIVEIS_BOT[nivel] ?? NIVEIS_BOT[NIVEL_BOT_PADRAO]
+  const cfg = (nivel && typeof nivel === 'object' ? nivel : NIVEIS_BOT[nivel]) ?? NIVEIS_BOT[NIVEL_BOT_PADRAO]
   const sorte = () => (rng ? aleatorio(rng) : Math.random())
   const jogaveis = cartasJogaveis(estado, j)
   if (!jogaveis.length) return null

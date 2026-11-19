@@ -30,6 +30,13 @@
 //   fechado(par, [primeiro, segundo])     os dois confirmaram (na ordem da confirmação)
 //
 // agendar(fn, ms) devolve uma função que cancela.
+//
+// BOTS (docs/online.md "Bots do Jogar Rápido", server/bots/): com `bots` ligado, quem está PROCURANDO há
+// mais que o próprio limiar (sorteado a cada entrada, bots.limiarMs(): 8 a 20 s) sem achar gente ganha
+// um bot de oponente. O par é o de sempre (pareado -> confirmar -> sala casual): o bot confirma como
+// gente. Gente sempre pareia primeiro (o bot só entra quando ninguém serviu); o bot nunca fica na
+// espera (num par desfeito, ele sai em vez de voltar para a fila).
+//   bots = { limiarMs() -> ms, oferecer(c) -> cliente do bot | null, ehBot(c) -> bool }
 import crypto from 'node:crypto'
 
 export const CONFIRMAR_MS = 10_000 // para os dois aceitarem a partida achada
@@ -46,7 +53,7 @@ export const agendarPadrao = (fn, ms) => {
   return () => clearTimeout(t)
 }
 
-export function criarFila({ agora = Date.now, agendar = agendarPadrao, podeParear = () => true, avisos = {}, confirmarMs = CONFIRMAR_MS } = {}) {
+export function criarFila({ agora = Date.now, agendar = agendarPadrao, podeParear = () => true, avisos = {}, confirmarMs = CONFIRMAR_MS, bots = null } = {}) {
   const espera = [] // [{ c, desde }] na ordem da fila
   const pares = new Map() // id do par -> par
   const parDe = new Map() // cliente -> par
@@ -55,11 +62,62 @@ export function criarFila({ agora = Date.now, agendar = agendarPadrao, podeParea
   const naEspera = (c) => espera.findIndex((e) => e.c === c)
   const estado = (c) => (parDe.has(c) ? 'pareado' : naEspera(c) >= 0 ? 'procurando' : 'fora')
 
+  const ehBot = (c) => Boolean(bots?.ehBot?.(c))
+
   function colocar(c, desde, frente) {
-    const item = { c, desde }
+    const item = { c, desde, limiar: null, cancelarBot: null }
     if (frente) espera.unshift(item)
     else espera.push(item)
     avisar('procurando', c, desde)
+    vigiarBot(item, frente)
+  }
+
+  // o limiar deste jogador (quem volta de um par desfeito espera de novo, mais curto)
+  function vigiarBot(item, voltou = false) {
+    if (!bots?.oferecer) return
+    const ms = Math.max(0, Math.round((bots.limiarMs?.() ?? 15_000) * (voltou ? 0.5 : 1)))
+    item.limiar = agora() + ms
+    item.cancelarBot?.()
+    item.cancelarBot = agendar(() => {
+      item.cancelarBot = null
+      oferecerBots()
+    }, ms + 20)
+  }
+
+  // quem passou do limiar sem gente: um bot (se tiver um livre); senão tenta de novo daqui a pouco
+  function oferecerBots() {
+    const t = agora()
+    for (const item of [...espera]) {
+      if (item.limiar == null || item.limiar > t || espera.indexOf(item) < 0) continue
+      const bot = bots.oferecer(item.c)
+      if (!bot) {
+        item.limiar = t + 4000
+        item.cancelarBot?.()
+        item.cancelarBot = agendar(() => {
+          item.cancelarBot = null
+          oferecerBots()
+        }, 4020)
+        continue
+      }
+      espera.splice(espera.indexOf(item), 1)
+      item.cancelarBot?.()
+      formarPar(item, { c: bot, desde: t })
+    }
+  }
+
+  const tirar = (i) => {
+    const [item] = espera.splice(i, 1)
+    item?.cancelarBot?.()
+    return item
+  }
+
+  function formarPar(a, b) {
+    const par = { id: crypto.randomBytes(8).toString('hex'), a: a.c, b: b.c, desde: { a: a.desde, b: b.desde }, expira: agora() + confirmarMs, confirmados: [], cancelar: null }
+    par.cancelar = agendar(verificar, confirmarMs + 50)
+    pares.set(par.id, par)
+    parDe.set(par.a, par)
+    parDe.set(par.b, par)
+    avisar('pareado', par)
   }
 
   // junta o que der: cada um com o primeiro compatível depois dele
@@ -69,15 +127,10 @@ export function criarFila({ agora = Date.now, agendar = agendarPadrao, podeParea
       const j = espera.findIndex((b, k) => k > i && podeParear(a.c, b.c))
       if (j < 0) continue
       const b = espera[j]
-      espera.splice(j, 1)
-      espera.splice(i, 1)
+      tirar(j)
+      tirar(i)
       i--
-      const par = { id: crypto.randomBytes(8).toString('hex'), a: a.c, b: b.c, desde: { a: a.desde, b: b.desde }, expira: agora() + confirmarMs, confirmados: [], cancelar: null }
-      par.cancelar = agendar(verificar, confirmarMs + 50)
-      pares.set(par.id, par)
-      parDe.set(par.a, par)
-      parDe.set(par.b, par)
-      avisar('pareado', par)
+      formarPar(a, b)
     }
   }
 
@@ -97,8 +150,9 @@ export function criarFila({ agora = Date.now, agendar = agendarPadrao, podeParea
     const culpados = new Set(falhou.map((f) => f.c))
     const volta = [par.a, par.b].filter((c) => !culpados.has(c))
     avisar('desfeito', par, { volta, fora: falhou })
+    // o bot não volta para a espera (ele sai; o lobby desliga o cliente dele)
     // de trás para frente: quem esperava há mais tempo fica na frente
-    for (const c of [...volta].sort((x, y) => desdeDe(par, y) - desdeDe(par, x))) if (estado(c) === 'fora') colocar(c, desdeDe(par, c), true)
+    for (const c of [...volta].sort((x, y) => desdeDe(par, y) - desdeDe(par, x))) if (estado(c) === 'fora' && !ehBot(c)) colocar(c, desdeDe(par, c), true)
     parear()
   }
   const desdeDe = (par, c) => (c === par.a ? par.desde.a : par.desde.b)
@@ -124,7 +178,7 @@ export function criarFila({ agora = Date.now, agendar = agendarPadrao, podeParea
     sair(c, motivo = 'saiu') {
       const i = naEspera(c)
       if (i >= 0) {
-        espera.splice(i, 1)
+        tirar(i)
         return true
       }
       const par = parDe.get(c)
@@ -154,6 +208,8 @@ export function criarFila({ agora = Date.now, agendar = agendarPadrao, podeParea
     verificar,
     // reavalia quem pode parear com quem (ex.: mudou um bloqueio)
     parear,
+    // bots: quem já passou do limiar ganha um bot agora (os testes chamam; o timer também)
+    oferecerBots: () => bots?.oferecer && oferecerBots(),
     tamanho: () => espera.length,
     pares: () => pares.size,
   }

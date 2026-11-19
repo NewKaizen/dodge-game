@@ -252,6 +252,14 @@ export function criarRegistro(supabase) {
       const d = await chamar('equipar_conta', { p_uid: usuario, p_tipo: tipo, p_item: item ?? null })
       return Array.isArray(d) ? d[0] : d
     },
+    // BOTS DO JOGAR RÁPIDO (0019, server/bots/): só o servidor (a tabela public.bots não tem policy nenhuma)
+    listarBots: async () => {
+      const d = await chamar('bots_listar', {})
+      return Array.isArray(d) ? d : []
+    },
+    perfilDeBot: async (id) => (await chamar('bot_perfil', { p_user: id })) ?? null,
+    criarBot: (spec) => chamar('criar_bot', { p_spec: spec }),
+    atividadeDeBot: (id, x) => chamar('bot_atividade', { p_user: id, p_partidas: x.partidas, p_vitorias: x.vitorias, p_xp: x.xp }),
     conquistasDaConta: async (usuario) => {
       const d = (await chamar('conquistas_da_conta', { p_user: usuario })) ?? {}
       return {

@@ -3,6 +3,7 @@ import { defineConfig } from 'vite'
 import { anexarLan } from './server/lan.js'
 import { iniciarContas } from './server/contas.js'
 import { criarContasFalsas } from './server/contasFalsas.js'
+import { botsLigados } from './server/bots/index.js'
 
 // Lobby do modo LAN (server/lan.js) também no `npm run dev` e no `vite preview`.
 // Para o outro PC alcançar o dev: `npm run dev -- --host`. O jeito normal é `npm run lan`.
@@ -16,7 +17,7 @@ const ligar = async (server) => {
   const contas = await iniciarContas(process.env)
   server.middlewares.use((req, res, next) => (contas.tratar(req, res) ? undefined : next()))
   const teste = falsas ? criarContasFalsas() : null
-  if (server.httpServer) anexarLan(server.httpServer, { online, autenticar: teste?.autenticar ?? contas.autenticar, relacoes: contas.relacoes, registro: teste?.registro ?? contas.registro, deslocarSemana: falsas ? 7 * 86_400_000 * (Number(process.env.DODGE_SEMANA) || 0) : 0 })
+  if (server.httpServer) anexarLan(server.httpServer, { online, autenticar: teste?.autenticar ?? contas.autenticar, relacoes: contas.relacoes, registro: teste?.registro ?? contas.registro, bots: { ligado: botsLigados() }, deslocarSemana: falsas ? 7 * 86_400_000 * (Number(process.env.DODGE_SEMANA) || 0) : 0 })
 }
 const lan = () => ({
   name: 'dodge-lan',
