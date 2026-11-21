@@ -177,7 +177,10 @@ test('a regra do Jevil: a descrição é UMA frase e a rolagem do início da rod
   regra.inicioDaRodada(3)
   const esperado = rolarDado({ semente: 'teste', rodada: 3, fase: 0 }).map((d) => d.id)
   assert.deepEqual(regra.inst.facesDaRodada(), esperado)
-  assert.deepEqual(regra.inst.previa(), rolarDado({ semente: 'teste', rodada: 4, fase: 0 }).map((d) => d.id))
+  assert.deepEqual(regra.inst.previaDoDado(), rolarDado({ semente: 'teste', rodada: 4, fase: 0 }).map((d) => d.id))
+  // o gancho `previa` (a prévia da carta do chefe) não é trocado pela lista de faces
+  const p = { tipo: 'carta', carta: { naipe: 'copas', valor: 3 } }
+  assert.equal(regra.previa(p), p)
   regra.faseNova(2)
   estado.rodada = 5
   regra.inicioDaRodada(5)

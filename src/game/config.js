@@ -55,10 +55,21 @@ import Religando from './religando.js'
 // o conteúdo dos cosméticos dos slots novos (som de dano, efeito, lançamento, moldura animada)
 import './cosmeticosRegistro.js'
 
+// (dev e testes) ?renderer=canvas|webgl força o renderer, para medir um contra o outro
+// (docs/desempenho.md). Fora do dev só vale num build com VITE_FERRAMENTAS_PERF=1; no build
+// normal a conta some e fica o AUTO de sempre.
+function tipoDoRenderer() {
+  if (!(import.meta.env?.DEV || import.meta.env?.VITE_FERRAMENTAS_PERF === '1')) return Phaser.AUTO
+  const pedido = new URLSearchParams(globalThis.location?.search ?? '').get('renderer')
+  if (pedido === 'canvas') return Phaser.CANVAS
+  if (pedido === 'webgl') return Phaser.WEBGL
+  return Phaser.AUTO
+}
+
 // tamanho: { largura, altura, zoomCss } de prepararResolucao() (resolucao.js)
 export function criarConfig(parent, { largura = LARGURA, altura = ALTURA, zoomCss = 1 } = {}) {
   return {
-    type: Phaser.AUTO,
+    type: tipoDoRenderer(),
     parent,
     width: largura,
     height: altura,

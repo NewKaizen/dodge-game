@@ -25,3 +25,6 @@ dist-ssr
 
 # cache do Python (scripts/)
 __pycache__/
+
+# medidas de desempenho locais (scripts/perf/)
+perf-resultados/

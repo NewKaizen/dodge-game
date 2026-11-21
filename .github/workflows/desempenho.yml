@@ -1,0 +1,43 @@
+# DESEMPENHO E PARIDADE VISUAL (docs/desempenho.md). DESLIGADO de propósito: só roda pelo botão
+# "Run workflow" (workflow_dispatch), nunca sozinho em PR.
+#
+# Por quê: o orçamento (docs/perf-budget.json) foi medido numa máquina só. Um runner padrão do
+# GitHub tem CPU diferente (e variável de uma execução para outra), então o perf:check aqui mede
+# outra coisa e pode falhar ou passar por acaso. Para ligar de verdade em PR:
+#   1. rodar este workflow algumas vezes e medir a variação entre execuções;
+#   2. gerar um orçamento PRÓPRIO do runner (npm run perf:check -- --atualizar --orcamento=docs/perf-budget-ci.json)
+#      e apontar o passo abaixo para ele;
+#   3. trocar o `on:` por `pull_request: { paths: ['src/game/**'] }`.
+# A paridade visual (pixels) não depende da velocidade da máquina e é a parte mais confiável aqui.
+name: desempenho
+
+on:
+  workflow_dispatch:
+
+jobs:
+  desempenho:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # a paridade extrai o main com git archive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: paridade visual (main x este commit)
+        run: |
+          git fetch origin main:main || true
+          npm run paridade:base
+          npm run paridade
+      - name: perf:check (orçamento da máquina de referência; ver o aviso no topo)
+        run: npm run perf:check
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: perf-resultados
+          path: perf-resultados/
