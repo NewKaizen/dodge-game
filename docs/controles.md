@@ -1,16 +1,67 @@
 # Controles
 
-O jogo se liga ao primeiro controle que o jogador usar, **sem nenhum botão para clicar**. Teclado, controle físico (gamepad) e joysticks serial (Arduino, um por porta USB) podem estar ligados ao mesmo tempo.
+O jogo se liga ao primeiro controle que o jogador usar, **sem nenhum botão para clicar**. Teclado, controle físico (gamepad), joysticks serial (Arduino, um por porta USB) e o **toque na tela** (celular e tablet, seção [Celular / toque](#celular--toque)) podem estar ligados ao mesmo tempo.
 
 | Controle | Como liga | O que ainda exige clique |
 | --- | --- | --- |
 | Teclado | A primeira tecla do jogo (WASD, setas, Espaço, Enter, C, P, Esc, as remapeadas) apertada na página. Direções valem na hora; a primeira A/B/C só "acorda" | Nada |
 | Controle físico | O primeiro botão apertado (o navegador só mostra o controle à página depois disso). Mexer só o analógico não liga | Nada |
+| Toque (celular / tablet) | O primeiro toque na tela. Os controles aparecem sozinhos em tela de toque (`pointer: coarse` ou depois de um toque de verdade); com mouse, nunca | Nada |
 | Joystick serial (um Arduino por porta USB) | Ao abrir a página, o jogo reabre sozinho **todas** as portas já autorizadas (`navigator.serial.getPorts`) e religa cada uma quando o cabo é plugado de novo (evento `connect`). Cada porta é uma fonte; a 1ª é o jogador 1, a 2ª o jogador 2 | **O primeiro pareamento de cada placa**: o navegador só abre a lista de portas (`requestPort`) com um gesto do jogador. CONFIGURAÇÕES → GAMEPAD → CONECTAR JOYSTICK SERIAL (A no teclado), uma vez por joystick |
 
 Navegador sem Web Serial (Firefox, Safari): a opção CONECTAR JOYSTICK SERIAL nem aparece.
 
 A barra de cima da página mostra só um resumo discreto ("controles: teclado · controle · 2 jogadores") e o botão de tela cheia (tecla F). Não há botão para escolher o número de jogadores: o jogo decide sozinho (seção abaixo). Antes de qualquer entrada, o menu inicial fica apagado e pede "aperte uma tecla ou um botão do controle".
+
+## Celular / toque
+
+O jogo inteiro roda no navegador do celular e do tablet (Chrome do Android e Safari do iPhone/iPad): menus, PVP, CO-OP, Expedição, campanha, online e contas. O toque é **mais uma fonte de entrada** no mesmo modelo das outras: os dedos viram as mesmas linhas `JOY` / `BTN` do protocolo ([protocolo-serial.md](protocolo-serial.md)), então nenhuma cena sabe que é toque. O toque é sempre o **jogador 1** e não conta como 2ª fonte para a detecção de 2 jogadores (dois jogadores no mesmo celular não existe; um controle ligado no celular continua sendo o jogador 1 junto com a tela).
+
+### Os controles na tela
+
+| Onde | O quê |
+| --- | --- |
+| Lado esquerdo (42% da largura) | **Joystick flutuante**: nasce onde o polegar encosta; arrastando além da borda, a base vem junto. Na caixa ele é **analógico** (`passoDoCoracao` já aceita -100..100 e limita o vetor a 1: diagonais suaves, inclinar pouco anda devagar). Zona morta de 14% do raio e 100% a 85% do raio. Parado, só um lembrete pequeno no canto |
+| Direita, embaixo | **A** (grande, 80 px) e **B** (66 px), na diagonal para o polegar |
+| Canto de cima à direita | **❚❚ pausa** (o C) e, onde o navegador deixa, **tela cheia**. Ficam em coluna: no celular deitado cabem na faixa preta ao lado do jogo e não cobrem o placar |
+
+- **Menus**: o joystick vira direção digital com **repetição** (segurando: de novo depois de 450 ms e a cada 120 ms) e **histerese** perto da diagonal (a direção não pula entre dois eixos; só troca quando o outro eixo passa com 25% de folga, e só solta abaixo de 60% do limiar). Só vale enquanto o joystick da tela está inclinado: teclado, controle e joystick serial continuam como sempre. As telas que já repetem sozinhas (barras de CONFIGURAÇÕES, Grimório) põem `controles.repetirToque = false`.
+- **Toque direto**: um toque rápido (até 450 ms, sem inclinar) no lado do joystick passa para a tela como clique: escolhe a opção do menu inicial, a aba e a linha de CONFIGURAÇÕES e o que mais já aceitava mouse (as outras telas seguem no joystick e no A/B). No resto da tela (fora dos botões) o dedo vai direto para o jogo.
+- **Multitoque**: cada dedo é um `pointerId`; o joystick e o A/B funcionam juntos. Um segundo dedo no lado do joystick não rouba o primeiro; dois dedos no mesmo botão apertam uma vez.
+- **Vibração**: `navigator.vibrate` de leve ao apertar A/B/C e quando o joystick muda de direção (Android; o iPhone não deixa o site vibrar).
+- **Visual**: semitransparente, quadrado com borda branca de 3 px (as caixas do jogo) e contorno preto, fonte pixelada; aperta e acende na cor (A vermelho, B ciano, pausa amarelo).
+- Os eventos de toque que nascem nos controles param ali (`preventDefault`): o Phaser ouve os toques da janela inteira e escolheria a opção do menu embaixo do polegar.
+
+CONFIGURAÇÕES → **TOQUE**: **CONTROLES NA TELA** (AUTOMÁTICO / SEMPRE / ESCONDIDOS), **TAMANHO** (70% a 150%), **OPACIDADE** (20% a 90%, padrão 55%), **VIBRAR AO TOCAR** e RESTAURAR PADRÃO. Preferências `toqueControles`, `toqueTamanho`, `toqueOpacidade`, `toqueVibrar` (validadas em `preferencias.js`). Com ESCONDIDOS o toque vai direto para a tela: dá para voltar tocando na linha (a metade da direita avança o valor).
+
+### A página no celular
+
+- **Modo app** (classe `modo-toque` no `<html>`, posta por `lib/toque.js` em tela de toque): some a barra de cima e o rodapé, o palco ocupa a tela inteira menos as **margens seguras** (`env(safe-area-inset-*)`: notch e barra do iPhone; `viewport-fit=cover`). `game/resolucao.js` mede o palco e encaixa o 854x480 sem os passos de 5%.
+- **Deitado primeiro**: em pé aparece "GIRE O CELULAR" (e uma partida local pausa, como ao perder o foco: `entrada-perdida`).
+- **Tela cheia**: no primeiro toque (o `pointerup`, que é o gesto que o navegador aceita) o jogo pede tela cheia e trava a tela deitada (`screen.orientation.lock('landscape')`, só no Android). Uma vez só; depois, o botão do canto. O Safari do iPhone não tem tela cheia de elemento nem trava: fica a tela "gire" e as margens seguras. No iPad o botão usa `webkitRequestFullscreen`.
+- **Sem zoom nem rolagem**: `user-scalable=no` e `maximum-scale=1` no viewport, `gesturestart` cancelado (o Safari ignora o `user-scalable`), `touch-action: none` na área do jogo e `manipulation` no resto, `overscroll-behavior: none` (sem "puxar para recarregar"), sem seleção de texto nem menu de toque longo nos controles.
+- **Texto**: as telas que digitam (nome, código da sala, chat, IP; `capturarTexto` em `lib/simulador.js`) abrem, no modo toque, um campo de verdade no alto da tela (`lib/campoToque.js`) com OK e ✕: é ele que chama o teclado da tela. O texto passa pelo mesmo filtro e limite. As telas em Svelte (foto do perfil, recorte) usam botões de 44 px no mínimo com `pointer: coarse`.
+- **App na tela inicial (PWA)**: `public/manifest.webmanifest` (`display: fullscreen`, `orientation: landscape`, cor do tema, ícones do coração em `public/icones/`, gerados por `node scripts/gerar-icones-app.mjs`) e `apple-touch-icon`. **Sem service worker** de propósito: nada de build velha em cache.
+- **Som**: o celular só libera o áudio num gesto, e no iPhone o gesto que vale é o `touchend`/`pointerup`/`click`. `lib/destravarAudio.js` retoma o contexto único do jogo (efeitos, Phaser e a música MIDI do soundfont) nesses eventos, para sempre (o iPhone deixa o contexto "interrupted" depois de ligação ou bloqueio de tela), e toca um buffer mudo no primeiro. `game/midi.js` também tenta de novo no `pointerup`/`touchend`.
+- **Segundo plano** (trocar de app, bloquear a tela): o celular dispara `visibilitychange`; vale o mesmo de uma aba escondida ([rede-pvp.md](rede-pvp.md) "Aba em segundo plano e pausa online"): partida local pausa (`entrada-perdida`), numa sala o jogo continua pelo relógio de fundo com o coração parado e os outros veem AUSENTE. Os dedos são soltos (`blur`, `pagehide`, `visibilitychange`).
+
+### Desempenho
+
+- No modo toque o canvas usa no máximo **1,5** pixel do aparelho por pixel CSS (celulares têm dpr 2,6 a 3) e **1x** com GRÁFICOS no MÍNIMO. Pixel 7 deitado: canvas de 1466x824 para 1100x618.
+- Desenhos parados com milhares de comandos de `Graphics` viram textura uma vez só (`arte/assar.js`): o verso e a frente clássica das cartas (de ~3 mil e ~1 mil comandos por carta, refeitos todo quadro) e o piso do CASTELO (~480 losangos; agora só os que a onda de brilho cruza são redesenhados, com triângulos em vez de `fillPoints`/earcut).
+- Medido com o Playwright (Chromium sem GPU, desenho em software (SwiftShader): serve para comparar antes/depois, não é o FPS de um celular de verdade), Pixel 7 deitado: esquiva do PVP de **17 para 31 FPS**; com a CPU 4x mais lenta (`Emulation.setCPUThrottlingRate` 4) o menu foi de 12 para 18 FPS e a esquiva fica em ~17 FPS (iPhone 14: menu 21 FPS). No perfil o JavaScript já é pequeno: o resto é o desenho em software, que num aparelho de verdade vai para a GPU.
+- Ainda pesado, para depois: outros fundos de arena com `Graphics` redesenhado todo quadro e o gravador do replay do fim de partida (uma foto da caixa por quadro).
+
+### Onde está o código
+
+- [src/game/toque.js](../src/game/toque.js): a conta (joystick, histerese, repetição, multitoque), testada em `src/game/__tests__/toque.test.js`.
+- [src/lib/toque.js](../src/lib/toque.js): a fonte `toque`, modo app, tela cheia no 1º toque, "gire", soltar os dedos.
+- [src/ui/ControlesToque.svelte](../src/ui/ControlesToque.svelte): o desenho e os ouvintes dos dedos.
+- [src/lib/campoToque.js](../src/lib/campoToque.js) (teclado da tela), [src/lib/destravarAudio.js](../src/lib/destravarAudio.js) (som), [src/lib/telaCheia.js](../src/lib/telaCheia.js) (tela cheia + trava deitada).
+
+### Só dá para confirmar num aparelho de verdade
+
+O som no iPhone (o Playwright não emula as regras de áudio do Safari; e a chave de silencioso do iPhone deixa o Web Audio mudo), a tela cheia e a trava deitada no Android (o Chromium sem janela não gira), o teclado da tela abrindo direto ao tocar A (o iPhone só abre com foco dentro do gesto), a vibração, o FPS real (GPU de verdade) e as margens do notch/Dynamic Island.
 
 ## Mapa do controle físico (padrão "standard")
 
