@@ -3,8 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- celular: sem zoom (pinça e toque duplo), conteúdo por baixo do notch (o jogo usa env(safe-area-inset-*)) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0b0d19" />
+    <!-- "adicionar à tela inicial": abre em tela cheia, deitado (public/manifest.webmanifest) -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icones/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DODGE" />
+    <meta name="format-detection" content="telephone=no" />
     <meta name="description" content="Dodge: esquive dos ataques, jogue suas cartas e enfrente seus amigos ou chefes em batalhas arcade." />
     <title>DODGE — Desvie ou caia</title>
   </head>

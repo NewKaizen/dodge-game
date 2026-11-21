@@ -3,6 +3,7 @@ import { processarLinha } from './protocolo.js'
 import { pref, aoMudarPref } from '../game/preferencias.js'
 import { normalizarTeclas, JOGADORES } from '../game/teclas.js'
 import { teclaAtiva } from '../game/fontes.js'
+import { abrirCampoToque, ehCampoToque } from './campoToque.js'
 
 // Teclas de cada jogador (e.code, independe do layout do teclado): as
 // remapeadas na tela Config (preferência 'teclas'), ou as de fábrica
@@ -183,8 +184,14 @@ export function capturarTexto({ inicial = '', max = 24, permitido = /^[\p{L}\p{N
   pararCaptura()
   if (ativo) soltarTudo()
   let texto = String(inicial).slice(0, max)
-  const fim = () => window.removeEventListener('keydown', aoTeclar, true)
+  // celular (modo toque, lib/toque.js): um campo de verdade para o teclado da tela (lib/campoToque.js)
+  let fecharCampo = () => {}
+  const fim = () => {
+    window.removeEventListener('keydown', aoTeclar, true)
+    fecharCampo()
+  }
   function aoTeclar(e) {
+    if (ehCampoToque(e.target)) return // digitando no campo da tela: ele mesmo trata
     e.preventDefault()
     e.stopImmediatePropagation()
     if (e.key === 'Enter' || e.key === 'NumpadEnter') {
@@ -202,5 +209,25 @@ export function capturarTexto({ inicial = '', max = 24, permitido = /^[\p{L}\p{N
     aoMudar?.(texto)
   }
   window.addEventListener('keydown', aoTeclar, true)
+  if (typeof document !== 'undefined' && document.documentElement.classList.contains('modo-toque')) {
+    fecharCampo = abrirCampoToque({
+      inicial: texto,
+      max,
+      permitido,
+      aoMudar: (t) => {
+        texto = t
+        aoMudar?.(texto)
+      },
+      aoConfirmar: (t) => {
+        texto = t
+        fim()
+        aoConfirmar?.(texto)
+      },
+      aoCancelar: () => {
+        fim()
+        aoCancelar?.()
+      },
+    })
+  }
   return fim
 }

@@ -1,5 +1,7 @@
 import Phaser from 'phaser'
 import { LARGURA, ALTURA } from './constants.js'
+import { telaCheiaAtual } from '../lib/telaCheia.js'
+import { pref, aoMudarPref } from './preferencias.js'
 
 // Resolução de desenho.
 //
@@ -17,18 +19,43 @@ export const RES = { zoom: 1, dpr: 1, escala: 1 }
 
 const MARGEM_VERTICAL = 110 // barra de conexão acima do jogo
 const DPR_MAX = 2 // acima disso o canvas fica pesado sem ganho visível
+// celular/tablet (modo toque): no máximo 1,5 pixel do aparelho por pixel CSS (celular tem dpr 2,6 a 3:
+// desenhar em 2x ou 3x quase dobra os pixels do canvas e o FPS cai, sem ganho visível na arte em
+// pixel; o texto ainda fica mais nítido que em 1x). Com GRÁFICOS no MÍNIMO, 1x.
+// Medido com o Playwright (Pixel 7 deitado): ver docs/controles.md "Celular / toque"
+const DPR_MAX_TOQUE = 1.5
 const ZOOM_MIN = 0.25 // nunca menor que isso (abaixo, nem dá para ler)
+
+// MODO TOQUE (lib/toque.js põe a classe 'modo-toque' no <html>): a página vira "app", só o jogo,
+// ocupando a tela inteira menos as margens seguras (notch, barra do iPhone) que o CSS põe como
+// padding da .arcade-stage
+const modoToque = () => document.documentElement.classList.contains('modo-toque')
+function areaDoPalco() {
+  const palco = document.querySelector('.arcade-stage')
+  if (!palco) return { largura: window.innerWidth, altura: window.innerHeight }
+  const css = getComputedStyle(palco)
+  const px = (v) => parseFloat(v) || 0
+  return {
+    largura: window.innerWidth - px(css.paddingLeft) - px(css.paddingRight),
+    altura: window.innerHeight - px(css.paddingTop) - px(css.paddingBottom),
+  }
+}
 
 function medir() {
   // em tela cheia (lib/telaCheia.js) só o jogo aparece: sem margens, ocupa tudo
-  const cheia = Boolean(document.fullscreenElement)
+  const cheia = Boolean(telaCheiaAtual())
+  const toque = modoToque()
+  const area = toque && !cheia ? areaDoPalco() : null
   const zoomLivre = cheia
     ? Math.min(window.innerWidth / LARGURA, window.innerHeight / ALTURA)
-    : Math.min((window.innerWidth - 36) / LARGURA, (window.innerHeight - (window.innerWidth <= 700 ? 180 : MARGEM_VERTICAL)) / ALTURA)
+    : toque
+      ? Math.min(area.largura / LARGURA, area.altura / ALTURA)
+      : Math.min((window.innerWidth - 36) / LARGURA, (window.innerHeight - (window.innerWidth <= 700 ? 180 : MARGEM_VERTICAL)) / ALTURA)
   // fora da tela cheia: passos de 5%, para não recriar tudo a cada pixel de resize.
   // Janela estreita (menos que os 854 do mundo): encolhe em vez de vazar para o lado
-  const zoom = cheia ? zoomLivre : Math.max(ZOOM_MIN, Math.floor(zoomLivre * 20) / 20)
-  const dpr = Math.min(window.devicePixelRatio || 1, DPR_MAX)
+  const zoom = cheia || toque ? Math.max(ZOOM_MIN, zoomLivre) : Math.max(ZOOM_MIN, Math.floor(zoomLivre * 20) / 20)
+  let dpr = Math.min(window.devicePixelRatio || 1, DPR_MAX)
+  if (toque) dpr = pref('graficos') === 'minimo' ? 1 : Math.min(dpr, DPR_MAX_TOQUE)
   return { zoom, dpr, escala: zoom * dpr }
 }
 
@@ -95,9 +122,19 @@ export function instalarResolucao(game) {
     }, 150)
   }
   window.addEventListener('resize', aoRedimensionar)
+  const pararPref = aoMudarPref((chave) => chave === 'graficos' && aoRedimensionar())
   document.addEventListener('fullscreenchange', aoRedimensionar)
+  document.addEventListener('webkitfullscreenchange', aoRedimensionar)
+  // celular: girar a tela (o resize às vezes chega antes das medidas novas) e a barra do navegador
+  // que some/aparece (visualViewport)
+  window.addEventListener('orientationchange', aoRedimensionar)
+  window.visualViewport?.addEventListener('resize', aoRedimensionar)
   return () => {
+    pararPref()
     window.removeEventListener('resize', aoRedimensionar)
     document.removeEventListener('fullscreenchange', aoRedimensionar)
+    document.removeEventListener('webkitfullscreenchange', aoRedimensionar)
+    window.removeEventListener('orientationchange', aoRedimensionar)
+    window.visualViewport?.removeEventListener('resize', aoRedimensionar)
   }
 }
