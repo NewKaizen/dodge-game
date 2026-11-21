@@ -17,5 +17,9 @@ npm run build   # o Vite precisa compilar
 - `npm test` não depende do lint: os dois podem ser rodados separadamente.
 - O lint não reformata nada. Não existem regras de estilo nem `prettier` aqui.
 
+Mexeu em desenho, fundo, carta ou HUD por desempenho? Rode também a paridade visual e o
+portão de desempenho (`npm run paridade`, `npm run perf:check`): ver
+[docs/desempenho.md](desempenho.md).
+
 Se um aviso for falso positivo (por exemplo, uma global do jogo), declare a global em
 `eslint.config.js` em vez de desligar a regra para o projeto inteiro.

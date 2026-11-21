@@ -1,0 +1,73 @@
+{
+  "versao": 1,
+  "descricao": "Orçamento do passo do Phaser (update + render, ms por frame) a 4x de CPU no modo JS (viewport 300x300), mediana de 3 rodadas. npm run perf:check falha se a mediana passar do orçamento + tolerância. As fases 1 a 4 do plano de otimização apertam estes números (npm run perf:check -- --atualizar). Ver docs/desempenho.md.",
+  "taxa": 4,
+  "tolerancia": 0.15,
+  "rodadas": 3,
+  "janelaMs": 4000,
+  "viewport": [
+    300,
+    300
+  ],
+  "musica": "on",
+  "metaPassoMs8x": 6,
+  "cenas": {
+    "menu": {
+      "passoMs": null
+    },
+    "pvp-castelo": {
+      "passoMs": null
+    },
+    "pvp-cafe": {
+      "passoMs": null
+    },
+    "pvp-cidade": {
+      "passoMs": null
+    },
+    "pvp-praia": {
+      "passoMs": null
+    },
+    "pvp-chinatown": {
+      "passoMs": null
+    },
+    "pvp-estacao": {
+      "passoMs": null
+    },
+    "pvp-palco": {
+      "passoMs": null
+    },
+    "pvp-escolha": {
+      "passoMs": null
+    },
+    "coop-king": {
+      "passoMs": null
+    },
+    "coop-queen": {
+      "passoMs": null
+    },
+    "coop-jevil": {
+      "passoMs": null
+    },
+    "coop-coronel": {
+      "passoMs": null
+    },
+    "coop-escuridao": {
+      "passoMs": null
+    },
+    "expedicao": {
+      "passoMs": null
+    },
+    "galeria-estilos": {
+      "passoMs": null
+    },
+    "galeria-efeitos": {
+      "passoMs": null
+    },
+    "campanha-mapa": {
+      "passoMs": null
+    },
+    "campanha-luta": {
+      "passoMs": null
+    }
+  }
+}

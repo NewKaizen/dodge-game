@@ -37,6 +37,15 @@
     const desligarResolucao = instalarResolucao(game)
     const desligarTelaCheia = instalarTelaCheia(container)
     registrarDebug(game)
+    // HUD de desempenho (?perf=1 ou F9; docs/desempenho.md): só no dev ou num build com
+    // VITE_FERRAMENTAS_PERF=1; no build normal o import some do pacote
+    let desligarHudPerf = () => {}
+    let montado = true
+    if (import.meta.env.DEV || import.meta.env.VITE_FERRAMENTAS_PERF === '1') {
+      import('../game/hudPerf.js').then((m) => {
+        if (montado) desligarHudPerf = m.instalarHudPerf(game)
+      })
+    }
     // canvas preto por perda do contexto WebGL (comum no Firefox em PCs fracos): avisa e deixa recarregar
     let desligarContexto = () => {}
     const vigiar = () => (desligarContexto = vigiarContextoWebgl(game.canvas, container))
@@ -51,6 +60,8 @@
     ligarJogo(game)
 
     return () => {
+      montado = false
+      desligarHudPerf()
       desligarToque()
       desligarAudio()
       desligarContexto()
