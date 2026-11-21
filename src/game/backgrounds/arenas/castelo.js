@@ -1,4 +1,5 @@
 import { LARGURA, ALTURA } from '../../constants.js'
+import { assar } from '../../arte/assar.js'
 
 // cor entre a e b (p de 0 a 1)
 const misturar = (a, b, p) => {
@@ -14,15 +15,28 @@ export default function castelo(scene, objetos) {
     objetos.push(o)
     return o.setDepth(-10)
   }
-  const g = add(scene.add.graphics())
-  g.fillStyle(0x0d0a16, 1)
-  g.fillRect(0, 0, LARGURA, ALTURA)
-  g.fillStyle(0x17122b, 1)
-  g.fillRoundedRect(6, 66, LARGURA - 12, ALTURA - 72, 16)
   const losangos = []
   for (let y = 84; y < ALTURA - 14; y += 28) {
     for (let x = 24 + ((y / 28) % 2) * 14; x < LARGURA - 16; x += 28) losangos.push({ x, y })
   }
+  const losango = (g, x, y) => {
+    // dois triângulos (o fillPoints passaria pelo earcut a cada quadro)
+    g.fillTriangle(x, y - 4, x + 3, y, x - 3, y)
+    g.fillTriangle(x, y + 4, x + 3, y, x - 3, y)
+  }
+  // o piso parado (salão e os ~480 losangos apagados) vira textura uma vez só (arte/assar.js):
+  // só os losangos que a onda de brilho está cruzando são desenhados a cada quadro
+  const pintarPiso = (g, dx = 0, dy = 0) => {
+    g.fillStyle(0x0d0a16, 1)
+    g.fillRect(dx, dy, LARGURA, ALTURA)
+    g.fillStyle(0x17122b, 1)
+    g.fillRoundedRect(dx + 6, dy + 66, LARGURA - 12, ALTURA - 72, 16)
+    g.fillStyle(0x221a3c, 1)
+    for (const { x, y } of losangos) losango(g, dx + x, dy + y)
+  }
+  const piso = assar(scene, 'fundo-castelo', LARGURA, ALTURA, (g) => pintarPiso(g, -LARGURA / 2, -ALTURA / 2))
+  if (piso) add(piso.setPosition(LARGURA / 2, ALTURA / 2))
+  else pintarPiso(add(scene.add.graphics()))
   const brilho = add(scene.add.graphics())
   const NAIPES = ['espadas', 'copas', 'ouros', 'paus']
   const CORES_NAIPES = [0x9a8bff, 0xff5f8a, 0xffd24c, 0x7fe0c0]
@@ -46,8 +60,9 @@ export default function castelo(scene, objetos) {
       brilho.clear()
       for (const { x, y } of losangos) {
         const perto = Math.max(0, 1 - Math.abs(x + y - frente) / 90)
+        if (perto <= 0) continue // apagado: já está no piso
         brilho.fillStyle(misturar(0x221a3c, 0x5a46a8, perto), 1)
-        brilho.fillPoints([{ x, y: y - 4 }, { x: x + 3, y }, { x, y: y + 4 }, { x: x - 3, y }], true)
+        losango(brilho, x, y)
       }
     },
   }

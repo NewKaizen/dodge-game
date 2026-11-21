@@ -8,6 +8,7 @@ import { shake } from '../effects/shake.js'
 import { fatores } from '../acessibilidade.js'
 import { frenteNaCarta, versoNaCarta, definirCarta } from '../cosmeticosSlots.js'
 import { semLigaduras } from '../campanha/texto.js'
+import { assar, assarGraphics } from '../arte/assar.js'
 
 // Carta de baralho desenhada por código (frente, verso e animações).
 // Só o VISUAL: as regras (baralho, naipes, valores, efeitos) ficam em outro módulo.
@@ -412,6 +413,17 @@ export default class Carta extends Phaser.GameObjects.Container {
     this.frente.add(this.camadaBrilhos)
     // a animação do estilo (respeita "reduzir animações"; some com a carta)
     if (tema?.animar) this.animFrente = tema.animar(ctx) ?? null
+    // a frente clássica é um desenho parado com 600 a 2 mil comandos: vira textura (arte/assar.js),
+    // uma por carta diferente, e todas as iguais usam a mesma. Os estilos (cosméticos) ficam como são
+    if (!tema) {
+      const chave = `carta-frente-${dados.personagem}-${dados.naipe}-${dados.valor}-${this.corPersonagem}-${u}`
+      const img = assarGraphics(this.scene, chave, w, h, g)
+      if (img) {
+        this.frente.addAt(img, this.frente.getIndex(g))
+        this.frente.remove(g, true)
+        ctx.g = null
+      }
+    }
   }
 
   desenharGema(semEnergia) {
@@ -657,14 +669,22 @@ export default class Carta extends Phaser.GameObjects.Container {
       this.verso.removeAll(true)
     }
     const { largura: w, altura: h, u } = this
-    const hw = w / 2
-    const hh = h / 2
     // verso equipado: o campo é a cor dele e a treliça/filetes ficam mais claros por cima
     const cor = this.corVerso != null ? misturar(this.corVerso, 0xffffff, 0.55) : this.corPersonagem
     const fundo = this.corVerso != null ? this.corVerso : misturar(CORES_CARTA.verso, cor, 0.18)
+    // desenho parado com ~3 mil comandos: vira textura uma vez só (arte/assar.js); todas as cartas
+    // iguais usam a mesma. Sem textura (contexto perdido), o Graphics de sempre
+    const img = assar(this.scene, `carta-verso-${cor}-${fundo}-${u}`, w, h, (g) => this.pintarVerso(g, cor, fundo))
+    if (img) return this.verso.add(img)
     const g = this.scene.add.graphics()
     this.verso.add(g)
+    this.pintarVerso(g, cor, fundo)
+  }
 
+  pintarVerso(g, cor, fundo) {
+    const { largura: w, altura: h, u } = this
+    const hw = w / 2
+    const hh = h / 2
     // borda de papel (como baralho de verdade) e campo escuro
     g.fillStyle(CORES_CARTA.borda, 1)
     g.fillRoundedRect(-hw, -hh, w, h, 6 * u)
