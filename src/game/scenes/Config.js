@@ -8,7 +8,7 @@ import { CORES, CORACAO, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../cons
 import { pref, definirPref, aoMudarPref, menosMovimento, PREFERENCIAS_PADRAO, OPCOES } from '../preferencias.js'
 import { ACOES, ROTULO_ACAO, atribuirTecla, ehSeta, nomeTecla, normalizarTeclas, resumoTeclas } from '../teclas.js'
 import { jogo, CONFIG_PADRAO } from '../../lib/estado.js'
-import { alternarTelaCheia } from '../../lib/telaCheia.js'
+import { alternarTelaCheia, telaCheiaAtual } from '../../lib/telaCheia.js'
 import { capturarTecla } from '../../lib/simulador.js'
 import { ACOES_PAD, ROTULO_PAD, ZONA_MORTA_LIMITES, ZONA_MORTA_PADRAO, atribuirBotao, nomeBotao, normalizarBotoes, resumoBotoes } from '../gamepad.js'
 import { capturarBotaoPad, controlesLigados } from '../../lib/gamepad.js'
@@ -17,6 +17,7 @@ import { despedir, testarBuzzer } from '../../lib/saida.js'
 import { testarVibracao } from '../../lib/vibracao.js'
 import { INTENSIDADES, intensidadeEfetiva } from '../vibracao.js'
 import { rotulo as rotuloJoystick } from '../../lib/joysticks.js'
+import { TAMANHO_TOQUE, OPACIDADE_TOQUE } from '../toque.js'
 
 // Configurações, no jeito dos menus de console (abas em cima, lista de opções
 // à esquerda com o valor alinhado à direita "◀ VALOR ▶", painel à direita
@@ -28,7 +29,8 @@ import { rotulo as rotuloJoystick } from '../../lib/joysticks.js'
 //
 // Abas: ÁUDIO e JOGO (volumes, som e velocidade ficam em lib/estado.js),
 // CONTROLES (teclas do teclado, game/teclas.js), GAMEPAD (botões do controle físico,
-// zona morta do analógico e o pareamento do joystick serial; game/gamepad.js),
+// zona morta do analógico e o pareamento do joystick serial; game/gamepad.js), TOQUE (os controles
+// na tela do celular: mostrar, tamanho, opacidade e vibração; lib/toque.js),
 // ACESSIBILIDADE e GRÁFICOS
 // (game/preferencias.js; quem aplica cada uma são os efeitos/fundos do jogo,
 // aqui só se escolhe). Cada aba termina com "RESTAURAR PADRÃO".
@@ -85,6 +87,12 @@ const opcaoPref = (chave) => ({
 const NOMES_TREMOR = { normal: 'NORMAL', reduzido: 'REDUZIDO', desligado: 'DESLIGADO' }
 const NOMES_DALTONISMO = { nenhum: 'NENHUM', protanopia: 'PROTANOPIA', deuteranopia: 'DEUTERANOPIA', tritanopia: 'TRITANOPIA' }
 const NOMES_GRAFICOS = { minimo: 'MÍNIMO', medio: 'MÉDIO', maximo: 'MÁXIMO' }
+const NOMES_TOQUE = { auto: 'AUTOMÁTICO', sempre: 'SEMPRE', escondido: 'ESCONDIDOS' }
+const TEXTO_TOQUE = {
+  auto: 'AUTOMÁTICO: aparecem sozinhos em celular e tablet (tela de toque); com mouse, nunca.',
+  sempre: 'SEMPRE: aparecem mesmo sem tela de toque (para testar ou em notebook com tela de toque).',
+  escondido: 'ESCONDIDOS: nunca aparecem (para jogar com um controle ligado no celular). Volte aqui com o controle ou tocando nas opções.',
+}
 const NOMES_MENU = { mesa: 'MESA DE CARTAS', sala: 'SALA DE TV' }
 const TEXTO_MENU = {
   mesa: 'A turma jogando cartas na mesa, com a luta passando no telão ao fundo.',
@@ -214,7 +222,7 @@ const ABAS = [
         tipo: 'opcoes',
         ...LIGA,
         nomes: (v) => (v ? 'LIGADA' : 'DESLIGADA'),
-        ler: () => Boolean(document.fullscreenElement),
+        ler: () => Boolean(telaCheiaAtual()),
         escrever: () => alternarTelaCheia(),
         descricao: 'Só o jogo na tela inteira, sem as barras de cima da página. Atalho: tecla F (Esc sai).',
       },
@@ -373,6 +381,64 @@ const ABAS = [
     ],
   },
   {
+    // celular / tablet: os controles na tela (lib/toque.js, ui/ControlesToque.svelte)
+    id: 'toque',
+    rotulo: 'TOQUE',
+    itens: [
+      {
+        id: 'toqueControles',
+        rotulo: 'CONTROLES NA TELA',
+        ...opcaoPref('toqueControles'),
+        nomes: (v) => NOMES_TOQUE[v],
+        descricao: (v) =>
+          `${TEXTO_TOQUE[v]}\n\nNo celular: joystick à esquerda (aparece onde o polegar encosta), A e B à direita, pausa no canto de cima. Tocar rápido sem arrastar escolhe a opção do menu.`,
+      },
+      {
+        id: 'toqueTamanho',
+        rotulo: 'TAMANHO',
+        titulo: 'TAMANHO DOS CONTROLES',
+        tipo: 'barra',
+        min: Math.round(TAMANHO_TOQUE.min * 100),
+        max: Math.round(TAMANHO_TOQUE.max * 100),
+        passo: 10,
+        aVoltaAoPadrao: true,
+        ler: () => Math.round(pref('toqueTamanho') * 100),
+        escrever: (v) => definirPref('toqueTamanho', v / 100),
+        padrao: () => Math.round(TAMANHO_TOQUE.padrao * 100),
+        formato: (v) => `${v}%`,
+        descricao: 'Tamanho do joystick e dos botões A, B e pausa. Maior é mais fácil de acertar com o polegar; menor cobre menos o jogo. A volta para o padrão (100%).',
+      },
+      {
+        id: 'toqueOpacidade',
+        rotulo: 'OPACIDADE',
+        titulo: 'OPACIDADE DOS CONTROLES',
+        tipo: 'barra',
+        min: Math.round(OPACIDADE_TOQUE.min * 100),
+        max: Math.round(OPACIDADE_TOQUE.max * 100),
+        passo: 5,
+        aVoltaAoPadrao: true,
+        ler: () => Math.round(pref('toqueOpacidade') * 100),
+        escrever: (v) => definirPref('toqueOpacidade', v / 100),
+        padrao: () => Math.round(OPACIDADE_TOQUE.padrao * 100),
+        formato: (v) => `${v}%`,
+        descricao: `Quanto os controles na tela aparecem. Mais transparente deixa ver o jogo por baixo. A volta para o padrão (${Math.round(OPACIDADE_TOQUE.padrao * 100)}%).`,
+      },
+      {
+        id: 'toqueVibrar',
+        rotulo: 'VIBRAR AO TOCAR',
+        ...opcaoPref('toqueVibrar'),
+        descricao: 'O celular dá uma vibradinha ao apertar A, B ou pausa e quando o joystick muda de direção. Funciona no Android (Chrome); o iPhone não deixa o site vibrar.',
+      },
+      {
+        id: 'restaurar',
+        rotulo: 'RESTAURAR PADRÃO',
+        tipo: 'acao',
+        fazer: () => ['toqueControles', 'toqueTamanho', 'toqueOpacidade', 'toqueVibrar'].forEach((k) => definirPref(k, PREFERENCIAS_PADRAO[k])),
+        descricao: `Controles na tela automáticos, tamanho 100%, opacidade ${Math.round(OPACIDADE_TOQUE.padrao * 100)}% e vibração ligada.`,
+      },
+    ],
+  },
+  {
     id: 'acessibilidade',
     rotulo: 'ACESSIBILIDADE',
     itens: [
@@ -490,6 +556,7 @@ export default class Config extends Phaser.Scene {
     this.controles = new Controles(this)
     this.controles.onBotao((_, botao) => this.apertar(botao))
     this.controles.onPausa(() => this.apertar('C'))
+    this.controles.repetirToque = false // as barras já repetem segurando (repetir)
     this.aba = Phaser.Math.Clamp(this.registry.get('configAba') ?? 0, 0, ABAS.length - 1)
     this.foco = 'abas' // 'abas' | 'lista'
     this.indice = 0

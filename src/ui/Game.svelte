@@ -15,15 +15,24 @@
   import { lan } from '../lib/lan/rede.js'
   import { ligarJogo, pingPartida, ROTAS, corDoPing } from '../lib/lan/transmissao.js'
   import '../lib/lan/controleRemoto.js'
+  import { instalarToque } from '../lib/toque.js'
+  import { instalarDestravarAudio } from '../lib/destravarAudio.js'
+  import ControlesToque from './ControlesToque.svelte'
 
   let container
+  let jogoPhaser = null
 
   // LAN/ONLINE: a partida numa sala (PVP e CO-OP) roda no PC de cada um
   // (game/rede.js); o ping fica no canto durante a partida (aparece também em tela cheia)
   let emPartidaRemota = $derived($lan.fase === 'sala' && $lan.sala?.emPartida && $lan.sala.membros.length > 1)
 
   onMount(() => {
+    // celular/tablet: os controles na tela (lib/toque.js) e o som destravado no primeiro toque.
+    // Antes do jogo: o "modo app" da página (tela inteira) já vale para a primeira medida da resolução
+    const desligarToque = instalarToque(() => jogoPhaser)
+    const desligarAudio = instalarDestravarAudio()
     const game = new Phaser.Game(criarConfig(container, prepararResolucao()))
+    jogoPhaser = game
     const desligar = ligarBridge(game)
     const desligarResolucao = instalarResolucao(game)
     const desligarTelaCheia = instalarTelaCheia(container)
@@ -42,6 +51,8 @@
     ligarJogo(game)
 
     return () => {
+      desligarToque()
+      desligarAudio()
       desligarContexto()
       desligarRede()
       desligarAvisos()
@@ -57,6 +68,7 @@
 </script>
 
 <div class="jogo" bind:this={container}>
+  <ControlesToque canvas={() => jogoPhaser?.canvas ?? null} />
   {#if emPartidaRemota}
     <div class="ping" style:color={corDoPing($pingPartida.ms)} title={$pingPartida.rota ? `ligação ${ROTAS[$pingPartida.rota]}` : ''}>
       {$pingPartida.ms ?? '…'} ms{$pingPartida.rota && $pingPartida.rota !== 'direta' ? ` · ${ROTAS[$pingPartida.rota]}` : ''}
@@ -67,6 +79,11 @@
 <style>
   .jogo {
     position: relative;
+    touch-action: none; /* no jogo o dedo é do jogo: sem rolar, sem zoom de pinça ou de toque duplo */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .jogo:fullscreen {
@@ -90,4 +107,5 @@
   .jogo { border: 1px solid var(--color-rule); box-shadow: 0 16px 60px var(--color-shadow); line-height: 0; }
   .jogo :global(canvas) { display: block; }
   .jogo:fullscreen { border: 0; box-shadow: none; }
+  :global(html.modo-toque) .jogo { border: 0; box-shadow: none; }
 </style>

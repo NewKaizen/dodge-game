@@ -28,11 +28,17 @@
 //   pistasVisuais     true/false  BOSS SEMANAL · ESCURIDÃO: setas na borda da caixa no lugar das pistas de som
 //   dicaJoystickUsb   true/false  o aviso "Joystick USB? CONFIGURAÇÕES → GAMEPAD" do menu já foi visto (scenes/Menu.js)
 //                     (coop/semanal/escuridao.js; sugerido sozinho quando o volume dos efeitos está no 0)
+//   toqueControles    'auto' | 'sempre' | 'escondido'  CONTROLES NA TELA (celular/tablet, game/toque.js): auto = só
+//                     em tela de toque (pointer: coarse ou o primeiro toque), nunca com mouse
+//   toqueTamanho      0.7 a 1.5: tamanho do joystick e dos botões na tela (padrão 1)
+//   toqueOpacidade    0.2 a 0.9: opacidade dos controles na tela (padrão 0.55)
+//   toqueVibrar       true/false  o celular vibra de leve ao apertar A/B/C e ao mudar a direção (navigator.vibrate)
 //   manual            null ou o progresso do Manual do Ralsei (páginas completas e mini-lições da página 2;
 //                     formato e validação em manual/progresso.js)
 import { problemasDosBotoes, zonaMortaValida, ZONA_MORTA_PADRAO } from './gamepad.js'
 import { intensidadeValida } from './vibracao.js'
 import { progressoValido } from './manual/progresso.js'
+import { MODOS_TOQUE, TAMANHO_TOQUE, OPACIDADE_TOQUE, tamanhoToqueValido, opacidadeToqueValida } from './toque.js'
 
 const CHAVE = 'dodge-preferencias'
 
@@ -52,6 +58,10 @@ export const PREFERENCIAS_PADRAO = {
   buzzerJoystick: true,
   pistasVisuais: false,
   dicaJoystickUsb: false,
+  toqueControles: 'auto',
+  toqueTamanho: TAMANHO_TOQUE.padrao,
+  toqueOpacidade: OPACIDADE_TOQUE.padrao,
+  toqueVibrar: true,
   manual: null,
 }
 
@@ -60,6 +70,7 @@ export const OPCOES = {
   tremor: ['normal', 'reduzido', 'desligado'],
   daltonismo: ['nenhum', 'protanopia', 'deuteranopia', 'tritanopia'],
   menu: ['mesa', 'sala'],
+  toqueControles: MODOS_TOQUE,
 }
 
 function valido(chave, valor) {
@@ -70,6 +81,8 @@ function valido(chave, valor) {
   if (chave === 'joysticksSerial') return valor === null || (typeof valor === 'object' && !Array.isArray(valor))
   if (chave === 'zonaMorta') return zonaMortaValida(valor)
   if (chave === 'vibracaoIntensidade') return intensidadeValida(valor)
+  if (chave === 'toqueTamanho') return tamanhoToqueValido(valor)
+  if (chave === 'toqueOpacidade') return opacidadeToqueValida(valor)
   if (chave === 'manual') return progressoValido(valor)
   return typeof valor === typeof PREFERENCIAS_PADRAO[chave]
 }

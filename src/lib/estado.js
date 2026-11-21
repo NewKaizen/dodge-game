@@ -27,8 +27,8 @@ export const CONFIG_PADRAO = PADRAO // "restaurar padrão" da tela Config
 // Estado compartilhado entre a UI (Svelte) e o jogo (Phaser, via bridge.js)
 export const jogo = writable({
   conectado: false, // alguma fonte de controle ligada (teclado, controle ou serial)
-  fonte: null, // a principal: 'serial' | 'gamepad' | 'teclado' (game/fontes.js)
-  fontes: { teclado: false, gamepad: false, serial: false }, // todas as ligadas
+  fonte: null, // a principal: 'serial' | 'gamepad' | 'teclado' | 'toque' (game/fontes.js)
+  fontes: { teclado: false, gamepad: false, serial: false, toque: false }, // todas as ligadas (toque: controles na tela, lib/toque.js)
   numJogadores: 1, // jogadores locais; o jogo decide sozinho (game/jogadores.js). As telas de escolha recomeçam quando muda
   p2Teclado: false, // o jogador 2 entrou pelo teclado (A na tela de escolha), não por um 2º dispositivo
   seriais: 0, // quantos joysticks serial abertos (um Arduino por porta USB); cada um é uma fonte distinta
@@ -41,7 +41,7 @@ export const jogo = writable({
 })
 
 // Liga/desliga uma fonte de controle: 'teclado' (lib/simulador.js), 'gamepad'
-// (lib/gamepad.js) ou 'serial' (lib/serial.js). Várias podem estar ligadas.
+// (lib/gamepad.js), 'serial' (lib/serial.js) ou 'toque' (lib/toque.js). Várias podem estar ligadas.
 export function definirFonte(nome, ativa) {
   jogo.update((s) => {
     if (Boolean(s.fontes[nome]) === Boolean(ativa)) return s
