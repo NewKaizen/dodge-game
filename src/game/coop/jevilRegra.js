@@ -93,7 +93,9 @@ export function criarRegraDoDado({
       return {
         // consultas (os testes e o debug leem)
         facesDaRodada: () => [...faces],
-        previa: () => rolar(api.rodada + 1).map((d) => d.id),
+        // (não pode se chamar `previa`: esse nome é o GANCHO da prévia da carta do chefe em regraChefe.js,
+        // e uma lista de faces no lugar da prévia travava a arena no 'inicio' da rodada 1)
+        previaDoDado: () => rolar(api.rodada + 1).map((d) => d.id),
         fase: () => fase,
         // (dev e testes) força as faces desta rodada, como se o dado tivesse dado elas
         forcar(ids) {
