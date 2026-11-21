@@ -25,3 +25,38 @@ button:disabled { opacity: .45; cursor: default; }
   .arcade-footer .secondary { display: none; }
 }
 @media(prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------- celular / tablet ----------
+ * A página se comporta como app: sem zoom de toque duplo, sem "puxar para recarregar", sem rolar
+ * passando do fim. No MODO TOQUE (lib/toque.js põe 'modo-toque' no <html>: tela de toque) só o jogo
+ * aparece, na tela inteira menos as margens seguras (notch e barra do iPhone); game/resolucao.js
+ * mede a .arcade-stage para encaixar o canvas. Os controles na tela são ui/ControlesToque.svelte. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html, body { overscroll-behavior: none; }
+body { touch-action: manipulation; }
+html.modo-toque, html.modo-toque body { height: 100%; overflow: hidden; }
+html.modo-toque body { background: #000; }
+html.modo-toque .arcade-header, html.modo-toque .arcade-footer { display: none; }
+html.modo-toque .arcade-shell { min-height: 0; padding: 0; gap: 0; }
+html.modo-toque .arcade-stage {
+  position: fixed; inset: 0;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background: #000;
+}
+@media (pointer: coarse) {
+  button { min-height: 44px; min-width: 44px; font-size: 15px; }
+}
+/* campo de texto do celular (lib/campoToque.js): no alto, para o teclado da tela não cobrir */
+.campo-toque {
+  position: fixed; z-index: 90; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 8px); transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px)); display: flex; gap: 6px; padding: 6px;
+  background: #000; border: 3px solid #fff; font-family: var(--font-display);
+}
+.campo-toque input {
+  flex: 1; min-width: 0; font: 18px var(--font-display); color: #fff; background: #111324;
+  border: 2px solid #6fe3ff; padding: 8px 10px; border-radius: 0; outline: none;
+  -webkit-user-select: text; user-select: text;
+}
+.campo-toque button { font: 16px var(--font-display); border-radius: 0; border: 2px solid #fff; background: #111324; min-width: 48px; min-height: 44px; }
+.campo-toque .ok { color: #7fe08a; }
+.campo-toque .x { color: #ff7a7a; }

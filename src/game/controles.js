@@ -2,6 +2,8 @@ import Phaser from 'phaser'
 import { partidaOnline } from './online.js'
 import { emRede, meuLado } from './rede.js'
 import { podeLer } from './travaEntrada.js'
+import { direcaoDigital, criarRepetidor } from './toque.js'
+import { toqueSegurando } from '../lib/toque.js'
 
 const LIMIAR = 50 // quanto o joystick precisa inclinar para contar como direção nos menus
 
@@ -45,6 +47,11 @@ export default class Controles {
     this.ouvintesPerda = []
     this.anterior = []
     this.toques = []
+    // joystick da TELA (celular, lib/toque.js) inclinado: nos menus a direção repete segurando e tem
+    // histerese perto da diagonal (game/toque.js). Quem já repete sozinho (as barras de CONFIGURAÇÕES,
+    // o Grimório) põe repetirToque = false. Teclado, controle e joystick serial seguem como sempre.
+    this.repetirToque = true
+    this.repetidores = []
 
     const aoBotao = (evento) => {
       const { jogador, botao } = evento
@@ -107,8 +114,19 @@ export default class Controles {
 
   // Chamar uma vez por frame: detecta as direções recém-apertadas (para menus)
   atualizar() {
+    const toque = toqueSegurando()
+    const agora = this.scene.time?.now ?? performance.now()
     for (let j = 0; j < this.numJogadores; j++) {
       const { x, y } = this.joy(j)
+      if (toque && j === 0) {
+        const direcao = direcaoDigital(x, y, this.anterior[j])
+        const rep = (this.repetidores[j] ??= criarRepetidor())
+        const passo = rep.passo(direcao, agora)
+        this.toques[j] = this.repetirToque ? passo : direcao !== this.anterior[j] ? direcao : null
+        this.anterior[j] = direcao
+        continue
+      }
+      this.repetidores[j]?.zerar()
       let direcao = null
       if (Math.max(Math.abs(x), Math.abs(y)) >= LIMIAR) {
         if (Math.abs(x) > Math.abs(y)) direcao = x > 0 ? 'direita' : 'esquerda'

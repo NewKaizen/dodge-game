@@ -75,7 +75,7 @@
   function aoMover(e) {
     if (!arrasto) return
     const l = ladoFonte()
-    const porPx = l / VISTA
+    const porPx = l / (canvas.clientWidth || VISTA) // o quadro encolhe no celular deitado (CSS)
     cx = arrasto.cx - ((e.clientX - arrasto.x) * porPx) / img.naturalWidth
     cy = arrasto.cy - ((e.clientY - arrasto.y) * porPx) / img.naturalHeight
   }
@@ -180,5 +180,17 @@
   .erro {
     color: #f55;
     margin: 0;
+  }
+
+  /* celular deitado: o quadro encolhe para caber com os botões; a barra de zoom fica larga para o dedo */
+  @media (max-height: 480px) {
+    .quadro {
+      width: 160px;
+      height: 160px;
+    }
+    .lado input[type='range'] {
+      width: 100%;
+      min-height: 32px;
+    }
   }
 </style>

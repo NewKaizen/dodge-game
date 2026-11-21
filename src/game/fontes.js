@@ -1,4 +1,4 @@
-// De onde vêm os controles (teclado, controle físico, joystick serial): lógica
+// De onde vêm os controles (teclado, controle físico, joystick serial, toque na tela): lógica
 // pura, testada em Node (__tests__/fontes.test.js).
 //
 //   resumirFontes({ teclado, gamepad, serial })   { conectado, fonte }: o que o resto do jogo enxerga.
@@ -15,7 +15,8 @@
 //        .esquecer()                                zera tudo
 import { ACOES, JOGADORES } from './teclas.js'
 
-export const PRIORIDADE_FONTES = ['serial', 'gamepad', 'teclado']
+// 'toque': os controles na tela do celular (lib/toque.js). Não conta como 2º jogador (game/jogadores.js)
+export const PRIORIDADE_FONTES = ['serial', 'gamepad', 'teclado', 'toque']
 
 export function resumirFontes(fontes = {}) {
   const fonte = PRIORIDADE_FONTES.find((f) => fontes[f]) ?? null

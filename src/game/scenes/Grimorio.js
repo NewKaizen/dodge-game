@@ -120,6 +120,7 @@ export default class Grimorio extends Phaser.Scene {
   create() {
     Object.assign(this, estadoInicial())
     this.controles = new Controles(this)
+    this.controles.repetirToque = false // segurar ←/→ já corre pelas cartas (update)
     this.controles.onBotao((j, botao) => (botao === 'A' ? this.apertarA(j) : this.apertarB()))
     this.controles.onPausa(() => this.apertarB())
     this.saindo = false

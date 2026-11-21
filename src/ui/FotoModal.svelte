@@ -5,6 +5,7 @@
   import { fotoModal, concluirFoto } from '../lib/fotoModal.js'
   import { enviarFoto } from '../lib/conta.js'
   import RecorteFoto from './RecorteFoto.svelte'
+  import { telaCheiaAtual, sairDaTelaCheia } from '../lib/telaCheia.js'
 
   const TIPOS_FOTO = ['image/png', 'image/jpeg', 'image/webp']
   const MAX_ARQUIVO = 15 * 1024 * 1024 // a foto original (o recorte que sobe é bem menor)
@@ -20,6 +21,8 @@
   // abriu: zera e tenta abrir o seletor logo (o navegador só deixa se o clique veio de um gesto; senão é o botão)
   $effect(() => {
     if (!aberto) return
+    // celular em tela cheia: só o jogo aparece (o modal fica fora dele); sai para mostrar o modal
+    if (telaCheiaAtual()) sairDaTelaCheia()
     arquivo = null
     erro = ''
     ocupado = false
@@ -102,6 +105,7 @@
     outline: none;
     width: min(460px, 100%);
     max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
     overflow: auto;
     background: #0d0e1a;
     border: 2px solid #6dffb0;
@@ -135,5 +139,19 @@
   .erro {
     color: #f55;
     margin: 8px 0 0;
+  }
+
+  /* celular deitado: pouca altura */
+  @media (max-height: 480px) {
+    .fundo {
+      padding: 8px;
+      padding-left: max(8px, env(safe-area-inset-left));
+      padding-right: max(8px, env(safe-area-inset-right));
+    }
+    .painel {
+      width: min(560px, 100%);
+      max-height: calc(100dvh - 16px);
+      padding: 8px 12px;
+    }
   }
 </style>

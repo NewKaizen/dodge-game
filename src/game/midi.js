@@ -163,17 +163,19 @@ function baixar(url) {
 }
 
 // O navegador só libera som depois de um clique/tecla: se o contexto estiver
-// suspenso, tenta de novo no próximo gesto
+// suspenso, tenta de novo no próximo gesto. No celular o gesto que vale é o pointerup/touchend
+// (o pointerdown de toque não destrava o som; ver lib/destravarAudio.js)
+const GESTOS = ['pointerdown', 'pointerup', 'touchend', 'keydown']
 function destravar(ctx) {
-  if (ctx.state !== 'suspended') return
-  ctx.resume()
+  if (ctx.state === 'running') return
+  ctx.resume()?.catch?.(() => {})
   const tentar = () => {
-    ctx.resume()
-    window.removeEventListener('pointerdown', tentar)
-    window.removeEventListener('keydown', tentar)
+    // iPhone: o toque de baixo não vale; só sai quando o contexto voltou de verdade
+    Promise.resolve(ctx.resume?.())
+      .then(() => ctx.state === 'running' && GESTOS.forEach((g) => window.removeEventListener(g, tentar)))
+      .catch(() => {})
   }
-  window.addEventListener('pointerdown', tentar)
-  window.addEventListener('keydown', tentar)
+  GESTOS.forEach((g) => window.addEventListener(g, tentar))
 }
 
 // Toca `url` em loop (se já estiver tocando, não reinicia).

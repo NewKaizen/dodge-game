@@ -13,7 +13,7 @@
 
   // os controles se ligam sozinhos (game/entrada.js): a primeira tecla, o primeiro botão do
   // controle ou o joystick serial já autorizado. Aqui só um resumo discreto.
-  const NOMES = { teclado: 'teclado', gamepad: 'controle', serial: 'joystick serial' }
+  const NOMES = { teclado: 'teclado', gamepad: 'controle', serial: 'joystick serial', toque: 'toque' }
   let ligados = $derived(Object.keys(NOMES).filter((f) => $jogo.fontes[f]).map((f) => NOMES[f]))
 
   // botão opcional do joystick USB: só onde o navegador tem Web Serial. O clique é o gesto que o

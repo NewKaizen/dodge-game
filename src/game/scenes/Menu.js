@@ -284,7 +284,10 @@ export default class Menu extends Phaser.Scene {
     this.realceMenu.clear().fillStyle(UI.elevado, 1).fillRoundedRect(24, l.y - this.pos.passo / 2 + 1, 258, this.pos.passo - 2, 3)
     this.realceMenu.fillStyle(UI.ciano).fillRect(24, l.y - this.pos.passo / 2 + 1, 3, this.pos.passo - 2)
     this.seta.setVisible(true).setPosition(266, l.y)
-    this.aviso.setText(semLigaduras(this.conectado ? '↑↓ escolher · A confirmar  ou clique' : 'Clique para escolher ou conecte\num teclado / controle.')).setColor(UI.secundario)
+    // celular (modo toque, lib/toque.js): a dica fala do toque
+    const toque = typeof document !== 'undefined' && document.documentElement.classList.contains('modo-toque')
+    const dica = toque ? (this.conectado ? '↑↓ escolher · A confirmar  ou toque' : 'Toque para escolher.') : this.conectado ? '↑↓ escolher · A confirmar  ou clique' : 'Clique para escolher ou conecte\num teclado / controle.'
+    this.aviso.setText(semLigaduras(dica)).setColor(UI.secundario)
     this.modoTitulo.setText(opcao.rotulo).setColor(opcao.cor)
     this.modoDescricao.setText(this.dicaDe(opcao))
     this.atualizarMiniatura()

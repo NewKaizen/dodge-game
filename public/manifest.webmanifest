@@ -1,0 +1,18 @@
+{
+  "name": "DODGE — Desvie ou caia",
+  "short_name": "DODGE",
+  "description": "Esquive dos ataques, jogue suas cartas e enfrente seus amigos ou chefes em batalhas arcade.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#000000",
+  "theme_color": "#0b0d19",
+  "icons": [
+    { "src": "/icones/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icones/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icones/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
