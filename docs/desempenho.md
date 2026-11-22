@@ -171,4 +171,45 @@ para medir, não para jogar.
 
 ## Baseline (antes das otimizações)
 
-Ainda não medido nesta árvore: rode `npm run perf -- --saida=perf-resultados/baseline/medir-js.json` e `npm run perf:check -- --atualizar` (o orçamento está com `passoMs: null` até lá). Os números de referência do plano (mesma máquina, mesmo piloto) estão no plano de otimização, seção 1.
+Medido no commit `62bc595` (fase 0, sem nenhuma otimização), nesta VM de 4 núcleos, com
+`node scripts/perf/medir.mjs --musica=off` (todas as cenas, 1x/4x/8x, janela de 7 s, modo JS). Música
+desligada de propósito: a fase 2 (música pré-renderizada) tira o sintetizador, e a música muda os números
+de uma rodada para outra. Atenção: outra sessão usava a CPU ao mesmo tempo (carga ~3 a 6 na VM): a 8x os
+números variam bastante. O JSON completo e as origens estão em `perf-resultados/baseline/` (fora do git).
+
+| Cena | 1x: fps, passo ms (upd/rnd), p95 | 4x: fps, passo ms (upd/rnd), p95 | 8x: fps, passo ms (upd/rnd), p95 | dc | gcmd | clears/f | texto/f | aloc MB/s | GC/s |
+|---|---|---|---|---|---|---|---|---|---|
+| Menu | 59.4 fps, 0.9 ms (0.4/0.4), p95 1.5 | 57.6 fps, 4.3 ms (1.8/2.4), p95 10.1 | 57 fps, 6.5 ms (2.6/3.7), p95 14.7 | 35.5 | 684 | 3 | 0 | 18.3 | 2.9 |
+| PvP CASTELO, esquiva | 60 fps, 2.5 ms (0.6/1.9), p95 5 | 52.2 fps, 8.8 ms (0.9/7.9), p95 17.6 | 16.3 fps, 37.4 ms (16.3/20.8), p95 67.1 | 102.4 | 6807 | 1 | 0 | 64.3 | 5.3 |
+| PvP CAFÉ, esquiva | 48.7 fps, 5.2 ms (1.1/4.1), p95 8.3 | 20.4 fps, 22.3 ms (2.4/19.7), p95 34.9 | 13 fps, 44.3 ms (13/30.9), p95 77.4 | 194.4 | 7923 | 4 | 1.1 | 107.7 | 8.5 |
+| PvP CIDADE, esquiva | 58.6 fps, 5.1 ms (1.1/4), p95 8 | 23.8 fps, 24.4 ms (6.5/17.8), p95 50.8 | 11.6 fps, 57.8 ms (19.7/37.4), p95 98.1 | 111.9 | 17142 | 9 | 0 | 188 | 7.7 |
+| PvP PRAIA, esquiva | 55.8 fps, 6 ms (1.2/4.8), p95 9.4 | 26.5 fps, 23.4 ms (2.8/20.5), p95 35.3 | 11.8 fps, 58.5 ms (15.7/42.5), p95 109.6 | 99.7 | 34818 | 9 | 1.1 | 238.4 | 10.1 |
+| PvP CHINATOWN, esquiva | 55.3 fps, 4.8 ms (1.1/3.6), p95 8.7 | 29.7 fps, 17.5 ms (2.5/14.9), p95 31.5 | 16.7 fps, 37.2 ms (10.6/26.2), p95 63.5 | 109.9 | 9055 | 5 | 1.1 | 121.2 | 7.3 |
+| PvP ESTAÇÃO, esquiva (8x: fora da fase esquiva (revelacao)) | 59.6 fps, 3.3 ms (0.9/2.4), p95 6.1 | 49 fps, 9.4 ms (1.3/7.9), p95 15.4 | 15.6 fps, 34.9 ms (12.1/22.5), p95 84.2 | 103.2 | 7689 | 3 | 1.1 | 69 | 5.7 |
+| PvP PALCO, esquiva (8x: fora da fase esquiva (escolha)) | 58.6 fps, 3.7 ms (0.8/2.8), p95 6.8 | 49.5 fps, 8.6 ms (1/7.5), p95 14.3 | 18.6 fps, 30.3 ms (9.5/20.7), p95 60.3 | 109.4 | 6389 | 1 | 1.1 | 67.8 | 5.6 |
+| PvP CASTELO, escolha de cartas | 60 fps, 2.2 ms (0.1/2.1), p95 4 | 43.6 fps, 10.7 ms (0.6/9.9), p95 19.6 | 35.2 fps, 17 ms (1/15.7), p95 26.8 | 111.5 | 7096 | 1 | 0.1 | 74.4 | 6 |
+| CO-OP King, esquiva | 59.9 fps, 2.5 ms (0.3/2.2), p95 5.1 | 51.5 fps, 9.5 ms (1/8.4), p95 18.6 | 27.3 fps, 20.8 ms (2.9/17.6), p95 42.2 | 111 | 6278 | 0 | 0 | 58.3 | 4.7 |
+| CO-OP Queen, esquiva | 60 fps, 3 ms (0.4/2.6), p95 5.7 | 44.1 fps, 12.7 ms (1.8/10.8), p95 24.4 | 31.1 fps, 21 ms (3.8/17), p95 37.3 | 114.2 | 7230 | 6.9 | 0.1 | 76.8 | 6.3 |
+| CO-OP Jevil, esquiva | 58.5 fps, 4.6 ms (0.5/4), p95 9.6 | 24.8 fps, 23.1 ms (2.6/20.2), p95 45.7 | 17.6 fps, 34.1 ms (5/28.6), p95 58.2 | 121 | 8448 | 5.1 | 0.1 | 95.1 | 7.7 |
+| CO-OP Coronel, esquiva | 60 fps, 3.6 ms (0.3/3.3), p95 6.4 | 48.4 fps, 11.7 ms (1/10.5), p95 23.2 | 27 fps, 25.2 ms (3.5/21.5), p95 38.6 | 111.7 | 6306 | 4.1 | 0 | 109.4 | 9.3 |
+| CO-OP ESCURIDÃO (semanal), esquiva | 60 fps, 2.7 ms (0.5/2.2), p95 5.7 | 47 fps, 11.2 ms (1.4/9.7), p95 19.7 | 22.7 fps, 28 ms (6.2/21.4), p95 51.6 | 111 | 6009 | 3.5 | 0.1 | 69.2 | 5.7 |
+| Expedição (Jevil, fase 1), esquiva | 58.8 fps, 3.6 ms (0.4/3.1), p95 6.4 | 34 fps, 15.2 ms (1.7/13.2), p95 28.6 | 30.8 fps, 19.2 ms (2.1/16.8), p95 31 | 103.3 | 7991 | 2 | 0 | 78.4 | 6.4 |
+| Galeria: estilos de carta | 60 fps, 3.3 ms (0.1/3.2), p95 6.4 | 41.5 fps, 11.5 ms (0.5/10.9), p95 17.3 | 23.7 fps, 26.4 ms (1.2/25), p95 47.9 | 111.6 | 26852 | 0 | 0 | 105.6 | 23.3 |
+| Galeria: efeitos de carta | 60 fps, 1.3 ms (0.1/1.1), p95 1.9 | 60 fps, 5.3 ms (0.3/4.9), p95 9 | 56.4 fps, 9.4 ms (0.4/8.8), p95 15.8 | 8 | 2232 | 6 | 0 | 60 | 10 |
+| Campanha: mapa | 60 fps, 0.8 ms (0.1/0.7), p95 1.6 | 60 fps, 2.1 ms (0.1/1.9), p95 4.2 | 60 fps, 4 ms (0.2/3.7), p95 7.6 | 10 | 4622 | 2 | 0 | 25.9 | 4.4 |
+| Campanha: luta | 60 fps, 0.7 ms (0.1/0.6), p95 1.5 | 59.9 fps, 2.7 ms (0.2/2.3), p95 7.1 | 55.7 fps, 4.6 ms (0.4/3.9), p95 9.3 | 15 | 3256 | 1 | 0 | 18.1 | 2.9 |
+
+dc, gcmd, clears, texto, aloc e GC: na taxa 1x. Cenas de arena: só os quadros da fase pedida.
+
+O orçamento (`docs/perf-budget.json`) foi semeado com `npm run perf:check -- --atualizar` no mesmo commit,
+**com a música desligada** (`"musica": "off"` no orçamento: o mesmo motivo de cima). As medianas a 4x
+saíram mais altas que as da tabela (ex.: CASTELO 17 ms) porque a paridade visual e a outra sessão rodavam
+junto: o primeiro orçamento é folgado; a fase 1 aperta com as medidas novas.
+
+### Autoteste da paridade
+
+`node scripts/perf/paridade.mjs autoteste` no commit `62bc595`, com os frames padrão (30, 120, 600 e
+**1200**, o 1200 entrou na fase 0 sem autoteste): **76 fotos, 0 diferenças** (19 cenas x 4 frames,
+tolerância zero). O modo determinístico continua determinístico com o frame 1200.
+
+A base da paridade da fase 1 é `npm run paridade:base -- --ref=62bc595` (o conserto do Jevil incluído).
