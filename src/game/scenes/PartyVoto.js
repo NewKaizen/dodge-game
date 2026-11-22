@@ -5,7 +5,7 @@ import { CHEFES, ORDEM_CHEFES } from '../coop/chefes/index.js'
 import { criarRng } from '../pvp/baralho.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { ESCALA, escalaDe } from '../arte/texturas.js'
-import { tocar, musica } from '../audio.js'
+import { tocar, musica, preCarregarMusica } from '../audio.js'
 import { estilhacos } from '../effects/entrada.js'
 import { claraoCamera } from '../effects/flash.js'
 import { fatores } from '../acessibilidade.js'
@@ -344,6 +344,7 @@ export default class PartyVoto extends Phaser.Scene {
     this.status.setText(empate ? (Object.keys(r.votos ?? {}).length ? 'EMPATE! ROLETA!' : 'NINGUÉM VOTOU: ROLETA!') : 'APURAÇÃO!')
     this.tweens.add({ targets: this.status, scale: { from: 1.4, to: 1 }, duration: 200, ease: 'Back.easeOut' })
     await esperar(350)
+    if (ARENA[r.vencedora]) preCarregarMusica(ARENA[r.vencedora].musica) // a música da arena já vem baixando
     if (empate && !this.calmo) await this.roleta(r.empatadas, r.voltas, esperar)
     await this.destacar(r.vencedora, esperar)
     if (this.souHost) this.seguir(r.vencedora)

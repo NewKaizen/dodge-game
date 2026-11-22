@@ -4,7 +4,7 @@ import Controles from '../controles.js'
 import { ARENAS, ARENA, ALEATORIA, apurarVotos, eventosDaArena } from '../pvp/arenas.js'
 import { criarRng } from '../pvp/baralho.js'
 import { criarFundo } from '../backgrounds/index.js'
-import { tocar, musica } from '../audio.js'
+import { tocar, musica, preCarregarMusica } from '../audio.js'
 import { estilhacos } from '../effects/entrada.js'
 import { CORES, FONTE, LARGURA, ALTURA, TEXTO, corTexto } from '../constants.js'
 import { tremerCamera } from '../effects/shake.js'
@@ -286,6 +286,7 @@ export default class PvpVoto extends Phaser.Scene {
       r = apurarVotos(this.votos, criarRng(`voto:${Date.now()}`))
       if (this.rede) canal.enviar('apuracao', null, { votos: [...this.votos], ...r })
     }
+    preCarregarMusica(ARENA[r.arena]?.musica) // a música da arena já vem baixando durante a apuração
     const esperar = (ms) => new Promise((ok) => this.time.delayedCall(ms, ok))
     await esperar(400)
 

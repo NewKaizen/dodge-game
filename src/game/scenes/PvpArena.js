@@ -3,7 +3,7 @@ import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, ACELERACAO, f
 import Controles from '../controles.js'
 import { criarSelos, ladoDe, outroAusente } from '../ausencia.js'
 import { abrirPausaOnline } from '../pausaOnline.js'
-import { tocar, musica, pausarMusica, retomarMusica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal, tomMusica, cortarMusica, reforcarGrave } from '../audio.js'
+import { tocar, musica, pausarMusica, retomarMusica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal, tomMusica, cortarMusica, reforcarGrave, preCarregarMusica } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import Carta, { CORES_CARTA, TIPOS } from '../entities/Carta.js'
@@ -136,7 +136,7 @@ import { fatores } from '../acessibilidade.js'
 //                replay acabou e o host abre a PvpResultado nos dois (irParaCena)
 // forcarMao/setHp/setEnergia (dev) valem nos dois PCs; forcarBonus vai ao host.
 //
-// Música: a da arena (public/assets/musicas/<arena.musica>.mid; sem o arquivo, pvp.mid).
+// Música: a da arena (assets-fonte/musicas/<arena.musica>.mid; sem o arquivo, pvp.mid).
 //
 // No dev: debugJogo.jogo.scene.start('PvpArena', { p1: 'susie', p2: 'noelle' })
 // e window.pvpArena (estadoDebug, forcarMao, setHp) para os testes.
@@ -1152,6 +1152,8 @@ export default class PvpArena extends Phaser.Scene {
     this.escolhas[m] = id
     if (this.rede && !remoto) this.rede.enviarJogada(id)
     if (id) {
+      const dados = this.maos[m].selecionada?.dados
+      if (ehSuper(dados)) preCarregarMusica(`super_${dados.personagem}`) // a música especial já vem baixando
       this.maos[m].selecionada?.confirmar()
     } else {
       tocar(this, 'passar')

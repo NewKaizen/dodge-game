@@ -67,9 +67,8 @@ const TIPOS = {
   '.ogg': 'audio/ogg',
   '.mp3': 'audio/mpeg',
   '.wav': 'audio/wav',
-  '.mid': 'audio/midi',
-  '.sf2': 'application/octet-stream',
-  '.sf3': 'application/octet-stream',
+  '.webm': 'audio/webm', // músicas pré-renderizadas (public/assets/musicas/render/)
+  '.m4a': 'audio/mp4',
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
 }
@@ -114,9 +113,39 @@ const servidor = http.createServer((req, res) => {
     return
   }
   if (!fs.existsSync(arquivo) || fs.statSync(arquivo).isDirectory()) arquivo = path.join(PASTA, 'index.html')
-  res.writeHead(200, { 'Content-Type': TIPOS[path.extname(arquivo).toLowerCase()] ?? 'application/octet-stream', 'Cache-Control': 'no-cache' })
-  fs.createReadStream(arquivo).pipe(res)
+  enviarArquivo(req, res, arquivo)
 })
+
+// Arquivo estático. Os de nome com hash (as músicas: <nome>.<hash>.webm) ficam no cache para
+// sempre; o resto revalida. Aceita Range (o <audio> pede pedaços, e o Safari exige 206).
+const COM_HASH = /\.[0-9a-f]{12}\.(webm|m4a)$/
+function enviarArquivo(req, res, arquivo) {
+  const { size, mtime } = fs.statSync(arquivo)
+  const cabecalho = {
+    'Content-Type': TIPOS[path.extname(arquivo).toLowerCase()] ?? 'application/octet-stream',
+    'Cache-Control': COM_HASH.test(arquivo) ? 'public, max-age=31536000, immutable' : 'no-cache',
+    'Last-Modified': mtime.toUTCString(),
+    'Accept-Ranges': 'bytes',
+  }
+  const pedaco = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '')
+  if (pedaco && (pedaco[1] || pedaco[2])) {
+    let ini = pedaco[1] ? Number(pedaco[1]) : size - Number(pedaco[2])
+    let fim = pedaco[1] && pedaco[2] ? Number(pedaco[2]) : size - 1
+    ini = Math.max(0, ini)
+    fim = Math.min(size - 1, fim)
+    if (ini > fim) {
+      res.writeHead(416, { 'Content-Range': `bytes */${size}` }).end()
+      return
+    }
+    res.writeHead(206, { ...cabecalho, 'Content-Range': `bytes ${ini}-${fim}/${size}`, 'Content-Length': fim - ini + 1 })
+    if (req.method === 'HEAD') return res.end()
+    fs.createReadStream(arquivo, { start: ini, end: fim }).pipe(res)
+    return
+  }
+  res.writeHead(200, { ...cabecalho, 'Content-Length': size })
+  if (req.method === 'HEAD') return res.end()
+  fs.createReadStream(arquivo).pipe(res)
+}
 
 const ice = servidoresIce()
 anexarLan(servidor, { online: ONLINE, ice, autenticar: contas.autenticar, relacoes: contas.relacoes, registro: contas.registro, metricas, bots: { ligado: botsLigados() } })

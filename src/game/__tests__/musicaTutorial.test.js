@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import { vlq, novaTrilha, arquivoMidi, lerMidi } from '../../../scripts/musica/midi.mjs'
 import { comporTutorial, MELODIA, HARMONIA, ARQUIVOS, FIM, PPQ, COMPASSOS, GM } from '../../../scripts/musica/tutorial.mjs'
 
-const pasta = new URL('../../../public/assets/musicas/', import.meta.url)
+const pasta = new URL('../../../assets-fonte/musicas/', import.meta.url)
 
 test('VLQ do MIDI (exemplos da especificação)', () => {
   assert.deepEqual(vlq(0), [0x00])

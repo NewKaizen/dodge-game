@@ -3,7 +3,7 @@ import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, TEMPOS, ACELE
 import Controles from '../controles.js'
 import { marcaDeAusencia, assinaturaDeAusencia, COR_AUSENCIA } from '../ausencia.js'
 import { abrirPausaOnline } from '../pausaOnline.js'
-import { tocar, musica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal } from '../audio.js'
+import { tocar, musica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal, preCarregarMusica } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import Carta, { CORES_CARTA } from '../entities/Carta.js'
@@ -933,6 +933,7 @@ export default class PvpArenaN extends Phaser.Scene {
       this.mao.setAtiva(false)
       return this.atualizarEscolha()
     }
+    if (ehSuper(carta.dados)) preCarregarMusica(`super_${carta.dados.personagem}`) // a música especial já vem baixando
     this.escolher(carta.dados.id)
   }
 

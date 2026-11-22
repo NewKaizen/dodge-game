@@ -3,7 +3,7 @@ import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, DESAFIO, NIVE
 import Controles from '../controles.js'
 import { marcaDeAusencia, assinaturaDeAusencia, COR_AUSENCIA } from '../ausencia.js'
 import { abrirPausaOnline } from '../pausaOnline.js'
-import { tocar, musica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal } from '../audio.js'
+import { tocar, musica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal, preCarregarMusica } from '../audio.js'
 import { debug } from '../debug.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { CHEFES, nivelDoChefe } from '../coop/chefes/index.js'
@@ -968,6 +968,7 @@ class CoopArenaN extends Phaser.Scene {
       this.time.delayedCall(900, () => this.atualizarEscolha())
       return
     }
+    if (ehSuper(carta.dados)) preCarregarMusica(`super_${carta.dados.personagem}`) // a música especial já vem baixando
     this.escolher(carta.dados.id)
   }
 
