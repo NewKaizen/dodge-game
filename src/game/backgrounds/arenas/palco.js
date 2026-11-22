@@ -78,8 +78,10 @@ export default function palco(scene, objetos) {
 
   add(scene.add.image(0, 0, CENARIO_FUNDO).setOrigin(0))
 
-  // ---------- telão + letreiro (redesenhados todo frame: poucas formas) ----------
-  const telao = add(scene.add.graphics())
+  // ---------- telão + letreiro ----------
+  // (Images em lugares fixos que acendem e apagam: antes era um Graphics redesenhado a cada quadro
+  // com ~800 comandos; docs/desempenho.md, fase 1)
+  const telao = telaoDeImagens(scene, add)
 
   // ---------- feixes de holofote ----------
   // (tudo o que é ADD fica junto na ordem de desenho: menos trocas de modo de mistura)
@@ -166,7 +168,7 @@ export default function palco(scene, objetos) {
       const fracao = batida - Math.floor(batida)
       const pancada = Math.pow(1 - fracao, 3) // 1 no instante da batida, cai rápido
 
-      desenharTelao(telao, t, batida, pancada)
+      telao.atualizar(t, batida, pancada)
 
       for (const f of feixes) {
         const a = f.base + Math.sin((t / f.periodo) * Math.PI * 2 + f.fase) * f.amp
@@ -227,51 +229,60 @@ export default function palco(scene, objetos) {
 
 // ---------- telão ----------
 
-// Telão no meio do fundo: 8 batidas de equalizador, 4 de coração batendo. As
-// lâmpadas do letreiro em volta correm (chase) uma casa por meia batida.
-function desenharTelao(g, t, batida, pancada) {
+// Telão no meio do fundo: 8 batidas de equalizador, 4 de coração batendo; as lâmpadas do letreiro
+// em volta correm (chase) uma casa por meia batida. Com Images: os segmentos do equalizador (10 barras x 11), os pixels
+// do coração (as duas escalas) e as lâmpadas do letreiro ficam em lugares fixos e só mudam de
+// visibilidade, cor e alpha. A ordem de desenho é a mesma (miolo e depois as lâmpadas)
+function telaoDeImagens(scene, add) {
   const { x, y, w, h } = TELAO
-  g.clear()
-  const ciclo = Math.floor(batida) % 12
-  if (ciclo < 8) {
-    // equalizador: barras de segmentos de LED (rosa embaixo, violeta, ciano no topo)
-    const barras = 10
-    const lb = 6
-    const vao = (w - 8 - barras * lb) / (barras - 1)
-    for (let k = 0; k < barras; k++) {
-      const ruido = 0.5 + 0.5 * Math.sin(t / (170 + k * 23) + k * 1.7) * Math.sin(t / (260 + k * 11) + k)
-      const nivel = Math.min(1, 0.2 + ruido * 0.6 + pancada * (k % 3 === 0 ? 0.45 : 0.25))
-      const segmentos = Math.round(nivel * 11)
-      const bx = x + 4 + k * (lb + vao)
-      for (let s = 0; s < segmentos; s++) {
-        const cor = s < 5 ? ROSA : s < 9 ? VIOLETA : CIANO
-        g.fillStyle(cor, 0.85)
-        g.fillRect(Math.round(bx), y + h - 6 - s * 4, lb, 3)
-      }
-    }
-  } else {
-    // coração de pixels batendo no meio do telão
-    const escala = 3 + (pancada > 0.5 ? 1 : 0)
+  const ret = (rx, ry, rw, rh) => add(scene.add.image(rx, ry, '__WHITE').setOrigin(0).setDisplaySize(rw, rh).setVisible(false))
+  const barras = 10
+  const lb = 6
+  const vao = (w - 8 - barras * lb) / (barras - 1)
+  const segmentos = Array.from({ length: barras }, (_, k) => {
+    const bx = x + 4 + k * (lb + vao)
+    return Array.from({ length: 11 }, (_, s) => ret(Math.round(bx), y + h - 6 - s * 4, lb, 3).setTint(s < 5 ? ROSA : s < 9 ? VIOLETA : CIANO).setAlpha(0.85))
+  })
+  const coracoes = [3, 4].map((escala) => {
     const cx = x + w / 2
     const cy = y + h / 2 + 1
-    g.fillStyle(ROSA, 0.9)
+    const pixels = []
     CORACAO_PIXEL.forEach((linha, ly) => {
-      for (let lx = 0; lx < linha.length; lx++) if (linha[lx] === '#') g.fillRect(Math.round(cx + (lx - 3.5) * escala), Math.round(cy + (ly - 3) * escala), escala, escala)
+      for (let lx = 0; lx < linha.length; lx++) if (linha[lx] === '#') pixels.push(ret(Math.round(cx + (lx - 3.5) * escala), Math.round(cy + (ly - 3) * escala), escala, escala).setTint(ROSA).setAlpha(0.9))
     })
-  }
-  // lâmpadas do letreiro em volta do telão (chase)
-  const passo = 6
-  const lampadas = []
-  for (let lx = x - 4; lx <= x + w + 4; lx += passo) lampadas.push([lx, y - 5])
-  for (let ly = y + 1; ly <= y + h - 1; ly += passo) lampadas.push([x + w + 4, ly])
-  for (let lx = x + w + 4; lx >= x - 4; lx -= passo) lampadas.push([lx, y + h + 5])
-  for (let ly = y + h - 1; ly >= y + 1; ly -= passo) lampadas.push([x - 4, ly])
-  const casa = Math.floor(batida * 2)
-  lampadas.forEach(([lx, ly], k) => {
-    const acesa = (k + casa) % 3 === 0
-    g.fillStyle(acesa ? 0xffe9a0 : 0x6a4a20, acesa ? 0.95 : 0.8)
-    g.fillRect(Math.round(lx) - 1, Math.round(ly) - 1, 2, 2)
+    return pixels
   })
+  const passo = 6
+  const pontos = []
+  for (let lx = x - 4; lx <= x + w + 4; lx += passo) pontos.push([lx, y - 5])
+  for (let ly = y + 1; ly <= y + h - 1; ly += passo) pontos.push([x + w + 4, ly])
+  for (let lx = x + w + 4; lx >= x - 4; lx -= passo) pontos.push([lx, y + h + 5])
+  for (let ly = y + h - 1; ly >= y + 1; ly -= passo) pontos.push([x - 4, ly])
+  const lampadas = pontos.map(([lx, ly]) => ret(Math.round(lx) - 1, Math.round(ly) - 1, 2, 2).setVisible(true))
+  let casaAntes = -1
+  return {
+    atualizar(t, batida, pancada) {
+      const ciclo = Math.floor(batida) % 12
+      for (let k = 0; k < barras; k++) {
+        let n = 0
+        if (ciclo < 8) {
+          const ruido = 0.5 + 0.5 * Math.sin(t / (170 + k * 23) + k * 1.7) * Math.sin(t / (260 + k * 11) + k)
+          const nivel = Math.min(1, 0.2 + ruido * 0.6 + pancada * (k % 3 === 0 ? 0.45 : 0.25))
+          n = Math.round(nivel * 11)
+        }
+        segmentos[k].forEach((img, s) => img.setVisible(s < n))
+      }
+      const grande = pancada > 0.5 ? 1 : 0
+      coracoes.forEach((pixels, i) => pixels.forEach((img) => img.setVisible(ciclo >= 8 && i === grande)))
+      const casa = Math.floor(batida * 2) % 3
+      if (casa === casaAntes) return
+      casaAntes = casa
+      lampadas.forEach((img, k) => {
+        const acesa = (k + casa) % 3 === 0
+        img.setTint(acesa ? 0xffe9a0 : 0x6a4a20).setAlpha(acesa ? 0.95 : 0.8)
+      })
+    },
+  }
 }
 
 // pedaços do cenário da frente que têm desenho: [x, y, largura, altura]
