@@ -144,18 +144,19 @@ Outros recursos de audio.js usados pelos eventos:
   (volume dos efeitos, entra e sai em fade) até chamar `parar()`. O APAGÃO liga a chuva
   no `comecar()` e para no `terminar()`; a cada relâmpago toca `trovao` 150–400 ms
   depois do clarão. Com o som desligado devolve um `parar()` vazio.
-- `reforcarGrave(db = 0, ms = 400)`: realce de graves (lowshelf ~180 Hz) na música .mid.
+- `reforcarGrave(db = 0, ms = 400)`: realce de graves (lowshelf ~180 Hz) na música.
   O MODO FESTA pede `reforcarGrave(9)` no começo e `reforcarGrave(0)` ao encerrar
   (fica valendo até alguém pedir 0: sempre desfaça no `terminar()`).
-- `tomMusica(semitons)`: tom da música .mid sem mudar o andamento (keyShift de sistema do
-  sintetizador: nenhum reset do .mid desfaz). O COGUMELO pede -6 (gigante) / +6 (mini) e 0 no
-  fim. Cada troca corta as notas que estavam soando. Fica valendo até alguém pedir 0.
+- `tomMusica(semitons)`: tom da música, com o andamento junto, como um toca-discos (a música é
+  áudio pré-renderizado: playbackRate sem preservar o tom, deslizando em ~0,45 s). O COGUMELO
+  pede -6 (gigante: 30% mais lenta e grave) / +6 (mini: 41% mais rápida e aguda) e 0 no fim.
+  Fica valendo até alguém pedir 0.
 - `cortarMusica(true/false)`: corte SECO da música (~12 ms, sem fade perceptível) e a volta
   do mesmo ponto. Não briga com o pause do menu (pausar/retomar no meio de um corte não traz a
   música de volta) e vale também para a próxima música: sempre peça `false` no `terminar()`.
   `debugJogo.musica()` mostra `cortada`, `pausada` e `tom`.
 - `tocarMusicaEspecial(arena, nome)` / `voltarMusicaNormal(arena)`: música da carta
-  SUPER (pausa a de batalha e volta de onde parou; ver public/assets/musicas/LEIA-ME.txt).
+  SUPER (pausa a de batalha e volta de onde parou; ver assets-fonte/musicas/LEIA-ME.txt).
 
 ## Eventos de esquiva
 

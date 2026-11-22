@@ -5,7 +5,7 @@
 //   debugJogo.cena()            cenas ativas
 //   debugJogo.musica()          MIDI tocando agora e o segundo atual
 //   (as arenas expõem window.pvpArena / window.coopArena)
-import { estadoMidi } from './midi.js'
+import { estadoMidi } from './musica.js'
 
 export const debug = { invencivel: false, acelerar: 1 }
 
@@ -15,7 +15,7 @@ export function registrarDebug(game) {
     set: (opcoes) => Object.assign(debug, opcoes),
     config: debug,
     jogo: game, // o Phaser.Game (inspeção no console)
-    musica: () => estadoMidi(), // { tocando, tempo, contexto, cortada, pausada, tom }
+    musica: () => estadoMidi(), // { tocando, tempo, modo, formato, taxa, contexto, cortada, pausada, tom }
     cena: () => game.scene.getScenes(true).map((s) => s.scene.key),
     // dados com que uma cena foi iniciada (ex.: as estatísticas da vitória)
     dadosCena: (chave) => game.scene.getScene(chave)?.sys.settings.data ?? null,

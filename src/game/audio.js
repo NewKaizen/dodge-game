@@ -1,9 +1,10 @@
 import { AUDIO } from './constants.js'
-import { tocarMidi, pararMidi, pausarMidi, retomarMidi, cortarMidi, setVolumeMidi, setVelocidadeMidi, setGraveMidi, setTomMidi, tempoMidi, existeMidi, estadoMidi } from './midi.js'
+import { tocarMidi, pararMidi, pausarMidi, retomarMidi, cortarMidi, setVolumeMidi, setVelocidadeMidi, setGraveMidi, setTomMidi, tempoMidi, existeMidi, estadoMidi, preCarregarMidi, setFitaMidi } from './musica.js'
 
 // Sons: arquivo carregado pela Boot (som-<nome>: ASSETS.sons e os manifestos
 // de SUPER/habilidades/menu) ou sintetizado com WebAudio (SINTESE).
-// Músicas: public/assets/musicas/<nome>.mid, tocadas com soundfont (midi.js).
+// Músicas: pré-renderizadas de assets-fonte/musicas/<nome>.mid (scripts/musica/renderizar.mjs)
+// para assets-fonte/musicas/render/, tocadas por musica.js.
 
 let contexto = null
 let ligado = true
@@ -15,7 +16,7 @@ let guardada = null // tocarMusicaEspecial(): { nome, arquivo, tempo } da músic
 let pedidoEspecial = 0 // descarta tocarMusicaEspecial que ainda estava conferindo o arquivo
 const continuos = new Set() // somContinuo() tocando (setSomLigado(false) para todos)
 
-const arquivoMusica = (nome) => `assets/musicas/${nome}.mid`
+const arquivoMusica = (nome) => nome // musica.js acha o arquivo no manifesto
 
 export function setVolumes(musica, efeitos) {
   // o store muda a todo instante (joystick): só age quando o volume mudou de verdade
@@ -29,7 +30,7 @@ export function setVolumes(musica, efeitos) {
 // roleta do bonus round; restaurarMusica() volta ao normal
 export function abaixarMusica(fator = 0.35) {
   abafo = Math.max(0, Math.min(1, fator))
-  setVolumeMidi(volumes.musica * abafo) // o midi já faz a rampa (setTargetAtTime)
+  setVolumeMidi(volumes.musica * abafo) // musica.js já faz a rampa (setTargetAtTime)
 }
 
 export function restaurarMusica() {
@@ -56,8 +57,8 @@ export function tocar(scene, nome, opcoes) {
   if (c) SINTESE[nome]?.(sintetizador(c), opcoes ?? {})
 }
 
-// reserva: outra música para tocar se <nome>.mid não existir (ex.: 'menu'
-// cai na 'jevil' enquanto não houver menu.mid em public/assets/musicas/)
+// reserva: outra música para tocar se <nome> não existir (ex.: 'menu'
+// cai na 'jevil' enquanto não houver menu.mid em assets-fonte/musicas/)
 let pedidoMusica = 0
 export function musica(nome, reserva) {
   const pedido = ++pedidoMusica
@@ -89,8 +90,15 @@ export function pararMusica() {
   pararMidi()
 }
 
+// Pré-carrega uma música que vai tocar logo (a da arena depois da votação, a do SUPER quando
+// a carta é escolhida): o arquivo já está no cache quando musica()/tocarMusicaEspecial pedirem
+export function preCarregarMusica(nome) {
+  if (!ligado || !nome) return
+  preCarregarMidi(contextoAudio(), arquivoMusica(nome))
+}
+
 // ---------- música especial (carta SUPER) ----------
-// tocarMusicaEspecial(nome): se assets/musicas/<nome>.mid existir, guarda a
+// tocarMusicaEspecial(nome): se a música <nome> existir, guarda a
 // música que estava tocando (nome e segundo onde parou) e toca a especial em
 // loop. Sem o arquivo não faz NADA (a música de batalha continua) e devolve false.
 // voltarMusicaNormal(): volta a guardada do ponto onde parou, com fade-in.
@@ -132,9 +140,9 @@ function esquecerEspecial() {
   guardada = null
 }
 
-// Tom da música em semitons (0 = normal), sem mudar o andamento. Ex.: o
-// COGUMELO MALUCO deixa a música grave com o coração gigante e aguda com o mini.
-// Fica valendo até alguém pedir 0: sempre desfaça.
+// Tom da música em semitons (0 = normal). Muda o andamento junto, como um toca-discos
+// (musica.js setTomMidi): o COGUMELO MALUCO deixa a música grave e lenta com o coração
+// gigante e aguda e rápida com o mini. Fica valendo até alguém pedir 0: sempre desfaça.
 export const tomMusica = (semitons = 0) => setTomMidi(semitons)
 
 // Realce de graves na música (dB num lowshelf de ~180 Hz; 0 = normal), ex.: o
@@ -1155,7 +1163,6 @@ const SINTESE = {
 // de hoje só usa o corte: transmissão de TV, sem chiado). Sem
 // argumentos volta tudo ao normal: sempre desfaça. andamentoMusica(): o
 // andamento pedido agora (para devolver depois de uma câmera lenta).
-import { setFitaMidi } from './midi.js'
 export const fitaMusica = (opcoes, ms) => setFitaMidi(opcoes, ms)
 export const andamentoMusica = () => estadoMidi().velocidade
 

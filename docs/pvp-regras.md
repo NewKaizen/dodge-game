@@ -81,7 +81,7 @@ Todo baralho tem **uma** carta SUPER (`valor: 14`, `naipe: 'espadas'`, id `'<per
 - Ataque exclusivo de cada personagem: 3 fases de ~3 s com força 1 (~9 s ativos, mais os respiros), montadas com os padrões que já existem e dentro das faixas já validadas. Dano 13 por bala (já com o ×1,3, o mesmo de um K♠), ritmo padrão, não inverte controles.
 - **Imparável**: o ♦ Anular não cancela e o ♠ Espelho não reflete o SUPER. Com Espelho do outro lado, o Espelho manda o eco dele e o SUPER vai normal para a caixa do adversário.
 - A carta do adversário continua valendo: os dois atacam.
-- Na cena: animação especial (`pvp/super/anuncio.js`) e a música do personagem (`public/assets/musicas/super_<personagem>.mid`, se existir); depois a música de batalha volta de onde parou.
+- Na cena: animação especial (`pvp/super/anuncio.js`) e a música do personagem (`assets-fonte/musicas/super_<personagem>.mid`, se existir); depois a música de batalha volta de onde parou.
 - API em `cartas.js`: `SUPER = { valor: 14, custo: 10 }`, `ehSuper(carta)`, `superDoPersonagem(personagem)` → `{ nome, descricao, cor }`, `nomeDoValor(14) === '★'`. Em `resolverRodada`, cada jogada traz `super: true|false`.
 - CPU (`bot.js`): o SUPER tem a nota mais alta de todas; com ele na mão e faltando até 2 rodadas de energia, a CPU passa a vez para juntar energia (a não ser que esteja com menos de 30% de HP).
 
@@ -175,7 +175,7 @@ Código em `src/game/pvp/fimDePartida/` (o `index.js` explica as peças).
 
 Depois da escolha dos lutadores (e do "VS"), os jogadores **votam na arena** (cena `PvpVoto`, dados em `pvp/arenas.js`). Cada um move o próprio coração entre os cartões e vota com A (B desfaz). Ganha a mais votada; **empate = roleta** entre as empatadas; o cartão **"?" (ALEATÓRIA)** vale como voto numa arena sorteada na hora da apuração; acabou o tempo (12 s), quem não votou fica de fora (ninguém votou = roleta entre todas). Contra a CPU só o P1 vota: a CPU segue o voto. A revanche (tela de resultado) e o "recomeçar" do pause mantêm a arena.
 
-Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria (`public/assets/musicas/<arena.musica>.mid`; sem o arquivo, toca o `pvp.mid`) e a **sua lista de rodadas bônus** (no mínimo 10; Duelo e Cartas Malucas estão em todas). Um evento pode ter nome próprio numa arena (o Apagão vira TOCHAS no Templo e QUEDA DE ENERGIA na Informática).
+Cada arena tem fundo animado próprio (`backgrounds/arenas/`), música própria (`assets-fonte/musicas/<arena.musica>.mid`; sem o arquivo, toca o `pvp.mid`) e a **sua lista de rodadas bônus** (no mínimo 10; Duelo e Cartas Malucas estão em todas). Um evento pode ter nome próprio numa arena (o Apagão vira TOCHAS no Templo e QUEDA DE ENERGIA na Informática).
 
 | Arena | Música | Bônus |
 |---|---|---|

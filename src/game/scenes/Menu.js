@@ -36,7 +36,7 @@ import { semLigaduras } from '../campanha/texto.js'
 // opção escolhida faz; até alguém apertar uma tecla ou um botão do controle (ou o
 // joystick serial já autorizado abrir), as opções ficam apagadas e a linha pede isso.
 //
-// Música: public/assets/musicas/menu.mid; sem o arquivo, toca a do Jevil. O
+// Música: assets-fonte/musicas/menu.mid; sem o arquivo, toca a do Jevil. O
 // nome no canto de cima vem de ASSETS.tituloMusicaMenu.
 //
 // As peças ficam em game/menu/ (layout.js, sala.js, telao.js, logo.js).

@@ -7,7 +7,7 @@ import fs from 'node:fs'
 import { lerMidi } from '../../../scripts/musica/midi.mjs'
 import { ARENA } from '../pvp/arenas.js'
 
-const pasta = new URL('../../../public/assets/musicas/', import.meta.url)
+const pasta = new URL('../../../assets-fonte/musicas/', import.meta.url)
 const MUSICAS = {
   cidade: 'Boxing Boss',
   estacao: 'BIG SHOT',

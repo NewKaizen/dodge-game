@@ -427,7 +427,7 @@ export const TRILHAS = {
   'pvpResultado.mid': comporResultado,
 }
 
-const destino = (nome) => path.join(path.dirname(fileURLToPath(import.meta.url)), '../../public/assets/musicas', nome)
+const destino = (nome) => path.join(path.dirname(fileURLToPath(import.meta.url)), '../../assets-fonte/musicas', nome)
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   for (const [nome, compor] of Object.entries(TRILHAS)) {

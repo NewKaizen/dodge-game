@@ -1,4 +1,4 @@
-// Gera public/assets/musicas/lobby.mid: um loop calmo de lobby (piano
+// Gera assets-fonte/musicas/lobby.mid: um loop calmo de lobby (piano
 // elétrico, baixo, bateria leve e vibrafone), só para o lobby LAN não ficar
 // mudo. Troque pelo MIDI que quiser com o mesmo nome (e o título em
 // src/game/assets.js, tituloMusicaLobby).
@@ -101,6 +101,6 @@ nota(bateria, 9, TOTAL - PPQ / 4, PPQ / 4, 42, 24)
 
 const trilhas = [tempo, piano, baixo, vibra, bateria].map(trilha)
 const cabecalho = [0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, trilhas.length, (PPQ >>> 8) & 255, PPQ & 255]
-const destino = new URL('../../public/assets/musicas/lobby.mid', import.meta.url)
+const destino = new URL('../../assets-fonte/musicas/lobby.mid', import.meta.url)
 fs.writeFileSync(destino, Buffer.from([...cabecalho, ...trilhas.flat()]))
 console.log('gerado', destino.pathname)

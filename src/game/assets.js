@@ -1,6 +1,6 @@
 // Arquivos carregados pela Boot (caminhos relativos a public/). O resto da
 // arte é desenhado por código (arte/texturas.js), os efeitos sonoros são
-// sintetizados (audio.js) e as músicas são public/assets/musicas/<nome>.mid.
+// sintetizados (audio.js) e as músicas são assets-fonte/musicas/<nome>.mid.
 // Os sprites e sons de SUPER, habilidades e menu têm manifestos próprios
 // (pvp/super/sprites, pvp/habilidades/sprites, menu/sprites).
 export const ASSETS = {

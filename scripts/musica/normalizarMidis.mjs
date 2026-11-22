@@ -1,6 +1,6 @@
 // Normaliza o volume de MIDIs enviados de fora para soarem na mesma altura das
 // outras músicas do jogo. Toca cada MIDI com o MESMO sintetizador e soundfont do
-// jogo (spessasynth_core + public/assets/audio/soundfont.sf3), mede o volume
+// jogo (spessasynth_core + assets-fonte/soundfont/soundfont.sf3), mede o volume
 // (RMS dos trechos com som, em blocos de 400 ms) e ajusta o Volume (CC7) de cada
 // canal até ficar a ±0,5 dB do alvo. O alvo é a mediana das músicas das arenas
 // que já estão no jogo.
@@ -15,14 +15,14 @@ import { fileURLToPath } from 'node:url'
 import { BasicMIDI, SoundBankLoader, SpessaSynthProcessor, SpessaSynthSequencer, MIDIMessage } from 'spessasynth_core'
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const MUSICAS = path.join(RAIZ, 'public/assets/musicas')
+const MUSICAS = path.join(RAIZ, 'assets-fonte/musicas')
 const REFERENCIAS = ['pvp.mid', 'arena_jardim.mid', 'arena_informatica.mid', 'arena_palco.mid', 'arena_templo.mid', 'arena_coliseu.mid']
 const TAXA = 22050
 const MAX_S = 75
 const CC_VOLUME = 7
 const CC_PADRAO = 100
 
-const fonte = SoundBankLoader.fromArrayBuffer((await fs.readFile(path.join(RAIZ, 'public/assets/audio/soundfont.sf3'))).buffer)
+const fonte = SoundBankLoader.fromArrayBuffer((await fs.readFile(path.join(RAIZ, 'assets-fonte/soundfont/soundfont.sf3'))).buffer)
 
 async function volumeDb(bufferMidi) {
   const midi = BasicMIDI.fromArrayBuffer(bufferMidi)
