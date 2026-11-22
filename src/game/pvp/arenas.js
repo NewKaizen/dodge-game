@@ -11,7 +11,7 @@
 // Formato de uma arena:
 //   id, nome, descricao     cartão da votação e página do Grimório
 //   curto                   nome no cartão pequeno da votação
-//   musica, tituloMusica    public/assets/musicas/<musica>.mid (sem o arquivo: toca o
+//   musica, tituloMusica    assets-fonte/musicas/<musica>.mid (sem o arquivo: toca o
 //                           pvp.mid) e o nome da música na votação (null: não mostra)
 //   cor                     cor da arena (cartão, nome no anúncio)
 //   moldura                 { cor, alpha }: borda do tabuleiro e o véu escuro por cima do

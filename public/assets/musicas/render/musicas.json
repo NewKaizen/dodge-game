@@ -1,0 +1,671 @@
+{
+  "versao": 1,
+  "taxa": 48000,
+  "alvo": -14.94,
+  "ffmpeg": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+  "faixas": {
+    "arena_cafe": {
+      "loopStart": 1.5,
+      "loopEnd": 198.305333,
+      "duracao": 200.805333,
+      "formatos": {
+        "webm": "arena_cafe.9500edec0a62.webm",
+        "m4a": "arena_cafe.0955554503ed.m4a"
+      },
+      "hash": "0e7e929cbd02",
+      "base": "1f49138def2cc526724c026637b47b42c34b6b7f99c84f6f41a38a5c8dee5a3b",
+      "alvo": -14.94,
+      "lufs": -14.92,
+      "ganhoDb": -0.02,
+      "picoDb": -2,
+      "limitadorDb": -1,
+      "variacaoDb": 0.5
+    },
+    "arena_chinatown": {
+      "loopStart": 1.5,
+      "loopEnd": 94.190667,
+      "duracao": 96.690667,
+      "formatos": {
+        "webm": "arena_chinatown.c9d2e01394df.webm",
+        "m4a": "arena_chinatown.f8a102a6e60c.m4a"
+      },
+      "hash": "9c389785b52c",
+      "base": "e5d2cc3899d3185b00810beadcf8ac3bc383364cdda268f402e1dee661ee4554",
+      "alvo": -14.94,
+      "lufs": -16.65,
+      "ganhoDb": 1.71,
+      "picoDb": -2,
+      "limitadorDb": -2.45,
+      "variacaoDb": -26.2
+    },
+    "arena_cidade": {
+      "loopStart": 1.5,
+      "loopEnd": 144.446667,
+      "duracao": 146.946667,
+      "formatos": {
+        "webm": "arena_cidade.2ceb972de0b1.webm",
+        "m4a": "arena_cidade.f8ad5a3ae650.m4a"
+      },
+      "hash": "985064e14e72",
+      "base": "53af7da14193083bbca05e5eac05498e633a42ca1aa00d83515eae797b16f607",
+      "alvo": -14.94,
+      "lufs": -14.96,
+      "ganhoDb": 0.02,
+      "picoDb": -2,
+      "limitadorDb": -1.37,
+      "variacaoDb": -23.7
+    },
+    "arena_coliseu": {
+      "loopStart": 1.5,
+      "loopEnd": 104.828,
+      "duracao": 107.328,
+      "formatos": {
+        "webm": "arena_coliseu.1303e91ceeac.webm",
+        "m4a": "arena_coliseu.9829422b126f.m4a"
+      },
+      "hash": "2577f59f3d30",
+      "base": "77476efe50d3aaa4de5549181bb8ca8e86a153b1d2401c269b003b854304c224",
+      "alvo": -14.94,
+      "lufs": -14.94,
+      "ganhoDb": 0,
+      "picoDb": -2,
+      "limitadorDb": -0.94,
+      "variacaoDb": -19.9
+    },
+    "arena_estacao": {
+      "loopStart": 1.5,
+      "loopEnd": 142.126667,
+      "duracao": 144.626667,
+      "formatos": {
+        "webm": "arena_estacao.e41ca917da31.webm",
+        "m4a": "arena_estacao.c3759313c3a0.m4a"
+      },
+      "hash": "8edfb5872199",
+      "base": "fa3607842651dc060186b9db961405e0a78a9b329dce097bef82fa81704b00c2",
+      "alvo": -14.94,
+      "lufs": -15.22,
+      "ganhoDb": 0.28,
+      "picoDb": -2,
+      "limitadorDb": -0.84,
+      "variacaoDb": -20.9
+    },
+    "arena_informatica": {
+      "loopStart": 1.5,
+      "loopEnd": 153.934667,
+      "duracao": 156.434667,
+      "formatos": {
+        "webm": "arena_informatica.45798556ff55.webm",
+        "m4a": "arena_informatica.6af981f41032.m4a"
+      },
+      "hash": "53f12d23721f",
+      "base": "1f8a9c1675acdda3f08d896e68e36e3ccef008e5b53494a14b38107ebd1495e5",
+      "alvo": -14.94,
+      "lufs": -15.14,
+      "ganhoDb": 0.2,
+      "picoDb": -2,
+      "limitadorDb": -1.92,
+      "variacaoDb": -12.7
+    },
+    "arena_jardim": {
+      "loopStart": 1.5,
+      "loopEnd": 193.502667,
+      "duracao": 196.002667,
+      "formatos": {
+        "webm": "arena_jardim.64cebaf1219d.webm",
+        "m4a": "arena_jardim.5becc187534e.m4a"
+      },
+      "hash": "acc1cf19c58e",
+      "base": "4420ceed35245cc4a0b637bb834e6f20f2c564681ab7bcb19390198e970e919a",
+      "alvo": -14.94,
+      "lufs": -14.9,
+      "ganhoDb": -0.04,
+      "picoDb": -2,
+      "limitadorDb": -0.68,
+      "variacaoDb": -2.3
+    },
+    "arena_palco": {
+      "loopStart": 1.5,
+      "loopEnd": 104.828,
+      "duracao": 107.328,
+      "formatos": {
+        "webm": "arena_palco.1303e91ceeac.webm",
+        "m4a": "arena_palco.9829422b126f.m4a"
+      },
+      "hash": "2577f59f3d30",
+      "base": "77476efe50d3aaa4de5549181bb8ca8e86a153b1d2401c269b003b854304c224",
+      "alvo": -14.94,
+      "lufs": -14.94,
+      "ganhoDb": 0,
+      "picoDb": -2,
+      "limitadorDb": -0.94,
+      "variacaoDb": -19.9
+    },
+    "arena_praia": {
+      "loopStart": 1.5,
+      "loopEnd": 161.209333,
+      "duracao": 163.709333,
+      "formatos": {
+        "webm": "arena_praia.19454d2d2e2d.webm",
+        "m4a": "arena_praia.db8cacfa9875.m4a"
+      },
+      "hash": "b6bb5da55ead",
+      "base": "53c11057f753dda34a6610dab7bc9a2c60e9f3d867dec70118c0facd5d7914c0",
+      "alvo": -14.94,
+      "lufs": -15.79,
+      "ganhoDb": 0.85,
+      "picoDb": -2,
+      "limitadorDb": -1.65,
+      "variacaoDb": -21.1
+    },
+    "arena_templo": {
+      "loopStart": 1.5,
+      "loopEnd": 133.5,
+      "duracao": 136,
+      "formatos": {
+        "webm": "arena_templo.094d28570a25.webm",
+        "m4a": "arena_templo.df7f7c6583ff.m4a"
+      },
+      "hash": "b41901ca8212",
+      "base": "b239754d1248f7be37822ee7c232354e0f59f17a44414048019cf44e5b6ecb49",
+      "alvo": -14.94,
+      "lufs": -14.94,
+      "ganhoDb": 0,
+      "picoDb": -2,
+      "limitadorDb": -1.95,
+      "variacaoDb": -19.4
+    },
+    "campanha": {
+      "loopStart": 1.5,
+      "loopEnd": 59.684,
+      "duracao": 62.184,
+      "formatos": {
+        "webm": "campanha.4176e3fc1af6.webm",
+        "m4a": "campanha.9c9c4a7551a5.m4a"
+      },
+      "hash": "46202302bfaf",
+      "base": "8ef6982014bb60934ba24788eebd8bacf0910474ba3a1c2fdd2d99a17cb16f5f",
+      "alvo": -14.94,
+      "lufs": -35.5,
+      "ganhoDb": 20.56,
+      "picoDb": -2,
+      "limitadorDb": -1.69,
+      "variacaoDb": -11.4
+    },
+    "campanha2": {
+      "loopStart": 1.5,
+      "loopEnd": 54.833333,
+      "duracao": 57.333333,
+      "formatos": {
+        "webm": "campanha2.aac4a9393ba8.webm",
+        "m4a": "campanha2.92927876275d.m4a"
+      },
+      "hash": "3c7eac0bd512",
+      "base": "93c977efd04e61ca03ecb42856ff65f3d36ff81a373fdd64e10b66a4894253e6",
+      "alvo": -14.94,
+      "lufs": -34.32,
+      "ganhoDb": 19.38,
+      "picoDb": -2,
+      "limitadorDb": -1.85,
+      "variacaoDb": -8.5
+    },
+    "campanha_chefe": {
+      "loopStart": 1.5,
+      "loopEnd": 52.028,
+      "duracao": 54.528,
+      "formatos": {
+        "webm": "campanha_chefe.95b315fcfa60.webm",
+        "m4a": "campanha_chefe.a5e86d0d29dc.m4a"
+      },
+      "hash": "8137f3f8ed98",
+      "base": "79399f5136d57af4b46b2c1ee5da8ecfcbd6367ccf9fdbf96fa9628064bd1ade",
+      "alvo": -14.94,
+      "lufs": -16.29,
+      "ganhoDb": 1.35,
+      "picoDb": -2,
+      "limitadorDb": -1.05,
+      "variacaoDb": -10.7
+    },
+    "campanha_final": {
+      "loopStart": 1.5,
+      "loopEnd": 54.833333,
+      "duracao": 57.333333,
+      "formatos": {
+        "webm": "campanha_final.1e893ea57b42.webm",
+        "m4a": "campanha_final.cfbb9dd15175.m4a"
+      },
+      "hash": "83d49d8b5171",
+      "base": "ce1cb7261f61f480d6fd45e88c9481808d5317e42ec2d1e1c9e2e787f5c3104d",
+      "alvo": -14.94,
+      "lufs": -26.67,
+      "ganhoDb": 11.73,
+      "picoDb": -2,
+      "limitadorDb": -0.56,
+      "variacaoDb": -5.2
+    },
+    "campanha_libertado": {
+      "loopStart": 1.5,
+      "loopEnd": 23.318667,
+      "duracao": 25.818667,
+      "formatos": {
+        "webm": "campanha_libertado.12c44eaba001.webm",
+        "m4a": "campanha_libertado.8503df85daaa.m4a"
+      },
+      "hash": "528ec4a457e6",
+      "base": "ced400d3f3c41b6e4796ddeb77d4fb4616a1adfe96c26552b98441304214b9b3",
+      "alvo": -14.94,
+      "lufs": -30.22,
+      "ganhoDb": 15.28,
+      "picoDb": -4.44,
+      "limitadorDb": 0,
+      "variacaoDb": -10.3
+    },
+    "campanha_luta": {
+      "loopStart": 1.5,
+      "loopEnd": 57.153333,
+      "duracao": 59.653333,
+      "formatos": {
+        "webm": "campanha_luta.06f5ca7b7074.webm",
+        "m4a": "campanha_luta.492c1505d91f.m4a"
+      },
+      "hash": "157f814f9528",
+      "base": "d0a9d06538be85009028fc8849782b21fdbf7232ee6bde9131babc7ffbcebcf5",
+      "alvo": -14.94,
+      "lufs": -19.63,
+      "ganhoDb": 4.69,
+      "picoDb": -2,
+      "limitadorDb": -1.62,
+      "variacaoDb": -16.9
+    },
+    "campanha_virada": {
+      "loopStart": 1.5,
+      "loopEnd": 52.028,
+      "duracao": 54.528,
+      "formatos": {
+        "webm": "campanha_virada.cbcd26e3e899.webm",
+        "m4a": "campanha_virada.6cfb96c854ce.m4a"
+      },
+      "hash": "843c619eccb7",
+      "base": "fbbd1fac65dd77ec62d0d7e272261b0d62363e4bbff1f51825f5e24dc0d6beec",
+      "alvo": -14.94,
+      "lufs": -16.21,
+      "ganhoDb": 1.27,
+      "picoDb": -2,
+      "limitadorDb": -0.45,
+      "variacaoDb": -11.7
+    },
+    "coronel": {
+      "loopStart": 1.5,
+      "loopEnd": 155.358667,
+      "duracao": 157.858667,
+      "formatos": {
+        "webm": "coronel.6b7a5f45c954.webm",
+        "m4a": "coronel.88b08db88f9e.m4a"
+      },
+      "hash": "6b5ccd529162",
+      "base": "f8c75a9bcaec3f9e8bdc86a0e1af8f2542777873706b4cc9604dffe087981ba8",
+      "alvo": -14.94,
+      "lufs": -13.15,
+      "ganhoDb": -1.79,
+      "picoDb": -2,
+      "limitadorDb": -2.02,
+      "variacaoDb": -17
+    },
+    "gameover": {
+      "loopStart": 1.5,
+      "loopEnd": 51.588,
+      "duracao": 54.088,
+      "formatos": {
+        "webm": "gameover.5334c8c697b8.webm",
+        "m4a": "gameover.af2a45540b76.m4a"
+      },
+      "hash": "5d04479216bc",
+      "base": "846541f497ecabaf06ab7885d625a395c4a47aaf80c67ef058480bff7f4ef862",
+      "alvo": -14.94,
+      "lufs": -16.24,
+      "ganhoDb": 1.3,
+      "picoDb": -3.54,
+      "limitadorDb": 0,
+      "variacaoDb": -8.7
+    },
+    "jevil": {
+      "loopStart": 1.5,
+      "loopEnd": 102.553333,
+      "duracao": 105.053333,
+      "formatos": {
+        "webm": "jevil.3d1bb4972e3f.webm",
+        "m4a": "jevil.f8257d8f0338.m4a"
+      },
+      "hash": "b278205cf6a0",
+      "base": "c1b34168c6b40a56e5fd255b00b0613435268168b827280994a45fd75350791f",
+      "alvo": -14.94,
+      "lufs": -14.94,
+      "ganhoDb": 0,
+      "picoDb": -2.48,
+      "limitadorDb": 0,
+      "variacaoDb": -27.8
+    },
+    "king": {
+      "loopStart": 1.5,
+      "loopEnd": 214.057333,
+      "duracao": 216.557333,
+      "formatos": {
+        "webm": "king.1228686682bb.webm",
+        "m4a": "king.f5ce0e620bd1.m4a"
+      },
+      "hash": "3cd6b84e798f",
+      "base": "e0dbdf00763a09d635d90d3c021eb5eb436b6080dbbbf838695e8d1ca0fc9ff3",
+      "alvo": -14.94,
+      "lufs": -12.21,
+      "ganhoDb": -2.73,
+      "picoDb": -2,
+      "limitadorDb": -1.65,
+      "variacaoDb": -17.2
+    },
+    "lobby": {
+      "loopStart": 1.5,
+      "loopEnd": 22.372,
+      "duracao": 24.872,
+      "formatos": {
+        "webm": "lobby.39f0231c5a42.webm",
+        "m4a": "lobby.eaad4d4eb54e.m4a"
+      },
+      "hash": "0e2a0ed1f7d1",
+      "base": "d91bc8a5ec6c66549bf384dbddcafcbd72a0d96783e9edf2daf2bd59688aaabb",
+      "alvo": -14.94,
+      "lufs": -25.36,
+      "ganhoDb": 10.42,
+      "picoDb": -2.18,
+      "limitadorDb": 0,
+      "variacaoDb": -16.4
+    },
+    "menu": {
+      "loopStart": 1.5,
+      "loopEnd": 34.692,
+      "duracao": 37.192,
+      "formatos": {
+        "webm": "menu.46d079c2c311.webm",
+        "m4a": "menu.4ec873912570.m4a"
+      },
+      "hash": "0b02e126a930",
+      "base": "71fb39f54a6940dffe0ec802ec9d0924ddb5465914bfabbbf62f648c048ba4f0",
+      "alvo": -14.94,
+      "lufs": -15.05,
+      "ganhoDb": 0.11,
+      "picoDb": -2,
+      "limitadorDb": -0.43,
+      "variacaoDb": -19.8
+    },
+    "pvp": {
+      "loopStart": 1.5,
+      "loopEnd": 154.041333,
+      "duracao": 156.541333,
+      "formatos": {
+        "webm": "pvp.8657406ef3c9.webm",
+        "m4a": "pvp.bd0c4e9566d2.m4a"
+      },
+      "hash": "5c612ea6f16e",
+      "base": "55fb97a266e7ecb49725833caff8139f6df0d6efbc5daecd0a13d21715c6d2c4",
+      "alvo": -14.94,
+      "lufs": -14.93,
+      "ganhoDb": -0.01,
+      "picoDb": -2,
+      "limitadorDb": -0.54,
+      "variacaoDb": -2.6
+    },
+    "pvpEscolha": {
+      "loopStart": 1.5,
+      "loopEnd": 126.033333,
+      "duracao": 128.533333,
+      "formatos": {
+        "webm": "pvpEscolha.f51acbba774b.webm",
+        "m4a": "pvpEscolha.b3d1cdac58aa.m4a"
+      },
+      "hash": "36b8b87c77a7",
+      "base": "954e002a35465343698fe50d3bbde9c7d494942078add354b8b2c4b8bd8721e6",
+      "alvo": -14.94,
+      "lufs": -14.2,
+      "ganhoDb": -0.74,
+      "picoDb": -2,
+      "limitadorDb": -1.28,
+      "variacaoDb": -30.6
+    },
+    "pvpResultado": {
+      "loopStart": 1.5,
+      "loopEnd": 18.644,
+      "duracao": 21.144,
+      "formatos": {
+        "webm": "pvpResultado.3c137ff38503.webm",
+        "m4a": "pvpResultado.b7835ad9573d.m4a"
+      },
+      "hash": "593ac4fa70d4",
+      "base": "ad0a21050d01c3c306415b7e7a25e7400b651554a6343e1ca4c363499dddeefb",
+      "alvo": -14.94,
+      "lufs": -22.37,
+      "ganhoDb": 7.43,
+      "picoDb": -2,
+      "limitadorDb": -0.75,
+      "variacaoDb": -11.2
+    },
+    "pvp_b": {
+      "loopStart": 1.5,
+      "loopEnd": 154.041333,
+      "duracao": 156.541333,
+      "formatos": {
+        "webm": "pvp_b.164cfeba8900.webm",
+        "m4a": "pvp_b.b662b40a03b3.m4a"
+      },
+      "hash": "d71bcd8ee9bc",
+      "base": "2c7a654e1386426548bca34bdde99919785c6a8490f409c34fbd42acdef425c2",
+      "alvo": -14.94,
+      "lufs": -12.12,
+      "ganhoDb": -2.82,
+      "picoDb": -2,
+      "limitadorDb": -0.53,
+      "variacaoDb": -2.6
+    },
+    "queen": {
+      "loopStart": 1.5,
+      "loopEnd": 244.838667,
+      "duracao": 247.338667,
+      "formatos": {
+        "webm": "queen.086b365456c1.webm",
+        "m4a": "queen.f96e2ed162ac.m4a"
+      },
+      "hash": "9a33740254c0",
+      "base": "22c0408b348ab5cc2dd731598f2e3a9833bbdc8d1136cf62bbf608827af24527",
+      "alvo": -14.94,
+      "lufs": -14.06,
+      "ganhoDb": -0.88,
+      "picoDb": -2,
+      "limitadorDb": -2.14,
+      "variacaoDb": -11.9
+    },
+    "selecao": {
+      "loopStart": 1.5,
+      "loopEnd": 324.502667,
+      "duracao": 327.002667,
+      "formatos": {
+        "webm": "selecao.c58b1af73b99.webm",
+        "m4a": "selecao.0e2a637474d5.m4a"
+      },
+      "hash": "cd25cfb92f1e",
+      "base": "e93ce4fb9c6885feafbd2253eb6dadec8cc1e9167c4422d958841237f080b81e",
+      "alvo": -14.94,
+      "lufs": -11.94,
+      "ganhoDb": -3,
+      "picoDb": -2,
+      "limitadorDb": -1.94,
+      "variacaoDb": -31.7
+    },
+    "super_asriel": {
+      "loopStart": 1.5,
+      "loopEnd": 34.825333,
+      "duracao": 37.325333,
+      "formatos": {
+        "webm": "super_asriel.b86048b4f0df.webm",
+        "m4a": "super_asriel.aec6777bc192.m4a"
+      },
+      "hash": "5333cb34e587",
+      "base": "c5cd0f1f5a4006ebc144a94e15372f7169e4dc6f8bacb9dedabc5c2c21588361",
+      "alvo": -14.94,
+      "lufs": -13.13,
+      "ganhoDb": -1.81,
+      "picoDb": -2.6,
+      "limitadorDb": 0,
+      "variacaoDb": -32.3
+    },
+    "super_berdly": {
+      "loopStart": 1.5,
+      "loopEnd": 84.705333,
+      "duracao": 87.205333,
+      "formatos": {
+        "webm": "super_berdly.b739a7752132.webm",
+        "m4a": "super_berdly.28bccbd017b3.m4a"
+      },
+      "hash": "aebc6cc5fada",
+      "base": "a38e6fd288c292f6cefe7c43951a8e08cc06d2e151665253547efe816d17c050",
+      "alvo": -14.94,
+      "lufs": -11.53,
+      "ganhoDb": -3.41,
+      "picoDb": -2,
+      "limitadorDb": -0.64,
+      "variacaoDb": -29.4
+    },
+    "super_dess": {
+      "loopStart": 1.5,
+      "loopEnd": 20.7,
+      "duracao": 23.2,
+      "formatos": {
+        "webm": "super_dess.5421f60e6457.webm",
+        "m4a": "super_dess.d0d72389961b.m4a"
+      },
+      "hash": "7082f28f29ce",
+      "base": "87ce69fd5a0baf21bebdc069f46183a940fed77ca8bfd18b470b9cf617bb87fa",
+      "alvo": -14.94,
+      "lufs": -9.13,
+      "ganhoDb": -5.81,
+      "picoDb": -2.34,
+      "limitadorDb": 0,
+      "variacaoDb": 4.3
+    },
+    "super_kris": {
+      "loopStart": 1.5,
+      "loopEnd": 12.929333,
+      "duracao": 15.429333,
+      "formatos": {
+        "webm": "super_kris.44c798e75734.webm",
+        "m4a": "super_kris.8504e957e050.m4a"
+      },
+      "hash": "8d0a357f01d8",
+      "base": "222ed202039260bd53fa5b187acd1258df7f3e45b0697e38a7a53903c4d3a6d8",
+      "alvo": -14.94,
+      "lufs": -15.88,
+      "ganhoDb": 0.94,
+      "picoDb": -2,
+      "limitadorDb": -0.54,
+      "variacaoDb": -13.2
+    },
+    "super_noelle": {
+      "loopStart": 1.5,
+      "loopEnd": 68.284,
+      "duracao": 70.784,
+      "formatos": {
+        "webm": "super_noelle.dcbc8dc2390f.webm",
+        "m4a": "super_noelle.198ad16df9c8.m4a"
+      },
+      "hash": "adee397ff84a",
+      "base": "83cb13e99cfb411f25bab12b72065bccc20f602b2d5da46d40528ebc4369a9a7",
+      "alvo": -14.94,
+      "lufs": -15.73,
+      "ganhoDb": 0.79,
+      "picoDb": -2,
+      "limitadorDb": -0.95,
+      "variacaoDb": -12.9
+    },
+    "super_ralsei": {
+      "loopStart": 1.5,
+      "loopEnd": 109.324,
+      "duracao": 111.824,
+      "formatos": {
+        "webm": "super_ralsei.c33233674c14.webm",
+        "m4a": "super_ralsei.1edf3b9f46f9.m4a"
+      },
+      "hash": "3af6d1977522",
+      "base": "df6c424a507475ceee17392ef1707461ab69e64c2d945cd18269371bd1607e04",
+      "alvo": -14.94,
+      "lufs": -14.19,
+      "ganhoDb": -0.75,
+      "picoDb": -2,
+      "limitadorDb": -0.53,
+      "variacaoDb": -23.1
+    },
+    "super_susie": {
+      "loopStart": 1.5,
+      "loopEnd": 20.974667,
+      "duracao": 23.474667,
+      "formatos": {
+        "webm": "super_susie.6c73fd634c4e.webm",
+        "m4a": "super_susie.558a1dd09dfe.m4a"
+      },
+      "hash": "83376fbaa3a3",
+      "base": "9ffc90c2d66804f18cd64b5462f1b16a4579719aa6ed468dd0eb96ecc46250f7",
+      "alvo": -14.94,
+      "lufs": -8.78,
+      "ganhoDb": -6.16,
+      "picoDb": -3.3,
+      "limitadorDb": 0,
+      "variacaoDb": -23.8
+    },
+    "tutorial": {
+      "loopStart": 1.5,
+      "loopEnd": 61.452,
+      "duracao": 63.952,
+      "formatos": {
+        "webm": "tutorial.a5e16c3ca706.webm",
+        "m4a": "tutorial.3181170467cb.m4a"
+      },
+      "hash": "9101eed4448b",
+      "base": "76eb79ee396a2839248e85736db00487bc908ced0d5221648331471a9e8a22a2",
+      "alvo": -14.94,
+      "lufs": -32.96,
+      "ganhoDb": 18.02,
+      "picoDb": -2,
+      "limitadorDb": -0.18,
+      "variacaoDb": -20.4
+    },
+    "tutorial2": {
+      "loopStart": 1.5,
+      "loopEnd": 56.873333,
+      "duracao": 59.373333,
+      "formatos": {
+        "webm": "tutorial2.623876390dde.webm",
+        "m4a": "tutorial2.8a2495193086.m4a"
+      },
+      "hash": "5a1db500769f",
+      "base": "64374072e4906343ff79a1f2e75afef95315a898fef64c2ae1fba56e444a6048",
+      "alvo": -14.94,
+      "lufs": -36.27,
+      "ganhoDb": 21.33,
+      "picoDb": -2,
+      "limitadorDb": -2.8,
+      "variacaoDb": -13.7
+    },
+    "vitoria": {
+      "loopStart": 1.5,
+      "loopEnd": 37.801333,
+      "duracao": 40.301333,
+      "formatos": {
+        "webm": "vitoria.6d72b3904634.webm",
+        "m4a": "vitoria.ff60ce7afbfb.m4a"
+      },
+      "hash": "943c86829b70",
+      "base": "9169375a367eb91341b02f28e5d332444dbd38959b679d3e718f36f377240a25",
+      "alvo": -14.94,
+      "lufs": -23.61,
+      "ganhoDb": 8.67,
+      "picoDb": -5.9,
+      "limitadorDb": 0,
+      "variacaoDb": -12.1
+    }
+  }
+}

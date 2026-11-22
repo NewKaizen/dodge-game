@@ -1,9 +1,9 @@
 // Gera as músicas da CAMPANHA, Mundo 1 "A Casa Silenciosa" (composição original, feita para o jogo):
-//   public/assets/musicas/campanha.mid    "Casa Silenciosa": o mapa e os diálogos. Piano esparso em
+//   assets-fonte/musicas/campanha.mid    "Casa Silenciosa": o mapa e os diálogos. Piano esparso em
 //                                          Ré menor, cada frase devolvida um tempo e meio depois, uma
 //                                          oitava acima e bem mais baixo (o ECO); cordas lentas e um
 //                                          pad grave sustentando o acorde. Muito espaço entre as notas.
-//   public/assets/musicas/campanha2.mid   o mesmo tema, um pouco mais tenso, para as fases e o chefe:
+//   assets-fonte/musicas/campanha2.mid   o mesmo tema, um pouco mais tenso, para as fases e o chefe:
 //                                          cordas em trêmolo, um tímpano baixinho batendo como um
 //                                          coração (tum-tum) e o baixo do piano em colcheias.
 // 4/4, 16 compassos em loop exato (~58 s e ~53 s), Ré menor.
@@ -157,7 +157,7 @@ export function comporCampanha(variacao = 1) {
   return arquivoMidi({ ppq: PPQ, trilhas, fim: FIM })
 }
 
-const destino = (nome) => path.join(path.dirname(fileURLToPath(import.meta.url)), '../../public/assets/musicas', nome)
+const destino = (nome) => path.join(path.dirname(fileURLToPath(import.meta.url)), '../../assets-fonte/musicas', nome)
 export const ARQUIVOS = { 'campanha.mid': 1, 'campanha2.mid': 2 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

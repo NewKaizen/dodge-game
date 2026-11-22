@@ -6,7 +6,7 @@ import fs from 'node:fs'
 import { lerMidi } from '../../../scripts/musica/midi.mjs'
 import { comporCampanha, MELODIA, HARMONIA, ARQUIVOS, FIM, PPQ, COMPASSOS, GM, ATRASO_ECO } from '../../../scripts/musica/campanha.mjs'
 
-const pasta = new URL('../../../public/assets/musicas/', import.meta.url)
+const pasta = new URL('../../../assets-fonte/musicas/', import.meta.url)
 const notas = (t) => t.eventos.filter((e) => e.tipo === 'on')
 
 test('a melodia e a harmonia: 16 compassos de 4 tempos, com muito silêncio', () => {

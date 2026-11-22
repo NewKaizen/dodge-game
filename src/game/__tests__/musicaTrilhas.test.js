@@ -7,7 +7,7 @@ import fs from 'node:fs'
 import { lerMidi } from '../../../scripts/musica/midi.mjs'
 import { TRILHAS, PPQ, acorde, paraMaior } from '../../../scripts/musica/trilhas.mjs'
 
-const pasta = new URL('../../../public/assets/musicas/', import.meta.url)
+const pasta = new URL('../../../assets-fonte/musicas/', import.meta.url)
 // a escala de cada uma (classes de altura) e o andamento esperado (bpm) e a duração do loop (s)
 const MENOR_HARMONICA = (t) => [0, 2, 3, 5, 7, 8, 10, 11].map((i) => (t + i) % 12)
 const MAIOR = (t) => [0, 2, 4, 5, 7, 9, 11].map((i) => (t + i) % 12)

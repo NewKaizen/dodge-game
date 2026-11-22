@@ -23,7 +23,7 @@ Porta diferente: `PORTA=5181 npm run lan`. Se o Windows perguntar, libere o Node
 - **Salas**: seu nome (A para editar), **+ CRIAR SALA**, as salas achadas na rede (modo, vagas, "JOGANDO") e **CONECTAR POR IP…** (ex.: `192.168.0.10` ou `192.168.0.10:5180`; se o PC de lá tiver uma sala só, já entra nela).
 - **Sala**: os dois jogadores com ping e se estão prontos, o **chat** (CONVERSAR) e as ações. O host escolhe o **MODO** (←/→) e começa com **COMEÇAR PARTIDA** quando o convidado marcou **ESTOU PRONTO!**. O host também pode tirar o convidado; **B** sai da sala (no host, fecha a sala).
 - Os textos (nome, IP, chat) se digitam pelo teclado: Enter confirma, Esc cancela.
-- Música própria: `public/assets/musicas/lobby.mid` (sem ele, a do menu). O nome no canto vem de `ASSETS.tituloMusicaLobby` em `src/game/assets.js`. O `lobby.mid` que está lá é provisório, gerado por `scripts/lobby/gerar_lobby_mid.mjs`.
+- Música própria: `assets-fonte/musicas/lobby.mid` (sem ele, a do menu). O nome no canto vem de `ASSETS.tituloMusicaLobby` em `src/game/assets.js`. O `lobby.mid` que está lá é provisório, gerado por `scripts/lobby/gerar_lobby_mid.mjs`.
 
 Na sala, o teclado inteiro de cada um comanda o próprio lado (o host é o P1, o convidado o P2) e o "Jogadores" da barra de cima fica travado. Na partida não tem pausa de verdade (pausar travaria o outro): o C abre o menu por cima e a partida continua, e a aba escondida também não trava ninguém ([rede-pvp.md](rede-pvp.md#aba-em-segundo-plano-e-pausa-online)). Quando a partida acaba (B na escolha de personagem antes de alguém confirmar, ou o fim da partida), os dois voltam ao lobby da sala, que continua aberta.
 

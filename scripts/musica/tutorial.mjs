@@ -1,7 +1,7 @@
 // Gera as músicas do Manual do Ralsei (composição original, feita para o jogo):
-//   public/assets/musicas/tutorial.mid    "Caderno do Ralsei": valsa de caixinha de música, para a
+//   assets-fonte/musicas/tutorial.mid    "Caderno do Ralsei": valsa de caixinha de música, para a
 //                                          entrada do GUIA e a página 1 (celesta + pizzicato + piano)
-//   public/assets/musicas/tutorial2.mid   o mesmo tema com um pouco mais de energia, para a página 2
+//   assets-fonte/musicas/tutorial2.mid   o mesmo tema com um pouco mais de energia, para a página 2
 //                                          (caixinha de música, pizzicato com colcheias, piano em
 //                                          arpejo e um glockenspiel respondendo)
 // 3/4, 32 compassos em loop exato (~60 s e ~55 s), Fá maior: A A' B A''.
@@ -138,7 +138,7 @@ export function comporTutorial(variacao = 1) {
   return arquivoMidi({ ppq: PPQ, trilhas, fim: FIM })
 }
 
-const destino = (nome) => path.join(path.dirname(fileURLToPath(import.meta.url)), '../../public/assets/musicas', nome)
+const destino = (nome) => path.join(path.dirname(fileURLToPath(import.meta.url)), '../../assets-fonte/musicas', nome)
 export const ARQUIVOS = { 'tutorial.mid': 1, 'tutorial2.mid': 2 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

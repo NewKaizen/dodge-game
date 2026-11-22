@@ -1,5 +1,13 @@
-Músicas em MIDI (.mid), com o nome da tela ou do chefe. O jogo procura
-<nome>.mid aqui e toca em loop com o soundfont (public/assets/audio/soundfont.sf3).
+Músicas em MIDI (.mid), com o nome da tela ou do chefe: as FONTES das músicas do jogo.
+O jogo não toca MIDI: depois de mudar ou acrescentar um .mid aqui, rode
+
+  node scripts/musica/renderizar.mjs
+
+Ele toca cada .mid com o soundfont (assets-fonte/soundfont/soundfont.sf3, o mesmo de
+sempre) e grava em public/assets/musicas/render/ o áudio pronto (Opus .webm + AAC .m4a, o
+loop sem emenda e o volume igualado) e o musicas.json. Commite os arquivos gerados (o
+deploy não renderiza nada). O jogo toca <nome> se ele estiver no musicas.json (game/musica.js).
+Nada desta pasta vai para o site.
 
   menu.mid         menu inicial (ainda não existe: enquanto isso toca jevil.mid).
                    O nome que aparece no canto do menu fica em

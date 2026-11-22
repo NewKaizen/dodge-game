@@ -72,4 +72,4 @@ Os números estão em `docs/coop-cartas.md` ("Balanceamento medido").
 
 ## Músicas (MIDI)
 
-Solte `<nome>.mid` em `public/assets/musicas/` (veja o `LEIA-ME.txt` de lá). O jogo toca com um soundfont General MIDI (`game/midi.js`, biblioteca spessasynth_lib), em loop e com fade entre as músicas. `debugJogo.musica()` mostra o que está tocando.
+Solte `<nome>.mid` em `assets-fonte/musicas/` (veja o `LEIA-ME.txt` de lá). Depois rode `node scripts/musica/renderizar.mjs`: ele renderiza o MIDI com o soundfont General MIDI (`assets-fonte/soundfont/`) para `public/assets/musicas/render/` (Opus e AAC + `musicas.json`), e o jogo toca o áudio pronto (`game/musica.js`), em loop sem emenda e com fade entre as músicas. `debugJogo.musica()` mostra o que está tocando.

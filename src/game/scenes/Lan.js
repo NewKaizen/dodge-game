@@ -76,7 +76,7 @@ import { corDaVaga, textoDaVaga } from '../vagas.js'
 // do modo (PvpEscolha / EscolhaParty). O Menu manda o host de volta para cá
 // enquanto ele estiver numa sala.
 //
-// Música: public/assets/musicas/lobby.mid (sem ele, a do menu). O nome no
+// Música: assets-fonte/musicas/lobby.mid (sem ele, a do menu). O nome no
 // canto vem de ASSETS.tituloMusicaLobby.
 //   cima/baixo escolher · esquerda/direita mudar o modo · A confirmar · B voltar
 // ONLINE, fora de sala: JOGAR RÁPIDO, criar sala, entrar com código e, embaixo, os atalhos
