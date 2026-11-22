@@ -134,15 +134,27 @@ export default class Transmissao {
     this.fim = new Promise((r) => (this.resolver = r))
     prepararTexturas(cena)
 
-    // os quadros que vão ao ar
+    // os quadros que vão ao ar. O gravador grava em dois ritmos (gravador.js: 15 fotos/s longe do
+    // K.O., 30 perto dele), então as fases são cortadas pelo TEMPO de jogo de cada foto (o mesmo
+    // trecho de sempre: TV.*.quadros fotos de GRAVACAO.quadroMs) e a reprodução anda pela duração
+    // de cada foto. Com tudo a 30 fotos/s dá exatamente o que dava antes
     const n = quadros.length
+    this.duracoes = quadros.map((q, i) => {
+      const d = i + 1 < n ? quadros[i + 1].tempo - q.tempo : GRAVACAO.quadroMs
+      return d > 0 ? d : GRAVACAO.quadroMs
+    })
+    const recuar = (de, ms) => {
+      let i = de
+      let soma = 0
+      while (i > 0 && soma + this.duracoes[i - 1] <= ms + 0.5) soma += this.duracoes[--i]
+      return i
+    }
     this.iFim = n - 1
-    this.iClose = Math.max(0, this.iFim - TV.close.quadros)
-    this.iLento = Math.max(0, this.iClose - TV.lento.quadros)
-    this.iPlay = Math.max(0, this.iLento - TV.playQuadros)
+    this.iClose = recuar(this.iFim, TV.close.quadros * GRAVACAO.quadroMs)
+    this.iLento = recuar(this.iClose, TV.lento.quadros * GRAVACAO.quadroMs)
+    this.iPlay = recuar(this.iLento, TV.playQuadros * GRAVACAO.quadroMs)
     this.pos = this.iPlay
-    this.ateGolpeMs =
-      TV.entradaMs + (this.iLento - this.iPlay) * GRAVACAO.quadroMs + ((this.iClose - this.iLento) * GRAVACAO.quadroMs) / TV.lento.fator + ((this.iFim - this.iClose) * GRAVACAO.quadroMs) / TV.close.fator
+    this.ateGolpeMs = TV.entradaMs + this.msEntre(this.iPlay, this.iLento) + this.msEntre(this.iLento, this.iClose) / TV.lento.fator + this.msEntre(this.iClose, this.iFim) / TV.close.fator
 
     this.montarTelas()
     this.montarArtes()
@@ -151,6 +163,28 @@ export default class Transmissao {
 
   tocar() {
     return this.fim
+  }
+
+  // ms de jogo entre as fotos a e b (a < b)
+  msEntre(a, b) {
+    let soma = 0
+    for (let i = a; i < b; i++) soma += this.duracoes[i]
+    return soma
+  }
+
+  // anda `ms` de jogo na gravação (a posição é o índice da foto, com a fração dentro dela), até `limite`
+  avancar(ms, limite) {
+    while (ms > 0 && this.pos < limite) {
+      const i = Math.floor(this.pos)
+      const d = this.duracoes[i] ?? GRAVACAO.quadroMs
+      const resto = (i + 1 - this.pos) * d
+      if (ms < resto) {
+        this.pos += ms / d
+        return
+      }
+      this.pos = i + 1
+      ms -= resto
+    }
   }
 
   novo(o) {
@@ -395,7 +429,7 @@ export default class Transmissao {
       velocidadeMusica(this.andamento * 0.6)
       fitaMusica({ corte: 420 }, 500)
       // batidas e flashes até o golpe
-      const total = ((this.iFim - this.iClose) * GRAVACAO.quadroMs) / TV.close.fator
+      const total = this.msEntre(this.iClose, this.iFim) / TV.close.fator
       for (let t = 650; t < total - 250; t += 650) this.agendar(t, () => tocar(cena, 'batidaLenta'))
       for (let t = 300; t < total - 150; t += Phaser.Math.Between(260, 520)) this.agendar(t, () => this.flashes(1, 0))
     } else if (fase === 'golpe') {
@@ -423,21 +457,20 @@ export default class Transmissao {
       item.fn()
       if (this.acabou || this.fase !== fase) return
     }
-    const passo = dt / GRAVACAO.quadroMs
     switch (fase) {
       case 'entrada':
         if (this.faseMs >= TV.entradaMs) this.mudarFase('play')
         break
       case 'play':
-        this.pos += passo
+        this.avancar(dt, this.iLento)
         if (this.pos >= this.iLento) this.mudarFase('lento')
         break
       case 'lento':
-        this.pos += passo * TV.lento.fator
+        this.avancar(dt * TV.lento.fator, this.iClose)
         if (this.pos >= this.iClose) this.mudarFase('close')
         break
       case 'close':
-        this.pos += passo * TV.close.fator
+        this.avancar(dt * TV.close.fator, this.iFim)
         if (this.pos >= this.iFim) this.mudarFase('golpe')
         break
       case 'golpe':

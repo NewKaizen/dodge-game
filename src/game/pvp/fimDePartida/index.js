@@ -7,6 +7,7 @@ import { shake } from '../../effects/shake.js'
 import { fatores } from '../../acessibilidade.js'
 import { ESCALA } from '../../arte/texturas.js'
 import Gravador from './gravador.js'
+import { perigoNaPista } from './limiar.js'
 import Transmissao from './transmissao.js'
 import AvisoPular from './avisoPular.js'
 import { PERSONAGENS } from '../../data/personagens.js'
@@ -95,7 +96,8 @@ export default class FimDePartida {
   // depois do update da arena (e do filtrarCaixas): a foto do quadro
   aoPosAtualizar(_, delta) {
     if (this.estado !== 'jogo') return
-    this.gravador.atualizar(delta * debug.acelerar, !this.arena.pausado && this.fontes.some((f) => f.gravando()))
+    const gravando = this.fontes.filter((f) => f.gravando())
+    this.gravador.atualizar(delta * debug.acelerar, !this.arena.pausado && gravando.length > 0, gravando.some((f) => f.rapido?.() ?? true))
   }
 
   // delta REAL (a câmera lenta e o replay andam no relógio de verdade)
@@ -212,7 +214,7 @@ export default class FimDePartida {
     this.quebras.push(quebrarCoracao(a, { x: p.x, y: p.y, cor, escala: (coracao.sprite?.scaleX ?? ESCALA.coracao) * (caixa.vista?.escala ?? 1) }))
     coracao.esconder()
     this.criarFantasma(k)
-    a.avisoPista[k].setText('K.O.!').setColor(TEXTO.caido).setFontSize(20).setScale(2.4)
+    a.avisoPista[k].setText('K.O.!').setColor(TEXTO.caido).setFontSize(20).setScale(2.4).setVisible(true)
     a.tweens.add({ targets: a.avisoPista[k], scale: 1, duration: 60, ease: 'Back.easeOut' })
     this.mortos.push({ j, k, i: 0 })
     return true
@@ -353,8 +355,10 @@ const emissores = (cena) => cena.children.list.filter((o) => o.type === 'Particl
 function fontePista(arena, pista, campo) {
   return {
     campo,
-    // (a arena pode dispensar uma pista: no todos contra todos só grava quando o K.O. pode acabar a partida)
-    gravando: () => arena.fase === 'esquiva' && pista.aberta && (arena.gravarPista?.(pista) ?? true),
+    // (a arena pode dispensar uma pista: no todos contra todos só grava quando o K.O. pode acabar a partida;
+    // e só grava quando um K.O. é possível nesta rodada: limiar.js)
+    gravando: () => arena.fase === 'esquiva' && pista.aberta && (arena.gravarPista?.(pista) ?? true) && perigoNaPista(arena, pista) > 0,
+    rapido: () => perigoNaPista(arena, pista) > 1,
     // (a caixa escondida pela vista do todos contra todos continua gravando: o K.O. pode ser nela)
     visivel: () => pista.aberta && (pista.caixa.camera.visible || pista.caixa.oculta),
     objetos: () => arena.children.list.filter((o) => o.willRender?.(pista.caixa.camera)),
