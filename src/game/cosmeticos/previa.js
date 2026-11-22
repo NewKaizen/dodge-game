@@ -10,14 +10,31 @@ import { aplicarEfeitoCarta } from './efeitos.js'
 import { desenharMoldura } from './molduras.js'
 import { tocarSomDano } from './sons.js'
 import { ligarAtualizacao, garantirTexturas, reduzido } from './util.js'
+import { assar } from '../arte/assar.js'
 
 const VAZIO = { destroy() {} }
+
+// um desenho parado em volta de (0, 0): textura assada (arte/assar.js); sem textura, o Graphics
+function parado(scene, chave, largura, altura, desenhar) {
+  const img = assar(scene, chave, largura, altura, desenhar)
+  if (img) return img
+  const g = scene.add.graphics()
+  desenhar(g)
+  return g
+}
 
 // verso de carta desenhado por código (só para a prévia)
 export function cartaDeMentira(scene, x, y, largura) {
   const altura = Math.round((largura * 10) / 7)
   const c = scene.add.container(x, y)
-  const g = scene.add.graphics()
+  const g = parado(scene, `previa-verso-${largura}x${altura}`, largura, altura, (g) => pintarVersoDeMentira(g, largura, altura))
+  c.add(g)
+  c.largura = largura
+  c.altura = altura
+  return c
+}
+
+function pintarVersoDeMentira(g, largura, altura) {
   const hw = largura / 2
   const hh = altura / 2
   const u = largura / 70
@@ -41,10 +58,6 @@ export function cartaDeMentira(scene, x, y, largura) {
   g.fillStyle(0x2a1f55, 1).fillCircle(0, 0, 14 * u)
   g.lineStyle(1.4 * u, 0xd9a93c, 1).strokeCircle(0, 0, 14 * u)
   g.fillStyle(0xd9a93c, 1).fillCircle(0, 0, 4 * u)
-  c.add(g)
-  c.largura = largura
-  c.altura = altura
-  return c
 }
 
 function iconeSom(scene, x, y, tamanho) {
@@ -53,7 +66,11 @@ function iconeSom(scene, x, y, tamanho) {
   const s = tamanho / 64
   c.add(g)
   let pulso = 0
+  let desenhado = false
   const lig = ligarAtualizacao(scene, (t, dt) => {
+    // parado (sem pulso) o desenho não muda: só redesenha enquanto as ondinhas pulsam
+    if (desenhado && pulso <= 0) return
+    desenhado = true
     pulso = Math.max(0, pulso - dt / 450)
     g.clear()
     g.fillStyle(0xe8e4f4, 1)
@@ -105,11 +122,12 @@ export function previa(scene, tipo, id, x, y, tamanho = 64) {
     if (tipo === 'lancamento') {
       const alc = tamanho * 0.95
       const base = scene.add.container(x, y)
-      const g = scene.add.graphics()
-      g.lineStyle(2, 0x6a6680, 0.8).strokeCircle(-alc, 0, 7)
-      g.lineStyle(2, 0xd0485a, 0.9).strokeCircle(alc, 0, 11)
-      g.lineBetween(alc - 16, 0, alc + 16, 0)
-      g.lineBetween(alc, -16, alc, 16)
+      const g = parado(scene, `previa-alvo-${alc}`, alc * 2 + 36, 36, (g) => {
+        g.lineStyle(2, 0x6a6680, 0.8).strokeCircle(-alc, 0, 7)
+        g.lineStyle(2, 0xd0485a, 0.9).strokeCircle(alc, 0, 11)
+        g.lineBetween(alc - 16, 0, alc + 16, 0)
+        g.lineBetween(alc, -16, alc, 16)
+      })
       base.add(g)
       let espera = 200
       let rodando = false
@@ -137,10 +155,11 @@ export function previa(scene, tipo, id, x, y, tamanho = 64) {
     if (tipo === 'moldura') {
       const lado = Math.round(tamanho * 0.62)
       const avatar = scene.add.container(x, y)
-      const g = scene.add.graphics()
-      g.fillStyle(0x3a3358, 1).fillRect(-lado / 2, -lado / 2, lado, lado)
-      g.fillStyle(0xbdb8d0, 1).fillCircle(0, -lado * 0.1, lado * 0.2)
-      g.fillStyle(0xbdb8d0, 1).fillRoundedRect(-lado * 0.32, lado * 0.14, lado * 0.64, lado * 0.4, 6)
+      const g = parado(scene, `previa-avatar-${lado}`, lado, lado, (g) => {
+        g.fillStyle(0x3a3358, 1).fillRect(-lado / 2, -lado / 2, lado, lado)
+        g.fillStyle(0xbdb8d0, 1).fillCircle(0, -lado * 0.1, lado * 0.2)
+        g.fillStyle(0xbdb8d0, 1).fillRoundedRect(-lado * 0.32, lado * 0.14, lado * 0.64, lado * 0.4, 6)
+      })
       avatar.add(g)
       const moldura = desenharMoldura(scene, x, y, lado, id)
       moldura.setDepth((avatar.depth ?? 0) + 1)
