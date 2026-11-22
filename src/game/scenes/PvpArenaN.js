@@ -36,6 +36,7 @@ import { efeitoDoEspecial, efeitoDoReflexo, escalaDaCarta } from '../pvp/efeitos
 import { fogoArtificio } from '../effects/festa.js'
 import { entrarNoJogo, voltarAoMenu, levouGolpe, informarVida, venceu } from '../../lib/saida.js'
 import { fatores } from '../acessibilidade.js'
+import { textoSeMudou } from '../textoSeMudou.js'
 import { pref } from '../preferencias.js'
 import { quemEmFoco, estadoDoCartao, TEXTO_CARTAO, vistasDaGrade, vistasDoFoco, criarTransicao, avancarTransicao, parametrosSopro, posicaoDoCartao, FOCO, TRANSICAO } from '../pvp/focoFfa.js'
 
@@ -1356,7 +1357,7 @@ export default class PvpArenaN extends Phaser.Scene {
     pista.caixa.tremer(260, 4)
     if (coracao?.ativo) particulas(this, coracao.x, coracao.y, { cor: corDaVaga(j), quantidade: 30, velocidade: 220, vida: 700 })
     coracao?.esconder()
-    this.avisoPista[j].setText(`${this.dupla ? 'CAIU' : 'K.O.'}!\n${this.nomeDe(j)}`).setColor(TEXTO.caido)
+    this.avisoPista[j].setText(`${this.dupla ? 'CAIU' : 'K.O.'}!\n${this.nomeDe(j)}`).setColor(TEXTO.caido).setAlpha(1)
     if (this.paradas[j]) return
     this.paradas[j] = true
     this.time.delayedCall(700, () => pista.parar())
@@ -1869,9 +1870,13 @@ export default class PvpArenaN extends Phaser.Scene {
             tocar(this, 'inverter')
           }
           joy = { x: -joy.x, y: -joy.y }
-          this.avisoPista[k].setText(fatores().pulso > 1 || Math.floor(this.time.now / 180) % 2 ? 'CONTROLES INVERTIDOS!' : '').setColor('#ff9a3a').setFontSize(11)
+          // o pisca é o alpha (a visibilidade daqui é do layout das caixas): sem re-render por quadro
+          const t = this.avisoPista[k]
+          if (t.text !== 'CONTROLES INVERTIDOS!') t.setFontSize(11)
+          textoSeMudou(t, 'CONTROLES INVERTIDOS!', '#ff9a3a').setAlpha(fatores().pulso > 1 || Math.floor(this.time.now / 180) % 2 === 1 ? 1 : 0)
         } else if (inv?.avisado) {
           this.invertido = 0
+          this.avisoPista[k].setAlpha(1)
           if (!this.ko[k]) this.avisoPista[k].setText('').setFontSize(14)
         }
       }

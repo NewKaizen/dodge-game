@@ -55,6 +55,7 @@ import { particulas } from '../effects/particulas.js'
 import { efeitoDoEspecial, efeitoDoReflexo, escalaDaCarta } from '../pvp/efeitosAses.js'
 import { entrarNoJogo, voltarAoMenu, levouGolpe, venceu } from '../../lib/saida.js'
 import { fatores } from '../acessibilidade.js'
+import { textoSeMudou } from '../textoSeMudou.js'
 import { ligarEscuridao } from '../coop/semanal/escuridao.js'
 import { salaSemanal } from '../../lib/lan/rede.js'
 import { ligarLadra } from '../coop/semanal/ladraCena.js'
@@ -1001,7 +1002,7 @@ class CoopArena extends PvpArena {
     for (const j of [0, 1]) this.perfeitoCoop[j] = q.jogadores[j] && !this.acertosRodada[j] && !this.ko[j] && !this.estado.jogadores[j].caido
     const perfeitos = this.registrarPerfeitosNoQuadro(q)
     this.invertido = [0, 0]
-    this.avisoPista.forEach((t) => t.setText(''))
+    this.avisoPista.forEach((t) => t.setText('').setVisible(true))
     await this.esperar(250)
     if (this.saindo) return
     this.infoPista.forEach((t) => t.setText(''))
@@ -1039,11 +1040,15 @@ class CoopArena extends PvpArena {
         inv.avisado = true
         tocar(this, 'inverter')
       }
-      const pisca = fatores().pulso > 1 || Math.floor(this.time.now / 180) % 2 ? 'CONTROLES\nINVERTIDOS!' : ''
-      for (const j of [0, 1]) if (this.noQuadro(j) && !this.ko[j]) this.avisoPista[j].setText(pisca).setColor('#ff9a3a')
+      // o pisca é só visibilidade: o texto e a cor mudam uma vez (sem re-render por quadro)
+      const aceso = fatores().pulso > 1 || Math.floor(this.time.now / 180) % 2 === 1
+      for (const j of [0, 1]) if (this.noQuadro(j) && !this.ko[j]) textoSeMudou(this.avisoPista[j], 'CONTROLES\nINVERTIDOS!', '#ff9a3a').setVisible(aceso)
     } else if (inv?.avisado) {
       this.invertido[0] = 0
-      for (const j of [0, 1]) if (!this.ko[j]) this.avisoPista[j].setText('')
+      for (const j of [0, 1]) {
+        this.avisoPista[j].setVisible(true)
+        if (!this.ko[j]) this.avisoPista[j].setText('')
+      }
     }
     const joys = [0, 1].map((j) => {
       const joy = j === this.cpu ? this.joyDaCpuNoQuadro(delta, invertendo) : this.controles.joy(j)
@@ -1115,7 +1120,7 @@ class CoopArena extends PvpArena {
     if (coracao?.ativo) particulas(this, coracao.x, coracao.y, { cor: CORES.almas[j], quantidade: 30, velocidade: 220, vida: 700 })
     this.deixarAlma(j) // RESGATE NA HORA: fica a alma dele no quadro (se tem parceiro de pé para buscar)
     coracao?.esconder()
-    this.avisoPista[j].setText('CAIU!').setColor(TEXTO.caido).setFontSize(20)
+    this.avisoPista[j].setText('CAIU!').setColor(TEXTO.caido).setFontSize(20).setVisible(true)
     this.atualizarCaidos()
     const armada = this.armadas[j]
     if (armada) {
