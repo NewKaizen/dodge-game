@@ -4,6 +4,7 @@ import { LARGURA, ALTURA, CENTRO_X, FONTE } from '../../constants.js'
 import { texturasPraiaCafe } from '../../arte/praiaCafe.js'
 import { ignorarNasCaixas } from '../../recorte.js'
 import { semLigaduras } from '../../campanha/texto.js'
+import { assarRegiao, trocarAssadaRegiao, texturaAssada } from '../../arte/assar.js'
 
 // CAFÉ FRANCÊS: o terraço de um café de Paris ao entardecer. De trás para a frente:
 //   céu em faixas do azul-noite ao rosa e ao âmbar, estrelinhas e uma lua crescente;
@@ -17,6 +18,18 @@ import { semLigaduras } from '../../campanha/texto.js'
 //   POMBOS ciscando (às vezes voam) e um ACORDEONISTA (silhueta de boina) com notinhas.
 // Nada forte atrás das caixas e das cartas: os brilhos ficam no alto, no vão do meio e nas
 // laterais (a arena ainda põe o véu da moldura por cima).
+//
+// DESEMPENHO (docs/desempenho.md, fase 1): as camadas paradas já eram assadas (assarCamadas).
+// Agora também: as estrelas, os brilhos da torre, as lâmpadas do varal e o vapor são Images de
+// uma textura só (eram ~130 Rectangle/Arc, cada um refeito a cada quadro e quebrando o lote de
+// desenho); as marquises, o gato e o acordeão são laços de quadros assados uma vez (a fase da
+// animação escolhe o quadro mais perto: o movimento é o mesmo, em degraus de menos de meio pixel);
+// os halos ADD parados das poças de luz dos postes entram na textura do chão.
+const QUADROS_MARQUISE = 24 // a bainha ondula com período 2π/1,4 s
+const QUADROS_RABO = 24 // o rabo do gato: período 2π/2,2 s
+const QUADROS_FOLE = 24 // o fole do acordeão: abre de 0 a 1
+// a fase (0..1) de um seno de frequência w no tempo t, em QUADROS degraus
+const degrau = (t, w, quadros) => Math.round((((t * w) / (Math.PI * 2)) % 1) * quadros) % quadros
 
 const CEU = [0x161638, 0x211f4c, 0x30266a, 0x4a2e78, 0x6e3a80, 0x984a82, 0xc25e82, 0xe07a7e, 0xf09a78, 0xf8b878]
 const HORIZONTE = 268
@@ -47,7 +60,7 @@ export default function cafe(scene, objetos) {
   pintarCeu(ceu, CEU, LARGURA, HORIZONTE)
   ceu.fillStyle(CEU[CEU.length - 1], 1).fillRect(0, HORIZONTE, LARGURA, ALTURA - HORIZONTE)
   const estrelas = Array.from({ length: 34 }, () => {
-    const e = add(scene.add.rectangle(sorte() * LARGURA, 4 + sorte() * 110, 1.5, 1.5, 0xfff4e0))
+    const e = add(scene.add.image(sorte() * LARGURA, 4 + sorte() * 110, '__WHITE').setDisplaySize(1.5, 1.5).setTint(0xfff4e0))
     return { e, fase: sorte() * 6.28, v: 0.6 + sorte() * 1.4 }
   })
   const lua = add(scene.add.graphics())
@@ -121,7 +134,7 @@ export default function cafe(scene, objetos) {
   const brilhosTorre = Array.from({ length: 30 }, () => {
     const y = TOPO + 8 + sorte() * (arcoY - TOPO - 14)
     const lado = sorte() < 0.5 ? -1 : 1
-    const r = add(scene.add.rectangle(CENTRO_X + lado * larg(y) * (0.1 + sorte() * 0.9), y, 2, 2, 0xffe8a0))
+    const r = add(scene.add.image(CENTRO_X + lado * larg(y) * (0.1 + sorte() * 0.9), y, '__WHITE').setDisplaySize(2, 2).setTint(0xffe8a0))
     return { r, fase: sorte() * 10, v: 1 + sorte() * 3 }
   })
 
@@ -204,10 +217,16 @@ export default function cafe(scene, objetos) {
   const marquises = [
     { x0: -4, w: 116, c1: 0xc8323a, c2: 0xf6ecd8 },
     { x0: LARGURA - 112, w: 116, c1: 0x2e5aa8, c2: 0xf6ecd8 },
-  ].map((m) => ({ ...m, g: add(scene.add.graphics()) }))
-  const desenharMarquise = (m, t) => {
-    const g = m.g
-    g.clear()
+  ].map((m, i) => ({ ...m, i, quadro: -1 }))
+  // um quadro do laço: a fase da bainha em q / QUADROS_MARQUISE do período
+  const pintarMarquise = (m, q) => (g) => desenharMarquise(m, (q / QUADROS_MARQUISE) * ((Math.PI * 2) / 1.4), g)
+  const regiaoMarquise = (m) => ({ x: m.x0 - 4, y: 188, largura: m.w + 12, altura: 52 })
+  for (const m of marquises) {
+    const img = assarRegiao(scene, `cafe-marquise-${m.i}-0`, regiaoMarquise(m), pintarMarquise(m, 0))
+    m.g = add(img ?? scene.add.graphics())
+  }
+  function desenharMarquise(m, t, g = m.g) {
+    if (g === m.g) g.clear()
     const topo = 192
     const base = 212
     const listras = 10
@@ -231,6 +250,13 @@ export default function cafe(scene, objetos) {
     g.fillStyle(0x000000, 0.2).fillRect(m.x0, topo, m.w, 3)
     g.fillStyle(0x000000, 0.12).fillEllipse(m.x0 + m.w / 2, base + 22, m.w * 0.9, 14)
   }
+  const atualizarMarquise = (m, t) => {
+    if (m.g instanceof Phaser.GameObjects.Graphics) return desenharMarquise(m, t)
+    const q = degrau(t, 1.4, QUADROS_MARQUISE)
+    if (q === m.quadro) return
+    m.quadro = q
+    trocarAssadaRegiao(scene, m.g, `cafe-marquise-${m.i}-${q}`, regiaoMarquise(m), pintarMarquise(m, q))
+  }
 
   // ---------- varal de luzinhas (cruza a rua) ----------
   const varais = [
@@ -239,6 +265,10 @@ export default function cafe(scene, objetos) {
   ]
   const fio = add(scene.add.graphics())
   const luzes = []
+  // as lâmpadas: um círculo assado (a cor é a tinta); ficam todas depois dos halos (um lote só de
+  // cada: halo e lâmpada não se encostam, a ordem entre eles não muda a imagem)
+  const bolinha = texturaAssada(scene, 'cafe-bolinha', 8, 8, (g) => g.fillStyle(0xffffff, 1).fillCircle(0, 0, 4), { folga: 0 })
+  const bulbos = []
   for (const v of varais) {
     const ponto = (u) => ({ x: v.x0 + (v.x1 - v.x0) * u, y: v.y0 + (v.y1 - v.y0) * 4 * u * (1 - u) })
     fio.lineStyle(1.3, 0x1c1a2a, 1)
@@ -253,9 +283,14 @@ export default function cafe(scene, objetos) {
       const p = ponto((k + 0.5) / v.bulbos)
       const cor = [0xfff0b0, 0xffd070, 0xffb890][k % 3]
       const halo = add(scene.add.image(p.x, p.y + 4, 'arte-brilho').setTint(cor).setBlendMode(ADD).setScale(0.38).setAlpha(0.55))
-      const bulbo = add(scene.add.circle(p.x, p.y + 4, 2.2, cor))
-      luzes.push({ halo, bulbo, fase: sorte() * 10, v: 0.8 + sorte() * 1.6 })
+      const l = { halo, fase: sorte() * 10, v: 0.8 + sorte() * 1.6 }
+      bulbos.push({ l, x: p.x, y: p.y + 4, cor })
+      luzes.push(l)
     }
+  }
+  for (const b of bulbos) {
+    b.l.bulbo = bolinha ? add(scene.add.image(b.x, b.y, bolinha).setTint(b.cor)) : add(scene.add.circle(b.x, b.y, 2.2, b.cor))
+    if (bolinha) b.l.bulbo.setScale(b.l.bulbo.scaleX * (2.2 / 4))
   }
 
   // ---------- postes de luz ----------
@@ -296,9 +331,11 @@ export default function cafe(scene, objetos) {
     linha++
   }
   // poças de luz quente das vitrines e do poste
+  // (as dos postes são paradas: entram na textura assada do chão, logo depois dele; ADD com ADD
+  // soma igual em qualquer ordem, então vir antes das duas animadas não muda a imagem)
+  const pocasPostes = postes.map((p) => add(scene.add.image(p.halo.x, RUA + 30, 'arte-brilho').setTint(0xffd890).setBlendMode(ADD).setDisplaySize(120, 26).setAlpha(0.28)))
   const luzChao = add(scene.add.image(54, RUA + 14, 'arte-brilho').setTint(0xffc060).setBlendMode(ADD).setDisplaySize(160, 40).setAlpha(0.32))
   const luzChao2 = add(scene.add.image(LARGURA - 54, RUA + 14, 'arte-brilho').setTint(0xffa0c0).setBlendMode(ADD).setDisplaySize(160, 40).setAlpha(0.28))
-  for (const p of postes) add(scene.add.image(p.halo.x, RUA + 30, 'arte-brilho').setTint(0xffd890).setBlendMode(ADD).setDisplaySize(120, 26).setAlpha(0.28))
 
   // ---------- terraço: mesas, cadeiras, xícaras, croissants ----------
   const mobilia = add(scene.add.graphics())
@@ -364,7 +401,10 @@ export default function cafe(scene, objetos) {
   // vapor das xícaras (fumacinhas que sobem)
   const vapor = []
   for (const x of xicaras) {
-    for (let k = 0; k < 3; k++) vapor.push({ obj: add(scene.add.circle(0, 0, 2, 0xffffff, 0.3)), x: x.x, y: x.y, k, esc: x.escala })
+    for (let k = 0; k < 3; k++) {
+      const obj = bolinha ? add(scene.add.image(0, 0, bolinha).setAlpha(0.3)) : add(scene.add.circle(0, 0, 2, 0xffffff, 0.3))
+      vapor.push({ obj, x: x.x, y: x.y, k, esc: x.escala, base: bolinha ? obj.scaleX * 0.5 : 1 })
+    }
   }
 
   // ---------- gato numa cadeira (esquerda) ----------
@@ -374,11 +414,24 @@ export default function cafe(scene, objetos) {
   gatoG.lineStyle(2.4, 0x2c1c18, 1).lineBetween(GATO.x - 10, GATO.y + 9, GATO.x - 11, GATO.y + 19).lineBetween(GATO.x + 10, GATO.y + 9, GATO.x + 11, GATO.y + 19)
   gatoG.fillStyle(0x7a4a2a, 1).fillEllipse(GATO.x, GATO.y + 8, 26, 7)
   gatoG.lineStyle(2.4, 0x3a2216, 1).lineBetween(GATO.x - 12, GATO.y + 7, GATO.x - 13, GATO.y - 14)
-  const gato = add(scene.add.graphics())
-  const desenharGato = (t) => {
-    const g = gato
-    g.clear()
+  // o gato: um laço de quadros (QUADROS_RABO fases do rabo x olhos abertos/fechados), assados na
+  // primeira vez que aparecem
+  const regiaoGato = { x: GATO.x - 26, y: GATO.y - 26, largura: 46, altura: 46 }
+  const pintarGato = (q, piscou) => (g) => desenharGato((q / QUADROS_RABO) * ((Math.PI * 2) / 2.2), g, piscou)
+  const imgGato = assarRegiao(scene, 'cafe-gato-0-0', regiaoGato, pintarGato(0, false))
+  const gato = add(imgGato ?? scene.add.graphics())
+  let quadroGato = ''
+  const atualizarGato = (t) => {
     const piscou = Math.sin(t * 0.9) > 0.985 || (t % 6) > 5.82
+    if (!imgGato) return desenharGato(t, gato, piscou, true)
+    const q = degrau(t, 2.2, QUADROS_RABO)
+    const chave = `${q}-${piscou ? 1 : 0}`
+    if (chave === quadroGato) return
+    quadroGato = chave
+    trocarAssadaRegiao(scene, gato, `cafe-gato-${chave}`, regiaoGato, pintarGato(q, piscou))
+  }
+  function desenharGato(t, g, piscou, limpar = false) {
+    if (limpar) g.clear()
     // corpo (tigrado laranja) sentado, olhando para a direita
     g.fillStyle(0xe8963a, 1).fillEllipse(GATO.x + 1, GATO.y - 2, 17, 17)
     g.fillStyle(0xc87428, 1)
@@ -404,16 +457,18 @@ export default function cafe(scene, objetos) {
     g.lineTo(GATO.x - 14 + Math.sin(t * 2.2) * 2.5, GATO.y + 12)
     g.lineTo(GATO.x - 17 + Math.sin(t * 2.2 + 0.8) * 4, GATO.y + 17)
     g.strokePath()
-    // zzz
-    const z = (t * 0.5) % 1
-    g.fillStyle(0xffffff, 0.8 * (1 - z))
   }
   const zzz = add(scene.add.text(GATO.x + 14, GATO.y - 26, 'z', { fontFamily: FONTE, fontSize: '10px', color: '#ffffff' }).setAlpha(0))
 
   // ---------- acordeonista (silhueta) ----------
   const ACORDEON = { x: 806, y: 296 }
   const musico = add(scene.add.graphics())
-  const acordeao = add(scene.add.graphics())
+  // o fole: QUADROS_FOLE aberturas assadas (cada quadro de jogo escolhe a mais perto)
+  const regiaoFole = { x: ACORDEON.x - 26, y: ACORDEON.y - 8, largura: 48, altura: 30 }
+  const pintarFole = (q) => (g) => desenharAcordeao(g, q / (QUADROS_FOLE - 1))
+  const imgFole = assarRegiao(scene, 'cafe-fole-0', regiaoFole, pintarFole(0))
+  const acordeao = add(imgFole ?? scene.add.graphics())
+  let quadroFole = -1
   musico.fillStyle(0x000000, 0.25).fillEllipse(ACORDEON.x, ACORDEON.y + 46, 40, 9)
   musico.fillStyle(0x16121e, 1)
   musico.fillRect(ACORDEON.x - 5, ACORDEON.y + 14, 4, 32).fillRect(ACORDEON.x + 1, ACORDEON.y + 14, 4, 32) // pernas
@@ -422,10 +477,16 @@ export default function cafe(scene, objetos) {
   musico.fillEllipse(ACORDEON.x + 1, ACORDEON.y - 23, 18, 5) // boina
   musico.fillCircle(ACORDEON.x - 2, ACORDEON.y - 26, 2)
   musico.fillStyle(0xc8323a, 1).fillRect(ACORDEON.x - 6, ACORDEON.y - 9, 12, 2) // lenço
-  const desenharAcordeao = (t) => {
-    const g = acordeao
-    g.clear()
+  const atualizarAcordeao = (t) => {
     const abre = (Math.sin(t * 3.2) + 1) / 2 // fole abrindo e fechando
+    if (!imgFole) return desenharAcordeao(acordeao, abre, true)
+    const q = Math.round(abre * (QUADROS_FOLE - 1))
+    if (q === quadroFole) return
+    quadroFole = q
+    trocarAssadaRegiao(scene, acordeao, `cafe-fole-${q}`, regiaoFole, pintarFole(q))
+  }
+  function desenharAcordeao(g, abre, limpar = false) {
+    if (limpar) g.clear()
     const larg2 = 14 + abre * 16
     const x0 = ACORDEON.x - 18
     const y0 = ACORDEON.y - 3
@@ -460,7 +521,7 @@ export default function cafe(scene, objetos) {
 
   // as camadas paradas viram uma imagem cada (o chão de paralelepípedos sozinho tinha ~60 mil
   // comandos de desenho refeitos a cada quadro)
-  assarCamadas(scene, objetos, [ceu, lua, telhados, torre, predios, lojas, fio, chao, mobilia, flores, gatoG, musico], 'arena-cafe', LARGURA, ALTURA)
+  assarCamadas(scene, objetos, [ceu, lua, telhados, torre, predios, lojas, fio, chao, ...pocasPostes, mobilia, flores, gatoG, musico], 'arena-cafe', LARGURA, ALTURA)
 
   return {
     atualizar(dt, estado) {
@@ -476,7 +537,7 @@ export default function cafe(scene, objetos) {
       luaHalo.setAlpha(0.26 + Math.sin(t * 0.5) * 0.04)
       farol.setAlpha(Math.sin(t * 2.4) > 0.2 ? 0.95 : 0.15)
       for (const b of brilhosTorre) b.r.setAlpha(Math.max(0, Math.sin(t * b.v + b.fase)) ** 2)
-      for (const m of marquises) desenharMarquise(m, t)
+      for (const m of marquises) atualizarMarquise(m, t)
       for (const l of luzes) {
         const a = 0.75 + 0.25 * Math.sin(t * l.v + l.fase)
         l.halo.setAlpha(0.26 + 0.14 * a)
@@ -489,14 +550,14 @@ export default function cafe(scene, objetos) {
       // vapor das xícaras
       vapor.forEach((v, i) => {
         const ph = (t * 0.55 + v.k / 3 + i * 0.17) % 1
-        v.obj.setPosition(v.x + Math.sin(ph * 7 + v.k * 2) * 3 * v.esc, v.y - ph * 18 * v.esc).setScale((0.6 + ph * 1.5) * v.esc).setAlpha(0.45 * (1 - ph))
+        v.obj.setPosition(v.x + Math.sin(ph * 7 + v.k * 2) * 3 * v.esc, v.y - ph * 18 * v.esc).setScale(v.base * (0.6 + ph * 1.5) * v.esc).setAlpha(0.45 * (1 - ph))
       })
 
-      desenharGato(t)
+      atualizarGato(t)
       const z = (t * 0.45) % 1
       zzz.setPosition(GATO.x + 14 + z * 6, GATO.y - 26 - z * 16).setAlpha(0.8 * (1 - z)).setScale(0.8 + z * 0.7)
 
-      desenharAcordeao(t)
+      atualizarAcordeao(t)
       notas.forEach((n) => {
         const ph = (t * 0.28 + n.fase) % 1
         n.obj.setPosition(ACORDEON.x - 12 + Math.sin(ph * 8 + n.fase * 9) * 10, ACORDEON.y - 36 - ph * 56).setAlpha(Math.min(1, ph * 6) * (1 - ph) * 0.9)
