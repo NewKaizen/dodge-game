@@ -5,7 +5,9 @@ O jogo não toca MIDI: depois de mudar ou acrescentar um .mid aqui, rode
 
 Ele toca cada .mid com o soundfont (assets-fonte/soundfont/soundfont.sf3, o mesmo de
 sempre) e grava em public/assets/musicas/render/ o áudio pronto (Opus .webm + AAC .m4a, o
-loop sem emenda e o volume igualado) e o musicas.json. Commite os arquivos gerados (o
+loop sem emenda, o volume de cada música igual ao de antes, só com o limitador de pico) e o
+musicas.json. O volume de uma música se muda no CC7 do .mid (normalizarMidis.mjs) ou em
+AJUSTE_DB no renderizar.mjs. Commite os arquivos gerados (o
 deploy não renderiza nada). O jogo toca <nome> se ele estiver no musicas.json (game/musica.js).
 Nada desta pasta vai para o site.
 

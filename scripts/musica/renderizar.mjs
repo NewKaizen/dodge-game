@@ -30,9 +30,13 @@
 //   notas ANTES do ponto de loop, o script para com erro: a introdução precisaria de outro
 //   esquema de arquivo.
 //
-// Volume: todas na mesma sonoridade (LUFS integrado, ITU-R BS.1770), a mediana das músicas de
-// arena (as mesmas referências de normalizarMidis.mjs, que já soavam iguais no jogo), e um
-// limitador de pico em LIMITE_DB (o king.mid batia em 0 dBFS e estourava).
+// Volume: cada música fica com a MESMA sonoridade que tinha no jogo (o render cru é exatamente o
+// que o sintetizador ao vivo tocava, com o CC7 dos .mid): nenhum ganho, só o limitador de pico em
+// LIMITE_DB onde a música estourava (o king.mid batia em 0 dBFS). As arenas já estavam igualadas
+// no próprio .mid por normalizarMidis.mjs. O manifesto guarda a sonoridade (LUFS integrado,
+// ITU-R BS.1770) antes (lufs) e depois do limitador (lufsFinal). Para mudar o nível de uma
+// música, ajuste AJUSTE_DB (ou mexa no CC7 do .mid). --normalizar (opcional) iguala todas na
+// mediana das arenas, como referência; não é o padrão (as músicas quietas têm nível de propósito).
 //
 // Idempotente: musicas.json guarda a chave de cada faixa (hash do .mid, do soundfont, dos
 // parâmetros e do alvo de volume). Os arquivos levam o hash do conteúdo no
@@ -65,10 +69,11 @@ const OPUS = '64k'
 const AAC = '96k'
 // as músicas de arena que já soavam iguais no jogo (normalizarMidis.mjs): a mediana delas é o alvo
 const REFERENCIAS = ['pvp', 'arena_jardim', 'arena_informatica', 'arena_palco', 'arena_templo', 'arena_coliseu']
-// ajuste fino por música, em dB, depois da normalização (ex.: { tutorial: -6 } deixa a caixinha de
-// música 6 dB abaixo das outras). Vazio: todas na mesma sonoridade.
+// ajuste fino por música, em dB (ex.: { tutorial: -3 } deixa a caixinha de música 3 dB mais baixa
+// que no jogo antigo). Vazio: todas com o nível de antes.
 const AJUSTE_DB = {}
-const PARAMETROS = { AJUSTE_DB, VERSAO, TAXA, BLOCO, PRE_S, POS_S, LIMITE_DB, LOOKAHEAD_S, SOLTURA_S, FUNDE_S, OPUS, AAC }
+const NORMALIZAR = process.argv.includes('--normalizar')
+const PARAMETROS = { NORMALIZAR, AJUSTE_DB, VERSAO, TAXA, BLOCO, PRE_S, POS_S, LIMITE_DB, LOOKAHEAD_S, SOLTURA_S, FUNDE_S, OPUS, AAC }
 
 const sha = (dados) => crypto.createHash('sha256').update(dados).digest('hex')
 const arredonda = (x, casas = 6) => Math.round(x * 10 ** casas) / 10 ** casas
@@ -319,9 +324,10 @@ function wav(l, r) {
 // Decodifica cada arquivo e mede: pico, duração e a emenda do loop (fim do loop colado no
 // começo, contra a continuação de verdade que está depois do loopEnd). "salto" é o degrau extra
 // que a emenda cria entre as duas amostras do salto, dividido pelo maior degrau normal da música
-// em ±100 ms: abaixo de 1 = sem estalo (a emenda mexe menos que a própria música). O pico do AAC passa do teto do
-// limitador (o codificador "estoura" até ~2,5 dB): não corta no jogo, que é ponto flutuante até o
-// compressor da música, mas o teste aceita até +1 dBFS no .m4a.
+// em ±100 ms: abaixo de 1 = sem estalo (a emenda mexe menos que a própria música). O codec passa do teto do limitador
+// nas músicas que o limitador segura muito (as que estouravam no jogo: super_susie, super_dess, king):
+// até ~+0,5 dBFS no Opus e ~+1,2 no AAC. Não corta no jogo, que é ponto flutuante até o compressor
+// da música; o teste aceita até +1 dBFS no .webm e +1,5 no .m4a.
 // o degrau no salto do loop (fim -> loopStart) menos o da continuação de verdade, contra o maior
 // degrau normal da música em ±100 ms
 function saltoDaEmenda(l, r, ini, fim) {
@@ -363,7 +369,7 @@ function verificar(ffmpeg, manifesto, pastaWav) {
     }
   }
   console.table(linhas)
-  const ruins = linhas.filter((x) => x.salto > 1 || x.picoDb > (x.formato === 'm4a' ? 1 : -0.3))
+  const ruins = linhas.filter((x) => x.salto > 1 || x.picoDb > (x.formato === 'm4a' ? 1.5 : 1))
   if (ruins.length) {
     console.error('emenda ou pico fora do esperado:', ruins.map((x) => `${x.nome}.${x.formato}`).join(', '))
     process.exitCode = 1
@@ -456,8 +462,9 @@ async function principal() {
       const s = brutos.get(n) ?? (await sintetizar(n))
       brutos.delete(n)
       const medida = medidas[n] ?? lufs(s.l, s.r, s.pre, s.pre + s.periodo)
-      const ganhoDb = alvo - medida + (AJUSTE_DB[n] ?? 0)
+      const ganhoDb = (NORMALIZAR ? alvo - medida : 0) + (AJUSTE_DB[n] ?? 0)
       const { picoDb, reducaoDb } = aplicarVolume(s.l, s.r, ganhoDb)
+      const final = lufs(s.l, s.r, s.pre, s.pre + s.periodo)
       periodizar(s.l, s.r, s.pre, s.periodo, s.margem) // o limitador mexe um tiquinho nas margens
       const pcm = intercalar(s.l, s.r)
       const temp = {}
@@ -482,12 +489,13 @@ async function principal() {
         base: base[n],
         alvo,
         lufs: arredonda(medida, 2),
+        lufsFinal: arredonda(final, 2),
         ganhoDb: arredonda(ganhoDb, 2),
         picoDb: arredonda(picoDb, 2),
         limitadorDb: arredonda(reducaoDb, 2),
         variacaoDb: arredonda(s.variacaoDb, 1),
       }
-      console.log(`${n.padEnd(20)} loop ${(s.periodo / TAXA).toFixed(2)} s  ${medida.toFixed(1)} LUFS ${ganhoDb >= 0 ? '+' : ''}${ganhoDb.toFixed(1)} dB  pico ${picoDb.toFixed(1)} dBFS  limitador ${reducaoDb.toFixed(1)} dB`)
+      console.log(`${n.padEnd(20)} loop ${(s.periodo / TAXA).toFixed(2)} s  ${medida.toFixed(1)} -> ${final.toFixed(1)} LUFS ${ganhoDb >= 0 ? '+' : ''}${ganhoDb.toFixed(1)} dB  pico ${picoDb.toFixed(1)} dBFS  limitador ${reducaoDb.toFixed(1)} dB`)
     }),
   )
   for (const w of trabalhadores) w.terminate()

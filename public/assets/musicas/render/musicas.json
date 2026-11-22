@@ -9,16 +9,17 @@
       "loopEnd": 198.305333,
       "duracao": 200.805333,
       "formatos": {
-        "webm": "arena_cafe.9500edec0a62.webm",
-        "m4a": "arena_cafe.0955554503ed.m4a"
+        "webm": "arena_cafe.1ab3c044845d.webm",
+        "m4a": "arena_cafe.bbd0417502ab.m4a"
       },
-      "hash": "0e7e929cbd02",
-      "base": "1f49138def2cc526724c026637b47b42c34b6b7f99c84f6f41a38a5c8dee5a3b",
+      "hash": "2989f36e98fb",
+      "base": "408a20cfa7e8a1cdad04ca5c9adb31d800e673d35edee0ce93c88d5a986fb582",
       "alvo": -14.94,
       "lufs": -14.92,
-      "ganhoDb": -0.02,
+      "lufsFinal": -14.92,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -1,
+      "limitadorDb": -1.03,
       "variacaoDb": 0.5
     },
     "arena_chinatown": {
@@ -26,16 +27,17 @@
       "loopEnd": 94.190667,
       "duracao": 96.690667,
       "formatos": {
-        "webm": "arena_chinatown.c9d2e01394df.webm",
-        "m4a": "arena_chinatown.f8a102a6e60c.m4a"
+        "webm": "arena_chinatown.796aecd4308c.webm",
+        "m4a": "arena_chinatown.798334902759.m4a"
       },
-      "hash": "9c389785b52c",
-      "base": "e5d2cc3899d3185b00810beadcf8ac3bc383364cdda268f402e1dee661ee4554",
+      "hash": "bdbbb4137de3",
+      "base": "f9f1bce4c6b135bb43559a5e41a153bd8122e5635a6782e97c3fd79fc6db2186",
       "alvo": -14.94,
       "lufs": -16.65,
-      "ganhoDb": 1.71,
+      "lufsFinal": -16.65,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -2.45,
+      "limitadorDb": -0.74,
       "variacaoDb": -26.2
     },
     "arena_cidade": {
@@ -43,16 +45,17 @@
       "loopEnd": 144.446667,
       "duracao": 146.946667,
       "formatos": {
-        "webm": "arena_cidade.2ceb972de0b1.webm",
-        "m4a": "arena_cidade.f8ad5a3ae650.m4a"
+        "webm": "arena_cidade.2df4115a9843.webm",
+        "m4a": "arena_cidade.670a05d59be9.m4a"
       },
-      "hash": "985064e14e72",
-      "base": "53af7da14193083bbca05e5eac05498e633a42ca1aa00d83515eae797b16f607",
+      "hash": "d5656537cb4e",
+      "base": "887055d1c6d2d3968f712513bd6c97008c325a977f0e7565ab84bdaed0169527",
       "alvo": -14.94,
       "lufs": -14.96,
-      "ganhoDb": 0.02,
+      "lufsFinal": -14.97,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -1.37,
+      "limitadorDb": -1.35,
       "variacaoDb": -23.7
     },
     "arena_coliseu": {
@@ -60,13 +63,14 @@
       "loopEnd": 104.828,
       "duracao": 107.328,
       "formatos": {
-        "webm": "arena_coliseu.1303e91ceeac.webm",
-        "m4a": "arena_coliseu.9829422b126f.m4a"
+        "webm": "arena_coliseu.23976f4b8816.webm",
+        "m4a": "arena_coliseu.86ad867008b9.m4a"
       },
-      "hash": "2577f59f3d30",
-      "base": "77476efe50d3aaa4de5549181bb8ca8e86a153b1d2401c269b003b854304c224",
+      "hash": "5c4f8998ee18",
+      "base": "7cb15248c8f737a737442d632a94db66aa55d921d3b78961cdf030048d2d2ff4",
       "alvo": -14.94,
       "lufs": -14.94,
+      "lufsFinal": -14.95,
       "ganhoDb": 0,
       "picoDb": -2,
       "limitadorDb": -0.94,
@@ -77,16 +81,17 @@
       "loopEnd": 142.126667,
       "duracao": 144.626667,
       "formatos": {
-        "webm": "arena_estacao.e41ca917da31.webm",
-        "m4a": "arena_estacao.c3759313c3a0.m4a"
+        "webm": "arena_estacao.d94865aed0d9.webm",
+        "m4a": "arena_estacao.5e9a3edc9161.m4a"
       },
-      "hash": "8edfb5872199",
-      "base": "fa3607842651dc060186b9db961405e0a78a9b329dce097bef82fa81704b00c2",
+      "hash": "3df778cce6f1",
+      "base": "32ade63490c33b2848c8d7ca244fb3281a156e6a7685f22dc318656c1a2bf9bb",
       "alvo": -14.94,
       "lufs": -15.22,
-      "ganhoDb": 0.28,
+      "lufsFinal": -15.22,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -0.84,
+      "limitadorDb": -0.56,
       "variacaoDb": -20.9
     },
     "arena_informatica": {
@@ -94,16 +99,17 @@
       "loopEnd": 153.934667,
       "duracao": 156.434667,
       "formatos": {
-        "webm": "arena_informatica.45798556ff55.webm",
-        "m4a": "arena_informatica.6af981f41032.m4a"
+        "webm": "arena_informatica.70c9406603f7.webm",
+        "m4a": "arena_informatica.f5f0721eb9db.m4a"
       },
-      "hash": "53f12d23721f",
-      "base": "1f8a9c1675acdda3f08d896e68e36e3ccef008e5b53494a14b38107ebd1495e5",
+      "hash": "17941f7d5349",
+      "base": "dcf30783255610cee1ed99a77afc01245d2141ff41bb796d2ac10e25f3eb0180",
       "alvo": -14.94,
       "lufs": -15.14,
-      "ganhoDb": 0.2,
+      "lufsFinal": -15.17,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -1.92,
+      "limitadorDb": -1.73,
       "variacaoDb": -12.7
     },
     "arena_jardim": {
@@ -111,16 +117,17 @@
       "loopEnd": 193.502667,
       "duracao": 196.002667,
       "formatos": {
-        "webm": "arena_jardim.64cebaf1219d.webm",
-        "m4a": "arena_jardim.5becc187534e.m4a"
+        "webm": "arena_jardim.0f786977165a.webm",
+        "m4a": "arena_jardim.551176e0bee0.m4a"
       },
-      "hash": "acc1cf19c58e",
-      "base": "4420ceed35245cc4a0b637bb834e6f20f2c564681ab7bcb19390198e970e919a",
+      "hash": "e7260b18b146",
+      "base": "6e2a1fa9da1eec6eba5dce8b8d91ad32a7db4edbc99d67011cdd0c341759fb42",
       "alvo": -14.94,
       "lufs": -14.9,
-      "ganhoDb": -0.04,
+      "lufsFinal": -14.9,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -0.68,
+      "limitadorDb": -0.72,
       "variacaoDb": -2.3
     },
     "arena_palco": {
@@ -128,13 +135,14 @@
       "loopEnd": 104.828,
       "duracao": 107.328,
       "formatos": {
-        "webm": "arena_palco.1303e91ceeac.webm",
-        "m4a": "arena_palco.9829422b126f.m4a"
+        "webm": "arena_palco.23976f4b8816.webm",
+        "m4a": "arena_palco.86ad867008b9.m4a"
       },
-      "hash": "2577f59f3d30",
-      "base": "77476efe50d3aaa4de5549181bb8ca8e86a153b1d2401c269b003b854304c224",
+      "hash": "5c4f8998ee18",
+      "base": "7cb15248c8f737a737442d632a94db66aa55d921d3b78961cdf030048d2d2ff4",
       "alvo": -14.94,
       "lufs": -14.94,
+      "lufsFinal": -14.95,
       "ganhoDb": 0,
       "picoDb": -2,
       "limitadorDb": -0.94,
@@ -145,16 +153,17 @@
       "loopEnd": 161.209333,
       "duracao": 163.709333,
       "formatos": {
-        "webm": "arena_praia.19454d2d2e2d.webm",
-        "m4a": "arena_praia.db8cacfa9875.m4a"
+        "webm": "arena_praia.c21a12598680.webm",
+        "m4a": "arena_praia.d69780a00068.m4a"
       },
-      "hash": "b6bb5da55ead",
-      "base": "53c11057f753dda34a6610dab7bc9a2c60e9f3d867dec70118c0facd5d7914c0",
+      "hash": "a0ff22b1ed16",
+      "base": "cc94b855a5c44f06396df7f0a7b86bcff7d6764e62c268a27eca34ae46f0ede6",
       "alvo": -14.94,
       "lufs": -15.79,
-      "ganhoDb": 0.85,
+      "lufsFinal": -15.81,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -1.65,
+      "limitadorDb": -0.8,
       "variacaoDb": -21.1
     },
     "arena_templo": {
@@ -162,13 +171,14 @@
       "loopEnd": 133.5,
       "duracao": 136,
       "formatos": {
-        "webm": "arena_templo.094d28570a25.webm",
-        "m4a": "arena_templo.df7f7c6583ff.m4a"
+        "webm": "arena_templo.be8fa068fe27.webm",
+        "m4a": "arena_templo.1651c61abce8.m4a"
       },
-      "hash": "b41901ca8212",
-      "base": "b239754d1248f7be37822ee7c232354e0f59f17a44414048019cf44e5b6ecb49",
+      "hash": "21bcab52ef24",
+      "base": "56ef0bfd6820be6c9812c950ab3934947763b2205a1f5aaae360a5d84481f045",
       "alvo": -14.94,
       "lufs": -14.94,
+      "lufsFinal": -14.96,
       "ganhoDb": 0,
       "picoDb": -2,
       "limitadorDb": -1.95,
@@ -179,16 +189,17 @@
       "loopEnd": 59.684,
       "duracao": 62.184,
       "formatos": {
-        "webm": "campanha.4176e3fc1af6.webm",
-        "m4a": "campanha.9c9c4a7551a5.m4a"
+        "webm": "campanha.f5abb29b5a24.webm",
+        "m4a": "campanha.faae1c5b6eda.m4a"
       },
-      "hash": "46202302bfaf",
-      "base": "8ef6982014bb60934ba24788eebd8bacf0910474ba3a1c2fdd2d99a17cb16f5f",
+      "hash": "40d21b8811ca",
+      "base": "222aee3bc669024052e52825c26f2147f56c8dc65c72e1f5d6b187b25314a5cc",
       "alvo": -14.94,
       "lufs": -35.5,
-      "ganhoDb": 20.56,
-      "picoDb": -2,
-      "limitadorDb": -1.69,
+      "lufsFinal": -35.5,
+      "ganhoDb": 0,
+      "picoDb": -20.87,
+      "limitadorDb": 0,
       "variacaoDb": -11.4
     },
     "campanha2": {
@@ -196,16 +207,17 @@
       "loopEnd": 54.833333,
       "duracao": 57.333333,
       "formatos": {
-        "webm": "campanha2.aac4a9393ba8.webm",
-        "m4a": "campanha2.92927876275d.m4a"
+        "webm": "campanha2.61b056e589a6.webm",
+        "m4a": "campanha2.b54cabdf30cd.m4a"
       },
-      "hash": "3c7eac0bd512",
-      "base": "93c977efd04e61ca03ecb42856ff65f3d36ff81a373fdd64e10b66a4894253e6",
+      "hash": "e5f4b9a90b1a",
+      "base": "8e31dc6fbc11bb34eb207176ad976ffa93ef33e80b8a2c78d849f035caea7170",
       "alvo": -14.94,
       "lufs": -34.32,
-      "ganhoDb": 19.38,
-      "picoDb": -2,
-      "limitadorDb": -1.85,
+      "lufsFinal": -34.32,
+      "ganhoDb": 0,
+      "picoDb": -19.53,
+      "limitadorDb": 0,
       "variacaoDb": -8.5
     },
     "campanha_chefe": {
@@ -213,16 +225,17 @@
       "loopEnd": 52.028,
       "duracao": 54.528,
       "formatos": {
-        "webm": "campanha_chefe.95b315fcfa60.webm",
-        "m4a": "campanha_chefe.a5e86d0d29dc.m4a"
+        "webm": "campanha_chefe.5311acdc66f9.webm",
+        "m4a": "campanha_chefe.2391d4021b85.m4a"
       },
-      "hash": "8137f3f8ed98",
-      "base": "79399f5136d57af4b46b2c1ee5da8ecfcbd6367ccf9fdbf96fa9628064bd1ade",
+      "hash": "638ec573798d",
+      "base": "47f26883b33a5305d91c702107b940e897a93f1b36d67b0e38d84d2f7c5cc9cc",
       "alvo": -14.94,
       "lufs": -16.29,
-      "ganhoDb": 1.35,
-      "picoDb": -2,
-      "limitadorDb": -1.05,
+      "lufsFinal": -16.29,
+      "ganhoDb": 0,
+      "picoDb": -2.3,
+      "limitadorDb": 0,
       "variacaoDb": -10.7
     },
     "campanha_final": {
@@ -230,16 +243,17 @@
       "loopEnd": 54.833333,
       "duracao": 57.333333,
       "formatos": {
-        "webm": "campanha_final.1e893ea57b42.webm",
-        "m4a": "campanha_final.cfbb9dd15175.m4a"
+        "webm": "campanha_final.06ab5b064601.webm",
+        "m4a": "campanha_final.065ad6b6a16c.m4a"
       },
-      "hash": "83d49d8b5171",
-      "base": "ce1cb7261f61f480d6fd45e88c9481808d5317e42ec2d1e1c9e2e787f5c3104d",
+      "hash": "d8e8155aa636",
+      "base": "e36727d654fcf1cc4024c5bb9b92a767e1e8fcb39c6b3fa0a0c084e7e7faaea2",
       "alvo": -14.94,
       "lufs": -26.67,
-      "ganhoDb": 11.73,
-      "picoDb": -2,
-      "limitadorDb": -0.56,
+      "lufsFinal": -26.67,
+      "ganhoDb": 0,
+      "picoDb": -13.17,
+      "limitadorDb": 0,
       "variacaoDb": -5.2
     },
     "campanha_libertado": {
@@ -247,15 +261,16 @@
       "loopEnd": 23.318667,
       "duracao": 25.818667,
       "formatos": {
-        "webm": "campanha_libertado.12c44eaba001.webm",
-        "m4a": "campanha_libertado.8503df85daaa.m4a"
+        "webm": "campanha_libertado.328bf743617c.webm",
+        "m4a": "campanha_libertado.509d5eb9f21a.m4a"
       },
-      "hash": "528ec4a457e6",
-      "base": "ced400d3f3c41b6e4796ddeb77d4fb4616a1adfe96c26552b98441304214b9b3",
+      "hash": "c5c033fb7bc1",
+      "base": "270b420e409dca75363144373826b7041913c890797b809c0398a21c4ed5dcd1",
       "alvo": -14.94,
       "lufs": -30.22,
-      "ganhoDb": 15.28,
-      "picoDb": -4.44,
+      "lufsFinal": -30.22,
+      "ganhoDb": 0,
+      "picoDb": -19.72,
       "limitadorDb": 0,
       "variacaoDb": -10.3
     },
@@ -264,16 +279,17 @@
       "loopEnd": 57.153333,
       "duracao": 59.653333,
       "formatos": {
-        "webm": "campanha_luta.06f5ca7b7074.webm",
-        "m4a": "campanha_luta.492c1505d91f.m4a"
+        "webm": "campanha_luta.a78cb8399fb5.webm",
+        "m4a": "campanha_luta.0bf9aa79b68d.m4a"
       },
-      "hash": "157f814f9528",
-      "base": "d0a9d06538be85009028fc8849782b21fdbf7232ee6bde9131babc7ffbcebcf5",
+      "hash": "b53feb116e6a",
+      "base": "85839d97e381306940d1411f8e19a20e66a1ba5ddc9c022a75377dc40f368c54",
       "alvo": -14.94,
       "lufs": -19.63,
-      "ganhoDb": 4.69,
-      "picoDb": -2,
-      "limitadorDb": -1.62,
+      "lufsFinal": -19.63,
+      "ganhoDb": 0,
+      "picoDb": -5.06,
+      "limitadorDb": 0,
       "variacaoDb": -16.9
     },
     "campanha_virada": {
@@ -281,16 +297,17 @@
       "loopEnd": 52.028,
       "duracao": 54.528,
       "formatos": {
-        "webm": "campanha_virada.cbcd26e3e899.webm",
-        "m4a": "campanha_virada.6cfb96c854ce.m4a"
+        "webm": "campanha_virada.962da7ef2c5d.webm",
+        "m4a": "campanha_virada.3e59daa6db6a.m4a"
       },
-      "hash": "843c619eccb7",
-      "base": "fbbd1fac65dd77ec62d0d7e272261b0d62363e4bbff1f51825f5e24dc0d6beec",
+      "hash": "ba0caeab6814",
+      "base": "801b412d141f8bc7c5d184cc8458b709c08d71d64577cf05bb75b99f957d1707",
       "alvo": -14.94,
       "lufs": -16.21,
-      "ganhoDb": 1.27,
-      "picoDb": -2,
-      "limitadorDb": -0.45,
+      "lufsFinal": -16.21,
+      "ganhoDb": 0,
+      "picoDb": -2.83,
+      "limitadorDb": 0,
       "variacaoDb": -11.7
     },
     "coronel": {
@@ -298,16 +315,17 @@
       "loopEnd": 155.358667,
       "duracao": 157.858667,
       "formatos": {
-        "webm": "coronel.6b7a5f45c954.webm",
-        "m4a": "coronel.88b08db88f9e.m4a"
+        "webm": "coronel.6b46e84eb405.webm",
+        "m4a": "coronel.965e3ea5145e.m4a"
       },
-      "hash": "6b5ccd529162",
-      "base": "f8c75a9bcaec3f9e8bdc86a0e1af8f2542777873706b4cc9604dffe087981ba8",
+      "hash": "1466d701bf6d",
+      "base": "a4c66fa43cb44f060c4c458c146ee2ad7480577640dd66336289fb8fb72f5cb5",
       "alvo": -14.94,
       "lufs": -13.15,
-      "ganhoDb": -1.79,
+      "lufsFinal": -13.33,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -2.02,
+      "limitadorDb": -3.82,
       "variacaoDb": -17
     },
     "gameover": {
@@ -315,15 +333,16 @@
       "loopEnd": 51.588,
       "duracao": 54.088,
       "formatos": {
-        "webm": "gameover.5334c8c697b8.webm",
-        "m4a": "gameover.af2a45540b76.m4a"
+        "webm": "gameover.e1e49ccfcbd1.webm",
+        "m4a": "gameover.fe3e7a64b0d8.m4a"
       },
-      "hash": "5d04479216bc",
-      "base": "846541f497ecabaf06ab7885d625a395c4a47aaf80c67ef058480bff7f4ef862",
+      "hash": "a3b4f9e32030",
+      "base": "a6260cff5977cdfb3e7c7a893120b252f8a3540f6ca31dd015327b29c872732b",
       "alvo": -14.94,
       "lufs": -16.24,
-      "ganhoDb": 1.3,
-      "picoDb": -3.54,
+      "lufsFinal": -16.24,
+      "ganhoDb": 0,
+      "picoDb": -4.84,
       "limitadorDb": 0,
       "variacaoDb": -8.7
     },
@@ -332,13 +351,14 @@
       "loopEnd": 102.553333,
       "duracao": 105.053333,
       "formatos": {
-        "webm": "jevil.3d1bb4972e3f.webm",
-        "m4a": "jevil.f8257d8f0338.m4a"
+        "webm": "jevil.8c049eff8ae2.webm",
+        "m4a": "jevil.3110e9535e0e.m4a"
       },
-      "hash": "b278205cf6a0",
-      "base": "c1b34168c6b40a56e5fd255b00b0613435268168b827280994a45fd75350791f",
+      "hash": "f7f64cb2d6d6",
+      "base": "80db09f51959c5c8686198bc444d87f5ecc75d8e3675749d77166a64454a2e40",
       "alvo": -14.94,
       "lufs": -14.94,
+      "lufsFinal": -14.94,
       "ganhoDb": 0,
       "picoDb": -2.48,
       "limitadorDb": 0,
@@ -349,16 +369,17 @@
       "loopEnd": 214.057333,
       "duracao": 216.557333,
       "formatos": {
-        "webm": "king.1228686682bb.webm",
-        "m4a": "king.f5ce0e620bd1.m4a"
+        "webm": "king.fe5771ea17fa.webm",
+        "m4a": "king.1c01b437b8c2.m4a"
       },
-      "hash": "3cd6b84e798f",
-      "base": "e0dbdf00763a09d635d90d3c021eb5eb436b6080dbbbf838695e8d1ca0fc9ff3",
+      "hash": "1aa83ba90147",
+      "base": "d6bdeeb94a898f6a1d2b4db8f69afcf83c20dba875080ec2e76ddea2179b3f4e",
       "alvo": -14.94,
       "lufs": -12.21,
-      "ganhoDb": -2.73,
+      "lufsFinal": -12.53,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -1.65,
+      "limitadorDb": -4.39,
       "variacaoDb": -17.2
     },
     "lobby": {
@@ -366,15 +387,16 @@
       "loopEnd": 22.372,
       "duracao": 24.872,
       "formatos": {
-        "webm": "lobby.39f0231c5a42.webm",
-        "m4a": "lobby.eaad4d4eb54e.m4a"
+        "webm": "lobby.f7b7e7b9b690.webm",
+        "m4a": "lobby.8a9951719780.m4a"
       },
-      "hash": "0e2a0ed1f7d1",
-      "base": "d91bc8a5ec6c66549bf384dbddcafcbd72a0d96783e9edf2daf2bd59688aaabb",
+      "hash": "a19172b0b90e",
+      "base": "9c7a630e3941a9bb863c268a1130d651c9f7772b8006710a106b4e640d5bca75",
       "alvo": -14.94,
       "lufs": -25.36,
-      "ganhoDb": 10.42,
-      "picoDb": -2.18,
+      "lufsFinal": -25.36,
+      "ganhoDb": 0,
+      "picoDb": -12.6,
       "limitadorDb": 0,
       "variacaoDb": -16.4
     },
@@ -383,16 +405,17 @@
       "loopEnd": 34.692,
       "duracao": 37.192,
       "formatos": {
-        "webm": "menu.46d079c2c311.webm",
-        "m4a": "menu.4ec873912570.m4a"
+        "webm": "menu.2863a7107efb.webm",
+        "m4a": "menu.43fd6bd37ff9.m4a"
       },
-      "hash": "0b02e126a930",
-      "base": "71fb39f54a6940dffe0ec802ec9d0924ddb5465914bfabbbf62f648c048ba4f0",
+      "hash": "38c8b484e4de",
+      "base": "b6ebc2f33c369e88044a3e258f6f9648be1a234cc54f7f1932aca013bc26ea7f",
       "alvo": -14.94,
       "lufs": -15.05,
-      "ganhoDb": 0.11,
+      "lufsFinal": -15.06,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -0.43,
+      "limitadorDb": -0.32,
       "variacaoDb": -19.8
     },
     "pvp": {
@@ -400,16 +423,17 @@
       "loopEnd": 154.041333,
       "duracao": 156.541333,
       "formatos": {
-        "webm": "pvp.8657406ef3c9.webm",
-        "m4a": "pvp.bd0c4e9566d2.m4a"
+        "webm": "pvp.063dc8407d99.webm",
+        "m4a": "pvp.2e262a53ddb9.m4a"
       },
-      "hash": "5c612ea6f16e",
-      "base": "55fb97a266e7ecb49725833caff8139f6df0d6efbc5daecd0a13d21715c6d2c4",
+      "hash": "9d63e5f3bd80",
+      "base": "f62b7a9ee233404af7515a7e23d2ac02819fb4ef1b18c5579ce03ee8e3dae38c",
       "alvo": -14.94,
       "lufs": -14.93,
-      "ganhoDb": -0.01,
+      "lufsFinal": -14.93,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -0.54,
+      "limitadorDb": -0.55,
       "variacaoDb": -2.6
     },
     "pvpEscolha": {
@@ -417,16 +441,17 @@
       "loopEnd": 126.033333,
       "duracao": 128.533333,
       "formatos": {
-        "webm": "pvpEscolha.f51acbba774b.webm",
-        "m4a": "pvpEscolha.b3d1cdac58aa.m4a"
+        "webm": "pvpEscolha.b23211306856.webm",
+        "m4a": "pvpEscolha.469ba6e3cde4.m4a"
       },
-      "hash": "36b8b87c77a7",
-      "base": "954e002a35465343698fe50d3bbde9c7d494942078add354b8b2c4b8bd8721e6",
+      "hash": "542222ed9a54",
+      "base": "fc32d5ddcdaefb8cb37916649c74f4cbe829d8e1d8c8704400704ff3d286337b",
       "alvo": -14.94,
       "lufs": -14.2,
-      "ganhoDb": -0.74,
+      "lufsFinal": -14.24,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -1.28,
+      "limitadorDb": -2.03,
       "variacaoDb": -30.6
     },
     "pvpResultado": {
@@ -434,16 +459,17 @@
       "loopEnd": 18.644,
       "duracao": 21.144,
       "formatos": {
-        "webm": "pvpResultado.3c137ff38503.webm",
-        "m4a": "pvpResultado.b7835ad9573d.m4a"
+        "webm": "pvpResultado.61712628cfdc.webm",
+        "m4a": "pvpResultado.6d104a7cab69.m4a"
       },
-      "hash": "593ac4fa70d4",
-      "base": "ad0a21050d01c3c306415b7e7a25e7400b651554a6343e1ca4c363499dddeefb",
+      "hash": "da0afe681b68",
+      "base": "80162438d82d1d0ab1811fe8df21b7acc4b471284a5e5c4c304565d6ba8fba9e",
       "alvo": -14.94,
       "lufs": -22.37,
-      "ganhoDb": 7.43,
-      "picoDb": -2,
-      "limitadorDb": -0.75,
+      "lufsFinal": -22.37,
+      "ganhoDb": 0,
+      "picoDb": -8.68,
+      "limitadorDb": 0,
       "variacaoDb": -11.2
     },
     "pvp_b": {
@@ -451,16 +477,17 @@
       "loopEnd": 154.041333,
       "duracao": 156.541333,
       "formatos": {
-        "webm": "pvp_b.164cfeba8900.webm",
-        "m4a": "pvp_b.b662b40a03b3.m4a"
+        "webm": "pvp_b.7c3453112314.webm",
+        "m4a": "pvp_b.a8ab9fdbbbe1.m4a"
       },
-      "hash": "d71bcd8ee9bc",
-      "base": "2c7a654e1386426548bca34bdde99919785c6a8490f409c34fbd42acdef425c2",
+      "hash": "0ef2324e390b",
+      "base": "a8a158827ef8e53bc5b5491582124deed33e2493edc30d5fcb13f598a9260ad0",
       "alvo": -14.94,
       "lufs": -12.12,
-      "ganhoDb": -2.82,
+      "lufsFinal": -12.36,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -0.53,
+      "limitadorDb": -3.35,
       "variacaoDb": -2.6
     },
     "queen": {
@@ -468,16 +495,17 @@
       "loopEnd": 244.838667,
       "duracao": 247.338667,
       "formatos": {
-        "webm": "queen.086b365456c1.webm",
-        "m4a": "queen.f96e2ed162ac.m4a"
+        "webm": "queen.9dfdd057b0bb.webm",
+        "m4a": "queen.84ffacd18388.m4a"
       },
-      "hash": "9a33740254c0",
-      "base": "22c0408b348ab5cc2dd731598f2e3a9833bbdc8d1136cf62bbf608827af24527",
+      "hash": "2d37e306bf4b",
+      "base": "789edce750684eb4adb8d47a71867819d53fa1e85abb54baf5ca6eaa7151c0b0",
       "alvo": -14.94,
       "lufs": -14.06,
-      "ganhoDb": -0.88,
+      "lufsFinal": -14.13,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -2.14,
+      "limitadorDb": -3.02,
       "variacaoDb": -11.9
     },
     "selecao": {
@@ -485,16 +513,17 @@
       "loopEnd": 324.502667,
       "duracao": 327.002667,
       "formatos": {
-        "webm": "selecao.c58b1af73b99.webm",
-        "m4a": "selecao.0e2a637474d5.m4a"
+        "webm": "selecao.64b60a24cf23.webm",
+        "m4a": "selecao.9c5d6ffb7238.m4a"
       },
-      "hash": "cd25cfb92f1e",
-      "base": "e93ce4fb9c6885feafbd2253eb6dadec8cc1e9167c4422d958841237f080b81e",
+      "hash": "5e3aba1780c9",
+      "base": "87c2da5022a40e33821b1ec3f79805f52452a071121bcee94f04b59868b2aa80",
       "alvo": -14.94,
       "lufs": -11.94,
-      "ganhoDb": -3,
+      "lufsFinal": -12.49,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -1.94,
+      "limitadorDb": -4.94,
       "variacaoDb": -31.7
     },
     "super_asriel": {
@@ -502,16 +531,17 @@
       "loopEnd": 34.825333,
       "duracao": 37.325333,
       "formatos": {
-        "webm": "super_asriel.b86048b4f0df.webm",
-        "m4a": "super_asriel.aec6777bc192.m4a"
+        "webm": "super_asriel.7d3baeb0471e.webm",
+        "m4a": "super_asriel.d89869e97490.m4a"
       },
-      "hash": "5333cb34e587",
-      "base": "c5cd0f1f5a4006ebc144a94e15372f7169e4dc6f8bacb9dedabc5c2c21588361",
+      "hash": "80b002475df9",
+      "base": "8a8120b99beebb6d5dbc730f468f315c157d91ad784a2521e080a43b16c0e3d4",
       "alvo": -14.94,
       "lufs": -13.13,
-      "ganhoDb": -1.81,
-      "picoDb": -2.6,
-      "limitadorDb": 0,
+      "lufsFinal": -13.16,
+      "ganhoDb": 0,
+      "picoDb": -2,
+      "limitadorDb": -1.21,
       "variacaoDb": -32.3
     },
     "super_berdly": {
@@ -519,16 +549,17 @@
       "loopEnd": 84.705333,
       "duracao": 87.205333,
       "formatos": {
-        "webm": "super_berdly.b739a7752132.webm",
-        "m4a": "super_berdly.28bccbd017b3.m4a"
+        "webm": "super_berdly.6646ee2467ed.webm",
+        "m4a": "super_berdly.f2562d5c19a9.m4a"
       },
-      "hash": "aebc6cc5fada",
-      "base": "a38e6fd288c292f6cefe7c43951a8e08cc06d2e151665253547efe816d17c050",
+      "hash": "8543df675e24",
+      "base": "b918cfe3085e23161225a25fc1e406a39c5c7d02b3bc823c1dbcc80a553d2a4f",
       "alvo": -14.94,
       "lufs": -11.53,
-      "ganhoDb": -3.41,
+      "lufsFinal": -11.85,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -0.64,
+      "limitadorDb": -4.05,
       "variacaoDb": -29.4
     },
     "super_dess": {
@@ -536,16 +567,17 @@
       "loopEnd": 20.7,
       "duracao": 23.2,
       "formatos": {
-        "webm": "super_dess.5421f60e6457.webm",
-        "m4a": "super_dess.d0d72389961b.m4a"
+        "webm": "super_dess.de00c3873cc0.webm",
+        "m4a": "super_dess.8789566f83e6.m4a"
       },
-      "hash": "7082f28f29ce",
-      "base": "87ce69fd5a0baf21bebdc069f46183a940fed77ca8bfd18b470b9cf617bb87fa",
+      "hash": "4ca32d5d40dc",
+      "base": "a83c43fa03d4e60818483d3a8ecf6d8b80ba29330523b95690e52801fc00028d",
       "alvo": -14.94,
       "lufs": -9.13,
-      "ganhoDb": -5.81,
-      "picoDb": -2.34,
-      "limitadorDb": 0,
+      "lufsFinal": -10.32,
+      "ganhoDb": 0,
+      "picoDb": -2,
+      "limitadorDb": -5.47,
       "variacaoDb": 4.3
     },
     "super_kris": {
@@ -553,16 +585,17 @@
       "loopEnd": 12.929333,
       "duracao": 15.429333,
       "formatos": {
-        "webm": "super_kris.44c798e75734.webm",
-        "m4a": "super_kris.8504e957e050.m4a"
+        "webm": "super_kris.d854bf88bbd4.webm",
+        "m4a": "super_kris.ea8387bb643e.m4a"
       },
-      "hash": "8d0a357f01d8",
-      "base": "222ed202039260bd53fa5b187acd1258df7f3e45b0697e38a7a53903c4d3a6d8",
+      "hash": "98fddbe2e469",
+      "base": "868a50ee7b28df65ab634389ab54208965748470a8ec93dd7bf2009644db5683",
       "alvo": -14.94,
       "lufs": -15.88,
-      "ganhoDb": 0.94,
-      "picoDb": -2,
-      "limitadorDb": -0.54,
+      "lufsFinal": -15.88,
+      "ganhoDb": 0,
+      "picoDb": -2.4,
+      "limitadorDb": 0,
       "variacaoDb": -13.2
     },
     "super_noelle": {
@@ -570,16 +603,17 @@
       "loopEnd": 68.284,
       "duracao": 70.784,
       "formatos": {
-        "webm": "super_noelle.dcbc8dc2390f.webm",
-        "m4a": "super_noelle.198ad16df9c8.m4a"
+        "webm": "super_noelle.49d2d48872cd.webm",
+        "m4a": "super_noelle.fc657082dea0.m4a"
       },
-      "hash": "adee397ff84a",
-      "base": "83cb13e99cfb411f25bab12b72065bccc20f602b2d5da46d40528ebc4369a9a7",
+      "hash": "a3547e4d72fe",
+      "base": "48e173918c31cfce0f897c5f9836a1afe4dc556ff6c97e4ac38f0915a44ea07f",
       "alvo": -14.94,
       "lufs": -15.73,
-      "ganhoDb": 0.79,
+      "lufsFinal": -15.73,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -0.95,
+      "limitadorDb": -0.15,
       "variacaoDb": -12.9
     },
     "super_ralsei": {
@@ -587,16 +621,17 @@
       "loopEnd": 109.324,
       "duracao": 111.824,
       "formatos": {
-        "webm": "super_ralsei.c33233674c14.webm",
-        "m4a": "super_ralsei.1edf3b9f46f9.m4a"
+        "webm": "super_ralsei.2159b8fa3a4b.webm",
+        "m4a": "super_ralsei.326e09f6ce9a.m4a"
       },
-      "hash": "3af6d1977522",
-      "base": "df6c424a507475ceee17392ef1707461ab69e64c2d945cd18269371bd1607e04",
+      "hash": "88d2c2f51b7b",
+      "base": "564f3041374332a9506d170c38ae16a580de7e88a9540e29613ac09d65896bdf",
       "alvo": -14.94,
       "lufs": -14.19,
-      "ganhoDb": -0.75,
+      "lufsFinal": -14.19,
+      "ganhoDb": 0,
       "picoDb": -2,
-      "limitadorDb": -0.53,
+      "limitadorDb": -1.28,
       "variacaoDb": -23.1
     },
     "super_susie": {
@@ -604,16 +639,17 @@
       "loopEnd": 20.974667,
       "duracao": 23.474667,
       "formatos": {
-        "webm": "super_susie.6c73fd634c4e.webm",
-        "m4a": "super_susie.558a1dd09dfe.m4a"
+        "webm": "super_susie.004e23065677.webm",
+        "m4a": "super_susie.852d991b2160.m4a"
       },
-      "hash": "83376fbaa3a3",
-      "base": "9ffc90c2d66804f18cd64b5462f1b16a4579719aa6ed468dd0eb96ecc46250f7",
+      "hash": "171227d48445",
+      "base": "4a32469cc25624951690de7e30d45658c6df94addd881893827e8fff906cbc1a",
       "alvo": -14.94,
       "lufs": -8.78,
-      "ganhoDb": -6.16,
-      "picoDb": -3.3,
-      "limitadorDb": 0,
+      "lufsFinal": -9.79,
+      "ganhoDb": 0,
+      "picoDb": -2,
+      "limitadorDb": -4.87,
       "variacaoDb": -23.8
     },
     "tutorial": {
@@ -621,16 +657,17 @@
       "loopEnd": 61.452,
       "duracao": 63.952,
       "formatos": {
-        "webm": "tutorial.a5e16c3ca706.webm",
-        "m4a": "tutorial.3181170467cb.m4a"
+        "webm": "tutorial.9502a4869b99.webm",
+        "m4a": "tutorial.53b334e4a22d.m4a"
       },
-      "hash": "9101eed4448b",
-      "base": "76eb79ee396a2839248e85736db00487bc908ced0d5221648331471a9e8a22a2",
+      "hash": "4a23818bea7e",
+      "base": "249f46b3871f8082d09592d4f3d8f9be31b15e2a7bf1d8e8bd8fe4a1224b7db6",
       "alvo": -14.94,
       "lufs": -32.96,
-      "ganhoDb": 18.02,
-      "picoDb": -2,
-      "limitadorDb": -0.18,
+      "lufsFinal": -32.96,
+      "ganhoDb": 0,
+      "picoDb": -19.83,
+      "limitadorDb": 0,
       "variacaoDb": -20.4
     },
     "tutorial2": {
@@ -638,16 +675,17 @@
       "loopEnd": 56.873333,
       "duracao": 59.373333,
       "formatos": {
-        "webm": "tutorial2.623876390dde.webm",
-        "m4a": "tutorial2.8a2495193086.m4a"
+        "webm": "tutorial2.439e7b87f731.webm",
+        "m4a": "tutorial2.8a967da2062f.m4a"
       },
-      "hash": "5a1db500769f",
-      "base": "64374072e4906343ff79a1f2e75afef95315a898fef64c2ae1fba56e444a6048",
+      "hash": "a4025e0733cb",
+      "base": "df9914a7487dcc90bae7c790657642b2c553fed9b3d413309382b8e631e46a54",
       "alvo": -14.94,
       "lufs": -36.27,
-      "ganhoDb": 21.33,
-      "picoDb": -2,
-      "limitadorDb": -2.8,
+      "lufsFinal": -36.27,
+      "ganhoDb": 0,
+      "picoDb": -20.53,
+      "limitadorDb": 0,
       "variacaoDb": -13.7
     },
     "vitoria": {
@@ -655,15 +693,16 @@
       "loopEnd": 37.801333,
       "duracao": 40.301333,
       "formatos": {
-        "webm": "vitoria.6d72b3904634.webm",
-        "m4a": "vitoria.ff60ce7afbfb.m4a"
+        "webm": "vitoria.ba9c6600e582.webm",
+        "m4a": "vitoria.ae9df1a0f17e.m4a"
       },
-      "hash": "943c86829b70",
-      "base": "9169375a367eb91341b02f28e5d332444dbd38959b679d3e718f36f377240a25",
+      "hash": "ba1266ac9fd2",
+      "base": "dd253359462e1b4eaa01ff7ffc1043e08062e528a7de4bbdf59be5e144ebd99c",
       "alvo": -14.94,
       "lufs": -23.61,
-      "ganhoDb": 8.67,
-      "picoDb": -5.9,
+      "lufsFinal": -23.61,
+      "ganhoDb": 0,
+      "picoDb": -14.57,
       "limitadorDb": 0,
       "variacaoDb": -12.1
     }
