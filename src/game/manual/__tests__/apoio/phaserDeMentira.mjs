@@ -20,7 +20,43 @@ class Vector2 {
   }
 }
 
-const Rectangle = { Contains: (r, x, y) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom }
+// (também construível: a BattleBox de verdade guarda os limites num Rectangle, pvp/__tests__/replayDados.test.js)
+class Rectangle {
+  constructor(x = 0, y = 0, width = 0, height = 0) {
+    this.setTo(x, y, width, height)
+  }
+  setTo(x, y, width, height) {
+    this.x = x
+    this.y = y
+    this.width = width
+    this.height = height
+    return this
+  }
+  get left() {
+    return this.x
+  }
+  get right() {
+    return this.x + this.width
+  }
+  get top() {
+    return this.y
+  }
+  get bottom() {
+    return this.y + this.height
+  }
+  get centerX() {
+    return this.x + this.width / 2
+  }
+  get centerY() {
+    return this.y + this.height / 2
+  }
+  static Contains(r, x, y) {
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom
+  }
+  static Clone(r) {
+    return new Rectangle(r.x, r.y, r.width, r.height)
+  }
+}
 
 // mulberry32 semeado pelo hash da semente (string)
 class RandomDataGenerator {
@@ -50,6 +86,17 @@ class RandomDataGenerator {
 }
 
 class GameObject {}
-const GameObjects = { Image: GameObject, Sprite: GameObject, Text: GameObject }
+class GameObjectFactory {
+  text() {}
+}
+const GameObjects = { Image: GameObject, Sprite: GameObject, Text: GameObject, GameObjectFactory }
 
-export default { Math: { Clamp, Vector2, RandomDataGenerator, DegToRad: (g) => (g * Math.PI) / 180 }, Geom: { Rectangle }, GameObjects }
+export default {
+  Math: { Clamp, Vector2, RandomDataGenerator, DegToRad: (g) => (g * Math.PI) / 180, FloatBetween: (a, b) => (a + b) / 2, Linear: (a, b, t) => a + (b - a) * t },
+  Geom: { Rectangle },
+  GameObjects,
+  Textures: { FilterMode: { LINEAR: 1, NEAREST: 0 } },
+  BlendModes: { NORMAL: 0, ADD: 1 },
+  Scenes: { Events: { CREATE: 'create' } },
+  Scale: { Events: { RESIZE: 'resize' } },
+}
