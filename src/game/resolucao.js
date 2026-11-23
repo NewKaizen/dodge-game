@@ -15,7 +15,7 @@ import { pref, aoMudarPref } from './preferencias.js'
 //   RES.zoom     quantas vezes o 854x480 é ampliado (ou reduzido) na página (CSS)
 //   RES.dpr      pixels do monitor por pixel CSS (telas HiDPI)
 //   RES.escala   zoom x dpr: pixels reais por pixel do jogo
-import { RES } from './resEscala.js'
+import { RES, medirBatata } from './resEscala.js'
 export { RES }
 
 const MARGEM_VERTICAL = 110 // barra de conexão acima do jogo
@@ -57,7 +57,8 @@ function medir() {
   const zoom = cheia || toque ? Math.max(ZOOM_MIN, zoomLivre) : Math.max(ZOOM_MIN, Math.floor(zoomLivre * 20) / 20)
   let dpr = Math.min(window.devicePixelRatio || 1, DPR_MAX)
   if (toque) dpr = pref('graficos') === 'minimo' ? 1 : Math.min(dpr, DPR_MAX_TOQUE)
-  return { zoom, dpr, escala: zoom * dpr }
+  if (pref('resolucao') === 'batata') return medirBatata(zoom, window.devicePixelRatio || 1)
+  return { zoom, dpr, escala: zoom * dpr, batata: false }
 }
 
 // Chame antes de criar o jogo: devolve o tamanho do canvas e o zoom CSS
@@ -66,8 +67,14 @@ export function prepararResolucao() {
   return {
     largura: Math.round(LARGURA * RES.escala),
     altura: Math.round(ALTURA * RES.escala),
-    zoomCss: 1 / RES.dpr,
+    zoomCss: RES.batata ? RES.zoom : 1 / RES.dpr,
   }
+}
+
+// o canvas na BATATA: ampliado sem borrar (o navegador repete os pixels em vez de interpolar)
+function estiloDoCanvas(game) {
+  const c = game.canvas
+  if (c?.style) c.style.imageRendering = RES.batata ? 'pixelated' : ''
 }
 
 // Câmera que mostra o mundo 640x480 a partir de (x, y) do mundo, desenhada em
@@ -86,6 +93,7 @@ function ajustarCena(cena) {
   const textos = (lista) =>
     lista.forEach((o) => {
       if (o instanceof Phaser.GameObjects.Text) o.setResolution(RES.escala)
+      o.reajustarEscala?.() // TextoBitmap (textoBitmap.js): a fonte na resolução nova
       if (o.list) textos(o.list)
     })
   textos(cena.children.list)
@@ -100,12 +108,15 @@ Phaser.GameObjects.GameObjectFactory.prototype.text = function (...args) {
 // Liga as cenas à resolução e acompanha o redimensionamento da janela.
 // Devolve a função que desliga o listener.
 export function instalarResolucao(game) {
-  const ligar = () => {
-    for (const cena of game.scene.scenes) {
-      cena.sys.events.on(Phaser.Scenes.Events.CREATE, () => ajustarCena(cena))
-      ajustarCena(cena)
-    }
+  const ligarCena = (cena) => {
+    cena.sys.events.on(Phaser.Scenes.Events.CREATE, () => ajustarCena(cena))
+    ajustarCena(cena)
   }
+  const ligar = () => {
+    for (const cena of game.scene.scenes) ligarCena(cena)
+  }
+  // as cenas carregadas sob demanda (cenasPreguicosas.js) chegam depois
+  game.events.on('cenanova', ligarCena)
   // as cenas só existem depois do READY (o isBooted vem antes, com elas ainda na fila)
   if (game.scene.scenes.length) ligar()
   else game.events.once(Phaser.Core.Events.READY, ligar)
@@ -115,15 +126,17 @@ export function instalarResolucao(game) {
     clearTimeout(timer)
     timer = setTimeout(() => {
       const novo = medir()
-      if (novo.escala === RES.escala && novo.dpr === RES.dpr) return
+      if (novo.escala === RES.escala && novo.dpr === RES.dpr && novo.zoom === RES.zoom && novo.batata === RES.batata) return
       const { largura, altura, zoomCss } = prepararResolucao()
       game.scale.resize(largura, altura)
       game.scale.setZoom(zoomCss)
+      estiloDoCanvas(game)
       game.scene.scenes.forEach(ajustarCena)
     }, 150)
   }
+  estiloDoCanvas(game)
   window.addEventListener('resize', aoRedimensionar)
-  const pararPref = aoMudarPref((chave) => chave === 'graficos' && aoRedimensionar())
+  const pararPref = aoMudarPref((chave) => (chave === 'graficos' || chave === 'resolucao') && aoRedimensionar())
   document.addEventListener('fullscreenchange', aoRedimensionar)
   document.addEventListener('webkitfullscreenchange', aoRedimensionar)
   // celular: girar a tela (o resize às vezes chega antes das medidas novas) e a barra do navegador

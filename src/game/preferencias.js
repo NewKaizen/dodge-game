@@ -8,6 +8,9 @@
 //   menosMovimento()                     true com "reduzir animações" ligado
 //
 // Chaves:
+//   resolucao         'normal' | 'batata'  RESOLUÇÃO BATATA: o jogo desenha no tamanho do mundo (854x480) e a página
+//                     amplia sem borrar (resolucao.js). Liga sozinha quando o FPS fica baixo (game/batata.js)
+//   batataAutomatica  true/false  pode ligar a BATATA sozinha (vira false quando o jogador desfaz)
 //   graficos          'minimo' | 'medio' | 'maximo'  (como nos jogos em flash: menos partículas,
 //                     fundos parados, sem filtros pesados no mínimo)
 //   reduzirMovimento  true/false  tremores, zooms, clarões e câmeras lentas mais suaves (ou nenhum)
@@ -44,6 +47,8 @@ const CHAVE = 'dodge-preferencias'
 
 export const PREFERENCIAS_PADRAO = {
   graficos: 'maximo',
+  resolucao: 'normal',
+  batataAutomatica: true,
   reduzirMovimento: false,
   tremor: 'normal',
   flashes: true,
@@ -67,6 +72,7 @@ export const PREFERENCIAS_PADRAO = {
 
 export const OPCOES = {
   graficos: ['minimo', 'medio', 'maximo'],
+  resolucao: ['normal', 'batata'],
   tremor: ['normal', 'reduzido', 'desligado'],
   daltonismo: ['nenhum', 'protanopia', 'deuteranopia', 'tritanopia'],
   menu: ['mesa', 'sala'],
