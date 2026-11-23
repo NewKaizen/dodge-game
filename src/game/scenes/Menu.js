@@ -97,6 +97,8 @@ export default class Menu extends Phaser.Scene {
 
   create() {
     Object.assign(this, estadoInicial())
+    // o tempo de boot (scripts/perf/boot.mjs): a primeira vez que o Menu fica pronto
+    if (!performance.getEntriesByName?.('menu-pronto').length) performance.mark?.('menu-pronto')
     // host de uma sala LAN: o "menu" dele é o lobby. Aberto por um link
     // ?sala=CODIGO: vai direto para a tela ONLINE, que entra na sala
     if (souHost() || salaDoLink()) {
