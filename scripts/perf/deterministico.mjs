@@ -39,6 +39,9 @@ export async function prepararPagina(pagina, semente) {
 // Depois do Menu: para o relógio, desliga o som, adormece o laço e instala o passo manual
 export async function congelar(pagina, semente) {
   await pagina.evaluate(async () => (await import('/src/game/audio.js')).setSomLigado(false))
+  // as cenas carregadas sob demanda (src/game/cenasPreguicosas.js) chegam antes: a cena pedida nasce no mesmo
+  // quadro de uma árvore sem o carregamento sob demanda
+  await pagina.evaluate(async () => window.__carregarTodasAsCenas?.())
   await pagina.clock.pauseAt(CONGELA)
   await pagina.evaluate(
     ({ semente, delta }) => {
@@ -51,7 +54,8 @@ export async function congelar(pagina, semente) {
           c.port1.onmessage = () => ok()
           c.port2.postMessage(0)
         })
-      const carregando = () => g.scene.getScenes(false).some((s) => s.sys.settings.status < 5 && s.sys.settings.status > 0 && s.load?.isLoading?.())
+      // (e as cenas carregadas sob demanda, src/game/cenasPreguicosas.js: o import ainda não chegou)
+      const carregando = () => (window.__cenasCarregando ?? 0) > 0 || g.scene.getScenes(false).some((s) => s.sys.settings.status < 5 && s.sys.settings.status > 0 && s.load?.isLoading?.())
       let t = 1_000_000 // o tempo do laço (fixo: não depende de quanto o boot demorou)
       window.__det = {
         // um frame: o tempo do laço anda `delta` e o Phaser dá um passo inteiro (update + render)

@@ -11,11 +11,15 @@ import { varrerCena, ouvintesSemRemocao } from './auditoriaCenas.js'
 
 const ler = (rel) => readFileSync(new URL(`../${rel}`, import.meta.url), 'utf8')
 
-// cenas da lista `scene: [...]` de config.js -> arquivo (Carregando/Religando ficam fora de scenes/)
+// cenas de config.js -> arquivo (Carregando/Religando ficam fora de scenes/): as do boot (a lista
+// CENAS_DO_BOOT, com import no topo) e as carregadas sob demanda (CENAS_SOB_DEMANDA, Chave: () => import(...))
 const config = ler('config.js')
-const arquivos = [...config.matchAll(/^import (\w+) from '\.\/((?:scenes\/)?\w+)\.js'/gm)]
-  .filter((m) => new RegExp(`scene: \\[[^\\]]*\\b${m[1]}\\b`).test(config))
-  .map((m) => ({ nome: m[1], arquivo: `${m[2]}.js` }))
+const arquivos = [
+  ...[...config.matchAll(/^import (\w+) from '\.\/((?:scenes\/)?\w+)\.js'/gm)]
+    .filter((m) => new RegExp(`CENAS_DO_BOOT = \\[[^\\]]*\\b${m[1]}\\b`).test(config))
+    .map((m) => ({ nome: m[1], arquivo: `${m[2]}.js` })),
+  ...[...config.matchAll(/^  (\w+): \(\) => import\('\.\/(scenes\/\w+)\.js'\)/gm)].map((m) => ({ nome: m[1], arquivo: `${m[2]}.js` })),
+]
 
 // Estado vindo de OUTRO arquivo (lógica pura da PvpResultado, ver pvp/telaResultado.js)
 const ESTADO_EXTERNO = { PvpResultado: 'pvp/telaResultado.js' }
