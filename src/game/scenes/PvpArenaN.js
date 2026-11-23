@@ -6,6 +6,7 @@ import { marcaDeAusencia, assinaturaDeAusencia, COR_AUSENCIA } from '../ausencia
 import { abrirPausaOnline } from '../pausaOnline.js'
 import { tocar, musica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal, preCarregarMusica } from '../audio.js'
 import { debug } from '../debug.js'
+import { andarEsquiva } from '../passoFixo.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import Carta, { CORES_CARTA } from '../entities/Carta.js'
 import Mao from '../entities/Mao.js'
@@ -1833,7 +1834,8 @@ export default class PvpArenaN extends Phaser.Scene {
     const direcao = this.controles.toque(meuLado())
     if ((direcao === 'esquerda' || direcao === 'direita') && (this.fase === 'escolha' || this.euFora)) this.moverCursor(direcao)
     if (this.fase === 'escolha') this.atualizarRelogio(delta)
-    this.atualizarPistas(delta)
+    // a esquiva anda em tiques fixos de 1/60 s, o desenho interpola (passoFixo.js)
+    andarEsquiva(this, delta, (dt) => this.atualizarPistas(dt), debug.acelerar)
     this.rede.atualizar(delta)
     this.avancarVista(deltaReal)
     if (this.seguindo != null) {

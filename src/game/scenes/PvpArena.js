@@ -33,6 +33,7 @@ import { efeitoDoEspecial, efeitoDoReflexo, escalaDaCarta } from '../pvp/efeitos
 import { fogoArtificio, canhoesConfete, chuvaConfete } from '../effects/festa.js'
 import { anunciarSuper } from '../pvp/super/anuncio.js'
 import FimDePartida from '../pvp/fimDePartida/index.js'
+import { criarPassoFixo, andarEsquiva } from '../passoFixo.js'
 import { entrarNoJogo, voltarAoMenu, informarVida, levouGolpe, venceu } from '../../lib/saida.js'
 import { nomesDaPartida } from '../pvp/nomesDaPartida.js'
 import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, artesDosVersos, cosmeticosDaPartida, participantesDaPartida } from '../rede.js'
@@ -238,6 +239,7 @@ export default class PvpArena extends Phaser.Scene {
 
   create() {
     this.comecouEm = Date.now() // a duração vai no resultado (o servidor mede a dele)
+    this.passoFixo = criarPassoFixo() // a esquiva anda em tiques de 1/60 s (passoFixo.js)
     // partida EM REDE (docs/rede-pvp.md): cada PC roda esta cena; pvp/rede/ArenaRede.js
     // faz a ponte (quem decide é o host, cada um é dono do próprio coração)
     this.rede = emRede() ? new ArenaRede(this, { canal, meuLado: meuLado(), souHost: souHostDaRede(), ausente: () => outroAusente(participantesDaPartida(), meuLado()) }) : null
@@ -1978,11 +1980,19 @@ export default class PvpArena extends Phaser.Scene {
       this.atualizarRelogio(delta)
     }
 
-    this.atualizarPistas(delta)
-    this.efeitoBonus?.atualizar?.(delta)
-    if (this.fase === 'duelo') this.duelo?.atualizar(delta)
+    // a SIMULAÇÃO da esquiva (corações, balas, ataques, eventos de bônus, duelo) anda em tiques fixos de
+    // 1/60 s (passoFixo.js): igual a 30, 60 ou 144 Hz; o desenho interpola entre o tique anterior e o atual
+    // (a CoopArena herda este update: o mesmo passo fixo, com o quadro único no lugar das pistas)
+    andarEsquiva(this, delta, (dt) => this.tiqueDaEsquiva(dt), debug.acelerar)
     // em rede: manda a posição do meu coração e põe o do outro na caixa espelho
     this.rede?.atualizar(delta)
+  }
+
+  // Um tique da simulação (dt = PASSO_MS de jogo)
+  tiqueDaEsquiva(dt) {
+    this.atualizarPistas(dt)
+    this.efeitoBonus?.atualizar?.(dt)
+    if (this.fase === 'duelo') this.duelo?.atualizar(dt)
   }
 
   // As pistas andam um frame (o coração de cada uma pelo joystick do dono, ou

@@ -6,6 +6,7 @@ import { marcaDeAusencia, assinaturaDeAusencia, COR_AUSENCIA } from '../ausencia
 import { abrirPausaOnline } from '../pausaOnline.js'
 import { tocar, musica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal, preCarregarMusica } from '../audio.js'
 import { debug } from '../debug.js'
+import { andarEsquiva } from '../passoFixo.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { CHEFES, nivelDoChefe } from '../coop/chefes/index.js'
 import { partyDe } from '../data/batalha.js'
@@ -1832,7 +1833,8 @@ class CoopArenaN extends Phaser.Scene {
       if (direcao === 'esquerda' || direcao === 'direita') this.moverCursor(direcao)
       this.atualizarRelogio(delta)
     }
-    this.atualizarPistas(delta)
+    // a esquiva anda em tiques fixos de 1/60 s, o desenho interpola (passoFixo.js)
+    andarEsquiva(this, delta, (dt) => this.atualizarPistas(dt), debug.acelerar)
     this.rede.atualizar(delta)
     // a cada ~250 ms: quem caiu da rede / voltou (cartão, personagem, coração)
     this.vigia = (this.vigia ?? 0) + deltaReal

@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { criarFiltroCaixas } from '../recorte.js'
 import Controles from '../controles.js'
 import Pista from '../pvp/Pista.js'
+import { criarPassoFixo } from '../passoFixo.js'
 import { EsquivaBot } from '../pvp/botEsquiva.js'
 import { ARENA } from '../pvp/arenas.js'
 import { hpInicial } from '../pvp/regras.js'
@@ -455,14 +456,19 @@ export default class GuiaBonus extends Phaser.Scene {
       }
     }
 
-    // a mesma ordem da PvpArena: joy -> passo -> pista; depois atualizar do efeito
-    this.pistas.forEach((pista, j) => {
-      let joy = this.joyDaPista(j, delta)
-      if (this.efeito?.joy) joy = this.protegido((e) => e.joy(j, joy), joy) ?? joy
-      const passo = this.efeito?.passo ? this.protegido((e) => e.passo(j, delta, joy), delta) : delta
-      if (passo > 0) pista.atualizar(passo, joy)
+    // a mesma ordem da PvpArena: joy -> passo -> pista; depois atualizar do efeito, em tiques fixos (passoFixo.js)
+    this.passoFixo ??= criarPassoFixo()
+    this.pistas.forEach((p) => p.desfazerInterpolacao())
+    this.passoFixo.avancar(delta, (dt) => {
+      this.pistas.forEach((pista, j) => {
+        let joy = this.joyDaPista(j, dt)
+        if (this.efeito?.joy) joy = this.protegido((e) => e.joy(j, joy), joy) ?? joy
+        const passo = this.efeito?.passo ? this.protegido((e) => e.passo(j, dt, joy), dt) : dt
+        if (passo > 0) pista.atualizar(passo, joy)
+      })
+      if (this.efeito?.atualizar) this.protegido((e) => e.atualizar(dt))
     })
-    if (this.efeito?.atualizar) this.protegido((e) => e.atualizar(delta))
+    this.pistas.forEach((p) => p.interpolar(this.passoFixo.alfa))
 
     this.atualizarTextos()
   }

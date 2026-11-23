@@ -3,6 +3,7 @@ import { criarFiltroCaixas } from '../recorte.js'
 import Controles from '../controles.js'
 import Carta from '../entities/Carta.js'
 import Pista from '../pvp/Pista.js'
+import { criarPassoFixo } from '../passoFixo.js'
 import { EsquivaBot } from '../pvp/botEsquiva.js'
 import { COR_NAIPE } from '../pvp/perfil.js'
 import { EFEITOS } from '../pvp/bonus/eventos/index.js'
@@ -790,9 +791,16 @@ export default class Grimorio extends Phaser.Scene {
 
     // ♦ Q/K e cartas do chefe que invertem: valem enquanto o ataque roda (para a CPU também)
     const invertendo = Boolean(this.previa?.inverter) && this.pista.atacando
-    let joy = this.joyDaPrevia(delta, invertendo)
-    if (invertendo) joy = { x: -joy.x, y: -joy.y }
-    this.pista.atualizar(delta, joy)
+    // a prévia anda em tiques fixos como a arena (passoFixo.js)
+    this.passoFixo ??= criarPassoFixo()
+    const pista = this.pista
+    pista.desfazerInterpolacao()
+    this.passoFixo.avancar(delta, (dt) => {
+      let joy = this.joyDaPrevia(dt, invertendo)
+      if (invertendo) joy = { x: -joy.x, y: -joy.y }
+      pista.atualizar(dt, joy)
+    })
+    pista.interpolar(this.passoFixo.alfa)
 
     this.atualizarTextosPrevia(time, invertendo)
   }
