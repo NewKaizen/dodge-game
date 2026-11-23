@@ -1,6 +1,6 @@
 {
   "versao": 1,
-  "descricao": "Orçamento do passo do Phaser (update + render, ms por frame) a 4x de CPU no modo JS (viewport 300x300), mediana de 3 rodadas. npm run perf:check falha se a mediana passar do orçamento + tolerância. As fases 1 a 4 do plano de otimização apertam estes números (npm run perf:check -- --atualizar). Ver docs/desempenho.md.",
+  "descricao": "Orçamento do passo do Phaser (update + render, ms por frame) a 4x de CPU no modo JS (viewport 300x300), mediana de 3 rodadas. npm run perf:check falha se a mediana passar do orçamento + tolerância. As fases 1 a 4 do plano de otimização apertam estes números (npm run perf:check -- --atualizar). Ver docs/desempenho.md. Fase 3: apertado só nas cenas cuja mediana A/B (antes e depois medidos em seguida, 3 rodadas) caiu; ver docs/desempenho.md.",
   "taxa": 4,
   "tolerancia": 0.15,
   "rodadas": 3,
@@ -13,11 +13,11 @@
   "metaPassoMs8x": 6,
   "cenas": {
     "menu": {
-      "passoMs": 4.4,
+      "passoMs": 3.3,
       "fps": 59.4
     },
     "pvp-castelo": {
-      "passoMs": 7.1,
+      "passoMs": 6.5,
       "fps": 58.9
     },
     "pvp-cafe": {
@@ -45,11 +45,11 @@
       "fps": 48.5
     },
     "pvp-escolha": {
-      "passoMs": 8.1,
+      "passoMs": 6.6,
       "fps": 54
     },
     "coop-king": {
-      "passoMs": 9,
+      "passoMs": 6.9,
       "fps": 54.3
     },
     "coop-queen": {
@@ -69,11 +69,11 @@
       "fps": 52.5
     },
     "expedicao": {
-      "passoMs": 9.4,
+      "passoMs": 8.1,
       "fps": 53.5
     },
     "galeria-estilos": {
-      "passoMs": 7.2,
+      "passoMs": 5.4,
       "fps": 55.8
     },
     "galeria-efeitos": {
