@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { criarFiltroCaixas } from '../recorte.js'
 import Controles from '../controles.js'
 import Pista from '../pvp/Pista.js'
 import { EsquivaBot } from '../pvp/botEsquiva.js'
@@ -104,6 +105,8 @@ export default class GuiaBonus extends Phaser.Scene {
     this.desenharMoldura()
     this.criarPistas()
     this.criarHud()
+
+    this.filtrarCaixas = criarFiltroCaixas(this) // recorte.js: só os objetos novos de cada quadro
 
     this.events.on('postupdate', this.filtrarCaixas, this)
     this.events.once('shutdown', () => {
@@ -438,19 +441,6 @@ export default class GuiaBonus extends Phaser.Scene {
       velocidadeMax: pista.balas.velocidadeMax,
       invertido: false,
     })
-  }
-
-  // objetos de fora das caixas não aparecem nas câmeras de recorte (como na PvpArena)
-  filtrarCaixas() {
-    const caixas = this.caixasDeRecorte
-    if (!caixas?.length) return
-    const principal = this.cameras.main.id
-    let mascara = 0
-    for (const caixa of caixas) mascara |= caixa.camera.id
-    for (const o of this.children.list) {
-      if (o.cameraFilter & principal) continue
-      if ((o.cameraFilter & mascara) !== mascara) o.cameraFilter |= mascara
-    }
   }
 
   update(time, delta) {

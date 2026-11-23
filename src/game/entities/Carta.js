@@ -8,7 +8,7 @@ import { shake } from '../effects/shake.js'
 import { fatores } from '../acessibilidade.js'
 import { frenteNaCarta, versoNaCarta, definirCarta } from '../cosmeticosSlots.js'
 import { semLigaduras } from '../campanha/texto.js'
-import { assar, assarGraphics, assarRegiao, texturaAssada } from '../arte/assar.js'
+import { assar, assarGraphics, assarRegiao, imagemAssada, regiaoAssada, texturaAssada, texturaAssadaRegiao, trocarAssadaRegiao } from '../arte/assar.js'
 
 // Carta de baralho desenhada por código (frente, verso e animações).
 // Só o VISUAL: as regras (baralho, naipes, valores, efeitos) ficam em outro módulo.
@@ -227,9 +227,14 @@ export default class Carta extends Phaser.GameObjects.Container {
     // marca de custo no canto de baixo à esquerda: fica POR CIMA do véu e na parte da
     // carta que continua à vista quando a mão se sobrepõe (a gema do canto de cima, à
     // direita, fica coberta pela carta vizinha). Bloqueada: leva um "×" (não só a cor)
-    this.marcaCusto = this.oculta ? scene.add.graphics() : this.pecaEstado('marca', null, (g) => this.pintarMarcaCusto(g, false))
+    // (o número vai assado junto com a marca: ver pecaEstado)
     this.marcaTexto = this.texto(0, 0, this.oculta ? '' : String(dados.custo ?? 0), 9 * this.u, '#ffffff', { stroke: '#06283e', strokeThickness: 2 * this.u }).setOrigin(0.5, 0.52)
-    this.marcas = scene.add.container(0, 0, [this.marcaCusto, this.marcaTexto])
+    this.marcaCusto = this.oculta ? scene.add.graphics() : this.pecaEstado('marca', null, (g) => this.pintarMarcaCusto(g, false), this.marcaTexto)
+    if (this.marcaTexto?.scene && this.marcaCusto instanceof Phaser.GameObjects.Image) {
+      this.marcaTexto.destroy()
+      this.marcaTexto = null
+    }
+    this.marcas = scene.add.container(0, 0, [this.marcaCusto, this.marcaTexto].filter(Boolean))
     this.corpo.add([this.brilho, this.sombra, this.frente, this.verso, this.veu, this.marcas, this.clarao])
 
     if (!this.oculta) this.desenharFrente()
@@ -263,8 +268,10 @@ export default class Carta extends Phaser.GameObjects.Container {
     return g
   }
 
-  // a sombra continua um Graphics: assada, a da carta que chega na mão (comprar + virar, que mexe nela)
-  // aparecia como um retângulo escuro fora do lugar na paridade visual (docs/desempenho.md, fase 1)
+  // A sombra continua um Graphics, de propósito: ele QUEBRA o lote de desenho antes do verso. Assada (numa textura
+  // própria ou na placa do véu), o verso de cima dos montes perdia um triângulo de vez em quando (aparecia o preto
+  // das sombras de baixo) — um defeito do lote com várias texturas do Phaser 4.2.1, não do LRU nem da textura
+  // (investigação em docs/desempenho.md, fase 3). São 1 comando e 1 lote a mais por carta.
   pecaSombra() {
     const { largura: w, altura: h, u } = this
     const g = this.scene.add.graphics()
@@ -290,9 +297,8 @@ export default class Carta extends Phaser.GameObjects.Container {
     return g
   }
 
-  // As peças com dois estados (gema e marca de custo: com e sem energia) continuam Graphics: assadas,
-  // a troca de estado no meio da partida (uma textura nova criada no meio do jogo) deixou um buraco no
-  // verso de outra carta na paridade visual (docs/desempenho.md, fase 1). São ~20 comandos por carta.
+  // As peças com dois estados (gema e marca de custo: com e sem energia): as DUAS texturas são assadas
+  // quando a carta nasce, e a troca de estado é só um setTexture (nenhuma textura nova no meio da partida).
   caixaEstado(nome) {
     const { u } = this
     const x = nome === 'gema' ? this.largura / 2 - 9.5 * u : -this.largura / 2 + 9 * u
@@ -300,16 +306,71 @@ export default class Carta extends Phaser.GameObjects.Container {
     return { x, y }
   }
 
-  pecaEstado(nome, _g, pintar) {
+  // a região (mundo da carta) de uma peça de estado: um quadrado de 2 x 10 u em volta do centro dela
+  regiaoEstado(nome) {
+    const { u } = this
+    const { x, y } = this.caixaEstado(nome)
+    return { x: x - 10 * u, y: y - 10 * u, largura: 20 * u, altura: 20 * u }
+  }
+
+  pintarEstado(nome, g, bloqueada) {
+    if (nome === 'gema') this.pintarGema(g, bloqueada)
+    else this.pintarMarcaCusto(g, bloqueada)
+  }
+
+  chaveEstado(nome, bloqueada) {
+    return `carta-${nome}-${bloqueada ? 'sem' : 'com'}-${this.dados.custo ?? 0}-${this.largura}x${this.altura}-${this.u}`
+  }
+
+  // `texto` (o número do custo): vai assado junto, nos dois estados (o contorno muda com o estado). O Text é criado
+  // do mesmo jeito (o nome sorteado dele gasta Math.random: a sequência da cena não muda) e quem chama destrói ele
+  pecaEstado(nome, _g, pintar, texto = null) {
+    const regiao = this.regiaoEstado(nome)
+    if (texto) texto.setPosition(this.caixaEstado(nome).x, this.caixaEstado(nome).y)
+    const comTexto = texto ? [texto] : []
+    const contorno = (bloqueada) => texto?.setStroke(bloqueada ? '#3a0a14' : '#06283e', 2 * this.u)
+    const chaveSem = this.chaveEstado(nome, true)
+    // o outro estado primeiro (o Text termina no contorno do estado normal)
+    contorno(true)
+    const sem = texturaAssadaRegiao(this.scene, chaveSem, regiao, (g) => this.pintarEstado(nome, g, true), comTexto)
+    contorno(false)
+    const com = sem && texturaAssadaRegiao(this.scene, this.chaveEstado(nome, false), regiao, pintar, comTexto)
+    if (com) {
+      const img = imagemAssada(this.scene, com)
+      return img
+    }
     const g = this.scene.add.graphics()
     pintar(g)
     return g
   }
 
-  // troca o estado de uma peça (redesenha)
+  // troca o estado de uma peça (a textura do outro estado, ou redesenha o Graphics)
   estadoDaPeca(peca, nome, bloqueada, pintar) {
+    if (peca instanceof Phaser.GameObjects.Image) {
+      const chave = this.chaveEstado(nome, bloqueada)
+      const regiao = this.regiaoEstado(nome)
+      // (a textura sumiu: a escala da tela mudou no meio da partida. Refaz com o número, num Text de rascunho cujo
+      // nome sorteado não gasta o Math.random da cena)
+      const porCima = regiaoAssada(this.scene, chave, regiao) ? [] : [this.textoDeRascunho(nome, bloqueada)]
+      const ok = trocarAssadaRegiao(this.scene, peca, chave, regiao, pintar, porCima)
+      porCima.forEach((t) => t.destroy())
+      if (ok) return
+    }
+    if (!peca.clear) return
     peca.clear()
     pintar(peca)
+  }
+
+  textoDeRascunho(nome, bloqueada) {
+    const sorteio = Math.random
+    Math.random = () => 0.5
+    try {
+      const { x, y } = this.caixaEstado(nome)
+      const tamanho = (nome === 'gema' ? 8.5 : 9) * this.u
+      return this.texto(x, y, String(this.dados.custo ?? 0), tamanho, '#ffffff', { stroke: bloqueada ? '#3a0a14' : '#06283e', strokeThickness: 2 * this.u }).setOrigin(0.5, 0.52)
+    } finally {
+      Math.random = sorteio
+    }
   }
 
   // A FRENTE. Com um ESTILO equipado (cosmético, cosmeticos/frentes.js) quem desenha é o estilo: ele chama
@@ -422,6 +483,7 @@ export default class Carta extends Phaser.GameObjects.Container {
     const torto = tema?.torto ?? 0 // "mal desenhada": tudo um tiquinho torto
     if (torto) nome.setRotation(-torto * 0.5)
     this.frente.add(nome)
+    const textosFrente = [nome]
 
     // cantos: valor + naipe (o de baixo, de cabeça para baixo)
     const rotulo = rotuloValor(dados.valor)
@@ -443,16 +505,21 @@ export default class Carta extends Phaser.GameObjects.Container {
       const t = this.texto(cx * lado, (hh - 3 * u) * lado, rotulo, tamRotulo, corHex, { stroke: strokeRotulo, strokeThickness: (tema?.rotulo?.espessura ?? 0.6) * u })
       t.setOrigin(0.5, 0).setRotation((lado === 1 ? Math.PI : 0) - torto * lado)
       this.frente.add(t)
+      textosFrente.push(t)
       this.naipe(g, dados.naipe, cx * lado, (hh - 20 * u) * lado, 4 * u, cor, 1, lado === 1)
     }
 
-    // gema de energia (canto superior direito): igual em todos os estilos
-    this.gema = this.pecaEstado('gema', null, (g) => this.pintarGema(g, false))
+    // gema de energia (canto superior direito): igual em todos os estilos (o número vai assado junto)
     this.gemaTexto = this.texto(hw - 9.5 * u, -hh + 9.5 * u, String(dados.custo ?? 0), 8.5 * u, '#ffffff', {
       stroke: '#06283e',
       strokeThickness: 2 * u,
     }).setOrigin(0.5, 0.52)
-    this.frente.add([this.gema, this.gemaTexto])
+    this.gema = this.pecaEstado('gema', null, (g) => this.pintarGema(g, false), this.gemaTexto)
+    if (this.gema instanceof Phaser.GameObjects.Image) {
+      this.gemaTexto.destroy()
+      this.gemaTexto = null
+    }
+    this.frente.add([this.gema, this.gemaTexto].filter(Boolean))
     this.desenharGema(false)
 
     // por cima de tudo (brilho holográfico...), e os brilhos das figuras e do Ás
@@ -466,13 +533,22 @@ export default class Carta extends Phaser.GameObjects.Container {
     // a frente é um desenho parado com 600 a 3 mil comandos (os estilos cosméticos, até 3 mil): vira
     // textura (arte/assar.js), uma por carta diferente, e todas as iguais usam a mesma. O que o estilo
     // anima (pétalas, o brilho holográfico) são outras imagens, por cima ou por trás: continuam vivas
-    const chave = `carta-frente-${this.estiloFrente && tema ? this.estiloFrente : 'classica'}-${dados.personagem}-${dados.naipe}-${dados.valor}-${this.corPersonagem}-${u}`
-    const img = assarGraphics(this.scene, chave, w, h, g)
+    // Os textos parados da frente (nome e os dois rótulos de canto) vão na MESMA textura, por cima do desenho, quando
+    // vêm logo depois dele no container (nenhum enfeite do estilo no meio): menos 3 Texts (3 texturas, 3 objetos)
+    // por carta. Eles continuam sendo criados (o nome sorteado de cada Text gasta Math.random: a sequência não muda)
+    // e saem do container depois de assados.
+    const i0 = this.frente.getIndex(g)
+    const textos = this.frente.list.slice(i0 + 1, i0 + 1 + textosFrente.length)
+    const juntos = textos.length === textosFrente.length && textos.every((t, k) => t === textosFrente[k])
+    const chave = `carta-frente-${this.estiloFrente && tema ? this.estiloFrente : 'classica'}-${dados.personagem}-${dados.naipe}-${dados.valor}-${this.corPersonagem}-${u}${juntos ? `-txt-${dados.nome ?? ''}` : ''}`
+    if (juntos) for (const t of textosFrente) this.frente.remove(t) // (fora do container: desenhados na posição local deles)
+    const img = assarGraphics(this.scene, chave, w, h, g, { porCima: juntos ? textosFrente : [] })
     if (img) {
       this.frente.addAt(img, this.frente.getIndex(g))
       this.frente.remove(g, true)
       ctx.g = null
-    }
+      if (juntos) for (const t of textosFrente) t.destroy()
+    } else if (juntos) this.frente.addAt(textosFrente, this.frente.getIndex(g) + 1)
   }
 
   desenharGema(semEnergia) {
@@ -990,7 +1066,7 @@ export default class Carta extends Phaser.GameObjects.Container {
     const { u, indisponivel: bloqueada } = this
     const { x, y } = this.caixaEstado('marca')
     this.estadoDaPeca(this.marcaCusto, 'marca', bloqueada, (g) => this.pintarMarcaCusto(g, bloqueada))
-    this.marcaTexto.setPosition(x, y).setStroke(bloqueada ? '#3a0a14' : '#06283e', 2 * u)
+    this.marcaTexto?.setPosition(x, y).setStroke(bloqueada ? '#3a0a14' : '#06283e', 2 * u)
   }
 
   pintarMarcaCusto(g, bloqueada) {

@@ -1,4 +1,5 @@
 import PvpArena, { LAYOUT_PVP } from './PvpArena.js'
+import { criarFiltroCaixas } from '../recorte.js'
 import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, DESAFIO, NIVEIS, DIFICULDADES } from '../constants.js'
 import Controles from '../controles.js'
 import { outroAusente } from '../ausencia.js'
@@ -306,6 +307,7 @@ class CoopArena extends PvpArena {
     this.controles.onPausa(() => this.pausar())
     this.controles.onPausaOnline(() => this.pausarOnline())
     this.controles.onPerdaDeFoco((motivo) => this.pausar(motivo))
+    this.filtrarCaixas = criarFiltroCaixas(this) // recorte.js: só os objetos novos de cada quadro
     this.events.on('postupdate', this.filtrarCaixas, this)
 
     if (import.meta.env.DEV) window.coopArena = this

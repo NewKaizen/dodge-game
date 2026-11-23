@@ -1,4 +1,6 @@
 import Phaser from 'phaser'
+import { criarFiltroCaixas } from '../recorte.js'
+import { textoJogo } from '../textoBitmap.js'
 import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, ACELERACAO, fatorAceleracao, nivelAceleracao, parteDoFator } from '../constants.js'
 import Controles from '../controles.js'
 import { criarSelos, ladoDe, outroAusente } from '../ausencia.js'
@@ -311,6 +313,7 @@ export default class PvpArena extends Phaser.Scene {
     this.controles.onPerdaDeFoco((motivo) => this.pausar(motivo))
 
     // objetos de fora das caixas não aparecem nas câmeras de recorte (ver filtrarCaixas)
+    this.filtrarCaixas = criarFiltroCaixas(this) // recorte.js: só os objetos novos de cada quadro
     this.events.on('postupdate', this.filtrarCaixas, this)
 
     if (import.meta.env.DEV) window.pvpArena = this
@@ -418,8 +421,8 @@ export default class PvpArena extends Phaser.Scene {
   }
 
   criarTopo() {
-    const texto = (y, tamanho, cor) =>
-      this.add.text(CENTRO_X, y, '', { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(70)
+    // os textos da partida em fonte bitmap (textoBitmap.js): o relógio muda a cada segundo sem rasterizar nada
+    const texto = (y, tamanho, cor) => textoJogo(this, CENTRO_X, y, '', { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5, 0).setDepth(70)
     this.textoRodada = texto(5, 13, TEXTO.normal)
     this.textoRelogio = texto(22, 22, TEXTO.selecionado)
     this.textoTreino = texto(50, 9, '#9be7ff')
@@ -440,8 +443,7 @@ export default class PvpArena extends Phaser.Scene {
     const cartas = [0, 1, 2].map((k) =>
       new Carta(this, x - k * 1.2, y - k * 1.8, { personagem: this.ids[j], naipe: 'espadas', valor: 2 }, { virada: true, largura: 46, corVerso: this.versos[j], arteVerso: this.artesVerso[j] }).setDepth(5 + k).setRotation(j ? 0.08 : -0.08),
     )
-    const texto = this.add
-      .text(x, y + 40, '', { fontFamily: FONTE, fontSize: '10px', color: TEXTO.desabilitado, stroke: '#000000', strokeThickness: 3 })
+    const texto = textoJogo(this, x, y + 40, '', { fontFamily: FONTE, fontSize: '10px', color: TEXTO.desabilitado, stroke: '#000000', strokeThickness: 3 })
       .setOrigin(0.5, 0)
       .setDepth(8)
     return { cartas, texto }
@@ -514,28 +516,13 @@ export default class PvpArena extends Phaser.Scene {
 
   criarTextos() {
     const estilo = (tamanho, cor) => ({ fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 4, align: 'center' })
-    this.banner = this.add.text(CENTRO_X, 92, '', estilo(26, TEXTO.selecionado)).setOrigin(0.5).setDepth(96)
+    // fonte bitmap (textoBitmap.js): faixa, status, dica e avisos mudam no meio da partida sem rasterizar nada
+    this.banner = textoJogo(this, CENTRO_X, 92, '', estilo(26, TEXTO.selecionado)).setOrigin(0.5).setDepth(96)
+    // (o status fica Text: o bloqueio é uma pílula com fundo e margem, setBackgroundColor/setPadding)
     this.status = [0, 1].map((j) => this.add.text(CENTROS[j], 84, '', estilo(11, corTexto(CORES.almas[j]))).setOrigin(0.5).setDepth(40))
-    this.dica = this.add.text(CENTRO_X, 322, '', { ...estilo(9, TEXTO.desabilitado), strokeThickness: 2 }).setOrigin(0.5).setDepth(40)
-    this.infoPista = [0, 1].map((j) => this.add.text(CENTROS[j], 342, '', estilo(10, TEXTO.normal)).setOrigin(0.5, 0).setDepth(40))
-    this.avisoPista = [0, 1].map((j) => this.add.text(CENTROS[j], 92, '', estilo(12, TEXTO.caido)).setOrigin(0.5).setDepth(41))
-  }
-
-  // As câmeras de recorte das caixas desenham tudo o que não foi ignorado.
-  // Tudo que a câmera principal desenha (HUD, cartas, textos) é de fora das
-  // caixas; o que a caixa recorta (balas, coração) já é ignorado pela
-  // principal. Roda todo frame, depois do update, então pega também os
-  // objetos criados por Mao/Carta/efeitos.
-  filtrarCaixas() {
-    const caixas = this.caixasDeRecorte
-    if (!caixas?.length) return
-    const principal = this.cameras.main.id
-    let mascara = 0
-    for (const caixa of caixas) mascara |= caixa.camera.id
-    for (const o of this.children.list) {
-      if (o.cameraFilter & principal) continue
-      if ((o.cameraFilter & mascara) !== mascara) o.cameraFilter |= mascara
-    }
+    this.dica = textoJogo(this, CENTRO_X, 322, '', { ...estilo(9, TEXTO.desabilitado), strokeThickness: 2 }).setOrigin(0.5).setDepth(40)
+    this.infoPista = [0, 1].map((j) => textoJogo(this, CENTROS[j], 342, '', estilo(10, TEXTO.normal)).setOrigin(0.5, 0).setDepth(40))
+    this.avisoPista = [0, 1].map((j) => textoJogo(this, CENTROS[j], 92, '', estilo(12, TEXTO.caido)).setOrigin(0.5).setDepth(41))
   }
 
   // ---------- utilidades ----------
@@ -562,8 +549,7 @@ export default class PvpArena extends Phaser.Scene {
 
   // etiqueta pequena que sobe e some (efeito de carta, +HP, ESCUDO...)
   etiquetaEm(x, y, texto, cor, { atraso = 0, tamanho = 14, ms = 1300 } = {}) {
-    const t = this.add
-      .text(x, y, texto, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 4, align: 'center' })
+    const t = textoJogo(this, x, y, texto, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 4, align: 'center' })
       .setOrigin(0.5)
       .setDepth(97)
       .setAlpha(0)

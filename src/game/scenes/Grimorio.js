@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { criarFiltroCaixas } from '../recorte.js'
 import Controles from '../controles.js'
 import Carta from '../entities/Carta.js'
 import Pista from '../pvp/Pista.js'
@@ -150,6 +151,7 @@ export default class Grimorio extends Phaser.Scene {
     this.abrirPagina(this.indicePagina, { animar: false })
 
     // objetos de fora da caixa não aparecem na câmera de recorte dela (como na PvpArena)
+    this.filtrarCaixas = criarFiltroCaixas(this) // recorte.js: só os objetos novos de cada quadro
     this.events.on('postupdate', this.filtrarCaixas, this)
     const aoMudar = (_, valor, anterior) => valor !== anterior && !this.saindo && this.scene.restart()
     this.registry.events.on('changedata-numJogadores', aoMudar)
@@ -760,20 +762,6 @@ export default class Grimorio extends Phaser.Scene {
       velocidadeMax: pista.balas.velocidadeMax,
       invertido,
     })
-  }
-
-  // As câmeras de recorte das caixas desenham tudo o que não foi ignorado:
-  // o que é de fora da caixa (fundo, painéis, cartas) fica só na principal
-  filtrarCaixas() {
-    const caixas = this.caixasDeRecorte
-    if (!caixas?.length) return
-    const principal = this.cameras.main.id
-    let mascara = 0
-    for (const caixa of caixas) mascara |= caixa.camera.id
-    for (const o of this.children.list) {
-      if (o.cameraFilter & principal) continue
-      if ((o.cameraFilter & mascara) !== mascara) o.cameraFilter |= mascara
-    }
   }
 
   update(time, delta) {

@@ -41,12 +41,17 @@ export function assar(scene, chave, largura, altura, desenhar, { folga = FOLGA }
 
 // O mesmo, a partir de um Graphics já desenhado (em volta de (0, 0)): devolve a Image ou null.
 // Quem chama troca o Graphics pela Image (e o destrói)
-export function assarGraphics(scene, chave, largura, altura, g, { folga = FOLGA } = {}) {
+// `por cima`: outros objetos (textos da carta...) desenhados na mesma textura depois do Graphics, cada um na
+// posição, rotação e escala dele (coordenadas em volta de (0, 0), como o Graphics)
+export function assarGraphics(scene, chave, largura, altura, g, { folga = FOLGA, porCima = [] } = {}) {
   if (!podeAssar(scene)) return null
   const nome = nomeAssado(chave, largura, altura)
-  if (!existe(scene, nome) && !pintar(scene, nome, -largura / 2 - folga, -altura / 2 - folga, largura + folga * 2, altura + folga * 2, g)) return null
+  if (!existe(scene, nome) && !pintar(scene, nome, -largura / 2 - folga, -altura / 2 - folga, largura + folga * 2, altura + folga * 2, g, porCima)) return null
   return imagemAssada(scene, nome)
 }
+
+// já existe a textura deste desenho (assar / assarGraphics)? Para pular o trabalho de montar o desenho
+export const jaAssada = (scene, chave, largura, altura) => podeAssar(scene) && existe(scene, nomeAssado(chave, largura, altura))
 
 // Só a textura (desenhada em volta de (0, 0)); devolve o nome ou null
 export function texturaAssada(scene, chave, largura, altura, desenhar, { folga = FOLGA } = {}) {
@@ -84,7 +89,22 @@ export function assarGraphicsRegiao(scene, chave, { x, y, largura, altura, folga
   return imagemAssada(scene, nome)
 }
 
+// Só a textura de uma região (para deixar pronto um estado que ainda não aparece); devolve o nome ou null
+export function texturaAssadaRegiao(scene, chave, { x, y, largura, altura, folga = FOLGA }, desenhar, porCima = []) {
+  if (!podeAssar(scene)) return null
+  const nome = nomeAssado(`${chave}@${x},${y}`, largura, altura)
+  if (existe(scene, nome)) return usar(scene, nome), nome
+  const g = scene.make.graphics({}, false)
+  desenhar(g)
+  const ok = pintar(scene, nome, x - folga, y - folga, largura + folga * 2, altura + folga * 2, g, porCima)
+  g.destroy()
+  if (!ok) return null
+  usar(scene, nome)
+  return nome
+}
+
 // já existe a textura desta região? (para pular o desenho quando a cena volta)
+// (texturaAssadaRegiao aceita `porCima` como assarGraphics; imagemAssada mostra o nome que ela devolve)
 export const regiaoAssada = (scene, chave, { x, y, largura, altura }) => existe(scene, nomeAssado(`${chave}@${x},${y}`, largura, altura))
 
 // A Image de uma textura assada, no lugar do desenho (origem no (0, 0) do desenho)
@@ -118,7 +138,7 @@ const podeAssar = (scene) => typeof scene?.textures?.addDynamicTexture === 'func
 
 const existe = (scene, nome) => REGISTRO.has(nome) && scene.textures.exists(nome)
 
-function pintar(scene, nome, ox, oy, w, h, g) {
+function pintar(scene, nome, ox, oy, w, h, g, porCima = []) {
   const escala = RES.escala
   const tw = Math.max(1, Math.ceil(w * escala))
   const th = Math.max(1, Math.ceil(h * escala))
@@ -129,6 +149,7 @@ function pintar(scene, nome, ox, oy, w, h, g) {
   g.setPosition(0, 0).setScale(1).setRotation(0).setAlpha(1).setVisible(true)
   dt.camera.setOrigin(0, 0).setZoom(escala).setScroll(ox, oy)
   dt.draw(g)
+  for (const o of porCima) dt.draw(o)
   dt.render?.()
   g.setPosition(x, y).setScale(scaleX, scaleY).setRotation(rotation).setAlpha(alpha).setVisible(visible)
   REGISTRO.set(nome, { cenas: new Set(), uso: ++relogio, bytes: tw * th * 4, ox, oy, tw, th, escala })
@@ -180,14 +201,14 @@ export function estadoAssadas() {
 }
 
 // trocarAssada para uma região do mundo (assarRegiao): troca a textura de uma Image assada
-export function trocarAssadaRegiao(scene, img, chave, regiao, desenhar) {
+export function trocarAssadaRegiao(scene, img, chave, regiao, desenhar, porCima = []) {
   if (!podeAssar(scene)) return false
   const { x, y, largura, altura, folga = FOLGA } = regiao
   const nome = nomeAssado(`${chave}@${x},${y}`, largura, altura)
   if (!existe(scene, nome)) {
     const g = scene.make.graphics({}, false)
     desenhar(g)
-    const ok = pintar(scene, nome, x - folga, y - folga, largura + folga * 2, altura + folga * 2, g)
+    const ok = pintar(scene, nome, x - folga, y - folga, largura + folga * 2, altura + folga * 2, g, porCima)
     g.destroy()
     if (!ok) return false
   }

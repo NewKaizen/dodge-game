@@ -67,9 +67,19 @@ export default class BattleBox {
     this.faixaLigada = true // eventos que escurecem a caixa (apagão) desligam a faixa
     this.ajustarFaixa()
     this.filtrarFaixa = this.filtrarFaixa.bind(this)
+    // o filtro é incremental: uma volta inteira pela lista da cena na primeira vez, depois só os objetos
+    // que entraram nela desde o quadro anterior (o evento 'addedtoscene'); o resultado é o mesmo
+    this.faixaFeita = false
+    this.novosNaCena = []
+    this.aoEntrarNaCena = (o) => this.novosNaCena.push(o)
+    scene.events.on('addedtoscene', this.aoEntrarNaCena)
     scene.events.on('prerender', this.filtrarFaixa)
     // os eventos da cena sobrevivem ao restart: a caixa do co-op vive a cena toda
-    this.aoDesligarCena = () => scene.events.off('prerender', this.filtrarFaixa)
+    this.aoDesligarCena = () => {
+      scene.events.off('prerender', this.filtrarFaixa)
+      scene.events.off('addedtoscene', this.aoEntrarNaCena)
+      this.novosNaCena.length = 0
+    }
     scene.events.once('shutdown', this.aoDesligarCena)
 
     // Câmera com viewport do tamanho da caixa: o que for passado para
@@ -179,14 +189,24 @@ export default class BattleBox {
   // some junto quando alguém esconde a câmera da caixa, como a fita do replay),
   // e ignora tudo da cena que não foi aproximado — inclusive o que foi criado
   // neste quadro (HUD, efeitos, outros recortes)
+  // (incremental: ver o construtor. Filtra também com a faixa escondida, para a fila não crescer: dá no
+  // mesmo, porque quem entra na faixa depois passa por aproximar(), que tira o bit de novo)
   filtrarFaixa() {
     const cam = this.cameraFaixa
     cam.setVisible(this.faixaLigada && this.camera.visible)
-    if (!cam.visible) return
     const id = cam.id
-    for (const o of this.scene.children.list) {
+    const lista = this.scene.sys.displayList
+    const filtrar = (o) => {
       if (!(o.cameraFilter & id) && !this.naFaixa.has(o)) o.cameraFilter |= id
     }
+    const novos = this.novosNaCena
+    if (!this.faixaFeita) {
+      this.faixaFeita = true
+      for (const o of lista.list) filtrar(o)
+    } else {
+      for (let i = 0; i < novos.length; i++) if (novos[i].displayList === lista && novos[i].scene) filtrar(novos[i])
+    }
+    novos.length = 0
   }
 
   // Câmeras de recorte desta caixa e o retângulo (mundo) que cada uma mostra,

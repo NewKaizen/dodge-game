@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { criarFiltroCaixas } from '../recorte.js'
 import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, TEMPOS, ACELERACAO, fatorAceleracao, nivelAceleracao, parteDoFator } from '../constants.js'
 import Controles from '../controles.js'
 import { marcaDeAusencia, assinaturaDeAusencia, COR_AUSENCIA } from '../ausencia.js'
@@ -244,6 +245,7 @@ export default class PvpArenaN extends Phaser.Scene {
       if (botao === 'A') this.apertarA()
       else if (botao === 'B') this.apertarB()
     })
+    this.filtrarCaixas = criarFiltroCaixas(this) // recorte.js: só os objetos novos de cada quadro
     this.events.on('postupdate', this.filtrarCaixas, this)
     if (import.meta.env.DEV) window.pvpArenaN = this
     entrarNoJogo({ umJogador: true }) // sempre online: o meu buzzer e o meu HP vão a todo joystick deste PC
@@ -440,18 +442,6 @@ export default class PvpArenaN extends Phaser.Scene {
     this.dica = this.add.text(CENTRO_X, 466, '', { ...estilo(9, TEXTO.desabilitado), strokeThickness: 2 }).setOrigin(0.5).setDepth(40)
     // o anúncio DESENHADO de quem ataca quem (pvp/AnuncioAlvos.js): personagens + setas, sem texto
     this.anuncio = new AnuncioAlvos(this, { ids: this.ids })
-  }
-
-  filtrarCaixas() {
-    const caixas = this.caixasDeRecorte
-    if (!caixas?.length) return
-    const principal = this.cameras.main.id
-    let mascara = 0
-    for (const caixa of caixas) mascara |= caixa.camera.id
-    for (const o of this.children.list) {
-      if (o.cameraFilter & principal) continue
-      if ((o.cameraFilter & mascara) !== mascara) o.cameraFilter |= mascara
-    }
   }
 
   // ---------- utilidades ----------
