@@ -9,65 +9,86 @@
     300,
     300
   ],
-  "musica": "on",
+  "musica": "off",
   "metaPassoMs8x": 6,
   "cenas": {
     "menu": {
-      "passoMs": null
+      "passoMs": 4.4,
+      "fps": 59.4
     },
     "pvp-castelo": {
-      "passoMs": null
+      "passoMs": 7.1,
+      "fps": 58.9
     },
     "pvp-cafe": {
-      "passoMs": null
+      "passoMs": 9.2,
+      "fps": 45.3
     },
     "pvp-cidade": {
-      "passoMs": null
+      "passoMs": 11.9,
+      "fps": 38.3
     },
     "pvp-praia": {
-      "passoMs": null
+      "passoMs": 13,
+      "fps": 39.9
     },
     "pvp-chinatown": {
-      "passoMs": null
+      "passoMs": 9.6,
+      "fps": 48.3
     },
     "pvp-estacao": {
-      "passoMs": null
+      "passoMs": 8.3,
+      "fps": 53.1
     },
     "pvp-palco": {
-      "passoMs": null
+      "passoMs": 9.4,
+      "fps": 48.5
     },
     "pvp-escolha": {
-      "passoMs": null
+      "passoMs": 8.1,
+      "fps": 54
     },
     "coop-king": {
-      "passoMs": null
+      "passoMs": 9,
+      "fps": 54.3
     },
     "coop-queen": {
-      "passoMs": null
+      "passoMs": 9.8,
+      "fps": 52
     },
     "coop-jevil": {
-      "passoMs": null
+      "passoMs": 11.5,
+      "fps": 45.7
     },
     "coop-coronel": {
-      "passoMs": null
+      "passoMs": 15.3,
+      "fps": 39.3
     },
     "coop-escuridao": {
-      "passoMs": null
+      "passoMs": 10.1,
+      "fps": 52.5
     },
     "expedicao": {
-      "passoMs": null
+      "passoMs": 9.4,
+      "fps": 53.5
     },
     "galeria-estilos": {
-      "passoMs": null
+      "passoMs": 7.2,
+      "fps": 55.8
     },
     "galeria-efeitos": {
-      "passoMs": null
+      "passoMs": 3.7,
+      "fps": 60
     },
     "campanha-mapa": {
-      "passoMs": null
+      "passoMs": 2.3,
+      "fps": 60
     },
     "campanha-luta": {
-      "passoMs": null
+      "passoMs": 1.6,
+      "fps": 60
     }
-  }
+  },
+  "medidoEm": "2026-11-23",
+  "commit": "fdf3233"
 }

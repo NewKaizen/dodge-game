@@ -1,5 +1,7 @@
-import { pintarCeu } from './arteFundos.js'
+import { pintarCeu, assarNoLugar } from './arteFundos.js'
 import Phaser from 'phaser'
+import { assar, assarRegiao, texturaAssada, trocarAssada, trocarAssadaRegiao } from '../../arte/assar.js'
+import { RES } from '../../resolucao.js'
 import { LARGURA, ALTURA, CENTRO_X } from '../../constants.js'
 import { texturasPraiaCafe } from '../../arte/praiaCafe.js'
 import { ignorarNasCaixas } from '../../recorte.js'
@@ -16,6 +18,14 @@ import { ignorarNasCaixas } from '../../recorte.js'
 //   voando no céu.
 // O que tem brilho e movimento fica no alto, no vão do meio e nas laterais; atrás das caixas e
 // das cartas o mar e a areia são calmos (a arena ainda põe o véu da moldura por cima).
+//
+// DESEMPENHO (docs/desempenho.md, fase 1): o cenário era ~35 mil comandos de Graphics refeitos a
+// cada quadro. Agora o que é parado (céu, sol, nuvens, mar, ilha, veleiros, areia, guarda-sóis,
+// troncos) é textura assada (arte/assar.js); as fileiras de ondinhas são TileSprites (a crista
+// assada rola de lado e o recorte acompanha os trechos visíveis); as folhas dos coqueiros e as
+// gaivotas são quadros assados uma vez (a brisa e o bater de asas escolhem o quadro mais perto);
+// os brilhos na água e as bolinhas de espuma são Images. Só as três ondas grandes e a linha de
+// espuma da maré continuam Graphics (em faixas de triângulos, sem o earcut do fillPoints).
 
 const HORIZONTE = 98
 const CEU = [0x23408f, 0x2d52a6, 0x3d68b8, 0x5a82c8, 0x82a0d4, 0xb0b4d8, 0xe0b4c4, 0xf8b8a0, 0xffc890, 0xffd88c, 0xffe4a0]
@@ -72,6 +82,76 @@ function fronda(g, bx, by, ang, comp, queda, cor, corClara) {
   }
 }
 
+// faixa entre duas linhas de pontos (de cima e de baixo, mesma quantidade) em triângulos: o
+// fillPoints passaria o polígono pelo earcut a cada quadro
+function faixa(g, cima, baixo) {
+  for (let i = 0; i + 1 < cima.length; i++) {
+    const a = cima[i]
+    const b = cima[i + 1]
+    const c = baixo[i + 1]
+    const d = baixo[i]
+    g.fillTriangle(a.x, a.y, b.x, b.y, c.x, c.y)
+    g.fillTriangle(a.x, a.y, c.x, c.y, d.x, d.y)
+  }
+}
+
+// as fileiras de ondinhas: cristas que rolam de lado (TileSprite com a crista assada). O trecho
+// visível de cada fileira (o "pisca" que corre devagar e o recorte da areia) vira 1 a 3 pedaços
+const ONDINHA = { k: 0.03, periodos: 3, pedacos: 3 }
+const LARG_ONDINHA = Math.round((ONDINHA.periodos * Math.PI * 2) / ONDINHA.k) // 628 px: 3 cristas inteiras
+const K_ONDINHA = (ONDINHA.periodos * Math.PI * 2) / LARG_ONDINHA // o mesmo 0,03 (a emenda fecha)
+const VISIVEL = Math.asin(0.15) // sin(θ) > -0.15  <=>  θ (mod 2π) entre -VISIVEL e π + VISIVEL
+
+function fileira(r) {
+  const u = (r + 0.5) / FILEIRAS
+  return { u, yBase: HORIZONTE + 8 + u ** 1.6 * 218, largura: 1 + u * 1.4, alpha: 0.18 + u * 0.22, amp: 1.2 + u * 2.5 }
+}
+
+// os trechos [x0, x1] de 0 a LARGURA onde a fileira r aparece no tempo t (em ordem)
+function trechosDaFileira(r, t, y) {
+  const fase = r * 2.3 + t * 0.15
+  // o recorte da areia: a fileira some onde passa da linha da praia (enseada simétrica)
+  const folga = (praiaY(CENTRO_X) - 6 - y) / 176
+  if (folga <= 0) return []
+  const meia = CENTRO_X * Math.min(1, Math.sqrt(folga))
+  const c0 = CENTRO_X - meia
+  const c1 = CENTRO_X + meia
+  const lista = []
+  const periodo = (Math.PI * 2) / 0.011
+  // θ = 0,011 x + fase: começo dos trechos visíveis em x = (2πn - VISIVEL - fase) / 0,011
+  let n = Math.floor((0.011 * c0 + fase + VISIVEL) / (Math.PI * 2)) - 1
+  for (; ; n++) {
+    const a = (Math.PI * 2 * n - VISIVEL - fase) / 0.011
+    if (a > c1) break
+    const b = a + (Math.PI + 2 * VISIVEL) / 0.011
+    const x0 = Math.max(c0, a)
+    const x1 = Math.min(c1, b)
+    if (x1 - x0 > 1) lista.push([x0, x1])
+    if (a > c1 + periodo) break
+  }
+  return lista
+}
+
+// O construtor do TileSprite sorteia um nome (UUID, com Math.random) para a textura do modo Canvas. O
+// cenário não pode gastar sorteios do Math.random da cena (mudaria tudo o que vem depois: os tremores
+// de câmera, as faíscas...), então o nome sai de uma sequência própria
+let sorteiosProprios = 0
+function semSortear(criar) {
+  const original = Math.random
+  Math.random = () => ((++sorteiosProprios * 0.6180339887498949) % 1)
+  try {
+    return criar()
+  } finally {
+    Math.random = original
+  }
+}
+
+// a brisa dos coqueiros vai de -BRISA_MAX a BRISA_MAX: QUADROS_BRISA folhagens assadas
+const BRISA_MAX = 0.07 + 0.025
+const QUADROS_BRISA = 25
+// o bater de asas das gaivotas (sin de -1 a 1): QUADROS_ASA desenhos assados
+const QUADROS_ASA = 13
+
 export default function praia(scene, objetos) {
   texturasPraiaCafe(scene)
   const sorte = sorteador(11)
@@ -79,25 +159,31 @@ export default function praia(scene, objetos) {
     objetos.push(o)
     return o.setDepth(-10)
   }
+  // um Graphics parado vira textura assada no mesmo lugar (região nas coordenadas locais dele)
+  const parado = (g, chave, regiao) => assarNoLugar(scene, objetos, g, `praia-${chave}`, regiao)
 
   // ---------- céu ----------
   const ceu = add(scene.add.graphics())
   pintarCeu(ceu, CEU, LARGURA, HORIZONTE)
+  parado(ceu, 'ceu', { x: 0, y: 0, largura: LARGURA, altura: HORIZONTE + 2 })
 
   // ---------- sol ----------
   const halo = add(scene.add.image(SOL.x, SOL.y, 'arte-brilho').setTint(0xffd070).setBlendMode(Phaser.BlendModes.ADD).setScale(5.2).setAlpha(0.55))
   const halo2 = add(scene.add.image(SOL.x, SOL.y, 'arte-brilho').setTint(0xff8a50).setBlendMode(Phaser.BlendModes.ADD).setScale(9).setAlpha(0.25))
-  const raios = add(scene.add.graphics({ x: SOL.x, y: SOL.y }))
+  const gRaios = add(scene.add.graphics({ x: SOL.x, y: SOL.y }))
   for (let k = 0; k < 14; k++) {
     const a = (k / 14) * Math.PI * 2
     const comp = SOL.r * (k % 2 ? 1.7 : 2.3)
-    raios.fillStyle(0xfff0b0, k % 2 ? 0.35 : 0.5)
-    raios.fillTriangle(Math.cos(a - 0.1) * SOL.r, Math.sin(a - 0.1) * SOL.r, Math.cos(a + 0.1) * SOL.r, Math.sin(a + 0.1) * SOL.r, Math.cos(a) * comp, Math.sin(a) * comp)
+    gRaios.fillStyle(0xfff0b0, k % 2 ? 0.35 : 0.5)
+    gRaios.fillTriangle(Math.cos(a - 0.1) * SOL.r, Math.sin(a - 0.1) * SOL.r, Math.cos(a + 0.1) * SOL.r, Math.sin(a + 0.1) * SOL.r, Math.cos(a) * comp, Math.sin(a) * comp)
   }
+  const raios = parado(gRaios, 'raios', { x: -58, y: -58, largura: 116, altura: 116 })
+  const escalaRaios = raios.scaleX // a Image assada já vem com 1 / RES.escala
   const disco = add(scene.add.graphics({ x: SOL.x, y: SOL.y }))
   disco.fillStyle(0xffb04a, 1).fillCircle(0, 0, SOL.r)
   disco.fillStyle(0xffd86a, 1).fillCircle(0, 0, SOL.r - 2.5)
   disco.fillStyle(0xfff4b8, 1).fillCircle(-3, -3, SOL.r - 9)
+  parado(disco, 'sol', { x: -SOL.r - 1, y: -SOL.r - 1, largura: SOL.r * 2 + 2, altura: SOL.r * 2 + 2 })
 
   // ---------- nuvens ----------
   const nuvens = Array.from({ length: 6 }, (_, i) => {
@@ -110,10 +196,12 @@ export default function praia(scene, objetos) {
         g.fillEllipse(fx * larg, dy - Math.cos(fx * Math.PI) * 5, larg * 0.42, 12 - Math.abs(fx) * 6)
       }
     }
-    return { g, x: ((i * 160 + sorte() * 80) % (LARGURA + 140)) - 70, y: 22 + sorte() * 62, v: 2 + sorte() * 3, larg }
+    const meia = Math.ceil(larg * 0.71) + 2
+    const img = parado(g, `nuvem-${i}`, { x: -meia, y: -16, largura: meia * 2, altura: 30 })
+    return { g: img, x: ((i * 160 + sorte() * 80) % (LARGURA + 140)) - 70, y: 22 + sorte() * 62, v: 2 + sorte() * 3, larg }
   })
 
-  // ---------- mar (base) ----------
+  // ---------- mar (base) e a ilha ao longe (lado direito, fora da caixa) ----------
   const mar = add(scene.add.graphics())
   const nMar = MAR.length
   const alturaMar = 320 - HORIZONTE
@@ -124,25 +212,23 @@ export default function praia(scene, objetos) {
   })
   mar.fillStyle(MAR[nMar - 1], 1).fillRect(0, 320, LARGURA, ALTURA - 320)
   mar.fillStyle(0xfff4d0, 0.9).fillRect(0, HORIZONTE, LARGURA, 1) // a linha do horizonte, luminosa
+  mar.fillStyle(0x4f6aa8, 1).fillTriangle(764, HORIZONTE, 790, HORIZONTE - 13, 818, HORIZONTE)
+  mar.fillStyle(0x4f6aa8, 1).fillTriangle(800, HORIZONTE, 826, HORIZONTE - 9, 852, HORIZONTE)
+  mar.fillStyle(0x6a82bc, 1).fillTriangle(776, HORIZONTE, 790, HORIZONTE - 13, 794, HORIZONTE)
+  mar.fillStyle(0x38604e, 1).fillRect(788, HORIZONTE - 16, 1, 4)
+  parado(mar, 'mar', { x: 0, y: HORIZONTE - 18, largura: LARGURA, altura: ALTURA - HORIZONTE + 18 })
 
-  // ilha ao longe (lado direito, fora da caixa)
-  const ilha = add(scene.add.graphics())
-  ilha.fillStyle(0x4f6aa8, 1).fillTriangle(764, HORIZONTE, 790, HORIZONTE - 13, 818, HORIZONTE)
-  ilha.fillStyle(0x4f6aa8, 1).fillTriangle(800, HORIZONTE, 826, HORIZONTE - 9, 852, HORIZONTE)
-  ilha.fillStyle(0x6a82bc, 1).fillTriangle(776, HORIZONTE, 790, HORIZONTE - 13, 794, HORIZONTE)
-  ilha.fillStyle(0x38604e, 1).fillRect(788, HORIZONTE - 16, 1, 4)
-
-  // brilhos do sol na água (um caminho de pontinhos que piscam)
+  // brilhos do sol na água (um caminho de pontinhos que piscam): Images (o Rectangle era refeito a cada quadro)
   const brilhos = Array.from({ length: 30 }, () => {
     const p = sorte()
     const y = HORIZONTE + 3 + p ** 1.5 * 190
     const largura = 4 + p * 26
-    const r = add(scene.add.rectangle(SOL.x + (sorte() - 0.5) * (30 + p * 120), y, largura, 1.6 + p, 0xfff0b8))
+    const r = add(scene.add.image(SOL.x + (sorte() - 0.5) * (30 + p * 120), y, '__WHITE').setDisplaySize(largura, 1.6 + p).setTint(0xfff0b8))
     return { r, fase: sorte() * 10, v: 1.5 + sorte() * 3, x0: r.x, y0: y }
   })
 
   // ---------- veleiros (um grande e um pequeno ao longe) ----------
-  const veleiro = (escala, vela) => {
+  const veleiro = (escala, vela, chave) => {
     const g = add(scene.add.graphics())
     // casco
     g.fillStyle(0x6a3a22, 1).fillTriangle(-16, -2, 16, -2, 10, 5)
@@ -154,18 +240,47 @@ export default function praia(scene, objetos) {
     g.fillStyle(misturar(vela, 0xffffff, 0.45), 1).fillTriangle(-1, -30, -1, -6, -12, -6)
     g.fillStyle(0xff5a4a, 1).fillTriangle(0, -35, 0, -31, 6, -33)
     g.setScale(escala)
-    return g
+    return parado(g, chave, { x: -18, y: -37, largura: 36, altura: 44 })
   }
   const barcos = [
-    { g: veleiro(1, 0xfff4e4), x: 220, y: HORIZONTE + 5, v: 3.2 },
-    { g: veleiro(0.55, 0xffd0c0), x: 640, y: HORIZONTE + 2, v: -1.8 },
+    { g: veleiro(1, 0xfff4e4, 'veleiro-0'), x: 220, y: HORIZONTE + 5, v: 3.2 },
+    { g: veleiro(0.55, 0xffd0c0, 'veleiro-1'), x: 640, y: HORIZONTE + 2, v: -1.8 },
   ]
 
-  // ---------- ondas (redesenhadas todo quadro) ----------
+  // ---------- ondas ----------
+  // as fileiras de ondinhas: a crista de cada uma assada numa tira que repete (3 cristas), mostrada
+  // em até 3 pedaços de TileSprite (os trechos visíveis); a tira rola junto com a fase da onda
+  const fileiras = Array.from({ length: FILEIRAS }, (_, r) => {
+    const f = fileira(r)
+    const alto = Math.ceil(f.amp * 2 + f.largura + 4)
+    const chave = texturaAssada(scene, `praia-ondinha-${r}`, LARG_ONDINHA, alto, (g) => {
+      // a crista sen(K x) de uma ponta à outra (passa um pouco das bordas: a emenda fecha)
+      g.lineStyle(f.largura, 0xe8fbff, 1)
+      g.beginPath()
+      for (let x = -4; x <= LARG_ONDINHA + 4; x += 2) {
+        const y = Math.sin(x * K_ONDINHA) * f.amp
+        if (x === -4) g.moveTo(x - LARG_ONDINHA / 2, y)
+        else g.lineTo(x - LARG_ONDINHA / 2, y)
+      }
+      g.strokePath()
+    }, { folga: 0 })
+    const pedacos = chave
+      ? Array.from({ length: ONDINHA.pedacos }, () => add(semSortear(() => scene.add.tileSprite(0, 0, 8, alto, chave)).setOrigin(0, 0.5).setAlpha(f.alpha).setVisible(false)))
+      : []
+    for (const p of pedacos) p.setTileScale(1 / RES.escala)
+    return { ...f, r, alto, pedacos }
+  })
+  // bolinhas de espuma (as da onda quebrando, por cima das ondas, e as da areia molhada, por cima da
+  // linha de espuma): Images de um ponto assado no lugar dos fillCircle
+  const ponto = texturaAssada(scene, 'praia-ponto', 8, 8, (g) => g.fillStyle(0xffffff, 1).fillCircle(0, 0, 4), { folga: 0 })
+  const pool = (n) => (ponto ? Array.from({ length: n }, () => add(scene.add.image(0, 0, ponto).setVisible(false))) : [])
   const ondas = add(scene.add.graphics())
+  const bolinhasOnda = pool(90)
   const espuma = add(scene.add.graphics())
+  const bolinhasAreia = pool(40)
+  const escalaPonto = bolinhasAreia[0]?.scaleX ?? 1
 
-  // ---------- praia ----------
+  // ---------- praia: areia, conchas, estrelas-do-mar, guarda-sóis, toalhas e baldinho ----------
   const areia = add(scene.add.graphics())
   const topo = []
   for (let x = 0; x <= LARGURA; x += 6) topo.push({ x, y: praiaY(x) })
@@ -205,8 +320,8 @@ export default function praia(scene, objetos) {
   estrela(830, 280, 0xffb05a)
   estrela(430, 370, 0xff7a6a)
 
-  // ---------- guarda-sóis, toalhas, baldinho ----------
-  const cena = add(scene.add.graphics())
+  // (na mesma textura da areia: estavam logo acima dela, num Graphics parado)
+  const cena = areia
   const toalha = (x, y, w, h, c1, c2) => {
     cena.fillStyle(0x000000, 0.18).fillRect(x + 2, y + 2, w, h)
     for (let k = 0; k < w; k += 6) cena.fillStyle(k % 12 ? c1 : c2, 1).fillRect(x + k, y, 6, h)
@@ -252,12 +367,22 @@ export default function praia(scene, objetos) {
   cena.fillStyle(0xfff4e8, 1).fillEllipse(528, 330, 11, 44)
   cena.fillStyle(0x38c8e0, 1).fillRect(526, 316, 4, 28)
   cena.fillStyle(0xff7a5a, 1).fillRect(523, 331, 10, 3)
+  parado(areia, 'areia', { x: 0, y: 160, largura: LARGURA, altura: ALTURA - 160 })
 
   // ---------- coqueiros (laterais) ----------
+  const FOLHAS = [
+    { ang: -2.7, comp: 62, queda: 1.0 },
+    { ang: -2.1, comp: 66, queda: 0.7 },
+    { ang: -1.5, comp: 58, queda: 0.25 },
+    { ang: -0.95, comp: 66, queda: 0.7 },
+    { ang: -0.4, comp: 62, queda: 1.0 },
+    { ang: 0.2, comp: 52, queda: 1.3 },
+    { ang: 2.95, comp: 52, queda: 1.3 },
+  ]
   const palmeiras = [
     { x0: 28, y0: 262, cx: 74, cy: 176, tx: 62, ty: 104, escala: 1, lado: 1 },
     { x0: 826, y0: 270, cx: 786, cy: 178, tx: 794, ty: 110, escala: 0.95, lado: -1 },
-  ].map((p) => {
+  ].map((p, n) => {
     const tronco = add(scene.add.graphics())
     // tronco curvo (quadrática), mais grosso embaixo, com anéis
     const pts = []
@@ -278,18 +403,23 @@ export default function praia(scene, objetos) {
     tronco.fillStyle(0x000000, 0.2).fillEllipse(p.x0 + 6 * p.lado, p.y0 + 4, 60, 10)
     tronco.fillStyle(0x5a3a1a, 1)
     for (const [dx, dy] of [[-4, 4], [3, 6], [6, 2]]) tronco.fillCircle(p.tx + dx, p.ty + dy, 3.4)
-    const folhas = add(scene.add.graphics())
-    return { ...p, folhas }
+    const x0 = Math.min(p.x0, p.cx, p.tx) - 40
+    const x1 = Math.max(p.x0, p.cx, p.tx) + 40
+    parado(tronco, `tronco-${n}`, { x: x0, y: p.ty - 8, largura: x1 - x0, altura: p.y0 + 16 - p.ty })
+    // a folhagem: um desenho por nível de brisa (QUADROS_BRISA), assado na primeira vez
+    const regiao = { x: p.tx - 84, y: p.ty - 82, largura: 168, altura: 170 }
+    const desenhar = (q) => (g) => {
+      const brisa = -BRISA_MAX + (q / (QUADROS_BRISA - 1)) * BRISA_MAX * 2
+      FOLHAS.forEach((f, i) => {
+        const ang = (p.lado < 0 ? Math.PI - f.ang : f.ang) + brisa * (p.lado < 0 ? -1 : 1) * (1 + (i % 3) * 0.3)
+        fronda(g, p.tx, p.ty, ang, f.comp * p.escala, f.queda + brisa * 2, i % 2 ? 0x2f8a3a : 0x3aa046, 0x8ae070)
+      })
+    }
+    const chave = (q) => `praia-folhas-${n}-${q}`
+    const folhas = assarRegiao(scene, chave(0), regiao, desenhar(0))
+    if (folhas) add(folhas)
+    return { ...p, folhas: folhas ?? add(scene.add.graphics()), regiao, desenhar, chave, quadro: -1 }
   })
-  const FOLHAS = [
-    { ang: -2.7, comp: 62, queda: 1.0 },
-    { ang: -2.1, comp: 66, queda: 0.7 },
-    { ang: -1.5, comp: 58, queda: 0.25 },
-    { ang: -0.95, comp: 66, queda: 0.7 },
-    { ang: -0.4, comp: 62, queda: 1.0 },
-    { ang: 0.2, comp: 52, queda: 1.3 },
-    { ang: 2.95, comp: 52, queda: 1.3 },
-  ]
 
   // ---------- caranguejo (andando de lado pela areia da frente) ----------
   const caranguejo = add(scene.add.sprite(-30, 362, 'praia-caranguejo', 'c0').setScale(2.2))
@@ -297,34 +427,55 @@ export default function praia(scene, objetos) {
   const estadoCaranguejo = { x: -30, dir: 1, pausa: 0, velocidade: 24, pinca: 0 }
 
   // ---------- gaivotas ----------
-  const gaivotas = Array.from({ length: 5 }, (_, i) => ({
-    g: add(scene.add.graphics()),
-    x: sorte() * LARGURA,
-    y: 30 + sorte() * 70,
-    v: (i % 2 ? -1 : 1) * (14 + sorte() * 12),
-    fase: sorte() * 10,
-    escala: 0.8 + sorte() * 0.6,
-  }))
+  // o desenho de uma gaivota (escala 1, olhando para a direita) com as asas no ponto `bate` (-1 a 1)
+  const pintarGaivota = (bate) => (g) => {
+    g.lineStyle(2.2, 0xfdfdff, 1)
+    for (const lado of [-1, 1]) {
+      const pontaY = -6 - bate * 5
+      g.beginPath()
+      g.moveTo(0, 0)
+      g.lineTo(lado * 7, -5 - bate * 3)
+      g.lineTo(lado * 15, pontaY + 3)
+      g.strokePath()
+    }
+    g.fillStyle(0xffffff, 1).fillEllipse(0, 1, 7, 3.6)
+    g.fillStyle(0xf0a830, 1).fillTriangle(3.4, 0, 6.4, 0.6, 3.4, 1.6)
+  }
+  const batida = (q) => -1 + (q / (QUADROS_ASA - 1)) * 2
+  const gaivotas = Array.from({ length: 5 }, (_, i) => {
+    const gv = {
+      x: sorte() * LARGURA,
+      y: 30 + sorte() * 70,
+      v: (i % 2 ? -1 : 1) * (14 + sorte() * 12),
+      fase: sorte() * 10,
+      escala: 0.8 + sorte() * 0.6,
+      quadro: -1,
+    }
+    gv.img = assar(scene, 'praia-gaivota-0', 34, 26, pintarGaivota(batida(0)))
+    gv.g = gv.img ? add(gv.img) : add(scene.add.graphics())
+    gv.escalaBase = gv.img?.scaleX ?? 1
+    return gv
+  })
   const desenharGaivota = (gv, t) => {
-    const g = gv.g
-    g.clear()
     const bate = Math.sin(t * 5 + gv.fase)
     const e = gv.escala
     const dir = Math.sign(gv.v)
     const x = gv.x
     const y = gv.y + Math.sin(t * 0.9 + gv.fase) * 5
-    // asas em "M" batendo; corpo branco e bico amarelo
-    g.lineStyle(2.2 * e, 0xfdfdff, 1)
-    for (const lado of [-1, 1]) {
-      const pontaY = y - 6 * e - bate * 5 * e
-      g.beginPath()
-      g.moveTo(x, y)
-      g.lineTo(x + lado * 7 * e, y - 5 * e - bate * 3 * e)
-      g.lineTo(x + lado * 15 * e, pontaY + 3 * e)
-      g.strokePath()
+    if (!gv.img) {
+      // sem textura: o desenho de sempre, deslocado e na escala
+      const g = gv.g
+      g.clear()
+      g.setPosition(x, y).setScale(e * dir, e)
+      pintarGaivota(bate)(g)
+      return
     }
-    g.fillStyle(0xffffff, 1).fillEllipse(x, y + 1, 7 * e, 3.6 * e)
-    g.fillStyle(0xf0a830, 1).fillTriangle(x + dir * 3.4 * e, y, x + dir * 6.4 * e, y + 0.6 * e, x + dir * 3.4 * e, y + 1.6 * e)
+    const q = Math.round(((bate + 1) / 2) * (QUADROS_ASA - 1))
+    if (q !== gv.quadro) {
+      gv.quadro = q
+      trocarAssada(gv.img, scene, `praia-gaivota-${q}`, 34, 26, pintarGaivota(batida(q)))
+    }
+    gv.img.setPosition(x, y).setScale(gv.escalaBase * e).setFlipX(dir < 0)
   }
 
   let ignorado = false
@@ -342,7 +493,7 @@ export default function praia(scene, objetos) {
       const p = Math.sin(t * 0.8)
       halo.setScale(5.2 + p * 0.25).setAlpha(0.5 + p * 0.06)
       halo2.setScale(9 + p * 0.3)
-      raios.setRotation(t * 0.07).setScale(1 + p * 0.05)
+      raios.setRotation(t * 0.07).setScale(escalaRaios * (1 + p * 0.05))
       for (const n of nuvens) {
         n.x += n.v * seg
         if (n.x - n.larg > LARGURA + 20) n.x = -n.larg - 20
@@ -360,29 +511,27 @@ export default function praia(scene, objetos) {
       }
 
       // ---------- ondas ----------
+      // fileiras de ondinhas (cristas curtas que sobem e descem devagar): y = yBase + amp·sen(0,03x + fase) + bob
+      for (const f of fileiras) {
+        const fase = t * (0.5 + f.u * 0.35) + f.r * 1.7
+        const y = f.yBase + Math.sin(t * 0.7 + f.r) * 1.5
+        const trechos = trechosDaFileira(f.r, t, y)
+        // a tira tem sen(K x'): no x do mundo a crista é sen(0,03 x + fase) => x' = x + fase / K
+        const rolar = (x0) => ((((x0 + fase / K_ONDINHA) % LARG_ONDINHA) + LARG_ONDINHA) % LARG_ONDINHA) * RES.escala
+        f.pedacos.forEach((pd, i) => {
+          const tr = trechos[i]
+          if (!tr) return pd.setVisible(false)
+          pd.setVisible(true).setPosition(tr[0], y).setSize(tr[1] - tr[0], f.alto)
+          pd.tilePositionX = rolar(tr[0])
+        })
+      }
       ondas.clear()
       espuma.clear()
-      // fileiras de ondinhas (cristas curtas que sobem e descem devagar)
-      for (let r = 0; r < FILEIRAS; r++) {
-        const u = (r + 0.5) / FILEIRAS
-        const yBase = HORIZONTE + 8 + u ** 1.6 * 218
-        const largura = 1 + u * 1.4
-        ondas.lineStyle(largura, 0xe8fbff, 0.18 + u * 0.22)
-        const fase = t * (0.5 + u * 0.35) + r * 1.7
-        let pen = false
-        for (let x = 0; x <= LARGURA; x += 8) {
-          const y = yBase + Math.sin(x * 0.03 + fase) * (1.2 + u * 2.5) + Math.sin(t * 0.7 + r) * 1.5
-          const visivel = Math.sin(x * 0.011 + r * 2.3 + t * 0.15) > -0.15 && y < praiaY(x) - 6
-          if (visivel) {
-            if (!pen) ondas.beginPath().moveTo(x, y)
-            else ondas.lineTo(x, y)
-            pen = true
-          } else if (pen) {
-            ondas.strokePath()
-            pen = false
-          }
-        }
-        if (pen) ondas.strokePath()
+      const nb = [0, 0]
+      const bolinha = (lista, k, g, x, y, r, alpha) => {
+        const b = lista[nb[k]++]
+        if (!b) return g.fillStyle(0xffffff, alpha).fillCircle(x, y, r)
+        b.setVisible(true).setPosition(x, y).setScale(escalaPonto * (r / 4)).setAlpha(alpha)
       }
       // ondas grandes: do horizonte até a areia, seguindo a curva da praia
       for (let w = 0; w < ONDAS_GRANDES; w++) {
@@ -398,7 +547,7 @@ export default function praia(scene, objetos) {
         const alfa = Math.min(1, prog * 5) * Math.min(1, (1 - prog) * 5)
         // o corpo da onda: faixa azul-clara (a face) e a crista branca em cima
         ondas.fillStyle(0x7ae8f0, 0.22 * alfa)
-        ondas.fillPoints([...pontos, ...pontos.map((pt) => ({ x: pt.x, y: pt.y + alturaOnda })).reverse()], true)
+        faixa(ondas, pontos, pontos.map((pt) => ({ x: pt.x, y: pt.y + alturaOnda })))
         ondas.lineStyle(1.5 + prog * 2.5, 0xffffff, 0.75 * alfa)
         ondas.strokePoints(pontos)
         ondas.lineStyle(1, 0xffffff, 0.35 * alfa)
@@ -408,7 +557,7 @@ export default function praia(scene, objetos) {
           const k = (prog - 0.62) / 0.38
           for (let i = 0; i < pontos.length; i += 2) {
             const pt = pontos[i]
-            if (Math.sin(i * 1.7 + w * 3) > 0.1) espuma.fillStyle(0xffffff, 0.55 * k * alfa).fillCircle(pt.x, pt.y + Math.sin(t * 3 + i) * 1.2, 1.5 + k * 2)
+            if (Math.sin(i * 1.7 + w * 3) > 0.1) bolinha(bolinhasOnda, 0, ondas, pt.x, pt.y + Math.sin(t * 3 + i) * 1.2, 1.5 + k * 2, 0.55 * k * alfa)
           }
         }
       }
@@ -416,25 +565,29 @@ export default function praia(scene, objetos) {
       const mare = Math.sin(t * 0.55) * 0.5 + 0.5
       const espumaPts = []
       for (let x = 0; x <= LARGURA; x += 6) espumaPts.push({ x, y: praiaY(x) + mare * 9 + Math.sin(x * 0.045 + t * 1.3) * 1.8 })
-      espuma.fillStyle(0xbdf4f6, 0.4).fillPoints([...espumaPts.map((pt) => ({ x: pt.x, y: pt.y - 8 })), ...espumaPts.slice().reverse()], true)
+      espuma.fillStyle(0xbdf4f6, 0.4)
+      faixa(espuma, espumaPts.map((pt) => ({ x: pt.x, y: pt.y - 8 })), espumaPts)
       espuma.lineStyle(2, 0xffffff, 0.85).strokePoints(espumaPts)
       espuma.lineStyle(1, 0xffffff, 0.45).strokePoints(espumaPts.map((pt) => ({ x: pt.x, y: pt.y + 5 + Math.sin(pt.x * 0.08 + t) * 1.2 })))
       // bolhinhas de espuma na areia molhada
       for (let i = 0; i < 40; i++) {
         const x = (i * 97.3 + 13) % LARGURA
         const y = praiaY(x) + 4 + mare * 8 + ((i * 7) % 9)
-        espuma.fillStyle(0xffffff, 0.3 + 0.2 * Math.sin(t * 2 + i)).fillCircle(x, y, 1)
+        bolinha(bolinhasAreia, 1, espuma, x, y, 1, 0.3 + 0.2 * Math.sin(t * 2 + i))
       }
+      for (let i = nb[0]; i < bolinhasOnda.length; i++) bolinhasOnda[i].setVisible(false)
+      for (let i = nb[1]; i < bolinhasAreia.length; i++) bolinhasAreia[i].setVisible(false)
 
-      // ---------- coqueiros ----------
+      // ---------- coqueiros: a folhagem do nível de brisa mais perto ----------
       for (const pm of palmeiras) {
-        const g = pm.folhas
-        g.clear()
         const brisa = Math.sin(t * 1.2 + pm.x0 * 0.01) * 0.07 + Math.sin(t * 2.3 + pm.x0) * 0.025
-        FOLHAS.forEach((f, i) => {
-          const ang = (pm.lado < 0 ? Math.PI - f.ang : f.ang) + brisa * (pm.lado < 0 ? -1 : 1) * (1 + (i % 3) * 0.3)
-          fronda(g, pm.tx, pm.ty, ang, f.comp * pm.escala, f.queda + brisa * 2, i % 2 ? 0x2f8a3a : 0x3aa046, 0x8ae070)
-        })
+        const q = Math.round(((brisa + BRISA_MAX) / (BRISA_MAX * 2)) * (QUADROS_BRISA - 1))
+        if (q === pm.quadro) continue
+        pm.quadro = q
+        if (pm.folhas instanceof Phaser.GameObjects.Graphics) {
+          pm.folhas.clear()
+          pm.desenhar(q)(pm.folhas)
+        } else trocarAssadaRegiao(scene, pm.folhas, pm.chave(q), pm.regiao, pm.desenhar(q))
       }
 
       // ---------- caranguejo ----------

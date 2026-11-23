@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { LARGURA, ALTURA, CENTRO_X } from '../../constants.js'
 import { criarSorte, criarTextura, css, retArredondado } from './arteFundos.js'
+import { assar, texturaAssada } from '../../arte/assar.js'
 
 // CHINATOWN: uma rua de festa à noite. Camadas, de trás para a frente:
 //   - o céu (lua cheia grande, estrelas) com nuvenzinhas rasgadas que passam devagar;
@@ -442,8 +443,19 @@ export default function chinatown(scene, objetos) {
   add(scene.add.image(0, 0, texturaCeu(scene)).setOrigin(0))
 
   // nuvenzinhas rasgadas (elipses translúcidas), passando devagar
-  const gNuvens = add(scene.add.graphics())
+  // (cada nuvem é uma textura assada que anda; antes um Graphics redesenhado a cada quadro)
   const nuvens = Array.from({ length: 6 }, (_, i) => ({ x: i * 160, y: 60 + (i % 3) * 38, w: 90 + (i % 4) * 30, v: 4 + (i % 3) * 2.5 }))
+  for (const n of nuvens) {
+    const desenhar = (g) => {
+      g.fillStyle(0x6a3a6a, 0.22)
+      g.fillEllipse(0, 0, n.w, 9)
+      g.fillStyle(0x9a5a8a, 0.14)
+      g.fillEllipse(10, -3, n.w * 0.6, 6)
+    }
+    n.img = assar(scene, `chinatown-nuvem-${n.w}`, n.w + 22, 14, desenhar)
+    if (n.img) add(n.img)
+    else desenhar((n.g = add(scene.add.graphics())))
+  }
 
   add(scene.add.image(0, 0, texturaCenario(scene)).setOrigin(0))
 
@@ -475,8 +487,12 @@ export default function chinatown(scene, objetos) {
     { x: LARGURA - 128 + 24, y: 366 }, { x: LARGURA - 128 + 62, y: 366 }, { x: LARGURA - 128 + 94, y: 366 },
     { x: 262, y: CHAO_Y + 30 }, { x: 590, y: CHAO_Y + 36 },
   ]
-  const gVapor = add(scene.add.graphics())
+  // as bolinhas de vapor: Images de um disco assado (eram 70 fillCircle por quadro)
+  const disco = texturaAssada(scene, 'chinatown-disco', 32, 32, (g) => g.fillStyle(0xffffff, 1).fillCircle(0, 0, 16), { folga: 0 })
+  const gVapor = disco ? null : add(scene.add.graphics())
   const vapor = Array.from({ length: 70 }, (_, i) => ({ f: i % fontes.length, idade: (i * 331) % 3000, vida: 2600 + ((i * 97) % 1200), dx: ((i * 53) % 40) - 20 }))
+  if (disco) for (const p of vapor) p.img = add(scene.add.image(0, 0, disco).setTint(0xe8dcea))
+  const escalaDisco = vapor[0].img?.scaleX ?? 1
 
   // dragão da festa
   const gDragao = add(scene.add.graphics())
@@ -491,7 +507,10 @@ export default function chinatown(scene, objetos) {
   ].map((f) => ({ ...f, lanternas: Array.from({ length: f.n }, (_, k) => ({ img: add(scene.add.image(0, 0, lanternaTex).setScale(0.8 + (k % 3) * 0.1).setOrigin(0.5, 0.18)), u: (k + 0.5) / f.n, fase: k * 1.37 + f.fase })) }))
 
   // fogos de artifício
-  const gFogos = add(scene.add.graphics())
+  // fogos: as faíscas e o clarão são Images (pool), sem Graphics por quadro
+  const gFogos = disco ? null : add(scene.add.graphics())
+  const faiscas = disco ? Array.from({ length: 26 * 3 }, () => add(scene.add.image(0, 0, '__WHITE').setOrigin(0).setDisplaySize(2.2, 2.2).setVisible(false))) : []
+  const claroes = disco ? Array.from({ length: 3 }, () => add(scene.add.image(0, 0, disco).setVisible(false))) : []
   let fogos = []
   let proximoFogo = 4000
 
@@ -545,14 +564,10 @@ export default function chinatown(scene, objetos) {
     atualizar(dt, estado) {
       const t = estado.tempo
       // nuvens
-      gNuvens.clear()
       for (const n of nuvens) {
         n.x += (n.v * dt) / 1000
         if (n.x > LARGURA + n.w) n.x = -n.w
-        gNuvens.fillStyle(0x6a3a6a, 0.22)
-        gNuvens.fillEllipse(n.x, n.y, n.w, 9)
-        gNuvens.fillStyle(0x9a5a8a, 0.14)
-        gNuvens.fillEllipse(n.x + 10, n.y - 3, n.w * 0.6, 6)
+        ;(n.img ?? n.g).setPosition(n.x, n.y)
       }
 
       // néons: piscam de leve; o do defeito falha de vez em quando
@@ -593,7 +608,7 @@ export default function chinatown(scene, objetos) {
       }
 
       // vapor
-      gVapor.clear()
+      gVapor?.clear()
       for (const p of vapor) {
         p.idade += dt
         if (p.idade > p.vida) p.idade -= p.vida
@@ -601,8 +616,12 @@ export default function chinatown(scene, objetos) {
         const f = fontes[p.f]
         const x = f.x + p.dx * u + Math.sin(p.idade / 400 + p.f) * 5 * u
         const y = f.y - u * (f.y > 340 ? 54 : 70)
-        gVapor.fillStyle(0xe8dcea, 0.2 * (1 - u) * Math.min(1, u * 5))
-        gVapor.fillCircle(x, y, 4 + u * 11)
+        const alpha = 0.2 * (1 - u) * Math.min(1, u * 5)
+        if (p.img) p.img.setPosition(x, y).setScale(escalaDisco * ((4 + u * 11) / 16)).setAlpha(alpha)
+        else {
+          gVapor.fillStyle(0xe8dcea, alpha)
+          gVapor.fillCircle(x, y, 4 + u * 11)
+        }
       }
 
       desenharDragao(t)
@@ -616,20 +635,29 @@ export default function chinatown(scene, objetos) {
         const y = 84 + sorte() * 70
         fogos.push({ x, y, cor, idade: 0, p: Array.from({ length: 26 }, (_, i) => ({ a: (i / 26) * Math.PI * 2 + sorte() * 0.2, v: 50 + sorte() * 30 })) })
       }
-      gFogos.clear()
+      gFogos?.clear()
+      let nf = 0
+      let nc = 0
       for (const f of fogos) {
         f.idade += dt
         const u = f.idade / 1500
         for (const p of f.p) {
-          gFogos.fillStyle(f.cor, Math.max(0, 1 - u) * 0.9)
           const r = p.v * (1 - (1 - Math.min(1, u * 1.4)) ** 2)
-          gFogos.fillRect(f.x + Math.cos(p.a) * r, f.y + Math.sin(p.a) * r + u * u * 26, 2.2, 2.2)
+          const fx = f.x + Math.cos(p.a) * r
+          const fy = f.y + Math.sin(p.a) * r + u * u * 26
+          const img = faiscas[nf++]
+          if (img) img.setVisible(true).setPosition(fx, fy).setTint(f.cor).setAlpha(Math.max(0, 1 - u) * 0.9)
+          else if (gFogos) gFogos.fillStyle(f.cor, Math.max(0, 1 - u) * 0.9).fillRect(fx, fy, 2.2, 2.2)
         }
         if (u < 0.18) {
-          gFogos.fillStyle(0xffffff, 0.6 * (1 - u / 0.18))
-          gFogos.fillCircle(f.x, f.y, 18 * (1 - u / 0.18) + 2)
+          const raio = 18 * (1 - u / 0.18) + 2
+          const img = claroes[nc++]
+          if (img) img.setVisible(true).setPosition(f.x, f.y).setScale(escalaDisco * (raio / 16)).setAlpha(0.6 * (1 - u / 0.18))
+          else if (gFogos) gFogos.fillStyle(0xffffff, 0.6 * (1 - u / 0.18)).fillCircle(f.x, f.y, raio)
         }
       }
+      for (let i = nf; i < faiscas.length; i++) faiscas[i].setVisible(false)
+      for (let i = nc; i < claroes.length; i++) claroes[i].setVisible(false)
       fogos = fogos.filter((f) => f.idade < 1500)
     },
   }

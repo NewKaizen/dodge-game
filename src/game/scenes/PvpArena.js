@@ -37,6 +37,8 @@ import { canal, emRede, meuLado, souHostDaRede, irParaCena, coresDosVersos, arte
 import { somDoLado, lancarDoLado } from '../cosmeticosSlots.js'
 import ArenaRede from '../pvp/rede/ArenaRede.js'
 import { fatores } from '../acessibilidade.js'
+import { assarRegiao, trocarAssada, assar, texturaAssada } from '../arte/assar.js'
+import { textoSeMudou } from '../textoSeMudou.js'
 
 // Partida PvP de cartas. Junta as peças de pvp/ (regras, baralho, cartas,
 // Pista) com o visual das cartas (Carta, Mao). Regras em docs/pvp-regras.md.
@@ -367,7 +369,14 @@ export default class PvpArena extends Phaser.Scene {
     this.fundoArena = criarFundo(this, `arena-${this.arena.id}`)
     this.events.once('shutdown', () => this.fundoArena?.destruir())
     const { cor, alpha } = this.arena.moldura
-    const g = this.add.graphics().setDepth(-4)
+    // a moldura é parada: vira textura assada (arte/assar.js); sem textura, o Graphics de sempre
+    const pintar = (g) => this.pintarMoldura(g, cor, alpha)
+    const img = assarRegiao(this, `pvp-moldura-${cor}-${alpha}-${CORES.almas.join('-')}`, { x: 0, y: 0, largura: LARGURA, altura: ALTURA }, pintar)
+    if (img) img.setDepth(-4)
+    else pintar(this.add.graphics().setDepth(-4))
+  }
+
+  pintarMoldura(g, cor, alpha) {
     // faixa escura atrás do HUD (HP, energia): o fundo pode ser cheio de detalhe ali em cima
     g.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0.7, 0.7, 0.25, 0.25)
     g.fillRect(0, 0, LARGURA, 70)
@@ -450,24 +459,36 @@ export default class PvpArena extends Phaser.Scene {
   criarBotaoPassar(j) {
     const { x, y } = PASSAR[j]
     const c = this.add.container(x, y).setDepth(18)
-    const g = this.add.graphics()
+    const placa = (foco, escolhido) => (p) => {
+      p.fillStyle(escolhido ? 0x2a2a3a : 0x0b0914, 0.95)
+      p.fillRoundedRect(-22, -32, 44, 64, 6)
+      p.lineStyle(foco ? 3 : 1.5, foco || escolhido ? CORES.almas[j] : 0x5a4a7a, 1)
+      p.strokeRoundedRect(-22, -32, 44, 64, 6)
+    }
+    const chavePlaca = (foco, escolhido) => `pvp-passar-${foco ? 'foco' : 'solto'}-${escolhido ? 'pronto' : 'livre'}-${CORES.almas[j]}`
+    const g = assar(this, chavePlaca(false, false), 50, 70, placa(false, false)) ?? this.add.graphics()
+    // os outros três estados já no começo (nada de criar textura no meio da partida)
+    if (!(g instanceof Phaser.GameObjects.Graphics)) for (const [f, e] of [[true, false], [false, true], [true, true]]) texturaAssada(this, chavePlaca(f, e), 50, 70, placa(f, e))
     const titulo = this.add.text(0, -12, 'PASSAR', { fontFamily: FONTE, fontSize: '9px', color: TEXTO.normal, stroke: '#000000', strokeThickness: 2 }).setOrigin(0.5)
     const bonus = this.add.text(4, 8, `+${ENERGIA.passar}`, { fontFamily: FONTE, fontSize: '12px', color: '#7fd8ff', stroke: '#000000', strokeThickness: 3 }).setOrigin(0.5)
-    const gema = this.add.graphics()
-    gema.fillStyle(CORES_CARTA.gemaEscura, 1)
-    gema.fillPoints([{ x: -12, y: 2 }, { x: -7, y: 8 }, { x: -12, y: 14 }, { x: -17, y: 8 }], true)
-    gema.fillStyle(CORES_CARTA.gema, 1)
-    gema.fillPoints([{ x: -12, y: 3.5 }, { x: -8.3, y: 8 }, { x: -12, y: 12.5 }, { x: -15.7, y: 8 }], true)
+    // a gema e a placa do botão são paradas (a placa muda só com o foco e o PRONTO): texturas assadas
+    const pintarGema = (gema) => {
+      gema.fillStyle(CORES_CARTA.gemaEscura, 1)
+      gema.fillPoints([{ x: -12, y: 2 }, { x: -7, y: 8 }, { x: -12, y: 14 }, { x: -17, y: 8 }], true)
+      gema.fillStyle(CORES_CARTA.gema, 1)
+      gema.fillPoints([{ x: -12, y: 3.5 }, { x: -8.3, y: 8 }, { x: -12, y: 12.5 }, { x: -15.7, y: 8 }], true)
+    }
+    let gema = assar(this, 'pvp-passar-gema', 40, 40, pintarGema)
+    if (!gema) pintarGema((gema = this.add.graphics()))
     const cursor = this.add.image(0, -50, 'coracao').setTint(CORES.almas[j]).setScale(1.3).setAngle(180).setVisible(false)
     c.add([g, titulo, gema, bonus, cursor])
     const botao = { c, g, titulo, cursor, foco: false, escolhido: false }
     botao.desenhar = () => {
-      g.clear()
-      const cor = botao.escolhido ? 0x2a2a3a : 0x0b0914
-      g.fillStyle(cor, 0.95)
-      g.fillRoundedRect(-22, -32, 44, 64, 6)
-      g.lineStyle(botao.foco ? 3 : 1.5, botao.foco || botao.escolhido ? CORES.almas[j] : 0x5a4a7a, 1)
-      g.strokeRoundedRect(-22, -32, 44, 64, 6)
+      const pintar = placa(botao.foco, botao.escolhido)
+      if (g instanceof Phaser.GameObjects.Graphics) {
+        g.clear()
+        pintar(g)
+      } else trocarAssada(g, this, chavePlaca(botao.foco, botao.escolhido), 50, 70, pintar)
       titulo.setText(botao.escolhido ? 'PRONTO' : 'PASSAR')
     }
     botao.setFoco = (foco) => {
@@ -1591,7 +1612,7 @@ export default class PvpArena extends Phaser.Scene {
     const perfeitos = this.registrarDesviosPerfeitos(r, comAtaque)
     this.encerrarEfeitoBonus()
     this.invertido = [0, 0]
-    this.avisoPista.forEach((t) => t.setText(''))
+    this.avisoPista.forEach((t) => t.setText('').setVisible(true))
     await this.esperar(250)
     if (this.saindo) return
     this.infoPista.forEach((t) => t.setText(''))
@@ -1795,7 +1816,7 @@ export default class PvpArena extends Phaser.Scene {
     this.pistas[k].caixa.tremer(260, 4)
     particulas(this, coracao.x, coracao.y, { cor: CORES.almas[j], quantidade: 30, velocidade: 220, vida: 700 })
     coracao.esconder()
-    this.avisoPista[k].setText('K.O.!').setColor(TEXTO.caido).setFontSize(20)
+    this.avisoPista[k].setText('K.O.!').setColor(TEXTO.caido).setFontSize(20).setVisible(true)
     if (this.paradaAgendada) return
     this.paradaAgendada = true
     this.time.delayedCall(900, () => {
@@ -1996,9 +2017,11 @@ export default class PvpArena extends Phaser.Scene {
           tocar(this, 'inverter')
         }
         joy = { x: -joy.x, y: -joy.y }
-        this.avisoPista[j].setText(fatores().pulso > 1 || Math.floor(this.time.now / 180) % 2 ? 'CONTROLES INVERTIDOS!' : '').setColor('#ff9a3a')
+        // o pisca é só visibilidade: o texto e a cor mudam uma vez (sem re-render por quadro)
+        textoSeMudou(this.avisoPista[j], 'CONTROLES INVERTIDOS!', '#ff9a3a').setVisible(fatores().pulso > 1 || Math.floor(this.time.now / 180) % 2 === 1)
       } else if (inv?.avisado) {
         this.invertido[j] = 0
+        this.avisoPista[j].setVisible(true)
         if (!this.ko[dono]) this.avisoPista[j].setText('')
       }
       // bonus round: o evento pode mexer no joystick (gravidade...) e no

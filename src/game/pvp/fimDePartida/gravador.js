@@ -36,8 +36,9 @@ import Phaser from 'phaser'
 //     borda() }        cor da moldura
 //
 //   const g = new Gravador(cena, { fontes })
-//   g.atualizar(dt, ativo)   todo frame (dt de jogo); ativo = alguma fonte gravando. Quando
-//                            deixa de estar ativo, a próxima gravação recomeça do zero
+//   g.atualizar(dt, ativo, rapido)   todo frame (dt de jogo); ativo = alguma fonte gravando. Quando
+//                            deixa de estar ativo, a próxima gravação recomeça do zero; rapido = 30
+//                            fotos/s (senão 15)
 //   g.parar()                congela o que foi gravado (o K.O.)
 //   g.quadrosEmOrdem()       [{ tempo, fontes: [{ chave, caixa, borda, coracoes, closes } | null] }] do mais antigo ao mais novo
 //                            coracoes: [{ x, y, ativo, visivel, alpha, escala, cor, j }]
@@ -46,8 +47,14 @@ import Phaser from 'phaser'
 //
 // Foto: no máximo uma por frame. Abaixo de 30 fps sai uma por frame (menos
 // quadros); o replay toca com quantos houver.
+//
+// DOIS RITMOS (limiar.js): a fonte só grava quando um K.O. é possível nesta rodada (gravando()) e,
+// enquanto ninguém está a um golpe de cair, grava a 15 fotos/s (GRAVACAO.lentoMs); perto do K.O.
+// (rapido() de alguma fonte) volta às 30 fotos/s. O replay usa o tempo de cada foto (q.tempo), não o
+// índice: a câmera lenta e o close (os últimos quadros) continuam a 30.
 export const GRAVACAO = {
   quadroMs: 1000 / 30,
+  lentoMs: 1000 / 15,
   segundos: 3.2,
   escala: 0.6,
   close: { quadros: 18, escala: 1.25, largura: 184, altura: 150 }, // janela em px de jogo em volta do coração
@@ -106,7 +113,7 @@ export default class Gravador {
     return dt
   }
 
-  atualizar(dt, ativo) {
+  atualizar(dt, ativo, rapido = true) {
     if (!this.gravando) return
     if (!ativo) {
       this.ativo = false
@@ -122,8 +129,9 @@ export default class Gravador {
     }
     this.tempo += dt
     this.acumulado += dt
-    if (this.acumulado < GRAVACAO.quadroMs) return
-    this.acumulado = Math.min(this.acumulado - GRAVACAO.quadroMs, GRAVACAO.quadroMs) // sem rajada depois de um engasgo
+    const passo = rapido ? GRAVACAO.quadroMs : GRAVACAO.lentoMs
+    if (this.acumulado < passo) return
+    this.acumulado = Math.min(this.acumulado - passo, passo) // sem rajada depois de um engasgo
     this.capturar()
   }
 

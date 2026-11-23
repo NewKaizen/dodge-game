@@ -1,3 +1,4 @@
+import { assarGraphicsRegiao } from '../../arte/assar.js'
 // Utilidades dos fundos das arenas ESTAÇÃO ESPACIAL, CHINATOWN e CIDADE GRANDE
 // (estacao.js, chinatown.js, cidade.js): texturas de canvas desenhadas uma vez só, gerador
 // de números com semente (o cenário é sempre o mesmo) e ruído suave.
@@ -126,4 +127,26 @@ export function assarCamadas(scene, objetos, camadas, prefixo, largura, altura) 
     }
     objetos.push(img)
   })
+}
+
+// Troca UM Graphics PARADO (já desenhado) por uma Image assada (arte/assar.js) no mesmo lugar: mesma
+// posição na lista de desenho, profundidade, posição, rotação, escala, alpha, blend e visibilidade. A
+// região é nas coordenadas LOCAIS do Graphics (o que o desenho ocupa, sem a tela inteira: menos
+// pixels para a GPU pintar). Devolve a Image (quem anima o Graphics passa a animar ela) ou o próprio
+// Graphics, se a GPU não deixar criar a textura. `objetos` (a lista que o fundo destrói no fim) é
+// atualizada.
+//   const nuvem = assarNoLugar(scene, objetos, g, 'praia-nuvem-0', { x: -70, y: -16, largura: 140, altura: 32 })
+export function assarNoLugar(scene, objetos, g, chave, regiao) {
+  const img = assarGraphicsRegiao(scene, chave, regiao, g)
+  if (!img) return g
+  // a escala da Image já leva 1 / RES.escala (a textura está na resolução da tela): multiplica
+  img.setPosition(g.x, g.y).setRotation(g.rotation).setScale(img.scaleX * g.scaleX, img.scaleY * g.scaleY).setAlpha(g.alpha).setVisible(g.visible).setDepth(g.depth)
+  img.setScrollFactor(g.scrollFactorX, g.scrollFactorY)
+  if (g.blendMode !== undefined) img.setBlendMode(g.blendMode)
+  scene.children.moveBelow(img, g)
+  const k = objetos.indexOf(g)
+  if (k >= 0) objetos[k] = img
+  else objetos.push(img)
+  g.destroy()
+  return img
 }

@@ -1,4 +1,5 @@
 import { LARGURA, ALTURA } from '../constants.js'
+import { assar } from '../arte/assar.js'
 
 const FATIAS = 16
 const CORES_FATIAS = [0x2a1050, 0x0e2a55]
@@ -14,7 +15,21 @@ export default function jevil(scene, objetos) {
   }
   const [cx, cy] = [LARGURA / 2, 175] // centro do carrossel
   add(scene.add.rectangle(0, 0, LARGURA, ALTURA, 0x0a0418).setOrigin(0))
-  const espiral = add(scene.add.graphics())
+  // a espiral gira inteira (giro = 0,35 t, sem mudar de forma): é desenhada uma vez numa textura e a
+  // Image gira (antes: 16 fillPoints de 25 pontos pelo earcut a cada quadro). Sem textura, o Graphics
+  const pintarEspiral = (g, giro, x0 = 0, y0 = 0) => {
+    for (let k = 0; k < FATIAS; k++) {
+      g.fillStyle(CORES_FATIAS[k % 2], 1)
+      const a0 = giro + (k * Math.PI * 2) / FATIAS
+      const a1 = a0 + (Math.PI * 2) / FATIAS
+      const pontos = [{ x: x0, y: y0 }]
+      for (let r = 40; r <= 520; r += 40) pontos.push({ x: x0 + Math.cos(a0 + r / 260) * r, y: y0 + Math.sin(a0 + r / 260) * r })
+      for (let r = 520; r >= 40; r -= 40) pontos.push({ x: x0 + Math.cos(a1 + r / 260) * r, y: y0 + Math.sin(a1 + r / 260) * r })
+      g.fillPoints(pontos, true)
+    }
+  }
+  const espiralImg = assar(scene, 'fundo-jevil-espiral', 1044, 1044, (g) => pintarEspiral(g, 0), { folga: 0 })
+  const espiral = add(espiralImg ? espiralImg.setPosition(cx, cy) : scene.add.graphics())
   const aneis = add(scene.add.graphics())
 
   const naipes = Array.from({ length: 24 }, (_, i) => {
@@ -29,16 +44,11 @@ export default function jevil(scene, objetos) {
       const s = dt / 1000
 
       // espiral: fatias alternadas torcidas, girando
-      espiral.clear()
       const giro = t * 0.35
-      for (let k = 0; k < FATIAS; k++) {
-        espiral.fillStyle(CORES_FATIAS[k % 2], 1)
-        const a0 = giro + (k * Math.PI * 2) / FATIAS
-        const a1 = a0 + (Math.PI * 2) / FATIAS
-        const pontos = [{ x: cx, y: cy }]
-        for (let r = 40; r <= 520; r += 40) pontos.push({ x: cx + Math.cos(a0 + r / 260) * r, y: cy + Math.sin(a0 + r / 260) * r })
-        for (let r = 520; r >= 40; r -= 40) pontos.push({ x: cx + Math.cos(a1 + r / 260) * r, y: cy + Math.sin(a1 + r / 260) * r })
-        espiral.fillPoints(pontos, true)
+      if (espiralImg) espiral.setRotation(giro)
+      else {
+        espiral.clear()
+        pintarEspiral(espiral, giro, cx, cy)
       }
 
       // anéis pulsando a partir do centro

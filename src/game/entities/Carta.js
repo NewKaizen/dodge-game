@@ -8,7 +8,7 @@ import { shake } from '../effects/shake.js'
 import { fatores } from '../acessibilidade.js'
 import { frenteNaCarta, versoNaCarta, definirCarta } from '../cosmeticosSlots.js'
 import { semLigaduras } from '../campanha/texto.js'
-import { assar, assarGraphics } from '../arte/assar.js'
+import { assar, assarGraphics, assarRegiao, texturaAssada } from '../arte/assar.js'
 
 // Carta de baralho desenhada por código (frente, verso e animações).
 // Só o VISUAL: as regras (baralho, naipes, valores, efeitos) ficam em outro módulo.
@@ -84,6 +84,7 @@ const TAU = Math.PI * 2
 const VALOR_SUPER = 14
 // faixas da moldura arco-íris da carta SUPER (de fora para dentro) e cores dos brilhos
 const ARCO_IRIS = [0xff4a5a, 0xffa23a, 0xffe14a, 0x5ae06a, 0x4ab8ff, 0xa66bff]
+const BRILHO_MS = 520 // vida de um brilho (cresce 260 ms e volta 260 ms)
 const BASE = 70 // largura de referência: todas as medidas abaixo são em "u" (largura / 70)
 
 // ---------- formas de naipe (vetoriais: nítidas em qualquer escala) ----------
@@ -214,29 +215,25 @@ export default class Carta extends Phaser.GameObjects.Container {
     this.corpo = scene.add.container(0, 0)
     this.add(this.corpo)
 
-    this.sombra = scene.add.graphics()
+    // o véu e o clarão viram texturas assadas (arte/assar.js): um Graphics seria re-tesselado a cada
+    // quadro, e a mesa tem 14 a 16 cartas
+    this.sombra = this.pecaSombra()
     this.brilho = scene.add.image(0, 0, 'carta-brilho').setBlendMode(Phaser.BlendModes.ADD).setAlpha(0)
     this.brilho.setDisplaySize((this.largura * 128) / 70, (this.altura * 160) / 100)
     this.frente = scene.add.container(0, 0)
     this.verso = scene.add.container(0, 0)
-    this.veu = scene.add.graphics().setAlpha(0) // escurece (indisponível)
-    this.clarao = scene.add.graphics().setAlpha(0).setBlendMode(Phaser.BlendModes.ADD) // flash da revelação
+    this.veu = this.pecaPlaca(0x000000).setAlpha(0) // escurece (indisponível)
+    this.clarao = this.pecaPlaca(0xffffff).setAlpha(0).setBlendMode(Phaser.BlendModes.ADD) // flash da revelação
     // marca de custo no canto de baixo à esquerda: fica POR CIMA do véu e na parte da
     // carta que continua à vista quando a mão se sobrepõe (a gema do canto de cima, à
     // direita, fica coberta pela carta vizinha). Bloqueada: leva um "×" (não só a cor)
-    this.marcaCusto = scene.add.graphics()
+    this.marcaCusto = this.oculta ? scene.add.graphics() : this.pecaEstado('marca', null, (g) => this.pintarMarcaCusto(g, false))
     this.marcaTexto = this.texto(0, 0, this.oculta ? '' : String(dados.custo ?? 0), 9 * this.u, '#ffffff', { stroke: '#06283e', strokeThickness: 2 * this.u }).setOrigin(0.5, 0.52)
     this.marcas = scene.add.container(0, 0, [this.marcaCusto, this.marcaTexto])
     this.corpo.add([this.brilho, this.sombra, this.frente, this.verso, this.veu, this.marcas, this.clarao])
 
-    this.desenharSombra()
     if (!this.oculta) this.desenharFrente()
     this.desenharVerso()
-    const { largura: w, altura: h, u } = this
-    for (const [g, cor] of [[this.veu, 0x000000], [this.clarao, 0xffffff]]) {
-      g.fillStyle(cor, 1)
-      g.fillRoundedRect(-w / 2, -h / 2, w, h, 6 * u)
-    }
     this.legenda = this.oculta ? this.scene.add.container(0, 0).setVisible(false) : this.criarLegenda()
     if (this.oculta) this.corpo.add(this.legenda)
 
@@ -255,11 +252,64 @@ export default class Carta extends Phaser.GameObjects.Container {
     return t
   }
 
-  desenharSombra() {
+  // ---------- peças paradas (assadas; sem textura, o Graphics de sempre) ----------
+
+  // Image assada em volta de (0, 0) da carta, ou o Graphics desenhado (contexto perdido)
+  peca(chave, largura, altura, desenhar) {
+    const img = assar(this.scene, chave, largura, altura, desenhar)
+    if (img) return img
+    const g = this.scene.add.graphics()
+    desenhar(g)
+    return g
+  }
+
+  // a sombra continua um Graphics: assada, a da carta que chega na mão (comprar + virar, que mexe nela)
+  // aparecia como um retângulo escuro fora do lugar na paridade visual (docs/desempenho.md, fase 1)
+  pecaSombra() {
     const { largura: w, altura: h, u } = this
-    this.sombra.clear()
-    this.sombra.fillStyle(0x000000, 0.35)
-    this.sombra.fillRoundedRect(-w / 2 + 2.5 * u, -h / 2 + 3.5 * u, w, h, 6 * u)
+    const g = this.scene.add.graphics()
+    g.fillStyle(0x000000, 0.35)
+    g.fillRoundedRect(-w / 2 + 2.5 * u, -h / 2 + 3.5 * u, w, h, 6 * u)
+    return g
+  }
+
+  // a placa do tamanho da carta (o véu preto e o clarão branco: a mesma textura branca, tingida)
+  pecaPlaca(cor) {
+    const { largura: w, altura: h, u } = this
+    const desenhar = (g) => {
+      g.fillStyle(cor, 1)
+      g.fillRoundedRect(-w / 2, -h / 2, w, h, 6 * u)
+    }
+    const img = assar(this.scene, `carta-placa-${w}x${h}-${u}`, w, h, (g) => {
+      g.fillStyle(0xffffff, 1)
+      g.fillRoundedRect(-w / 2, -h / 2, w, h, 6 * u)
+    })
+    if (img) return cor === 0xffffff ? img : img.setTint(cor)
+    const g = this.scene.add.graphics()
+    desenhar(g)
+    return g
+  }
+
+  // As peças com dois estados (gema e marca de custo: com e sem energia) continuam Graphics: assadas,
+  // a troca de estado no meio da partida (uma textura nova criada no meio do jogo) deixou um buraco no
+  // verso de outra carta na paridade visual (docs/desempenho.md, fase 1). São ~20 comandos por carta.
+  caixaEstado(nome) {
+    const { u } = this
+    const x = nome === 'gema' ? this.largura / 2 - 9.5 * u : -this.largura / 2 + 9 * u
+    const y = nome === 'gema' ? -this.altura / 2 + 9.5 * u : this.altura / 2 - 10 * u
+    return { x, y }
+  }
+
+  pecaEstado(nome, _g, pintar) {
+    const g = this.scene.add.graphics()
+    pintar(g)
+    return g
+  }
+
+  // troca o estado de uma peça (redesenha)
+  estadoDaPeca(peca, nome, bloqueada, pintar) {
+    peca.clear()
+    pintar(peca)
   }
 
   // A FRENTE. Com um ESTILO equipado (cosmético, cosmeticos/frentes.js) quem desenha é o estilo: ele chama
@@ -397,7 +447,7 @@ export default class Carta extends Phaser.GameObjects.Container {
     }
 
     // gema de energia (canto superior direito): igual em todos os estilos
-    this.gema = this.scene.add.graphics()
+    this.gema = this.pecaEstado('gema', null, (g) => this.pintarGema(g, false))
     this.gemaTexto = this.texto(hw - 9.5 * u, -hh + 9.5 * u, String(dados.custo ?? 0), 8.5 * u, '#ffffff', {
       stroke: '#06283e',
       strokeThickness: 2 * u,
@@ -413,22 +463,25 @@ export default class Carta extends Phaser.GameObjects.Container {
     this.frente.add(this.camadaBrilhos)
     // a animação do estilo (respeita "reduzir animações"; some com a carta)
     if (tema?.animar) this.animFrente = tema.animar(ctx) ?? null
-    // a frente clássica é um desenho parado com 600 a 2 mil comandos: vira textura (arte/assar.js),
-    // uma por carta diferente, e todas as iguais usam a mesma. Os estilos (cosméticos) ficam como são
-    if (!tema) {
-      const chave = `carta-frente-${dados.personagem}-${dados.naipe}-${dados.valor}-${this.corPersonagem}-${u}`
-      const img = assarGraphics(this.scene, chave, w, h, g)
-      if (img) {
-        this.frente.addAt(img, this.frente.getIndex(g))
-        this.frente.remove(g, true)
-        ctx.g = null
-      }
+    // a frente é um desenho parado com 600 a 3 mil comandos (os estilos cosméticos, até 3 mil): vira
+    // textura (arte/assar.js), uma por carta diferente, e todas as iguais usam a mesma. O que o estilo
+    // anima (pétalas, o brilho holográfico) são outras imagens, por cima ou por trás: continuam vivas
+    const chave = `carta-frente-${this.estiloFrente && tema ? this.estiloFrente : 'classica'}-${dados.personagem}-${dados.naipe}-${dados.valor}-${this.corPersonagem}-${u}`
+    const img = assarGraphics(this.scene, chave, w, h, g)
+    if (img) {
+      this.frente.addAt(img, this.frente.getIndex(g))
+      this.frente.remove(g, true)
+      ctx.g = null
     }
   }
 
   desenharGema(semEnergia) {
+    if (this.gema) this.estadoDaPeca(this.gema, 'gema', semEnergia, (g) => this.pintarGema(g, semEnergia))
+    this.gemaTexto?.setStroke(semEnergia ? '#3a0a14' : '#06283e', 2 * this.u)
+  }
+
+  pintarGema(g, semEnergia) {
     const { u } = this
-    const g = this.gema
     const x = this.largura / 2 - 9.5 * u
     const y = -this.altura / 2 + 9.5 * u
     const r = 7.5 * u
@@ -440,7 +493,6 @@ export default class Carta extends Phaser.GameObjects.Container {
     ]
     const corpo = semEnergia ? CORES_CARTA.gemaSem : CORES_CARTA.gema
     const escura = semEnergia ? 0x3a0a14 : CORES_CARTA.gemaEscura
-    g.clear()
     g.fillStyle(escura, 1)
     g.fillPoints(losango(r + 1.3 * u), true)
     g.fillStyle(corpo, 1)
@@ -448,7 +500,6 @@ export default class Carta extends Phaser.GameObjects.Container {
     // faceta clara em cima
     g.fillStyle(semEnergia ? 0xd8707e : CORES_CARTA.gemaClara, 0.75)
     g.fillPoints([{ x, y: y - r }, { x: x + r * 0.86, y }, { x, y: y - r * 0.25 }, { x: x - r * 0.86, y }], true)
-    this.gemaTexto?.setStroke(semEnergia ? '#3a0a14' : '#06283e', 2 * u)
   }
 
   desenharPips(g, cy) {
@@ -755,11 +806,16 @@ export default class Carta extends Phaser.GameObjects.Container {
       lineSpacing: 0.5 * u,
     }).setOrigin(0.5, 0)
     const altura = 13 * u + desc.height
-    const g = this.scene.add.graphics()
-    g.fillStyle(0x0b0914, 0.94)
-    g.fillRoundedRect(-largura / 2, 0, largura, altura, 3 * u)
-    g.lineStyle(0.8 * u, this.super ? CORES_CARTA.ouro : cor === CORES_CARTA.vermelho ? 0xff5a70 : 0x9a8ad8, 1)
-    g.strokeRoundedRect(-largura / 2, 0, largura, altura, 3 * u)
+    const corBorda = this.super ? CORES_CARTA.ouro : cor === CORES_CARTA.vermelho ? 0xff5a70 : 0x9a8ad8
+    // a placa da legenda (parada): assada
+    const pintarPlaca = (p) => {
+      p.fillStyle(0x0b0914, 0.94)
+      p.fillRoundedRect(-largura / 2, 0, largura, altura, 3 * u)
+      p.lineStyle(0.8 * u, corBorda, 1)
+      p.strokeRoundedRect(-largura / 2, 0, largura, altura, 3 * u)
+    }
+    let g = assarRegiao(this.scene, `carta-legenda-${corBorda}-${u}`, { x: -largura / 2, y: 0, largura, altura }, pintarPlaca)
+    if (!g) pintarPlaca((g = this.scene.add.graphics()))
     c.add([g, tipo, desc])
     this.corpo.add(c)
     return c
@@ -767,32 +823,78 @@ export default class Carta extends Phaser.GameObjects.Container {
 
   // ---------- brilho (cursor e cartas especiais) ----------
 
+  // Os brilhos das figuras, do Ás e da SUPER: estrelinhas que nascem num ponto sorteado da carta,
+  // crescem girando e somem (260 ms indo e 260 ms voltando, Sine.easeInOut). A estrela é assada uma
+  // vez (arte/assar.js) e as Images são REAPROVEITADAS (um pool por carta, dentro da camadaBrilhos):
+  // antes era um Graphics novo por estrela (fillPoints -> earcut, tween, destroy), de 20 a 29 por
+  // segundo na mesa. Os sorteios (posição x, y e tamanho) são os mesmos e na mesma ordem: a sequência
+  // do Math.random da cena não muda. (Um ParticleEmitter do Phaser foi tentado: o emissor sorteia o
+  // ângulo de saída com Math.random a cada partícula, o que muda tudo o que vem depois na cena, e
+  // dentro do container da carta deixou falhas na paridade visual.)
   iniciarBrilhos() {
     const { u } = this
     const ouro = this.dados.valor === 1 ? 0xffffff : CORES_CARTA.ouroClaro
     let k = 0
+    this._poolBrilhos = []
     this.timerBrilhos = this.scene.time.addEvent({
       delay: this.super ? 170 : this.dados.valor === 1 ? 260 : 420,
       loop: true,
       callback: () => {
         if (!this.visible || this.virada || !this.scene) return
+        const cor = this.super ? ARCO_IRIS[k++ % ARCO_IRIS.length] : ouro
+        const x = Phaser.Math.FloatBetween(-24, 24) * u
+        const y = Phaser.Math.FloatBetween(-34, 18) * u
+        const maximo = Phaser.Math.FloatBetween(0.6, 1.1)
+        const img = this.brilhoDoPool()
+        if (img) {
+          img.setPosition(x, y).setTint(cor).setAngle(0).setScale(0).setVisible(true)
+          this.scene.tweens.add({
+            targets: img,
+            scale: maximo * img.escalaBase,
+            angle: 90,
+            duration: BRILHO_MS / 2,
+            yoyo: true,
+            ease: 'Sine.easeInOut',
+            onComplete: () => {
+              img.setVisible(false)
+              this._poolBrilhos?.push(img)
+            },
+          })
+          return
+        }
+        // sem textura (contexto perdido): o Graphics de sempre
         const g = this.scene.add.graphics()
-        g.fillStyle(this.super ? ARCO_IRIS[k++ % ARCO_IRIS.length] : ouro, 1)
+        g.fillStyle(cor, 1)
         g.fillPoints(pontosEstrela(3.2 * u), true)
-        g.setPosition(Phaser.Math.FloatBetween(-24, 24) * u, Phaser.Math.FloatBetween(-34, 18) * u)
-        g.setScale(0).setBlendMode(Phaser.BlendModes.ADD)
+        g.setPosition(x, y).setScale(0).setBlendMode(Phaser.BlendModes.ADD)
         this.camadaBrilhos.add(g)
-        this.scene.tweens.add({
-          targets: g,
-          scale: Phaser.Math.FloatBetween(0.6, 1.1),
-          angle: 90,
-          duration: 260,
-          yoyo: true,
-          ease: 'Sine.easeInOut',
-          onComplete: () => g.destroy(),
-        })
+        this.scene.tweens.add({ targets: g, scale: maximo, angle: 90, duration: BRILHO_MS / 2, yoyo: true, ease: 'Sine.easeInOut', onComplete: () => g.destroy() })
       },
     })
+  }
+
+  // uma estrela livre do pool (ou nova), no topo da camadaBrilhos (como uma nova ficaria)
+  brilhoDoPool() {
+    if (!this.camadaBrilhos?.active) return null
+    let img = null
+    while (this._poolBrilhos.length && !img) {
+      const livre = this._poolBrilhos.pop()
+      if (livre.active && livre.parentContainer === this.camadaBrilhos) img = livre
+    }
+    if (img) {
+      this.camadaBrilhos.bringToTop(img)
+      return img
+    }
+    const { u } = this
+    const textura = texturaAssada(this.scene, `carta-faisca-${u}`, 6.4 * u, 6.4 * u, (g) => {
+      g.fillStyle(0xffffff, 1)
+      g.fillPoints(pontosEstrela(3.2 * u), true)
+    })
+    if (!textura) return null
+    img = this.scene.add.image(0, 0, textura).setBlendMode(Phaser.BlendModes.ADD)
+    img.escalaBase = 1 / RES.escala // a textura está na resolução da tela
+    this.camadaBrilhos.add(img)
+    return img
   }
 
   atualizarBrilho() {
@@ -886,17 +988,20 @@ export default class Carta extends Phaser.GameObjects.Container {
   // gema pequena com o custo (e o "×" quando a carta está bloqueada) no canto de baixo à esquerda
   desenharMarcaCusto() {
     const { u, indisponivel: bloqueada } = this
-    const g = this.marcaCusto
-    const x = -this.largura / 2 + 9 * u
-    const y = this.altura / 2 - 10 * u
+    const { x, y } = this.caixaEstado('marca')
+    this.estadoDaPeca(this.marcaCusto, 'marca', bloqueada, (g) => this.pintarMarcaCusto(g, bloqueada))
+    this.marcaTexto.setPosition(x, y).setStroke(bloqueada ? '#3a0a14' : '#06283e', 2 * u)
+  }
+
+  pintarMarcaCusto(g, bloqueada) {
+    const { u } = this
+    const { x, y } = this.caixaEstado('marca')
     const r = 6.8 * u
     const losango = (k) => [{ x, y: y - k }, { x: x + k * 0.86, y }, { x, y: y + k }, { x: x - k * 0.86, y }]
-    g.clear()
     g.fillStyle(bloqueada ? 0x3a0a14 : CORES_CARTA.gemaEscura, 1)
     g.fillPoints(losango(r + 1.2 * u), true)
     g.fillStyle(bloqueada ? CORES_CARTA.gemaSem : CORES_CARTA.gema, 1)
     g.fillPoints(losango(r), true)
-    this.marcaTexto.setPosition(x, y).setStroke(bloqueada ? '#3a0a14' : '#06283e', 2 * u)
     if (bloqueada) {
       // selo "×" (branco sobre vermelho) no canto de cima da gema
       const bx = x + 5.5 * u
@@ -1112,11 +1217,13 @@ export default class Carta extends Phaser.GameObjects.Container {
   deixarRastro(cor) {
     if (!fatores().rastros) return
     const { largura: w, altura: h, u } = this
-    const g = this.scene.add.graphics()
-    g.fillStyle(cor, 0.4)
-    g.fillRoundedRect(-w / 2, -h / 2, w, h, 6 * u)
-    g.lineStyle(1.5 * u, 0xffffff, 0.5)
-    g.strokeRoundedRect(-w / 2, -h / 2, w, h, 6 * u)
+    // um a cada ~22 ms durante o voo: a placa é assada uma vez por cor e tamanho
+    const g = this.peca(`carta-rastro-${cor}-${w}x${h}-${u}`, w + 2 * u, h + 2 * u, (p) => {
+      p.fillStyle(cor, 0.4)
+      p.fillRoundedRect(-w / 2, -h / 2, w, h, 6 * u)
+      p.lineStyle(1.5 * u, 0xffffff, 0.5)
+      p.strokeRoundedRect(-w / 2, -h / 2, w, h, 6 * u)
+    })
     g.setPosition(this.x, this.y).setRotation(this.rotation).setScale(this.scaleX).setDepth(PROF.voo - 2)
     g.setBlendMode(Phaser.BlendModes.ADD)
     this.scene.tweens.add({ targets: g, alpha: 0, scale: this.scaleX * 0.8, duration: 200, onComplete: () => g.destroy() })
@@ -1192,6 +1299,27 @@ export default class Carta extends Phaser.GameObjects.Container {
 
 // as prévias dos estilos de carta (cosmeticos/frentes.js) montam cartas de verdade por aqui
 definirCarta(Carta)
+
+// PRÉ-ASSAR um baralho (docs/desempenho.md, fase 1): monta cada carta da lista fora da tela e já
+// destrói, só para as texturas da frente e do verso (arte/assar.js) ficarem prontas antes da partida.
+// Poucas por quadro (porQuadro), para não engasgar a tela de escolha. As texturas ficam no LRU do
+// assar.js quando a cena sai e a arena reaproveita (a chave é a mesma: personagem, naipe, valor, estilo).
+//   preassarCartas(cena, CARTAS[p1], { largura: 70, frente: 'frente-x' })
+export function preassarCartas(scene, lista, opcoes = {}, porQuadro = 3) {
+  const fila = [...(lista ?? [])]
+  const passo = () => {
+    if (!scene.sys?.isActive?.() || !fila.length) return
+    for (let i = 0; i < porQuadro && fila.length; i++) {
+      try {
+        new Carta(scene, -500, -500, fila.shift(), { largura: 70, ...opcoes }).destroy()
+      } catch {
+        // pré-assar é só adiantar trabalho: uma carta que falhe é montada na arena
+      }
+    }
+    if (fila.length) scene.time.delayedCall(16, passo)
+  }
+  passo()
+}
 
 // Estilhaço da carta no alvo: clarão, anel, naipe fantasma, cacos e faíscas
 function impactoCarta(scene, x, y, { naipe = 'espadas', largura = 70, especial = false } = {}) {

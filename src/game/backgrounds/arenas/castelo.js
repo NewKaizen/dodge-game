@@ -1,5 +1,5 @@
 import { LARGURA, ALTURA } from '../../constants.js'
-import { assar } from '../../arte/assar.js'
+import { assar, texturaAssada } from '../../arte/assar.js'
 
 // cor entre a e b (p de 0 a 1)
 const misturar = (a, b, p) => {
@@ -37,7 +37,14 @@ export default function castelo(scene, objetos) {
   const piso = assar(scene, 'fundo-castelo', LARGURA, ALTURA, (g) => pintarPiso(g, -LARGURA / 2, -ALTURA / 2))
   if (piso) add(piso.setPosition(LARGURA / 2, ALTURA / 2))
   else pintarPiso(add(scene.add.graphics()))
-  const brilho = add(scene.add.graphics())
+  // os losangos que a onda acende: Images de um losango branco assado, tingidas (antes um Graphics
+  // redesenhado a cada quadro, ~750 comandos); a onda cobre no máximo ~1/6 do piso de uma vez
+  const losangoBranco = texturaAssada(scene, 'castelo-losango', 8, 10, (g) => {
+    g.fillStyle(0xffffff, 1)
+    losango(g, 0, 0)
+  }, { folga: 0 })
+  const brilho = losangoBranco ? null : add(scene.add.graphics())
+  const acesos = losangoBranco ? Array.from({ length: 110 }, () => add(scene.add.image(0, 0, losangoBranco).setVisible(false))) : []
   const NAIPES = ['espadas', 'copas', 'ouros', 'paus']
   const CORES_NAIPES = [0x9a8bff, 0xff5f8a, 0xffd24c, 0x7fe0c0]
   const naipes = Array.from({ length: 22 }, (_, i) => ({
@@ -48,8 +55,10 @@ export default function castelo(scene, objetos) {
     fase: i * 1.7,
   }))
 
+  let brilhoReserva = null // (a onda nunca acende mais que o pool; se acender, o resto vai num Graphics)
   return {
     atualizar(dt, estado) {
+      brilhoReserva?.clear()
       for (const n of naipes) {
         n.y -= (n.v * dt) / 1000
         if (n.y < 50) n.y = ALTURA + 20
@@ -57,12 +66,22 @@ export default function castelo(scene, objetos) {
       }
       // a onda de brilho cruza o salão na diagonal a cada ~6 s
       const frente = ((estado.tempo / 6000) % 1) * (LARGURA + ALTURA + 400) - 200
-      brilho.clear()
+      brilho?.clear()
+      let n = 0
       for (const { x, y } of losangos) {
         const perto = Math.max(0, 1 - Math.abs(x + y - frente) / 90)
         if (perto <= 0) continue // apagado: já está no piso
-        brilho.fillStyle(misturar(0x221a3c, 0x5a46a8, perto), 1)
-        losango(brilho, x, y)
+        const cor = misturar(0x221a3c, 0x5a46a8, perto)
+        const img = acesos[n++]
+        if (img) img.setVisible(true).setPosition(x, y).setTint(cor)
+        else {
+          ;(brilho ?? (brilhoReserva ??= add(scene.add.graphics()))).fillStyle(cor, 1)
+          losango(brilho ?? brilhoReserva, x, y)
+        }
+      }
+      for (let i = n; i < acesos.length; i++) {
+        if (!acesos[i].visible) break
+        acesos[i].setVisible(false)
       }
     },
   }
