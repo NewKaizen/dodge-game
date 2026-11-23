@@ -213,3 +213,101 @@ junto: o primeiro orçamento é folgado; a fase 1 aperta com as medidas novas.
 tolerância zero). O modo determinístico continua determinístico com o frame 1200.
 
 A base da paridade da fase 1 é `npm run paridade:base -- --ref=62bc595` (o conserto do Jevil incluído).
+
+## Fase 1 (cartas, HUD, replay, textos e fundos)
+
+O que mudou (commits "Fase 1.x"):
+
+- **1.1 Graphics parados viram texturas assadas** (`arte/assar.js`): `assar`, `assarRegiao` (uma região do
+  mundo, a Image fica no lugar do desenho), `trocarAssada*` (troca de estado), e um **LRU**: cada textura
+  sabe que cenas a usam; no shutdown de uma cena as que ficaram sem cena viram ociosas e as mais antigas
+  são apagadas acima de `LRU.maxOciosas`/`LRU.maxBytes`. Assados: véu, clarão, legenda e rastro da carta,
+  as frentes dos ESTILOS cosméticos (antes só a clássica), placa e gemas do HUD, moldura da arena e botão
+  PASSAR, as prévias de cosméticos. A tela do VS (`PvpEscolha`) pré-assa as frentes dos dois baralhos.
+  **Ficaram Graphics:** a sombra da carta e as gemas de custo (dois estados): assadas, deixavam falhas
+  (um retângulo escuro / um buraco no verso de outra carta) na paridade visual; a causa (algo entre
+  texturas dinâmicas criadas no meio da partida e cartas em `comprar`/`virar`) não foi achada a tempo.
+- **1.2 Replay:** `pvp/fimDePartida/limiar.js` (testado): grava só com vida ≤ 2x o maior dano de um
+  acerto (o da carta; com evento de bônus, 30 % da vida máxima), ou sempre na morte súbita. A um golpe do
+  K.O. grava a 30 fotos/s; antes disso a 15. A transmissão anda pelo tempo de cada foto. O piloto do
+  medidor deixa a vida cheia: nas medidas o gravador fica desligado.
+- **1.3 Brilhos das cartas:** pool de Images com a estrela assada, mesmos sorteios na mesma ordem. Um
+  `ParticleEmitter` foi tentado e descartado: o emissor sorteia o ângulo com `Math.random` a cada partícula
+  (muda o resto da cena) e deixou falhas dentro do container da carta. O pool dos números de dano
+  (`effects/numero.js`) também foi descartado: cada `Text` novo sorteia um nome (UUID), e o pool mudava a
+  sequência do `Math.random`. `Bullets.js`, `queenPopup.js` e `attacks/contexto.js` não foram mexidos
+  (simulação; o ganho medido era pequeno).
+- **1.4** `textoSeMudou(t, texto, cor)` e o pisca do CONTROLES INVERTIDOS por visibilidade/alpha:
+  texto/f na esquiva = 0 em todas as arenas.
+- **1.5/1.6 Fundos:** CIDADE (céu = topo tingido + degradê assado; janelas numa DynamicTexture repintada
+  só onde o nível muda, sem string/Map por janela; carros, postes e helicóptero assados), PRAIA (camadas
+  assadas, ondinhas em TileSprite, folhas e gaivotas em laços de quadros, ondas grandes em triângulos),
+  CAFÉ (Images; marquises, gato e acordeão em laços de 24 quadros; halos parados no chão assado),
+  CHINATOWN, ESTAÇÃO, PALCO, CASTELO, Queen e Jevil (espiral assada que gira). Não mexidos: o dragão da
+  CHINATOWN, os fios de lanternas, `escuridaoRegra.js` (os olhos) e as três ondas grandes da PRAIA
+  (ainda ~9 mil comandos por quadro: o maior resto).
+
+### Antes e depois (medir.mjs --musica=off, mesma VM, outra sessão usando a CPU nas duas)
+
+| Cena | passo 1x (ms) | passo 4x | passo 8x | FPS 8x | dc | gcmd | texto/f | aloc MB/s | meta 8x |
+|---|---|---|---|---|---|---|---|---|---|
+| Menu | 0.9 → 0.9 | 4.3 → 3.6 | 6.5 → 6.1 | 57 → 58.9 | 35.5 → 35.5 | 684 → 692 | 0 → 0 | 18.3 → 18.1 |  |
+| PvP CASTELO, esquiva | 2.5 → 1.6 | 8.8 → 8 | 37.4 → 25.1 | 16.3 → 25.1 | 102.4 → 96.6 | 6807 → 1956 | 0 → 0 | 64.3 → 44.4 | ≤ 12: não |
+| PvP CAFÉ, esquiva | 5.2 → 2.4 | 22.3 → 12.9 | 44.3 → 35.2 | 13 → 16.6 | 194.4 → 109.9 | 7923 → 2114 | 1.1 → 0 | 107.7 → 48.9 | ≤ 15: não |
+| PvP CIDADE, esquiva | 5.1 → 2.6 | 24.4 → 10.7 | 57.8 → 43.3 | 11.6 → 15.4 | 111.9 → 107.8 | 17142 → 2733 | 0 → 0 | 188 → 63.4 | ≤ 15: não |
+| PvP PRAIA, esquiva | 6 → 2.8 | 23.4 → 14.5 | 58.5 → 40.4 | 11.8 → 16.3 | 99.7 → 96.4 | 34818 → 13421 | 1.1 → 0 | 238.4 → 129.8 | ≤ 15: não |
+| PvP CHINATOWN, esquiva | 4.8 → 2.3 | 17.5 → 14.1 | 37.2 → 27.9 | 16.7 → 21.6 | 109.9 → 108.7 | 9055 → 3103 | 1.1 → 0 | 121.2 → 68.6 |  |
+| PvP ESTAÇÃO, esquiva | 3.3 → 1.9 | 9.4 → 8.5 | 34.9 → 30.5 | 15.6 → 20.5 | 103.2 → 95.2 | 7689 → 2008 | 1.1 → 0 | 69 → 48.3 |  |
+| PvP PALCO, esquiva | 3.7 → 2.5 | 8.6 → 13.4 | 30.3 → 23.4 | 18.6 → 26.2 | 109.4 → 101.5 | 6389 → 1818 | 1.1 → 0 | 67.8 → 49.4 |  |
+| PvP CASTELO, escolha de cartas | 2.2 → 1.6 | 10.7 → 8 | 17 → 12.8 | 35.2 → 44.1 | 111.5 → 99 | 7096 → 2082 | 0.1 → 0.1 | 74.4 → 45.7 |  |
+| CO-OP King, esquiva | 2.5 → 1.9 | 9.5 → 11 | 20.8 → 17.2 | 27.3 → 36 | 111 → 110.9 | 6278 → 2515 | 0 → 0 | 58.3 → 47.3 | ≤ 14: não |
+| CO-OP Queen, esquiva | 3 → 2.3 | 12.7 → 9.5 | 21 → 28.3 | 31.1 → 23.2 | 114.2 → 115.5 | 7230 → 2168 | 0.1 → 0.1 | 76.8 → 64.8 | ≤ 14: não |
+| CO-OP Jevil, esquiva | 4.6 → 2.3 | 23.1 → 11.8 | 34.1 → 28.9 | 17.6 → 21.9 | 121 → 122.9 | 8448 → 2832 | 0.1 → 0.1 | 95.1 → 78.7 | ≤ 14: não |
+| CO-OP Coronel, esquiva | 3.6 → 2.7 | 11.7 → 11.2 | 25.2 → 30.1 | 27 → 22.3 | 111.7 → 111.6 | 6306 → 2520 | 0 → 0 | 109.4 → 97.2 | ≤ 14: não |
+| CO-OP ESCURIDÃO (semanal), esquiva | 2.7 → 2.9 | 11.2 → 14.8 | 28 → 30.6 | 22.7 → 22.6 | 111 → 110.4 | 6009 → 2168 | 0.1 → 0 | 69.2 → 57.2 | ≤ 14: não |
+| Expedição (Jevil, fase 1), esquiva | 3.6 → 1.8 | 15.2 → 13 | 19.2 → 20 | 30.8 → 31.6 | 103.3 → 105.1 | 7991 → 2342 | 0 → 0 | 78.4 → 60.4 | ≤ 14: não |
+| Galeria: estilos de carta | 3.3 → 1.5 | 11.5 → 8 | 26.4 → 14.9 | 23.7 → 39.8 | 111.6 → 106 | 26852 → 2476 | 0 → 0 | 105.6 → 39.4 | ≤ 8: não |
+| Galeria: efeitos de carta | 1.3 → 0.8 | 5.3 → 3.6 | 9.4 → 6.3 | 56.4 → 60 | 8 → 9 | 2232 → 780 | 0 → 0 | 60 → 35.5 | ≤ 8: atingida |
+| Campanha: mapa | 0.8 → 0.5 | 2.1 → 2.2 | 4 → 4.9 | 60 → 59.9 | 10 → 10 | 4622 → 4622 | 0 → 0 | 25.9 → 26 |  |
+| Campanha: luta | 0.7 → 0.4 | 2.7 → 1.6 | 4.6 → 4 | 55.7 → 60 | 15 → 11 | 3256 → 2914 | 0 → 0 | 18.1 → 13 |  |
+
+Leitura: a 1x o passo caiu ~2x nas arenas (0,4 a 2,9 ms: cabe na meta de 144 FPS num Core i3) e os
+comandos de Graphics caíram 3 a 10x (galeria 27 mil → 2,5 mil). **As metas de 8x da fase 1 não foram
+atingidas** (só a galeria de efeitos): o que sobra é o custo por objeto (~100 draw calls por quadro: um
+lote por texto e por troca de textura, cinco câmeras na PvpArena) e, a 8x, o ruído da VM (outra sessão na
+CPU: Queen/Coronel/ESCURIDÃO pioraram entre as duas medidas sem mudança que explique). Isso é da fase 3
+(BitmapText, atlas, menos câmeras e containers).
+
+### O portão apertado (perf:check --atualizar, 4x, mediana de 3)
+
+| Cena | baseline | fase 1 |
+|---|---|---|
+| PvP CASTELO esquiva | 17 | 7,1 |
+| PvP CAFÉ | 30 | 9,2 |
+| PvP CIDADE | 30,2 | 11,9 |
+| PvP PRAIA | 35,9 | 13 |
+| PvP CHINATOWN | 26,2 | 9,6 |
+| PvP ESTAÇÃO | 17,8 | 8,3 |
+| PvP PALCO | 21,2 | 9,4 |
+| Escolha de cartas | 12,7 | 8,1 |
+| CO-OP King / Queen / Jevil / Coronel / ESCURIDÃO | 13,6 / 15,5 / 17,3 / 15,4 / 13,8 | 9 / 9,8 / 11,5 / 15,3 / 10,1 |
+| Expedição | 13,1 | 9,4 |
+| Galeria estilos / efeitos | 13,9 / 5,5 | 7,2 / 3,7 |
+
+O `docs/perf-budget.json` agora tem as medianas da fase 1 (a base do baseline estava inflada pela carga
+da VM; com a CPU mais livre a fase 1 mediu 2 a 3x menos a 4x).
+
+### Paridade visual da fase 1
+
+`npm run paridade` contra `62bc595`: 68 de 76 fotos acima da tolerância, mas nenhuma com divergência de
+fluxo (as mesmas fases e cartas nos mesmos frames). O que difere:
+
+- ~1000 px por foto de arena (0,25 %): a linha de baixo das placas do HUD e da moldura cai 1 px acima
+  (empate de meio pixel no desenho da textura assada; não deu para desempatar igual à tela);
+- os fundos animados: laços de quadros (marquises, gato, acordeão, folhas, gaivotas, rotor) andam em
+  degraus de menos de meio pixel; nuvens e carros assados param em pixel inteiro (o `roundPixels` das
+  Images); até 0,8 % (CHINATOWN f1200, o vapor por cima do dragão);
+- galeria de efeitos (1,2 %): o verso de mentira balança em posição fracionária (a Image assada anda de
+  pixel em pixel).
+
+Menu e mapa da campanha: 0 pixels.
