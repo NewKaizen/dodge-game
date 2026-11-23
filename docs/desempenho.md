@@ -18,6 +18,7 @@ o orçamento em [`docs/perf-budget.json`](perf-budget.json).
 | `npm run paridade:base` | fotos determinísticas do `main` (a base) | ~10 min |
 | `npm run paridade` | fotos da árvore de trabalho e a diferença pixel a pixel contra a base | ~10 min |
 | `node scripts/perf/paridade.mjs autoteste` | a árvore de trabalho fotografada duas vezes: tem que dar 0 | ~20 min |
+| `node scripts/perf/replay.mjs [--duelo \| --bonus=evento]` | fumaça do replay em dados: K.O. contra a CPU e fotos da TV | ~2 min |
 | `node scripts/perf/boot.mjs` | build numa pasta temporária, tempo até o Menu com a CPU a 4x (mediana de 3) e os pedaços JS | ~3 min |
 | `?perf=1` / F9 | o HUD de desempenho no jogo (dev) | |
 | `?renderer=canvas` / `?renderer=webgl` | força o renderer (dev) | |
@@ -474,3 +475,91 @@ inclusive nas que a fase 3 não tocou (mapa da campanha 2,3 → 2,9 ms, luta 1,6
 (outra sessão). Gravar aquilo afrouxaria o portão. O `docs/perf-budget.json` foi apertado **só onde a A/B (as duas
 árvores medidas em seguida, mediana de 3) mostrou queda**: Menu 4,4 → 3,3, castelo 7,1 → 6,5, escolha de cartas
 8,1 → 6,6, King 9 → 6,9, Expedição 9,4 → 8,1, galeria de estilos 7,2 → 5,4 ms. O resto ficou como estava.
+
+## Fase 4 (passo fixo de 60 Hz e replay em dados)
+
+Base: `6b56e19` (fases 0 a 3). Commits "Fase 4.x".
+
+### 4.1 A esquiva em passo fixo (`src/game/passoFixo.js`)
+
+- **O que anda no tique:** tudo o que a esquiva simula: as pistas (coração pelo joystick/CPU, caixa dinâmica,
+  ataque, balas, colisão e graze), os eventos de bônus (`efeitoBonus.atualizar`), o duelo e, no CO-OP, as regras
+  do chefe (`atualizarCoop2NoQuadro`, chamadas de dentro de `atualizarPistas`). Fica no quadro (tempo da tela): o
+  fundo da arena, o relógio da escolha, os tweens e timers do Phaser, a ponte de rede (`rede.atualizar`: manda a
+  posição do meu coração e põe o do outro na caixa espelho, já interpolada por `sincronia.js`).
+- **O acumulador:** tiques de `PASSO_MS = 1000/60`; roda tique enquanto o acumulado passa de `FOLGA_MS` (0,5 ms),
+  então a simulação fica até um tique À FRENTE da tela e o desenho mostra o tempo exato da tela entre o tique
+  anterior e o atual (`alfa`). A 60 Hz cada quadro roda exatamente um tique com `alfa = 1`: o desenho é o mesmo de
+  antes (a paridade não muda). A folga absorve o quadro de 16,667 ms do medidor contra o tique de 16,666... ms.
+- **Espiral da morte:** no máximo `MAX_TIQUES = 5` por quadro (`× debug.acelerar`); o resto do atraso é jogado fora.
+- **Interpolação:** a `Pista` guarda a posição de corações e balas no começo de cada tique; depois dos tiques do
+  quadro, `pista.interpolar(alfa)` desloca os sprites (sprite, anel, marcador do coração; sprite da bala) para o
+  ponto entre o anterior e o atual, e `desfazerInterpolacao()` volta o valor exato antes do próximo tique (a
+  simulação nunca lê um sprite fora do lugar). O deslocamento é relativo: sprites que o ataque põe fora do x/y da
+  bala continuam certos. Não interpolam (andam a 60 Hz numa tela de 144): os objetos que os ataques e eventos
+  desenham à mão (Graphics, sprites de evento), o duelo e o coração espelho (este já vem interpolado pela rede).
+- **Onde:** `PvpArena` (e a `CoopArena` e o `ManualRalsei5Partida`, que herdam o update), `PvpArenaN`, `CoopArenaN`,
+  `GuiaBonus` e `Grimorio`. A luta da campanha já andava em passo fixo de 16 ms (o quadro conferido pelo servidor,
+  `campanha/quadro.js`) e não mudou; as páginas do Manual do Ralsei usam a simulação própria delas.
+- **Rede:** nada no protocolo muda. A partida em rede nunca foi lockstep: cada PC simula a própria caixa e a
+  caixa espelho com a mesma semente, e o dano/graze viaja como evento. Com o passo fixo a caixa espelho e a do
+  dono andam os MESMOS tiques de 16,667 ms (antes: o dt de cada PC, que divergia com FPS diferentes).
+- **Testes:** `src/game/__tests__/passoFixo.test.js` (o mesmo estado depois de N tiques com quadros de 30, 60, 75,
+  144 Hz, variados e com engasgos; um tique por quadro a 60 Hz; o teto de tiques; a interpolação volta exata) e
+  `src/game/pvp/__tests__/replayDados.test.js` (o mesmo com `Pista`, `BattleBox`, `Balas`, `Heart` e ataques de
+  verdade: `aimed`, `rain` que muda a caixa, `juntos(spiral, quicantes)` e `lasers`).
+
+### 4.2 O replay em dados (`pvp/fimDePartida/gravador.js` e `ressimulacao.js`)
+
+- **Gravação** (sempre ligada; `limiar.js` saiu): no `rodar()` o ataque e as opções (dano, ritmo, **semente**,
+  aceleração, mira) e a caixa; a cada passo o tique, o dt, a caixa no começo do passo, a velocidade do coração, o
+  fator e o teto das balas, a pista congelada e, de cada coração, a posição depois de andar (a entrada do jogador
+  já aplicada: joystick, controles invertidos, CPU, gravidade...), a hitbox e o desenho (visível, alpha, escala,
+  cor); e cada acerto que CONTOU (passo, coração, número da bala no ataque: `ContextoAtaque.bala` numera). ~30
+  números por passo num Array: nada de textura e nenhum custo medível (antes: ~11 MB de texturas e ~6 ms por
+  quadro a 8x enquanto gravava).
+- **No K.O.:** a gravação para (o passo do golpe entra) e UMA foto do ambiente da caixa: o que a câmera dela
+  desenha e não nasceu da simulação da pista (`Pista.simulando` marca `o.daSimulacao`), em duas camadas (abaixo e
+  acima da profundidade 5). São os eventos de bônus e enfeites da arena, parados no instante do golpe.
+- **No replay:** uma pista de mentira com as mesmas opções (mesma caixa, mesmo lugar do mundo, escondida de todas
+  as câmeras) roda o mesmo ataque com a mesma semente desde o começo; a cada passo gravado a caixa e os corações
+  vão para o estado gravado, e o resto (ataque, balas, avisos, lasers, decorações) se refaz; a bala que acertou some
+  no mesmo passo. Sem som (`emSilencio`). A TV anda até o começo do trecho aos poucos durante a tarja de entrada e
+  depois, a cada quadro, desenha o tempo de jogo no ar em duas texturas reaproveitadas (a aberta, `GRAVACAO.escala`,
+  e o close em volta do coração), interpolando entre tiques: a câmera lenta fica lisa sem misturar duas fotos.
+  O coração é o de verdade por cima, com o estado gravado (como antes).
+- **Duelo:** não é uma pista: grava a 30/s o estado de desenho dos objetos dele (imagens: textura, quadro, posição,
+  escala, giro, alpha, tinta; Graphics: uma cópia dos comandos) e dos corações; o replay refaz com imagens e
+  Graphics de mentira, interpolando a posição entre dois quadros.
+- **O que o jogador vê:** o mesmo trecho (os ~3,2 s antes do golpe, 1,5 s normal, câmera lenta, close em super
+  câmera lenta, o golpe), as mesmas fases e tempos da TV. Mudou: a câmera lenta não tem mais o "fantasma" da
+  mistura de duas fotos; os eventos de bônus aparecem parados no instante do golpe; textos do duelo e partículas
+  não entram no replay do duelo.
+- **Em rede:** cada PC refaz com o que ELE viu (o próprio coração exato; o do outro pelas posições que chegaram);
+  os dois replays mostram o mesmo ataque com a mesma semente, e o coração de quem caiu é exato no PC dele. Fazer os
+  dois PCs mostrarem o MESMO replay pediria mandar a gravação do dono do coração no K.O. (alguns KB): uma mensagem
+  nova e o PROTOCOLO novo. Ficou de fora por ser a escolha simples que não mexe no protocolo.
+- **Testes:** `replayDados.test.js`: a gravação refeita numa pista de mentira dá o mesmo estado final (balas,
+  caixa, coração, tempo do ataque) e o mesmo hash, andando e parado (com acertos), de uma vez e aos pedaços (como
+  a TV anda). Fumaça no navegador: `node scripts/perf/replay.mjs` (CASTELO), `--duelo`, `--bonus=brasas`.
+
+### Antes e depois (`6b56e19` → fase 4, `medir.mjs --musica=off --sem-origens`, mesma VM, em seguida)
+
+| Cena | passo 1x (ms) | passo 4x | passo 8x | FPS 8x |
+|---|---|---|---|---|
+| PvP CASTELO, esquiva | 2,1 → 1,7 | 7,5 → 7,1 | 24,5 → 16,0 | 26,5 → 38,1 |
+| PvP CAFÉ, esquiva | 2,2 → 1,8 | 8,6 → 8,0 | 22,6 → 21,8 | 26,3 → 26,9 |
+| PvP PRAIA, esquiva | 2,6 → 2,7 | 11,3 → 12,9 | 29,5 → 27,1 | 22,4 → 24,6 |
+| CO-OP King, esquiva | 2,1 → 1,6 | 8,5 → 7,3 | 23,5 → 14,1 | 27,6 → 42,7 |
+
+Uma rodada de cada. O passo fixo não deixa o quadro mais barato (o update é o mesmo trabalho: a 60 Hz um tique por
+quadro, como antes) e o medidor deixa a vida cheia, então o gravador de fotos já ficava desligado nas medidas: a
+diferença esperada é zero, e o que aparece está no ruído de 8x desta VM (±30 %; a 8x do CASTELO "antes" caiu numa
+janela com o SUPER). O ganho da 4.2 é onde o medidor não olha: a esquiva perto do K.O. (antes ~6 ms por quadro a 8x
+fotografando, ~11 MB de texturas; agora ~30 números por passo) e nenhuma textura até o replay.
+
+### Paridade visual da fase 4
+
+`npm run paridade` contra `6b56e19`: **76 fotos, 0 pixels diferentes** em todas as cenas (a 60 Hz do modo
+determinístico cada quadro roda exatamente um tique com alfa = 1, e a ordem dos sorteios do `Math.random` por
+tique é a mesma de antes).
