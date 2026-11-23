@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { textoJogo } from '../textoBitmap.js'
 import { UI } from '../tema.js'
 import { iconeDoPersonagem } from '../arte/icones.js'
 import { CORES, FONTE, TEXTO, LARGURA, corTexto } from '../constants.js'
@@ -66,8 +67,9 @@ export default class HudPvp {
     const origem = direita ? 1 : 0
 
     this.container = cena.add.container(0, 0).setDepth(70)
+    // fonte bitmap (textoBitmap.js): HP, energia e combo mudam no meio da esquiva sem rasterizar nada
     const texto = (x, y, conteudo, tamanho, cor, extra = {}) =>
-      cena.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra })
+      textoJogo(cena, x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra })
 
     // A faixa permanece dentro do espaço já reservado ao placar, fora das pistas.
     const larguraPlaca = 262
@@ -218,8 +220,7 @@ export default class HudPvp {
   // Levou um acerto com combo: "COMBO QUEBROU" pequeno sobe e some (e o combo apaga)
   comboQuebrou() {
     this.setSequencia(0, false)
-    const t = this.cena.add
-      .text(this.x0, this.yCombo, 'COMBO QUEBROU', { fontFamily: FONTE, fontSize: '9px', color: '#ff6a7a', stroke: '#000000', strokeThickness: 2 })
+    const t = textoJogo(this.cena, this.x0, this.yCombo, 'COMBO QUEBROU', { fontFamily: FONTE, fontSize: '9px', color: '#ff6a7a', stroke: '#000000', strokeThickness: 2 })
       .setOrigin(this.direita ? 1 : 0, 0)
     this.container.add(t)
     this.cena.tweens.add({ targets: t, x: { from: t.x + this.s * 3, to: t.x }, duration: 45, yoyo: true, repeat: 2 })
@@ -265,8 +266,7 @@ export class IndicadorVelocidade {
   constructor(cena, x, y, { origem = [0.5, 0], tamanho = 11, profundidade = 70 } = {}) {
     this.cena = cena
     this.fator = 1
-    this.texto = cena.add
-      .text(x, y, '', { fontFamily: FONTE, fontSize: `${tamanho}px`, color: '#ff9a3a', stroke: '#000000', strokeThickness: 3 })
+    this.texto = textoJogo(cena, x, y, '', { fontFamily: FONTE, fontSize: `${tamanho}px`, color: '#ff9a3a', stroke: '#000000', strokeThickness: 3 })
       .setOrigin(...origem)
       .setDepth(profundidade)
       .setVisible(false)

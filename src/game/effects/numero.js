@@ -1,5 +1,6 @@
 import { FONTE, TEXTO } from '../constants.js'
 import { ignorarNasCaixas } from '../recorte.js'
+import { textoJogo } from '../textoBitmap.js'
 
 // Número flutuante (dano, cura, MISS...) que pula, sobe e some.
 //   tamanho  fonte em px (padrão 20)
@@ -7,8 +8,8 @@ import { ignorarNasCaixas } from '../recorte.js'
 //   desvio   sorteia um deslocamento em x de até ±desvio px (golpes seguidos não se sobrepõem)
 export function numero(scene, x, y, texto, cor = TEXTO.dano, { tamanho = 20, pop = 1, desvio = 0 } = {}) {
   x += desvio ? Math.round((Math.random() * 2 - 1) * desvio) : 0
-  const t = scene.add
-    .text(x, y, texto, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 4 })
+  // fonte bitmap (textoBitmap.js): um número novo não rasteriza canvas nem cria textura
+  const t = textoJogo(scene, x, y, texto, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 4 })
     .setOrigin(0.5)
     .setDepth(30)
     .setScale(0.4)
