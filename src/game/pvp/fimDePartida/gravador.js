@@ -1,217 +1,351 @@
-import Phaser from 'phaser'
+import { PASSO_MS } from '../../passoFixo.js'
 
-// Gravador do replay: buffer circular com os últimos GRAVACAO.segundos de
-// cada FONTE (as duas pistas e a caixa do duelo), em "fotos" de baixa resolução.
+// GRAVADOR DO REPLAY em DADOS (docs/desempenho.md "Fase 4"). Antes eram fotos: cada quadro da caixa
+// desenhado numa textura (~11 MB de texturas e ~6 ms por quadro a 8x de CPU, por isso só gravava perto
+// de um K.O.: o antigo limiar.js). Agora a esquiva anda em tiques fixos (passoFixo.js) e o ataque sai
+// igual da mesma semente, então basta gravar o que NÃO vem da semente, tique a tique:
 //
-// Por que fotos (e não o estado das balas para redesenhar)? Os ataques criam
-// de tudo dentro da caixa: balas, mas também Graphics, sprites próprios,
-// containers, textos, partículas, filtros... Redesenhar a partir do estado
-// exigiria saber copiar cada tipo. A foto pega exatamente o que a câmera
-// mostrou, sem re-simular nada e sem depender do ataque. Ela é tirada com
-// uma DynamicTexture por quadro (desenho na GPU, nada volta para a CPU: sem
-// getImageData), a 30 quadros/s e GRAVACAO.escala do tamanho
-// (~180x156 px por pista; 2 pistas x 96 quadros ≈ 11 MB de textura).
+//   o começo     o ataque (o mesmo objeto) e as opções do rodar() (dano, ritmo, SEMENTE, aceleração,
+//                mira) e a caixa naquele instante
+//   cada passo   o tique, o dt, a caixa no começo do passo (eventos de bônus mexem nela), a velocidade do
+//                coração e o teto/fator das balas (idem), a pista congelada e, de cada coração, a posição
+//                DEPOIS de andar (a entrada do jogador já aplicada: joystick, controles invertidos, CPU,
+//                gravidade...), a hitbox e o desenho (visível, alpha, escala, cor)
+//   os acertos   (passo, coração, número da bala no ataque) de cada acerto que CONTOU: escudo, 2ª chance e
+//                i-frames já decididos pelas regras
 //
-// Cada foto: fundo preto, os objetos da fonte na ordem de profundidade,
-// recortados no retângulo da caixa daquele quadro. Os CORAÇÕES ficam de fora
-// da foto: vão só a posição, a cor, a escala e o pisca deles, e o replay
-// desenha o sprite de verdade por cima (nítido no zoom e livre para se
-// despedaçar). Junto vão o retângulo da caixa e a cor da borda (o replay
-// desenha a moldura).
+// São ~30 números por passo (Array simples), sempre ligado: o custo é zero perto das fotos. O replay
+// (ressimulacao.js) monta uma pista de mentira com as mesmas opções e refaz o ataque a partir do começo,
+// com os corações nas posições gravadas: as balas, avisos, lasers e decorações saem os mesmos, tique a tique.
 //
-// CLOSE: dos últimos GRAVACAO.close.quadros sai também, para cada coração,
-// uma foto em resolução maior (GRAVACAO.close.escala) de uma janela em volta
-// dele: é a "câmera 2" do replay, o zoom dramático no golpe, sem o borrado da
-// foto pequena ampliada. Quadros mais antigos perdem o close. No duelo os
-// dois corações dividem a caixa e ninguém sabe ainda quem vai cair: os dois
-// ganham close.
+// O que a semente não refaz (o que os eventos de bônus e a arena desenham dentro da caixa) vira UMA foto
+// do ambiente no instante do K.O. (fotoDoAmbiente): o fundo parado por baixo (e por cima) do ataque refeito.
+// Os objetos da simulação da pista são marcados (o.daSimulacao) quando nascem dentro de Pista.simulando().
 //
-// Fonte (quem monta é o FimDePartida):
-//   { campo,           região do mundo da foto { esquerda, direita, topo, base }
-//     gravando(),      conta para manter a gravação ligada
-//     visivel(),       tira a foto deste quadro
-//     objetos(),       o que desenhar (o gravador tira os corações), sem ordem
-//     coracoes(),      [{ sprite, x, y, ativo, cor, j }]
-//     limites(),       { left, right, top, bottom, x, y, width, height } da caixa
-//     borda() }        cor da moldura
+// O DUELO (bônus) não é uma pista: a caixa do duelo grava, a 30 quadros/s, só o ESTADO de desenho dos seus
+// objetos (imagens e comandos dos Graphics) e dos corações, nos últimos GRAVACAO.segundos (GravacaoDuelo).
 //
-//   const g = new Gravador(cena, { fontes })
-//   g.atualizar(dt, ativo)   todo frame (dt de jogo); ativo = alguma fonte gravando. Quando
-//                            deixa de estar ativo, a próxima gravação recomeça do zero
-//   g.parar()                congela o que foi gravado (o K.O.)
-//   g.quadrosEmOrdem()       [{ tempo, fontes: [{ chave, caixa, borda, coracoes, closes } | null] }] do mais antigo ao mais novo
-//                            coracoes: [{ x, y, ativo, visivel, alpha, escala, cor, j }]
-//                            closes:   [{ chave, x, y } (canto do mundo da janela) | null], um por coração
-//   g.destruir()             apaga as texturas
-//
-// Foto: no máximo uma por frame. Abaixo de 30 fps sai uma por frame (menos
-// quadros); o replay toca com quantos houver.
+//   const g = new Gravador(arena, { pistas, campos, duelo })   duelo: a fonte do duelo (index.js fonteDuelo)
+//   g.atualizarDuelo(dt)       todo quadro (dt de jogo): a foto de dados do duelo, se ele está lutando
+//   g.parar(validas)           o K.O.: congela tudo; validas(k) diz que pistas valem (a esquiva desta rodada)
+//   g.quadros(alvos)           [{ tempo, pistas: [registro | null] }] dos últimos GRAVACAO.segundos, um por
+//                              tique; registro = { caixa, borda, coracao, close, outros } (o que a TV lê)
+//   g.fonte(k)                 a fonte k ({ tipo: 'pista' | 'duelo', ... }) para montar o renderizador
+//   g.destruir()
 export const GRAVACAO = {
-  quadroMs: 1000 / 30,
+  quadroMs: 1000 / 30, // a unidade de tempo das fases da TV (transmissao.js)
   segundos: 3.2,
-  escala: 0.6,
-  close: { quadros: 18, escala: 1.25, largura: 184, altura: 150 }, // janela em px de jogo em volta do coração
+  escala: 0.6, // a imagem aberta da TV (a mesma resolução das fotos de antes)
+  close: { escala: 1.25, largura: 184, altura: 150 }, // janela em px de jogo em volta do coração
+  duelo: { quadroMs: 1000 / 30 },
 }
 
-let geracao = 0 // chaves únicas por gravador (a revanche cria outro antes do anterior sumir)
+// layout de um passo no Array: cabeçalho + POR_CORACAO por coração
+export const PASSO = { tique: 0, dt: 1, congelada: 2, velocidade: 3, fator: 4, teto: 5, lx: 6, ly: 7, lw: 8, lh: 9, borda: 10, cabecalho: 11 }
+export const CORACAO_G = { x: 0, y: 1, ativo: 2, hitbox: 3, graze: 4, visivel: 5, alpha: 6, escala: 7, cor: 8, tamanho: 9 }
 
-export default class Gravador {
-  constructor(cena, { fontes }) {
+// marca o que nasce na cena enquanto alguma pista simula (Pista.simulando)
+function instalarMarcador(cena, gravacoes) {
+  const aoEntrar = (o) => {
+    for (const g of gravacoes) if (g.dentro > 0) return void (o.daSimulacao = true)
+  }
+  cena.events.on('addedtoscene', aoEntrar)
+  return () => cena.events.off('addedtoscene', aoEntrar)
+}
+
+// A gravação de UMA pista (pista.gravacao): o trecho do ataque desta rodada
+export class GravacaoPista {
+  constructor(cena) {
     this.cena = cena
-    this.fontes = fontes
-    this.prefixo = `fim-replay-${++geracao}`
-    this.total = Math.round((GRAVACAO.segundos * 1000) / GRAVACAO.quadroMs)
-    const par = (v) => Math.ceil(v / 2) * 2
-    this.tamanhos = fontes.map(({ campo }) => ({ largura: par((campo.direita - campo.esquerda) * GRAVACAO.escala), altura: par((campo.base - campo.topo) * GRAVACAO.escala) }))
-    this.limparBuffers()
-    this.quadros = new Array(this.total)
-    this.proximo = 0
-    this.proximoClose = 0
-    this.cheios = 0
-    this.acumulado = 0
-    this.tempo = 0
+    this.trecho = null
+    this.dentro = 0 // > 0: a pista está simulando (o que nasce agora é da simulação)
+    this.parada = false
+    this.atual = -1 // o passo em andamento (os acertos dele entram), -1 = não grava
+    this.l = [0, 0, 0, 0]
+  }
+
+  comecar(pista, ataque, opcoes) {
+    if (this.parada) return
+    const l = pista.caixa.limites
+    this.trecho = {
+      ataque,
+      opcoes: { ...opcoes, ritmo: { ...(opcoes.ritmo ?? {}) } },
+      caixa: [l.x, l.y, l.width, l.height],
+      coracoes: pista.coracoes.length,
+      tamanho: PASSO.cabecalho + CORACAO_G.tamanho * pista.coracoes.length,
+      dados: [],
+      passos: 0,
+      acertos: new Set(),
+    }
+    this.atual = -1
+  }
+
+  // a caixa no começo do passo (antes dos corações andarem)
+  limites(pista) {
+    const l = pista.caixa.limites
+    const v = this.l
+    v[0] = l.x
+    v[1] = l.y
+    v[2] = l.width
+    v[3] = l.height
+  }
+
+  passo(pista, dt, velocidade) {
+    const t = this.trecho
+    if (!t || this.parada) {
+      this.atual = -1
+      return
+    }
+    const d = t.dados
+    const l = this.l
+    d.push(this.cena.passoFixo?.tiques ?? 0, dt, pista.congelada ? 1 : 0, velocidade, pista.balas.fatorVelocidade, pista.balas.velocidadeMax, l[0], l[1], l[2], l[3], pista.caixa.retangulo.strokeColor)
+    for (const c of pista.coracoes) {
+      const s = c.sprite
+      d.push(c.x, c.y, c.ativo ? 1 : 0, c.hitbox, c.graze, s?.visible ? 1 : 0, s?.alpha ?? 1, s?.scaleX ?? 1, s?.tintTopLeft ?? c.cor)
+    }
+    this.atual = t.passos++
+  }
+
+  // um acerto que contou (o K.O. para a gravação dentro do acerto: o passo dele ainda entra)
+  acerto(pista, coracao, bala) {
+    const t = this.trecho
+    if (!t || this.atual < 0 || bala.numero === undefined) return
+    t.acertos.add(chaveAcerto(this.atual, pista.coracoes.indexOf(coracao), bala.numero))
+  }
+
+  parar() {
+    this.parada = true
+  }
+
+  // o tique do passo i
+  tique(i) {
+    return this.trecho.dados[i * this.trecho.tamanho]
+  }
+
+  // registro de desenho do passo i (o que a TV lê), coração `foco` em destaque
+  registro(i, foco = 0) {
+    const t = this.trecho
+    const d = t.dados
+    const o = i * t.tamanho
+    const coracoes = []
+    for (let k = 0; k < t.coracoes; k++) {
+      const c = o + PASSO.cabecalho + k * CORACAO_G.tamanho
+      coracoes.push({ x: d[c], y: d[c + 1], ativo: d[c + 2] === 1, visivel: d[c + 5] === 1, alpha: d[c + 6], escala: d[c + 7], cor: d[c + 8], j: k })
+    }
+    const coracao = coracoes[foco] ?? null
+    return {
+      passo: i,
+      caixa: { x: d[o + PASSO.lx], y: d[o + PASSO.ly], largura: d[o + PASSO.lw], altura: d[o + PASSO.lh] },
+      borda: d[o + PASSO.borda],
+      coracao,
+      close: Boolean(coracao?.ativo),
+      outros: coracoes.filter((_, n) => n !== foco),
+    }
+  }
+}
+
+export const chaveAcerto = (passo, coracao, numero) => `${passo}:${coracao}:${numero}`
+
+// O DUELO: o estado de desenho dos objetos da caixa (imagens e Graphics) e dos corações, a 30/s, num anel
+export class GravacaoDuelo {
+  constructor(fonte) {
+    this.fonte = fonte
+    this.total = Math.ceil((GRAVACAO.segundos * 1000) / GRAVACAO.duelo.quadroMs) + 1
+    this.quadros = []
     this.ativo = false
-    this.gravando = true
+    this.parada = false
+    this.tempo = 0
+    this.acumulado = 0
+    this.ids = new WeakMap()
+    this.proximoId = 0
   }
 
-  limparBuffers() {
-    this.texturas = this.fontes.map(() => []) // DynamicTexture por quadro, criadas aos poucos
-    this.closes = this.fontes.map(() => []) // [fonte][coração][slot] as do close (buffer menor)
-    this.donosClose = this.fontes.map(() => []) // o registro que usa cada textura de close (para tirar o close dele quando ela for reaproveitada)
+  id(o) {
+    let n = this.ids.get(o)
+    if (n === undefined) this.ids.set(o, (n = ++this.proximoId))
+    return n
   }
 
-  // A textura do quadro `slot` da fonte k (criada na primeira volta do buffer)
-  textura(k, slot) {
-    const lista = this.texturas[k]
-    if (lista[slot]) return lista[slot]
-    const { largura, altura } = this.tamanhos[k]
-    const dt = this.cena.textures.addDynamicTexture(`${this.prefixo}-${k}-${slot}`, largura, altura)
-    if (!dt) return null
-    dt.setFilter(Phaser.Textures.FilterMode.LINEAR)
-    const campo = this.fontes[k].campo
-    dt.camera.setOrigin(0, 0).setZoom(GRAVACAO.escala).setScroll(campo.esquerda, campo.topo)
-    lista[slot] = dt
-    return dt
-  }
-
-  texturaClose(k, i, slot) {
-    const lista = (this.closes[k][i] ??= [])
-    if (lista[slot]) return lista[slot]
-    const { largura, altura, escala } = GRAVACAO.close
-    const dt = this.cena.textures.addDynamicTexture(`${this.prefixo}-close-${k}-${i}-${slot}`, Math.round(largura * escala), Math.round(altura * escala))
-    if (!dt) return null
-    dt.setFilter(Phaser.Textures.FilterMode.LINEAR)
-    dt.camera.setOrigin(0, 0).setZoom(escala)
-    lista[slot] = dt
-    return dt
-  }
-
-  atualizar(dt, ativo) {
-    if (!this.gravando) return
-    if (!ativo) {
+  atualizar(dt) {
+    if (this.parada) return
+    if (!this.fonte.gravando()) {
       this.ativo = false
       return
     }
     if (!this.ativo) {
-      // nova esquiva (ou duelo): o replay é só desta rodada
       this.ativo = true
-      this.cheios = 0
-      this.proximo = 0
-      this.acumulado = GRAVACAO.quadroMs // já tira a primeira foto
+      this.quadros = []
       this.tempo = 0
+      this.acumulado = GRAVACAO.duelo.quadroMs // já grava o primeiro
     }
     this.tempo += dt
     this.acumulado += dt
-    if (this.acumulado < GRAVACAO.quadroMs) return
-    this.acumulado = Math.min(this.acumulado - GRAVACAO.quadroMs, GRAVACAO.quadroMs) // sem rajada depois de um engasgo
+    if (this.acumulado < GRAVACAO.duelo.quadroMs) return
+    this.acumulado = Math.min(this.acumulado - GRAVACAO.duelo.quadroMs, GRAVACAO.duelo.quadroMs)
     this.capturar()
   }
 
-  // Desenha em dt os objetos (já ordenados) e pinta de preto o que ficou
-  // fora da caixa (l: limites da caixa; x0, y0: canto do mundo da foto; e: escala)
-  fotografar(dt, objetos, l, x0, y0, e) {
-    const W = dt.width
-    const H = dt.height
-    const cx0 = Phaser.Math.Clamp(Math.round((l.left - x0) * e), 0, W)
-    const cx1 = Phaser.Math.Clamp(Math.round((l.right - x0) * e), 0, W)
-    const cy0 = Phaser.Math.Clamp(Math.round((l.top - y0) * e), 0, H)
-    const cy1 = Phaser.Math.Clamp(Math.round((l.bottom - y0) * e), 0, H)
-    dt.clear()
-    dt.fill(0x000000, 1)
-    dt.draw(objetos)
-    const pretos = [
-      [0, 0, W, cy0],
-      [0, cy1, W, H - cy1],
-      [0, cy0, cx0, cy1 - cy0],
-      [cx1, cy0, W - cx1, cy1 - cy0],
-    ]
-    for (const [x, y, w, h] of pretos) if (w > 0 && h > 0) dt.fill(0x000000, 1, x, y, w, h)
-    dt.render()
-  }
-
   capturar() {
-    const slot = this.proximo
-    const slotClose = this.proximoClose
-    const quadro = { tempo: this.tempo, fontes: [] }
-    this.fontes.forEach((fonte, k) => {
-      const dt = fonte.visivel() ? this.textura(k, slot) : null
-      if (!dt) return quadro.fontes.push(null)
-      // na ordem de profundidade (sort estável), menos os corações
-      const coracoes = fonte.coracoes()
-      const sprites = new Set(coracoes.map((c) => c.sprite))
-      const objetos = fonte
-        .objetos()
-        .filter((o) => !sprites.has(o))
-        .sort((a, b) => a.depth - b.depth)
-      const l = fonte.limites()
-      this.fotografar(dt, objetos, l, fonte.campo.esquerda, fonte.campo.topo, GRAVACAO.escala)
-      const estados = coracoes.map(({ sprite: s, x, y, ativo, cor, j }) => ({ x, y, ativo, visivel: Boolean(s?.visible), alpha: s?.alpha ?? 1, escala: s?.scaleX ?? 1, cor: s?.tintTopLeft ?? cor, j }))
-      const registro = {
-        chave: dt.key,
-        caixa: { x: l.x, y: l.y, largura: l.width, altura: l.height },
-        borda: fonte.borda(),
-        coracoes: estados,
-        closes: [],
-      }
-      // close em volta de cada coração
-      estados.forEach((c, i) => {
-        registro.closes[i] = null
-        if (!c.ativo) return
-        const tc = this.texturaClose(k, i, slotClose)
-        if (!tc) return
-        const { largura, altura, escala } = GRAVACAO.close
-        const x = c.x - largura / 2
-        const y = c.y - altura / 2
-        tc.camera.setScroll(x, y)
-        this.fotografar(tc, objetos, l, x, y, escala)
-        const donos = (this.donosClose[k][i] ??= [])
-        if (donos[slotClose]) donos[slotClose].closes[i] = null
-        donos[slotClose] = registro
-        registro.closes[i] = { chave: tc.key, x, y }
-      })
-      quadro.fontes.push(registro)
+    const f = this.fonte
+    const coracoes = f.coracoes()
+    const sprites = new Set(coracoes.map((c) => c.sprite))
+    const objetos = []
+    for (const o of f.objetos()) {
+      if (sprites.has(o)) continue
+      const base = { id: this.id(o), d: o.depth, x: o.x, y: o.y, r: o.rotation, sx: o.scaleX, sy: o.scaleY, a: o.alpha, b: o.blendMode }
+      if (o.type === 'Graphics') objetos.push({ ...base, t: 'g', cmds: o.commandBuffer.slice() })
+      else if ((o.type === 'Image' || o.type === 'Sprite') && o.texture?.key) objetos.push({ ...base, t: 'i', key: o.texture.key, frame: o.frame?.name, ox: o.originX, oy: o.originY, tint: o.tintTopLeft, tm: o.tintMode, fx: o.flipX, fy: o.flipY })
+    }
+    const l = f.limites()
+    this.quadros.push({
+      tempo: this.tempo,
+      caixa: { x: l.x, y: l.y, largura: l.width, altura: l.height },
+      borda: f.borda(),
+      coracoes: coracoes.map(({ sprite: s, x, y, ativo, cor, j }) => ({ x, y, ativo, visivel: Boolean(s?.visible), alpha: s?.alpha ?? 1, escala: s?.scaleX ?? 1, cor: s?.tintTopLeft ?? cor, j })),
+      objetos,
     })
-    this.quadros[slot] = quadro
-    this.proximo = (slot + 1) % this.total
-    this.proximoClose = (slotClose + 1) % GRAVACAO.close.quadros
-    this.cheios = Math.min(this.total, this.cheios + 1)
+    if (this.quadros.length > this.total) this.quadros.shift()
   }
 
   parar() {
-    this.gravando = false
+    this.parada = true
+  }
+}
+
+export default class Gravador {
+  constructor(cena, { pistas, campos, duelo = null }) {
+    this.cena = cena
+    this.pistas = pistas
+    this.gravacoes = pistas.map((pista) => (pista.gravacao = new GravacaoPista(cena)))
+    this.campos = campos
+    this.duelo = duelo ? new GravacaoDuelo(duelo) : null
+    this.validas = pistas.map(() => false)
+    this.ambiente = pistas.map(() => null)
+    this.desligarMarcador = instalarMarcador(cena, this.gravacoes)
   }
 
-  quadrosEmOrdem() {
-    const n = this.cheios
-    const inicio = (this.proximo - n + this.total) % this.total
-    return Array.from({ length: n }, (_, i) => this.quadros[(inicio + i) % this.total]).filter(Boolean)
+  get kDuelo() {
+    return this.pistas.length
+  }
+
+  atualizarDuelo(dt) {
+    this.duelo?.atualizar(dt)
+  }
+
+  // o K.O.: congela; a foto do ambiente das pistas que valem (a esquiva desta rodada)
+  parar(validas = () => true) {
+    if (this.parado) return
+    this.parado = true
+    this.duelo?.parar()
+    this.gravacoes.forEach((g, k) => {
+      g.parar()
+      this.validas[k] = Boolean(g.trecho?.passos) && validas(k)
+      if (this.validas[k]) this.ambiente[k] = fotoDoAmbiente(this.cena, this.pistas[k], this.campos[k], k)
+    })
+  }
+
+  // a fonte k para montar o renderizador do replay
+  fonte(k) {
+    if (k === this.kDuelo) return this.duelo?.quadros.length ? { tipo: 'duelo', gravacao: this.duelo, campo: this.duelo.fonte.campo } : null
+    if (!this.validas[k]) return null
+    return { tipo: 'pista', pista: this.pistas[k], gravacao: this.gravacoes[k], campo: this.campos[k], ambiente: this.ambiente[k] }
+  }
+
+  // Os quadros da TV: alvos = [{ k, i }] (fonte e o coração em destaque nela)
+  quadros(alvos) {
+    if (!alvos.length) return []
+    if (alvos.some((m) => m.k === this.kDuelo)) {
+      const qs = this.duelo?.quadros ?? []
+      const vista = (q, i) => ({ caixa: q.caixa, borda: q.borda, coracao: q.coracoes[i] ?? null, close: Boolean(q.coracoes[i]?.ativo), outros: q.coracoes.filter((_, n) => n !== i), quadro: q })
+      return qs.map((q) => ({ tempo: q.tempo, pistas: alvos.map((m) => (m.k === this.kDuelo ? vista(q, m.i) : null)) }))
+    }
+    // pistas: um quadro por tique (o último passo de cada tique), nos últimos GRAVACAO.segundos
+    const fontes = alvos.map((m) => (this.validas[m.k] ? this.gravacoes[m.k] : null))
+    const fim = Math.max(-Infinity, ...fontes.filter(Boolean).map((g) => g.tique(g.trecho.passos - 1)))
+    if (!Number.isFinite(fim)) return []
+    const inicio = fim - Math.round((GRAVACAO.segundos * 1000) / PASSO_MS)
+    // por fonte, o último passo de cada tique da janela
+    const porTique = new Map()
+    fontes.forEach((g, n) => {
+      if (!g) return
+      for (let i = 0; i < g.trecho.passos; i++) {
+        const tq = g.tique(i)
+        if (tq < inicio) continue
+        let linha = porTique.get(tq)
+        if (!linha) porTique.set(tq, (linha = alvos.map(() => -1)))
+        linha[n] = i
+      }
+    })
+    const tiques = [...porTique.keys()].sort((a, b) => a - b)
+    const ultimo = alvos.map(() => -1)
+    return tiques.map((tq) => {
+      const linha = porTique.get(tq)
+      return {
+        tempo: tq * PASSO_MS,
+        pistas: alvos.map((m, n) => {
+          if (linha[n] >= 0) ultimo[n] = linha[n]
+          return ultimo[n] >= 0 ? fontes[n].registro(ultimo[n], m.i) : null
+        }),
+      }
+    })
   }
 
   destruir() {
-    this.gravando = false
-    for (const lista of [...this.texturas, ...this.closes.flat()]) for (const dt of lista ?? []) if (dt) this.cena.textures.remove(dt)
-    this.limparBuffers()
-    this.quadros = []
-    this.cheios = 0
+    this.desligarMarcador?.()
+    this.desligarMarcador = null
+    for (const a of this.ambiente) a?.destruir()
+    this.ambiente = this.pistas.map(() => null)
+    this.gravacoes.forEach((g, k) => {
+      if (this.pistas[k]?.gravacao === g) this.pistas[k].gravacao = null
+      g.trecho = null
+    })
+    if (this.duelo) this.duelo.quadros = []
+  }
+}
+
+// ---------- a foto do ambiente (uma, no K.O.) ----------
+
+let geracao = 0
+export const PROFUNDIDADE_AMBIENTE = 5 // abaixo: por baixo do ataque refeito; dali para cima: por cima
+
+// O que a câmera da caixa desenha e NÃO é da simulação da pista (eventos de bônus, enfeites da arena), em
+// duas texturas: o que fica por baixo e o que fica por cima do ataque refeito. Na resolução do close.
+function fotoDoAmbiente(cena, pista, campo, k) {
+  const cam = pista.caixa.camera
+  const coracoes = new Set(pista.coracoes.flatMap((c) => [c.sprite, c.anel, c.forma, c.tag, c.reticula]).filter(Boolean))
+  // (sem os de mistura ADD e afins: numa textura transparente eles viram um quadrado escuro; são brilhos que
+  // acompanham o coração, que a foto parada nem acertaria)
+  const objetos = cena.children.list.filter((o) => !o.daSimulacao && !coracoes.has(o) && o !== pista.caixa.retangulo && !o.blendMode && o.willRender?.(cam))
+  if (!objetos.length) return null
+  const e = GRAVACAO.close.escala
+  const largura = Math.ceil((campo.direita - campo.esquerda) * e)
+  const altura = Math.ceil((campo.base - campo.topo) * e)
+  const prefixo = `fim-ambiente-${++geracao}-${k}`
+  const camadas = []
+  for (const [nome, lista] of [
+    ['abaixo', objetos.filter((o) => o.depth < PROFUNDIDADE_AMBIENTE)],
+    ['acima', objetos.filter((o) => o.depth >= PROFUNDIDADE_AMBIENTE)],
+  ]) {
+    if (!lista.length) {
+      camadas.push(null)
+      continue
+    }
+    const dt = cena.textures.addDynamicTexture(`${prefixo}-${nome}`, largura, altura)
+    if (!dt) {
+      camadas.push(null)
+      continue
+    }
+    dt.camera.setOrigin(0, 0).setZoom(e).setScroll(campo.esquerda, campo.topo)
+    dt.draw(lista.sort((a, b) => a.depth - b.depth))
+    dt.render()
+    camadas.push(dt.key)
+  }
+  return {
+    abaixo: camadas[0],
+    acima: camadas[1],
+    escala: e,
+    destruir() {
+      for (const chave of camadas) if (chave && cena.textures?.exists(chave)) cena.textures.remove(chave)
+    },
   }
 }

@@ -9,9 +9,10 @@ import { tremerCamera } from '../../effects/shake.js'
 import { fatores, quantas } from '../../acessibilidade.js'
 
 // O REPLAY do golpe final como TRANSMISSÃO ESPORTIVA ao vivo na TV.
-// Toca as fotos do Gravador (nada é re-simulado), com o coração de verdade
-// desenhado por cima (a foto não tem o coração: ele fica nítido no zoom e
-// pode se despedaçar). Linha do tempo:
+// Mostra a caixa refeita dos DADOS do Gravador (gravador.js + ressimulacao.js:
+// o ataque re-simulado da semente com a entrada de cada tique), com o coração
+// de verdade desenhado por cima (a imagem da caixa não tem o coração: ele
+// fica nítido no zoom e pode se despedaçar). Linha do tempo:
 //   entrada  a TARJA do "INSTANT REPLAY" (faixas diagonais na cor da arena e
 //            o selo girando) varre a tela; no meio dela a arena vira o replay
 //            e o selo do canto troca "● AO VIVO" por "REPLAY". Torcida começa
@@ -19,7 +20,7 @@ import { fatores, quantas } from '../../acessibilidade.js'
 //   lento    câmera lenta, a câmera 1 fechando no coração de quem vai cair;
 //            barras de cinema entram, "LANCE DECISIVO" na tarja de baixo
 //   close    CORTE para a câmera 2: o close em alta (GRAVACAO.close), em
-//            super câmera lenta (quadros misturados, sem engasgo), seguindo
+//            super câmera lenta (lisa: a re-simulação interpola entre tiques), seguindo
 //            o coração; o círculo do comentarista (telestrator) vai sendo
 //            desenhado em volta dele; flashes de fotógrafos; a torcida cresce
 //   golpe    no quadro do golpe: clarão, tranco no zoom, o "K.O.!" batendo,
@@ -40,8 +41,9 @@ import { fatores, quantas } from '../../acessibilidade.js'
 // arena ficam escondidas durante o replay. encerrar() desfaz TUDO (câmeras,
 // objetos, música, sons da torcida se pulou).
 //
-//   const tv = new Transmissao(cena, { quadros, pistas: [k...], campos, mortos, jogadores, arena, andamento })
-//     quadros    [{ tempo, pistas: [{ chave, caixa, borda, coracao, close, outros } | null] }] (k indexa pistas e campos)
+//   const tv = new Transmissao(cena, { quadros, renderizadores, pistas: [k...], campos, mortos, jogadores, arena, andamento })
+//     quadros    [{ tempo, pistas: [{ caixa, borda, coracao, close, outros } | null] }] (k indexa pistas e campos)
+//     renderizadores  [k]: ressimulacao.js; desenhar(tempo, foco) dá as texturas da caixa no tempo de jogo
 //     mortos     [{ j, k }]   jogadores  [{ rotulo, nome, cor, hp }]   arena { nome, cor }
 //   await tv.tocar()      resolve no fim (ou quando encerrar() for chamado)
 //   tv.atualizar(dtReal)  todo frame
@@ -111,9 +113,10 @@ const suave = (u) => Phaser.Math.Easing.Sine.InOut(Phaser.Math.Clamp(u, 0, 1))
 const hex = (cor) => `#${cor.toString(16).padStart(6, '0')}`
 
 export default class Transmissao {
-  constructor(cena, { quadros, pistas, campos, mortos, jogadores, arena, andamento = 1 }) {
+  constructor(cena, { quadros, renderizadores = [], pistas, campos, mortos, jogadores, arena, andamento = 1 }) {
     this.cena = cena
     this.quadros = quadros
+    this.renderizadores = renderizadores
     this.ks = pistas
     this.campos = campos
     this.mortos = mortos
@@ -134,15 +137,26 @@ export default class Transmissao {
     this.fim = new Promise((r) => (this.resolver = r))
     prepararTexturas(cena)
 
-    // os quadros que vão ao ar
+    // os quadros que vão ao ar (um por tique nas pistas, 30/s no duelo): as fases são cortadas pelo
+    // TEMPO de jogo de cada quadro (o mesmo trecho de sempre: TV.*.quadros de GRAVACAO.quadroMs) e a
+    // reprodução anda pela duração de cada quadro
     const n = quadros.length
+    this.duracoes = quadros.map((q, i) => {
+      const d = i + 1 < n ? quadros[i + 1].tempo - q.tempo : GRAVACAO.quadroMs
+      return d > 0 ? d : GRAVACAO.quadroMs
+    })
+    const recuar = (de, ms) => {
+      let i = de
+      let soma = 0
+      while (i > 0 && soma + this.duracoes[i - 1] <= ms + 0.5) soma += this.duracoes[--i]
+      return i
+    }
     this.iFim = n - 1
-    this.iClose = Math.max(0, this.iFim - TV.close.quadros)
-    this.iLento = Math.max(0, this.iClose - TV.lento.quadros)
-    this.iPlay = Math.max(0, this.iLento - TV.playQuadros)
+    this.iClose = recuar(this.iFim, TV.close.quadros * GRAVACAO.quadroMs)
+    this.iLento = recuar(this.iClose, TV.lento.quadros * GRAVACAO.quadroMs)
+    this.iPlay = recuar(this.iLento, TV.playQuadros * GRAVACAO.quadroMs)
     this.pos = this.iPlay
-    this.ateGolpeMs =
-      TV.entradaMs + (this.iLento - this.iPlay) * GRAVACAO.quadroMs + ((this.iClose - this.iLento) * GRAVACAO.quadroMs) / TV.lento.fator + ((this.iFim - this.iClose) * GRAVACAO.quadroMs) / TV.close.fator
+    this.ateGolpeMs = TV.entradaMs + this.msEntre(this.iPlay, this.iLento) + this.msEntre(this.iLento, this.iClose) / TV.lento.fator + this.msEntre(this.iClose, this.iFim) / TV.close.fator
 
     this.montarTelas()
     this.montarArtes()
@@ -151,6 +165,28 @@ export default class Transmissao {
 
   tocar() {
     return this.fim
+  }
+
+  // ms de jogo entre as fotos a e b (a < b)
+  msEntre(a, b) {
+    let soma = 0
+    for (let i = a; i < b; i++) soma += this.duracoes[i]
+    return soma
+  }
+
+  // anda `ms` de jogo na gravação (a posição é o índice da foto, com a fração dentro dela), até `limite`
+  avancar(ms, limite) {
+    while (ms > 0 && this.pos < limite) {
+      const i = Math.floor(this.pos)
+      const d = this.duracoes[i] ?? GRAVACAO.quadroMs
+      const resto = (i + 1 - this.pos) * d
+      if (ms < resto) {
+        this.pos += ms / d
+        return
+      }
+      this.pos = i + 1
+      ms -= resto
+    }
   }
 
   novo(o) {
@@ -177,7 +213,7 @@ export default class Transmissao {
       const e = RES.escala
       const cam = cena.cameras.add(Math.round((duas ? i * vw : 0) * e), 0, Math.round(vw * e), Math.round(ALTURA * e)).setBackgroundColor(0x07070c).setVisible(false)
       this.cameras.push(cam)
-      // as fotos: a aberta (duas camadas: o quadro e o próximo por cima, misturando na câmera lenta) e a do close
+      // as imagens da caixa: a aberta e a do close (texturas do renderizador, ressimulacao.js)
       const foto = () => this.novo(cena.add.image(base.x + campo.esquerda, base.y + campo.topo, '__DEFAULT').setOrigin(0).setScale(1 / GRAVACAO.escala).setVisible(false))
       const close = () => this.novo(cena.add.image(0, 0, '__DEFAULT').setOrigin(0).setScale(1 / GRAVACAO.close.escala).setVisible(false))
       const tela = {
@@ -187,15 +223,14 @@ export default class Transmissao {
         campo,
         vw,
         abertaA: foto(),
-        abertaB: foto(),
         closeA: close(),
-        closeB: close(),
         borda: this.novo(cena.add.graphics()),
         circulo: this.novo(cena.add.graphics()),
         coracao: this.novo(cena.add.image(0, 0, 'coracao').setVisible(false)),
         outros: [], // os outros corações da mesma foto (duelo: quem ficou de pé), criados quando aparecem
         ultimaBorda: null,
         temClose: Boolean(ultimo?.pistas[k]?.close),
+        render: this.renderizadores[k] ?? null,
         morto: this.mortos.find((m) => m.k === k),
       }
       // zoom da câmera aberta: a maior caixa do trecho cabe com folga
@@ -395,7 +430,7 @@ export default class Transmissao {
       velocidadeMusica(this.andamento * 0.6)
       fitaMusica({ corte: 420 }, 500)
       // batidas e flashes até o golpe
-      const total = ((this.iFim - this.iClose) * GRAVACAO.quadroMs) / TV.close.fator
+      const total = this.msEntre(this.iClose, this.iFim) / TV.close.fator
       for (let t = 650; t < total - 250; t += 650) this.agendar(t, () => tocar(cena, 'batidaLenta'))
       for (let t = 300; t < total - 150; t += Phaser.Math.Between(260, 520)) this.agendar(t, () => this.flashes(1, 0))
     } else if (fase === 'golpe') {
@@ -414,6 +449,11 @@ export default class Transmissao {
 
   atualizar(dt) {
     if (this.acabou) return
+    // antes de ir ao ar: a re-simulação anda até o começo do trecho aos poucos (sem engasgo na tarja)
+    if (!this.trocou) {
+      const inicio = this.quadros[this.iPlay]?.tempo ?? 0
+      for (const t of this.telas) t.render?.preparar(inicio, 40)
+    }
     this.tempo += dt
     this.faseMs += dt
     const fase = this.fase
@@ -423,21 +463,20 @@ export default class Transmissao {
       item.fn()
       if (this.acabou || this.fase !== fase) return
     }
-    const passo = dt / GRAVACAO.quadroMs
     switch (fase) {
       case 'entrada':
         if (this.faseMs >= TV.entradaMs) this.mudarFase('play')
         break
       case 'play':
-        this.pos += passo
+        this.avancar(dt, this.iLento)
         if (this.pos >= this.iLento) this.mudarFase('lento')
         break
       case 'lento':
-        this.pos += passo * TV.lento.fator
+        this.avancar(dt * TV.lento.fator, this.iClose)
         if (this.pos >= this.iClose) this.mudarFase('close')
         break
       case 'close':
-        this.pos += passo * TV.close.fator
+        this.avancar(dt * TV.close.fator, this.iFim)
         if (this.pos >= this.iFim) this.mudarFase('golpe')
         break
       case 'golpe':
@@ -662,31 +701,27 @@ export default class Transmissao {
     const j = Math.min(i + 1, n - 1)
     const frac = this.fase === 'golpe' ? 0 : Phaser.Math.Clamp(this.pos - i, 0, 1)
     const modoClose = this.fase === 'close' || this.fase === 'golpe'
-    for (const t of this.telas) this.desenharTela(t, this.quadros[i]?.pistas[t.k] ?? null, this.quadros[j]?.pistas[t.k] ?? null, frac, modoClose)
+    // o tempo de jogo no ar (a caixa é refeita nele: ressimulacao.js)
+    const tempo = Phaser.Math.Linear(this.quadros[i]?.tempo ?? 0, this.quadros[j]?.tempo ?? 0, frac)
+    for (const t of this.telas) this.desenharTela(t, this.quadros[i]?.pistas[t.k] ?? null, this.quadros[j]?.pistas[t.k] ?? null, frac, modoClose, tempo)
     // a seta do canto gira; o ponto do "AO VIVO" pisca
     this.cantoSeta.setAngle((this.tempo * 0.25) % 360)
   }
 
-  desenharTela(t, q0, q1, frac, modoClose) {
+  desenharTela(t, q0, q1, frac, modoClose, tempo) {
     const { base, cam } = t
     const usarClose = modoClose && t.temClose && q0?.close
-    // fotos: a do quadro e a do próximo por cima (alpha = fração): a câmera lenta fica lisa
-    const camada = (img, q, chave, alpha) => {
-      if (!q || !chave) return img.setVisible(false)
-      img.setTexture(chave).setVisible(true).setAlpha(alpha)
-    }
-    camada(t.abertaA, q0, q0?.chave, 1)
-    camada(t.abertaB, q1, q1 && q1 !== q0 && frac > 0.02 ? q1.chave : null, frac)
-    if (usarClose) {
-      camada(t.closeA, q0, q0.close.chave, 1)
-      t.closeA.setPosition(base.x + q0.close.x, base.y + q0.close.y)
-      const c1 = q1?.close && frac > 0.02 ? q1.close : null
-      camada(t.closeB, q1, c1?.chave, frac)
-      if (c1) t.closeB.setPosition(base.x + c1.x, base.y + c1.y)
-    } else {
-      t.closeA.setVisible(false)
-      t.closeB.setVisible(false)
-    }
+    // a caixa no tempo de jogo no ar, refeita dos dados (aberta e, no close, a janela em volta do coração)
+    const c0q = q0?.coracao
+    const c1q = q1?.coracao ?? c0q
+    const focoClose = usarClose && c0q ? { x: Phaser.Math.Linear(c0q.x, c1q.x, frac), y: Phaser.Math.Linear(c0q.y, c1q.y, frac) } : null
+    const foto = q0 && t.render ? t.render.desenhar(tempo, focoClose) : null
+    if (foto?.chave) t.abertaA.setTexture(foto.chave).setVisible(true).setAlpha(1)
+    else t.abertaA.setVisible(false)
+    if (usarClose && foto?.close) {
+      t.closeA.setTexture(foto.close.chave).setVisible(true).setAlpha(1)
+      t.closeA.setPosition(base.x + foto.close.x, base.y + foto.close.y)
+    } else t.closeA.setVisible(false)
     // moldura da caixa daquele quadro (com a cor da borda dele: pisca vermelho no acerto)
     if (q0 && t.ultimaBorda !== q0) {
       t.ultimaBorda = q0
@@ -800,6 +835,7 @@ export default class Transmissao {
     }
     this.objetos.forEach((o) => o.scene && o.destroy())
     this.objetos = []
+    for (const t of this.telas ?? []) t.render?.destruir()
     for (const cam of this.cameras) cena.cameras?.remove(cam)
     this.cameras = []
     this.resolver()

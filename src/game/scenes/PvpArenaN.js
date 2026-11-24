@@ -1,10 +1,12 @@
 import Phaser from 'phaser'
+import { criarFiltroCaixas } from '../recorte.js'
 import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, TEMPOS, ACELERACAO, fatorAceleracao, nivelAceleracao, parteDoFator } from '../constants.js'
 import Controles from '../controles.js'
 import { marcaDeAusencia, assinaturaDeAusencia, COR_AUSENCIA } from '../ausencia.js'
 import { abrirPausaOnline } from '../pausaOnline.js'
 import { tocar, musica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal, preCarregarMusica } from '../audio.js'
 import { debug } from '../debug.js'
+import { andarEsquiva } from '../passoFixo.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import Carta, { CORES_CARTA } from '../entities/Carta.js'
 import Mao from '../entities/Mao.js'
@@ -36,6 +38,7 @@ import { efeitoDoEspecial, efeitoDoReflexo, escalaDaCarta } from '../pvp/efeitos
 import { fogoArtificio } from '../effects/festa.js'
 import { entrarNoJogo, voltarAoMenu, levouGolpe, informarVida, venceu } from '../../lib/saida.js'
 import { fatores } from '../acessibilidade.js'
+import { textoSeMudou } from '../textoSeMudou.js'
 import { pref } from '../preferencias.js'
 import { quemEmFoco, estadoDoCartao, TEXTO_CARTAO, vistasDaGrade, vistasDoFoco, criarTransicao, avancarTransicao, parametrosSopro, posicaoDoCartao, FOCO, TRANSICAO } from '../pvp/focoFfa.js'
 
@@ -243,6 +246,7 @@ export default class PvpArenaN extends Phaser.Scene {
       if (botao === 'A') this.apertarA()
       else if (botao === 'B') this.apertarB()
     })
+    this.filtrarCaixas = criarFiltroCaixas(this) // recorte.js: só os objetos novos de cada quadro
     this.events.on('postupdate', this.filtrarCaixas, this)
     if (import.meta.env.DEV) window.pvpArenaN = this
     entrarNoJogo({ umJogador: true }) // sempre online: o meu buzzer e o meu HP vão a todo joystick deste PC
@@ -439,18 +443,6 @@ export default class PvpArenaN extends Phaser.Scene {
     this.dica = this.add.text(CENTRO_X, 466, '', { ...estilo(9, TEXTO.desabilitado), strokeThickness: 2 }).setOrigin(0.5).setDepth(40)
     // o anúncio DESENHADO de quem ataca quem (pvp/AnuncioAlvos.js): personagens + setas, sem texto
     this.anuncio = new AnuncioAlvos(this, { ids: this.ids })
-  }
-
-  filtrarCaixas() {
-    const caixas = this.caixasDeRecorte
-    if (!caixas?.length) return
-    const principal = this.cameras.main.id
-    let mascara = 0
-    for (const caixa of caixas) mascara |= caixa.camera.id
-    for (const o of this.children.list) {
-      if (o.cameraFilter & principal) continue
-      if ((o.cameraFilter & mascara) !== mascara) o.cameraFilter |= mascara
-    }
   }
 
   // ---------- utilidades ----------
@@ -1357,7 +1349,7 @@ export default class PvpArenaN extends Phaser.Scene {
     pista.caixa.tremer(260, 4)
     if (coracao?.ativo) particulas(this, coracao.x, coracao.y, { cor: corDaVaga(j), quantidade: 30, velocidade: 220, vida: 700 })
     coracao?.esconder()
-    this.avisoPista[j].setText(`${this.dupla ? 'CAIU' : 'K.O.'}!\n${this.nomeDe(j)}`).setColor(TEXTO.caido)
+    this.avisoPista[j].setText(`${this.dupla ? 'CAIU' : 'K.O.'}!\n${this.nomeDe(j)}`).setColor(TEXTO.caido).setAlpha(1)
     if (this.paradas[j]) return
     this.paradas[j] = true
     this.time.delayedCall(700, () => pista.parar())
@@ -1842,7 +1834,8 @@ export default class PvpArenaN extends Phaser.Scene {
     const direcao = this.controles.toque(meuLado())
     if ((direcao === 'esquerda' || direcao === 'direita') && (this.fase === 'escolha' || this.euFora)) this.moverCursor(direcao)
     if (this.fase === 'escolha') this.atualizarRelogio(delta)
-    this.atualizarPistas(delta)
+    // a esquiva anda em tiques fixos de 1/60 s, o desenho interpola (passoFixo.js)
+    andarEsquiva(this, delta, (dt) => this.atualizarPistas(dt), debug.acelerar)
     this.rede.atualizar(delta)
     this.avancarVista(deltaReal)
     if (this.seguindo != null) {
@@ -1870,9 +1863,13 @@ export default class PvpArenaN extends Phaser.Scene {
             tocar(this, 'inverter')
           }
           joy = { x: -joy.x, y: -joy.y }
-          this.avisoPista[k].setText(fatores().pulso > 1 || Math.floor(this.time.now / 180) % 2 ? 'CONTROLES INVERTIDOS!' : '').setColor('#ff9a3a').setFontSize(11)
+          // o pisca é o alpha (a visibilidade daqui é do layout das caixas): sem re-render por quadro
+          const t = this.avisoPista[k]
+          if (t.text !== 'CONTROLES INVERTIDOS!') t.setFontSize(11)
+          textoSeMudou(t, 'CONTROLES INVERTIDOS!', '#ff9a3a').setAlpha(fatores().pulso > 1 || Math.floor(this.time.now / 180) % 2 === 1 ? 1 : 0)
         } else if (inv?.avisado) {
           this.invertido = 0
+          this.avisoPista[k].setAlpha(1)
           if (!this.ko[k]) this.avisoPista[k].setText('').setFontSize(14)
         }
       }

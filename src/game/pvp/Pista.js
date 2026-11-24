@@ -7,6 +7,7 @@ import { preparoCaixa } from '../attacks/definir.js'
 import { novaRodada, validarEspacoLivre } from '../attacks/validacao.js'
 import { particulas } from '../effects/particulas.js'
 import { tocar } from '../audio.js'
+import { lembrarAnterior, aplicarInterpolacao, desfazerInterpolacao } from '../passoFixo.js'
 
 // Pista: UMA caixa de esquiva completa (caixa + balas + coração + contexto
 // de ataque), para existir várias na mesma cena (modo PvP: cada jogador
@@ -45,8 +46,14 @@ import { tocar } from '../audio.js'
 //       mira (CO-OP 3–4): lista de jogadores que o chefe mira nesta rodada; os tiros mirados
 //       (a.alvo()) só vão para os corações deles; os corações mirados ganham a mira (Heart.setMirado)
 //   pista.parar()                        interrompe o ataque em andamento (a Promise resolve)
-//   pista.atualizar(dt, joy)             todo frame; joy = {x, y} (-100..100) do dono,
-//                                        ou função (jogador) => {x, y} se a pista tem vários corações
+//   pista.atualizar(dt, joy)             a cada TIQUE da simulação (passoFixo.js: 1/60 s); joy = {x, y}
+//                                        (-100..100) do dono, ou função (jogador) => {x, y} se a pista
+//                                        tem vários corações
+//   pista.interpolar(alfa)               depois dos tiques do quadro: corações e balas desenhados entre
+//                                        o tique anterior e o atual (alfa 0..1; 1 = o estado atual)
+//   pista.desfazerInterpolacao()         antes do próximo tique: os sprites voltam ao x/y da simulação
+//   pista.gravacao                       (opcional) o gravador do replay (fimDePartida/gravador.js): recebe
+//                                        o ataque no rodar() e o estado de cada tique
 //   pista.aoAcertar = (dano, bala, coracao) => {}   devolva false para o acerto não contar
 //   pista.aoGraze = (coracao, bala) => {}
 //   pista.somDano = (coracao) => {}      o som do acerto (o cosmético de quem levou); sem ele, o 'dano' de sempre
@@ -70,6 +77,7 @@ import { tocar } from '../audio.js'
 export default class Pista {
   constructor(cena, { x, y, largura, altura, jogador = 0, cor, tema = {}, velocidadeMax = Infinity, velocidade, dinamica, faixa, marcadores = null } = {}) {
     this.cena = cena
+    this.opcoes = { x, y, largura, altura, jogador, cor, tema, velocidadeMax, velocidade, dinamica, faixa, marcadores } // (a re-simulação do replay monta outra igual)
     this.jogadores = [jogador].flat()
     this.tema = tema
     this.velocidade = velocidade // px/s do coração (padrão: registry 'velocidade')
@@ -180,6 +188,17 @@ export default class Pista {
     await this.mostrar()
     if (geracao !== this.geracao || this.destruida || !this.aberta) return // outro rodar() ou esconder() enquanto a caixa abria
     novaRodada() // avisos de justiça voltam a aparecer (são por ataque)
+    const fim = new Promise((resolver) => this.iniciarAtaque(ataque, { dano, ritmo, semente, aceleracao, mira }, resolver))
+    await fim
+    // só volta ao padrão se nenhum outro rodar() começou nesse meio tempo
+    if (!this.destruida && geracao === this.geracao) await this.voltarAoPadrao()
+  }
+
+  // O começo síncrono do ataque (a caixa já aberta): o contexto com a semente, o preparo da caixa e os
+  // timers do início e do fim. A re-simulação do replay (fimDePartida/ressimulacao.js) chama direto, numa
+  // pista de mentira, com as mesmas opções: o ataque sai igual tique a tique
+  iniciarAtaque(ataque, { dano = 5, ritmo = {}, semente, aceleracao = 1, mira = null } = {}, resolver = () => {}) {
+    this.gravacao?.comecar(this, ataque, { dano, ritmo, semente, aceleracao, mira })
     const r = { velocidade: 1, densidade: 1, ...ritmo }
     r.velocidade *= aceleracao
     r.densidade *= aceleracao
@@ -203,12 +222,11 @@ export default class Pista {
     // e a mudança acontecem no respiro inicial e o ataque só começa depois
     const preparo = preparoCaixa(null, ataque.caixa)
     const inicio = Math.max(ATAQUE.respiroMs, preparo)
-    let at
-    const fim = new Promise((resolver) => {
-      at = { ctx, nome: ataque.nome, restante: inicio + ataque.duracao + ATAQUE.respiroMs, iniciado: false, desarmado: false, proximaValidacao: 0, resolver }
-      this.ataque = at
+    const at = { ctx, nome: ataque.nome, restante: inicio + ataque.duracao + ATAQUE.respiroMs, iniciado: false, desarmado: false, proximaValidacao: 0, resolver }
+    this.ataque = at
+    this.simulando(() => {
+      if (preparo) ctx.caixaPara(ataque.caixa)
     })
-    if (preparo) ctx.caixaPara(ataque.caixa)
     ctx.depois(inicio, () => {
       at.iniciado = true
       ataque.iniciar(ctx.limitar(ataque.duracao))
@@ -217,9 +235,20 @@ export default class Pista {
       this.balas.desarmar(ATAQUE.respiroMs)
       at.desarmado = true
     })
-    await fim
-    // só volta ao padrão se nenhum outro rodar() começou nesse meio tempo
-    if (!this.destruida && geracao === this.geracao) await this.voltarAoPadrao()
+    return at
+  }
+
+  // roda fn() marcando o que ela cria na cena como da simulação (o gravador do replay separa o que a
+  // re-simulação refaz do que é da arena: fimDePartida/gravador.js)
+  simulando(fn) {
+    const g = this.gravacao
+    if (!g) return fn()
+    g.dentro++
+    try {
+      return fn()
+    } finally {
+      g.dentro--
+    }
   }
 
   // Termina o ataque em andamento (balas e decorações somem na hora)
@@ -250,16 +279,41 @@ export default class Pista {
   // ---------- frame ----------
 
   atualizar(dt, joy) {
+    // a posição de antes deste tique (interpolar): só o que andou neste tique interpola
+    this.marcaTique = this.cena.passoFixo?.tiques
+    lembrarAnterior(this.coracoes)
+    lembrarAnterior(this.balas.lista)
     this.coracoes.forEach((c) => c.tick(dt))
     // passos pequenos para as balas rápidas não atravessarem o coração
     const passos = Math.max(1, Math.ceil(dt / 20))
     for (let k = 0; k < passos; k++) this.passo(dt / passos, joy)
   }
 
+  // ---------- desenho (interpolação entre tiques: passoFixo.js) ----------
+
+  interpolar(alfa) {
+    if (alfa >= 1 || this.marcaTique === undefined || this.marcaTique !== this.cena.passoFixo?.tiques) return
+    for (const c of this.coracoes) if (c.ativo && !c.espelho && !this.espelho) aplicarInterpolacao(c, [c.sprite, c.anel, c.forma, c.tag, c.reticula], alfa)
+    for (const b of this.balas.lista) if (!b.morta) aplicarInterpolacao(b, [b.sprite], alfa)
+  }
+
+  desfazerInterpolacao() {
+    for (const c of this.coracoes) desfazerInterpolacao(c)
+    for (const b of this.balas.lista) desfazerInterpolacao(b)
+  }
+
   passo(dt, joy) {
     const velocidade = this.velocidadeCoracao
+    const g = this.gravacao
+    if (g) g.limites(this) // a caixa no começo do passo (a re-simulação parte dela)
     if (!this.espelho) for (const c of this.coracoes) if (c.ativo && !c.espelho) c.update(typeof joy === 'function' ? joy(c.jogador) : joy, velocidade, dt)
+    if (!g) return this.simular(dt)
+    g.passo(this, dt, velocidade) // o replay: os corações já andaram, o resto se refaz da semente
+    this.simulando(() => this.simular(dt))
+  }
 
+  // o passo depois dos corações andarem: caixa, ataque, balas e colisão (o que a re-simulação refaz)
+  simular(dt) {
     if (this.congelada) {
       // o tempo do ataque não passa (nem a duração dele): só o coração encosta nas balas paradas
       if (this.ataque) this.balas.colidir(this.coracoes, (coracao, bala) => this.acertou(coracao, bala), (coracao, bala) => this.grazeou(coracao, bala))
@@ -277,7 +331,7 @@ export default class Pista {
       (coracao, bala) => this.grazeou(coracao, bala),
     )
 
-    if (import.meta.env.DEV && !at.desarmado) {
+    if (import.meta.env?.DEV && !at.desarmado) {
       at.proximaValidacao -= dt
       if (at.proximaValidacao <= 0) {
         at.proximaValidacao = ATAQUE.validarACadaMs
@@ -292,6 +346,7 @@ export default class Pista {
   acertou(coracao, bala) {
     if (coracao.invencivel || this.espelho || coracao.espelho) return false
     if (this.aoAcertar?.(bala.dano, bala, coracao) === false) return false
+    this.gravacao?.acerto(this, coracao, bala) // a re-simulação repete este acerto (e só os que contaram)
     coracao.tomarDano(TEMPOS.invencivelMs)
     particulas(this.cena, coracao.x, coracao.y, { cor: coracao.cor, quantidade: 10, velocidade: 110 })
     // somDano(coracao): a arena toca o som de dano equipado de quem levou (cosmeticosSlots.js)

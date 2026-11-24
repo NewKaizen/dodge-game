@@ -4,10 +4,10 @@ import Phaser from 'phaser'
 import { UI, detalheCarta } from '../tema.js'
 import Controles from '../controles.js'
 import { PERSONAGENS } from '../data/personagens.js'
-import { PERSONAGENS_PVP } from '../pvp/cartas.js'
+import { PERSONAGENS_PVP, CARTAS } from '../pvp/cartas.js'
 import { NIVEIS_BOT, NIVEL_BOT_PADRAO } from '../pvp/bot.js'
 import { perfilPvp, rotuloCarta, COR_NAIPE, TIPO_NAIPE, TEXTO_JOGADOR } from '../pvp/perfil.js'
-import { desenharNaipe } from '../entities/Carta.js'
+import { desenharNaipe, preassarCartas } from '../entities/Carta.js'
 import { criarFundo } from '../backgrounds/index.js'
 import { tocar, musica, pararMusica } from '../audio.js'
 import { estilhacos, faixasDiagonais } from '../effects/entrada.js'
@@ -644,6 +644,9 @@ export default class PvpEscolha extends Phaser.Scene {
       })
     }
 
+    // enquanto o VS passa: as frentes clássicas dos dois baralhos já viram textura (a mão da arena não
+    // paga o desenho no primeiro quadro; o estilo cosmético de cada lado é assado na arena)
+    preassarCartas(this, [...new Set([...(CARTAS[p1] ?? []), ...(CARTAS[p2] ?? [])])])
     this.time.delayedCall(VS.saida, () => {
       metades.forEach((g, j) => this.tweens.add({ targets: g, alpha: 0.6, duration: 200 }))
       camera.fadeOut(240, 0, 0, 0)

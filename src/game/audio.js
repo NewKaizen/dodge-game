@@ -46,8 +46,20 @@ export function setSomLigado(valor) {
 }
 
 // opcoes: repassadas ao som sintetizado (ex.: roletaGiro { duracao })
+// efeitos calados enquanto fn() roda (a re-simulação do replay, pvp/fimDePartida/ressimulacao.js: o
+// ataque refeito não toca os sons dele de novo)
+let silencio = 0
+export function emSilencio(fn) {
+  silencio++
+  try {
+    return fn()
+  } finally {
+    silencio--
+  }
+}
+
 export function tocar(scene, nome, opcoes) {
-  if (!ligado) return
+  if (!ligado || silencio) return
   const chave = `som-${nome}`
   if (scene.cache.audio.exists(chave)) {
     scene.sound.play(chave, { volume: AUDIO.volume * volumes.efeitos })

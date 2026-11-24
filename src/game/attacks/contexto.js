@@ -80,6 +80,7 @@ export default class ContextoAtaque {
     this.tempo = 0
     this.fim = Infinity
     this.proximoAlvo = { i: 0 }
+    this.contagem = { balas: 0 } // (objeto: os contextos filhos de limitar() contam junto) o número de cada bala do ataque
     this.mira = Array.isArray(mira) && mira.length ? mira : null // jogadores mirados (null: todos)
     this.fonteVelocidadeCoracao = velocidadeCoracao
   }
@@ -90,7 +91,9 @@ export default class ContextoAtaque {
     const forma = opcoes.forma ?? this.forma(0)
     // com textura própria (sprites dos SUPERs) a cor do tema não pinta a bala
     const cor = opcoes.textura ? undefined : this.cor(forma)
-    return this.balas.criar({ dano: this.dano, cor, origem: this.nome, ...opcoes, forma })
+    const b = this.balas.criar({ dano: this.dano, cor, origem: this.nome, ...opcoes, forma })
+    b.numero = ++this.contagem.balas // o replay (fimDePartida/gravador.js) reconhece a bala que acertou por ele
+    return b
   }
 
   aviso(forma, depois) {

@@ -29,9 +29,98 @@ export function quadrosDe(chave) {
 export const RAIO_BALA = 10
 const TAM_BALA = 32
 
-// Desenha por código as texturas de GERADORES (personagens, chefes, balas, interface)
+// Desenha por código as texturas de GERADORES (personagens, chefes, balas, interface).
+//
+// ATLAS DO BOOT (fase 3.2 do plano de otimização, docs/desempenho.md): os desenhos pequenos vão todos para UMA
+// textura grande (ou poucas, de LADO_ATLAS px), e cada chave de sempre ('bala-bola', 'kris', 'king-q1'...) vira um
+// recorte dela. Os pixels são os mesmos (drawImage em posição inteira, sem suavizar: cópia exata); a diferença é que
+// o Phaser envia uma textura só para a GPU no boot (em vez de ~150) e o lote de desenho não quebra ao trocar de
+// sprite. Cada recorte tem 1 px da própria borda repetido em volta (o "clamp" que a textura sozinha teria: o
+// NEAREST na beira de um sprite escalado pega a borda dele, não o vizinho).
+// Ficam FORA do atlas (textura própria, como antes): as que alguém lê como imagem (getSourceImage), as que mudam
+// de filtro (setFilter LINEAR muda a textura inteira), as de TileSprite (repetem) e as grandes.
+export const FORA_DO_ATLAS = new Set(['coracao', 'carta-brilho', 'vinheta', 'fundo-king-losangos', 'fundo-queen-cidade', 'fundo-queen-cidade-perto'])
+const LADO_MAX_NO_ATLAS = 256
+export const LADO_ATLAS = 2048
+
 export function gerarTexturas(scene) {
-  for (const [chave, gerar] of Object.entries(GERADORES)) scene.textures.addCanvas(chave, gerar())
+  const noAtlas = []
+  for (const [chave, gerar] of Object.entries(GERADORES)) {
+    const c = gerar()
+    if (FORA_DO_ATLAS.has(chave) || c.width > LADO_MAX_NO_ATLAS || c.height > LADO_MAX_NO_ATLAS || !scene.textures.addAtlas) scene.textures.addCanvas(chave, c)
+    else noAtlas.push([chave, c])
+  }
+  empacotar(scene, 'atlas-boot', noAtlas)
+}
+
+// Prateleiras: os desenhos do mais alto para o mais baixo, lado a lado; acabou a largura, prateleira nova; acabou
+// a altura, página nova. Devolve [{ pagina, chave, x, y, w, h }] (x, y: o canto do desenho, sem a borda repetida)
+export function planejarAtlas(tamanhos, lado = LADO_ATLAS, borda = 1) {
+  const ordem = [...tamanhos].sort((a, b) => b.h - a.h || b.w - a.w || (a.chave < b.chave ? -1 : 1))
+  const lugares = []
+  let pagina = 0
+  let x = 0
+  let y = 0
+  let alturaPrateleira = 0
+  for (const t of ordem) {
+    const w = t.w + borda * 2
+    const h = t.h + borda * 2
+    if (x + w > lado) {
+      x = 0
+      y += alturaPrateleira
+      alturaPrateleira = 0
+    }
+    if (y + h > lado) {
+      pagina++
+      x = 0
+      y = 0
+      alturaPrateleira = 0
+    }
+    lugares.push({ pagina, chave: t.chave, x: x + borda, y: y + borda, w: t.w, h: t.h })
+    x += w
+    alturaPrateleira = Math.max(alturaPrateleira, h)
+  }
+  return lugares
+}
+
+function empacotar(scene, prefixo, entradas) {
+  if (!entradas.length) return
+  const porChave = new Map(entradas)
+  const lugares = planejarAtlas(entradas.map(([chave, c]) => ({ chave, w: c.width, h: c.height })))
+  const paginas = []
+  for (const l of lugares) {
+    const p = (paginas[l.pagina] ??= { lugares: [], w: 0, h: 0 })
+    p.lugares.push(l)
+    p.w = Math.max(p.w, l.x + l.w + 1)
+    p.h = Math.max(p.h, l.y + l.h + 1)
+  }
+  paginas.forEach((p, i) => {
+    const [c, g] = tela(p.w, p.h)
+    for (const { chave, x, y, w, h } of p.lugares) {
+      const src = porChave.get(chave)
+      g.drawImage(src, x, y)
+      // a borda repetida (1 px de cada lado e os cantos)
+      g.drawImage(src, 0, 0, w, 1, x, y - 1, w, 1)
+      g.drawImage(src, 0, h - 1, w, 1, x, y + h, w, 1)
+      g.drawImage(src, 0, 0, 1, h, x - 1, y, 1, h)
+      g.drawImage(src, w - 1, 0, 1, h, x + w, y, 1, h)
+      g.drawImage(src, 0, 0, 1, 1, x - 1, y - 1, 1, 1)
+      g.drawImage(src, w - 1, 0, 1, 1, x + w, y - 1, 1, 1)
+      g.drawImage(src, 0, h - 1, 1, 1, x - 1, y + h, 1, 1)
+      g.drawImage(src, w - 1, h - 1, 1, 1, x + w, y + h, 1, 1)
+    }
+    const base = scene.textures.addCanvas(`${prefixo}-${i}`, c)
+    // cada chave: uma textura do Phaser com a MESMA fonte (a mesma textura da GPU) e o quadro __BASE recortado
+    const Textura = Object.getPrototypeOf(Object.getPrototypeOf(base)).constructor // Phaser.Textures.Texture (a CanvasTexture estende ela)
+    for (const { chave, x, y, w, h } of p.lugares) {
+      const t = new Textura(scene.textures, chave, [])
+      t.source.push(base.source[0])
+      t.add('__BASE', 0, x, y, w, h)
+      scene.textures.list[chave] = t
+      scene.textures.emit('addtexture', chave, t)
+      scene.textures.emit(`addtexture-${chave}`, t)
+    }
+  })
 }
 
 // ---------- utilitários de desenho ----------

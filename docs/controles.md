@@ -50,7 +50,7 @@ CONFIGURAÇÕES → **TOQUE**: **CONTROLES NA TELA** (AUTOMÁTICO / SEMPRE / ESC
 - No modo toque o canvas usa no máximo **1,5** pixel do aparelho por pixel CSS (celulares têm dpr 2,6 a 3) e **1x** com GRÁFICOS no MÍNIMO. Pixel 7 deitado: canvas de 1466x824 para 1100x618.
 - Desenhos parados com milhares de comandos de `Graphics` viram textura uma vez só (`arte/assar.js`): o verso e a frente clássica das cartas (de ~3 mil e ~1 mil comandos por carta, refeitos todo quadro) e o piso do CASTELO (~480 losangos; agora só os que a onda de brilho cruza são redesenhados, com triângulos em vez de `fillPoints`/earcut).
 - Medido com o Playwright (Chromium sem GPU, desenho em software (SwiftShader): serve para comparar antes/depois, não é o FPS de um celular de verdade), Pixel 7 deitado: esquiva do PVP de **17 para 31 FPS**; com a CPU 4x mais lenta (`Emulation.setCPUThrottlingRate` 4) o menu foi de 12 para 18 FPS e a esquiva fica em ~17 FPS (iPhone 14: menu 21 FPS). No perfil o JavaScript já é pequeno: o resto é o desenho em software, que num aparelho de verdade vai para a GPU.
-- Ainda pesado, para depois: outros fundos de arena com `Graphics` redesenhado todo quadro e o gravador do replay do fim de partida (uma foto da caixa por quadro).
+- Ainda pesado, para depois: outros fundos de arena com `Graphics` redesenhado todo quadro (o gravador do replay do fim de partida virou dados na fase 4: `docs/desempenho.md`).
 
 ### Onde está o código
 

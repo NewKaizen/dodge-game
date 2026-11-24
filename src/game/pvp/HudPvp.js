@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { textoJogo } from '../textoBitmap.js'
 import { UI } from '../tema.js'
 import { iconeDoPersonagem } from '../arte/icones.js'
 import { CORES, FONTE, TEXTO, LARGURA, corTexto } from '../constants.js'
@@ -7,6 +8,7 @@ import { CORES_CARTA } from '../entities/Carta.js'
 import { ENERGIA, COMBO_PERFEITO, multiplicadorPerfeito } from './regras.js'
 import { ignorarNasCaixas } from '../recorte.js'
 import { fatores } from '../acessibilidade.js'
+import { assarRegiao, assar, trocarAssada, texturaAssada } from '../arte/assar.js'
 
 
 // Placar de um jogador na arena PvP (canto de cima): P1/P2, nome do
@@ -27,6 +29,24 @@ import { fatores } from '../acessibilidade.js'
 const BARRA = { largura: 176, altura: 10 }
 const GEMA = { passo: 12, raio: 5 }
 const MARGEM = 14
+const GEMA_CAIXA = 14 // a caixa da textura de uma gema (em volta do centro)
+
+// uma gema de energia com centro em (x, y): acesa (losango azul com brilho) ou apagada (só o contorno)
+function pintarGema(g, x, y, cheia) {
+  const r = GEMA.raio
+  const losango = (k) => [{ x, y: y - k }, { x: x + k * 0.86, y }, { x, y: y + k }, { x: x - k * 0.86, y }]
+  if (cheia) {
+    g.fillStyle(CORES_CARTA.gemaEscura, 1)
+    g.fillPoints(losango(r + 1), true)
+    g.fillStyle(CORES_CARTA.gema, 1)
+    g.fillPoints(losango(r - 0.4), true)
+    g.fillStyle(0xffffff, 0.7)
+    g.fillPoints([{ x, y: y - r + 1 }, { x: x + 2, y: y - 1 }, { x, y }, { x: x - 2, y: y - 1 }], true)
+  } else {
+    g.lineStyle(1, CORES.gemaVazia, 1)
+    g.strokePoints(losango(r), true)
+  }
+}
 
 export default class HudPvp {
   constructor(cena, { jogador, personagem, hpMax, rotulo, nomeJogador }) {
@@ -47,16 +67,21 @@ export default class HudPvp {
     const origem = direita ? 1 : 0
 
     this.container = cena.add.container(0, 0).setDepth(70)
+    // fonte bitmap (textoBitmap.js): HP, energia e combo mudam no meio da esquiva sem rasterizar nada
     const texto = (x, y, conteudo, tamanho, cor, extra = {}) =>
-      cena.add.text(x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra })
+      textoJogo(cena, x, y, conteudo, { fontFamily: FONTE, fontSize: `${tamanho}px`, color: cor, stroke: '#000000', strokeThickness: 3, ...extra })
 
     // A faixa permanece dentro do espaço já reservado ao placar, fora das pistas.
     const larguraPlaca = 262
     const esquerda = direita ? LARGURA - larguraPlaca - 4 : 4
-    const placa = cena.add.graphics()
-    placa.fillStyle(UI.painel, 0.88).fillRoundedRect(esquerda, 2, larguraPlaca, 59, 4)
-    placa.lineStyle(1, UI.linha, 0.9).strokeRoundedRect(esquerda, 2, larguraPlaca, 59, 4)
-    placa.fillStyle(corPersonagem).fillRect(direita ? esquerda + larguraPlaca - 3 : esquerda, 8, 3, 45)
+    // a placa é parada: vira textura assada (arte/assar.js) no lugar do Graphics re-tesselado a cada quadro
+    const pintarPlaca = (placa) => {
+      placa.fillStyle(UI.painel, 0.88).fillRoundedRect(esquerda, 2, larguraPlaca, 59, 4)
+      placa.lineStyle(1, UI.linha, 0.9).strokeRoundedRect(esquerda, 2, larguraPlaca, 59, 4)
+      placa.fillStyle(corPersonagem).fillRect(direita ? esquerda + larguraPlaca - 3 : esquerda, 8, 3, 45)
+    }
+    let placa = assarRegiao(cena, `hud-pvp-placa-${larguraPlaca}-${corPersonagem}-${UI.painel}-${UI.linha}`, { x: esquerda, y: 2, largura: larguraPlaca, altura: 59 }, pintarPlaca)
+    if (!placa) pintarPlaca((placa = cena.add.graphics()))
     const icone = def ? cena.add.image(x0 + s * 237, 50, iconeDoPersonagem(personagem)).setDisplaySize(20, 20) : null
     const tag = texto(x0, 6, rotulo ?? `P${jogador + 1}`, 13, corTexto(CORES.almas[jogador])).setOrigin(origem, 0)
     const coracao = cena.add.image(x0 + s * (tag.width + 10), 13, 'coracao').setTint(CORES.almas[jogador]).setScale(0.9)
@@ -81,7 +106,21 @@ export default class HudPvp {
 
     // gemas de energia (ENERGIA.maxima espaços)
     this.yGemas = 52
-    this.gemas = cena.add.graphics()
+    // as gemas: uma Image por espaço (duas texturas assadas, acesa e apagada); sem textura, um Graphics
+    this.gemas = null
+    this.imagensGemas = []
+    // as duas texturas já no começo (nada de criar textura no meio da partida)
+    texturaAssada(cena, 'hud-gema-cheia', GEMA_CAIXA, GEMA_CAIXA, (g) => pintarGema(g, 0, 0, true))
+    for (let i = 0; i < ENERGIA.maxima; i++) {
+      const img = assar(cena, `hud-gema-vazia-${CORES.gemaVazia}`, GEMA_CAIXA, GEMA_CAIXA, (g) => pintarGema(g, 0, 0, false))
+      if (!img) break
+      this.imagensGemas.push(img.setPosition(this.x0 + this.s * (GEMA.raio + i * GEMA.passo), this.yGemas))
+    }
+    if (this.imagensGemas.length < ENERGIA.maxima) {
+      this.imagensGemas.forEach((img) => img.destroy())
+      this.imagensGemas = []
+      this.gemas = cena.add.graphics()
+    }
     this.textoEnergia = texto(x0 + s * (ENERGIA.maxima * GEMA.passo + 6), this.yGemas - 7, '', 11, UI.destaque).setOrigin(origem, 0)
 
     // combo de perfeitos (rodadas seguidas com desvio perfeito), discreto embaixo das gemas
@@ -89,7 +128,7 @@ export default class HudPvp {
     this.sequencia = 0
     this.textoCombo = texto(x0, this.yCombo, '', 10, '#ffd23c', { strokeThickness: 2 }).setOrigin(origem, 0).setVisible(false)
 
-    this.container.add([placa, ...(icone ? [icone] : []), fundo, vazio, this.rastro, this.barra, tag, coracao, this.nome, ...(this.personagemNome ? [this.personagemNome] : []), this.estado, this.textoHp, this.gemas, this.textoEnergia, this.textoCombo])
+    this.container.add([placa, ...(icone ? [icone] : []), fundo, vazio, this.rastro, this.barra, tag, coracao, this.nome, ...(this.personagemNome ? [this.personagemNome] : []), this.estado, this.textoHp, ...(this.gemas ? [this.gemas] : this.imagensGemas), this.textoEnergia, this.textoCombo])
     this.escudo = null
     this.protegido = false
     this.setHp(hpMax, false)
@@ -136,23 +175,12 @@ export default class HudPvp {
     const antes = this.energia
     this.energia = energia
     const g = this.gemas
-    g.clear()
+    g?.clear()
     for (let i = 0; i < ENERGIA.maxima; i++) {
-      const x = this.x0 + this.s * (GEMA.raio + i * GEMA.passo)
-      const y = this.yGemas
-      const r = GEMA.raio
-      const losango = (k) => [{ x, y: y - k }, { x: x + k * 0.86, y }, { x, y: y + k }, { x: x - k * 0.86, y }]
-      if (i < energia) {
-        g.fillStyle(CORES_CARTA.gemaEscura, 1)
-        g.fillPoints(losango(r + 1), true)
-        g.fillStyle(CORES_CARTA.gema, 1)
-        g.fillPoints(losango(r - 0.4), true)
-        g.fillStyle(0xffffff, 0.7)
-        g.fillPoints([{ x, y: y - r + 1 }, { x: x + 2, y: y - 1 }, { x, y }, { x: x - 2, y: y - 1 }], true)
-      } else {
-        g.lineStyle(1, CORES.gemaVazia, 1)
-        g.strokePoints(losango(r), true)
-      }
+      const cheia = i < energia
+      const img = this.imagensGemas[i]
+      if (img) trocarAssada(img, this.cena, cheia ? 'hud-gema-cheia' : `hud-gema-vazia-${CORES.gemaVazia}`, GEMA_CAIXA, GEMA_CAIXA, (p) => pintarGema(p, 0, 0, cheia))
+      else pintarGema(g, this.x0 + this.s * (GEMA.raio + i * GEMA.passo), this.yGemas, cheia)
     }
     this.textoEnergia.setText(`EN ${energia}/${ENERGIA.maxima}`)
     if (animado && energia !== antes) {
@@ -192,8 +220,7 @@ export default class HudPvp {
   // Levou um acerto com combo: "COMBO QUEBROU" pequeno sobe e some (e o combo apaga)
   comboQuebrou() {
     this.setSequencia(0, false)
-    const t = this.cena.add
-      .text(this.x0, this.yCombo, 'COMBO QUEBROU', { fontFamily: FONTE, fontSize: '9px', color: '#ff6a7a', stroke: '#000000', strokeThickness: 2 })
+    const t = textoJogo(this.cena, this.x0, this.yCombo, 'COMBO QUEBROU', { fontFamily: FONTE, fontSize: '9px', color: '#ff6a7a', stroke: '#000000', strokeThickness: 2 })
       .setOrigin(this.direita ? 1 : 0, 0)
     this.container.add(t)
     this.cena.tweens.add({ targets: t, x: { from: t.x + this.s * 3, to: t.x }, duration: 45, yoyo: true, repeat: 2 })
@@ -239,8 +266,7 @@ export class IndicadorVelocidade {
   constructor(cena, x, y, { origem = [0.5, 0], tamanho = 11, profundidade = 70 } = {}) {
     this.cena = cena
     this.fator = 1
-    this.texto = cena.add
-      .text(x, y, '', { fontFamily: FONTE, fontSize: `${tamanho}px`, color: '#ff9a3a', stroke: '#000000', strokeThickness: 3 })
+    this.texto = textoJogo(cena, x, y, '', { fontFamily: FONTE, fontSize: `${tamanho}px`, color: '#ff9a3a', stroke: '#000000', strokeThickness: 3 })
       .setOrigin(...origem)
       .setDepth(profundidade)
       .setVisible(false)

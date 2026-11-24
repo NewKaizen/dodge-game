@@ -7,6 +7,7 @@ import { shake } from '../../effects/shake.js'
 import { fatores } from '../../acessibilidade.js'
 import { ESCALA } from '../../arte/texturas.js'
 import Gravador from './gravador.js'
+import { criarRenderizador } from './ressimulacao.js'
 import Transmissao from './transmissao.js'
 import AvisoPular from './avisoPular.js'
 import { PERSONAGENS } from '../../data/personagens.js'
@@ -26,8 +27,9 @@ import { DUELO } from '../bonus/Duelo.js'
 //   2. A arena segue (caixas fecham, fimDaRodada) e, no começo de
 //      resultado(), espera replay(): a transmissão (transmissao.js: tarja de
 //      INSTANT REPLAY, placar, câmera lenta, close no coração, o coração
-//      despedaçando, torcida, flashes) com as fotos do Gravador (gravador.js:
-//      os últimos ~3 s de cada fonte: as duas pistas e a caixa do duelo).
+//      despedaçando, torcida, flashes) dos últimos ~3 s de cada fonte (as duas
+//      pistas e a caixa do duelo), refeitos dos DADOS do Gravador (gravador.js:
+//      a semente e a entrada de cada tique; ressimulacao.js refaz o ataque).
 //      Mostra a pista de quem caiu (as duas no empate).
 //   3. Depois o "P1 VENCEU!" de sempre e a PvpResultado.
 //
@@ -65,9 +67,9 @@ export default class FimDePartida {
     this.tv = null
     this.andamento = 1
     this.lentaPronta = Promise.resolve()
-    // fontes do replay: as pistas (0, 1) e a caixa do duelo (FONTE_DUELO)
-    this.fontes = [...arena.pistas.map((pista, k) => fontePista(arena, pista, campos[k])), fonteDuelo(arena)]
-    this.gravador = new Gravador(arena, { fontes: this.fontes })
+    // fontes do replay: as pistas (0, 1) e a caixa do duelo (FONTE_DUELO = depois das pistas)
+    this.fontes = [...arena.pistas.map((_, k) => ({ campo: campos[k] })), fonteDuelo(arena)]
+    this.gravador = new Gravador(arena, { pistas: arena.pistas, campos, duelo: this.fontes[arena.pistas.length] })
     this.aviso = new AvisoPular(arena)
     prepararTexturasCoracao(arena)
 
@@ -92,10 +94,10 @@ export default class FimDePartida {
 
   // ---------- frame ----------
 
-  // depois do update da arena (e do filtrarCaixas): a foto do quadro
+  // depois do update da arena: os dados do duelo (as pistas gravam sozinhas, a cada passo: gravador.js)
   aoPosAtualizar(_, delta) {
-    if (this.estado !== 'jogo') return
-    this.gravador.atualizar(delta * debug.acelerar, !this.arena.pausado && this.fontes.some((f) => f.gravando()))
+    if (this.estado !== 'jogo' || this.arena.pausado) return
+    this.gravador.atualizarDuelo(delta * debug.acelerar)
   }
 
   // delta REAL (a câmera lenta e o replay andam no relógio de verdade)
@@ -138,7 +140,9 @@ export default class FimDePartida {
     this.duracaoLenta = (duelo ? LENTA.duracaoDueloMs : LENTA.duracaoMs) * fatores().lenta
     // no duelo todo mundo está martelando A (atacar): demora mais para o A pular
     this.carencia = duelo ? LENTA.carenciaDueloMs : LENTA.carenciaMs
-    this.gravador.parar()
+    // vale a pista da esquiva desta rodada (no todos contra todos, só a que pode acabar a partida)
+    const a0 = this.arena
+    this.gravador.parar((k) => a0.fase === 'esquiva' && a0.pistas[k]?.aberta && (a0.gravarPista?.(a0.pistas[k]) ?? true))
     this.lentaPronta = new Promise((r) => (this.resolverLenta = r))
     const a = this.arena
     tocar(a, 'cameraLenta')
@@ -212,7 +216,7 @@ export default class FimDePartida {
     this.quebras.push(quebrarCoracao(a, { x: p.x, y: p.y, cor, escala: (coracao.sprite?.scaleX ?? ESCALA.coracao) * (caixa.vista?.escala ?? 1) }))
     coracao.esconder()
     this.criarFantasma(k)
-    a.avisoPista[k].setText('K.O.!').setColor(TEXTO.caido).setFontSize(20).setScale(2.4)
+    a.avisoPista[k].setText('K.O.!').setColor(TEXTO.caido).setFontSize(20).setScale(2.4).setVisible(true)
     a.tweens.add({ targets: a.avisoPista[k], scale: 1, duration: 60, ease: 'Back.easeOut' })
     this.mortos.push({ j, k, i: 0 })
     return true
@@ -263,11 +267,7 @@ export default class FimDePartida {
     // uma tela da TV por coração que caiu: a foto da fonte dele, com ele em
     // destaque (coracao/close) e os outros corações da mesma fonte por cima (outros)
     const alvos = [...this.mortos].sort((a, b) => a.k - b.k || a.i - b.i)
-    const vista = (r, i) => r && { chave: r.chave, caixa: r.caixa, borda: r.borda, coracao: r.coracoes[i] ?? null, close: r.closes[i] ?? null, outros: r.coracoes.filter((_, n) => n !== i) }
-    const quadros = this.gravador
-      .quadrosEmOrdem()
-      .map((q) => ({ tempo: q.tempo, pistas: alvos.map((m) => vista(q.fontes[m.k], m.i)) }))
-      .filter((q) => q.pistas.some(Boolean))
+    const quadros = this.gravador.quadros(alvos).filter((q) => q.pistas.some(Boolean))
     // Qualquer gravação serve: a Transmissao encurta as fases quando há poucos
     // quadros. Exigir um mínimo (eram 12) sumia com o replay quando o K.O. vinha
     // logo no começo da esquiva ou o jogo rodava abaixo de 30 fps (o Gravador
@@ -286,6 +286,8 @@ export default class FimDePartida {
     this.estado = 'replay'
     this.tv = new Transmissao(a, {
       quadros,
+      // o que vai na tela de cada alvo: a caixa refeita dos dados (ressimulacao.js)
+      renderizadores: alvos.map((m) => criarRenderizador(a, this.gravador.fonte(m.k), m.i)),
       pistas: alvos.map((_, n) => n),
       campos: alvos.map((m) => this.fontes[m.k].campo),
       mortos: alvos.map((m, n) => ({ j: Math.max(0, lados.indexOf(m.j)), k: n })),
@@ -343,26 +345,11 @@ export default class FimDePartida {
   }
 }
 
-// ---------- fontes do gravador ----------
+// ---------- a fonte do duelo (as pistas gravam pela própria Pista: gravador.js) ----------
 
 export const FONTE_DUELO = 2 // depois das duas pistas
 
 const emissores = (cena) => cena.children.list.filter((o) => o.type === 'ParticleEmitter')
-
-// Uma pista: o que a câmera de recorte da caixa desenharia, durante a esquiva
-function fontePista(arena, pista, campo) {
-  return {
-    campo,
-    // (a arena pode dispensar uma pista: no todos contra todos só grava quando o K.O. pode acabar a partida)
-    gravando: () => arena.fase === 'esquiva' && pista.aberta && (arena.gravarPista?.(pista) ?? true),
-    // (a caixa escondida pela vista do todos contra todos continua gravando: o K.O. pode ser nela)
-    visivel: () => pista.aberta && (pista.caixa.camera.visible || pista.caixa.oculta),
-    objetos: () => arena.children.list.filter((o) => o.willRender?.(pista.caixa.camera)),
-    coracoes: () => pista.coracoes.map((c) => ({ sprite: c.sprite, x: c.x, y: c.y, ativo: c.ativo, cor: c.cor, j: c.jogador })),
-    limites: () => pista.caixa.limites,
-    borda: () => pista.caixa.retangulo.strokeColor,
-  }
-}
 
 // A caixa do duelo (bonus round), na câmera principal: os objetos do próprio
 // duelo e as partículas, com os dois corações de fora da foto

@@ -66,7 +66,7 @@ function recolorir(game, { numeros, textos }) {
   if (!numeros.size && !textos.size) return
   const trocar = (o) => {
     if (o.list) o.list.forEach(trocar) // containers
-    if (o.type === 'Text') {
+    if (o.type === 'Text' || o.type === 'TextoBitmap') {
       const nova = textos.get(String(o.style?.color ?? '').toLowerCase())
       if (nova) o.setColor(nova)
       return

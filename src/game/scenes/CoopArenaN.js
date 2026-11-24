@@ -1,10 +1,12 @@
 import Phaser from 'phaser'
+import { criarFiltroCaixas } from '../recorte.js'
 import { LARGURA, ALTURA, CENTRO_X, FONTE, CORES, TEXTO, corTexto, DESAFIO, NIVEIS, DIFICULDADES, TEMPOS } from '../constants.js'
 import Controles from '../controles.js'
 import { marcaDeAusencia, assinaturaDeAusencia, COR_AUSENCIA } from '../ausencia.js'
 import { abrirPausaOnline } from '../pausaOnline.js'
 import { tocar, musica, velocidadeMusica, tocarMusicaEspecial, voltarMusicaNormal, preCarregarMusica } from '../audio.js'
 import { debug } from '../debug.js'
+import { andarEsquiva } from '../passoFixo.js'
 import { PERSONAGENS } from '../data/personagens.js'
 import { CHEFES, nivelDoChefe } from '../coop/chefes/index.js'
 import { partyDe } from '../data/batalha.js'
@@ -267,6 +269,7 @@ class CoopArenaN extends Phaser.Scene {
       if (botao === 'A') this.apertarA()
       else if (botao === 'B') this.apertarB()
     })
+    this.filtrarCaixas = criarFiltroCaixas(this) // recorte.js: só os objetos novos de cada quadro
     this.events.on('postupdate', this.filtrarCaixas, this)
     if (import.meta.env.DEV) window.coopArena = this
     entrarNoJogo({ umJogador: true }) // sempre online: o meu buzzer e o meu HP vão a todo joystick deste PC
@@ -431,19 +434,6 @@ class CoopArenaN extends Phaser.Scene {
     this.status = this.add.text(MAO.x, 372, '', estilo(11, textoDaVaga(this.meu))).setOrigin(0.5).setDepth(40)
     this.dica = this.add.text(CENTRO_X, 462, '', { ...estilo(9, TEXTO.desabilitado), strokeThickness: 2 }).setOrigin(0.5).setDepth(40)
     this.infoQuadro = this.add.text(CENTRO_X, this.quadroCfg.campo.base + 2, '', estilo(9, TEXTO.normal)).setOrigin(0.5, 0).setDepth(40)
-  }
-
-  // As câmeras de recorte das caixas desenham tudo o que não foi ignorado (como na PvpArena)
-  filtrarCaixas() {
-    const caixas = this.caixasDeRecorte
-    if (!caixas?.length) return
-    const principal = this.cameras.main.id
-    let mascara = 0
-    for (const caixa of caixas) mascara |= caixa.camera.id
-    for (const o of this.children.list) {
-      if (o.cameraFilter & principal) continue
-      if ((o.cameraFilter & mascara) !== mascara) o.cameraFilter |= mascara
-    }
   }
 
   // ---------- utilidades ----------
@@ -1843,7 +1833,8 @@ class CoopArenaN extends Phaser.Scene {
       if (direcao === 'esquerda' || direcao === 'direita') this.moverCursor(direcao)
       this.atualizarRelogio(delta)
     }
-    this.atualizarPistas(delta)
+    // a esquiva anda em tiques fixos de 1/60 s, o desenho interpola (passoFixo.js)
+    andarEsquiva(this, delta, (dt) => this.atualizarPistas(dt), debug.acelerar)
     this.rede.atualizar(delta)
     // a cada ~250 ms: quem caiu da rede / voltou (cartão, personagem, coração)
     this.vigia = (this.vigia ?? 0) + deltaReal

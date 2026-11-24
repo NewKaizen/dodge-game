@@ -1,6 +1,8 @@
 import Phaser from 'phaser'
 import { LARGURA, ALTURA, CENTRO_X } from '../../constants.js'
 import { criarSorte, criarTextura, misturar, limitar } from './arteFundos.js'
+import { RES } from '../../resolucao.js'
+import { assar, assarRegiao, texturaAssada, trocarAssada } from '../../arte/assar.js'
 
 // CIDADE GRANDE: o skyline numa avenida, do fim da tarde até a noite (um ciclo de ~2 min:
 // dia -> entardecer -> noite -> volta). Camadas, de trás para a frente:
@@ -16,6 +18,18 @@ import { criarSorte, criarTextura, misturar, limitar } from './arteFundos.js'
 //   - um HELICÓPTERO que cruza o céu de vez em quando (luz vermelha piscando e, de noite,
 //     o facho do holofote), e a vinheta.
 // O miolo (atrás das caixas) é só céu e skyline: o movimento forte fica na avenida e nas bordas.
+//
+// DESEMPENHO (docs/desempenho.md, fase 1): era o fundo mais pesado (~17 a 23 mil comandos de Graphics
+// por quadro, ~6 mil só nas janelas, com uma string e um Map.get por janela por quadro). Agora:
+//   - o céu é a cor do topo (uma Image branca tingida) com um degradê branco assado por cima, tingido
+//     com a cor do horizonte: topo·(1-k) + horizonte·k é a mesma conta das 100 faixas;
+//   - as JANELAS ficam numa DynamicTexture por skyline: o nível de cada janela é a mesma conta de
+//     antes, e só as que mudaram de nível (em degraus de 1/NIVEIS) são repintadas nela;
+//   - as janelas que apagam/acendem sozinhas guardam o estado no próprio objeto (sem string nem Map
+//     por quadro); estrelas, vapor e nuvens são Images; carros, postes, semáforos e o helicóptero
+//     são desenhos assados (o que muda com a noite, as luzes, continua num Graphics pequeno).
+const NIVEIS = 40 // degraus do acender de uma janela (2 % de alpha cada)
+const QUADROS_ROTOR = 8 // o rotor do helicóptero: sin(t/22) em QUADROS_ROTOR níveis
 
 const CICLO_MS = 120000
 const CHAO = 296 // topo da avenida
@@ -212,6 +226,101 @@ function texturaVinheta(scene) {
   })
 }
 
+// o degradê do céu: as 100 faixas de antes, em branco com alpha k^1.6 (k = faixa / 99). Cada linha
+// de pixel leva a faixa que era pintada por último em cima dela (as faixas se sobrepunham 1 px)
+function texturaDegrade(scene) {
+  return criarTextura(scene, 'arena-cidade-degrade', 4, CHAO, (g) => {
+    for (let y = 0; y < CHAO; y++) {
+      const i = Math.min(99, Math.floor(((y + 0.5) * 100) / CHAO))
+      g.fillStyle = `rgba(255,255,255,${(i / 99) ** 1.6})`
+      g.fillRect(0, y, 4, 1)
+    }
+  })
+}
+
+// As janelas de um skyline numa DynamicTexture: a cada quadro o nível de cada janela é a mesma conta
+// de antes (acende com a noite, algumas tremem, algumas apagam/acendem sozinhas: j.extra); só as que
+// mudaram de degrau (NIVEIS) são repintadas (limpa o retângulo e pinta com o alpha novo). Sem
+// textura, o Graphics de sempre.
+function camadaDeJanelas(scene, chave, predios, escala) {
+  const janelas = predios.flatMap((b) => b.janelas)
+  const nivelDe = (j, noite, t) => {
+    // acende quando a noite passa do limite dela; algumas tremem
+    let nivel = limitar((noite - j.th * 0.8) * 6, 0, 1)
+    if (j.pisca && noite > 0.7) nivel *= Math.sin(t / 700 + j.x) > -0.2 ? 1 : 0.1
+    if (j.extra !== undefined && noite > 0.6) nivel = j.extra
+    return nivel
+  }
+  const e = RES.escala
+  const nome = `${chave}@${e}`
+  const w = Math.ceil(LARGURA * e)
+  const h = Math.ceil(CHAO * e)
+  let dt = scene.textures.exists(nome) ? scene.textures.get(nome) : scene.textures.addDynamicTexture?.(nome, w, h)
+  if (!dt?.fill) {
+    const g = scene.add.graphics()
+    return {
+      objeto: g,
+      atualizar(noite, t) {
+        g.clear()
+        for (const j of janelas) {
+          const nivel = nivelDe(j, noite, t)
+          if (nivel <= 0.02) continue
+          g.fillStyle(j.quente ? 0xffd070 : 0xa8e0ff, 0.85 * nivel * escala)
+          g.fillRect(j.x, j.y, j.w, j.h)
+        }
+      },
+    }
+  }
+  dt.clear()
+  dt.render()
+  // o retângulo de cada janela em pixels da textura (a regra do raster: os centros de pixel dentro dele)
+  for (const j of janelas) {
+    const x0 = Math.round(j.x * e)
+    const y0 = Math.round(j.y * e)
+    j.px = [x0, y0, Math.round((j.x + j.w) * e) - x0, Math.round((j.y + j.h) * e) - y0]
+    j.q = 0
+  }
+  const objeto = scene.add.image(0, 0, nome).setOrigin(0).setDisplaySize(w / e, h / e)
+  return {
+    objeto,
+    atualizar(noite, t) {
+      let mudou = false
+      for (const j of janelas) {
+        const nivel = nivelDe(j, noite, t)
+        const q = nivel <= 0.02 ? 0 : Math.max(1, Math.round(nivel * NIVEIS))
+        if (q === j.q) continue
+        j.q = q
+        mudou = true
+        const [x, y, lw, lh] = j.px
+        dt.clear(x, y, lw, lh)
+        if (q) dt.fill(j.quente ? 0xffd070 : 0xa8e0ff, 0.85 * (q / NIVEIS) * escala, x, y, lw, lh)
+      }
+      if (mudou) dt.render()
+    },
+  }
+}
+
+// um carro em (x, y): sombra, corpo, janelas, rodas, farol e lanterna (d: sentido; frenando: lanterna acesa)
+function pintarCarro(g, c, d, comp, frenando, x = 0, y = 0) {
+  g.fillStyle(0x000000, 0.35)
+  g.fillEllipse(x, y + 5, comp + 2, 4)
+  g.fillStyle(c.cor, 1)
+  g.fillRoundedRect(x - comp / 2, y - 6, comp, c.tipo === 'onibus' ? 11 : 8, 2.5)
+  if (c.tipo === 'carro') g.fillRoundedRect(x - comp * 0.3 + d * -1, y - 10, comp * 0.55, 6, 2)
+  g.fillStyle(0x16202e, 0.9)
+  if (c.tipo === 'onibus') for (let k = 0; k < 5; k++) g.fillRect(x - comp / 2 + 3 + k * 7, y - 4, 5, 4)
+  else g.fillRect(x - comp * 0.24 - d * 0, y - 9, comp * 0.4, 4)
+  g.fillStyle(0x08080c, 1)
+  g.fillCircle(x - comp * 0.3, y + 3, 2.2)
+  g.fillCircle(x + comp * 0.3, y + 3, 2.2)
+  const faroX = x + d * (comp / 2)
+  const lanX = x - d * (comp / 2)
+  g.fillStyle(0xfff4c0, 1)
+  g.fillRect(faroX - (d > 0 ? 1.5 : 0), y - 3, 1.5, 2.5)
+  g.fillStyle(frenando ? 0xff4040 : 0xc02020, 1)
+  g.fillRect(lanX - (d > 0 ? 0 : 1.5), y - 3, 1.5, 2.5)
+}
+
 export default function cidade(scene, objetos) {
   const add = (o) => {
     objetos.push(o)
@@ -221,30 +330,76 @@ export default function cidade(scene, objetos) {
   const sorte = Math.random
   const brilho = texturaBrilho(scene)
 
-  // céu (faixas), sol, lua, estrelas
-  const gCeu = add(scene.add.graphics())
+  // céu: o topo (branco tingido) e, por cima, o degradê das 100 faixas (alpha k^1.6) tingido com o horizonte
+  const ceuTopo = add(scene.add.image(0, 0, '__WHITE').setOrigin(0).setDisplaySize(LARGURA, CHAO))
+  const ceuGrad = add(scene.add.image(0, 0, texturaDegrade(scene)).setOrigin(0).setDisplaySize(LARGURA, CHAO))
+  const ceuChao = add(scene.add.image(0, CHAO, '__WHITE').setOrigin(0).setDisplaySize(LARGURA, ALTURA - CHAO))
   const estrelas = Array.from({ length: 70 }, (_, i) => ({ x: (i * 211) % LARGURA, y: 60 + ((i * 97) % 190), f: i * 1.9 }))
-  const gEstrelas = add(scene.add.graphics())
+  for (const e of estrelas) e.img = add(scene.add.image(e.x, e.y, '__WHITE').setOrigin(0).setDisplaySize(1.5, 1.5).setVisible(false))
   const sol = add(scene.add.image(CENTRO_X + 40, 200, brilho).setDisplaySize(260, 260).setBlendMode(ADD).setTint(0xffd890))
   const solNucleo = add(scene.add.image(CENTRO_X + 40, 200, brilho).setDisplaySize(64, 64).setBlendMode(ADD).setTint(0xfff4d0))
   const lua = add(scene.add.circle(CENTRO_X - 120, 120, 17, 0xf0f0e0).setAlpha(0))
   const luaHalo = add(scene.add.image(CENTRO_X - 120, 120, brilho).setDisplaySize(120, 120).setBlendMode(ADD).setTint(0xb8c8ff).setAlpha(0))
-  const gNuvens = add(scene.add.graphics())
   const nuvens = Array.from({ length: 7 }, (_, i) => ({ x: i * 130, y: 78 + (i % 4) * 34, w: 70 + (i % 3) * 36, v: 3 + (i % 4) * 1.6 }))
+  // cada nuvem: as duas elipses brancas (alpha 0,4) assadas; a cor do entardecer é a tinta
+  for (const n of nuvens) {
+    const desenhar = (g) => {
+      g.fillStyle(0xffffff, 0.4)
+      g.fillEllipse(0, 0, n.w, 11)
+      g.fillEllipse(14, -4, n.w * 0.6, 9)
+    }
+    n.img = assar(scene, `cidade-nuvem-${n.w}`, n.w + 30, 24, desenhar)
+    if (n.img) add(n.img)
+    else {
+      n.g = add(scene.add.graphics())
+      desenhar(n.g)
+    }
+  }
 
   // skyline
   const longe = add(scene.add.image(0, 0, texturaSkyline(scene, 'arena-cidade-longe', LONGE, { base: '#7c88ac', topoCor: '#a8b4d4', detalhe: '#7a84a4' })).setOrigin(0))
   const prediosLonge = construirPredios(LONGE.semente, LONGE)
-  const gJanelasLonge = add(scene.add.graphics())
+  const jLonge = camadaDeJanelas(scene, 'arena-cidade-janelas-longe', prediosLonge, 0.7)
+  add(jLonge.objeto)
   const perto = add(scene.add.image(0, 0, texturaSkyline(scene, 'arena-cidade-perto', PERTO, { base: '#383c58', topoCor: '#5a6088', detalhe: '#4a4e6c' })).setOrigin(0))
   const prediosPerto = construirPredios(PERTO.semente, PERTO)
-  const gJanelas = add(scene.add.graphics())
+  const jPerto = camadaDeJanelas(scene, 'arena-cidade-janelas-perto', prediosPerto, 1)
+  add(jPerto.objeto)
+  // as janelas que apagam/acendem sozinhas de noite: a chave numérica (x, y) acha as janelas das duas
+  // camadas com essas coordenadas (como a chave `${x},${y}` de antes), uma vez só
+  const porChave = new Map()
+  for (const b of [...prediosLonge, ...prediosPerto]) {
+    for (const j of b.janelas) {
+      j.chave = j.x * 1024 + j.y
+      j.extra = undefined
+      if (!porChave.has(j.chave)) porChave.set(j.chave, [])
+      porChave.get(j.chave).push(j)
+    }
+  }
   const frente = add(scene.add.image(0, 0, texturaFrente(scene)).setOrigin(0))
   const gOutdoor = add(scene.add.graphics())
   const brilhoHorizonte = add(scene.add.image(CENTRO_X, CHAO - 10, brilho).setDisplaySize(900, 140).setBlendMode(ADD).setTint(0xff8a50).setAlpha(0.3))
 
   // postes de luz ao longo da calçada
   const postes = Array.from({ length: 9 }, (_, i) => ({ x: 40 + i * 100 }))
+  // as partes paradas dos postes e dos semáforos (assadas); as lâmpadas acesas e os carros por cima
+  const fixos = assarRegiao(scene, 'cidade-postes', { x: 0, y: CHAO - 58, largura: LARGURA, altura: 60 }, (g) => {
+    for (const p of postes) {
+      g.fillStyle(0x2a2e3a, 1)
+      g.fillRect(p.x - 1, CHAO - 34, 2, 34)
+      g.fillRect(p.x - 1, CHAO - 34, 10, 2)
+    }
+    for (const x of [PARADA + 8, LARGURA - PARADA - 8]) {
+      g.fillStyle(0x20242e, 1)
+      g.fillRect(x - 1, CHAO - 40, 3, 40)
+      g.fillStyle(0x0c0e14, 1)
+      g.fillRoundedRect(x - 5, CHAO - 56, 11, 30, 3)
+    }
+  })
+  if (fixos) add(fixos)
+  // os carros: uma Image por carro, logo antes do Graphics da avenida (as luzes ficam por cima);
+  // o carro que dá a volta troca de cor e tamanho: troca a textura
+  const imagensCarros = []
   const gAvenida = add(scene.add.graphics())
 
   // carros
@@ -255,8 +410,28 @@ export default function cidade(scene, objetos) {
   })
   const ciclistas = [{ x: 100, v: 38, cor: 0xff5a5a }, { x: 520, v: -30, cor: 0x5ad0ff }, { x: 760, v: 44, cor: 0xffd23a }]
   const pedestres = Array.from({ length: 9 }, (_, i) => ({ x: (i * 97) % LARGURA, v: (i % 2 ? -1 : 1) * (14 + (i % 3) * 6), camada: i % 3, fase: i * 1.7, cor: CORES_CARRO[i % CORES_CARRO.length] }))
+  carros.forEach((c) => {
+    const img = assar(scene, 'cidade-carro-carro-20', 52, 26, (g) => pintarCarro(g, { tipo: 'carro', cor: CORES_CARRO[0] }, 1, 20, false))
+    if (img) {
+      add(img.setVisible(false))
+      scene.children.moveBelow(img, gAvenida)
+    }
+    imagensCarros.push(img)
+  })
+  const imagemDoCarro = new Map(carros.map((c, i) => [c, imagensCarros[i]]))
+  function desenharCarro(g, c, x, y, d, comp, frenando) {
+    const img = imagemDoCarro.get(c)
+    if (!img) return pintarCarro(g, c, d, comp, frenando, x, y)
+    trocarAssada(img, scene, `cidade-carro-${c.tipo}-${comp}-${c.cor}-${d}-${frenando ? 1 : 0}`, 52, 26, (p) => pintarCarro(p, c, d, comp, frenando))
+    img.setVisible(true).setPosition(x, y)
+  }
   const gHelicoptero = add(scene.add.graphics())
+  const heli = assar(scene, 'cidade-heli-0-0', 70, 34, (g) => pintarHelicoptero(g, -1, false))
+  if (heli) add(heli.setVisible(false))
   const gVapor = add(scene.add.graphics())
+  const vaporDisco = texturaAssada(scene, 'cidade-vapor', 32, 32, (g) => g.fillStyle(0xffffff, 1).fillCircle(0, 0, 16), { folga: 0 })
+  const vapores = vaporDisco ? Array.from({ length: 5 }, () => add(scene.add.image(0, 0, vaporDisco).setTint(0xe8e0f0).setVisible(false))) : []
+  const escalaVapor = vapores[0]?.scaleX ?? 1
 
   add(scene.add.image(0, 0, texturaVinheta(scene)).setOrigin(0))
 
@@ -267,23 +442,15 @@ export default function cidade(scene, objetos) {
   }
 
   let ultimaPisca = 0
-  const estadoJanelas = new Map()
-
-  const desenharJanelas = (g, predios, noite, t, escala) => {
-    g.clear()
-    for (const b of predios) {
-      for (const j of b.janelas) {
-        // acende quando a noite passa do limite dela; algumas tremem
-        let nivel = limitar((noite - j.th * 0.8) * 6, 0, 1)
-        if (j.pisca && noite > 0.7) nivel *= Math.sin(t / 700 + j.x) > -0.2 ? 1 : 0.1
-        const chave = `${j.x},${j.y}`
-        const extra = estadoJanelas.get(chave)
-        if (extra !== undefined && noite > 0.6) nivel = extra
-        if (nivel <= 0.02) continue
-        g.fillStyle(j.quente ? 0xffd070 : 0xa8e0ff, 0.85 * nivel * escala)
-        g.fillRect(j.x, j.y, j.w, j.h)
-      }
-    }
+  // as janelas que apagaram/acenderam sozinhas (no máximo 40: sai a mais antiga), em ordem de chegada
+  const estadoJanelas = new Map() // chave numérica -> 0 | 1
+  const marcarJanela = (chave, valor) => {
+    estadoJanelas.set(chave, valor)
+    for (const j of porChave.get(chave) ?? []) j.extra = valor
+  }
+  const soltarJanela = (chave) => {
+    estadoJanelas.delete(chave)
+    for (const j of porChave.get(chave) ?? []) j.extra = undefined
   }
 
   const desenharOutdoor = (g, t, noite) => {
@@ -336,9 +503,11 @@ export default function cidade(scene, objetos) {
     g.clear()
     // postes
     for (const p of postes) {
-      g.fillStyle(0x2a2e3a, 1)
-      g.fillRect(p.x - 1, CHAO - 34, 2, 34)
-      g.fillRect(p.x - 1, CHAO - 34, 10, 2)
+      if (!fixos) {
+        g.fillStyle(0x2a2e3a, 1)
+        g.fillRect(p.x - 1, CHAO - 34, 2, 34)
+        g.fillRect(p.x - 1, CHAO - 34, 10, 2)
+      }
       const luz = limitar((noite - 0.35) * 3, 0, 1)
       g.fillStyle(luz > 0.05 ? 0xffe8a0 : 0x8a8e98, 1)
       g.fillRect(p.x + 7, CHAO - 33, 5, 3)
@@ -352,10 +521,12 @@ export default function cidade(scene, objetos) {
     // semáforos (um para cada sentido), nas calçadas do meio
     const estado = semaforo(t)
     for (const x of [PARADA + 8, LARGURA - PARADA - 8]) {
-      g.fillStyle(0x20242e, 1)
-      g.fillRect(x - 1, CHAO - 40, 3, 40)
-      g.fillStyle(0x0c0e14, 1)
-      g.fillRoundedRect(x - 5, CHAO - 56, 11, 30, 3)
+      if (!fixos) {
+        g.fillStyle(0x20242e, 1)
+        g.fillRect(x - 1, CHAO - 40, 3, 40)
+        g.fillStyle(0x0c0e14, 1)
+        g.fillRoundedRect(x - 5, CHAO - 56, 11, 30, 3)
+      }
       const luz = (dy, ligada, cor) => {
         g.fillStyle(ligada ? cor : 0x2a2a30, 1)
         g.fillCircle(x, CHAO - 50 + dy, 3)
@@ -433,26 +604,12 @@ export default function cidade(scene, objetos) {
         const y = f.y
         const d = f.dir
         const comp = c.len
-        // sombra, corpo, janelas, rodas
-        g.fillStyle(0x000000, 0.35)
-        g.fillEllipse(x, y + 5, comp + 2, 4)
-        g.fillStyle(c.cor, 1)
-        g.fillRoundedRect(x - comp / 2, y - 6, comp, c.tipo === 'onibus' ? 11 : 8, 2.5)
-        if (c.tipo === 'carro') g.fillRoundedRect(x - comp * 0.3 + d * -1, y - 10, comp * 0.55, 6, 2)
-        g.fillStyle(0x16202e, 0.9)
-        if (c.tipo === 'onibus') for (let k = 0; k < 5; k++) g.fillRect(x - comp / 2 + 3 + k * 7, y - 4, 5, 4)
-        else g.fillRect(x - comp * 0.24 - d * 0, y - 9, comp * 0.4, 4)
-        g.fillStyle(0x08080c, 1)
-        g.fillCircle(x - comp * 0.3, y + 3, 2.2)
-        g.fillCircle(x + comp * 0.3, y + 3, 2.2)
-        // faróis (frente) e lanternas (trás): somam luz à noite e quando freia
+        // o carro (sombra, corpo, janelas, rodas, farol e lanterna) é um desenho assado por tipo,
+        // tamanho, cor, sentido e freio; as luzes da noite (faróis e lanternas) ficam no Graphics
         const frenando = c.v < f.v * 0.5
         const faroX = x + d * (comp / 2)
         const lanX = x - d * (comp / 2)
-        g.fillStyle(0xfff4c0, 1)
-        g.fillRect(faroX - (d > 0 ? 1.5 : 0), y - 3, 1.5, 2.5)
-        g.fillStyle(frenando ? 0xff4040 : 0xc02020, 1)
-        g.fillRect(lanX - (d > 0 ? 0 : 1.5), y - 3, 1.5, 2.5)
+        desenharCarro(g, c, x, y, d, comp, frenando)
         if (noite > 0.25) {
           g.fillStyle(0xfff0b0, 0.16 * noite * 1.4)
           g.fillTriangle(faroX, y - 2, faroX + d * 46, y - 8, faroX + d * 46, y + 6)
@@ -471,7 +628,10 @@ export default function cidade(scene, objetos) {
     g.clear()
     const ciclo = 30000
     const c = (t - 6000) % ciclo
-    if (t < 6000 || c > 11000) return
+    if (t < 6000 || c > 11000) {
+      heli?.setVisible(false)
+      return
+    }
     const k = c / 11000
     const x = -30 + k * (LARGURA + 60)
     const y = 92 + Math.sin(k * 6) * 5
@@ -480,19 +640,35 @@ export default function cidade(scene, objetos) {
       g.fillStyle(0xdde8ff, 0.14 * limitar((noite - 0.45) * 3, 0, 1))
       g.fillTriangle(x + 6, y + 6, x - 22 + Math.sin(t / 900) * 24, CHAO + 40, x + 44 + Math.sin(t / 900) * 24, CHAO + 40)
     }
+    const giro = Math.sin(t / 22)
+    const pisca = Math.sin(t / 200) > 0.4
+    if (heli) {
+      // o corpo assado: o rotor em QUADROS_ROTOR posições e a luz piscando (ligada/desligada)
+      const q = Math.round(((giro + 1) / 2) * (QUADROS_ROTOR - 1))
+      trocarAssada(heli, scene, `cidade-heli-${q}-${pisca ? 1 : 0}`, 70, 34, (p) => pintarHelicoptero(p, -1 + (q / (QUADROS_ROTOR - 1)) * 2, pisca))
+      heli.setVisible(true).setPosition(x, y)
+      return
+    }
+    g.translateCanvas(x, y)
+    pintarHelicoptero(g, giro, pisca)
+    g.translateCanvas(-x, -y)
+  }
+
+  // o helicóptero em volta de (0, 0): corpo, cauda, rotor (giro de -1 a 1) e as luzes
+  function pintarHelicoptero(g, giro, pisca) {
+    const x = 0
+    const y = 0
     g.fillStyle(0x15181f, 1)
     g.fillEllipse(x, y, 26, 11)
     g.fillRect(x - 24, y - 2, 18, 3) // cauda
     g.fillRect(x - 24, y - 7, 3, 8)
     g.fillRect(x - 1, y - 8, 2, 3) // mastro
-    const giro = Math.sin(t / 22)
     g.lineStyle(2, 0x2a2e3a, 0.9)
     g.lineBetween(x - 20 * giro, y - 9, x + 20 * giro, y - 9)
     g.lineStyle(1, 0x15181f, 1)
     g.lineBetween(x - 8, y + 8, x + 8, y + 8)
     g.fillStyle(0x6ab0e0, 0.85)
     g.fillEllipse(x + 6, y - 1, 9, 6)
-    const pisca = Math.sin(t / 200) > 0.4
     g.fillStyle(0xff3030, pisca ? 1 : 0.2)
     g.fillCircle(x - 24, y - 8, 2)
     if (pisca) {
@@ -510,18 +686,12 @@ export default function cidade(scene, objetos) {
       const t = estado.tempo
       const noite = horaDo(t)
 
-      // céu: faixas de degradê entre o topo e o horizonte
-      gCeu.clear()
+      // céu: o topo e o degradê do horizonte por cima (a mesma mistura das 100 faixas)
       const topo = paleta(noite, 0)
       const horiz = paleta(noite, 1)
-      const faixas = 100
-      for (let i = 0; i < faixas; i++) {
-        const k = i / (faixas - 1)
-        gCeu.fillStyle(misturar(topo, horiz, k ** 1.6), 1)
-        gCeu.fillRect(0, (i * CHAO) / faixas, LARGURA, CHAO / faixas + 1)
-      }
-      gCeu.fillStyle(misturar(horiz, 0x0a0a14, 0.5), 1)
-      gCeu.fillRect(0, CHAO, LARGURA, ALTURA - CHAO)
+      ceuTopo.setTint(topo)
+      ceuGrad.setTint(horiz)
+      ceuChao.setTint(misturar(horiz, 0x0a0a14, 0.5))
 
       // sol desce atrás do skyline; lua e estrelas aparecem
       const solY = 150 + noite * 190
@@ -530,23 +700,18 @@ export default function cidade(scene, objetos) {
       const luaA = limitar((noite - 0.55) * 2.4, 0, 1)
       lua.setAlpha(luaA).setPosition(CENTRO_X - 130, 130 - noite * 18)
       luaHalo.setAlpha(luaA * 0.5).setPosition(CENTRO_X - 130, 130 - noite * 18)
-      gEstrelas.clear()
       const ea = limitar((noite - 0.55) * 2.2, 0, 1)
-      if (ea > 0) {
-        for (const e of estrelas) {
-          gEstrelas.fillStyle(0xffffff, ea * (0.5 + 0.5 * Math.sin(t / 600 + e.f)))
-          gEstrelas.fillRect(e.x, e.y, 1.5, 1.5)
-        }
+      for (const e of estrelas) {
+        e.img.setVisible(ea > 0)
+        if (ea > 0) e.img.setAlpha(ea * (0.5 + 0.5 * Math.sin(t / 600 + e.f)))
       }
       // nuvens com a cor do entardecer
-      gNuvens.clear()
       const corNuvem = misturar(misturar(0xffffff, 0xff9a6a, limitar(noite * 2, 0, 1)), 0x2a3a6a, limitar(noite * 2 - 1, 0, 1))
       for (const n of nuvens) {
         n.x += (n.v * dt) / 1000
         if (n.x > LARGURA + n.w) n.x = -n.w
-        gNuvens.fillStyle(corNuvem, 0.4)
-        gNuvens.fillEllipse(n.x, n.y, n.w, 11)
-        gNuvens.fillEllipse(n.x + 14, n.y - 4, n.w * 0.6, 9)
+        if (n.img) n.img.setPosition(n.x, n.y).setTint(corNuvem)
+        else n.g.setPosition(n.x, n.y)
       }
 
       // os prédios pegam a cor da hora
@@ -562,24 +727,30 @@ export default function cidade(scene, objetos) {
         for (let k = 0; k < 3; k++) {
           const b = prediosPerto[Math.floor(sorte() * prediosPerto.length)]
           const j = b.janelas[Math.floor(sorte() * b.janelas.length)]
-          if (j) estadoJanelas.set(`${j.x},${j.y}`, sorte() < 0.5 ? 0 : 1)
+          if (j) marcarJanela(j.chave, sorte() < 0.5 ? 0 : 1)
         }
-        if (estadoJanelas.size > 40) estadoJanelas.delete(estadoJanelas.keys().next().value)
+        if (estadoJanelas.size > 40) soltarJanela(estadoJanelas.keys().next().value)
       }
-      desenharJanelas(gJanelasLonge, prediosLonge, noite, t, 0.7)
-      desenharJanelas(gJanelas, prediosPerto, noite, t, 1)
+      jLonge.atualizar(noite, t)
+      jPerto.atualizar(noite, t)
       desenharOutdoor(gOutdoor, t, noite)
       desenharAvenida(t, noite, dt)
       desenharHelicoptero(t, noite)
 
       // fumaça saindo de bueiros na avenida
       gVapor.clear()
-      for (const f of fumacas.slice(0, 5)) {
+      for (let i = 0; i < 5; i++) {
+        const f = fumacas[i]
         f.idade += dt
         if (f.idade > f.vida) f.idade -= f.vida
         const u = f.idade / f.vida
-        gVapor.fillStyle(0xe8e0f0, 0.14 * (1 - u))
-        gVapor.fillCircle(f.x + Math.sin(f.idade / 500) * 5, CHAO + 54 - u * 22, 4 + u * 9)
+        const x = f.x + Math.sin(f.idade / 500) * 5
+        const r = 4 + u * 9
+        if (vapores[i]) vapores[i].setVisible(true).setPosition(x, CHAO + 54 - u * 22).setScale(escalaVapor * (r / 16)).setAlpha(0.14 * (1 - u))
+        else {
+          gVapor.fillStyle(0xe8e0f0, 0.14 * (1 - u))
+          gVapor.fillCircle(x, CHAO + 54 - u * 22, r)
+        }
       }
     },
   }

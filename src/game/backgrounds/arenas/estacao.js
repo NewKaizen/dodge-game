@@ -520,7 +520,8 @@ export default function estacao(scene, objetos) {
     { n: 40, vel: 8, tam: 1.5, alpha: 0.75 },
     { n: 18, vel: 20, tam: 2, alpha: 0.95 },
   ].map((c) => ({ ...c, estrelas: Array.from({ length: c.n }, () => ({ x: sorte() * LARGURA, y: 58 + sorte() * (ALTURA - 100), fase: sorte() * 6.28, cor: sorte() < 0.15 ? 0xffd8a0 : sorte() < 0.3 ? 0xa8c8ff : 0xffffff })) }))
-  const gEstrelas = add(scene.add.graphics())
+  // (Images: antes um Graphics redesenhado a cada quadro; docs/desempenho.md, fase 1)
+  for (const c of camadas) for (const e of c.estrelas) e.img = add(scene.add.image(0, 0, '__WHITE').setOrigin(0).setDisplaySize(c.tam, c.tam).setTint(e.cor))
 
   // o Sol: clarão no canto de cima (pulsa devagar) com um reflexo comprido
   const sol = add(scene.add.image(SOL.x, SOL.y, texturaBrilho(scene)).setDisplaySize(360, 360).setBlendMode(ADD).setTint(0xffe8b0).setAlpha(0.55))
@@ -547,8 +548,15 @@ export default function estacao(scene, objetos) {
 
   // a estrutura e as luzes
   add(scene.add.image(0, 0, texturaEstrutura(scene)).setOrigin(0))
-  const gLuzes = add(scene.add.graphics())
+  // os LEDs dos consoles: o retângulo e o halo de cada um são Images (na ordem de antes: led, halo,
+  // led, halo...); o osciloscópio e a luz da comporta continuam num Graphics pequeno por cima
   const ledEstado = [...LEDS_DIREITA, ...LEDS_BAIXO].map((p, i) => ({ ...p, periodo: 500 + ((i * 337) % 1700), fase: (i * 911) % 2000, cor: CORES_LED[i % CORES_LED.length] }))
+  for (const l of ledEstado) {
+    l.img = add(scene.add.image(l.x, l.y, '__WHITE').setOrigin(0).setDisplaySize(5, 3).setTint(l.cor))
+    l.halo = add(scene.add.image(l.x - 2, l.y - 2, '__WHITE').setOrigin(0).setDisplaySize(9, 7).setTint(l.cor).setAlpha(0.16))
+    l.ligada = null
+  }
+  const gLuzes = add(scene.add.graphics())
   add(scene.add.image(0, 0, texturaVinheta(scene)).setOrigin(0))
 
   const desenharTerra = (tempo) => {
@@ -568,14 +576,12 @@ export default function estacao(scene, objetos) {
       raioSol.setAlpha(0.2 + 0.05 * Math.sin(t / 1300))
 
       // estrelas: correm para a esquerda (a estação anda) e piscam
-      gEstrelas.clear()
       for (const c of camadas) {
         for (const e of c.estrelas) {
           e.x -= (c.vel * dt) / 1000
           if (e.x < -2) e.x += LARGURA + 4
           const piscar = 0.6 + 0.4 * Math.sin(t / (500 + c.vel * 30) + e.fase)
-          gEstrelas.fillStyle(e.cor, c.alpha * piscar)
-          gEstrelas.fillRect(Math.round(e.x), Math.round(e.y), c.tam, c.tam)
+          e.img.setPosition(Math.round(e.x), Math.round(e.y)).setAlpha(c.alpha * piscar)
         }
       }
 
@@ -611,12 +617,10 @@ export default function estacao(scene, objetos) {
       gLuzes.clear()
       for (const l of ledEstado) {
         const ligada = Math.floor((t + l.fase) / l.periodo) % 3 !== 0
-        gLuzes.fillStyle(l.cor, ligada ? 0.95 : 0.12)
-        gLuzes.fillRect(l.x, l.y, 5, 3)
-        if (ligada) {
-          gLuzes.fillStyle(l.cor, 0.16)
-          gLuzes.fillRect(l.x - 2, l.y - 2, 9, 7)
-        }
+        if (ligada === l.ligada) continue
+        l.ligada = ligada
+        l.img.setAlpha(ligada ? 0.95 : 0.12)
+        l.halo.setVisible(ligada)
       }
       // osciloscópio do painel: duas ondas verdes correndo
       gLuzes.lineStyle(1.5, 0x40ff90, 0.9)

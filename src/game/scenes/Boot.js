@@ -7,6 +7,7 @@ import { IMAGENS_SUPER, SONS_SUPER } from '../pvp/super/sprites/index.js'
 import { IMAGENS_HABILIDADES, SONS_HABILIDADES } from '../pvp/habilidades/sprites/index.js'
 import { IMAGENS_MENU, SONS_MENU } from '../menu/sprites/index.js'
 import { instalarGraficos } from '../graficos.js'
+import { vigiarFps } from '../batata.js'
 
 // Carrega os arquivos dos manifestos, desenha por código o resto e espera a
 // fonte pixelada antes de começar
@@ -30,6 +31,7 @@ export default class Boot extends Phaser.Scene {
 
   async create() {
     instalarGraficos(this.game) // preferências de gráficos e modo daltônico (graficos.js)
+    vigiarFps(this.game) // a RESOLUÇÃO BATATA liga sozinha com o FPS baixo (batata.js)
     gerarTexturas(this)
     await carregarFonte()
     this.scene.start('Menu')

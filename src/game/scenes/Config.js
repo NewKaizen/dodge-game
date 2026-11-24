@@ -87,6 +87,11 @@ const opcaoPref = (chave) => ({
 const NOMES_TREMOR = { normal: 'NORMAL', reduzido: 'REDUZIDO', desligado: 'DESLIGADO' }
 const NOMES_DALTONISMO = { nenhum: 'NENHUM', protanopia: 'PROTANOPIA', deuteranopia: 'DEUTERANOPIA', tritanopia: 'TRITANOPIA' }
 const NOMES_GRAFICOS = { minimo: 'MÍNIMO', medio: 'MÉDIO', maximo: 'MÁXIMO' }
+const NOMES_RESOLUCAO = { normal: 'NORMAL', batata: 'BATATA' }
+const TEXTO_RESOLUCAO = {
+  normal: 'NORMAL: o jogo desenha na resolução da tela (texto e formas nítidos).',
+  batata: 'BATATA: desenha em 854x480 e amplia sem borrar, como um console antigo. Bem mais leve para a placa de vídeo de PCs e celulares fracos. Liga sozinha se o jogo ficar abaixo de 50 FPS.',
+}
 const NOMES_TOQUE = { auto: 'AUTOMÁTICO', sempre: 'SEMPRE', escondido: 'ESCONDIDOS' }
 const TEXTO_TOQUE = {
   auto: 'AUTOMÁTICO: aparecem sozinhos em celular e tablet (tela de toque); com mouse, nunca.',
@@ -496,6 +501,14 @@ const ABAS = [
         descricao: (v) => TEXTO_GRAFICOS[v],
       },
       {
+        id: 'resolucao',
+        rotulo: 'RESOLUÇÃO',
+        titulo: 'RESOLUÇÃO',
+        ...opcaoPref('resolucao'),
+        nomes: (v) => NOMES_RESOLUCAO[v],
+        descricao: (v) => TEXTO_RESOLUCAO[v],
+      },
+      {
         id: 'menu',
         rotulo: 'MENU INICIAL',
         titulo: 'MENU INICIAL',
@@ -507,8 +520,8 @@ const ABAS = [
         id: 'restaurar',
         rotulo: 'RESTAURAR PADRÃO',
         tipo: 'acao',
-        fazer: () => ['graficos', 'menu'].forEach((k) => definirPref(k, PREFERENCIAS_PADRAO[k])),
-        descricao: `Volta a qualidade para ${NOMES_GRAFICOS[PREFERENCIAS_PADRAO.graficos]} e o menu inicial para a ${NOMES_MENU[PREFERENCIAS_PADRAO.menu]}.`,
+        fazer: () => ['graficos', 'resolucao', 'menu'].forEach((k) => definirPref(k, PREFERENCIAS_PADRAO[k])),
+        descricao: `Volta a qualidade para ${NOMES_GRAFICOS[PREFERENCIAS_PADRAO.graficos]}, a resolução para ${NOMES_RESOLUCAO[PREFERENCIAS_PADRAO.resolucao]} e o menu inicial para a ${NOMES_MENU[PREFERENCIAS_PADRAO.menu]}.`,
       },
     ],
   },
